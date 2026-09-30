@@ -33,7 +33,7 @@ export function LoginPage() {
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-contrast">
             <Bot className="h-6 w-6" />
           </div>
-          <h1 className="text-lg font-semibold">AI Workspace</h1>
+          <h1 className="text-lg font-semibold">anemo</h1>
           <p className="text-[13px] text-muted">Sign in to continue</p>
         </div>
 

@@ -113,7 +113,7 @@ class OpenAIChatAdapter:
         self.is_openai = cfg.type == "openai"
         headers = dict(cfg.headers)
         if self.is_openrouter:
-            headers.setdefault("X-Title", "AI Workspace")
+            headers.setdefault("X-Title", "anemo")
         self.client = openai.AsyncOpenAI(
             base_url=cfg.base_url or None,
             api_key=cfg.api_key or "not-needed",  # local servers often need no key

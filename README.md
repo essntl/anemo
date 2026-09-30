@@ -1,6 +1,6 @@
-# AI Workspace
+# anemo
 
-A self-hosted, single-user AI workspace and agent operating environment: chat,
+**anemo** is a self-hosted, single-user AI workspace and agent operating environment: chat,
 autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
@@ -13,7 +13,7 @@ Docker Compose on a homelab.
 ## Quick start (homelab)
 
 ```bash
-git clone <this repo> ai-workspace && cd ai-workspace
+git clone https://github.com/essntl/anemo.git && cd anemo
 cp .env.example .env
 # edit .env: APP_SECRET_KEY, POSTGRES_PASSWORD, ADMIN_PASSWORD(_HASH), WORKSPACE_PATH
 docker compose up -d

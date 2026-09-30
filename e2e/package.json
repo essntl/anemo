@@ -1,5 +1,5 @@
 {
-  "name": "ai-workspace-e2e",
+  "name": "anemo-e2e",
   "private": true,
   "type": "module",
   "scripts": {

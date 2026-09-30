@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
     app = FastAPI(
-        title="AI Workspace",
+        title="anemo",
         version="0.1.0",
         lifespan=lifespan,
         docs_url="/api/docs" if settings.env != "production" else None,

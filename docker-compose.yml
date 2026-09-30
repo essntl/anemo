@@ -1,4 +1,4 @@
-# AI Workspace — production stack.
+# anemo — production stack.
 #   cp .env.example .env   (fill in the required values)
 #   docker compose up -d
 #

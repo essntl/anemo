@@ -1,4 +1,4 @@
-# Architecture — AI Workspace & Agent Operating Environment
+# Architecture — anemo (AI Workspace & Agent Operating Environment)
 
 ## Context
 

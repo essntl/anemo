@@ -58,7 +58,7 @@ export function Sidebar() {
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-accent-contrast">
           <Bot className="h-4.5 w-4.5" />
         </div>
-        <span className="text-[15px] font-semibold">AI Workspace</span>
+        <span className="text-[15px] font-semibold">anemo</span>
       </div>
 
       <div className="flex gap-2">
