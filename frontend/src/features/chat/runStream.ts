@@ -66,15 +66,28 @@ const EVENT_TYPES = [
   'run.model',
   'run.fallback',
   'run.restarted',
+  // Agent runs: the timeline itself is loaded from the API when these arrive.
+  'tool.started',
+  'tool.completed',
+  'tool.denied',
+  'approval.requested',
+  'approval.resolved',
+  'plan.updated',
 ]
 
 /** Subscribes to a run's events while `runId` is set. Calls `onFinished` once at the end. */
-export function useRunStream(runId: string | null, onFinished?: (view: RunView) => void): RunView {
+export function useRunStream(
+  runId: string | null,
+  onFinished?: (view: RunView) => void,
+  onEvent?: (event: RunEvent) => void,
+): RunView {
   const [view, dispatch] = useReducer(runReducer, initialRunView)
   // Kept in a ref so a new callback on re-render does not restart the stream.
   const finished = useRef(onFinished)
+  const eventHook = useRef(onEvent)
   useEffect(() => {
     finished.current = onFinished
+    eventHook.current = onEvent
   })
 
   useEffect(() => {
@@ -86,6 +99,7 @@ export function useRunStream(runId: string | null, onFinished?: (view: RunView) 
       const event: RunEvent = { type, data: JSON.parse(e.data) as Record<string, unknown> }
       state = runReducer(state, event)
       dispatch(event)
+      eventHook.current?.(event)
       if (type === 'run.status' && TERMINAL.includes(state.status)) {
         source.close()
         finished.current?.(state)

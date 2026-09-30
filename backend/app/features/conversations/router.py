@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Query
 
 from app.api.deps import Db
+from app.features.attachments import service as attachments
 from app.features.conversations import service
 from app.features.conversations.models import Conversation
 from app.features.conversations.schemas import (
@@ -65,7 +66,9 @@ async def update_conversation(
 
 @router.delete("/{conversation_id}", status_code=204)
 async def delete_conversation(conversation_id: uuid.UUID, db: Db) -> None:
-    await db.delete(await service.get_conversation(db, conversation_id))
+    conv = await service.get_conversation(db, conversation_id)
+    await attachments.delete_files_for_conversation(db, conv.id)
+    await db.delete(conv)
     await db.commit()
 
 
@@ -78,11 +81,13 @@ async def list_messages(conversation_id: uuid.UUID, db: Db) -> list[MessageOut]:
 @router.post("/{conversation_id}/turns", response_model=TurnOut, status_code=202)
 async def send_turn(conversation_id: uuid.UUID, body: TurnIn, db: Db) -> TurnOut:
     """Queues the answer; follow it live at GET /api/runs/{run_id}/events."""
-    run, user, assistant = await service.send_turn(db, conversation_id, body.text, body.model_id)
+    run, user, assistant, files = await service.send_turn(
+        db, conversation_id, body.text, body.model_id, body.attachment_ids, body.mode
+    )
     return TurnOut(
         run_id=run.id,
-        user_message=service.message_out(user),
-        assistant_message=service.message_out(assistant),
+        user_message=service.message_out(user, files),
+        assistant_message=service.message_out(assistant, mode=run.kind),
     )
 
 
@@ -92,5 +97,7 @@ async def regenerate(
 ) -> TurnOut:
     run, assistant = await service.regenerate(db, conversation_id, model_id)
     return TurnOut(
-        run_id=run.id, user_message=None, assistant_message=service.message_out(assistant)
+        run_id=run.id,
+        user_message=None,
+        assistant_message=service.message_out(assistant, mode=run.kind),
     )

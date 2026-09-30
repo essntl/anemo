@@ -8,6 +8,7 @@ Redis database 15. They are skipped automatically when no database is configured
 
 import asyncio
 import os
+import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -32,6 +33,8 @@ os.environ.update(
         "ADMIN_PASSWORD_HASH": PasswordHasher().hash(TEST_PASSWORD),
         "ADMIN_PASSWORD": "",
         "REDIS_URL": _redis_url,
+        "DATA_PATH": tempfile.mkdtemp(prefix="aiw-test-data-"),
+        "WORKSPACE_PATH": tempfile.mkdtemp(prefix="aiw-test-ws-") + "/workspace",
     }
 )
 if _base_db_url:

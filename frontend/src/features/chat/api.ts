@@ -57,11 +57,22 @@ function useApplyTurn() {
 export function useSendTurn() {
   const apply = useApplyTurn()
   return useMutation({
-    mutationFn: async (v: { conversationId: string; text: string; modelId: string | null }) =>
+    mutationFn: async (v: {
+      conversationId: string
+      text: string
+      modelId: string | null
+      attachmentIds?: string[]
+      mode?: 'chat' | 'agent'
+    }) =>
       unwrap(
         await api.POST('/api/conversations/{conversation_id}/turns', {
           params: { path: { conversation_id: v.conversationId } },
-          body: { text: v.text, model_id: v.modelId },
+          body: {
+            text: v.text,
+            model_id: v.modelId,
+            attachment_ids: v.attachmentIds ?? [],
+            mode: v.mode ?? 'chat',
+          },
         }),
       ),
     onSuccess: (turn, v) => apply(v.conversationId, turn),

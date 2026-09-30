@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import { Sparkles } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
+import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
 import { useSetupStatus } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
 import { conversationKey, conversationsKey, createConversation, messagesKey } from '../api'
@@ -15,10 +16,12 @@ export function NewChatPage() {
   const settings = useSettings()
   const setup = useSetupStatus()
   const [modelId, setModelId] = useState<string | null>(null)
+  const [modeOverride, setModeOverride] = useState<Mode | null>(null)
+  const mode: Mode = modeOverride ?? settings.data?.general.default_chat_mode ?? 'chat'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const start = async (text: string) => {
+  const start = async (text: string, attachmentIds: string[]) => {
     setBusy(true)
     setError(null)
     try {
@@ -26,7 +29,7 @@ export function NewChatPage() {
       const turn = unwrap(
         await api.POST('/api/conversations/{conversation_id}/turns', {
           params: { path: { conversation_id: conv.id } },
-          body: { text, model_id: modelId },
+          body: { text, model_id: modelId, attachment_ids: attachmentIds, mode },
         }),
       )
       // Seed the cache so the conversation page renders instantly and starts streaming.
@@ -62,7 +65,10 @@ export function NewChatPage() {
           disabled={busy || Boolean(needsSetup)}
           onSend={start}
           toolbar={
-            <ModelPicker value={modelId} defaultModelId={settings.data?.models.chat ?? null} onChange={setModelId} />
+            <>
+              <ModeSwitch mode={mode} onChange={setModeOverride} />
+              <ModelPicker value={modelId} defaultModelId={settings.data?.models.chat ?? null} onChange={setModelId} />
+            </>
           }
         />
       </div>

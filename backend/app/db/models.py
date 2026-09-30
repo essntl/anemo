@@ -4,6 +4,7 @@ When adding a feature with tables, import its models module here.
 """
 
 from app.db.base import Base
+from app.features.attachments import models as attachments_models
 from app.features.audit import models as audit_models
 from app.features.auth import models as auth_models
 from app.features.conversations import models as conversations_models
@@ -16,6 +17,7 @@ from app.jobs import models as jobs_models
 
 __all__ = [
     "Base",
+    "attachments_models",
     "audit_models",
     "auth_models",
     "conversations_models",

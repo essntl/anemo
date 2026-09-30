@@ -573,6 +573,65 @@
         }
       }
     },
+    "/api/settings/permissions": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Permissions Settings",
+        "operationId": "put_permissions_settings_api_settings_permissions_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -2234,6 +2293,520 @@
           }
         }
       }
+    },
+    "/api/attachments": {
+      "post": {
+        "tags": [
+          "attachments"
+        ],
+        "summary": "Upload",
+        "operationId": "upload_api_attachments_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_api_attachments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attachments/{attachment_id}/content": {
+      "get": {
+        "tags": [
+          "attachments"
+        ],
+        "summary": "Content",
+        "operationId": "content_api_attachments__attachment_id__content_get",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/timeline": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Timeline",
+        "operationId": "timeline_api_runs__run_id__timeline_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/approvals": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Approvals",
+        "operationId": "list_approvals_api_approvals_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "const": "pending",
+              "type": "string",
+              "default": "pending",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PendingApprovalOut"
+                  },
+                  "title": "Response List Approvals Api Approvals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/approvals/{approval_id}": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Decide",
+        "operationId": "decide_api_approvals__approval_id__post",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/permissions/catalog": {
+      "get": {
+        "tags": [
+          "permissions"
+        ],
+        "summary": "Catalog",
+        "operationId": "catalog_api_permissions_catalog_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/permissions/summary": {
+      "get": {
+        "tags": [
+          "permissions"
+        ],
+        "summary": "Summary",
+        "operationId": "summary_api_permissions_summary_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/permissions/preview": {
+      "post": {
+        "tags": [
+          "permissions"
+        ],
+        "summary": "Preview",
+        "description": "Summary for unsaved settings, so the settings page can show the effect live.",
+        "operationId": "preview_api_permissions_preview_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tools": {
+      "get": {
+        "tags": [
+          "permissions"
+        ],
+        "summary": "Tools",
+        "operationId": "tools_api_tools_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ToolOut"
+                  },
+                  "title": "Response Tools Api Tools Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2248,13 +2821,17 @@
           },
           "models": {
             "$ref": "#/components/schemas/ModelDefaults"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/PermissionSettings"
           }
         },
         "type": "object",
         "required": [
           "general",
           "appearance",
-          "models"
+          "models",
+          "permissions"
         ],
         "title": "AllSettings"
       },
@@ -2288,6 +2865,165 @@
         },
         "type": "object",
         "title": "AppearanceSettings"
+      },
+      "ApprovalOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "tool_call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tool Call Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "tool_call_id",
+          "status",
+          "scope",
+          "summary",
+          "reason",
+          "created_at",
+          "decided_at"
+        ],
+        "title": "ApprovalOut"
+      },
+      "AttachmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "extraction_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "mime",
+          "size",
+          "kind",
+          "extraction_note"
+        ],
+        "title": "AttachmentOut"
+      },
+      "AttachmentSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "kind",
+          "mime",
+          "size"
+        ],
+        "title": "AttachmentSummary"
       },
       "AuditOut": {
         "properties": {
@@ -2367,6 +3103,84 @@
           "details"
         ],
         "title": "AuditOut"
+      },
+      "Body_upload_api_attachments_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_api_attachments_post"
+      },
+      "CatalogOut": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryOut"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/LevelOut"
+            },
+            "type": "array",
+            "title": "Levels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "categories",
+          "levels"
+        ],
+        "title": "CatalogOut"
+      },
+      "CategoryOut": {
+        "properties": {
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "default_level": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "ask",
+              "ask_dangerous",
+              "workspace",
+              "autonomous"
+            ],
+            "title": "Default Level"
+          },
+          "workspace_scoped": {
+            "type": "boolean",
+            "title": "Workspace Scoped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capability",
+          "label",
+          "description",
+          "default_level",
+          "workspace_scoped"
+        ],
+        "title": "CategoryOut"
       },
       "ConversationIn": {
         "properties": {
@@ -2451,6 +3265,11 @@
             ],
             "title": "Active Run Id"
           },
+          "default_mode": {
+            "type": "string",
+            "title": "Default Mode",
+            "default": "chat"
+          },
           "snippet": {
             "anyOf": [
               {
@@ -2527,6 +3346,44 @@
         },
         "type": "object",
         "title": "ConversationPatch"
+      },
+      "DecisionIn": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "deny"
+            ],
+            "title": "Decision"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "once",
+              "run"
+            ],
+            "title": "Scope",
+            "default": "once"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "DecisionIn"
       },
       "DiscoveredModelOut": {
         "properties": {
@@ -2634,6 +3491,58 @@
           "model_keys"
         ],
         "title": "ImportModelsIn"
+      },
+      "LevelOut": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "ask",
+              "ask_dangerous",
+              "workspace",
+              "autonomous"
+            ],
+            "title": "Level"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "label"
+        ],
+        "title": "LevelOut"
+      },
+      "Limits": {
+        "properties": {
+          "max_steps": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "default": 25
+          },
+          "max_tool_calls": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 1.0,
+            "title": "Max Tool Calls",
+            "default": 100
+          },
+          "max_runtime_s": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 10.0,
+            "title": "Max Runtime S",
+            "default": 1800
+          }
+        },
+        "type": "object",
+        "title": "Limits"
       },
       "LoginIn": {
         "properties": {
@@ -2751,6 +3660,25 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentSummary"
+            },
+            "type": "array",
+            "title": "Attachments",
+            "default": []
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
           }
         },
         "type": "object",
@@ -3178,6 +4106,179 @@
         ],
         "title": "PasswordIn"
       },
+      "PendingApprovalOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "tool_call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tool Call Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "tool_call_id",
+          "status",
+          "scope",
+          "summary",
+          "reason",
+          "created_at",
+          "decided_at",
+          "conversation_id",
+          "tool_name"
+        ],
+        "title": "PendingApprovalOut"
+      },
+      "PermissionSettings": {
+        "properties": {
+          "levels": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "deny",
+                "ask",
+                "ask_dangerous",
+                "workspace",
+                "autonomous"
+              ]
+            },
+            "type": "object",
+            "title": "Levels"
+          },
+          "ceiling": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "deny",
+                "ask",
+                "ask_dangerous",
+                "workspace",
+                "autonomous"
+              ]
+            },
+            "type": "object",
+            "title": "Ceiling"
+          },
+          "extra_rules": {
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "type": "array",
+            "title": "Extra Rules"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/Limits"
+          }
+        },
+        "type": "object",
+        "title": "PermissionSettings",
+        "description": "Stored in app_settings[\"permissions\"] (security-sensitive section)."
+      },
+      "PermissionSummary": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps"
+          },
+          "max_tool_calls": {
+            "type": "integer",
+            "title": "Max Tool Calls"
+          },
+          "max_runtime_s": {
+            "type": "integer",
+            "title": "Max Runtime S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "max_steps",
+          "max_tool_calls",
+          "max_runtime_s"
+        ],
+        "title": "PermissionSummary"
+      },
       "ProviderIn": {
         "properties": {
           "name": {
@@ -3444,6 +4545,62 @@
         ],
         "title": "ProviderTypeOut"
       },
+      "Rule": {
+        "properties": {
+          "cap": {
+            "type": "string",
+            "title": "Cap",
+            "description": "Capability or pattern: \"fs.write\", \"fs.*\", \"mcp.github.*\""
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "ask",
+              "deny"
+            ],
+            "title": "Decision"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Scope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unless_risk": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "safe",
+                "moderate",
+                "dangerous"
+              ]
+            },
+            "type": "array",
+            "title": "Unless Risk"
+          },
+          "else": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "ask",
+              "deny"
+            ],
+            "title": "Else",
+            "default": "ask"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cap",
+          "decision"
+        ],
+        "title": "Rule"
+      },
       "RunOut": {
         "properties": {
           "id": {
@@ -3454,6 +4611,10 @@
           "kind": {
             "type": "string",
             "title": "Kind"
+          },
+          "step": {
+            "type": "integer",
+            "title": "Step"
           },
           "status": {
             "type": "string",
@@ -3541,6 +4702,7 @@
         "required": [
           "id",
           "kind",
+          "step",
           "status",
           "conversation_id",
           "assistant_message_id",
@@ -3551,6 +4713,20 @@
           "ended_at"
         ],
         "title": "RunOut"
+      },
+      "Scope": {
+        "properties": {
+          "roots": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roots"
+          }
+        },
+        "type": "object",
+        "title": "Scope",
+        "description": "Restricts a rule to workspace roots (top-level folders). \"*\" means any."
       },
       "SessionOut": {
         "properties": {
@@ -3630,6 +4806,67 @@
         ],
         "title": "SetupStatus"
       },
+      "SummaryItem": {
+        "properties": {
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "ask",
+              "ask_dangerous",
+              "workspace",
+              "autonomous"
+            ],
+            "title": "Level"
+          },
+          "level_label": {
+            "type": "string",
+            "title": "Level Label"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "allowed",
+              "partly",
+              "ask",
+              "never"
+            ],
+            "title": "Group"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capability",
+          "label",
+          "description",
+          "level",
+          "level_label",
+          "group",
+          "detail",
+          "available"
+        ],
+        "title": "SummaryItem"
+      },
       "TestResult": {
         "properties": {
           "ok": {
@@ -3670,6 +4907,240 @@
         ],
         "title": "TestResult"
       },
+      "TimelineOut": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCallOut"
+            },
+            "type": "array",
+            "title": "Tool Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "kind",
+          "status",
+          "plan",
+          "tool_calls"
+        ],
+        "title": "TimelineOut"
+      },
+      "ToolCallOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "step": {
+            "type": "integer",
+            "title": "Step"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          },
+          "actions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "result_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Data"
+          },
+          "is_error": {
+            "type": "boolean",
+            "title": "Is Error"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "step",
+          "position",
+          "tool_name",
+          "capability",
+          "args",
+          "actions",
+          "risk",
+          "decision",
+          "decision_reason",
+          "status",
+          "result",
+          "result_data",
+          "is_error",
+          "started_at",
+          "ended_at"
+        ],
+        "title": "ToolCallOut"
+      },
+      "ToolOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "capability"
+        ],
+        "title": "ToolOut"
+      },
       "TurnIn": {
         "properties": {
           "text": {
@@ -3689,6 +5160,24 @@
               }
             ],
             "title": "Model Id"
+          },
+          "attachment_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Attachment Ids"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "agent"
+            ],
+            "title": "Mode",
+            "default": "chat"
           }
         },
         "type": "object",

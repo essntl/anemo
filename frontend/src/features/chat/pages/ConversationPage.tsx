@@ -4,6 +4,9 @@ import { useParams } from 'react-router'
 import { Pin, PinOff } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
+import { timelineKey } from '@/features/agents/api'
+import { RunActivity } from '@/features/agents/components/RunActivity'
+import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
 import { useSettings } from '@/features/settings/api'
 import {
   type ChatMessage,
@@ -20,7 +23,7 @@ import {
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { ModelPicker } from '../components/ModelPicker'
-import { type RunView, useRunStream } from '../runStream'
+import { type RunEvent, type RunView, useRunStream } from '../runStream'
 
 /** Keeps the view pinned to the bottom while new text streams in, unless the user scrolled up. */
 function useStickToBottom(dep: unknown) {
@@ -53,6 +56,8 @@ export function ConversationPage() {
   const regenerate = useRegenerate()
   const update = useUpdateConversation()
   const [modelOverride, setModelOverride] = useState<string | null>(null)
+  const [modeOverride, setModeOverride] = useState<Mode | null>(null)
+  const mode: Mode = modeOverride ?? (conversation.data?.default_mode === 'agent' ? 'agent' : 'chat')
 
   const activeRunId = conversation.data?.active_run_id ?? null
   const modelId = modelOverride ?? conversation.data?.model_id ?? null
@@ -72,7 +77,12 @@ export function ConversationPage() {
     void qc.invalidateQueries({ queryKey: conversationKey(conversationId) })
     void qc.invalidateQueries({ queryKey: conversationsKey })
   }
-  const live = useRunStream(activeRunId, onFinished)
+  const onEvent = (event: RunEvent) => {
+    if (activeRunId && /^(tool|approval|plan)\./.test(event.type)) {
+      void qc.invalidateQueries({ queryKey: timelineKey(activeRunId) })
+    }
+  }
+  const live = useRunStream(activeRunId, onFinished, onEvent)
 
   // Whichever signal arrives first (this run's stream or the app-wide event),
   // make sure the finished message is reloaded once the run is no longer active.
@@ -108,7 +118,7 @@ export function ConversationPage() {
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
           {list.map((m) => {
-            if (m.role === 'user') return <UserBubble key={m.id} text={m.text} />
+            if (m.role === 'user') return <UserBubble key={m.id} text={m.text} attachments={m.attachments} />
             const isLive = m.run_id === activeRunId && m.status === 'streaming'
             return isLive ? (
               <AssistantMessage
@@ -119,6 +129,7 @@ export function ConversationPage() {
                 error={live.error}
                 modelLabel={live.modelLabel}
                 notice={live.notice}
+                activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live /> : undefined}
               />
             ) : (
               <AssistantMessage
@@ -128,6 +139,7 @@ export function ConversationPage() {
                 status={m.status}
                 error={m.error}
                 modelLabel={m.model_label}
+                activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live={false} /> : undefined}
                 onRegenerate={
                   m.id === lastAssistant?.id && !activeRunId
                     ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
@@ -143,9 +155,16 @@ export function ConversationPage() {
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
         <Composer
           running={Boolean(activeRunId)}
-          onSend={(text) => send.mutate({ conversationId, text, modelId: modelOverride })}
+          onSend={(text, attachmentIds) =>
+            send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, mode })
+          }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
-          toolbar={<ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} />}
+          toolbar={
+            <>
+              <ModeSwitch mode={mode} onChange={setModeOverride} />
+              <ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} />
+            </>
+          }
         />
       </div>
     </div>

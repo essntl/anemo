@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router'
+import { PermissionsPage } from '@/features/agents/PermissionsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProvidersPage } from '@/features/providers/ProvidersPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
@@ -16,7 +17,7 @@ const placeholder = (path: string, title: string) => ({
   element: <PlaceholderPage title={title} />,
 })
 
-const BUILT_SETTINGS = ['general', 'appearance', 'providers']
+const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions']
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
               { path: 'general', element: <GeneralPage /> },
               { path: 'appearance', element: <AppearancePage /> },
               { path: 'providers', element: <ProvidersPage /> },
+              { path: 'permissions', element: <PermissionsPage /> },
               ...SETTINGS_SECTIONS.filter((s) => !BUILT_SETTINGS.includes(s.to)).map((s) =>
                 placeholder(s.to, s.label),
               ),

@@ -28,10 +28,11 @@ REAP_INTERVAL_S = 30.0
 
 
 def default_handlers() -> dict[str, Handler]:
-    from app.runtime.chat import execute_chat_run, generate_title
+    from app.runtime.chat import generate_title
+    from app.runtime.dispatch import execute_run
 
     async def run_execute(payload: dict[str, Any]) -> None:
-        await execute_chat_run(uuid.UUID(payload["run_id"]))
+        await execute_run(uuid.UUID(payload["run_id"]))
 
     async def conversation_title(payload: dict[str, Any]) -> None:
         await generate_title(uuid.UUID(payload["conversation_id"]))

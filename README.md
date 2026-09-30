@@ -5,10 +5,22 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: milestone 1 complete: login, settings & theming, providers/models with
-> encrypted keys, and streaming chat executed by a background worker (survives page
-> reloads and worker restarts). Agents, tools, memory, documents etc. follow the
-> phases in `docs/architecture.md`.
+> Status: phases 0–4 done: login, settings & theming, providers/models with encrypted
+> keys, streaming chat run by a background worker (survives reloads and worker
+> restarts), chat attachments (images, PDFs, text/code), and **Agent mode** with a
+> server-enforced permission system and approvals. File editing, shell, web search,
+> memory, documents etc. follow the phases in `docs/architecture.md`.
+
+### Chat vs. Agent mode
+
+**Chat** answers directly and never uses tools. **Agent** may use tools (today:
+planning, listing and reading workspace files), but every tool call is checked on
+the server against **Settings → Agent Permissions**: per category you choose
+*Never*, *Always ask*, *Ask for dangerous actions*, *Allowed in workspace* or
+*Fully autonomous*. When an action needs approval the run pauses (no worker is held)
+and an approval card appears in the chat: *Allow once*, *Allow for this run* (same
+kind of action, same folder) or *Deny*. Paths outside the workspace and anything
+touching settings or secrets are always refused, whatever the settings say.
 
 ## Quick start (homelab)
 

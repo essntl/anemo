@@ -32,6 +32,7 @@ BLOCK_MS = 15_000
 class RunOut(BaseModel):
     id: uuid.UUID
     kind: str
+    step: int
     status: str
     conversation_id: uuid.UUID | None
     assistant_message_id: uuid.UUID | None
@@ -58,8 +59,13 @@ async def cancel_run(run_id: uuid.UUID, db: Db) -> RunOut:
     if run.status in TERMINAL_STATUSES:
         return run_out(run)
     run.cancel_requested = True
-    if run.status == "queued":
-        # No worker has it yet: finish it here. The worker skips terminal runs.
+    if run.status in ("queued", "waiting_approval", "paused"):
+        # No worker holds it: finish it here. A worker that picks it up later skips it.
+        if run.kind == "agent":
+            from app.runtime.agent import _finalize
+
+            await _finalize(db, run, "cancelled")  # commits
+            return run_out(run)
         if run.assistant_message_id:
             msg = await db.get(ChatMessage, run.assistant_message_id)
             if msg is not None:

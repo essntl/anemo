@@ -13,6 +13,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.policy.presets import PermissionSettings
+
 
 class GeneralSettings(BaseModel):
     timezone: str = Field("UTC", max_length=64)
@@ -57,4 +59,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "general": SectionSpec(GeneralSettings),
     "appearance": SectionSpec(AppearanceSettings),
     "models": SectionSpec(ModelDefaults),
+    "permissions": SectionSpec(PermissionSettings, sensitive=True),
 }

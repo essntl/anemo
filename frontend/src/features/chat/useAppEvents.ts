@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { approvalsKey } from '@/features/agents/api'
 import { conversationKey, conversationsKey, messagesKey } from './api'
 import { TERMINAL } from './runStream'
 
@@ -23,6 +24,10 @@ export function useAppEvents() {
     }
     source.addEventListener('run.status', refreshConversation as EventListener)
     source.addEventListener('conversation.updated', refreshConversation as EventListener)
+    source.addEventListener('approval.requested', ((e: MessageEvent<string>) => {
+      void qc.invalidateQueries({ queryKey: approvalsKey })
+      refreshConversation(e)
+    }) as EventListener)
     return () => source.close()
   }, [qc])
 }

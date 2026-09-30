@@ -5,6 +5,10 @@ heartbeats, rate limits). Anything that must survive a restart lives in Postgres
 """
 
 from redis.asyncio import Redis
+from redis.asyncio.retry import Retry
+from redis.backoff import ExponentialBackoff
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from app.core.config import get_settings
 
@@ -21,6 +25,9 @@ def get_redis() -> Redis:
             socket_timeout=None,
             socket_connect_timeout=5,
             health_check_interval=30,
+            # Ride out short Valkey restarts (e.g. during `docker compose up -d`).
+            retry=Retry(ExponentialBackoff(cap=2.0, base=0.1), retries=5),
+            retry_on_error=[RedisConnectionError, RedisTimeoutError],
         )
     return _client
 

@@ -51,8 +51,18 @@ class ReasoningBlock(BaseModel):
     signature: str | None = None
 
 
+class AttachmentRef(BaseModel):
+    """Reference to a stored chat attachment. The runtime replaces it with Text/Image
+    blocks for the chosen model before a request is sent; adapters never see it."""
+
+    type: Literal["attachment"] = "attachment"
+    attachment_id: str
+    filename: str = ""
+    kind: str = ""
+
+
 ContentBlock = Annotated[
-    TextBlock | ImageBlock | ToolUseBlock | ToolResultBlock | ReasoningBlock,
+    TextBlock | ImageBlock | ToolUseBlock | ToolResultBlock | ReasoningBlock | AttachmentRef,
     Field(discriminator="type"),
 ]
 

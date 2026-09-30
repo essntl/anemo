@@ -19,6 +19,7 @@ dependencies = [
   "anthropic>=0.45",
   "pgvector>=0.3",
   "python-multipart>=0.0.20",
+  "pypdf>=5.1",
 ]
 
 [dependency-groups]
@@ -28,6 +29,7 @@ dev = [
   "ruff>=0.8",
   "mypy>=1.13",
   "asgi-lifespan>=2.1",
+  "hypothesis>=6.120",
 ]
 
 [tool.ruff]

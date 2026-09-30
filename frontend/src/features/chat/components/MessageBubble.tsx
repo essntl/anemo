@@ -1,11 +1,34 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AlertCircle, Brain, Check, ChevronRight, Copy, RotateCcw } from 'lucide-react'
+import type { Schemas } from '@/api/client'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
+import { AttachmentChip } from './AttachmentChip'
 
-export function UserBubble({ text }: { text: string }) {
+type AttachmentSummary = Schemas['AttachmentSummary']
+
+export function UserBubble({ text, attachments = [] }: { text: string; attachments?: AttachmentSummary[] }) {
   return (
-    <div className="flex justify-end">
+    <div className="flex flex-col items-end gap-2">
+      {attachments.length > 0 && (
+        <div className="flex max-w-[80%] flex-wrap justify-end gap-2">
+          {attachments.map((a) =>
+            a.kind === 'image' ? (
+              <a key={a.id} href={`/api/attachments/${a.id}/content`} target="_blank" rel="noreferrer">
+                <img
+                  src={`/api/attachments/${a.id}/content`}
+                  alt={a.filename}
+                  className="max-h-48 max-w-64 rounded-xl border border-border object-cover"
+                />
+              </a>
+            ) : (
+              <a key={a.id} href={`/api/attachments/${a.id}/content`} download={a.filename}>
+                <AttachmentChip name={a.filename} size={a.size} />
+              </a>
+            ),
+          )}
+        </div>
+      )}
       <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
         {text}
       </div>
@@ -45,12 +68,23 @@ interface AssistantProps {
   modelLabel?: string | null
   notice?: string | null
   onRegenerate?: () => void
+  /** Agent runs: plan and tool calls, shown above the answer. */
+  activity?: ReactNode
 }
 
-export function AssistantMessage({ text, reasoning, status, error, modelLabel, notice, onRegenerate }: AssistantProps) {
+export function AssistantMessage({
+  text,
+  reasoning,
+  status,
+  error,
+  modelLabel,
+  notice,
+  onRegenerate,
+  activity,
+}: AssistantProps) {
   const [copied, setCopied] = useState(false)
-  const live = ['streaming', 'queued', 'running'].includes(status)
-  const waiting = live && !text && !reasoning
+  const live = ['streaming', 'queued', 'running', 'waiting_approval'].includes(status)
+  const waiting = live && !text && !reasoning && status !== 'waiting_approval'
 
   const copy = async () => {
     await navigator.clipboard.writeText(text)
@@ -61,6 +95,7 @@ export function AssistantMessage({ text, reasoning, status, error, modelLabel, n
   return (
     <div className="group">
       {notice && <div className="mb-2 text-[12px] text-warning">{notice}</div>}
+      {activity}
       {reasoning && <ReasoningPanel text={reasoning} active={live && !text} />}
       {waiting && (
         <div className="flex items-center gap-1.5 py-2" aria-label="Waiting for the model">
@@ -70,7 +105,7 @@ export function AssistantMessage({ text, reasoning, status, error, modelLabel, n
         </div>
       )}
       {text && <Markdown text={text} />}
-      {live && text && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
+      {live && text && status !== 'waiting_approval' && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
 
       {status === 'failed' && (
         <div className="mt-2 flex items-start gap-2 rounded-xl bg-error/10 px-3 py-2 text-[13px] text-error">

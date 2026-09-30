@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -25,7 +26,16 @@ class ConversationOut(BaseModel):
     last_message_at: datetime
     created_at: datetime
     active_run_id: uuid.UUID | None = None
+    default_mode: str = "chat"
     snippet: str | None = None  # matching text when listed with a search query
+
+
+class AttachmentSummary(BaseModel):
+    id: uuid.UUID
+    filename: str
+    kind: str
+    mime: str
+    size: int
 
 
 class MessageOut(BaseModel):
@@ -39,11 +49,15 @@ class MessageOut(BaseModel):
     run_id: uuid.UUID | None
     model_label: str | None
     created_at: datetime
+    attachments: list[AttachmentSummary] = []
+    mode: str | None = None  # "chat" or "agent" for assistant messages
 
 
 class TurnIn(BaseModel):
     text: str = Field(min_length=1, max_length=200_000)
     model_id: uuid.UUID | None = None
+    attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=10)
+    mode: Literal["chat", "agent"] = "chat"
 
 
 class TurnOut(BaseModel):

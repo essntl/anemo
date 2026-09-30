@@ -214,6 +214,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Permissions Settings */
+        put: operations["put_permissions_settings_api_settings_permissions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -573,6 +590,162 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/attachments/{attachment_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Content */
+        get: operations["content_api_attachments__attachment_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Timeline */
+        get: operations["timeline_api_runs__run_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Approvals */
+        get: operations["list_approvals_api_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{approval_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide */
+        post: operations["decide_api_approvals__approval_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permissions/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog */
+        get: operations["catalog_api_permissions_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permissions/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary */
+        get: operations["summary_api_permissions_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permissions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview
+         * @description Summary for unsaved settings, so the settings page can show the effect live.
+         */
+        post: operations["preview_api_permissions_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tools */
+        get: operations["tools_api_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -582,6 +755,7 @@ export interface components {
             general: components["schemas"]["GeneralSettings"];
             appearance: components["schemas"]["AppearanceSettings"];
             models: components["schemas"]["ModelDefaults"];
+            permissions: components["schemas"]["PermissionSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -602,6 +776,73 @@ export interface components {
              * @enum {string}
              */
             density: "comfortable" | "compact";
+        };
+        /** ApprovalOut */
+        ApprovalOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Tool Call Id
+             * Format: uuid
+             */
+            tool_call_id: string;
+            /** Status */
+            status: string;
+            /** Scope */
+            scope: string | null;
+            /** Summary */
+            summary: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /** AttachmentOut */
+        AttachmentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Filename */
+            filename: string;
+            /** Mime */
+            mime: string;
+            /** Size */
+            size: number;
+            /** Kind */
+            kind: string;
+            /** Extraction Note */
+            extraction_note: string | null;
+        };
+        /** AttachmentSummary */
+        AttachmentSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Filename */
+            filename: string;
+            /** Kind */
+            kind: string;
+            /** Mime */
+            mime: string;
+            /** Size */
+            size: number;
         };
         /** AuditOut */
         AuditOut: {
@@ -629,6 +870,34 @@ export interface components {
             details: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** Body_upload_api_attachments_post */
+        Body_upload_api_attachments_post: {
+            /** File */
+            file: string;
+        };
+        /** CatalogOut */
+        CatalogOut: {
+            /** Categories */
+            categories: components["schemas"]["CategoryOut"][];
+            /** Levels */
+            levels: components["schemas"]["LevelOut"][];
+        };
+        /** CategoryOut */
+        CategoryOut: {
+            /** Capability */
+            capability: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /**
+             * Default Level
+             * @enum {string}
+             */
+            default_level: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
+            /** Workspace Scoped */
+            workspace_scoped: boolean;
         };
         /** ConversationIn */
         ConversationIn: {
@@ -664,6 +933,11 @@ export interface components {
             created_at: string;
             /** Active Run Id */
             active_run_id?: string | null;
+            /**
+             * Default Mode
+             * @default chat
+             */
+            default_mode: string;
             /** Snippet */
             snippet?: string | null;
         };
@@ -677,6 +951,22 @@ export interface components {
             archived?: boolean | null;
             /** Model Id */
             model_id?: string | null;
+        };
+        /** DecisionIn */
+        DecisionIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approve" | "deny";
+            /**
+             * Scope
+             * @default once
+             * @enum {string}
+             */
+            scope: "once" | "run";
+            /** Reason */
+            reason?: string | null;
         };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
@@ -721,6 +1011,34 @@ export interface components {
         ImportModelsIn: {
             /** Model Keys */
             model_keys: string[];
+        };
+        /** LevelOut */
+        LevelOut: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
+            /** Label */
+            label: string;
+        };
+        /** Limits */
+        Limits: {
+            /**
+             * Max Steps
+             * @default 25
+             */
+            max_steps: number;
+            /**
+             * Max Tool Calls
+             * @default 100
+             */
+            max_tool_calls: number;
+            /**
+             * Max Runtime S
+             * @default 1800
+             */
+            max_runtime_s: number;
         };
         /** LoginIn */
         LoginIn: {
@@ -769,6 +1087,13 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["AttachmentSummary"][];
+            /** Mode */
+            mode?: string | null;
         };
         /**
          * ModelDefaults
@@ -889,6 +1214,71 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** PendingApprovalOut */
+        PendingApprovalOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Tool Call Id
+             * Format: uuid
+             */
+            tool_call_id: string;
+            /** Status */
+            status: string;
+            /** Scope */
+            scope: string | null;
+            /** Summary */
+            summary: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Tool Name */
+            tool_name: string;
+        };
+        /**
+         * PermissionSettings
+         * @description Stored in app_settings["permissions"] (security-sensitive section).
+         */
+        PermissionSettings: {
+            /** Levels */
+            levels?: {
+                [key: string]: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
+            };
+            /** Ceiling */
+            ceiling?: {
+                [key: string]: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
+            };
+            /** Extra Rules */
+            extra_rules?: components["schemas"]["Rule"][];
+            limits?: components["schemas"]["Limits"];
+        };
+        /** PermissionSummary */
+        PermissionSummary: {
+            /** Items */
+            items: components["schemas"]["SummaryItem"][];
+            /** Max Steps */
+            max_steps: number;
+            /** Max Tool Calls */
+            max_tool_calls: number;
+            /** Max Runtime S */
+            max_runtime_s: number;
+        };
         /** ProviderIn */
         ProviderIn: {
             /** Name */
@@ -979,6 +1369,28 @@ export interface components {
             /** Needs Key */
             needs_key: boolean;
         };
+        /** Rule */
+        Rule: {
+            /**
+             * Cap
+             * @description Capability or pattern: "fs.write", "fs.*", "mcp.github.*"
+             */
+            cap: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "allow" | "ask" | "deny";
+            scope?: components["schemas"]["Scope"] | null;
+            /** Unless Risk */
+            unless_risk?: ("safe" | "moderate" | "dangerous")[];
+            /**
+             * Else
+             * @default ask
+             * @enum {string}
+             */
+            else: "allow" | "ask" | "deny";
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -988,6 +1400,8 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /** Step */
+            step: number;
             /** Status */
             status: string;
             /** Conversation Id */
@@ -1009,6 +1423,14 @@ export interface components {
             started_at: string | null;
             /** Ended At */
             ended_at: string | null;
+        };
+        /**
+         * Scope
+         * @description Restricts a rule to workspace roots (top-level folders). "*" means any.
+         */
+        Scope: {
+            /** Roots */
+            roots?: string[];
         };
         /** SessionOut */
         SessionOut: {
@@ -1043,6 +1465,31 @@ export interface components {
             /** Has Chat Default */
             has_chat_default: boolean;
         };
+        /** SummaryItem */
+        SummaryItem: {
+            /** Capability */
+            capability: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
+            /** Level Label */
+            level_label: string;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "allowed" | "partly" | "ask" | "never";
+            /** Detail */
+            detail: string;
+            /** Available */
+            available: boolean;
+        };
         /** TestResult */
         TestResult: {
             /** Ok */
@@ -1054,12 +1501,92 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
+        /** TimelineOut */
+        TimelineOut: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /** Plan */
+            plan: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Tool Calls */
+            tool_calls: components["schemas"]["ToolCallOut"][];
+        };
+        /** ToolCallOut */
+        ToolCallOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Step */
+            step: number;
+            /** Position */
+            position: number;
+            /** Tool Name */
+            tool_name: string;
+            /** Capability */
+            capability: string | null;
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /** Actions */
+            actions: {
+                [key: string]: unknown;
+            }[];
+            /** Risk */
+            risk: string | null;
+            /** Decision */
+            decision: string | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /** Status */
+            status: string;
+            /** Result */
+            result: string | null;
+            /** Result Data */
+            result_data: {
+                [key: string]: unknown;
+            } | null;
+            /** Is Error */
+            is_error: boolean;
+            /** Started At */
+            started_at: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            approval?: components["schemas"]["ApprovalOut"] | null;
+        };
+        /** ToolOut */
+        ToolOut: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Capability */
+            capability: string;
+        };
         /** TurnIn */
         TurnIn: {
             /** Text */
             text: string;
             /** Model Id */
             model_id?: string | null;
+            /** Attachment Ids */
+            attachment_ids?: string[];
+            /**
+             * Mode
+             * @default chat
+             * @enum {string}
+             */
+            mode: "chat" | "agent";
         };
         /** TurnOut */
         TurnOut: {
@@ -1448,6 +1975,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelDefaults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_permissions_settings_api_settings_permissions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionSettings"];
                 };
             };
             /** @description Validation Error */
@@ -2355,6 +2917,303 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    content_api_attachments__attachment_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    timeline_api_runs__run_id__timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_approvals_api_approvals_get: {
+        parameters: {
+            query?: {
+                status?: "pending";
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingApprovalOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_api_approvals__approval_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_api_permissions_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_permissions_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_permissions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tools_api_tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolOut"][];
+                };
             };
             /** @description Validation Error */
             422: {

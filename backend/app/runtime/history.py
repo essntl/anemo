@@ -6,8 +6,9 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.features.attachments.service import render_blocks
 from app.features.conversations.models import ChatMessage
-from app.providers.base import Message, TextBlock
+from app.providers.base import AttachmentRef, ContentBlock, Message, TextBlock
 
 CHARS_PER_TOKEN = 4  # rough estimate; good enough for trimming decisions
 
@@ -45,6 +46,29 @@ async def load_history(
         else:
             history.append(msg)
     return history
+
+
+async def resolve_attachments(
+    db: AsyncSession, history: list[Message], capabilities: dict[str, bool]
+) -> list[Message]:
+    """Replace attachment references with model input suited to these capabilities."""
+    resolved: list[Message] = []
+    for msg in history:
+        blocks: list[ContentBlock] = []
+        for block in msg.content:
+            if isinstance(block, AttachmentRef):
+                blocks.extend(await render_blocks(db, block.attachment_id, capabilities))
+            else:
+                blocks.append(block)
+        resolved.append(Message(role=msg.role, content=blocks))
+    return resolved
+
+
+def latest_user_attachment_kinds(history: list[Message]) -> set[str]:
+    for msg in reversed(history):
+        if msg.role == "user":
+            return {b.kind for b in msg.content if isinstance(b, AttachmentRef)}
+    return set()
 
 
 def trim_to_budget(history: list[Message], max_tokens: int) -> list[Message]:

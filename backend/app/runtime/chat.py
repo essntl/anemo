@@ -13,6 +13,7 @@ import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +37,12 @@ from app.providers.base import (
 )
 from app.providers.registry import make_adapter
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
-from app.runtime.history import load_history, trim_to_budget
+from app.runtime.history import (
+    latest_user_attachment_kinds,
+    load_history,
+    resolve_attachments,
+    trim_to_budget,
+)
 from app.runtime.streaming import StreamProgress, StreamResult, stream_with_fallback
 
 log = logging.getLogger(__name__)
@@ -71,7 +77,7 @@ class CancelFlag:
 
 
 async def _watch_for_cancel(
-    run_id: uuid.UUID, target: asyncio.Task[StreamResult], flag: CancelFlag
+    run_id: uuid.UUID, target: "asyncio.Task[Any]", flag: CancelFlag
 ) -> None:
     """Cancels `target` when a cancel signal arrives (Redis), or the DB flag is set."""
     pubsub = get_redis().pubsub()
@@ -172,20 +178,39 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         await runs.set_status(db, run, "running")
 
         history = await load_history(db, run.conversation_id, before_seq=message.seq)
+        # Images in the new message need a model that can see them.
+        needs = (
+            frozenset({"vision"})
+            if "image" in latest_user_attachment_kinds(history)
+            else frozenset()
+        )
         try:
             candidates = await resolve(
-                db, RouteRequest(task="chat", explicit_model_id=run.requested_model_id)
+                db,
+                RouteRequest(
+                    task="chat",
+                    explicit_model_id=run.requested_model_id,
+                    required_capabilities=needs,
+                ),
             )
         except NoModelAvailable as exc:
             await _finish(db, run, message, None, status="failed", error=exc.message)
             return
+        # Attachments are rendered per capability set (a fallback model may differ).
+        rendered = {
+            vision: await resolve_attachments(db, history, {"vision": vision})
+            for vision in {bool(m.capabilities.get("vision")) for m in candidates}
+        }
         await db.commit()
 
     system = SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
     progress = StreamProgress()
     stream_task = asyncio.create_task(
         stream_with_fallback(
-            run_id, candidates, lambda m: build_request(m, history, system), progress
+            run_id,
+            candidates,
+            lambda m: build_request(m, rendered[bool(m.capabilities.get("vision"))], system),
+            progress,
         )
     )
     cancel_flag = CancelFlag()

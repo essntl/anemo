@@ -6,13 +6,17 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, NotFound
+from app.features.attachments import service as attachments
+from app.features.attachments.models import Attachment
 from app.features.conversations.models import ChatMessage, Conversation
-from app.features.conversations.schemas import ConversationOut, MessageOut
+from app.features.conversations.schemas import AttachmentSummary, ConversationOut, MessageOut
 from app.features.runs.models import ACTIVE_STATUSES, Run
 from app.jobs import queue
 
 
-def message_out(m: ChatMessage) -> MessageOut:
+def message_out(
+    m: ChatMessage, files: list[Attachment] | None = None, mode: str | None = None
+) -> MessageOut:
     reasoning = "".join(
         b.get("text", "") for b in m.content if isinstance(b, dict) and b.get("type") == "reasoning"
     )
@@ -27,6 +31,11 @@ def message_out(m: ChatMessage) -> MessageOut:
         run_id=m.run_id,
         model_label=m.model_label,
         created_at=m.created_at,
+        attachments=[
+            AttachmentSummary(id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size)
+            for a in files or []
+        ],
+        mode=mode,
     )
 
 
@@ -60,6 +69,7 @@ def conversation_out(
         last_message_at=c.last_message_at,
         created_at=c.created_at,
         active_run_id=active.get(c.id),
+        default_mode=c.default_mode,
         snippet=snippet,
     )
 
@@ -99,12 +109,28 @@ async def list_conversations(
 
 
 async def list_messages(db: AsyncSession, conversation_id: uuid.UUID) -> list[MessageOut]:
-    rows = await db.scalars(
-        select(ChatMessage)
-        .where(ChatMessage.conversation_id == conversation_id)
-        .order_by(ChatMessage.seq)
+    rows = list(
+        await db.scalars(
+            select(ChatMessage)
+            .where(ChatMessage.conversation_id == conversation_id)
+            .order_by(ChatMessage.seq)
+        )
     )
-    return [message_out(m) for m in rows]
+    files: dict[uuid.UUID, list[Attachment]] = {}
+    for att in await db.scalars(
+        select(Attachment)
+        .where(Attachment.conversation_id == conversation_id)
+        .order_by(Attachment.created_at)
+    ):
+        if att.message_id:
+            files.setdefault(att.message_id, []).append(att)
+    run_ids = [m.run_id for m in rows if m.run_id]
+    kinds: dict[uuid.UUID, str] = {}
+    if run_ids:
+        kinds = dict((await db.execute(select(Run.id, Run.kind).where(Run.id.in_(run_ids)))).all())
+    return [
+        message_out(m, files.get(m.id), kinds.get(m.run_id) if m.run_id else None) for m in rows
+    ]
 
 
 async def _next_seq(db: AsyncSession, conversation_id: uuid.UUID) -> int:
@@ -142,9 +168,10 @@ async def _start_run(
     request: str,
     model_id: uuid.UUID | None,
     user_message_id: uuid.UUID | None,
+    mode: str = "chat",
 ) -> Run:
     run = Run(
-        kind="chat",
+        kind=mode,
         status="queued",
         conversation_id=conv.id,
         user_message_id=user_message_id,
@@ -162,8 +189,13 @@ async def _start_run(
 
 
 async def send_turn(
-    db: AsyncSession, conversation_id: uuid.UUID, text: str, model_id: uuid.UUID | None
-) -> tuple[Run, ChatMessage, ChatMessage]:
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    text: str,
+    model_id: uuid.UUID | None,
+    attachment_ids: list[uuid.UUID] | None = None,
+    mode: str = "chat",
+) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     conv = await _lock_idle_conversation(db, conversation_id)
     if model_id is not None:
         conv.model_id = model_id  # remember the last explicit choice for this conversation
@@ -185,12 +217,18 @@ async def send_turn(
     )
     db.add_all([user, assistant])
     await db.flush()
-    run = await _start_run(db, conv, assistant, text, conv.model_id, user.id)
+    files: list[Attachment] = []
+    if attachment_ids:
+        files = await attachments.claim_for_message(db, attachment_ids, conv.id, user.id)
+        # Files come before the text, as if dropped in and then described.
+        user.content = [attachments.ref_block(a) for a in files] + list(user.content)
+    conv.default_mode = mode
+    run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, mode)
     conv.last_message_at = func.now()
     await db.commit()
     await db.refresh(user)
     await db.refresh(assistant)
-    return run, user, assistant
+    return run, user, assistant, files
 
 
 async def regenerate(
@@ -209,7 +247,7 @@ async def regenerate(
     if last is None or last.role != "assistant":
         raise Conflict("Nothing to regenerate", code="nothing_to_regenerate")
     last.content, last.text_plain, last.status, last.error = [], "", "streaming", None
-    run = await _start_run(db, conv, last, "(regenerate)", conv.model_id, None)
+    run = await _start_run(db, conv, last, "(regenerate)", conv.model_id, None, conv.default_mode)
     await db.commit()
     await db.refresh(last)
     return run, last

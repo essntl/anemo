@@ -8,10 +8,13 @@ from fastapi import APIRouter, Depends
 
 from app.api import health
 from app.api.deps import require_session
+from app.features.attachments.router import router as attachments_router
 from app.features.audit.router import router as audit_router
 from app.features.auth.router import router as auth_router
 from app.features.conversations.router import router as conversations_router
+from app.features.permissions_router import router as permissions_router
 from app.features.providers.router import router as providers_router
+from app.features.runs.agent_router import router as agent_router
 from app.features.runs.router import router as runs_router
 from app.features.settings.router import router as settings_router
 
@@ -25,4 +28,7 @@ protected.include_router(audit_router)
 protected.include_router(providers_router)
 protected.include_router(conversations_router)
 protected.include_router(runs_router)
+protected.include_router(attachments_router)
+protected.include_router(agent_router)
+protected.include_router(permissions_router)
 api_router.include_router(protected)
