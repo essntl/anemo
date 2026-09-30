@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Workspace</title>
+    <script>
+      // Apply the cached theme before first paint to avoid a light/dark flash.
+      // Mirrors applyAppearance() in src/features/settings/theme.ts.
+      try {
+        var a = JSON.parse(localStorage.getItem('aiw.appearance') || '{}')
+        var mode = a.mode || 'system'
+        if (mode === 'system') {
+          mode = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        var root = document.documentElement
+        root.dataset.theme = mode
+        root.dataset.density = a.density || 'comfortable'
+        if (a.accent) root.style.setProperty('--accent', a.accent)
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

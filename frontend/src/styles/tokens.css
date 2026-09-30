@@ -1,0 +1,97 @@
+/*
+ * Design tokens: the single source of truth for the app's look.
+ *
+ * Components never use raw colors. They use Tailwind utilities that map to
+ * these variables (see app.css), e.g. `bg-surface`, `text-muted`, `bg-accent`.
+ * `--accent` is overwritten at runtime from Settings > Appearance.
+ */
+
+:root {
+  color-scheme: light;
+
+  --accent: #3478f6;
+  --accent-hover: color-mix(in oklch, var(--accent), black 12%);
+  --accent-soft: color-mix(in oklch, var(--accent) 12%, transparent);
+  --accent-contrast: #ffffff;
+  --selection: color-mix(in oklch, var(--accent) 22%, transparent);
+
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --surface-hover: #e7e9ee;
+  --card: #ffffff;
+  --overlay: rgb(255 255 255 / 0.78);
+  --text: #15171c;
+  --text-muted: #6a7080;
+  --text-subtle: #9aa0ad;
+  --border: rgb(15 20 30 / 0.08);
+  --border-strong: rgb(15 20 30 / 0.16);
+
+  --success: #1f9d55;
+  --warning: #d97706;
+  --error: #dc3b3b;
+  --info: #3478f6;
+
+  /* Agent tool/run states */
+  --tool-running: var(--accent);
+  --tool-ok: var(--success);
+  --tool-waiting: var(--warning);
+  --tool-denied: var(--error);
+
+  --shadow-soft: 0 1px 2px rgb(15 20 30 / 0.04), 0 4px 16px rgb(15 20 30 / 0.05);
+  --shadow-float: 0 2px 6px rgb(15 20 30 / 0.06), 0 16px 40px rgb(15 20 30 / 0.12);
+
+  /* Density: spacing multiplier used by a few layout primitives */
+  --density: 1;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --accent-hover: color-mix(in oklch, var(--accent), white 12%);
+  --accent-soft: color-mix(in oklch, var(--accent) 20%, transparent);
+  --selection: color-mix(in oklch, var(--accent) 32%, transparent);
+
+  --bg: #0e1014;
+  --surface: #15181e;
+  --surface-2: #1c2027;
+  --surface-hover: #242933;
+  --card: #181b22;
+  --overlay: rgb(21 24 30 / 0.8);
+  --text: #eceef2;
+  --text-muted: #9aa1ae;
+  --text-subtle: #6b7280;
+  --border: rgb(255 255 255 / 0.07);
+  --border-strong: rgb(255 255 255 / 0.14);
+
+  --success: #3ccf7a;
+  --warning: #f2a93b;
+  --error: #f06464;
+  --info: #5b9bff;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+  --shadow-float: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.45);
+}
+
+[data-density='compact'] {
+  --density: 0.8;
+}
+
+/* Syntax highlighting (code blocks) */
+:root {
+  --code-keyword: #a626a4;
+  --code-string: #50a14f;
+  --code-number: #986801;
+  --code-comment: #a0a1a7;
+  --code-function: #4078f2;
+  --code-type: #c18401;
+}
+
+[data-theme='dark'] {
+  --code-keyword: #c678dd;
+  --code-string: #98c379;
+  --code-number: #d19a66;
+  --code-comment: #7f848e;
+  --code-function: #61afef;
+  --code-type: #e5c07b;
+}

@@ -1,0 +1,65 @@
+# Development overrides: hot reload for backend and frontend.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Open http://localhost:5173 (Vite proxies /api to the app container).
+
+services:
+  migrate:
+    image: ai-workspace-backend:dev
+    build:
+      args:
+        INSTALL_DEV: "true"
+    volumes:
+      - ./backend:/app
+
+  app:
+    image: ai-workspace-backend:dev
+    build:
+      args:
+        INSTALL_DEV: "true"
+    environment:
+      ENV: development
+      LOG_LEVEL: DEBUG
+      COOKIE_SECURE: "false"
+      PUBLIC_URL: http://localhost:5173
+    command: ["uvicorn", "app.main_api:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--reload-dir", "/app/app"]
+    volumes:
+      - ./backend:/app
+      - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+
+  worker:
+    image: ai-workspace-backend:dev
+    build:
+      args:
+        INSTALL_DEV: "true"
+    environment:
+      ENV: development
+      LOG_LEVEL: DEBUG
+    command: ["python", "-m", "app.main_worker"]
+    volumes:
+      - ./backend:/app
+      - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  valkey:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /frontend
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+    environment:
+      API_PROXY_TARGET: http://app:8080
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/frontend
+      - frontend_node_modules:/frontend/node_modules
+    networks: [core]
+    depends_on: [app]
+
+volumes:
+  frontend_node_modules:

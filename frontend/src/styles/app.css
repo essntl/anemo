@@ -1,0 +1,122 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* `dark:` variant follows our data-theme attribute instead of the OS setting. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Map design tokens to Tailwind utilities. The default palette is removed on
+ * purpose (`--color-*: initial`) so components can only use semantic colors.
+ * `inline` makes utilities reference the variables directly, which is what
+ * lets the accent change at runtime.
+ */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-card: var(--card);
+  --color-overlay: var(--overlay);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-selection: var(--selection);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  --color-tool-running: var(--tool-running);
+  --color-tool-ok: var(--tool-ok);
+  --color-tool-waiting: var(--tool-waiting);
+  --color-tool-denied: var(--tool-denied);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-float: var(--shadow-float);
+
+  --radius-control: 10px;
+  --radius-card: 18px;
+  --radius-panel: 22px;
+
+  --font-sans: 'Inter', 'MiSans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  ::selection {
+    background: var(--selection);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Smooth theme switches without animating every layout change. */
+  .theme-transition,
+  .theme-transition * {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease;
+  }
+}
+
+/* Rendered Markdown (assistant messages, documents). Kept here rather than in
+   components so every Markdown surface looks the same. */
+@layer components {
+  .markdown {
+    @apply text-[14.5px] leading-7 break-words;
+  }
+  .markdown > :first-child { margin-top: 0; }
+  .markdown > :last-child { margin-bottom: 0; }
+  .markdown p { @apply my-3; }
+  .markdown h1 { @apply mt-6 mb-3 text-xl font-semibold; }
+  .markdown h2 { @apply mt-5 mb-2.5 text-lg font-semibold; }
+  .markdown h3 { @apply mt-4 mb-2 text-base font-semibold; }
+  .markdown ul { @apply my-3 list-disc pl-6; }
+  .markdown ol { @apply my-3 list-decimal pl-6; }
+  .markdown li { @apply my-1; }
+  .markdown a { @apply text-accent underline underline-offset-2; }
+  .markdown blockquote { @apply my-3 border-l-4 border-border-strong pl-4 text-muted; }
+  .markdown hr { @apply my-6 border-border; }
+  .markdown table { @apply my-3 block overflow-x-auto border-collapse text-[13.5px]; }
+  .markdown th, .markdown td { @apply border border-border px-3 py-1.5 text-left; }
+  .markdown th { @apply bg-surface-2 font-semibold; }
+  .markdown :not(pre) > code { @apply rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[0.88em]; }
+  .markdown input[type='checkbox'] { @apply mr-1.5 align-middle; }
+
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in { color: var(--code-keyword); }
+  .hljs-string, .hljs-attr-value, .hljs-regexp, .hljs-addition { color: var(--code-string); }
+  .hljs-number, .hljs-symbol, .hljs-bullet { color: var(--code-number); }
+  .hljs-comment, .hljs-quote, .hljs-meta { color: var(--code-comment); font-style: italic; }
+  .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--code-function); }
+  .hljs-type, .hljs-class, .hljs-attr, .hljs-variable, .hljs-params { color: var(--code-type); }
+  .hljs-deletion { color: var(--error); }
+}

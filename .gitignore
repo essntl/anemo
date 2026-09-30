@@ -1,0 +1,26 @@
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+frontend/src/api/schema.d.ts.bak
+
+# local data
+/data/
+/workspace-dev/
+*.log
+
+# e2e artifacts
+e2e/test-results/
+e2e/playwright-report/

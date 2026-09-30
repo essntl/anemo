@@ -1,0 +1,114 @@
+# AI Workspace — production stack.
+#   cp .env.example .env   (fill in the required values)
+#   docker compose up -d
+#
+# Only the `app` service publishes a port. Point Nginx Proxy Manager at it.
+
+name: ai-workspace
+
+x-backend: &backend
+  image: ai-workspace-backend:${APP_VERSION:-latest}
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+    args:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+  restart: unless-stopped
+  environment: &backend-env
+    ENV: ${ENV:-production}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    DATABASE_URL: postgresql+asyncpg://aiw:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/aiw
+    REDIS_URL: redis://valkey:6379/0
+    APP_SECRET_KEY: ${APP_SECRET_KEY:?set APP_SECRET_KEY in .env}
+    ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+    ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+    ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+    COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    FORWARDED_ALLOW_IPS: ${TRUSTED_PROXIES:-127.0.0.1}
+    TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1}
+    TZ: ${TZ:-UTC}
+    WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    SEARXNG_URL: ${SEARXNG_URL:-}
+    ENABLE_FAKE_PROVIDER: ${ENABLE_FAKE_PROVIDER:-false}
+  volumes:
+    - appdata:/data
+    - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+  networks: [core]
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aiw
+      POSTGRES_DB: aiw
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiw -d aiw"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [core]
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    # Redis only holds ephemeral streams/signals; no persistence needed.
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [core]
+
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    <<: *backend
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.main_worker"]
+    stop_grace_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.cli", "worker-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  pgdata:
+  appdata:
+
+networks:
+  core:
