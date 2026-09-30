@@ -958,6 +958,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shell/ssh-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ssh Key */
+        get: operations["ssh_key_api_shell_ssh_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1314,6 +1331,11 @@ export interface components {
              * @default 1800
              */
             max_runtime_s: number;
+            /**
+             * Max Shell Timeout S
+             * @default 600
+             */
+            max_shell_timeout_s: number;
         };
         /** ListingOut */
         ListingOut: {
@@ -1782,6 +1804,15 @@ export interface components {
             has_model: boolean;
             /** Has Chat Default */
             has_chat_default: boolean;
+        };
+        /** SshKeyOut */
+        SshKeyOut: {
+            /** Available */
+            available: boolean;
+            /** Public Key */
+            public_key?: string | null;
+            /** Fingerprint */
+            fingerprint?: string | null;
         };
         /** SummaryItem */
         SummaryItem: {
@@ -4039,6 +4070,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ssh_key_api_shell_ssh_key_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SshKeyOut"];
+                };
             };
             /** @description Validation Error */
             422: {

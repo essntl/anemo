@@ -35,6 +35,8 @@ class Limits(BaseModel):
     max_steps: int = Field(25, ge=1, le=500)
     max_tool_calls: int = Field(100, ge=1, le=5000)
     max_runtime_s: int = Field(1800, ge=10, le=86_400)
+    # Longest a single shell command may run before it is stopped.
+    max_shell_timeout_s: int = Field(600, ge=10, le=3600)
 
 
 class Policy(BaseModel):

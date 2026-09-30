@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl tini \
 ARG PUID=1000
 ARG PGID=1000
 RUN groupadd -g ${PGID} app && useradd -u ${PUID} -g app -m -s /usr/sbin/nologin app \
-    && mkdir -p /data /workspace && chown app:app /data /workspace
+    && mkdir -p /data /workspace /run/sandbox-ssh && chown app:app /data /workspace /run/sandbox-ssh     && chmod 700 /run/sandbox-ssh
 COPY --from=deps /opt/venv /opt/venv
 WORKDIR /app
 COPY backend/ ./

@@ -39,23 +39,22 @@ export function ModelDefaultsCard({ initial, models }: { initial: ModelDefaults;
               : m.capabilities.chat !== false && (!task.needs || m.capabilities[task.needs]),
           )
           return (
-            <label key={task.key} className="block">
+            <div key={task.key}>
               <span className="mb-1 block text-[13px] font-medium">{task.label}</span>
               <Select
+                aria-label={task.label}
                 value={form[task.key] ?? ''}
-                onChange={(e) => setForm({ ...form, [task.key]: e.target.value || null })}
-              >
-                <option value="">
-                  {task.key === 'chat' ? 'Not set' : task.key === 'embeddings' ? 'Not set (disables semantic search)' : 'Use chat model'}
-                </option>
-                {options.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.display_name} — {m.provider_name}
-                  </option>
-                ))}
-              </Select>
+                onValueChange={(v) => setForm({ ...form, [task.key]: v || null })}
+                options={[
+                  {
+                    value: '',
+                    label: task.key === 'chat' ? 'Not set' : task.key === 'embeddings' ? 'Not set (disables semantic search)' : 'Use chat model',
+                  },
+                  ...options.map((m) => ({ value: m.id, label: `${m.display_name} — ${m.provider_name}` })),
+                ]}
+              />
               <span className="mt-1 block text-[12px] text-muted">{task.hint}</span>
-            </label>
+            </div>
           )
         })}
         <div className="flex items-center gap-3 sm:col-span-2">

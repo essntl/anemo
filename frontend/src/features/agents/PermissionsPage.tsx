@@ -7,6 +7,7 @@ import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useSettings } from '@/features/settings/api'
 import { type Level, type PermissionSettings, type PermissionSummary, previewPermissions, usePermissionCatalog, useSavePermissions } from './api'
+import { SshKeyCard } from './components/SshKeyCard'
 
 const GROUP_TONE: Record<string, string> = {
   allowed: 'text-success',
@@ -39,7 +40,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
     else delete ceiling[cap]
     setForm({ ...form, ceiling })
   }
-  const limits = form.limits ?? { max_steps: 25, max_tool_calls: 100, max_runtime_s: 1800 }
+  const limits = form.limits ?? { max_steps: 25, max_tool_calls: 100, max_runtime_s: 1800, max_shell_timeout_s: 600 }
 
   return (
     <div className="flex flex-col gap-5">
@@ -70,14 +71,11 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
                   aria-label={`${cat.label} level`}
                   className="flex-1 sm:w-56 sm:flex-none"
                   value={level}
-                  onChange={(e) => setLevel(cat.capability, e.target.value as Level)}
-                >
-                  {levels
+                  onValueChange={(v) => setLevel(cat.capability, v as Level)}
+                  options={levels
                     .filter((l) => cat.workspace_scoped || l.level !== 'workspace')
-                    .map((l) => (
-                      <option key={l.level} value={l.level}>{l.label}</option>
-                    ))}
-                </Select>
+                    .map((l) => ({ value: l.level, label: l.label }))}
+                />
                 {item && <span className={`text-right text-[12px] sm:w-20 ${GROUP_TONE[item.group]}`}>{item.group === 'partly' ? 'mostly' : item.group}</span>}
               </div>
             )
@@ -87,7 +85,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
 
       <Card>
         <CardHeader title="Limits" description="A run stops gracefully when it reaches one of these." />
-        <CardBody className="grid gap-4 sm:grid-cols-3">
+        <CardBody className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Max steps">
             <Input type="number" min={1} value={limits.max_steps}
               onChange={(e) => setForm({ ...form, limits: { ...limits, max_steps: Number(e.target.value) } })} />
@@ -99,6 +97,10 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
           <Field label="Max minutes">
             <Input type="number" min={1} value={Math.round(limits.max_runtime_s / 60)}
               onChange={(e) => setForm({ ...form, limits: { ...limits, max_runtime_s: Number(e.target.value) * 60 } })} />
+          </Field>
+          <Field label="Max minutes per shell command">
+            <Input type="number" min={1} max={60} value={Math.round(limits.max_shell_timeout_s / 60)}
+              onChange={(e) => setForm({ ...form, limits: { ...limits, max_shell_timeout_s: Number(e.target.value) * 60 } })} />
           </Field>
         </CardBody>
       </Card>
@@ -113,17 +115,17 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
             </p>
             <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
               {catalog.data?.categories.map((cat) => (
-                <label key={cat.capability} className="flex items-center justify-between gap-3 text-[13px]">
+                <div key={cat.capability} className="flex items-center justify-between gap-3 text-[13px]">
                   {cat.label}
                   <Select className="h-8 w-40 text-[12.5px] sm:w-48" aria-label={`${cat.label} ceiling`}
                     value={(form.ceiling?.[cat.capability] as string | undefined) ?? ''}
-                    onChange={(e) => setCeiling(cat.capability, e.target.value as Level | '')}>
-                    <option value="">No limit</option>
-                    {levels.filter((l) => cat.workspace_scoped || l.level !== 'workspace').map((l) => (
-                      <option key={l.level} value={l.level}>{l.label}</option>
-                    ))}
-                  </Select>
-                </label>
+                    onValueChange={(v) => setCeiling(cat.capability, v as Level | '')}
+                    options={[
+                      { value: '', label: 'No limit' },
+                      ...levels.filter((l) => cat.workspace_scoped || l.level !== 'workspace')
+                        .map((l) => ({ value: l.level, label: l.label })),
+                    ]} />
+                </div>
               ))}
             </div>
           </CardBody>
@@ -161,6 +163,7 @@ export function PermissionsPage() {
       {settings.data && (
         <PermissionsForm key={JSON.stringify(settings.data.permissions)} initial={settings.data.permissions} />
       )}
+      <SshKeyCard />
     </div>
   )
 }

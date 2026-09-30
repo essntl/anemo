@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     enable_fake_provider: bool = False
     searxng_url: str | None = None
 
+    # Shell sandboxes (worker only): execd URLs and the token files they write.
+    sandbox_url: str = "http://sandbox:7070"
+    sandbox_net_url: str = "http://sandbox-net:7070"
+    sandbox_token_file: str = "/run/sandbox-token/sandbox/token"  # noqa: S105 (a path)
+    sandbox_net_token_file: str = "/run/sandbox-token/sandbox-net/token"  # noqa: S105
+    sandbox_ssh_dir: str = "/run/sandbox-ssh"  # app: the agents' SSH key (public half shown)
+
     @model_validator(mode="after")
     def _check_secret_key(self) -> "Settings":
         if self.env != "test" and len(self.app_secret_key.get_secret_value()) < 32:

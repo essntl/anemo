@@ -5,25 +5,58 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–5b done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–6 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
 > file tools with change history and one-click revert. Works on phones and can be
-> installed to your home screen. Shell, web search, memory,
-> documents etc. follow the phases in `docs/architecture.md`.
+> installed to your home screen. Agents can run **shell commands in an isolated
+> sandbox**. Web search, memory, documents etc. follow the phases in
+> `docs/architecture.md`.
 
 ### Chat vs. Agent mode
 
 **Chat** answers directly and never uses tools. **Agent** may use tools (today:
-planning, and listing, reading, writing, editing, moving and deleting workspace
-files), but every tool call is checked on
+planning; listing, reading, writing, editing, moving and deleting workspace
+files; running shell commands), but every tool call is checked on
 the server against **Settings → Agent Permissions**: per category you choose
 *Never*, *Always ask*, *Ask for dangerous actions*, *Allowed in workspace* or
 *Fully autonomous*. When an action needs approval the run pauses (no worker is held)
 and an approval card appears in the chat: *Allow once*, *Allow for this run* (same
 kind of action, same folder) or *Deny*. Paths outside the workspace and anything
 touching settings or secrets are always refused, whatever the settings say.
+
+### Shell commands
+
+Agents run commands in a separate **sandbox** container (Debian with git, Python,
+Node/npm, curl, jq, ripgrep, sqlite3, make), never in the app itself:
+
+- no root and no Linux capabilities, read-only system files, CPU/memory/process
+  limits; only the workspace (`/workspace`) and a scratch home folder are mounted;
+- **no network at all** by default. A command that needs the internet (package
+  installs, `git clone`) runs in a second container, `sandbox-net`, and needs the
+  *Shell with network* permission. Note that "internet" includes your LAN;
+- neither sandbox can reach the database, Valkey, the app or each other.
+
+Every command is rated *safe*, *moderate* or *dangerous* before it runs (e.g.
+`ls` is safe, `npm install` moderate, `rm -rf`, `git push --force` or
+`curl … | sh` dangerous), so *Ask for dangerous actions* lets ordinary commands
+run and asks you first for the risky ones. Commands stop after 2 minutes by
+default (the agent can ask for up to 10). Output streams live into the chat.
+
+**SSH to your servers.** Agents can use `ssh`, `scp` and `rsync` from commands
+that have network access. They use their own key, created by the `sandbox-net`
+container on first start. Its public half is under **Settings → Agent
+Permissions → SSH from agent commands**: add it to `~/.ssh/authorized_keys` on
+the server (ideally for a dedicated account, prefixed with
+`from="<Docker host IP>"`). Password logins are not possible. For
+`ssh host 'command'`, the command that runs on the server is rated too.
+`host.docker.internal` is the Docker host itself.
+
+Shell commands can only *start* in folders agents may change, but a running
+command can reach every folder in the workspace, and its file changes can't be
+reverted with one click like the file tools' changes. Keep private data outside
+the workspace, or set *Run shell commands* to *Never*.
 
 ### Files
 
@@ -93,6 +126,8 @@ Set `PUBLIC_URL` to your public address and `TRUSTED_PROXIES` to NPM's address.
 | `postgres` | PostgreSQL 17 + pgvector — all durable state         |
 | `valkey`   | Live event streams and control signals (ephemeral)   |
 | `migrate`  | Applies database migrations, then exits              |
+| `sandbox`  | Runs agent shell commands, with no network            |
+| `sandbox-net` | Runs agent shell commands that need the internet   |
 
 ## Development
 

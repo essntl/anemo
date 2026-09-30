@@ -21,6 +21,7 @@ import {
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
+import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/cn'
 import {
@@ -70,16 +71,26 @@ function Row({ entry, selected, onOpen, showPath }: { entry: Entry; selected: bo
   const trash = useTrashPath()
   const folder = parentOf(entry.path)
 
-  const rename = () => {
-    const name = window.prompt('New name', entry.name)?.trim()
+  const rename = async () => {
+    const name = await promptDialog({
+      title: `Rename ${entry.is_dir ? 'folder' : 'file'}`, label: 'New name', initial: entry.name,
+      selectName: !entry.is_dir, confirmLabel: 'Rename',
+    })
     if (name && name !== entry.name) move.mutate({ source: entry.path, destination: joinPath(folder, name) })
   }
-  const moveTo = () => {
-    const dest = window.prompt('Move to (path inside the workspace)', entry.path)?.trim().replace(/^\/+/, '')
+  const moveTo = async () => {
+    const dest = (await promptDialog({
+      title: `Move "${entry.name}"`, label: 'New location (path inside the workspace)', initial: entry.path,
+      confirmLabel: 'Move',
+    }))?.replace(/^\/+/, '')
     if (dest && dest !== entry.path) move.mutate({ source: entry.path, destination: dest })
   }
-  const remove = () => {
-    if (window.confirm(`Move "${entry.name}" to the trash?`)) trash.mutate(entry.path)
+  const remove = async () => {
+    const ok = await confirmDialog({
+      title: `Move "${entry.name}" to the trash?`, message: 'You can restore it from Trash later.',
+      confirmLabel: 'Move to trash', danger: true,
+    })
+    if (ok) trash.mutate(entry.path)
   }
   const error = move.error ?? trash.error
 
@@ -103,18 +114,18 @@ function Row({ entry, selected, onOpen, showPath }: { entry: Entry; selected: bo
             <Download className="h-3.5 w-3.5" />
           </a>
         )}
-        <button type="button" aria-label="Rename" onClick={rename} className="rounded p-1.5 text-muted hover:text-text"><Pencil className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Move" onClick={moveTo} className="rounded p-1.5 text-muted hover:text-text"><MoveRight className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Delete" onClick={remove} className="rounded p-1.5 text-muted hover:text-error"><Trash2 className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Rename" onClick={() => void rename()} className="rounded p-1.5 text-muted hover:text-text"><Pencil className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Move" onClick={() => void moveTo()} className="rounded p-1.5 text-muted hover:text-text"><MoveRight className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Delete" onClick={() => void remove()} className="rounded p-1.5 text-muted hover:text-error"><Trash2 className="h-3.5 w-3.5" /></button>
       </span>
       <ActionMenu
         className="md:hidden"
         label={`Actions for ${entry.name}`}
         actions={[
           ...(entry.is_dir ? [] : [{ label: 'Download', icon: <Download />, download: downloadUrl(entry.path) }]),
-          { label: 'Rename', icon: <Pencil />, onSelect: rename },
-          { label: 'Move', icon: <MoveRight />, onSelect: moveTo },
-          { label: 'Move to trash', icon: <Trash2 />, onSelect: remove, danger: true },
+          { label: 'Rename', icon: <Pencil />, onSelect: () => void rename() },
+          { label: 'Move', icon: <MoveRight />, onSelect: () => void moveTo() },
+          { label: 'Move to trash', icon: <Trash2 />, onSelect: () => void remove(), danger: true },
         ]}
       />
     </div>
@@ -152,12 +163,14 @@ export function FilesPage() {
     }
   }
 
-  const newFolder = () => {
-    const name = window.prompt('Folder name')?.trim()
+  const newFolder = async () => {
+    const name = await promptDialog({ title: 'New folder', label: 'Folder name', confirmLabel: 'Create' })
     if (name) makeFolder.mutate(joinPath(path, name))
   }
   const newFile = async () => {
-    const name = window.prompt('File name', 'untitled.md')?.trim()
+    const name = await promptDialog({
+      title: 'New file', label: 'File name', initial: 'untitled.md', selectName: true, confirmLabel: 'Create',
+    })
     if (!name) return
     const saved = await saveFile.mutateAsync({ path: joinPath(path, name), content: '', base_hash: null })
     go({ file: saved.path })
@@ -193,7 +206,7 @@ export function FilesPage() {
               className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-2 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10 md:w-44" />
           </div>
           <Button size="sm" variant="ghost" icon={<FilePlus className="h-3.5 w-3.5" />} onClick={() => void newFile()}>File</Button>
-          <Button size="sm" variant="ghost" icon={<FolderPlus className="h-3.5 w-3.5" />} onClick={newFolder}>Folder</Button>
+          <Button size="sm" variant="ghost" icon={<FolderPlus className="h-3.5 w-3.5" />} onClick={() => void newFolder()}>Folder</Button>
           <Button size="sm" variant="secondary" icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={pickFiles}>Upload</Button>
           <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>
         </header>

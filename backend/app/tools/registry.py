@@ -6,6 +6,7 @@ from app.policy.engine import evaluate
 from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.plan import UpdatePlan
+from app.tools.builtin.shell import RunShell
 from app.tools.builtin.workspace import (
     CreateFolder,
     CurrentTime,
@@ -28,6 +29,7 @@ BUILTIN_TOOLS: list[Tool] = [
     CreateFolder(),
     MovePath(),
     DeletePath(),
+    RunShell(),
     CurrentTime(),
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
@@ -42,7 +44,7 @@ def all_tools() -> list[Tool]:
 
 
 def available_capabilities() -> set[str]:
-    return {t.capability for t in BUILTIN_TOOLS}
+    return {c for t in BUILTIN_TOOLS for c in (t.capability, *t.extra_capabilities)}
 
 
 def toolset_for(mode: str, policy: Policy, ceiling: Policy | None) -> list[Tool]:

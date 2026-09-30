@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { Outlet, useLocation, useMatches } from 'react-router'
+import { DialogHost } from '@/components/ui/DialogHost'
 import { ReauthDialog } from '@/features/auth/ReauthDialog'
 import { useAppEvents } from '@/features/chat/useAppEvents'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
@@ -48,6 +49,7 @@ export function AppLayout() {
         </main>
       </div>
       <ReauthDialog />
+      <DialogHost />
     </div>
   )
 }

@@ -114,6 +114,7 @@ async def test_agent_uses_tools_and_plan(authed):
         "create_folder",
         "move_path",
         "delete_path",
+        "run_shell",
         "get_current_time",
     ]
 
@@ -277,7 +278,8 @@ async def test_permission_summary(authed):
     by_cap = {i["capability"]: i for i in s["items"]}
     assert by_cap["fs.read"]["group"] == "partly" and by_cap["fs.read"]["available"]
     assert by_cap["agent.spawn"]["group"] == "never"
-    assert not by_cap["shell.exec"]["available"]
+    assert by_cap["shell.exec"]["available"] and by_cap["shell.network"]["available"]
+    assert not by_cap["browser.use"]["available"]
     preview = (
         await authed.post(
             "/api/permissions/preview",

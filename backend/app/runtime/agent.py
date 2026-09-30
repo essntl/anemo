@@ -109,6 +109,7 @@ class AgentRun:
             # vision takes over, images are replaced by a short note for it.
             can_view_images=bool(candidates and candidates[0].capabilities.get("vision")),
             add_image=self._add_image,
+            limits=policy.limits,
         )
         self.current_call: uuid.UUID | None = None
         self.started = time.monotonic()
@@ -413,7 +414,7 @@ class AgentRun:
             return
         row.status, row.started_at = "running", datetime.now(UTC)
         await db.commit()  # checkpoint: a crash from here on is detected on resume
-        self.current_call = row.id
+        self.current_call = self.ctx.call_id = row.id
         await self._emit("tool.started", {"tool_call_id": str(row.id), "tool": tool.name})
         try:
             result = await asyncio.wait_for(tool.run(args, self.ctx), timeout=tool.timeout_s)

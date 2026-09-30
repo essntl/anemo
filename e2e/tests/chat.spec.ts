@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { fakeModels, login, newChat, send, signOutAfterEach } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, newChat, pickModel, send, signOutAfterEach } from './helpers'
 
 signOutAfterEach()
 
@@ -19,7 +19,7 @@ test('chat streams a reply and survives a reload mid-stream', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Regenerate' })).toBeVisible()
 
   // A slow answer: reload while it streams; it must continue and finish.
-  await page.getByLabel('Model').selectOption(models.slow)
+  await pickModel(page, models.slow)
   const words = Array.from({ length: 24 }, (_, i) => `w${i}`).join(' ')
   await send(page, words)
   await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible()
@@ -86,16 +86,13 @@ test('agent asks for approval, then finishes after approval', async ({ page }) =
 test('file manager: create, edit, save, trash and restore', async ({ page }) => {
   await login(page)
   const folder = `e2e-${Date.now()}`
-  page.on('dialog', async (d) => {
-    // Prompts ask for names; confirms are accepted.
-    if (d.type() === 'prompt') await d.accept(d.message().startsWith('Folder') ? folder : 'note.md')
-    else await d.accept()
-  })
   try {
     await page.goto('/files')
     await page.getByRole('button', { name: 'Folder', exact: true }).click()
+    await answerPrompt(page, folder)
     await page.getByRole('button', { name: folder }).click()
     await page.getByRole('button', { name: 'File', exact: true }).click()
+    await answerPrompt(page, 'note.md')
     await expect(page.getByText(`${folder}/note.md`).first()).toBeVisible()
 
     await page.locator('.cm-content').click()
@@ -113,6 +110,7 @@ test('file manager: create, edit, save, trash and restore', async ({ page }) => 
     await page.getByRole('button', { name: 'Close' }).click()
     await page.getByRole('button', { name: 'note.md' }).hover()
     await page.getByRole('button', { name: 'Delete' }).click()
+    await confirmWith(page, 'Move to trash')
     await expect(page.getByRole('button', { name: 'note.md' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Trash', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).first().click()

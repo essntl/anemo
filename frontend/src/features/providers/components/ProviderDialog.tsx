@@ -97,11 +97,8 @@ export function ProviderDialog({
       <div className="flex flex-col gap-4">
         {!editing && (
           <Field label="Type">
-            <Select value={type} onChange={(e) => setType(e.target.value as ProviderType)}>
-              {types.data?.map((t) => (
-                <option key={t.type} value={t.type}>{t.label}</option>
-              ))}
-            </Select>
+            <Select aria-label="Type" value={type} onValueChange={(v) => setType(v as ProviderType)}
+              options={(types.data ?? []).map((t) => ({ value: t.type, label: t.label }))} />
           </Field>
         )}
         <Field label="Name">

@@ -18,6 +18,7 @@ import {
 import { CapabilityChips } from './CapabilityChips'
 import { DiscoverDialog } from './DiscoverDialog'
 import { ProviderDialog } from './ProviderDialog'
+import { confirmDialog } from '@/components/ui/dialogs'
 
 function TestOutcome({ ok, message }: { ok: boolean; message: string }) {
   return (
@@ -69,10 +70,14 @@ export function ProviderCard({ provider, models }: { provider: Provider; models:
   const update = useUpdateProvider()
   const remove = useDeleteProvider()
 
-  const confirmDelete = () => {
-    if (window.confirm(`Delete "${provider.name}" and its ${models.length} model(s)? The stored API key is destroyed.`)) {
-      remove.mutate(provider.id)
-    }
+  const confirmDelete = async () => {
+    const ok = await confirmDialog({
+      title: `Delete "${provider.name}"?`,
+      message: `Its ${models.length} model(s) are removed and the stored API key is destroyed.`,
+      confirmLabel: 'Delete provider',
+      danger: true,
+    })
+    if (ok) remove.mutate(provider.id)
   }
 
   return (
@@ -108,7 +113,7 @@ export function ProviderCard({ provider, models }: { provider: Provider; models:
           <Button size="icon" variant="ghost" aria-label="Edit provider" onClick={() => setEditing(true)}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" aria-label="Delete provider" onClick={confirmDelete}>
+          <Button size="icon" variant="ghost" aria-label="Delete provider" onClick={() => void confirmDelete()}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>

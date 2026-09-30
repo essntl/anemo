@@ -17,7 +17,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel
 
 from app.features.attachments.images import PreparedImage
-from app.policy.models import Action
+from app.policy.models import Action, Limits
 from app.providers.base import ToolSpec
 from app.workspace.access import WorkspaceSettings
 
@@ -47,6 +47,8 @@ class ToolContext:
     can_view_images: bool = False
     add_image: AddImageFn = _no_images
     state: dict[str, Any] = field(default_factory=dict)  # per-run scratch (e.g. the plan)
+    limits: Limits = field(default_factory=Limits)  # the run's limits (from its policy snapshot)
+    call_id: uuid.UUID | None = None  # the tool call being executed (for progress events)
 
 
 class ToolResult(BaseModel):
@@ -60,6 +62,8 @@ class Tool(ABC):
     name: ClassVar[str]  # [a-zA-Z0-9_-], what the model calls
     description: ClassVar[str]
     capability: ClassVar[str]
+    # Other capabilities a call may need (e.g. run_shell with network also needs shell.network).
+    extra_capabilities: ClassVar[tuple[str, ...]] = ()
     Input: ClassVar[type[BaseModel]]
     # Safe to run again if a worker crashed mid-call (reads: yes; writes: no).
     idempotent: ClassVar[bool] = True

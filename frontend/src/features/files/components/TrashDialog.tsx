@@ -3,6 +3,7 @@ import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { usePurge, useRestore, useTrash } from '../api'
+import { confirmDialog } from '@/components/ui/dialogs'
 
 export function TrashDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const trash = useTrash(open)
@@ -28,7 +29,10 @@ export function TrashDialog({ open, onOpenChange }: { open: boolean; onOpenChang
               Restore
             </Button>
             <Button size="icon" variant="ghost" aria-label="Delete forever"
-              onClick={() => window.confirm(`Delete "${item.name}" forever? This cannot be undone.`) && purge.mutate(item.id)}>
+              onClick={async () => {
+                if (await confirmDialog({ title: `Delete "${item.name}" forever?`, message: 'This cannot be undone.',
+                  confirmLabel: 'Delete forever', danger: true })) purge.mutate(item.id)
+              }}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>

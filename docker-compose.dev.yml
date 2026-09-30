@@ -25,6 +25,9 @@ services:
     volumes:
       - ./backend:/app
       - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+      # execd source, so backend tests can run it in-process (tests/api/test_shell.py).
+      - ./sandbox/execd:/opt/execd-src:ro
+      - sandbox-ssh:/run/sandbox-ssh:ro
 
   worker:
     image: ai-workspace-backend:dev
@@ -38,6 +41,8 @@ services:
     volumes:
       - ./backend:/app
       - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+      - sandbox-token:/run/sandbox-token/sandbox:ro
+      - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
 
   postgres:
     ports:

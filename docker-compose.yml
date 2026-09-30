@@ -37,6 +37,32 @@ x-backend: &backend
     - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
   networks: [core]
 
+# The shell sandbox (see sandbox/Dockerfile). Agent commands only ever run here:
+# no root, no Linux capabilities, read-only system files, resource limits, and only
+# the workspace mounted. Each sandbox sits on its own internal network shared only
+# with the worker, so it can't reach the database, Valkey, the app or the other sandbox.
+x-sandbox: &sandbox
+  image: ai-workspace-sandbox:${APP_VERSION:-latest}
+  build:
+    context: ./sandbox
+    args:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 512
+  mem_limit: ${SANDBOX_MEMORY:-2g}
+  cpus: ${SANDBOX_CPUS:-2}
+  tmpfs:
+    - /tmp:size=512m,mode=1777
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7070/health')"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -76,6 +102,11 @@ services:
 
   app:
     <<: *backend
+    volumes:
+      - appdata:/data
+      - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+      # Read-only, to show the agents' SSH public key in Settings.
+      - sandbox-ssh:/run/sandbox-ssh:ro
     ports:
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
     depends_on:
@@ -93,6 +124,13 @@ services:
   worker:
     <<: *backend
     command: ["python", "-m", "app.main_worker"]
+    volumes:
+      - appdata:/data
+      - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+      # Each sandbox writes a fresh access token here on start; only the worker reads it.
+      - sandbox-token:/run/sandbox-token/sandbox:ro
+      - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
+    networks: [core, sandbox_int, sandbox_net_int]
     stop_grace_period: 30s
     depends_on:
       migrate:
@@ -106,9 +144,45 @@ services:
       retries: 3
       start_period: 20s
 
+  # Commands without network access (the default).
+  sandbox:
+    <<: *sandbox
+    volumes:
+      - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+      - sandbox-home:/home/agent
+      - sandbox-token:/run/execd
+    networks: [sandbox_int]
+
+  # Commands the agent runs with internet access (needs the "Shell with network"
+  # permission). Note: "internet" includes your LAN, like any container with egress.
+  sandbox-net:
+    <<: *sandbox
+    environment:
+      EXECD_SSH: "1"  # create the agents' SSH key (see Settings > Agent Permissions)
+    # Lets commands reach the Docker host itself, e.g. `ssh you@host.docker.internal`.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
+      - sandbox-net-home:/home/agent
+      - sandbox-ssh:/home/agent/.ssh
+      - sandbox-net-token:/run/execd
+    networks: [sandbox_net_int, egress]
+
 volumes:
   pgdata:
   appdata:
+  sandbox-home:
+  sandbox-net-home:
+  sandbox-token:
+  sandbox-net-token:
+  sandbox-ssh:
 
 networks:
   core:
+  # internal: no route to the outside world.
+  sandbox_int:
+    internal: true
+  sandbox_net_int:
+    internal: true
+  egress:

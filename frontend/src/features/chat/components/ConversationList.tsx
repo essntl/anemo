@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate, useParams } from 'react-router'
 import { Loader2, Pencil, Pin, Search, Trash2 } from 'lucide-react'
+import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { cn } from '@/lib/cn'
 import { type Conversation, useConversations, useDeleteConversation, useUpdateConversation } from '../api'
 
@@ -19,12 +20,16 @@ function Item({ conv }: { conv: Conversation }) {
   const update = useUpdateConversation()
   const remove = useDeleteConversation()
 
-  const rename = () => {
-    const title = window.prompt('Rename conversation', conv.title)?.trim()
+  const rename = async () => {
+    const title = await promptDialog({ title: 'Rename chat', label: 'Title', initial: conv.title, confirmLabel: 'Rename' })
     if (title) update.mutate({ id: conv.id, body: { title } })
   }
-  const del = () => {
-    if (!window.confirm(`Delete "${conv.title}"? This cannot be undone.`)) return
+  const del = async () => {
+    const ok = await confirmDialog({
+      title: `Delete "${conv.title}"?`, message: 'The chat and its attachments are deleted. This cannot be undone.',
+      confirmLabel: 'Delete', danger: true,
+    })
+    if (!ok) return
     remove.mutate(conv.id, { onSuccess: () => conversationId === conv.id && navigate('/') })
   }
 
@@ -42,10 +47,10 @@ function Item({ conv }: { conv: Conversation }) {
       <span className="min-w-0 flex-1 truncate" title={conv.snippet ?? conv.title}>{conv.title}</span>
       {/* Hover reveals the actions; touch screens (no hover) always show them. */}
       <span className="hidden shrink-0 items-center group-hover:flex pointer-coarse:flex" onClick={(e) => e.preventDefault()}>
-        <button type="button" aria-label="Rename" onClick={rename} className="rounded p-1 hover:text-text pointer-coarse:p-2">
+        <button type="button" aria-label="Rename" onClick={() => void rename()} className="rounded p-1 hover:text-text pointer-coarse:p-2">
           <Pencil className="h-3.5 w-3.5" />
         </button>
-        <button type="button" aria-label="Delete" onClick={del} className="rounded p-1 hover:text-error pointer-coarse:p-2">
+        <button type="button" aria-label="Delete" onClick={() => void del()} className="rounded p-1 hover:text-error pointer-coarse:p-2">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </span>

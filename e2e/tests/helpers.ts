@@ -45,7 +45,26 @@ export async function fakeModels(request: APIRequestContext): Promise<Record<str
 export async function newChat(page: Page, mode: 'Chat' | 'Agent', modelId: string) {
   await page.goto('/')
   await page.getByRole('radio', { name: mode }).click()
-  await page.getByLabel('Model').selectOption(modelId)
+  await pickModel(page, modelId)
+}
+
+/** Chooses a model in the composer's model dropdown. */
+export async function pickModel(page: Page, modelId: string) {
+  await page.getByRole('combobox', { name: 'Model' }).click()
+  await page.locator(`[role="option"][data-value="${modelId}"]`).click()
+}
+
+/** Types an answer into the app's name dialog (e.g. "New folder") and submits it. */
+export async function answerPrompt(page: Page, value: string) {
+  const box = page.getByRole('dialog').getByRole('textbox')
+  await box.fill(value)
+  await box.press('Enter')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+}
+
+/** Clicks the confirm button of the app's confirmation dialog. */
+export async function confirmWith(page: Page, label: string) {
+  await page.getByRole('dialog').getByRole('button', { name: label }).click()
 }
 
 export async function send(page: Page, text: string) {

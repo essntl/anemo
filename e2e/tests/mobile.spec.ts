@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { fakeModels, login, signOutAfterEach } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, pickModel, signOutAfterEach } from './helpers'
 
 /*
  * Phone layout and installable-app checks. Runs in the "mobile" project
@@ -62,15 +62,13 @@ test('settings is a list of sections with a way back', async ({ page }) => {
 test('files: open a file full screen, go back, and use the row menu', async ({ page }) => {
   await login(page)
   const folder = `e2e-m-${Date.now()}`
-  page.on('dialog', async (d) => {
-    if (d.type() === 'prompt') await d.accept(d.message().startsWith('Folder') ? folder : 'note.md')
-    else await d.accept()
-  })
   try {
     await page.goto('/files')
     await page.getByRole('button', { name: 'Folder', exact: true }).click()
+    await answerPrompt(page, folder)
     await page.getByRole('button', { name: folder, exact: true }).click()
     await page.getByRole('button', { name: 'File', exact: true }).click()
+    await answerPrompt(page, 'note.md')
     // The editor takes the whole screen; the list is hidden until you go back.
     await expect(page.locator('.cm-content')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Upload' })).toBeHidden()
@@ -80,6 +78,7 @@ test('files: open a file full screen, go back, and use the row menu', async ({ p
     // Touch screens have no hover, so row actions live in a "⋯" menu.
     await page.getByRole('button', { name: 'Actions for note.md' }).click()
     await page.getByRole('button', { name: 'Move to trash' }).click()
+    await confirmWith(page, 'Move to trash')
     await expect(page.getByRole('button', { name: 'note.md', exact: true })).toHaveCount(0)
   } finally {
     await page.request.post('/api/files/trash', { data: { path: folder } })
@@ -94,7 +93,7 @@ test('chat on a phone: send with the button, Enter adds a new line', async ({ pa
   await login(page)
   const models = await fakeModels(page.request)
   await page.getByRole('radio', { name: 'Chat' }).click()
-  await page.getByLabel('Model').selectOption(models.echo)
+  await pickModel(page, models.echo)
   const box = page.getByPlaceholder('Message the assistant…')
   await box.fill('first line')
   await box.press('Enter')

@@ -23,9 +23,11 @@ import {
 } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
+import { confirmDialog } from '@/components/ui/dialogs'
 import { Input } from '@/components/ui/Input'
 import { cn } from '@/lib/cn'
 import { type FileChangeView, type ToolCallView, useDecide, useRevertChange, useTimeline } from '../api'
+import { ShellDetails } from './ShellCall'
 
 const STATUS: Record<string, { icon: typeof Circle; tone: string; label: string }> = {
   pending: { icon: Clock, tone: 'text-muted', label: 'Queued' },
@@ -103,7 +105,10 @@ function shownImage(call: ToolCallView): { attachment_id: string; width: number;
 }
 
 function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
-  const [open, setOpen] = useState(false)
+  const shell = call.tool_name === 'run_shell'
+  // null = not toggled by the user: shell commands open by themselves while running.
+  const [toggled, setOpen] = useState<boolean | null>(null)
+  const open = toggled ?? (shell && call.status === 'running')
   const image = shownImage(call)
   const s = STATUS[call.status] ?? STATUS.pending
   const Icon = s.icon
@@ -123,12 +128,13 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
             <span className="font-mono">{call.tool_name}</span>
             {call.decision && <> · permission: {call.decision} ({call.decision_reason})</>}
           </div>
-          {Object.keys(call.args).length > 0 && (
+          {shell && <ShellDetails call={call} />}
+          {!shell && Object.keys(call.args).length > 0 && (
             <pre className="overflow-x-auto rounded-lg bg-surface-2 p-2 font-mono text-[11.5px]">
               {JSON.stringify(call.args, null, 2)}
             </pre>
           )}
-          {call.result && (
+          {!shell && call.result && (
             <pre className={cn('max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-2 p-2 font-mono text-[11.5px]',
               call.is_error && 'text-error')}>
               {call.result}
@@ -162,9 +168,11 @@ function FileChangeRow({ runId, change }: { runId: string; change: FileChangeVie
     try {
       await revert.mutateAsync({ changeId: change.id, force })
     } catch (err) {
-      if (err instanceof ApiError && ['changed_since', 'not_empty'].includes(err.code) &&
-          window.confirm(`${err.message}`)) {
-        await revert.mutateAsync({ changeId: change.id, force: true })
+      if (err instanceof ApiError && ['changed_since', 'not_empty'].includes(err.code)) {
+        const ok = await confirmDialog({
+          title: 'Revert anyway?', message: err.message, confirmLabel: 'Revert anyway', danger: true,
+        })
+        if (ok) await revert.mutateAsync({ changeId: change.id, force: true })
       }
     }
   }

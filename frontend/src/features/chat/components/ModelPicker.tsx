@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/Select'
 import { useModels } from '@/features/providers/api'
 
 /**
@@ -22,20 +23,20 @@ export function ModelPicker({
     ? (all.find((m) => m.id === current)?.display_name ?? 'Deleted model')
     : null
   return (
-    <select
+    <Select
       aria-label="Model"
+      variant="ghost"
+      className="max-w-40 px-1 md:max-w-56 md:px-2"
       value={current}
-      onChange={(e) => onChange(e.target.value || null)}
-      className="h-8 min-w-0 max-w-56 truncate rounded-lg bg-transparent px-1 text-[12.5px] md:px-2 pointer-coarse:h-10 text-muted hover:bg-surface-hover hover:text-text focus:outline-none"
-    >
-      {!current && <option value="">No model configured</option>}
-      {unavailable && <option value={current}>{unavailable} (unavailable)</option>}
-      {options.map((m) => (
-        <option key={m.id} value={m.id}>
-          {m.display_name}
-          {m.id === defaultModelId ? ' (default)' : ''}
-        </option>
-      ))}
-    </select>
+      onValueChange={(v) => onChange(v || null)}
+      options={[
+        ...(!current ? [{ value: '', label: 'No model configured', disabled: true }] : []),
+        ...(unavailable ? [{ value: current, label: `${unavailable} (unavailable)`, disabled: true }] : []),
+        ...options.map((m) => ({
+          value: m.id,
+          label: `${m.display_name}${m.id === defaultModelId ? ' (default)' : ''}`,
+        })),
+      ]}
+    />
   )
 }

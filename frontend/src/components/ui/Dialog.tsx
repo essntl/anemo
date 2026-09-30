@@ -12,18 +12,21 @@ interface DialogProps {
   footer?: ReactNode
   /** Extra classes; use `md:` for sizes so the phone bottom sheet stays full width. */
   className?: string
+  /** Where focus goes when the dialog opens (default: the first focusable element). */
+  onOpenAutoFocus?: (event: Event) => void
 }
 
 /**
  * On phones (below `md`) a dialog is a bottom sheet: full width, anchored to the
  * bottom edge where thumbs reach, scrollable if tall. From `md` up it is centered.
  */
-export function Dialog({ open, onOpenChange, title, description, children, footer, className }: DialogProps) {
+export function Dialog({ open, onOpenChange, title, description, children, footer, className, onOpenAutoFocus }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fade fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" />
         <RadixDialog.Content
+          onOpenAutoFocus={onOpenAutoFocus}
           className={cn(
             'sheet fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-panel border border-border bg-card p-5 shadow-float focus:outline-none',
             'pb-[max(1.25rem,env(safe-area-inset-bottom))]',

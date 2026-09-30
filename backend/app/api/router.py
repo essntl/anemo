@@ -18,6 +18,7 @@ from app.features.providers.router import router as providers_router
 from app.features.runs.agent_router import router as agent_router
 from app.features.runs.router import router as runs_router
 from app.features.settings.router import router as settings_router
+from app.features.shell.router import router as shell_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
@@ -33,4 +34,5 @@ protected.include_router(attachments_router)
 protected.include_router(agent_router)
 protected.include_router(permissions_router)
 protected.include_router(files_router)
+protected.include_router(shell_router)
 api_router.include_router(protected)

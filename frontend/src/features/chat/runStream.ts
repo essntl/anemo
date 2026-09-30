@@ -73,6 +73,7 @@ const EVENT_TYPES = [
   'approval.requested',
   'approval.resolved',
   'plan.updated',
+  'tool.progress', // live shell output
 ]
 
 /** Subscribes to a run's events while `runId` is set. Calls `onFinished` once at the end. */

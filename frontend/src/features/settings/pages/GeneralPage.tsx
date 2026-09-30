@@ -6,6 +6,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Field, Input } from '@/components/ui/Input'
 import { useRevokeSession, useSessions } from '@/features/auth/api'
 import { useSaveGeneral, useSettings } from '../api'
+import { Select } from '@/components/ui/Select'
 
 type General = Schemas['GeneralSettings']
 
@@ -23,14 +24,15 @@ function GeneralForm({ initial }: { initial: General }) {
           <Input value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
         </Field>
         <Field label="Default mode for new chats">
-          <select
-            className="h-10 w-full rounded-control border border-border bg-surface px-3 text-sm"
+          <Select
+            aria-label="Default mode for new chats"
             value={form.default_chat_mode}
-            onChange={(e) => setForm({ ...form, default_chat_mode: e.target.value as General['default_chat_mode'] })}
-          >
-            <option value="chat">Chat</option>
-            <option value="agent">Agent</option>
-          </select>
+            onValueChange={(v) => setForm({ ...form, default_chat_mode: v as General['default_chat_mode'] })}
+            options={[
+              { value: 'chat', label: 'Chat' },
+              { value: 'agent', label: 'Agent' },
+            ]}
+          />
         </Field>
         <label className="flex items-center gap-2 text-[13px]">
           <input

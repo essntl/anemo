@@ -3641,6 +3641,55 @@
           }
         }
       }
+    },
+    "/api/shell/ssh-key": {
+      "get": {
+        "tags": [
+          "shell"
+        ],
+        "summary": "Ssh Key",
+        "operationId": "ssh_key_api_shell_ssh_key_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SshKeyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4541,6 +4590,13 @@
             "minimum": 10.0,
             "title": "Max Runtime S",
             "default": 1800
+          },
+          "max_shell_timeout_s": {
+            "type": "integer",
+            "maximum": 3600.0,
+            "minimum": 10.0,
+            "title": "Max Shell Timeout S",
+            "default": 600
           }
         },
         "type": "object",
@@ -5937,6 +5993,41 @@
           "has_chat_default"
         ],
         "title": "SetupStatus"
+      },
+      "SshKeyOut": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key"
+          },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "SshKeyOut"
       },
       "SummaryItem": {
         "properties": {

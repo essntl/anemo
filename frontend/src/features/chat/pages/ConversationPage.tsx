@@ -6,6 +6,7 @@ import { errorMessage } from '@/api/client'
 import { MenuButton, NewChatButton } from '@/app/mobileNav'
 import { Button } from '@/components/ui/Button'
 import { timelineKey } from '@/features/agents/api'
+import { useShellOutput } from '@/features/agents/shellOutput'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
 import { useSettings } from '@/features/settings/api'
@@ -78,7 +79,12 @@ export function ConversationPage() {
     void qc.invalidateQueries({ queryKey: conversationKey(conversationId) })
     void qc.invalidateQueries({ queryKey: conversationsKey })
   }
+  const appendShellOutput = useShellOutput((s) => s.append)
   const onEvent = (event: RunEvent) => {
+    if (event.type === 'tool.progress') {
+      appendShellOutput(String(event.data.tool_call_id), String(event.data.text ?? ''))
+      return
+    }
     if (activeRunId && /^(tool|approval|plan)\./.test(event.type)) {
       void qc.invalidateQueries({ queryKey: timelineKey(activeRunId) })
     }
