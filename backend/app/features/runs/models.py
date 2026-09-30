@@ -124,3 +124,25 @@ class Approval(Base, IdMixin, TimestampMixin):
     summary: Mapped[str] = mapped_column(String(500))
     reason: Mapped[str | None] = mapped_column(String(500))  # the user's note on deny
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FileChange(Base, IdMixin, TimestampMixin):
+    """A workspace change made by an agent tool, with what's needed to undo it."""
+
+    __tablename__ = "run_file_changes"
+    __table_args__ = (Index("ix_run_file_changes_run", "run_id", "created_at"),)
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("runs.id", ondelete="CASCADE")
+    )
+    tool_call_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tool_calls.id", ondelete="SET NULL")
+    )
+    op: Mapped[str] = mapped_column(String(10))  # create | modify | delete | move | mkdir
+    path: Mapped[str] = mapped_column(String(1000))
+    dest_path: Mapped[str | None] = mapped_column(String(1000))  # for moves
+    before_hash: Mapped[str | None] = mapped_column(String(64))
+    after_hash: Mapped[str | None] = mapped_column(String(64))
+    # Where the previous content is kept: "backup:<file>" or "trash:<item id>".
+    backup_ref: Mapped[str | None] = mapped_column(String(200))
+    reverted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -1,55 +1,7 @@
-import { expect, type APIRequestContext, type Page, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { fakeModels, login, newChat, send, signOutAfterEach } from './helpers'
 
-/*
- * These tests run against a live instance that may also be in real use, so they
- * never change the user's settings: they pick the mode and model explicitly in
- * the UI, and anything they must change temporarily is restored afterwards.
- */
-
-const USERNAME = process.env.E2E_USERNAME ?? 'admin'
-const PASSWORD = process.env.E2E_PASSWORD ?? ''
-
-async function login(page: Page) {
-  await page.goto('/login')
-  await page.getByLabel('Username').fill(USERNAME)
-  await page.getByLabel('Password').fill(PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('button', { name: 'New chat' })).toBeVisible()
-}
-
-/** Makes sure a fake provider with the echo/slow/agent models exists; returns their ids. */
-async function fakeModels(request: APIRequestContext): Promise<Record<string, string>> {
-  const wanted = ['echo', 'slow', 'agent']
-  const providers = (await (await request.get('/api/providers')).json()) as { id: string; type: string }[]
-  let fake = providers.find((p) => p.type === 'fake')
-  if (!fake) {
-    const created = await request.post('/api/providers', { data: { name: 'E2E fake', type: 'fake' } })
-    expect(created.ok(), 'fake provider must be enabled (ENABLE_FAKE_PROVIDER=true)').toBeTruthy()
-    fake = (await created.json()) as { id: string; type: string }
-  }
-  type M = { id: string; model_key: string; provider_id: string }
-  const list = async () =>
-    ((await (await request.get('/api/models')).json()) as M[]).filter((m) => m.provider_id === fake.id)
-  let models = await list()
-  const missing = wanted.filter((k) => !models.some((m) => m.model_key === k))
-  if (missing.length) {
-    await request.post(`/api/providers/${fake.id}/models/import`, { data: { model_keys: missing } })
-    models = await list()
-  }
-  return Object.fromEntries(models.map((m) => [m.model_key, m.id]))
-}
-
-/** Opens a new chat with an explicit mode and model. */
-async function newChat(page: Page, mode: 'Chat' | 'Agent', modelId: string) {
-  await page.goto('/')
-  await page.getByRole('radio', { name: mode }).click()
-  await page.getByLabel('Model').selectOption(modelId)
-}
-
-async function send(page: Page, text: string) {
-  await page.getByPlaceholder('Message the assistant…').fill(text)
-  await page.keyboard.press('Enter')
-}
+signOutAfterEach()
 
 test('login is required', async ({ page }) => {
   await page.goto('/settings/general')
@@ -128,5 +80,50 @@ test('agent asks for approval, then finishes after approval', async ({ page }) =
     await expect(page.getByRole('button', { name: /\d+ actions?$/ })).toBeVisible()
   } finally {
     await page.request.put('/api/settings/permissions', { data: previous })
+  }
+})
+
+test('file manager: create, edit, save, trash and restore', async ({ page }) => {
+  await login(page)
+  const folder = `e2e-${Date.now()}`
+  page.on('dialog', async (d) => {
+    // Prompts ask for names; confirms are accepted.
+    if (d.type() === 'prompt') await d.accept(d.message().startsWith('Folder') ? folder : 'note.md')
+    else await d.accept()
+  })
+  try {
+    await page.goto('/files')
+    await page.getByRole('button', { name: 'Folder', exact: true }).click()
+    await page.getByRole('button', { name: folder }).click()
+    await page.getByRole('button', { name: 'File', exact: true }).click()
+    await expect(page.getByText(`${folder}/note.md`).first()).toBeVisible()
+
+    await page.locator('.cm-content').click()
+    await page.keyboard.type('# Hello from e2e')
+    await expect(page.getByText('Unsaved')).toBeVisible()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Unsaved')).toHaveCount(0)
+
+    const saved = await page.request.get(`/api/files/content?path=${folder}/note.md`)
+    expect(((await saved.json()) as { content: string }).content).toBe('# Hello from e2e')
+
+    await page.reload()
+    await expect(page.locator('.cm-content')).toContainText('# Hello from e2e')
+
+    await page.getByRole('button', { name: 'Close' }).click()
+    await page.getByRole('button', { name: 'note.md' }).hover()
+    await page.getByRole('button', { name: 'Delete' }).click()
+    await expect(page.getByRole('button', { name: 'note.md' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Trash', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).first().click()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('button', { name: 'note.md' })).toBeVisible()
+  } finally {
+    // Clean up: trash the folder, then remove it from the trash.
+    await page.request.post('/api/files/trash', { data: { path: folder } })
+    const trash = (await (await page.request.get('/api/files/trash')).json()) as { id: string; original_path: string }[]
+    for (const item of trash.filter((t) => t.original_path.startsWith(folder))) {
+      await page.request.delete(`/api/files/trash/${item.id}`)
+    }
   }
 })

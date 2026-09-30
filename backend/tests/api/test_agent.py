@@ -108,6 +108,12 @@ async def test_agent_uses_tools_and_plan(authed):
         "update_plan",
         "list_files",
         "read_file",
+        "find_files",
+        "write_file",
+        "edit_file",
+        "create_folder",
+        "move_path",
+        "delete_path",
         "get_current_time",
     ]
 

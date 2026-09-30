@@ -58,9 +58,17 @@
 
 @layer base {
   html,
-  body,
-  #root {
+  body {
     height: 100%;
+  }
+
+  /* dvh follows the browser's toolbars and (with interactive-widget=resizes-content
+     in index.html) the on-screen keyboard. Padding keeps content clear of notches
+     and the home indicator when the page extends under them (viewport-fit=cover). */
+  #root {
+    height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
   }
 
   body {
@@ -119,4 +127,28 @@
   .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--code-function); }
   .hljs-type, .hljs-class, .hljs-attr, .hljs-variable, .hljs-params { color: var(--code-type); }
   .hljs-deletion { color: var(--error); }
+}
+
+/* Phone drawer and sheets: slide/fade in (Radix sets data-state). */
+@keyframes drawer-in { from { transform: translateX(-100%); } }
+@keyframes sheet-in { from { transform: translateY(100%); } }
+@keyframes fade-in { from { opacity: 0; } }
+.drawer[data-state='open'] { animation: drawer-in 200ms ease-out; }
+.fade[data-state='open'] { animation: fade-in 200ms ease-out; }
+@media (max-width: 767px) {
+  .sheet[data-state='open'] { animation: sheet-in 220ms ease-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer, .fade, .sheet { animation: none !important; }
+}
+
+/* iOS zooms into any text field whose font is smaller than 16px. Unlayered, so it
+   wins over Tailwind's text-[…] utilities on phones. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select,
+  .cm-content {
+    font-size: 16px;
+  }
 }

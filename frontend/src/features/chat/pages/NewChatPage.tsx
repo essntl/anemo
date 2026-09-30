@@ -46,13 +46,15 @@ export function NewChatPage() {
   const needsSetup = setup.data && !setup.data.has_chat_default
 
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6">
-      <div className="w-full max-w-3xl">
-        <div className="mb-8 flex flex-col items-center text-center">
+    // Phones: greeting centered, composer at the bottom within thumb reach.
+    // From `md` up: both centered together.
+    <div className="flex h-full flex-col px-2 pb-2 md:items-center md:justify-center md:px-6 md:pb-0">
+      <div className="flex w-full max-w-3xl flex-1 flex-col md:flex-none">
+        <div className="flex flex-1 flex-col items-center justify-center px-4 text-center md:mb-8 md:flex-none">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
             <Sparkles className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-semibold">How can I help today?</h1>
+          <h1 className="text-xl font-semibold md:text-2xl">How can I help today?</h1>
           {needsSetup && (
             <p className="mt-2 text-[13px] text-muted">
               First, <Link to="/settings/providers" className="text-accent underline">connect a provider and pick a default model</Link>.

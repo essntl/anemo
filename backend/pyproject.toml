@@ -20,6 +20,7 @@ dependencies = [
   "pgvector>=0.3",
   "python-multipart>=0.0.20",
   "pypdf>=5.1",
+  "pillow>=11",
 ]
 
 [dependency-groups]

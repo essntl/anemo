@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>anemo is offline</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root { color-scheme: light dark; --bg: #f4f5f8; --text: #15171c; --muted: #6a7080; --accent: #3478f6; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #0e1014; --text: #eceef2; --muted: #9aa1ae; } }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; align-items: center; justify-content: center; padding: 24px;
+        background: var(--bg); color: var(--text); text-align: center;
+        font: 15px/1.5 Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      img { width: 56px; height: 56px; }
+      h1 { font-size: 20px; margin: 16px 0 6px; }
+      p { color: var(--muted); margin: 0 0 20px; max-width: 320px; }
+      button {
+        height: 44px; padding: 0 20px; border: 0; border-radius: 10px; font: inherit;
+        font-weight: 600; color: #fff; background: var(--accent); cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/favicon.svg" alt="" />
+      <h1>Can't reach anemo</h1>
+      <p>Your server isn't answering. Check your connection (or VPN), then try again.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

@@ -68,7 +68,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
                 </div>
                 <Select
                   aria-label={`${cat.label} level`}
-                  className="w-56"
+                  className="flex-1 sm:w-56 sm:flex-none"
                   value={level}
                   onChange={(e) => setLevel(cat.capability, e.target.value as Level)}
                 >
@@ -78,7 +78,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
                       <option key={l.level} value={l.level}>{l.label}</option>
                     ))}
                 </Select>
-                {item && <span className={`w-20 text-right text-[12px] ${GROUP_TONE[item.group]}`}>{item.group === 'partly' ? 'mostly' : item.group}</span>}
+                {item && <span className={`text-right text-[12px] sm:w-20 ${GROUP_TONE[item.group]}`}>{item.group === 'partly' ? 'mostly' : item.group}</span>}
               </div>
             )
           })}
@@ -105,7 +105,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
 
       <Card>
         <details>
-          <summary className="cursor-pointer px-6 py-4 text-[15px] font-semibold">Advanced: ceiling</summary>
+          <summary className="cursor-pointer px-4 py-4 text-[15px] font-semibold md:px-6">Advanced: ceiling</summary>
           <CardBody className="pt-0">
             <p className="mb-3 text-[13px] text-muted">
               The ceiling is the most autonomy anything may ever get, even if an agent profile or automation
@@ -115,7 +115,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
               {catalog.data?.categories.map((cat) => (
                 <label key={cat.capability} className="flex items-center justify-between gap-3 text-[13px]">
                   {cat.label}
-                  <Select className="h-8 w-48 text-[12.5px]" aria-label={`${cat.label} ceiling`}
+                  <Select className="h-8 w-40 text-[12.5px] sm:w-48" aria-label={`${cat.label} ceiling`}
                     value={(form.ceiling?.[cat.capability] as string | undefined) ?? ''}
                     onChange={(e) => setCeiling(cat.capability, e.target.value as Level | '')}>
                     <option value="">No limit</option>

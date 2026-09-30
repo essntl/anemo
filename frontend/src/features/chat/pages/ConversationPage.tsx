@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { Pin, PinOff } from 'lucide-react'
 import { errorMessage } from '@/api/client'
+import { MenuButton, NewChatButton } from '@/app/mobileNav'
 import { Button } from '@/components/ui/Button'
 import { timelineKey } from '@/features/agents/api'
 import { RunActivity } from '@/features/agents/components/RunActivity'
@@ -101,8 +102,9 @@ export function ConversationPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
-        <h1 className="truncate text-[15px] font-semibold">{conversation.data?.title ?? ' '}</h1>
+      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:h-14 md:px-6">
+        <MenuButton />
+        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{conversation.data?.title ?? ' '}</h1>
         {conversation.data && (
           <Button
             size="icon"
@@ -113,10 +115,11 @@ export function ConversationPage() {
             {conversation.data.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
           </Button>
         )}
+        <NewChatButton />
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-5 md:px-6 md:py-8">
           {list.map((m) => {
             if (m.role === 'user') return <UserBubble key={m.id} text={m.text} attachments={m.attachments} />
             const isLive = m.run_id === activeRunId && m.status === 'streaming'
@@ -151,7 +154,7 @@ export function ConversationPage() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl px-6 pb-6">
+      <div className="mx-auto w-full max-w-3xl px-2 pb-2 md:px-6 md:pb-6">
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
         <Composer
           running={Boolean(activeRunId)}

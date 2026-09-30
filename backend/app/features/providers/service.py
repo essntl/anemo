@@ -213,6 +213,7 @@ def model_out(m: Model) -> ModelOut:
         pricing=m.pricing,
         provider_options=m.provider_options,
         enabled=m.enabled,
+        provider_enabled=m.provider.enabled,
     )
 
 

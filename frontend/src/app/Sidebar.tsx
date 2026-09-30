@@ -12,6 +12,7 @@ import {
   LogOut,
   Plus,
   Settings,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useLogout, useMe } from '@/features/auth/api'
@@ -24,7 +25,7 @@ function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children
       to={to}
       className={({ isActive }) =>
         cn(
-          'flex h-9 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium transition-colors',
+          'flex h-9 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium transition-colors pointer-coarse:h-11 pointer-coarse:text-[15px]',
           isActive
             ? 'bg-accent-soft text-accent'
             : 'text-muted hover:bg-surface-hover hover:text-text',
@@ -48,17 +49,24 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-export function Sidebar() {
+/** `onClose` is set when the sidebar is shown in the phone drawer. */
+export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const navigate = useNavigate()
   const me = useMe()
   const logout = useLogout()
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-surface px-3 py-4">
+    <aside className={cn('h-full shrink-0 flex-col border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
       <div className="mb-4 flex items-center gap-2 px-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-accent-contrast">
           <Bot className="h-4.5 w-4.5" />
         </div>
-        <span className="text-[15px] font-semibold">anemo</span>
+        <span className="flex-1 text-[15px] font-semibold">anemo</span>
+        {onClose && (
+          <button type="button" aria-label="Close menu" onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -95,7 +103,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => logout.mutate()}
-          className="flex h-9 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium text-muted hover:bg-surface-hover hover:text-text"
+          className="flex h-9 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-11 pointer-coarse:text-[15px]"
         >
           <LogOut className="h-4 w-4" />
           Sign out {me.data && <span className="truncate text-subtle">({me.data.username})</span>}

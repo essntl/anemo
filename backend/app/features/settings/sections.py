@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.policy.presets import PermissionSettings
+from app.workspace.access import WorkspaceSettings
 
 
 class GeneralSettings(BaseModel):
@@ -60,4 +61,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "appearance": SectionSpec(AppearanceSettings),
     "models": SectionSpec(ModelDefaults),
     "permissions": SectionSpec(PermissionSettings, sensitive=True),
+    "workspace": SectionSpec(WorkspaceSettings, sensitive=True),
 }

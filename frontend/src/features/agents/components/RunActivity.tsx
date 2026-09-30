@@ -13,17 +13,19 @@ import {
   ChevronRight,
   Circle,
   CircleDot,
+  FileDiff,
+  Undo2,
   Clock,
   Loader2,
   ShieldAlert,
   Wrench,
   XCircle,
 } from 'lucide-react'
-import { errorMessage } from '@/api/client'
+import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { cn } from '@/lib/cn'
-import { type ToolCallView, useDecide, useTimeline } from '../api'
+import { type FileChangeView, type ToolCallView, useDecide, useRevertChange, useTimeline } from '../api'
 
 const STATUS: Record<string, { icon: typeof Circle; tone: string; label: string }> = {
   pending: { icon: Clock, tone: 'text-muted', label: 'Queued' },
@@ -59,7 +61,7 @@ function ApprovalCard({ runId, call }: { runId: string; call: ToolCallView }) {
         </div>
       </div>
       {denying ? (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <Input
             autoFocus
             placeholder="Optional: tell the agent why"
@@ -94,15 +96,22 @@ function ApprovalCard({ runId, call }: { runId: string; call: ToolCallView }) {
   )
 }
 
+/** The image a tool showed the model (e.g. read_file on a PNG), if any. */
+function shownImage(call: ToolCallView): { attachment_id: string; width: number; height: number } | null {
+  const image = call.result_data?.image as { attachment_id?: string; width: number; height: number } | undefined
+  return image?.attachment_id ? { ...image, attachment_id: image.attachment_id } : null
+}
+
 function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
   const [open, setOpen] = useState(false)
+  const image = shownImage(call)
   const s = STATUS[call.status] ?? STATUS.pending
   const Icon = s.icon
   const needsApproval = call.status === 'waiting_approval' && call.approval?.status === 'pending'
   return (
     <div className="py-1">
       <button type="button" onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] hover:bg-surface-hover">
+        className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] hover:bg-surface-hover pointer-coarse:py-2.5">
         <Icon className={cn('h-3.5 w-3.5 shrink-0', s.tone, call.status === 'running' && 'animate-spin')} />
         <span className="min-w-0 flex-1 truncate">{describe(call)}</span>
         <span className={cn('shrink-0 text-[11.5px]', s.tone)}>{s.label}</span>
@@ -127,7 +136,56 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
           )}
         </div>
       )}
+      {image && (
+        <a href={`/api/attachments/${image.attachment_id}/content`} target="_blank" rel="noreferrer"
+          className="ml-7 mt-1 inline-block" title={`What the agent saw (${image.width}×${image.height})`}>
+          <img src={`/api/attachments/${image.attachment_id}/content`} alt="Image the agent viewed"
+            className="max-h-32 max-w-56 rounded-lg border border-border object-contain" />
+        </a>
+      )}
       {needsApproval && <ApprovalCard runId={runId} call={call} />}
+    </div>
+  )
+}
+
+const OP_LABEL: Record<string, string> = {
+  create: 'Created',
+  modify: 'Edited',
+  delete: 'Deleted',
+  move: 'Moved',
+  mkdir: 'Created folder',
+}
+
+function FileChangeRow({ runId, change }: { runId: string; change: FileChangeView }) {
+  const revert = useRevertChange(runId)
+  const run = async (force = false) => {
+    try {
+      await revert.mutateAsync({ changeId: change.id, force })
+    } catch (err) {
+      if (err instanceof ApiError && ['changed_since', 'not_empty'].includes(err.code) &&
+          window.confirm(`${err.message}`)) {
+        await revert.mutateAsync({ changeId: change.id, force: true })
+      }
+    }
+  }
+  return (
+    <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-[13px]">
+      <FileDiff className="h-3.5 w-3.5 shrink-0 text-muted" />
+      <span className={cn('min-w-0 flex-1 truncate', change.reverted_at && 'line-through opacity-60')}>
+        {OP_LABEL[change.op] ?? change.op} <span className="font-mono text-[12px]">{change.path}</span>
+        {change.dest_path && <> → <span className="font-mono text-[12px]">{change.dest_path}</span></>}
+      </span>
+      {change.reverted_at ? (
+        <span className="text-[11.5px] text-muted">Reverted</span>
+      ) : (
+        <Button size="sm" variant="ghost" icon={<Undo2 className="h-3.5 w-3.5" />} loading={revert.isPending}
+          onClick={() => void run()}>
+          Revert
+        </Button>
+      )}
+      {revert.isError && !(revert.error instanceof ApiError && revert.error.code === 'changed_since') && (
+        <span className="text-[11.5px] text-error">{errorMessage(revert.error)}</span>
+      )}
     </div>
   )
 }
@@ -136,7 +194,7 @@ export function RunActivity({ runId, live }: { runId: string; live: boolean }) {
   const timeline = useTimeline(runId)
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const data = timeline.data
-  if (!data || (data.tool_calls.length === 0 && !data.plan)) return null
+  if (!data || (data.tool_calls.length === 0 && !data.plan && data.file_changes.length === 0)) return null
 
   const calls = data.tool_calls
   const waiting = calls.some((c) => c.status === 'waiting_approval')
@@ -146,7 +204,7 @@ export function RunActivity({ runId, live }: { runId: string; live: boolean }) {
   return (
     <div className="mb-3 rounded-xl border border-border bg-surface-2/50">
       <button type="button" onClick={() => setExpanded(!isOpen)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-muted hover:text-text">
+        className="flex w-full items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-muted hover:text-text pointer-coarse:py-3">
         <Wrench className="h-3.5 w-3.5" />
         {waiting ? 'Waiting for your approval' : live ? 'Working…' : `${calls.length} action${calls.length === 1 ? '' : 's'}`}
         <ChevronRight className={cn('ml-auto h-3.5 w-3.5 transition-transform', isOpen && 'rotate-90')} />
@@ -169,6 +227,16 @@ export function RunActivity({ runId, live }: { runId: string; live: boolean }) {
             </div>
           )}
           {calls.map((c) => <ToolRow key={c.id} runId={runId} call={c} />)}
+          {data.file_changes.length > 0 && (
+            <div className="mt-2 border-t border-border pt-2">
+              <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                Files changed
+              </div>
+              {[...data.file_changes].reverse().map((c) => (
+                <FileChangeRow key={c.id} runId={runId} change={c} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

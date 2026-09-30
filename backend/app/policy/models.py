@@ -52,6 +52,9 @@ class Action(BaseModel):
     risk: Risk = "safe"
     summary: str = ""  # human-readable, shown in approvals and history
     outside_workspace: bool = False  # path resolved outside the workspace: always denied
+    # Set when something outside the policy forbids the action outright (e.g. the
+    # folder is hidden from agents). Always denied, with this as the reason.
+    blocked: str | None = None
 
 
 class Grant(BaseModel):

@@ -20,7 +20,7 @@ export function ProvidersPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Providers & Models</h2>
           <p className="text-[13px] text-muted">Connect AI providers, pick models, and choose defaults per task.</p>

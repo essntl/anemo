@@ -48,7 +48,7 @@ export function DiscoverDialog({
       onOpenChange={onOpenChange}
       title={`Models from ${provider.name}`}
       description="Pick the models you want to use. You can adjust their capabilities afterwards."
-      className="w-[min(94vw,640px)]"
+      className="md:w-[min(94vw,640px)]"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

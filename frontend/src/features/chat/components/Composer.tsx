@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { ArrowUp, Paperclip, Square } from 'lucide-react'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
@@ -23,6 +24,9 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, toolb
   const textRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const files = useAttachments()
+  // Touch screens: the on-screen keyboard has its own send flow, so Enter adds a line
+  // and the box doesn't grab focus (which would pop the keyboard up on every visit).
+  const touch = useMediaQuery('(pointer: coarse)')
 
   // Grow with the content up to a limit.
   useEffect(() => {
@@ -42,8 +46,8 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, toolb
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter sends, Shift+Enter adds a line. Ignore Enter while an IME is composing.
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+    // Enter sends, Shift+Enter adds a line (not on touch screens). Ignore Enter while an IME is composing.
+    if (e.key === 'Enter' && !e.shiftKey && !touch && !e.nativeEvent.isComposing) {
       e.preventDefault()
       send()
     }
@@ -94,7 +98,7 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, toolb
       <textarea
         ref={textRef}
         rows={1}
-        autoFocus
+        autoFocus={!touch}
         value={text}
         disabled={disabled}
         placeholder={dragging ? 'Drop files to attach' : (placeholder ?? 'Message the assistant…')}
@@ -103,15 +107,15 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, toolb
         onPaste={onPaste}
         className="block max-h-60 w-full resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none"
       />
-      <div className="flex items-center justify-between gap-2 pl-1">
-        <div className="flex min-w-0 items-center gap-1">
+      <div className="flex items-center justify-between gap-1 pl-1 md:gap-2">
+        <div className="flex min-w-0 items-center gap-0.5 md:gap-1">
           <button
             type="button"
             aria-label="Attach files"
             title="Attach files (or drop / paste them)"
             disabled={disabled || files.items.length >= MAX_ATTACHMENTS}
             onClick={() => fileRef.current?.click()}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10"
           >
             <Paperclip className="h-4 w-4" />
           </button>
@@ -133,7 +137,7 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, toolb
             type="button"
             onClick={onStop}
             aria-label="Stop"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-text text-bg transition-opacity hover:opacity-85"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-bg transition-opacity hover:opacity-85 pointer-coarse:h-10 pointer-coarse:w-10"
           >
             <Square className="h-3.5 w-3.5 fill-current" />
           </button>
@@ -144,7 +148,7 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, toolb
             aria-label="Send"
             disabled={!canSend}
             className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-contrast transition-all',
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-contrast transition-all pointer-coarse:h-10 pointer-coarse:w-10',
               'hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40',
             )}
           >

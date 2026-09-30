@@ -96,6 +96,8 @@ def evaluate(
         return Evaluation(
             decision="deny", reason="Path is outside the workspace", rule="hard-floor"
         )
+    if action.blocked:
+        return Evaluation(decision="deny", reason=action.blocked, rule="hard-floor")
 
     # 2 + 3. Layers, most restrictive wins.
     results = [evaluate_policy(policy, action)]

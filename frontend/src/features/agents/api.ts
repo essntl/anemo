@@ -8,6 +8,7 @@ export type ToolCallView = Schemas['ToolCallOut']
 export type PermissionSettings = Schemas['PermissionSettings']
 export type PermissionSummary = Schemas['PermissionSummary']
 export type Level = Schemas['LevelOut']['level']
+export type FileChangeView = Schemas['FileChangeOut']
 
 export const timelineKey = (runId: string) => ['timeline', runId] as const
 export const approvalsKey = ['approvals'] as const
@@ -73,6 +74,22 @@ export function useSavePermissions() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: settingsKey })
       void qc.invalidateQueries({ queryKey: permissionSummaryKey })
+    },
+  })
+}
+
+export function useRevertChange(runId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { changeId: string; force?: boolean }) =>
+      unwrap(
+        await api.POST('/api/runs/{run_id}/files/{change_id}/revert', {
+          params: { path: { run_id: runId, change_id: v.changeId }, query: { force: v.force ?? false } },
+        }),
+      ),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: timelineKey(runId) })
+      void qc.invalidateQueries({ queryKey: ['files'] })
     },
   })
 }

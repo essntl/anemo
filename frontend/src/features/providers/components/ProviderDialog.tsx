@@ -84,7 +84,7 @@ export function ProviderDialog({
       onOpenChange={onOpenChange}
       title={editing ? `Edit ${provider?.name}` : 'Add provider'}
       description="API keys are encrypted on the server and never shown again."
-      className="w-[min(92vw,520px)]"
+      className="md:w-[min(92vw,520px)]"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

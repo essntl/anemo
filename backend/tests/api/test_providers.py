@@ -118,6 +118,22 @@ async def test_default_model_routing(authed):
         except NoModelAvailable as exc:
             assert "disabled" in exc.message
 
+    # An explicitly picked model that can't be used fails instead of being swapped.
+    await authed.put("/api/settings/models", json={"chat": by_key["reasoning"]})
+    await authed.patch(f"/api/providers/{pid}", json={"enabled": False})
+    async with get_sessionmaker()() as db:
+        try:
+            await resolve(
+                db,
+                RouteRequest(
+                    task="chat", explicit_model_id=__import__("uuid").UUID(by_key["echo"])
+                ),
+            )
+            raise AssertionError("an unusable explicit model must not be replaced")
+        except NoModelAvailable as exc:
+            assert "selected model" in exc.message
+            assert "provider" in exc.message
+
 
 async def test_delete_provider_removes_models_and_secrets(authed):
     from app.core.db import get_sessionmaker

@@ -2,7 +2,7 @@
 
 A tool declares its input schema, the capability it needs, and — computed from the
 concrete arguments by deterministic code — the Actions a call would perform. The
-executor (tools/executor.py) checks those actions against the permission policy
+executor (runtime/agent.py) checks those actions against the permission policy
 *before* `run()` is ever called. Tools never decide their own permissions.
 
 To add a tool: subclass Tool, then register it in tools/registry.py.
@@ -16,16 +16,36 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
+from app.features.attachments.images import PreparedImage
 from app.policy.models import Action
 from app.providers.base import ToolSpec
+from app.workspace.access import WorkspaceSettings
 
 EmitFn = Callable[[str, dict[str, Any]], Awaitable[None]]
+RecordChangeFn = Callable[..., Awaitable[None]]
+AddImageFn = Callable[[str, PreparedImage], Awaitable[str]]
+
+
+async def _no_record(**_: Any) -> None:
+    return None
+
+
+async def _no_images(filename: str, image: PreparedImage) -> str:
+    raise RuntimeError("images are not available in this context")
 
 
 @dataclass
 class ToolContext:
     run_id: uuid.UUID
     emit: EmitFn  # publish a live event on the run's stream
+    # Workspace folder access, snapshotted when the run started.
+    workspace: WorkspaceSettings = field(default_factory=WorkspaceSettings)
+    # Records a file change for the run's history (op, path, before/after hash, backup).
+    record_change: RecordChangeFn = _no_record
+    # Whether the run's model can look at images, and how a tool hands one over:
+    # add_image stores it and returns an attachment id to put in ToolResult.images.
+    can_view_images: bool = False
+    add_image: AddImageFn = _no_images
     state: dict[str, Any] = field(default_factory=dict)  # per-run scratch (e.g. the plan)
 
 
@@ -33,6 +53,7 @@ class ToolResult(BaseModel):
     content: str  # what the model sees
     is_error: bool = False
     data: dict[str, Any] | None = None  # structured extras for the UI (never sent to the model)
+    images: list[str] = []  # attachment ids shown to the model right after this result
 
 
 class Tool(ABC):

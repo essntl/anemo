@@ -6,9 +6,30 @@ from app.policy.engine import evaluate
 from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.plan import UpdatePlan
-from app.tools.builtin.workspace import CurrentTime, ListFiles, ReadFile
+from app.tools.builtin.workspace import (
+    CreateFolder,
+    CurrentTime,
+    DeletePath,
+    EditFile,
+    FindFiles,
+    ListFiles,
+    MovePath,
+    ReadFile,
+    WriteFile,
+)
 
-BUILTIN_TOOLS: list[Tool] = [UpdatePlan(), ListFiles(), ReadFile(), CurrentTime()]
+BUILTIN_TOOLS: list[Tool] = [
+    UpdatePlan(),
+    ListFiles(),
+    ReadFile(),
+    FindFiles(),
+    WriteFile(),
+    EditFile(),
+    CreateFolder(),
+    MovePath(),
+    DeletePath(),
+    CurrentTime(),
+]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 
 

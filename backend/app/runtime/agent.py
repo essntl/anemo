@@ -24,15 +24,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.events import bus
+from app.features.attachments import service as attachments
+from app.features.attachments.images import PreparedImage
 from app.features.conversations.models import ChatMessage
 from app.features.runs import service as runs
-from app.features.runs.models import TERMINAL_STATUSES, Approval, Run, ToolCall
+from app.features.runs.models import TERMINAL_STATUSES, Approval, FileChange, Run, ToolCall
 from app.features.settings import service as settings_service
 from app.features.usage import service as usage
 from app.policy.engine import combine, evaluate
 from app.policy.models import Grant, Policy
 from app.policy.presets import PermissionSettings, compile_ceiling, compile_policy
 from app.providers.base import (
+    AttachmentRef,
     ChatRequest,
     ContentBlock,
     Message,
@@ -53,6 +56,7 @@ from app.runtime.history import (
 from app.runtime.streaming import StreamProgress, stream_with_fallback
 from app.tools import registry
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.workspace.access import WorkspaceSettings
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +92,7 @@ class AgentRun:
         policy: Policy,
         ceiling: Policy | None,
         tools: list[Tool],
+        workspace: WorkspaceSettings | None = None,
     ) -> None:
         self.run_id = run_id
         self.candidates = candidates
@@ -95,11 +100,40 @@ class AgentRun:
         self.ceiling = ceiling
         self.tools = {t.name: t for t in tools}
         self.system = AGENT_SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
-        self.ctx = ToolContext(run_id=run_id, emit=self._emit)
+        self.ctx = ToolContext(
+            run_id=run_id,
+            emit=self._emit,
+            workspace=workspace or WorkspaceSettings(),
+            record_change=self._record_change,
+            # The first candidate is the model normally used; if a fallback without
+            # vision takes over, images are replaced by a short note for it.
+            can_view_images=bool(candidates and candidates[0].capabilities.get("vision")),
+            add_image=self._add_image,
+        )
+        self.current_call: uuid.UUID | None = None
         self.started = time.monotonic()
 
     async def _emit(self, event_type: str, data: dict[str, Any]) -> None:
         await bus.publish_run_event(self.run_id, event_type, data)
+
+    async def _record_change(self, **change: Any) -> None:
+        """Called by file tools: keeps a revertible history of workspace changes."""
+        async with get_sessionmaker()() as db:
+            row = FileChange(run_id=self.run_id, tool_call_id=self.current_call, **change)
+            db.add(row)
+            await db.commit()
+        await self._emit(
+            "file.changed",
+            {"change_id": str(row.id), "op": change.get("op"), "path": change.get("path")},
+        )
+
+    async def _add_image(self, filename: str, image: PreparedImage) -> str:
+        """Called by tools that show the model an image: stores a snapshot of it."""
+        async with get_sessionmaker()() as db:
+            run = await _get_run(db, self.run_id)
+            att = await attachments.store_image(db, filename, image, run.conversation_id)
+            await db.commit()
+            return str(att.id)
 
     # -- main loop ---------------------------------------------------------------
 
@@ -349,6 +383,16 @@ class AgentRun:
             )
             for r in ordered
         ]
+        # Images go after all tool results: not every provider accepts them inside a
+        # tool result, but all accept them in the user turn that carries the results.
+        for r in ordered:
+            for image in (r.result_data or {}).get("images", []):
+                results.append(TextBlock(text=f"[Image from {r.tool_name}: {image['name']}]"))
+                results.append(
+                    AttachmentRef(
+                        attachment_id=image["attachment_id"], filename=image["name"], kind="image"
+                    )
+                )
         run.transcript = [*run.transcript, Message(role="user", content=results).model_dump()]
         await db.commit()
         return "done"
@@ -369,6 +413,7 @@ class AgentRun:
             return
         row.status, row.started_at = "running", datetime.now(UTC)
         await db.commit()  # checkpoint: a crash from here on is detected on resume
+        self.current_call = row.id
         await self._emit("tool.started", {"tool_call_id": str(row.id), "tool": tool.name})
         try:
             result = await asyncio.wait_for(tool.run(args, self.ctx), timeout=tool.timeout_s)
@@ -395,7 +440,14 @@ class AgentRun:
         content = result.content
         if len(content) > MAX_RESULT_CHARS:
             content = content[:MAX_RESULT_CHARS] + "\n[Output truncated]"
-        row.status, row.result, row.result_data = status, content, result.data
+        data = result.data
+        if result.images:
+            name = (data or {}).get("path") or row.tool_name
+            data = {
+                **(data or {}),
+                "images": [{"attachment_id": i, "name": name} for i in result.images],
+            }
+        row.status, row.result, row.result_data = status, content, data
         row.is_error = result.is_error
         row.ended_at = datetime.now(UTC)
         await db.commit()
@@ -478,19 +530,22 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             if run.totals.get("text"):
                 await runs.emit(db, run, "message.delta", {"text": run.totals["text"]})
 
-        settings = await settings_service.get_section(db, PermissionSettings, "permissions")
         if run.policy is None:
-            # Snapshot the policy: changing settings later does not affect this run.
-            policy, ceiling = compile_policy(settings), compile_ceiling(settings)
+            # Snapshot permissions and folder access: changing settings later does not
+            # affect a run that has already started.
+            settings = await settings_service.get_section(db, PermissionSettings, "permissions")
+            ws_settings = await settings_service.get_section(db, WorkspaceSettings, "workspace")
+            snap_policy, snap_ceiling = compile_policy(settings), compile_ceiling(settings)
             run.policy = {
-                "policy": policy.model_dump(by_alias=True),
-                "ceiling": ceiling.model_dump(by_alias=True) if ceiling else None,
+                "policy": snap_policy.model_dump(by_alias=True),
+                "ceiling": snap_ceiling.model_dump(by_alias=True) if snap_ceiling else None,
+                "workspace": ws_settings.model_dump(),
             }
-        else:
-            policy = Policy.model_validate(run.policy["policy"])
-            ceiling = (
-                Policy.model_validate(run.policy["ceiling"]) if run.policy.get("ceiling") else None
-            )
+        policy = Policy.model_validate(run.policy["policy"])
+        ceiling = (
+            Policy.model_validate(run.policy["ceiling"]) if run.policy.get("ceiling") else None
+        )
+        workspace = WorkspaceSettings.model_validate(run.policy.get("workspace") or {})
 
         if not run.transcript:
             assert run.conversation_id is not None
@@ -518,7 +573,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         tools = registry.toolset_for("agent", policy, ceiling)
         await runs.set_status(db, run, "running")  # commits
 
-    agent = AgentRun(run_id, candidates, policy, ceiling, tools)
+    agent = AgentRun(run_id, candidates, policy, ceiling, tools, workspace)
     task = asyncio.create_task(agent.run())
     flag = CancelFlag()
     watcher = asyncio.create_task(_watch_for_cancel(run_id, task, flag))

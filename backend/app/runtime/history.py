@@ -8,17 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.attachments.service import render_blocks
 from app.features.conversations.models import ChatMessage
-from app.providers.base import AttachmentRef, ContentBlock, Message, TextBlock
+from app.providers.base import AttachmentRef, ContentBlock, ImageBlock, Message, TextBlock
 
 CHARS_PER_TOKEN = 4  # rough estimate; good enough for trimming decisions
+IMAGE_TOKENS = 1_600  # what a ~1568px image costs on current vision models
 
 
 def estimate_tokens(messages: list[Message]) -> int:
-    total = 0
+    chars, images = 0, 0
     for m in messages:
         for b in m.content:
-            total += len(b.model_dump_json())
-    return total // CHARS_PER_TOKEN
+            if isinstance(b, ImageBlock):
+                images += 1  # its base64 length says nothing about its token cost
+            else:
+                chars += len(b.model_dump_json())
+    return chars // CHARS_PER_TOKEN + images * IMAGE_TOKENS
 
 
 async def load_history(

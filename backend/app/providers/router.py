@@ -69,7 +69,9 @@ def candidate_ids(req: RouteRequest, defaults: ModelDefaults) -> list[uuid.UUID]
 
 def unusable_reason(model: Model, req: RouteRequest) -> str | None:
     """Rule 2 - filter: skip disabled models and those missing a required capability."""
-    if not model.enabled or not model.provider.enabled:
+    if not model.provider.enabled:
+        return f"{model.display_name} is disabled (provider {model.provider.name} is turned off)"
+    if not model.enabled:
         return f"{model.display_name} is disabled"
     missing = sorted(c for c in req.required_capabilities if not model.capabilities.get(c))
     if missing:
@@ -109,9 +111,15 @@ async def resolve(db: AsyncSession, req: RouteRequest) -> list[ResolvedModel]:
     reasons: list[str] = []
     for mid in ids:
         model = rows.get(mid)
+        explicit = mid == req.explicit_model_id
         if model is None:
+            if explicit:
+                raise NoModelAvailable("The selected model no longer exists. Pick another model.")
             continue
         reason = unusable_reason(model, req)
+        if reason and explicit:
+            # Never quietly swap a model the user picked for another (possibly paid) one.
+            raise NoModelAvailable(f"The selected model can't be used: {reason}.")
         if reason:
             reasons.append(reason)
             continue

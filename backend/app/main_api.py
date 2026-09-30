@@ -48,6 +48,12 @@ def create_app() -> FastAPI:
     return app
 
 
+_ALWAYS_REVALIDATE = {
+    "sw.js": "text/javascript",
+    "manifest.webmanifest": "application/manifest+json",
+}
+
+
 def _mount_spa(app: FastAPI, static_dir: Path) -> None:
     """Serve the built React app; unknown non-API paths fall back to index.html."""
     static_dir = static_dir.resolve()
@@ -64,6 +70,13 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
             raise HTTPException(status_code=404)
         candidate = (static_dir / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(static_dir):
+            if path in _ALWAYS_REVALIDATE:
+                # The service worker and manifest must update as soon as a new build ships.
+                return FileResponse(
+                    candidate,
+                    media_type=_ALWAYS_REVALIDATE[path],
+                    headers={"Cache-Control": "no-cache"},
+                )
             return FileResponse(candidate)
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
 

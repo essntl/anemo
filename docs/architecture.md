@@ -446,6 +446,18 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
 - No barrel-file magic.
 - Comments on non-obvious flows (SSE reducer, reconnect).
 
+**Mobile & installable app** (a homelab assistant is often used from a phone):
+- **Mobile-first rule**: every screen must work at phone width (375 px) before its phase counts as done. Tailwind's default breakpoints are used: the unprefixed classes are the phone layout, and `md:` (≥768 px) and `lg:` (≥1024 px) add the desktop layout.
+- **Navigation**: below `md` the sidebar becomes an off-canvas drawer (Radix Dialog: focus trap, Esc/scrim closes it, and it closes itself after navigating), opened from a menu button in a slim top bar. From `md` up it is the fixed sidebar.
+- **Chat**: full-width messages. The composer is pinned to the bottom and stays above the on-screen keyboard (`100dvh` layout, `env(safe-area-inset-bottom)` padding). The header collapses the mode, model and permission controls into a compact row or menu. Code blocks and tables scroll horizontally inside themselves, never the page.
+- **Agent UI**: the approval card, activity list and Revert buttons get touch-sized targets (≥44 px). The run inspector becomes a full-screen sheet.
+- **Files**: one pane at a time on phones (browse → open file, with a back button). Hover-only actions (rename, delete) are always visible or live in a "⋯" menu. Uploads use the native file picker, which also offers the camera.
+- **Settings**: the sub-navigation becomes a list page that leads into each section, and multi-column forms stack.
+- **Dialogs** become bottom sheets or full-screen on phones.
+- **Inputs**: font-size ≥16 px on phones, so iOS doesn't zoom in on focus. `viewport-fit=cover` plus safe-area insets for notched phones.
+- **Installable (PWA)**: a web app manifest (name "anemo", icons, `display: standalone`, theme colour following the appearance setting) and a minimal service worker. The service worker caches only the app shell (built JS/CSS/icons). It **never caches `/api`** responses or event streams, so there is no stale or private data offline, and it shows a simple "offline" page when the server is unreachable. Add-to-home-screen then opens anemo full-screen without browser bars. Installing requires HTTPS, which NPM provides. On plain-HTTP LAN access it stays a normal website.
+- **Push notifications** to the phone remain in Phase 12 (Discord/ntfy first; Web Push is deferred, see S).
+
 ---
 
 ## K. Streaming / Event Architecture
@@ -564,7 +576,7 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
 
 ## P. Implementation Phases
 
-Each phase ends with a green test suite, a working `docker compose up`, and a demoable feature.
+Each phase ends with a green test suite, a working `docker compose up`, and a demoable feature. **From phase 5b on, every new or changed screen must also work at phone width (375 px)** (see J, "Mobile & installable app").
 
 0. **Foundation**: git init, repo skeleton, `.gitattributes`, backend app factory, config, logging, uuid7, Alembic baseline, Compose (migrate/app/worker/postgres/valkey) with health checks, frontend Vite shell, Tailwind v4 + `tokens.css` + light/dark/system + accent, UI kit basics, CI (ruff, mypy, pytest, eslint, tsc, vitest), OpenAPI→TS generation.
 1. **Auth, settings, secrets**: login page, sessions, re-auth, settings framework + Appearance/General pages, encrypted secrets, audit log, first-run wizard skeleton.
@@ -572,6 +584,7 @@ Each phase ends with a green test suite, a working `docker compose up`, and a de
 3. **Jobs, runs, streaming, chat**: jobs queue + worker + leases, runs table, event publisher, SSE gateway with reconnect, conversations/messages, chat mode end-to-end (streaming, reasoning display, markdown/code, stop = cancel), titles, conversation FTS, basic text/image attachments with capability check. **← First milestone**
 4. **Policy engine + tool framework + approvals**: pure engine with exhaustive tests, presets, DSL validation, ceiling, grants, permission summary; ToolExecutor; approvals suspend/resume; Agent Permissions settings UI; mode switch with Agent mode, initially with harmless tools (`plan.update`, `workspace.list`).
 5. **Workspace & files**: roots, WorkspaceFS guard, file manager UI, fs tools (read/write/edit/move/delete→trash), `run_file_changes` + revert, watcher/scan.
+5b. **Mobile & installable app** (inserted before phase 6, while there are few screens): responsive app shell (drawer sidebar + top bar below `md`), mobile chat (keyboard-safe composer, compact header, scrollable code/tables), touch-sized agent UI (approvals, activity, revert), one-pane Files on phones, stacked Settings, dialogs as sheets, safe-area/viewport fixes; PWA manifest + icons + app-shell-only service worker; Playwright checks at phone size.
 6. **Sandbox & shell**: execd, sandbox/sandbox-net, shell classifier, `shell.exec` tool with streaming output, timeouts/kill, shell history UI.
 7. **Agent runtime completion**: plans (+approval/edit), pause/resume/cancel hardening, crash recovery/interrupted semantics, limits, compaction, tool output artifacts, profiles, skills (+`load_skill`), Runs history UI.
 8. **Web**: SearXNG provider + settings test, `net.fetch` with SSRF guard, `http.request`.
@@ -611,6 +624,7 @@ Each phase ends with a green test suite, a working `docker compose up`, and a de
   - Automation with `ask` running unattended (must pause, never auto-allow).
   - Grant-scope overreach (grant for `projects/a` used on `projects/b`).
   - Policy edited mid-run (snapshot semantics).
+- **Mobile (Playwright, phone viewport 375×812 with touch)**: no horizontal page scroll on any screen; the sidebar drawer opens and closes; a chat can be sent and an approval answered; a file can be opened in Files; the manifest and service worker are served, and the service worker never serves `/api` from cache.
 - **Frontend (Vitest + RTL)**: run reducer, useRunStream reconnect logic (mock EventSource), ApprovalCard, theme/accent application, forms validation, editor markdown round-trip fixtures.
 - **E2E (Playwright)** against compose with the fake provider: login → chat stream → refresh mid-stream reconnects → agent run with approval → file created visible in file manager → automation run-now → notification → memory created and visible.
 - **Deployment tests** (CI job): `docker compose up` from clean, wait healthy, run migrations twice (idempotent), smoke E2E, `docker compose restart worker` during a run → run completes or is correctly `interrupted`/resumed; image size budget check.
@@ -681,5 +695,6 @@ This proves the backbone every later feature depends on: jobs, runs, events, pro
 - `make test` runs ruff, mypy, pytest (unit+integration with containers), eslint, tsc and vitest. It must pass.
 - `docker compose up -d` from a clean clone plus `.env` makes all services healthy (`docker compose ps`), and `curl :8080/api/health` → 200.
 - Manual: log in, configure a real provider (or the fake provider with `ENABLE_FAKE_PROVIDER=1`), send a chat, verify streaming in the built-in browser pane, refresh mid-stream, cancel, check `usage_records`.
-- `npx playwright test` in `e2e/` against the running stack.
+- `npx playwright test` in `e2e/` against the running stack, including the phone-viewport project.
+- Manual: check each new or changed screen at phone width in the browser pane (mobile preset) and in dark mode.
 - Resilience: `docker compose restart worker` during a streaming run results in a correct `interrupted` → resumed/failed state and a UI that recovers.

@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFound
+from app.features.attachments.images import PreparedImage
 from app.features.attachments.models import Attachment
 from app.providers.base import ImageBlock, TextBlock
 
@@ -186,6 +187,34 @@ async def store_upload(db: AsyncSession, filename: str, mime: str, data: bytes) 
         storage_path=str(rel),
         extracted_text=text,
         extraction_note=note,
+    )
+    db.add(att)
+    await db.flush()
+    return att
+
+
+async def store_image(
+    db: AsyncSession,
+    filename: str,
+    image: PreparedImage,
+    conversation_id: uuid.UUID | None,
+) -> Attachment:
+    """Stores an image produced by a tool (e.g. an agent reading a workspace image) so
+    it can be sent to the model like a chat attachment. It's a snapshot: later edits
+    to the original file don't change what the conversation saw."""
+    att_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    rel = Path("uploads") / f"{now:%Y}" / f"{now:%m}" / str(att_id)
+    await asyncio.to_thread(_write, Path(get_settings().data_path) / rel, image.data)
+    att = Attachment(
+        id=att_id,
+        conversation_id=conversation_id,
+        filename=Path(filename).name[:255],
+        mime=image.mime,
+        size=len(image.data),
+        sha256=hashlib.sha256(image.data).hexdigest(),
+        kind="image",
+        storage_path=str(rel),
     )
     db.add(att)
     await db.flush()

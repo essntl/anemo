@@ -33,7 +33,7 @@ function ModelRow({ model }: { model: Model }) {
   const remove = useDeleteModel()
   const test = useTestModel()
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-5 py-3">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3 md:px-5">
       <Switch
         label={`Enable ${model.display_name}`}
         checked={model.enabled}
@@ -77,12 +77,12 @@ export function ProviderCard({ provider, models }: { provider: Provider; models:
 
   return (
     <Card>
-      <div className="flex flex-wrap items-start gap-4 px-5 py-4">
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-2 px-4 py-4 md:px-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <Plug className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="text-[15px] font-semibold">{provider.name}</h3>
             <Badge>{provider.type.replace('_', '-')}</Badge>
             {!provider.enabled && <Badge tone="warning">Disabled</Badge>}
@@ -96,7 +96,7 @@ export function ProviderCard({ provider, models }: { provider: Provider; models:
             {remove.isError && <TestOutcome ok={false} message={errorMessage(remove.error)} />}
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 max-md:w-full max-md:justify-end">
           <Switch
             label={`Enable ${provider.name}`}
             checked={provider.enabled}
@@ -116,7 +116,7 @@ export function ProviderCard({ provider, models }: { provider: Provider; models:
 
       {models.map((m) => <ModelRow key={m.id} model={m} />)}
 
-      <div className="flex items-center justify-between border-t border-border px-5 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 md:px-5">
         <span className="text-[12px] text-muted">
           {models.length === 0 ? 'No models added yet.' : `${models.length} model${models.length === 1 ? '' : 's'}`}
         </span>

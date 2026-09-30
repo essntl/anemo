@@ -16,6 +16,11 @@ const { mode, accent, density } = useThemeStore.getState()
 applyAppearance({ mode, accent, density })
 watchSystemTheme()
 
+// Installable app: register the service worker (production builds only; it never caches /api).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js'))
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

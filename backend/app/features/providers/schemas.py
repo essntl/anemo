@@ -97,6 +97,7 @@ class ModelOut(BaseModel):
     pricing: dict[str, float] | None
     provider_options: dict[str, Any]
     enabled: bool
+    provider_enabled: bool
 
 
 class DiscoveredModelOut(BaseModel):

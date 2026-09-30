@@ -4,6 +4,7 @@ Approvals are the only way an `ask` becomes a yes. They come from the logged-in
 user through this API, never from model output.
 """
 
+import asyncio
 import posixpath
 import uuid
 from datetime import UTC, datetime
@@ -18,9 +19,10 @@ from app.core.errors import Conflict, NotFound
 from app.events import bus
 from app.features.audit import service as audit
 from app.features.runs import service
-from app.features.runs.models import Approval, Run, ToolCall
+from app.features.runs.models import Approval, FileChange, Run, ToolCall
 from app.jobs import queue
 from app.policy.models import Grant
+from app.workspace import revert
 
 router = APIRouter(tags=["agents"])
 
@@ -57,12 +59,23 @@ class ToolCallOut(BaseModel):
     approval: ApprovalOut | None = None
 
 
+class FileChangeOut(BaseModel):
+    id: uuid.UUID
+    tool_call_id: uuid.UUID | None
+    op: str
+    path: str
+    dest_path: str | None
+    reverted_at: datetime | None
+    created_at: datetime
+
+
 class TimelineOut(BaseModel):
     run_id: uuid.UUID
     kind: str
     status: str
     plan: list[dict[str, Any]] | None
     tool_calls: list[ToolCallOut]
+    file_changes: list[FileChangeOut]
 
 
 @router.get("/runs/{run_id}/timeline", response_model=TimelineOut)
@@ -79,11 +92,15 @@ async def timeline(run_id: uuid.UUID, db: Db) -> TimelineOut:
         a.tool_call_id: ApprovalOut.model_validate(a, from_attributes=True)
         for a in await db.scalars(select(Approval).where(Approval.run_id == run.id))
     }
+    changes = await db.scalars(
+        select(FileChange).where(FileChange.run_id == run.id).order_by(FileChange.created_at)
+    )
     return TimelineOut(
         run_id=run.id,
         kind=run.kind,
         status=run.status,
         plan=run.plan,
+        file_changes=[FileChangeOut.model_validate(c, from_attributes=True) for c in changes],
         tool_calls=[
             ToolCallOut.model_validate(c, from_attributes=True).model_copy(
                 update={"approval": approvals.get(c.id)}
@@ -171,3 +188,31 @@ async def decide(approval_id: uuid.UUID, body: DecisionIn, request: Request, db:
     )
     await service.set_status(db, run, "queued")  # commits
     return ApprovalOut.model_validate(approval, from_attributes=True)
+
+
+class RevertOut(BaseModel):
+    message: str
+    change: FileChangeOut
+
+
+@router.post("/runs/{run_id}/files/{change_id}/revert", response_model=RevertOut)
+async def revert_change(
+    run_id: uuid.UUID, change_id: uuid.UUID, request: Request, db: Db, force: bool = False
+) -> RevertOut:
+    """Undo one file change made by an agent in this run."""
+    change = await db.get(FileChange, change_id)
+    if change is None or change.run_id != run_id:
+        raise NotFound("Change not found")
+    message = await asyncio.to_thread(revert.revert, change, force=force)
+    audit.record(
+        db,
+        "files.revert",
+        target_type="file_change",
+        target_id=change.id,
+        ip=client_ip(request),
+        details={"message": message, "force": force},
+    )
+    await db.commit()
+    return RevertOut(
+        message=message, change=FileChangeOut.model_validate(change, from_attributes=True)
+    )

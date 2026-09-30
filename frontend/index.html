@@ -3,8 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: draw under notches (safe-area padding is in app.css).
+         interactive-widget: the on-screen keyboard shrinks the page, so the composer stays visible. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <title>anemo</title>
+    <!-- Installable app ("Add to Home Screen"); see public/manifest.webmanifest and public/sw.js. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="anemo" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Browser/status bar colour; kept in sync with the theme by applyAppearance(). -->
+    <meta name="theme-color" content="#f4f5f8" />
     <script>
       // Apply the cached theme before first paint to avoid a light/dark flash.
       // Mirrors applyAppearance() in src/features/settings/theme.ts.
@@ -18,6 +31,7 @@
         root.dataset.theme = mode
         root.dataset.density = a.density || 'comfortable'
         if (a.accent) root.style.setProperty('--accent', a.accent)
+        document.querySelector('meta[name=theme-color]').content = mode === 'dark' ? '#0e1014' : '#f4f5f8'
       } catch (e) {}
     </script>
   </head>

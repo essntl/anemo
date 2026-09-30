@@ -73,6 +73,9 @@ export function applyAppearance(a: Appearance): void {
   root.dataset.density = a.density
   root.style.setProperty('--accent', a.accent)
   root.style.setProperty('--accent-contrast', contrastText(a.accent))
+  // The phone's status bar / browser toolbar takes the page background colour.
+  const bg = getComputedStyle(root).getPropertyValue('--bg').trim()
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg)
   window.setTimeout(() => root.classList.remove('theme-transition'), 250)
 }
 

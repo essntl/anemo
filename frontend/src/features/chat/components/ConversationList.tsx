@@ -33,18 +33,19 @@ function Item({ conv }: { conv: Conversation }) {
       to={`/c/${conv.id}`}
       className={({ isActive }) =>
         cn(
-          'group flex h-9 items-center gap-2 rounded-control px-3 text-[13px]',
+          'group flex h-9 items-center gap-2 rounded-control px-3 text-[13px] pointer-coarse:h-11 pointer-coarse:text-[15px]',
           isActive ? 'bg-surface-hover text-text' : 'text-muted hover:bg-surface-hover hover:text-text',
         )
       }
     >
       {conv.active_run_id && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />}
       <span className="min-w-0 flex-1 truncate" title={conv.snippet ?? conv.title}>{conv.title}</span>
-      <span className="hidden shrink-0 items-center group-hover:flex" onClick={(e) => e.preventDefault()}>
-        <button type="button" aria-label="Rename" onClick={rename} className="rounded p-1 hover:text-text">
+      {/* Hover reveals the actions; touch screens (no hover) always show them. */}
+      <span className="hidden shrink-0 items-center group-hover:flex pointer-coarse:flex" onClick={(e) => e.preventDefault()}>
+        <button type="button" aria-label="Rename" onClick={rename} className="rounded p-1 hover:text-text pointer-coarse:p-2">
           <Pencil className="h-3.5 w-3.5" />
         </button>
-        <button type="button" aria-label="Delete" onClick={del} className="rounded p-1 hover:text-error">
+        <button type="button" aria-label="Delete" onClick={del} className="rounded p-1 hover:text-error pointer-coarse:p-2">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </span>
@@ -68,7 +69,7 @@ export function ConversationList() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search chats"
-          className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-3 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
+          className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-3 pointer-coarse:h-10 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
         />
       </div>
       {pinned.length > 0 && (
