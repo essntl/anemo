@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Sparkles } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
@@ -18,7 +18,11 @@ export function NewChatPage() {
   const setup = useSetupStatus()
   const [modelId, setModelId] = useState<string | null>(null)
   const [modeOverride, setModeOverride] = useState<Mode | null>(null)
-  const mode: Mode = modeOverride ?? settings.data?.general.default_chat_mode ?? 'chat'
+  // "Ask the assistant" on a document opens a new chat about it: the agent can read
+  // (and, if allowed, edit) the file, so Agent mode is preselected.
+  const [params] = useSearchParams()
+  const aboutDoc = params.get('doc')
+  const mode: Mode = modeOverride ?? (aboutDoc ? 'agent' : (settings.data?.general.default_chat_mode ?? 'chat'))
   const [profileId, setProfileId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -67,6 +71,7 @@ export function NewChatPage() {
         <Composer
           running={false}
           disabled={busy || Boolean(needsSetup)}
+          initialText={aboutDoc ? `About my document “${params.get('title') ?? aboutDoc}” (${aboutDoc}): ` : undefined}
           onSend={start}
           toolbar={
             <>

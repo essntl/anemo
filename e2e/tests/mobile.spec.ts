@@ -11,6 +11,7 @@ signOutAfterEach()
 const SCREENS = [
   '/',
   '/files',
+  '/documents',
   '/runs',
   '/runs?kind=all',
   '/agents',

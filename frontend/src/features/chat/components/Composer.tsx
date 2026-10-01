@@ -11,6 +11,8 @@ interface ComposerProps {
   running: boolean
   disabled?: boolean
   placeholder?: string
+  /** Text the box starts with (e.g. a question about a document). */
+  initialText?: string
   /** Controls shown under the text box (model picker, mode switch). */
   toolbar?: ReactNode
 }
@@ -18,8 +20,8 @@ interface ComposerProps {
 const ACCEPT =
   'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/*,.md,.csv,.json,.yaml,.yml,.toml,.py,.js,.ts,.tsx,.jsx,.go,.rs,.java,.c,.cpp,.h,.cs,.rb,.php,.sh,.sql,.html,.css,.xml,.log'
 
-export function Composer({ onSend, onStop, running, disabled, placeholder, toolbar }: ComposerProps) {
-  const [text, setText] = useState('')
+export function Composer({ onSend, onStop, running, disabled, placeholder, initialText, toolbar }: ComposerProps) {
+  const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
   const textRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)

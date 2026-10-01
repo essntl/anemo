@@ -4,6 +4,7 @@ import { ProfilesPage } from '@/features/profiles/pages/ProfilesPage'
 import { RunDetailPage } from '@/features/runs/pages/RunDetailPage'
 import { RunsPage } from '@/features/runs/pages/RunsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { DocumentsPage } from '@/features/documents/DocumentsPage'
 import { FilesPage } from '@/features/files/FilesPage'
 import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
 import { MemoryPage } from '@/features/memory/MemoryPage'
@@ -45,7 +46,8 @@ export const router = createBrowserRouter([
           },
           placeholder('search', 'Search'),
           { path: 'files', element: <FilesPage /> },
-          placeholder('documents', 'Documents'),
+          { path: 'documents', element: <DocumentsPage /> },
+          { path: 'documents/:documentId', element: <DocumentsPage /> },
           placeholder('tasks', 'Tasks'),
           placeholder('calendar', 'Calendar'),
           { path: 'runs', element: <RunsPage /> },

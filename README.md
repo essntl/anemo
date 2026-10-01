@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–9 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–10 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -14,8 +14,8 @@ Docker Compose on a homelab.
 > sandbox**, follow **agent profiles** and **skills**, have their plans reviewed,
 > be paused and resumed, and every run is in the **Runs** history. They can
 > **search the web** (SearXNG), read pages and call APIs, and the assistant has a
-> **memory** you control. Documents, tasks etc. follow the phases in
-> `docs/architecture.md`.
+> **memory** you control. **Documents** are Markdown files with a rich editor and
+> history. Tasks, calendar etc. follow the phases in `docs/architecture.md`.
 
 ### Chat vs. Agent mode
 
@@ -62,6 +62,30 @@ page through it, and you can download it from the run.
 
 **Runs** lists every agent run with its status, profile, time, tokens and cost, and
 opens each one with its plan, tool calls, approvals, file changes and answer.
+
+### Documents
+
+**Documents** are plain Markdown files in the `documents/` folder of your
+workspace, so the app, agents, the file manager and any other Markdown tool work
+on the same files. Sub-folders are groups; images you drop in go to
+`documents/_assets/`.
+
+- **Editor:** rich text (headings, lists, checklists, tables, code blocks, links,
+  images) that reads and writes Markdown, or the Markdown source itself. Documents
+  using raw HTML or footnotes open as source, because the rich editor would lose
+  those.
+- **Autosave** about a second after you stop typing. If the file was changed
+  somewhere else in the meantime (an agent, another tab), nothing is overwritten:
+  you choose which version to keep. With no unsaved changes, outside changes just
+  appear.
+- **History:** every document keeps its last 50 versions (your autosaves within
+  10 minutes count as one), marked as yours, an agent's, or made outside the app.
+  Restoring one keeps the current text in the history.
+- **Agents** can list, read, search, create and edit documents. Reading follows the
+  file-read permission and the folder access for `documents`; writing has its own
+  category, *Edit documents* (asks by default). Their changes are in the history
+  and can be reverted from the run.
+- **Delete** moves the file to the workspace trash (Files → Trash).
 
 ### Memory
 

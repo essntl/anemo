@@ -32,6 +32,12 @@ export function useAppEvents() {
     }) as EventListener)
     // Memories changed (a tool saved one, or background extraction found some).
     source.addEventListener('memory.changed', () => void qc.invalidateQueries({ queryKey: ['memories'] }))
+    // A document was saved (here, in another tab, or by an agent).
+    source.addEventListener('document.changed', ((e: MessageEvent<string>) => {
+      const data = JSON.parse(e.data) as { document_id?: string }
+      void qc.invalidateQueries({ queryKey: ['documents'] })
+      if (data.document_id) void qc.invalidateQueries({ queryKey: ['document', data.document_id] })
+    }) as EventListener)
     return () => source.close()
   }, [qc])
 }

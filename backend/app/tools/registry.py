@@ -7,6 +7,7 @@ from app.policy.engine import evaluate
 from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
+from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.shell import RunShell
@@ -33,6 +34,7 @@ BUILTIN_TOOLS: list[Tool] = [
     CreateFolder(),
     MovePath(),
     DeletePath(),
+    *DOCUMENT_TOOLS,
     RunShell(),
     WebSearch(),
     ReadWebPage(),

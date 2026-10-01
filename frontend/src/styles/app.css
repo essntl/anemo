@@ -119,6 +119,26 @@
   .markdown th { @apply bg-surface-2 font-semibold; }
   .markdown :not(pre) > code { @apply rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[0.88em]; }
   .markdown input[type='checkbox'] { @apply mr-1.5 align-middle; }
+  .markdown img { @apply my-3 max-w-full rounded-lg; }
+
+  /* The rich document editor (TipTap) uses .markdown too; these are its extras. */
+  .tiptap pre { @apply my-3 overflow-x-auto rounded-xl border border-border bg-surface-2 p-3 font-mono text-[12.5px] leading-relaxed; }
+  .tiptap table { @apply table w-full; }
+  .tiptap td > p, .tiptap th > p { @apply my-0; }
+  .tiptap .selectedCell { background: var(--selection); }
+  .tiptap ul[data-type='taskList'] { @apply list-none pl-1; }
+  .tiptap ul[data-type='taskList'] > li { @apply flex items-start gap-2; }
+  .tiptap ul[data-type='taskList'] > li > label { @apply flex h-7 shrink-0 items-center; }
+  .tiptap ul[data-type='taskList'] > li > div { @apply min-w-0 flex-1; }
+  .tiptap ul[data-type='taskList'] > li > div > p { @apply my-0; }
+  .tiptap img.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+  .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--text-subtle);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
 
   .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in { color: var(--code-keyword); }
   .hljs-string, .hljs-attr-value, .hljs-regexp, .hljs-addition { color: var(--code-string); }

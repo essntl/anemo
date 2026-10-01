@@ -47,7 +47,15 @@ def default_handlers() -> dict[str, Handler]:
 
         await memory.reindex_all()
 
+    async def document_index(payload: dict[str, Any]) -> None:
+        from app.core.db import get_sessionmaker as sessionmaker
+        from app.features.documents import service as documents
+
+        async with sessionmaker()() as db:
+            await documents.index_document(db, uuid.UUID(payload["document_id"]))
+
     return {
+        "document.index": document_index,
         "run.execute": run_execute,
         "conversation.title": conversation_title,
         "memory.extract": memory_extract,

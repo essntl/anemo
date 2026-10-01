@@ -114,6 +114,11 @@ async def test_agent_uses_tools_and_plan(authed):
         "create_folder",
         "move_path",
         "delete_path",
+        "list_documents",
+        "read_document",
+        "search_documents",
+        "write_document",
+        "edit_document",
         "run_shell",
         "read_web_page",  # web_search only appears once SearXNG is set up
         "http_request",
