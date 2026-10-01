@@ -691,6 +691,65 @@
         }
       }
     },
+    "/api/settings/web": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Web Settings",
+        "operationId": "put_web_settings_api_settings_web_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -4870,6 +4929,114 @@
           }
         }
       }
+    },
+    "/api/web/status": {
+      "get": {
+        "tags": [
+          "web"
+        ],
+        "summary": "Status",
+        "operationId": "status_api_web_status_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/web/test-search": {
+      "post": {
+        "tags": [
+          "web"
+        ],
+        "summary": "Test Search",
+        "operationId": "test_search_api_web_test_search_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchTestIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4890,6 +5057,9 @@
           },
           "workspace": {
             "$ref": "#/components/schemas/WorkspaceSettings"
+          },
+          "web": {
+            "$ref": "#/components/schemas/WebSettings"
           }
         },
         "type": "object",
@@ -4898,7 +5068,8 @@
           "appearance",
           "models",
           "permissions",
-          "workspace"
+          "workspace",
+          "web"
         ],
         "title": "AllSettings"
       },
@@ -7996,6 +8167,75 @@
         "title": "Scope",
         "description": "Restricts a rule to workspace roots (top-level folders). \"*\" means any."
       },
+      "SearchTestIn": {
+        "properties": {
+          "searxng_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Searxng Url"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Query",
+            "default": "open source"
+          }
+        },
+        "type": "object",
+        "title": "SearchTestIn"
+      },
+      "SearchTestOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchTestResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "SearchTestOut"
+      },
+      "SearchTestResult": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url"
+        ],
+        "title": "SearchTestResult"
+      },
       "SessionOut": {
         "properties": {
           "id": {
@@ -8772,6 +9012,74 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WebSettings": {
+        "properties": {
+          "searxng_url": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Searxng Url",
+            "default": ""
+          },
+          "search_results": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Search Results",
+            "default": 8
+          },
+          "safesearch": {
+            "type": "string",
+            "enum": [
+              "off",
+              "moderate",
+              "strict"
+            ],
+            "title": "Safesearch",
+            "default": "moderate"
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Language",
+            "default": "auto"
+          },
+          "allowed_private_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Allowed Private Hosts"
+          }
+        },
+        "type": "object",
+        "title": "WebSettings"
+      },
+      "WebStatus": {
+        "properties": {
+          "search_configured": {
+            "type": "boolean",
+            "title": "Search Configured"
+          },
+          "env_searxng_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env Searxng Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "search_configured",
+          "env_searxng_url"
+        ],
+        "title": "WebStatus"
       },
       "WorkspaceSettings": {
         "properties": {

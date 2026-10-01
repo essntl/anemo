@@ -115,6 +115,8 @@ async def test_agent_uses_tools_and_plan(authed):
         "move_path",
         "delete_path",
         "run_shell",
+        "read_web_page",  # web_search only appears once SearXNG is set up
+        "http_request",
         "get_current_time",
         "read_tool_output",
     ]

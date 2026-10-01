@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { Check, Copy } from 'lucide-react'
+import { stripCitationMarkup } from '@/lib/citations'
 
 function CodeBlock({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) {
   const ref = useRef<HTMLPreElement>(null)
@@ -46,7 +47,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
           a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
         }}
       >
-        {text}
+        {stripCitationMarkup(text)}
       </ReactMarkdown>
     </div>
   )

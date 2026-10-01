@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from app.features.attachments.images import PreparedImage
 from app.policy.models import Action, Limits
 from app.providers.base import ToolSpec
+from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
 
 EmitFn = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -50,6 +51,7 @@ class ToolContext:
     limits: Limits = field(default_factory=Limits)  # the run's limits (from its policy snapshot)
     call_id: uuid.UUID | None = None  # the tool call being executed (for progress events)
     skills: list[str] = field(default_factory=list)  # short names of skills the run may load
+    web: WebSettings = field(default_factory=WebSettings)  # search & network allowlist (snapshot)
 
 
 class ToolResult(BaseModel):

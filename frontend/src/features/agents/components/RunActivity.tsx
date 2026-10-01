@@ -114,6 +114,24 @@ function shownImage(call: ToolCallView): { attachment_id: string; width: number;
   return image?.attachment_id ? { ...image, attachment_id: image.attachment_id } : null
 }
 
+type WebData = { results?: { title: string; url: string }[]; url?: string; title?: string }
+
+/** Search results and pages the agent read, as links the user can open. */
+function WebDetails({ data }: { data: WebData }) {
+  const links = data.results ?? (data.url ? [{ title: data.title || data.url, url: data.url }] : [])
+  if (!links.length) return null
+  return (
+    <ul className="space-y-0.5">
+      {links.map((l) => (
+        <li key={l.url} className="truncate">
+          <a href={l.url} target="_blank" rel="noreferrer noopener" className="text-accent hover:underline">{l.title}</a>
+          <span className="ml-1.5 text-subtle">{new URL(l.url).hostname}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
   const shell = call.tool_name === 'run_shell'
   // null = not toggled by the user: shell commands open by themselves while running.
@@ -124,6 +142,7 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
   const Icon = s.icon
   const needsApproval = call.status === 'waiting_approval' && call.approval?.status === 'pending'
   const output = call.result_data?.output as { chars: number } | undefined
+  const web = (call.result_data?.search ?? call.result_data?.web) as WebData | undefined
   return (
     <div className="py-1">
       <button type="button" onClick={() => setOpen(!open)}
@@ -140,6 +159,7 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
             {call.decision && <> · permission: {call.decision} ({call.decision_reason})</>}
           </div>
           {shell && <ShellDetails call={call} />}
+          {web && <WebDetails data={web} />}
           {!shell && Object.keys(call.args).length > 0 && (
             <pre className="overflow-x-auto rounded-lg bg-surface-2 p-2 font-mono text-[11.5px]">
               {JSON.stringify(call.args, null, 2)}

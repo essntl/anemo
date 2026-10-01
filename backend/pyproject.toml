@@ -22,6 +22,7 @@ dependencies = [
   "pypdf>=5.1",
   "pillow>=11",
   "pyyaml>=6",
+  "trafilatura>=2.0",
 ]
 
 [dependency-groups]

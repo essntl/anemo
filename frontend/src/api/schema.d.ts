@@ -248,6 +248,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/web": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Web Settings */
+        put: operations["put_web_settings_api_settings_web_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -1208,6 +1225,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/web/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_web_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/web/test-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Search */
+        post: operations["test_search_api_web_test_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1219,6 +1270,7 @@ export interface components {
             models: components["schemas"]["ModelDefaults"];
             permissions: components["schemas"]["PermissionSettings"];
             workspace: components["schemas"]["WorkspaceSettings"];
+            web: components["schemas"]["WebSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -2302,6 +2354,35 @@ export interface components {
             /** Roots */
             roots?: string[];
         };
+        /** SearchTestIn */
+        SearchTestIn: {
+            /** Searxng Url */
+            searxng_url?: string | null;
+            /**
+             * Query
+             * @default open source
+             */
+            query: string;
+        };
+        /** SearchTestOut */
+        SearchTestOut: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+            /**
+             * Results
+             * @default []
+             */
+            results: components["schemas"]["SearchTestResult"][];
+        };
+        /** SearchTestResult */
+        SearchTestResult: {
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
         /** SessionOut */
         SessionOut: {
             /**
@@ -2579,6 +2660,39 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WebSettings */
+        WebSettings: {
+            /**
+             * Searxng Url
+             * @default
+             */
+            searxng_url: string;
+            /**
+             * Search Results
+             * @default 8
+             */
+            search_results: number;
+            /**
+             * Safesearch
+             * @default moderate
+             * @enum {string}
+             */
+            safesearch: "off" | "moderate" | "strict";
+            /**
+             * Language
+             * @default auto
+             */
+            language: string;
+            /** Allowed Private Hosts */
+            allowed_private_hosts?: string[];
+        };
+        /** WebStatus */
+        WebStatus: {
+            /** Search Configured */
+            search_configured: boolean;
+            /** Env Searxng Url */
+            env_searxng_url: string | null;
         };
         /**
          * WorkspaceSettings
@@ -3030,6 +3144,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_web_settings_api_settings_web_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebSettings"];
                 };
             };
             /** @description Validation Error */
@@ -5314,6 +5463,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_web_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_search_api_web_test_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchTestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchTestOut"];
                 };
             };
             /** @description Validation Error */

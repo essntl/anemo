@@ -6,6 +6,7 @@ import { RunsPage } from '@/features/runs/pages/RunsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { FilesPage } from '@/features/files/FilesPage'
 import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
+import { WebSettingsPage } from '@/features/web/WebSettingsPage'
 import { ProvidersPage } from '@/features/providers/ProvidersPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { ConversationPage } from '@/features/chat/pages/ConversationPage'
@@ -23,7 +24,7 @@ const placeholder = (path: string, title: string) => ({
   element: <PlaceholderPage title={title} />,
 })
 
-const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace']
+const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web']
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
               { path: 'providers', element: <ProvidersPage /> },
               { path: 'permissions', element: <PermissionsPage /> },
               { path: 'workspace', element: <WorkspaceSettingsPage /> },
+              { path: 'web', element: <WebSettingsPage /> },
               ...SETTINGS_SECTIONS.filter((s) => !BUILT_SETTINGS.includes(s.to)).map((s) =>
                 placeholder(s.to, s.label),
               ),

@@ -101,3 +101,13 @@ test('runs page filters and settings show the new limits', async ({ page }) => {
   await expect(page.getByLabel('Max cost (USD)')).toBeVisible()
   await expect(page.getByLabel('Stop after failures in a row')).toBeVisible()
 })
+
+test('web settings: the search test reports an unreachable SearXNG without saving', async ({ page }) => {
+  await login(page)
+  await page.goto('/settings/web')
+  await expect(page.getByRole('heading', { name: 'Web & Search' })).toBeVisible()
+  await page.getByLabel('SearXNG URL').fill('http://127.0.0.1:9')
+  await page.getByRole('button', { name: 'Test search' }).click()
+  await expect(page.getByText(/not reachable/)).toBeVisible()
+  await expect(page.getByLabel('Allowed hosts')).toBeVisible()
+})

@@ -5,15 +5,16 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–7 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–8 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
 > file tools with change history and one-click revert. Works on phones and can be
 > installed to your home screen. Agents can run **shell commands in an isolated
 > sandbox**, follow **agent profiles** and **skills**, have their plans reviewed,
-> be paused and resumed, and every run is in the **Runs** history. Web search,
-> memory, documents etc. follow the phases in `docs/architecture.md`.
+> be paused and resumed, and every run is in the **Runs** history. They can
+> **search the web** (SearXNG), read pages and call APIs. Memory, documents etc.
+> follow the phases in `docs/architecture.md`.
 
 ### Chat vs. Agent mode
 
@@ -60,6 +61,26 @@ page through it, and you can download it from the run.
 
 **Runs** lists every agent run with its status, profile, time, tokens and cost, and
 opens each one with its plan, tool calls, approvals, file changes and answer.
+
+### Web search and web pages
+
+Agents can **search the web** through your own [SearXNG](https://docs.searxng.org/)
+instance, **read web pages** (main content as Markdown; also PDFs, text and JSON)
+and **call HTTP APIs**. Set it up in **Settings → Web & Search**: the SearXNG URL
+(or `SEARXNG_URL` in `.env`) with a *Test search* button. SearXNG must allow JSON
+output: in its `settings.yml`, `search: formats: [html, json]`.
+
+Whether agents may use these is set per category in Agent Permissions (*Web
+search*, *Read web pages*, *External API calls*). Calls other than GET, such as
+POST or DELETE, count as moderate risk.
+
+Web pages can't send agents into your network: every connection agents make
+(including redirects) is checked against the address it really goes to, and
+private, loopback, link-local, CGNAT and cloud-metadata addresses are refused,
+as are this server's own containers. To let agents use a service at home (say
+Home Assistant), add its host name, IP address or range under **Allowed hosts**.
+Page contents are marked as untrusted for the model, but a page can still try to
+mislead it, so keep approvals on for anything that changes things.
 
 ### Shell commands
 

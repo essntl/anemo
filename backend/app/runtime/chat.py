@@ -37,6 +37,7 @@ from app.providers.base import (
 )
 from app.providers.registry import make_adapter
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
+from app.runtime import citations
 from app.runtime.history import (
     latest_user_attachment_kinds,
     load_history,
@@ -115,7 +116,8 @@ async def _finish(
     error: str | None = None,
 ) -> None:
     blocks: list[dict[str, object]] = []
-    text = result.text if result else ""
+    # Chat mode has no sources: citation markup some models emit anyway is removed.
+    text = citations.render(result.text) if result else ""
     if result:
         reasoning = result.reasoning_blocks or (
             [ReasoningBlock(text=result.reasoning_text)] if result.reasoning_text else []

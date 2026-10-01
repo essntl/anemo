@@ -11,7 +11,7 @@ export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'providers', label: 'Providers & Models', sensitive: true },
   { to: 'permissions', label: 'Agent Permissions', sensitive: true },
   { to: 'workspace', label: 'Workspace', sensitive: true },
-  { to: 'search', label: 'Search' },
+  { to: 'web', label: 'Web & Search', sensitive: true },
   { to: 'mcp', label: 'MCP', sensitive: true },
   { to: 'notifications', label: 'Notifications' },
   { to: 'memory', label: 'Memory' },

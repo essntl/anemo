@@ -8,6 +8,7 @@ from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.shell import RunShell
+from app.tools.builtin.web import HttpRequest, ReadWebPage, WebSearch
 from app.tools.builtin.workspace import (
     CreateFolder,
     CurrentTime,
@@ -31,6 +32,9 @@ BUILTIN_TOOLS: list[Tool] = [
     MovePath(),
     DeletePath(),
     RunShell(),
+    WebSearch(),
+    ReadWebPage(),
+    HttpRequest(),
     CurrentTime(),
     LoadSkill(),
     ReadToolOutput(),
@@ -51,13 +55,21 @@ def available_capabilities() -> set[str]:
 
 
 def toolset_for(
-    mode: str, policy: Policy, ceiling: Policy | None, *, has_skills: bool = False
+    mode: str,
+    policy: Policy,
+    ceiling: Policy | None,
+    *,
+    has_skills: bool = False,
+    has_search: bool = False,
 ) -> list[Tool]:
     if mode != "agent":
         return []
     offered = []
     for tool in BUILTIN_TOOLS:
-        if tool.name == "load_skill" and not has_skills:
+        # Tools that cannot work in this setup are not offered at all.
+        if (tool.name == "load_skill" and not has_skills) or (
+            tool.name == "web_search" and not has_search
+        ):
             continue
         probe = Action(capability=tool.capability, resource="", risk="safe")
         if evaluate(probe, policy, ceiling=ceiling).decision != "deny":

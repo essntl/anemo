@@ -21,6 +21,7 @@ const SCREENS = [
   '/settings/providers',
   '/settings/permissions',
   '/settings/workspace',
+  '/settings/web',
 ]
 
 async function horizontalOverflow(page: Page): Promise<number> {
