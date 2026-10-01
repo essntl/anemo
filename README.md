@@ -272,6 +272,21 @@ as Ollama), use **Add models** to pick models, and choose a default chat model.
 Provider changes are security-sensitive: if you logged in more than 15 minutes ago
 you will be asked to confirm your password.
 
+### ZimaOS / CasaOS (prebuilt images)
+
+Images are on Docker Hub: `essntl/anemo:latest` (app and worker) and
+`essntl/anemo:sandbox` (the shell sandbox), for 64-bit Intel/AMD machines.
+[`deploy/zimaos/docker-compose.yml`](deploy/zimaos/docker-compose.yml) uses them
+and needs no `.env` file:
+
+1. Open the file and replace every `CHANGE_ME` (the comments at the top say what
+   goes where), and set `PUBLIC_URL` to your ZimaOS address with port `8484`.
+2. In ZimaOS: App Store → **+** → *Install a customized app* → *Import*, paste the
+   file and install.
+3. Open `http://<your-zimaos-address>:8484` and log in.
+
+Data is kept in `/DATA/AppData/anemo` (workspace, uploads, database).
+
 ### Behind Nginx Proxy Manager
 
 Create a proxy host pointing at `http://<docker-host>:8080` (or at `app:8080` if

@@ -9,3 +9,4 @@
 .env
 data
 e2e
+**/.hypothesis

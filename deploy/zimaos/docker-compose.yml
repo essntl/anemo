@@ -1,0 +1,240 @@
+# Anemo on ZimaOS (or CasaOS), using the images from Docker Hub:
+#   essntl/anemo:latest   the app and its background worker
+#   essntl/anemo:sandbox  the isolated shell that agents run commands in
+#
+# ZimaOS: App Store > "+" > Install a customized app > Import > paste this file.
+# No .env file is needed; everything is set below.
+#
+# BEFORE YOU START, replace every CHANGE_ME (there are four):
+#   APP_SECRET_KEY     at least 32 random characters (letters and digits)
+#   ADMIN_PASSWORD     the password you log in with
+#   the database password, in two places that must match: inside DATABASE_URL
+#   and as POSTGRES_PASSWORD (letters and digits only)
+# and set PUBLIC_URL to the address you open in the browser (port 8484).
+# The app refuses to start while APP_SECRET_KEY is still CHANGE_ME.
+#
+# Your data is kept under /DATA/AppData/anemo:
+#   workspace/  the files and documents you and the agents work on
+#   data/       uploads and run outputs
+#   postgres/   the database
+# Back up that folder together with your APP_SECRET_KEY (without the key, saved
+# provider keys cannot be read again).
+
+name: anemo
+
+x-settings: &settings
+  # --- CHANGE THESE -----------------------------------------------------------
+  APP_SECRET_KEY: "CHANGE_ME"
+  ADMIN_USERNAME: "admin"
+  ADMIN_PASSWORD: "CHANGE_ME"
+  # The address you open in the browser (used for links in notifications).
+  PUBLIC_URL: "http://zimaos.local:8484"
+  TZ: "Europe/Oslo"
+  # ---------------------------------------------------------------------------
+  # "false" for plain http:// on your home network. Set it to "true" once you
+  # reach Anemo through https:// (e.g. behind a reverse proxy).
+  COOKIE_SECURE: "false"
+  # The same password as POSTGRES_PASSWORD further down goes in this address.
+  DATABASE_URL: "postgresql+asyncpg://aiw:CHANGE_ME@postgres:5432/aiw"
+  REDIS_URL: "redis://valkey:6379/0"
+  ENV: "production"
+  LOG_LEVEL: "INFO"
+  WORKER_CONCURRENCY: "4"
+  # Your reverse proxy's address, if you use one (so logins show the real client IP).
+  FORWARDED_ALLOW_IPS: "127.0.0.1"
+  TRUSTED_PROXIES: "127.0.0.1"
+  # Optional: your SearXNG address for web search (can also be set in Settings).
+  SEARXNG_URL: ""
+
+services:
+  # Makes the data folders writable for the app (it does not run as root).
+  init:
+    image: busybox:1.37
+    restart: "no"
+    command: ["sh", "-c", "mkdir -p /workspace /data && chown 1000:1000 /workspace /data"]
+    volumes:
+      - /DATA/AppData/anemo/workspace:/workspace
+      - /DATA/AppData/anemo/data:/data
+    network_mode: none
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aiw
+      POSTGRES_DB: aiw
+      POSTGRES_PASSWORD: "CHANGE_ME"
+    volumes:
+      - /DATA/AppData/anemo/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiw -d aiw"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [core]
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [core]
+
+  # Prepares or updates the database, then exits.
+  migrate:
+    image: essntl/anemo:latest
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    environment: *settings
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [core]
+
+  app:
+    image: essntl/anemo:latest
+    restart: unless-stopped
+    environment: *settings
+    ports:
+      - "8484:8080"
+    volumes:
+      - /DATA/AppData/anemo/data:/data
+      - /DATA/AppData/anemo/workspace:/workspace
+      - sandbox-ssh:/run/sandbox-ssh:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [core]
+
+  # Runs chats, agents, automations and reminders in the background.
+  worker:
+    image: essntl/anemo:latest
+    restart: unless-stopped
+    command: ["python", "-m", "app.main_worker"]
+    environment: *settings
+    volumes:
+      - /DATA/AppData/anemo/data:/data
+      - /DATA/AppData/anemo/workspace:/workspace
+      - sandbox-token:/run/sandbox-token/sandbox:ro
+      - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
+    stop_grace_period: 30s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.cli", "worker-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks: [core, sandbox_int, sandbox_net_int]
+
+  # Where agents run shell commands: no root, no network, only the workspace.
+  sandbox:
+    image: essntl/anemo:sandbox
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      - /DATA/AppData/anemo/workspace:/workspace
+      - sandbox-home:/home/agent
+      - sandbox-token:/run/execd
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7070/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [sandbox_int]
+
+  # The same, with internet access (only used when you allow "Shell with network").
+  sandbox-net:
+    image: essntl/anemo:sandbox
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    environment:
+      EXECD_SSH: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /DATA/AppData/anemo/workspace:/workspace
+      - sandbox-net-home:/home/agent
+      - sandbox-ssh:/home/agent/.ssh
+      - sandbox-net-token:/run/execd
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7070/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [sandbox_net_int, egress]
+
+volumes:
+  sandbox-home:
+  sandbox-net-home:
+  sandbox-token:
+  sandbox-net-token:
+  sandbox-ssh:
+
+networks:
+  core:
+  # internal: no route to the outside world.
+  sandbox_int:
+    internal: true
+  sandbox_net_int:
+    internal: true
+  egress:
+
+# How the app appears on the ZimaOS / CasaOS dashboard.
+x-casaos:
+  architectures:
+    - amd64
+  main: app
+  author: essntl
+  category: Utilities
+  title:
+    en_us: Anemo
+  tagline:
+    en_us: Self-hosted AI workspace with agents
+  description:
+    en_us: Chat, autonomous agents with permissions you control, files, documents, tasks, calendar, automations and notifications. Bring your own model provider.
+  icon: https://raw.githubusercontent.com/essntl/anemo/main/frontend/public/icons/icon-192.png
+  scheme: http
+  hostname: ""
+  port_map: "8484"
+  index: /
