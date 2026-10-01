@@ -25,6 +25,22 @@ export function formatWhen(iso: string, now = new Date()): string {
   return `${date} ${time}`
 }
 
+/** The day a date falls on, for list headings: "Today", "Yesterday", "Past week"
+ *  (2 to 7 days ago), otherwise the date: "12 Sep" (with the year if not this year). */
+export function dayLabel(iso: string, now = new Date()): string {
+  const d = new Date(iso)
+  // Calendar days, not 24-hour blocks, so it stays right when the clocks change.
+  const daysAgo = (n: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - n).getTime()
+  if (d.getTime() >= daysAgo(0)) return 'Today'
+  if (d.getTime() >= daysAgo(1)) return 'Yesterday'
+  if (d.getTime() >= daysAgo(7)) return 'Past week'
+  return d.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  })
+}
+
 /** null (unknown price) → "unknown"; tiny amounts keep enough digits to be useful. */
 export function formatCost(usd: number | null | undefined): string {
   if (usd == null) return 'unknown'

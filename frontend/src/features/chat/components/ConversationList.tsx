@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useParams } from 'react-router'
 import { Loader2, Pencil, Pin, Search, Trash2 } from 'lucide-react'
 import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { cn } from '@/lib/cn'
+import { dayLabel } from '@/lib/format'
 import { type Conversation, useConversations, useDeleteConversation, useUpdateConversation } from '../api'
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -58,13 +59,45 @@ function Item({ conv }: { conv: Conversation }) {
   )
 }
 
+/** The list shows this many chats; more than that and it scrolls. */
+const VISIBLE_CHATS = 7
+
+type Group = { label: string; pinned?: boolean; chats: Conversation[] }
+
+/** Pinned chats first, then one group per day: Today, Yesterday, Past week, then dates.
+ *  The server already sorts by latest message, so chats of one day are next to each other. */
+function groupChats(all: Conversation[], searching: boolean): Group[] {
+  if (searching) return all.length ? [{ label: 'Results', chats: all }] : []
+  const groups: Group[] = []
+  const pinned = all.filter((c) => c.pinned)
+  if (pinned.length) groups.push({ label: 'Pinned', pinned: true, chats: pinned })
+  for (const chat of all.filter((c) => !c.pinned)) {
+    const label = dayLabel(chat.last_message_at)
+    const last = groups[groups.length - 1]
+    if (last && !last.pinned && last.label === label) last.chats.push(chat)
+    else groups.push({ label, chats: [chat] })
+  }
+  return groups
+}
+
+/** How many group headings sit above or between the first `VISIBLE_CHATS` chats. */
+function headingsInView(groups: Group[]): number {
+  let chats = 0
+  let headings = 0
+  for (const group of groups) {
+    if (chats >= VISIBLE_CHATS) break
+    headings += 1
+    chats += group.chats.length
+  }
+  return headings
+}
+
 export function ConversationList() {
   const [query, setQuery] = useState('')
   const q = useDebounced(query.trim(), 250)
   const conversations = useConversations(q)
   const all = conversations.data ?? []
-  const pinned = all.filter((c) => c.pinned)
-  const recent = all.filter((c) => !c.pinned)
+  const groups = groupChats(all, Boolean(q))
 
   return (
     <div className="mt-3">
@@ -77,19 +110,25 @@ export function ConversationList() {
           className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-3 pointer-coarse:h-10 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
         />
       </div>
-      {pinned.length > 0 && (
-        <div className="mt-2">
-          <div className="mb-1 flex items-center gap-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
-            <Pin className="h-3 w-3" /> Pinned
-          </div>
-          {pinned.map((c) => <Item key={c.id} conv={c} />)}
-        </div>
-      )}
-      <div className="mt-2">
-        <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
-          {q ? 'Results' : 'Chats'}
-        </div>
-        {recent.map((c) => <Item key={c.id} conv={c} />)}
+      {/* Tall enough for 7 chats and their headings; the rest is reached by scrolling.
+          --row matches the height of one chat (taller on touch screens). */}
+      <div
+        aria-label="Chats"
+        className="mt-2 overflow-y-auto [--row:2.25rem] pointer-coarse:[--row:2.75rem]"
+        style={
+          all.length > VISIBLE_CHATS
+            ? { maxHeight: `calc(${VISIBLE_CHATS} * var(--row) + ${headingsInView(groups)} * 1.75rem)` }
+            : undefined
+        }
+      >
+        {groups.map((group) => (
+          <section key={group.label}>
+            <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
+              {group.pinned && <Pin className="h-3 w-3" />} {group.label}
+            </div>
+            {group.chats.map((c) => <Item key={c.id} conv={c} />)}
+          </section>
+        ))}
         {conversations.data && all.length === 0 && (
           <p className="px-3 py-2 text-[12px] text-subtle">{q ? 'No matches.' : 'No chats yet.'}</p>
         )}

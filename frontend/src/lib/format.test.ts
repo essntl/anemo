@@ -1,6 +1,18 @@
-import { formatCost, formatCount, formatDuration, formatWhen } from './format'
+import { dayLabel, formatCost, formatCount, formatDuration, formatWhen } from './format'
 
 describe('formatters', () => {
+  it('names the day a date falls on', () => {
+    const now = new Date(2026, 9, 10, 9, 0) // 10 Oct 2026, 09:00
+    const at = (y: number, m: number, d: number, h = 12) => new Date(y, m, d, h).toISOString()
+    expect(dayLabel(at(2026, 9, 10, 0), now)).toBe('Today')
+    expect(dayLabel(at(2026, 9, 9, 23), now)).toBe('Yesterday')
+    expect(dayLabel(at(2026, 9, 8), now)).toBe('Past week')
+    expect(dayLabel(at(2026, 9, 3, 0), now)).toBe('Past week')
+    expect(dayLabel(at(2026, 9, 2, 23), now)).toMatch(/2/)
+    expect(dayLabel(at(2026, 9, 2, 23), now)).not.toMatch(/2026/)
+    expect(dayLabel(at(2025, 11, 31), now)).toMatch(/2025/)
+  })
+
   it('formats durations', () => {
     expect(formatDuration(42)).toBe('42 s')
     expect(formatDuration(185)).toBe('3 min 5 s')
