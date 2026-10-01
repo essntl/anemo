@@ -5,6 +5,7 @@ import { DialogHost } from '@/components/ui/DialogHost'
 import { ToastHost } from '@/components/ui/ToastHost'
 import { ReauthDialog } from '@/features/auth/ReauthDialog'
 import { useAppEvents } from '@/features/chat/useAppEvents'
+import { CommandPalette } from '@/features/search/CommandPalette'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
 import { MobileTopBar } from './mobileNav'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
@@ -52,6 +53,7 @@ export function AppLayout() {
       <ReauthDialog />
       <DialogHost />
       <ToastHost />
+      <CommandPalette />
     </div>
   )
 }

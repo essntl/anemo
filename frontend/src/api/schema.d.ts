@@ -2066,6 +2066,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description Search chats, documents, memories, tasks, events, files and automations.
+         *     Hits come grouped by kind.
+         */
+        get: operations["search_api_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary */
+        get: operations["summary_api_usage_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Records
+         * @description Single model calls, newest first. Page with `before` = the last item's ts.
+         */
+        get: operations["records_api_usage_records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4132,6 +4190,48 @@ export interface components {
             /** Roots */
             roots?: string[];
         };
+        /** SearchGroup */
+        SearchGroup: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "chat" | "document" | "memory" | "task" | "event" | "file" | "automation";
+            /** Hits */
+            hits: components["schemas"]["SearchHit"][];
+            /** Has More */
+            has_more: boolean;
+        };
+        /** SearchHit */
+        SearchHit: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "chat" | "document" | "memory" | "task" | "event" | "file" | "automation";
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Snippet
+             * @default
+             */
+            snippet: string;
+            /** Url */
+            url: string;
+            /** When */
+            when?: string | null;
+        };
+        /** SearchOut */
+        SearchOut: {
+            /** Query */
+            query: string;
+            /** By Meaning */
+            by_meaning: boolean;
+            /** Groups */
+            groups: components["schemas"]["SearchGroup"][];
+        };
         /** SearchTestIn */
         SearchTestIn: {
             /** Searxng Url */
@@ -4529,6 +4629,103 @@ export interface components {
             run_id: string;
             user_message: components["schemas"]["MessageOut"] | null;
             assistant_message: components["schemas"]["MessageOut"];
+        };
+        /** UsageGroup */
+        UsageGroup: {
+            /**
+             * Requests
+             * @default 0
+             */
+            requests: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
+            /**
+             * Unknown Cost Requests
+             * @default 0
+             */
+            unknown_cost_requests: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** UsageRecordOut */
+        UsageRecordOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Provider Name */
+            provider_name: string;
+            /** Model Key */
+            model_key: string;
+            /** Request Kind */
+            request_kind: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Input Tokens */
+            input_tokens: number | null;
+            /** Output Tokens */
+            output_tokens: number | null;
+            /** Cost Usd */
+            cost_usd: number | null;
+            /** Cost Source */
+            cost_source: string;
+        };
+        /** UsageSummary */
+        UsageSummary: {
+            totals: components["schemas"]["UsageTotals"];
+            /** Groups */
+            groups: components["schemas"]["UsageGroup"][];
+        };
+        /** UsageTotals */
+        UsageTotals: {
+            /**
+             * Requests
+             * @default 0
+             */
+            requests: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
+            /**
+             * Unknown Cost Requests
+             * @default 0
+             */
+            unknown_cost_requests: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -9604,6 +9801,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrowserView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                /** @description Comma-separated; default: everything */
+                kinds?: string | null;
+                /** @description Hits per kind */
+                limit?: number;
+                /** @description hybrid: documents and memories are also found by meaning */
+                mode?: "hybrid" | "keyword";
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_usage_summary_get: {
+        parameters: {
+            query?: {
+                group_by?: "day" | "model" | "provider" | "kind" | "profile" | "automation";
+                /** @description From this moment (inclusive) */
+                start?: string | null;
+                /** @description Until this moment (exclusive) */
+                end?: string | null;
+                /** @description Time zone for grouping by day */
+                tz?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    records_api_usage_records_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                /** @description Only calls before this moment */
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageRecordOut"][];
                 };
             };
             /** @description Validation Error */

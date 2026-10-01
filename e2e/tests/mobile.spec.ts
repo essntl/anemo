@@ -29,6 +29,8 @@ const SCREENS = [
   '/settings/memory',
   '/settings/notifications',
   '/settings/mcp',
+  '/settings/usage',
+  '/search?q=test',
   '/automations',
   '/notifications',
   '/memory',

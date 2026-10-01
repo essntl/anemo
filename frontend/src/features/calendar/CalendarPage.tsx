@@ -10,6 +10,7 @@ import interactionPlugin, { type DateClickArg, type EventResizeDoneArg } from '@
 import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
+import { useSearchParams } from 'react-router'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
@@ -36,6 +37,9 @@ type Open =
 
 export function CalendarPage() {
   const calendar = useRef<FullCalendar>(null)
+  // /calendar?date=2026-10-10 (e.g. from search) starts on that day.
+  const [params] = useSearchParams()
+  const startDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') ? params.get('date')! : undefined
   const desktop = useMediaQuery(DESKTOP)
   const [view, setView] = useState(desktop ? 'dayGridMonth' : 'listWeek')
   const [range, setRange] = useState<{ start: string; end: string } | null>(null)
@@ -137,6 +141,7 @@ export function CalendarPage() {
           ref={calendar}
           plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
           initialView={view}
+          initialDate={startDate}
           headerToolbar={false}
           height="100%"
           locale={navigator.language}

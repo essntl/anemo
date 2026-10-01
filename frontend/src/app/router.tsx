@@ -3,6 +3,8 @@ import { PermissionsPage } from '@/features/agents/PermissionsPage'
 import { ProfilesPage } from '@/features/profiles/pages/ProfilesPage'
 import { RunDetailPage } from '@/features/runs/pages/RunDetailPage'
 import { RunsPage } from '@/features/runs/pages/RunsPage'
+import { SearchPage } from '@/features/search/SearchPage'
+import { UsagePage } from '@/features/usage/UsagePage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { AutomationsPage } from '@/features/automations/AutomationsPage'
 import { DocumentsPage } from '@/features/documents/DocumentsPage'
@@ -34,7 +36,7 @@ const placeholder = (path: string, title: string) => ({
   element: <PlaceholderPage title={title} />,
 })
 
-const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory', 'notifications', 'mcp']
+const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory', 'notifications', 'mcp', 'usage']
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -53,7 +55,7 @@ export const router = createBrowserRouter([
             element: <ConversationPage />,
             handle: { ownMobileHeader: true } satisfies RouteHandle,
           },
-          placeholder('search', 'Search'),
+          { path: 'search', element: <SearchPage /> },
           { path: 'files', element: <FilesPage /> },
           { path: 'documents', element: <DocumentsPage /> },
           { path: 'documents/:documentId', element: <DocumentsPage /> },
@@ -78,6 +80,7 @@ export const router = createBrowserRouter([
               { path: 'web', element: <WebSettingsPage /> },
               { path: 'memory', element: <MemorySettingsPage /> },
               { path: 'mcp', element: <McpSettingsPage /> },
+              { path: 'usage', element: <UsagePage /> },
               { path: 'notifications', element: <NotificationSettingsPage /> },
               ...SETTINGS_SECTIONS.filter((s) => !BUILT_SETTINGS.includes(s.to)).map((s) =>
                 placeholder(s.to, s.label),

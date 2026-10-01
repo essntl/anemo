@@ -12,6 +12,7 @@ import {
   History,
   LogOut,
   Plus,
+  Search,
   Settings,
   X,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import { ConversationList } from '@/features/chat/components/ConversationList'
 import { useMemorySummary } from '@/features/memory/api'
 import { useNotificationSummary } from '@/features/notifications/api'
 import { useRunsSummary } from '@/features/runs/api'
+import { usePalette } from '@/features/search/paletteStore'
 import { cn } from '@/lib/cn'
 
 function NavItem({ to, icon, children, badge }: { to: string; icon: ReactNode; children: ReactNode; badge?: ReactNode }) {
@@ -99,6 +101,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   const navigate = useNavigate()
   const me = useMe()
   const logout = useLogout()
+  const openSearch = usePalette((s) => s.setOpen)
   return (
     <aside className={cn('h-full shrink-0 flex-col border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
       <div className="mb-4 flex items-center gap-2 px-2">
@@ -122,6 +125,11 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           onClick={() => navigate('/')}
         >
           New chat
+        </Button>
+        {/* Search everything (also Ctrl+K). The box below only filters the chat list. */}
+        <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" aria-label="Search everything"
+          title="Search everything (Ctrl+K)" onClick={() => openSearch(true)}>
+          <Search className="h-4 w-4" />
         </Button>
       </div>
 

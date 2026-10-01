@@ -25,10 +25,12 @@ from app.features.profiles.router import router as profiles_router
 from app.features.providers.router import router as providers_router
 from app.features.runs.agent_router import router as agent_router
 from app.features.runs.router import router as runs_router
+from app.features.search.router import router as search_router
 from app.features.settings.router import router as settings_router
 from app.features.shell.router import router as shell_router
 from app.features.skills.router import router as skills_router
 from app.features.tasks.router import router as tasks_router
+from app.features.usage.router import router as usage_router
 from app.web.router import router as web_router
 
 api_router = APIRouter(prefix="/api")
@@ -57,4 +59,6 @@ protected.include_router(notifications_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)
+protected.include_router(search_router)
+protected.include_router(usage_router)
 api_router.include_router(protected)

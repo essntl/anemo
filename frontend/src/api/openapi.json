@@ -9008,6 +9008,351 @@
           }
         }
       }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search",
+        "description": "Search chats, documents, memories, tasks, events, files and automations.\nHits come grouped by kind.",
+        "operationId": "search_api_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated; default: everything",
+              "title": "Kinds"
+            },
+            "description": "Comma-separated; default: everything"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Hits per kind",
+              "default": 5,
+              "title": "Limit"
+            },
+            "description": "Hits per kind"
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "hybrid",
+                "keyword"
+              ],
+              "type": "string",
+              "description": "hybrid: documents and memories are also found by meaning",
+              "default": "keyword",
+              "title": "Mode"
+            },
+            "description": "hybrid: documents and memories are also found by meaning"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usage/summary": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Summary",
+        "operationId": "summary_api_usage_summary_get",
+        "parameters": [
+          {
+            "name": "group_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day",
+                "model",
+                "provider",
+                "kind",
+                "profile",
+                "automation"
+              ],
+              "type": "string",
+              "default": "day",
+              "title": "Group By"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "From this moment (inclusive)",
+              "title": "Start"
+            },
+            "description": "From this moment (inclusive)"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Until this moment (exclusive)",
+              "title": "End"
+            },
+            "description": "Until this moment (exclusive)"
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "description": "Time zone for grouping by day",
+              "default": "UTC",
+              "title": "Tz"
+            },
+            "description": "Time zone for grouping by day"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usage/records": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Records",
+        "description": "Single model calls, newest first. Page with `before` = the last item's ts.",
+        "operationId": "records_api_usage_records_get",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only calls before this moment",
+              "title": "Before"
+            },
+            "description": "Only calls before this moment"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UsageRecordOut"
+                  },
+                  "title": "Response Records Api Usage Records Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14935,6 +15280,121 @@
         "title": "Scope",
         "description": "Restricts a rule to workspace roots (top-level folders). \"*\" means any."
       },
+      "SearchGroup": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "document",
+              "memory",
+              "task",
+              "event",
+              "file",
+              "automation"
+            ],
+            "title": "Kind"
+          },
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "type": "array",
+            "title": "Hits"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "hits",
+          "has_more"
+        ],
+        "title": "SearchGroup"
+      },
+      "SearchHit": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "document",
+              "memory",
+              "task",
+              "event",
+              "file",
+              "automation"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet",
+            "default": ""
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "when": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "When"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "title",
+          "url"
+        ],
+        "title": "SearchHit"
+      },
+      "SearchOut": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "by_meaning": {
+            "type": "boolean",
+            "title": "By Meaning"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SearchGroup"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "by_meaning",
+          "groups"
+        ],
+        "title": "SearchOut"
+      },
       "SearchTestIn": {
         "properties": {
           "searxng_url": {
@@ -16116,6 +16576,202 @@
           "assistant_message"
         ],
         "title": "TurnOut"
+      },
+      "UsageGroup": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests",
+            "default": 0
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens",
+            "default": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens",
+            "default": 0
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd",
+            "default": 0.0
+          },
+          "unknown_cost_requests": {
+            "type": "integer",
+            "title": "Unknown Cost Requests",
+            "default": 0
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "UsageGroup"
+      },
+      "UsageRecordOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name"
+          },
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "request_kind": {
+            "type": "string",
+            "title": "Request Kind"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "cost_source": {
+            "type": "string",
+            "title": "Cost Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ts",
+          "provider_name",
+          "model_key",
+          "request_kind",
+          "run_id",
+          "conversation_id",
+          "input_tokens",
+          "output_tokens",
+          "cost_usd",
+          "cost_source"
+        ],
+        "title": "UsageRecordOut"
+      },
+      "UsageSummary": {
+        "properties": {
+          "totals": {
+            "$ref": "#/components/schemas/UsageTotals"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/UsageGroup"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "totals",
+          "groups"
+        ],
+        "title": "UsageSummary"
+      },
+      "UsageTotals": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests",
+            "default": 0
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens",
+            "default": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens",
+            "default": 0
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd",
+            "default": 0.0
+          },
+          "unknown_cost_requests": {
+            "type": "integer",
+            "title": "Unknown Cost Requests",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "UsageTotals"
       },
       "ValidationError": {
         "properties": {

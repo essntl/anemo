@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–14 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–15 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -17,7 +17,7 @@ Docker Compose on a homelab.
 > **memory** you control. **Documents** are Markdown files with a rich editor and
 > history, and there are **tasks** and a **calendar**. **Automations** run agents
 > on a schedule and report back through **notifications** (in the app, on your
-> desktop, on Discord). **MCP servers** add more tools, and agents can drive a real **browser**. Search etc. follow the phases in
+> desktop, on Discord). **MCP servers** add more tools, and agents can drive a real **browser**. **Search** covers everything, and **Usage** shows what the models cost. Sub-agents etc. follow the phases in
 > `docs/architecture.md`.
 
 ### Chat vs. Agent mode
@@ -173,6 +173,26 @@ you have looked at it, and runs already in progress do not get the changed tool.
 
 Only add servers you trust: a server sees what agents send to its tools, and its
 answers can try to steer the agent.
+
+### Search
+
+Press **Ctrl+K** (⌘K on a Mac) anywhere, or the search button next to *New chat*,
+to search everything: chats, documents, memories, tasks, calendar events, files
+(by name) and automations. Typing a page name ("calendar", "settings mcp") jumps
+there. Arrow keys move, Enter opens.
+
+*All results* opens the search page, where you can filter by kind. Every word you
+type has to match. On that page documents and memories are also found by meaning
+when an embedding model is set (Settings → Providers & Models); the quick box
+matches words only, so typing never calls a model.
+
+### Usage
+
+**Settings → Usage** shows model calls, tokens and cost for a period: totals, a
+chart per day, a breakdown by model, kind of work, provider, agent profile or
+automation, and every single call. A cost is what the provider reported, or is
+worked out from the prices you set for a model; without either it is shown as
+*unknown*, never as $0.
 
 ### Memory
 

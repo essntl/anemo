@@ -40,7 +40,7 @@ export function TasksPage() {
   const [quick, setQuick] = useState('')
   const [search, setSearch] = useState('')
   const [showDone, setShowDone] = useState(false)
-  const [editing, setEditing] = useState<Editing>(null)
+  const [chosen, setEditing] = useState<Editing>(null)
   const [projectsOpen, setProjectsOpen] = useState(false)
 
   const setParam = (key: string, value: string) => {
@@ -52,6 +52,9 @@ export function TasksPage() {
 
   const projectMap = useMemo(() => new Map<string, Project>((projects.data ?? []).map((p) => [p.id, p])), [projects.data])
   const all = useMemo(() => tasks.data ?? [], [tasks.data])
+  // A link to one task (/tasks?task=<id>, e.g. from search) opens it.
+  const linked = all.find((t) => t.id === params.get('task'))
+  const editing: Editing = chosen ?? (linked ? { task: linked } : null)
   const tags = useMemo(() => [...new Set(all.flatMap((t) => t.tags))].sort(), [all])
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -159,7 +162,7 @@ export function TasksPage() {
       )}
 
       {editing && (
-        <TaskDialog task={editing.task} onClose={() => setEditing(null)}
+        <TaskDialog task={editing.task} onClose={() => { setEditing(null); setParam('task', '') }}
           defaults={{ status: editing.status, project_id: projectFilter || null }} />
       )}
       {projectsOpen && <ProjectsDialog onClose={() => setProjectsOpen(false)} />}

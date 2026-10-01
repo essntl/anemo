@@ -13,6 +13,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 
 from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -104,10 +105,29 @@ class Hit:
     similarity: float | None  # cosine similarity, when found by meaning
 
 
-def keyword_query(text: str) -> str | None:
-    """An OR query of the text's words: a long question should still match a short note."""
+def keyword_query(text: str, *, all_words: bool = False) -> str | None:
+    """A query of the text's words. By default any word may match (a long question
+    should still find a short note); `all_words` requires every word."""
     words = list(dict.fromkeys(re.findall(r"[^\W_]{3,}", text.lower())))[:MAX_QUERY_WORDS]
-    return " | ".join(words) if words else None
+    return (" & " if all_words else " | ").join(words) if words else None
+
+
+# A query as a vector, with the id of the embedding model that made it.
+QueryVector = tuple[str, list[float]]
+
+
+async def embed_query(db: AsyncSession, query: str) -> QueryVector | None:
+    """The query's vector, or None when there is no embedding model (or it failed).
+    Compute it once to search several source types with the same query."""
+    model = await embedding_model(db)
+    if model is None or not query.strip():
+        return None
+    try:
+        [vector] = await embed(db, model, [query])
+    except ProviderError as exc:
+        log.warning("query embedding failed", extra={"ctx": {"error": str(exc)}})
+        return None
+    return str(model.model_id), vector
 
 
 async def search(
@@ -117,41 +137,44 @@ async def search(
     *,
     limit: int = 10,
     min_similarity: float = 0.3,
+    query_vector: QueryVector | None | Literal["auto"] = "auto",
+    all_words: bool = False,
 ) -> list[Hit]:
-    """Chunks of `source_type` matching `query`, best first (one hit per source)."""
+    """Chunks of `source_type` matching `query`, best first (one hit per source).
+
+    `query_vector`: "auto" embeds the query here; pass the result of embed_query() to
+    reuse it, or None to search by keywords only.
+    `all_words`: the keyword part only finds chunks that contain every word.
+    """
     ranks: dict[uuid.UUID, float] = {}
     info: dict[uuid.UUID, Hit] = {}
 
-    model = await embedding_model(db)
-    if model is not None and query.strip():
-        try:
-            [vector] = await embed(db, model, [query])
-        except ProviderError as exc:
-            log.warning("query embedding failed", extra={"ctx": {"error": str(exc)}})
-        else:
-            key = str(model.model_id)
-            # CASE keeps Postgres from comparing vectors of another model (other size).
-            distance = case(
-                (KnowledgeChunk.model_key == key, KnowledgeChunk.embedding.cosine_distance(vector)),
-                else_=None,
+    if query_vector == "auto":
+        query_vector = await embed_query(db, query)
+    if query_vector is not None:
+        key, vector = query_vector
+        # CASE keeps Postgres from comparing vectors of another model (other size).
+        distance = case(
+            (KnowledgeChunk.model_key == key, KnowledgeChunk.embedding.cosine_distance(vector)),
+            else_=None,
+        )
+        rows = await db.execute(
+            select(KnowledgeChunk.source_id, KnowledgeChunk.content, distance.label("d"))
+            .where(
+                KnowledgeChunk.source_type == source_type,
+                KnowledgeChunk.model_key == key,
+                distance <= 1 - min_similarity,
             )
-            rows = await db.execute(
-                select(KnowledgeChunk.source_id, KnowledgeChunk.content, distance.label("d"))
-                .where(
-                    KnowledgeChunk.source_type == source_type,
-                    KnowledgeChunk.model_key == key,
-                    distance <= 1 - min_similarity,
-                )
-                .order_by("d")
-                .limit(limit * 2)
-            )
-            for rank, (source_id, content, d) in enumerate(rows.all()):
-                if source_id in info:
-                    continue
-                ranks[source_id] = 1 / (RRF_K + rank)
-                info[source_id] = Hit(source_id, content, 0.0, similarity=1 - float(d))
+            .order_by("d")
+            .limit(limit * 2)
+        )
+        for rank, (source_id, content, d) in enumerate(rows.all()):
+            if source_id in info:
+                continue
+            ranks[source_id] = 1 / (RRF_K + rank)
+            info[source_id] = Hit(source_id, content, 0.0, similarity=1 - float(d))
 
-    tsq_text = keyword_query(query)
+    tsq_text = keyword_query(query, all_words=all_words)
     if tsq_text:
         tsq = func.to_tsquery("english", tsq_text)
         rank_expr = func.ts_rank_cd(KnowledgeChunk.tsv, tsq)
