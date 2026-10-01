@@ -39,3 +39,20 @@ export function formatCount(n: number): string {
   if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`
   return `${(n / 1_000_000).toFixed(1)}M`
 }
+
+/** A time that is still to come: "Today 14:03", "Tomorrow 08:00", otherwise "Mon 12 Sep 08:00". */
+export function formatUpcoming(iso: string, now = new Date()): string {
+  const d = new Date(iso)
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const days = Math.floor((d.getTime() - startOfToday) / 86_400_000)
+  if (days === 0) return `Today ${time}`
+  if (days === 1) return `Tomorrow ${time}`
+  const date = d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  })
+  return `${date} ${time}`
+}

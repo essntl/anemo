@@ -54,7 +54,19 @@ def default_handlers() -> dict[str, Handler]:
         async with sessionmaker()() as db:
             await documents.index_document(db, uuid.UUID(payload["document_id"]))
 
+    async def notify_deliver(payload: dict[str, Any]) -> None:
+        from app.features.notifications import service as notifications
+
+        await notifications.deliver(uuid.UUID(payload["delivery_id"]))
+
+    async def automation_retry(payload: dict[str, Any]) -> None:
+        from app.features.automations import service as automations
+
+        await automations.retry_run(uuid.UUID(payload["automation_id"]), int(payload["retry"]))
+
     return {
+        "automation.retry": automation_retry,
+        "notify.deliver": notify_deliver,
         "document.index": document_index,
         "run.execute": run_execute,
         "conversation.title": conversation_title,

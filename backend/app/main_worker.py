@@ -52,7 +52,7 @@ async def main() -> None:
 
     log.info("worker starting", extra={"ctx": {"worker_id": wid}})
     beat = asyncio.create_task(heartbeat_loop(wid, stop))
-    periodic = asyncio.create_task(scheduler.run(stop))  # reminders, ...
+    periodic = asyncio.create_task(scheduler.run(stop))  # reminders, automations
     # Returns after `stop` is set and in-flight jobs have finished or been handed back.
     await JobRunner(wid, settings.worker_concurrency).run(stop)
     log.info("worker stopped")

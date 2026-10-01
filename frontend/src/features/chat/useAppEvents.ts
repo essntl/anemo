@@ -1,7 +1,11 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router'
 import { toast } from '@/components/ui/toast'
 import { approvalsKey } from '@/features/agents/api'
+import { automationsKey } from '@/features/automations/api'
+import { notificationsKey } from '@/features/notifications/api'
+import { showDesktopNotification } from '@/features/notifications/desktop'
 import { conversationKey, conversationsKey, messagesKey } from './api'
 import { TERMINAL } from './runStream'
 
@@ -11,6 +15,7 @@ import { TERMINAL } from './runStream'
  */
 export function useAppEvents() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   useEffect(() => {
     const source = new EventSource('/api/events')
     const refreshConversation = (e: MessageEvent<string>) => {
@@ -45,15 +50,17 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: ['projects'] })
     })
     source.addEventListener('calendar.changed', () => void qc.invalidateQueries({ queryKey: ['calendar'] }))
-    // A reminder for an event or task became due.
-    source.addEventListener('reminder', ((e: MessageEvent<string>) => {
-      const data = JSON.parse(e.data) as { kind: string; title: string; starts_at: string; all_day: boolean }
-      const when = new Date(data.starts_at)
-      const time = data.all_day
-        ? when.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
-        : when.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })
-      toast({ message: `Reminder: ${data.title} (${data.kind === 'task' ? 'due ' : ''}${time})`, duration: 30_000 })
+    source.addEventListener('automations.changed', () => void qc.invalidateQueries({ queryKey: automationsKey }))
+    // A new notification (a reminder, an automation's result, ...): show it as a
+    // desktop notification when the tab is in the background, else as a notice here.
+    source.addEventListener('notification', ((e: MessageEvent<string>) => {
+      const note = JSON.parse(e.data) as { id: string; title: string; body: string; link: string | null }
+      void qc.invalidateQueries({ queryKey: notificationsKey })
+      const open = () => void navigate(note.link ?? '/notifications')
+      if (showDesktopNotification(note, open)) return
+      toast({ message: note.title, duration: 10_000, action: { label: 'Open', onClick: open } })
     }) as EventListener)
+    source.addEventListener('notifications.changed', () => void qc.invalidateQueries({ queryKey: notificationsKey }))
     return () => source.close()
-  }, [qc])
+  }, [qc, navigate])
 }

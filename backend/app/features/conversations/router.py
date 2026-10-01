@@ -1,10 +1,8 @@
 import uuid
 
 from fastapi import APIRouter, Query
-from sqlalchemy import select
 
 from app.api.deps import Db
-from app.features.attachments import service as attachments
 from app.features.conversations import service
 from app.features.conversations.models import Conversation
 from app.features.conversations.schemas import (
@@ -16,8 +14,6 @@ from app.features.conversations.schemas import (
     TurnOut,
 )
 from app.features.profiles import service as profiles
-from app.features.runs.models import Run
-from app.runtime import outputs
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -75,11 +71,8 @@ async def update_conversation(
 @router.delete("/{conversation_id}", status_code=204)
 async def delete_conversation(conversation_id: uuid.UUID, db: Db) -> None:
     conv = await service.get_conversation(db, conversation_id)
-    await attachments.delete_files_for_conversation(db, conv.id)
-    run_ids = list(await db.scalars(select(Run.id).where(Run.conversation_id == conv.id)))
-    await db.delete(conv)
+    await service.delete_conversations(db, [conv.id])
     await db.commit()
-    outputs.delete_for_runs(run_ids)
 
 
 @router.get("/{conversation_id}/messages", response_model=list[MessageOut])

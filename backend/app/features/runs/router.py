@@ -54,6 +54,8 @@ class RunOut(BaseModel):
     model_id: uuid.UUID | None
     profile_id: uuid.UUID | None
     profile_name: str | None = None
+    automation_id: uuid.UUID | None = None
+    automation_name: str | None = None
     request: str
     pause_requested: bool
     plan_version: int
@@ -108,6 +110,8 @@ def run_out(r: Run) -> RunOut:
         model_id=r.model_id,
         profile_id=r.profile_id,
         profile_name=profile.get("name"),
+        automation_id=r.automation_id,
+        automation_name=(snapshot.get("automation") or {}).get("name"),
         request=r.request,
         pause_requested=r.pause_requested,
         plan_version=r.plan_version,
@@ -126,6 +130,7 @@ async def list_runs(
     kind: Literal["agent", "chat", "all"] = "agent",
     status: Literal["active", "waiting", "completed", "failed", "cancelled", "all"] = "all",
     profile_id: uuid.UUID | None = None,
+    automation_id: uuid.UUID | None = None,
     q: str | None = Query(None, max_length=200, description="Search in the request text"),
     before: datetime | None = Query(None, description="Only runs created before this time"),
     limit: int = Query(50, ge=1, le=200),
@@ -148,6 +153,8 @@ async def list_runs(
         stmt = stmt.where(Run.status == status)
     if profile_id:
         stmt = stmt.where(Run.profile_id == profile_id)
+    if automation_id:
+        stmt = stmt.where(Run.automation_id == automation_id)
     if q:
         stmt = stmt.where(Run.request.ilike(f"%{q}%"))
     if before:

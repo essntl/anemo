@@ -238,12 +238,13 @@ async def test_reminders_fire_once(authed):
     assert await reminders.fire_due(now - timedelta(minutes=30)) == 0  # too early for both
     assert await reminders.fire_due(now) == 2
     assert await reminders.fire_due(now + timedelta(minutes=1)) == 0  # not again
-    sent = await global_events("reminder")
-    assert sorted((e["kind"], e["title"]) for e in sent) == [
-        ("event", "Standup"),
-        ("task", "Call the bank"),
+    # Reminders are notifications, with the time in the user's time zone.
+    sent = (await authed.get("/api/notifications")).json()
+    assert sorted((n["title"], n["body"], n["link"]) for n in sent) == [
+        ("Reminder: Call the bank", "Due Mon 12 Oct, 09:00", "/tasks"),
+        ("Reminder: Standup", "Mon 12 Oct, 09:00", "/calendar"),
     ]
-    assert next(e for e in sent if e["kind"] == "event")["starts_at"] == "2026-10-12T07:00:00+00:00"
+    assert all(n["kind"] == "reminder" and n["read_at"] is None for n in sent)
     # Next week's occurrence gets its own reminder.
     assert await reminders.fire_due(now + timedelta(days=7)) == 1
 

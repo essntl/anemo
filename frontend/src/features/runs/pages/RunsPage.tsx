@@ -28,7 +28,8 @@ const KIND_OPTIONS: { value: RunKindFilter; label: string }[] = [
 ]
 
 function RunRow({ run }: { run: RunListItem }) {
-  const meta = [run.profile_name ?? (run.kind === 'agent' ? 'Default agent' : 'Chat'), run.conversation_title, run.model_label]
+  const who = run.profile_name ?? (run.kind === 'agent' ? 'Default agent' : 'Chat')
+  const meta = [run.automation_id ? 'Automation' : null, who, run.conversation_title, run.model_label]
     .filter(Boolean)
     .join(' · ')
   return (

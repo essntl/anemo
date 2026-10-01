@@ -130,6 +130,7 @@ async def test_agent_uses_tools_and_plan(authed):
         "create_event",
         "update_event",
         "delete_event",
+        "send_notification",
         "remember",
         "update_memory",
         "forget_memory",

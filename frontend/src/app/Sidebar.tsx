@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import {
+  Bell,
   Bot,
   Brain,
   CalendarDays,
@@ -18,6 +19,7 @@ import { Button } from '@/components/ui/Button'
 import { useLogout, useMe } from '@/features/auth/api'
 import { ConversationList } from '@/features/chat/components/ConversationList'
 import { useMemorySummary } from '@/features/memory/api'
+import { useNotificationSummary } from '@/features/notifications/api'
 import { useRunsSummary } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
 
@@ -80,6 +82,18 @@ function MemoryBadge() {
   )
 }
 
+/** Notifications not opened yet. */
+function NotificationsBadge() {
+  const unread = useNotificationSummary().data?.unread ?? 0
+  if (!unread) return null
+  return (
+    <span title={`${unread} unread`}
+      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-accent-contrast">
+      {unread > 99 ? '99+' : unread}
+    </span>
+  )
+}
+
 /** `onClose` is set when the sidebar is shown in the phone drawer. */
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const navigate = useNavigate()
@@ -130,6 +144,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
       </nav>
 
       <div className="flex flex-col gap-0.5 border-t border-border pt-3">
+        <NavItem to="/notifications" icon={<Bell />} badge={<NotificationsBadge />}>Notifications</NavItem>
         <NavItem to="/settings" icon={<Settings />}>Settings</NavItem>
         <button
           type="button"

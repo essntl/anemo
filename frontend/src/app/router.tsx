@@ -4,11 +4,14 @@ import { ProfilesPage } from '@/features/profiles/pages/ProfilesPage'
 import { RunDetailPage } from '@/features/runs/pages/RunDetailPage'
 import { RunsPage } from '@/features/runs/pages/RunsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { AutomationsPage } from '@/features/automations/AutomationsPage'
 import { DocumentsPage } from '@/features/documents/DocumentsPage'
 import { FilesPage } from '@/features/files/FilesPage'
 import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
 import { MemoryPage } from '@/features/memory/MemoryPage'
 import { MemorySettingsPage } from '@/features/memory/MemorySettingsPage'
+import { NotificationSettingsPage } from '@/features/notifications/NotificationSettingsPage'
+import { NotificationsPage } from '@/features/notifications/NotificationsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
 import { WebSettingsPage } from '@/features/web/WebSettingsPage'
 import { ProvidersPage } from '@/features/providers/ProvidersPage'
@@ -29,7 +32,7 @@ const placeholder = (path: string, title: string) => ({
   element: <PlaceholderPage title={title} />,
 })
 
-const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory']
+const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory', 'notifications']
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -54,9 +57,10 @@ export const router = createBrowserRouter([
           { path: 'calendar', element: <CalendarPage /> },
           { path: 'runs', element: <RunsPage /> },
           { path: 'runs/:runId', element: <RunDetailPage /> },
-          placeholder('automations', 'Automations'),
+          { path: 'automations', element: <AutomationsPage /> },
           { path: 'agents', element: <ProfilesPage /> },
           { path: 'memory', element: <MemoryPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           {
             path: 'settings',
             element: <SettingsLayout />,
@@ -69,6 +73,7 @@ export const router = createBrowserRouter([
               { path: 'workspace', element: <WorkspaceSettingsPage /> },
               { path: 'web', element: <WebSettingsPage /> },
               { path: 'memory', element: <MemorySettingsPage /> },
+              { path: 'notifications', element: <NotificationSettingsPage /> },
               ...SETTINGS_SECTIONS.filter((s) => !BUILT_SETTINGS.includes(s.to)).map((s) =>
                 placeholder(s.to, s.label),
               ),

@@ -1709,6 +1709,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications
+         * @description Newest first. Page with `before` = the last item's created_at.
+         */
+        get: operations["list_notifications_api_notifications_get"];
+        put?: never;
+        post?: never;
+        /** Clear Notifications */
+        delete: operations["clear_notifications_api_notifications_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary */
+        get: operations["summary_api_notifications_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Read */
+        post: operations["mark_read_api_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{notification_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Notification */
+        delete: operations["delete_notification_api_notifications__notification_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notification-destinations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Destinations */
+        get: operations["list_destinations_api_notification_destinations_get"];
+        put?: never;
+        /** Create Destination */
+        post: operations["create_destination_api_notification_destinations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notification-destinations/{destination_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Destination */
+        delete: operations["delete_destination_api_notification_destinations__destination_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Destination */
+        patch: operations["update_destination_api_notification_destinations__destination_id__patch"];
+        trace?: never;
+    };
+    "/api/notification-destinations/{destination_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Destination */
+        post: operations["test_destination_api_notification_destinations__destination_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Automations */
+        get: operations["list_automations_api_automations_get"];
+        put?: never;
+        /** Create Automation */
+        post: operations["create_automation_api_automations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/schedule-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule Preview
+         * @description The schedule in words and its next run times (an invalid one is a 422).
+         */
+        post: operations["schedule_preview_api_automations_schedule_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Automation */
+        get: operations["get_automation_api_automations__automation_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Automation
+         * @description Deletes the automation and the conversations of its past runs.
+         */
+        delete: operations["delete_automation_api_automations__automation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Automation */
+        patch: operations["update_automation_api_automations__automation_id__patch"];
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Automation Now */
+        post: operations["run_automation_now_api_automations__automation_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1849,6 +2051,124 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** AutomationIn */
+        AutomationIn: {
+            /** Name */
+            name: string;
+            /** Prompt */
+            prompt: string;
+            schedule: components["schemas"]["Schedule"];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            /**
+             * On Ask
+             * @default pause
+             * @enum {string}
+             */
+            on_ask: "pause" | "deny" | "fail";
+            /**
+             * Notify
+             * @default always
+             * @enum {string}
+             */
+            notify: "always" | "on_failure" | "never";
+            /** Destination Ids */
+            destination_ids?: string[] | null;
+            /** Document Path */
+            document_path?: string | null;
+            /**
+             * Max Retries
+             * @default 0
+             */
+            max_retries: number;
+        };
+        /** AutomationOut */
+        AutomationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Prompt */
+            prompt: string;
+            schedule: components["schemas"]["Schedule"];
+            /** Schedule Text */
+            schedule_text: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Profile Id */
+            profile_id: string | null;
+            /** Model Id */
+            model_id: string | null;
+            /**
+             * On Ask
+             * @enum {string}
+             */
+            on_ask: "pause" | "deny" | "fail";
+            /**
+             * Notify
+             * @enum {string}
+             */
+            notify: "always" | "on_failure" | "never";
+            /** Destination Ids */
+            destination_ids: string[] | null;
+            /** Document Path */
+            document_path: string | null;
+            /** Max Retries */
+            max_retries: number;
+            /** State */
+            state: {
+                [key: string]: string;
+            };
+            /** Next Run At */
+            next_run_at: string | null;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: string | null;
+            /** Last Run Id */
+            last_run_id: string | null;
+            /** Active Run Id */
+            active_run_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AutomationPatch */
+        AutomationPatch: {
+            /** Name */
+            name?: string | null;
+            /** Prompt */
+            prompt?: string | null;
+            schedule?: components["schemas"]["Schedule"] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            /** On Ask */
+            on_ask?: ("pause" | "deny" | "fail") | null;
+            /** Notify */
+            notify?: ("always" | "on_failure" | "never") | null;
+            /** Destination Ids */
+            destination_ids?: string[] | null;
+            /** Document Path */
+            document_path?: string | null;
+            /** Max Retries */
+            max_retries?: number | null;
+        };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
             /** File */
@@ -1957,6 +2277,8 @@ export interface components {
             default_mode: string;
             /** Profile Id */
             profile_id?: string | null;
+            /** Automation Id */
+            automation_id?: string | null;
             /** Snippet */
             snippet?: string | null;
         };
@@ -2001,6 +2323,59 @@ export interface components {
             /** Reason */
             reason?: string | null;
             plan?: components["schemas"]["PlanIn"] | null;
+        };
+        /** DestinationIn */
+        DestinationIn: {
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @default discord
+             * @constant
+             */
+            type: "discord";
+            /** Url */
+            url: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Kinds */
+            kinds?: ("reminder" | "automation" | "approval" | "agent")[];
+        };
+        /** DestinationOut */
+        DestinationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Url Hint */
+            url_hint: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Kinds */
+            kinds: string[];
+            /** Last Error */
+            last_error: string | null;
+            /** Last Sent At */
+            last_sent_at: string | null;
+        };
+        /** DestinationPatch */
+        DestinationPatch: {
+            /** Name */
+            name?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Kinds */
+            kinds?: ("reminder" | "automation" | "approval" | "agent")[] | null;
         };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
@@ -2302,6 +2677,14 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * MarkReadIn
+         * @description Mark these as read; with no ids, everything.
+         */
+        MarkReadIn: {
+            /** Ids */
+            ids?: string[] | null;
+        };
         /** MeOut */
         MeOut: {
             /** Username */
@@ -2592,6 +2975,42 @@ export interface components {
             } | null;
             /** Enabled */
             enabled?: boolean | null;
+        };
+        /** NotificationOut */
+        NotificationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "info" | "success" | "warning" | "error";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reminder" | "automation" | "approval" | "agent";
+            /** Link */
+            link: string | null;
+            /** Read At */
+            read_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** NotificationSummary */
+        NotificationSummary: {
+            /** Unread */
+            unread: number;
         };
         /**
          * OccurrenceIn
@@ -3120,6 +3539,10 @@ export interface components {
             profile_id: string | null;
             /** Profile Name */
             profile_name?: string | null;
+            /** Automation Id */
+            automation_id?: string | null;
+            /** Automation Name */
+            automation_name?: string | null;
             /** Request */
             request: string;
             /** Pause Requested */
@@ -3179,6 +3602,10 @@ export interface components {
             profile_id: string | null;
             /** Profile Name */
             profile_name?: string | null;
+            /** Automation Id */
+            automation_id?: string | null;
+            /** Automation Name */
+            automation_name?: string | null;
             /** Request */
             request: string;
             /** Pause Requested */
@@ -3231,6 +3658,10 @@ export interface components {
             profile_id: string | null;
             /** Profile Name */
             profile_name?: string | null;
+            /** Automation Id */
+            automation_id?: string | null;
+            /** Automation Name */
+            automation_name?: string | null;
             /** Request */
             request: string;
             /** Pause Requested */
@@ -3255,6 +3686,19 @@ export interface components {
             started_at: string | null;
             /** Ended At */
             ended_at: string | null;
+        };
+        /** RunStarted */
+        RunStarted: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
         };
         /** RunTotals */
         RunTotals: {
@@ -3292,6 +3736,36 @@ export interface components {
             path: string;
             /** Hash */
             hash: string;
+        };
+        /** Schedule */
+        Schedule: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "cron" | "interval" | "once";
+            /** Cron */
+            cron?: string | null;
+            /** Every Minutes */
+            every_minutes?: number | null;
+            /** At */
+            at?: string | null;
+            /**
+             * Tz
+             * @default UTC
+             */
+            tz: string;
+        };
+        /** SchedulePreviewIn */
+        SchedulePreviewIn: {
+            schedule: components["schemas"]["Schedule"];
+        };
+        /** SchedulePreviewOut */
+        SchedulePreviewOut: {
+            /** Text */
+            text: string;
+            /** Next Runs */
+            next_runs: string[];
         };
         /**
          * Scope
@@ -3557,6 +4031,13 @@ export interface components {
             tags?: string[] | null;
             /** Project Id */
             project_id?: string | null;
+        };
+        /** TestOut */
+        TestOut: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
         };
         /** TestResult */
         TestResult: {
@@ -5086,6 +5567,7 @@ export interface operations {
                 kind?: "agent" | "chat" | "all";
                 status?: "active" | "waiting" | "completed" | "failed" | "cancelled" | "all";
                 profile_id?: string | null;
+                automation_id?: string | null;
                 /** @description Search in the request text */
                 q?: string | null;
                 /** @description Only runs created before this time */
@@ -7833,6 +8315,570 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_api_notifications_get: {
+        parameters: {
+            query?: {
+                unread?: boolean;
+                /** @description Only notifications created before this */
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_notifications_api_notifications_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_notifications_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_notifications_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkReadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_notification_api_notifications__notification_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_destinations_api_notification_destinations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DestinationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_destination_api_notification_destinations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DestinationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DestinationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_destination_api_notification_destinations__destination_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                destination_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_destination_api_notification_destinations__destination_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                destination_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DestinationPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DestinationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_destination_api_notification_destinations__destination_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                destination_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_automations_api_automations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_automation_api_automations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_preview_api_automations_schedule_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchedulePreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchedulePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_automation_api_automations__automation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_automation_api_automations__automation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_automation_api_automations__automation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_automation_now_api_automations__automation_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStarted"];
+                };
             };
             /** @description Validation Error */
             422: {

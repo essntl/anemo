@@ -47,6 +47,10 @@ class Run(Base, IdMixin, TimestampMixin):
     profile_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agent_profiles.id", ondelete="SET NULL")
     )
+    # Set when an automation started this run (it then runs unattended).
+    automation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("automations.id", ondelete="SET NULL"), index=True
+    )
     attempt: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     totals: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)

@@ -64,6 +64,7 @@ INTERNAL_RULES = [
     Rule(cap="memory.read", decision="allow"),  # looking up memories changes nothing
     Rule(cap="tasks.read", decision="allow"),
     Rule(cap="calendar.read", decision="allow"),
+    Rule(cap="automation.state", decision="allow"),  # an automation's own notes
 ]
 
 

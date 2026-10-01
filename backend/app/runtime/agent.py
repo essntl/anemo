@@ -12,6 +12,10 @@ The same suspend/resume path serves:
   - pause/resume by the user (honoured between steps and between tool calls)
   - crash recovery (another worker resumes from the last checkpoint)
 
+Runs started by an automation are unattended. What happens when an action needs
+approval is the automation's choice: wait and notify, refuse it and carry on, or
+stop the run. It never becomes a silent yes.
+
 Security note: the model only ever *requests* tool calls. Whether one runs is
 decided here, by code, from the policy snapshot taken when the run started.
 """
@@ -32,6 +36,8 @@ from app.core.db import get_sessionmaker
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.images import PreparedImage
+from app.features.automations import service as automations
+from app.features.automations.models import Automation
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.memory import extraction
 from app.features.memory import service as memory
@@ -40,7 +46,7 @@ from app.features.profiles.models import AgentProfile
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Approval, FileChange, Run, ToolCall
 from app.features.settings import service as settings_service
-from app.features.settings.sections import GeneralSettings
+from app.features.settings.sections import GeneralSettings, ModelDefaults, TaskType
 from app.features.skills.service import skills_for_profile
 from app.features.usage import service as usage
 from app.jobs import queue
@@ -137,6 +143,24 @@ edit it first). If you later change the steps, the new plan is reviewed again. \
 Questions that need no tools can be answered directly.
 """
 
+AUTOMATION_SECTION = """
+## Scheduled run
+This is an unattended run of the automation "{name}": it started by itself and \
+nobody is watching. Do not ask questions; decide yourself and finish the task. \
+Your final answer is the result the user receives, so make it complete and \
+readable on its own.
+get_automation_state and set_automation_state keep short notes between runs of \
+this automation (for example what you saw last time, so you can report only what \
+changed).
+"""
+
+AUTOMATION_ON_ASK = {
+    "pause": "If an action needs the user's approval, the run waits and they are notified.",
+    "deny": "Actions that would need the user's approval are refused in this run; "
+    "carry on without them and say what you could not do.",
+    "fail": "If an action needs the user's approval, the run stops. Avoid such actions.",
+}
+
 LIMIT_NOTICE = (
     "[System notice: this run has reached its limit ({reason}). Do not call any tools. "
     "In a few sentences, tell the user what you did, what is left, and what they could "
@@ -201,8 +225,13 @@ class AgentRun:
         plan_review: str = "off",
         skills: list[str] | None = None,
         usage_kind: str = "agent",
+        automation_id: uuid.UUID | None = None,
+        on_ask: str = "pause",
     ) -> None:
         self.run_id = run_id
+        # Unattended runs: what to do when an action needs approval (pause|deny|fail).
+        self.on_ask = on_ask
+        self.blocked_by: str | None = None  # the action that stopped an on_ask="fail" run
         self.usage_kind = usage_kind  # "agent", or "chat" for chat turns with memory tools
         # The model call in flight; kept so a cancelled answer keeps what was streamed.
         self.progress = StreamProgress()
@@ -224,6 +253,7 @@ class AgentRun:
             limits=policy.limits,
             skills=list(skills or []),
             web=web or WebSettings(),
+            automation_id=automation_id,
         )
         self.current_call: uuid.UUID | None = None
         # Active time is counted per worker segment and added up in run.totals, so
@@ -305,7 +335,8 @@ class AgentRun:
         return outcome
 
     async def run(self) -> str:
-        """Returns "completed", "waiting", "paused", "refused" or "limit:<which>"."""
+        """Returns "completed", "waiting", "paused", "blocked", "refused" or
+        "limit:<which>"."""
         forced_compaction = False
         while True:
             async with get_sessionmaker()() as db:
@@ -317,7 +348,7 @@ class AgentRun:
                 uses = [b for b in last.content if isinstance(b, ToolUseBlock)]
                 if last.role == "assistant" and uses:
                     outcome = await self._process_tools(db, run, uses)
-                    if outcome in ("waiting", "paused"):
+                    if outcome in ("waiting", "paused", "blocked"):
                         return outcome
                     continue
                 if last.role == "assistant":
@@ -630,7 +661,26 @@ class AgentRun:
                 continue
             if verdict.decision == "ask":
                 summary = "; ".join(a.summary for a in actions if a.summary) or tool.name
-                return await self._ask(db, run, row, tool, "action", summary)
+                if self.on_ask == "pause":
+                    return await self._ask(db, run, row, tool, "action", summary)
+                # Unattended and set not to wait: the answer is no, never a silent yes.
+                row.decision_reason = f"{verdict.reason}; nobody is here to approve"[:300]
+                await self._finish_row(
+                    db,
+                    row,
+                    "denied",
+                    ToolResult(
+                        content="This action needs the user's approval and this unattended "
+                        "run does not wait for it. Do not retry; continue without it and "
+                        "say in your answer what you could not do.",
+                        is_error=True,
+                    ),
+                )
+                await self._emit("tool.denied", {"tool_call_id": str(row.id)})
+                if self.on_ask == "fail":
+                    self.blocked_by = summary
+                    return "blocked"
+                continue
             await self._execute(db, run, row, tool, args)
 
         # Every call of this step is settled: hand the results to the model.
@@ -888,6 +938,12 @@ async def _finalize(
             db, run, "message.completed", {"message_id": str(message.id), "status": message.status}
         )
     await runs.set_status(db, run, status, error={"message": error} if error else None)
+    if run.automation_id is not None:
+        try:
+            await automations.on_run_finished(db, run, status, error)
+        except Exception:  # noqa: BLE001 - delivering the result must not break the run
+            log.exception("automation follow-up failed", extra={"ctx": {"run_id": str(run.id)}})
+            await db.rollback()
 
 
 # Chat turns run through the same loop, but only with memory tools and tight limits.
@@ -906,9 +962,13 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     memories, prompt): changing settings later does not affect a run that has started."""
     chat = run.kind == "chat"
     profile = await db.get(AgentProfile, run.profile_id) if run.profile_id else None
+    automation = await db.get(Automation, run.automation_id) if run.automation_id else None
     settings = await profiles.effective_settings(db, profile)
     if chat:
         settings = settings.model_copy(update={"limits": CHAT_LIMITS, "plan_review": "off"})
+    if automation is not None:
+        # Nobody is there to review a plan; each action is still checked on its own.
+        settings = settings.model_copy(update={"plan_review": "off"})
     ws_settings = await settings_service.get_section(db, WorkspaceSettings, "workspace")
     web_settings = await settings_service.get_section(db, WebSettings, "web")
     snap_policy, snap_ceiling = compile_policy(settings), compile_ceiling(settings)
@@ -924,6 +984,9 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     system += section
     if memory_settings.enabled:
         system += memory.MEMORY_TOOLS_HINT
+    if automation is not None:
+        system += AUTOMATION_SECTION.format(name=automation.name)
+        system += AUTOMATION_ON_ASK[automation.on_ask] + "\n"
     run.options = {**run.options, "memory_context": used}
     run.policy = {
         "policy": snap_policy.model_dump(by_alias=True),
@@ -935,6 +998,13 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
         "profile": {"id": str(profile.id), "name": profile.name} if profile else None,
         "system": system,
         "memory": memory_settings.enabled,
+        "automation": {
+            "id": str(automation.id),
+            "name": automation.name,
+            "on_ask": automation.on_ask,
+        }
+        if automation
+        else None,
         "default_model_id": str(profile.default_model_id)
         if profile and profile.default_model_id
         else None,
@@ -958,12 +1028,15 @@ async def _resolve_models(db: AsyncSession, run: Run, needs: set[str]) -> list[R
             raise NoModelAvailable("The chat model no longer supports tools.")
         return usable
     profile_default = run.policy.get("default_model_id") if run.policy else None
+    # Automations use their own default model when one is set in Settings.
+    defaults = await settings_service.get_section(db, ModelDefaults, "models")
+    task: TaskType = "automation" if run.automation_id and defaults.automation else "agent"
     if run.requested_model_id is None and profile_default:
         try:
             return await resolve(
                 db,
                 RouteRequest(
-                    task="agent",
+                    task=task,
                     explicit_model_id=uuid.UUID(profile_default),
                     required_capabilities=frozenset(needs),
                 ),
@@ -973,7 +1046,7 @@ async def _resolve_models(db: AsyncSession, run: Run, needs: set[str]) -> list[R
     return await resolve(
         db,
         RouteRequest(
-            task="agent",
+            task=task,
             explicit_model_id=run.requested_model_id,
             required_capabilities=frozenset(needs),
         ),
@@ -1042,7 +1115,10 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             has_skills=bool(skills),
             has_search=bool(web.search_url()),
             has_memory=bool(run.policy.get("memory")),
+            is_automation=run.automation_id is not None,
         )
+        automation_id = run.automation_id
+        on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         await runs.set_status(db, run, "running")  # commits
 
     agent = AgentRun(
@@ -1057,6 +1133,8 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         plan_review=run.policy.get("plan_review", "off"),
         skills=skills,
         usage_kind=run.kind,
+        automation_id=automation_id,
+        on_ask=on_ask,
     )
     task = asyncio.create_task(agent.drive())
     flag = CancelFlag()
@@ -1094,6 +1172,16 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
                         else None,
                     },
                 )
+                await automations.on_needs_approval(db, run)
+        elif outcome == "blocked":
+            run.options = {**run.options, "no_retry": True}  # it would stop the same way
+            await _finalize(
+                db,
+                run,
+                "failed",
+                error=f"Stopped because an action needed your approval: {agent.blocked_by}. "
+                "(This automation is set to stop when approval is needed.)",
+            )
         elif outcome.startswith("limit:"):
             note = limit_message(outcome.removeprefix("limit:"), policy.limits)
             await _finalize(db, run, "completed", note=f"\n\n_{note}_")
@@ -1111,6 +1199,8 @@ async def _after_answer(db: AsyncSession, run: Run) -> None:
     memory extraction look at it later."""
     if run.conversation_id is None or run.assistant_message_id is None:
         return
+    if run.automation_id is not None:
+        return  # scheduled runs are not conversations with the user
     message = await db.get(ChatMessage, run.assistant_message_id)
     if message is None:
         return

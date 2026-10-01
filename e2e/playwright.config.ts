@@ -17,8 +17,20 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /mobile\.spec\.ts/ },
+    {
+      name: 'desktop',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: [/mobile\.spec\.ts/, /automations\.spec\.ts/],
+    },
     // Phone size with touch (pointer: coarse), Chromium-based so no extra browser is needed.
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /mobile\.spec\.ts/ },
+    // Runs after the others: its notification pops up in every open tab of the app,
+    // where it could get in the way of another test's clicks.
+    {
+      name: 'notifications',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /automations\.spec\.ts/,
+      dependencies: ['desktop', 'mobile'],
+    },
   ],
 })

@@ -34,6 +34,11 @@ class Conversation(Base, IdMixin, TimestampMixin):
     profile_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agent_profiles.id", ondelete="SET NULL")
     )
+    # Set for the conversation of an automation run. These are not listed with the
+    # chats; they are reached from the automation's history.
+    automation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("automations.id", ondelete="CASCADE"), index=True
+    )
     # Messages up to this seq were already read by memory extraction.
     memory_extracted_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)

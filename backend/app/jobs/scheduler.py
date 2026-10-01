@@ -13,9 +13,15 @@ TICK_S = 30.0
 
 
 def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
+    from app.features.automations import service as automations
     from app.features.calendar import reminders
+    from app.features.notifications import service as notifications
 
-    return [("reminders", reminders.fire_due)]
+    return [
+        ("reminders", reminders.fire_due),
+        ("automations", automations.fire_due),
+        ("notifications.prune", notifications.prune),
+    ]
 
 
 async def run(stop: asyncio.Event) -> None:

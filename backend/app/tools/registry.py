@@ -7,9 +7,11 @@ from app.policy.engine import evaluate
 from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
+from app.tools.builtin.automation import AUTOMATION_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.memory import MEMORY_TOOLS
+from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.tasks import TASK_TOOLS
@@ -43,7 +45,9 @@ BUILTIN_TOOLS: list[Tool] = [
     HttpRequest(),
     *TASK_TOOLS,
     *EVENT_TOOLS,
+    SendNotification(),
     *MEMORY_TOOLS,
+    *AUTOMATION_TOOLS,
     CurrentTime(),
     LoadSkill(),
     ReadToolOutput(),
@@ -71,6 +75,7 @@ def toolset_for(
     has_skills: bool = False,
     has_search: bool = False,
     has_memory: bool = False,
+    is_automation: bool = False,
 ) -> list[Tool]:
     offered = []
     for tool in BUILTIN_TOOLS:
@@ -80,6 +85,7 @@ def toolset_for(
             (tool.name == "load_skill" and not has_skills)
             or (tool.name == "web_search" and not has_search)
             or (is_memory and not has_memory)
+            or (tool in AUTOMATION_TOOLS and not is_automation)
             or (mode != "agent" and not is_memory)
         ):
             continue

@@ -25,6 +25,7 @@ dependencies = [
   "trafilatura>=2.0",
   "python-dateutil>=2.9",
   "tzdata>=2025.1",
+  "cronsim>=2.6",
 ]
 
 [dependency-groups]

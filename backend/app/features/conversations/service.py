@@ -13,6 +13,7 @@ from app.features.conversations.schemas import AttachmentSummary, ConversationOu
 from app.features.profiles.models import AgentProfile
 from app.features.runs.models import ACTIVE_STATUSES, Run
 from app.jobs import queue
+from app.runtime import outputs
 
 
 def message_out(
@@ -72,6 +73,7 @@ def conversation_out(
         active_run_id=active.get(c.id),
         default_mode=c.default_mode,
         profile_id=c.profile_id,
+        automation_id=c.automation_id,
         snippet=snippet,
     )
 
@@ -80,7 +82,9 @@ async def list_conversations(
     db: AsyncSession, *, q: str | None, archived: bool, limit: int
 ) -> list[ConversationOut]:
     snippets: dict[uuid.UUID, str] = {}
-    stmt = select(Conversation).where(Conversation.archived == archived)
+    stmt = select(Conversation).where(
+        Conversation.archived == archived, Conversation.automation_id.is_(None)
+    )
     if q:
         tsq = func.websearch_to_tsquery("english", q)
         hits = await db.execute(
@@ -108,6 +112,20 @@ async def list_conversations(
     convs = list(await db.scalars(stmt))
     active = await active_runs(db, [c.id for c in convs])
     return [conversation_out(c, active, snippets.get(c.id)) for c in convs]
+
+
+async def delete_conversations(db: AsyncSession, ids: list[uuid.UUID]) -> None:
+    """Delete conversations with their files and saved tool outputs. The caller commits."""
+    run_ids: list[uuid.UUID] = []
+    for conversation_id in ids:
+        conv = await db.get(Conversation, conversation_id)
+        if conv is None:
+            continue
+        await attachments.delete_files_for_conversation(db, conv.id)
+        run_ids += list(await db.scalars(select(Run.id).where(Run.conversation_id == conv.id)))
+        await db.delete(conv)
+    await db.flush()
+    outputs.delete_for_runs(run_ids)
 
 
 async def list_messages(db: AsyncSession, conversation_id: uuid.UUID) -> list[MessageOut]:

@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–11 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–12 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -15,8 +15,10 @@ Docker Compose on a homelab.
 > be paused and resumed, and every run is in the **Runs** history. They can
 > **search the web** (SearXNG), read pages and call APIs, and the assistant has a
 > **memory** you control. **Documents** are Markdown files with a rich editor and
-> history, and there are **tasks** and a **calendar**. Notifications, automations
-> etc. follow the phases in `docs/architecture.md`.
+> history, and there are **tasks** and a **calendar**. **Automations** run agents
+> on a schedule and report back through **notifications** (in the app, on your
+> desktop, on Discord). MCP, browser automation etc. follow the phases in
+> `docs/architecture.md`.
 
 ### Chat vs. Agent mode
 
@@ -106,13 +108,47 @@ Times follow the time zone of your browser. A repeating event keeps its local
 time when the clocks change. Tasks without a time, and times given by agents
 without a zone, use the time zone from **Settings → General**.
 
-**Reminders** (on events and tasks) currently show as a notice in the app while it
-is open in a tab. Notifications that reach you when it is closed (Discord and
-others) come with the next phase.
+**Reminders** (on events and tasks) arrive as notifications; see below.
 
 **Agents** can list, add, change and delete tasks and events. Changes follow the
 *Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
 action, so the default level asks you first.
+
+### Notifications
+
+Reminders, the results of automations and messages from agents are listed under
+**Notifications** (the bell in the sidebar shows how many are unread). While the
+app is open they also pop up as a notice.
+
+In **Settings → Notifications** you choose where else they go:
+
+- **Desktop notifications**: shown by your browser while Anemo is open in a tab
+  you are not looking at. This is a per-browser choice and needs HTTPS.
+- **Discord**: add a channel's webhook URL (channel settings → Integrations →
+  Webhooks) to get notifications on your phone when the app is closed. The URL is
+  stored encrypted and never shown again; for each channel you pick which kinds
+  of notification it receives. Sending is retried when Discord is unreachable.
+
+Agents can send you a notification themselves (the *Send notifications*
+permission); they cannot choose or change where notifications go.
+
+### Automations
+
+An automation is a prompt that an agent runs by itself on a schedule: every
+morning, every weekday, every few hours, once, or any cron expression. Times are
+wall-clock times in your time zone and stay put when the clocks change.
+
+Each run is a normal agent run in its own conversation (open it from the
+automation's **History**), with the permissions of the agent profile you pick.
+Because nobody is watching, you choose what happens **when an action would need
+your approval**: wait and notify you (default), skip that action and carry on,
+or stop the run. It is never approved automatically.
+
+The final answer is sent to you as a notification, and can also be saved as a
+document (for example `briefings/{date}`). An automation can keep short notes
+between its runs, so "tell me when this page changes" works. Failed runs can be
+retried. If the app was off when a run was due, that run is skipped rather than
+caught up later, and a run still going when the next one is due is not stacked.
 
 ### Memory
 

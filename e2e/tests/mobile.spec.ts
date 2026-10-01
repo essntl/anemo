@@ -27,6 +27,9 @@ const SCREENS = [
   '/settings/workspace',
   '/settings/web',
   '/settings/memory',
+  '/settings/notifications',
+  '/automations',
+  '/notifications',
   '/memory',
   '/memory?tab=pending',
 ]

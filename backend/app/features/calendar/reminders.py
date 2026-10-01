@@ -5,8 +5,8 @@ The worker calls fire_due() every half minute. A reminder is due when
 outage does not swallow it). Each one is claimed with a unique row first, so it
 fires once even with several workers.
 
-For now a reminder is an app-wide event shown as a notice in open tabs.
-Notifications that also reach you while the app is closed come with phase 12.
+A reminder is a notification: listed in the app, and sent to the destinations
+that receive reminders (e.g. Discord), so it also reaches you when the app is closed.
 """
 
 import uuid
@@ -17,9 +17,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
-from app.events import bus
 from app.features.calendar import recurrence, service
 from app.features.calendar.models import Reminder
+from app.features.notifications import service as notifications
 from app.features.settings import service as settings_service
 from app.features.settings.sections import GeneralSettings
 from app.features.tasks.models import Task
@@ -41,6 +41,13 @@ async def _claim(db: AsyncSession, kind: str, target_id: uuid.UUID, start: datet
     return row is not None
 
 
+def when_text(moment: datetime, tz: str, *, all_day: bool) -> str:
+    """e.g. "Thu 1 Oct, 14:30" in the user's time zone."""
+    local = moment.astimezone(recurrence.zone(tz))
+    day = f"{local:%a} {local.day} {local:%b}"
+    return day if all_day else f"{day}, {local:%H:%M}"
+
+
 def task_due_instant(task: Task, tz: str) -> datetime | None:
     if task.due_date is None:
         return None
@@ -53,6 +60,7 @@ async def fire_due(now: datetime | None = None) -> int:
     now = now or datetime.now(UTC)
     sent = 0
     async with get_sessionmaker()() as db:
+        general = await settings_service.get_section(db, GeneralSettings, "general")
         for occ in await service.occurrences(db, now - GRACE, now + LOOKAHEAD):
             minutes = occ.event.remind_minutes
             if minutes is None:
@@ -62,18 +70,11 @@ async def fire_due(now: datetime | None = None) -> int:
                 continue
             if await _claim(db, "event", occ.event.id, occ.original_start):
                 sent += 1
-                await bus.publish_global(
-                    "reminder",
-                    {
-                        "kind": "event",
-                        "id": str(occ.event.id),
-                        "title": occ.title,
-                        "starts_at": occ.start_at.isoformat(),
-                        "all_day": occ.event.all_day,
-                    },
+                when = when_text(occ.start_at, general.timezone, all_day=occ.event.all_day)
+                await notifications.create(
+                    db, title=f"Reminder: {occ.title}", body=when, kind="reminder", link="/calendar"
                 )
 
-        general = await settings_service.get_section(db, GeneralSettings, "general")
         today = now.astimezone(recurrence.zone(general.timezone)).date()
         tasks = await db.scalars(
             select(Task).where(
@@ -92,14 +93,12 @@ async def fire_due(now: datetime | None = None) -> int:
                 continue
             if await _claim(db, "task", task.id, due):
                 sent += 1
-                await bus.publish_global(
-                    "reminder",
-                    {
-                        "kind": "task",
-                        "id": str(task.id),
-                        "title": task.title,
-                        "starts_at": due.isoformat(),
-                        "all_day": task.due_time is None,
-                    },
+                when = when_text(due, general.timezone, all_day=task.due_time is None)
+                await notifications.create(
+                    db,
+                    title=f"Reminder: {task.title}",
+                    body=f"Due {when}",
+                    kind="reminder",
+                    link="/tasks",
                 )
     return sent

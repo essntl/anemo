@@ -16,6 +16,7 @@ dependencies = [
     { name = "anthropic" },
     { name = "argon2-cffi" },
     { name = "asyncpg" },
+    { name = "cronsim" },
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -51,6 +52,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.45" },
     { name = "argon2-cffi", specifier = ">=23.1" },
     { name = "asyncpg", specifier = ">=0.30" },
+    { name = "cronsim", specifier = ">=2.6" },
     { name = "cryptography", specifier = ">=43" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
@@ -542,6 +544,14 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bb/16/2a771612ee0b3acaa95ac21cc7e8a3319e815d6360f8ffc5987d1ce28499/courlan-1.4.0.tar.gz", hash = "sha256:fbbac7b7fcde2195ea08e707609503c81cf39c891e8d26cdb1fed4585782d63d", size = 208997, upload-time = "2026-06-01T17:30:17.306Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1f/38/ce65091ff20a16e06d17418c4353af5f56d3190821b1a06983c79ae79274/courlan-1.4.0-py3-none-any.whl", hash = "sha256:ad1dbdefd912ca7238d4607dc855df5df097f56bac175dd662c84eed3802f49e", size = 34193, upload-time = "2026-06-01T17:30:14.984Z" },
+]
+
+[[package]]
+name = "cronsim"
+version = "2.7"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/1a/02f105147f7f2e06ed4f734ff5a6439590bb275a53dd91fc73df6312298a/cronsim-2.7-py3-none-any.whl", hash = "sha256:1e1431fa08c51dc7f72e67e571c7c7a09af26420169b607badd4ca9677ffad1e", size = 14213, upload-time = "2025-10-21T16:38:20.431Z" },
 ]
 
 [[package]]

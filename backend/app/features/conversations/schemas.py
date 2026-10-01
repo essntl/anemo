@@ -29,6 +29,7 @@ class ConversationOut(BaseModel):
     active_run_id: uuid.UUID | None = None
     default_mode: str = "chat"
     profile_id: uuid.UUID | None = None
+    automation_id: uuid.UUID | None = None  # set for the conversation of an automation run
     snippet: str | None = None  # matching text when listed with a search query
 
 

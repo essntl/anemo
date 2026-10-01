@@ -2285,6 +2285,23 @@
             }
           },
           {
+            "name": "automation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Automation Id"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -7350,6 +7367,995 @@
           }
         }
       }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Notifications",
+        "description": "Newest first. Page with `before` = the last item's created_at.",
+        "operationId": "list_notifications_api_notifications_get",
+        "parameters": [
+          {
+            "name": "unread",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Unread"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only notifications created before this",
+              "title": "Before"
+            },
+            "description": "Only notifications created before this"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationOut"
+                  },
+                  "title": "Response List Notifications Api Notifications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Clear Notifications",
+        "operationId": "clear_notifications_api_notifications_delete",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/summary": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Summary",
+        "operationId": "summary_api_notifications_summary_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark Read",
+        "operationId": "mark_read_api_notifications_read_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{notification_id}": {
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Delete Notification",
+        "operationId": "delete_notification_api_notifications__notification_id__delete",
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Notification Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification-destinations": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Destinations",
+        "operationId": "list_destinations_api_notification_destinations_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DestinationOut"
+                  },
+                  "title": "Response List Destinations Api Notification Destinations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Create Destination",
+        "operationId": "create_destination_api_notification_destinations_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DestinationIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DestinationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification-destinations/{destination_id}": {
+      "patch": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Update Destination",
+        "operationId": "update_destination_api_notification_destinations__destination_id__patch",
+        "parameters": [
+          {
+            "name": "destination_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Destination Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DestinationPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DestinationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Delete Destination",
+        "operationId": "delete_destination_api_notification_destinations__destination_id__delete",
+        "parameters": [
+          {
+            "name": "destination_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Destination Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification-destinations/{destination_id}/test": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Test Destination",
+        "operationId": "test_destination_api_notification_destinations__destination_id__test_post",
+        "parameters": [
+          {
+            "name": "destination_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Destination Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "List Automations",
+        "operationId": "list_automations_api_automations_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationOut"
+                  },
+                  "title": "Response List Automations Api Automations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Create Automation",
+        "operationId": "create_automation_api_automations_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/schedule-preview": {
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Schedule Preview",
+        "description": "The schedule in words and its next run times (an invalid one is a 422).",
+        "operationId": "schedule_preview_api_automations_schedule_preview_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchedulePreviewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulePreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/{automation_id}": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Get Automation",
+        "operationId": "get_automation_api_automations__automation_id__get",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Update Automation",
+        "operationId": "update_automation_api_automations__automation_id__patch",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Delete Automation",
+        "description": "Deletes the automation and the conversations of its past runs.",
+        "operationId": "delete_automation_api_automations__automation_id__delete",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/{automation_id}/run": {
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Run Automation Now",
+        "operationId": "run_automation_now_api_automations__automation_id__run_post",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStarted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7694,6 +8700,460 @@
         ],
         "title": "AuditOut"
       },
+      "AutomationIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/Schedule"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "on_ask": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "deny",
+              "fail"
+            ],
+            "title": "On Ask",
+            "default": "pause"
+          },
+          "notify": {
+            "type": "string",
+            "enum": [
+              "always",
+              "on_failure",
+              "never"
+            ],
+            "title": "Notify",
+            "default": "always"
+          },
+          "destination_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Ids"
+          },
+          "document_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Path"
+          },
+          "max_retries": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Max Retries",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "prompt",
+          "schedule"
+        ],
+        "title": "AutomationIn"
+      },
+      "AutomationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/Schedule"
+          },
+          "schedule_text": {
+            "type": "string",
+            "title": "Schedule Text"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "on_ask": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "deny",
+              "fail"
+            ],
+            "title": "On Ask"
+          },
+          "notify": {
+            "type": "string",
+            "enum": [
+              "always",
+              "on_failure",
+              "never"
+            ],
+            "title": "Notify"
+          },
+          "destination_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Ids"
+          },
+          "document_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Path"
+          },
+          "max_retries": {
+            "type": "integer",
+            "title": "Max Retries"
+          },
+          "state": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "State"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "last_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Id"
+          },
+          "active_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Run Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "prompt",
+          "schedule",
+          "schedule_text",
+          "enabled",
+          "profile_id",
+          "model_id",
+          "on_ask",
+          "notify",
+          "destination_ids",
+          "document_path",
+          "max_retries",
+          "state",
+          "next_run_at",
+          "last_run_at",
+          "last_status",
+          "last_run_id",
+          "created_at"
+        ],
+        "title": "AutomationOut"
+      },
+      "AutomationPatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Schedule"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "on_ask": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pause",
+                  "deny",
+                  "fail"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Ask"
+          },
+          "notify": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "always",
+                  "on_failure",
+                  "never"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notify"
+          },
+          "destination_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Ids"
+          },
+          "document_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Path"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          }
+        },
+        "type": "object",
+        "title": "AutomationPatch"
+      },
       "Body_upload_api_attachments_post": {
         "properties": {
           "file": {
@@ -7966,6 +9426,18 @@
             ],
             "title": "Profile Id"
           },
+          "automation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Id"
+          },
           "snippet": {
             "anyOf": [
               {
@@ -8135,6 +9607,189 @@
           "decision"
         ],
         "title": "DecisionIn"
+      },
+      "DestinationIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "const": "discord",
+            "title": "Type",
+            "default": "discord"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "kinds": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "reminder",
+                "automation",
+                "approval",
+                "agent"
+              ]
+            },
+            "type": "array",
+            "title": "Kinds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url"
+        ],
+        "title": "DestinationIn"
+      },
+      "DestinationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "url_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Hint"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sent At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "url_hint",
+          "enabled",
+          "kinds",
+          "last_error",
+          "last_sent_at"
+        ],
+        "title": "DestinationOut"
+      },
+      "DestinationPatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "reminder",
+                    "automation",
+                    "approval",
+                    "agent"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kinds"
+          }
+        },
+        "type": "object",
+        "title": "DestinationPatch"
       },
       "DiscoveredModelOut": {
         "properties": {
@@ -8890,6 +10545,29 @@
           "password"
         ],
         "title": "LoginIn"
+      },
+      "MarkReadIn": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "title": "MarkReadIn",
+        "description": "Mark these as read; with no ids, everything."
       },
       "MeOut": {
         "properties": {
@@ -9751,6 +11429,96 @@
         },
         "type": "object",
         "title": "ModelPatch"
+      },
+      "NotificationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ],
+            "title": "Level"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reminder",
+              "automation",
+              "approval",
+              "agent"
+            ],
+            "title": "Kind"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "body",
+          "level",
+          "kind",
+          "link",
+          "read_at",
+          "created_at"
+        ],
+        "title": "NotificationOut"
+      },
+      "NotificationSummary": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread"
+        ],
+        "title": "NotificationSummary"
       },
       "OccurrenceIn": {
         "properties": {
@@ -11125,6 +12893,29 @@
             ],
             "title": "Profile Name"
           },
+          "automation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Id"
+          },
+          "automation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Name"
+          },
           "request": {
             "type": "string",
             "title": "Request"
@@ -11334,6 +13125,29 @@
             ],
             "title": "Profile Name"
           },
+          "automation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Id"
+          },
+          "automation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Name"
+          },
           "request": {
             "type": "string",
             "title": "Request"
@@ -11524,6 +13338,29 @@
             ],
             "title": "Profile Name"
           },
+          "automation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Id"
+          },
+          "automation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Name"
+          },
           "request": {
             "type": "string",
             "title": "Request"
@@ -11614,6 +13451,26 @@
         ],
         "title": "RunOut"
       },
+      "RunStarted": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "conversation_id"
+        ],
+        "title": "RunStarted"
+      },
       "RunTotals": {
         "properties": {
           "input_tokens": {
@@ -11673,6 +13530,101 @@
           "hash"
         ],
         "title": "SaveOut"
+      },
+      "Schedule": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cron",
+              "interval",
+              "once"
+            ],
+            "title": "Kind"
+          },
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron"
+          },
+          "every_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 44640.0,
+                "minimum": 5.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every Minutes"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "tz": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Tz",
+            "default": "UTC"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "Schedule"
+      },
+      "SchedulePreviewIn": {
+        "properties": {
+          "schedule": {
+            "$ref": "#/components/schemas/Schedule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule"
+        ],
+        "title": "SchedulePreviewIn"
+      },
+      "SchedulePreviewOut": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "next_runs": {
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": "array",
+            "title": "Next Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "next_runs"
+        ],
+        "title": "SchedulePreviewOut"
       },
       "Scope": {
         "properties": {
@@ -12434,6 +14386,24 @@
         },
         "type": "object",
         "title": "TaskPatch"
+      },
+      "TestOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "TestOut"
       },
       "TestResult": {
         "properties": {

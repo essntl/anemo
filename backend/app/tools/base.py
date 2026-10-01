@@ -52,6 +52,7 @@ class ToolContext:
     call_id: uuid.UUID | None = None  # the tool call being executed (for progress events)
     skills: list[str] = field(default_factory=list)  # short names of skills the run may load
     web: WebSettings = field(default_factory=WebSettings)  # search & network allowlist (snapshot)
+    automation_id: uuid.UUID | None = None  # set in runs started by an automation
 
 
 class ToolResult(BaseModel):
