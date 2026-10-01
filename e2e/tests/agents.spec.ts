@@ -80,7 +80,7 @@ test('import, disable, export and delete a skill', async ({ page }) => {
 test('runs page filters and settings show the new limits', async ({ page }) => {
   await login(page)
   await page.goto('/runs')
-  await expect(page.getByRole('heading', { name: 'Runs' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Runs', exact: true })).toBeVisible()
   await page.getByRole('combobox', { name: 'Status' }).click()
   await page.getByRole('option', { name: 'Failed' }).click()
   await expect(page).toHaveURL(/status=failed/)

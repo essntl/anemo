@@ -1,15 +1,23 @@
 """Run lifecycle helpers shared by the API (create/cancel) and the worker (execute)."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.db import get_sessionmaker
 from app.core.errors import NotFound
 from app.events import bus
-from app.features.runs.models import ACTIVE_STATUSES, TERMINAL_STATUSES, Run, RunEvent
+from app.features.runs.models import (
+    ACTIVE_STATUSES,
+    TERMINAL_STATUSES,
+    Approval,
+    Run,
+    RunEvent,
+)
+from app.jobs import queue
 
 # Event types stored durably in run_events (everything else is live-only).
 DURABLE_EVENTS = {
@@ -72,3 +80,31 @@ async def set_status(
             "conversation_id": str(run.conversation_id) if run.conversation_id else None,
         },
     )
+
+
+# An approval request nobody answers is not left open forever: after this long the
+# answer is "no", and the run continues without the action.
+APPROVAL_TTL = timedelta(hours=24)
+
+
+async def expire_stale_approvals(now: datetime | None = None) -> int:
+    """Periodic (worker): treat approval requests older than APPROVAL_TTL as declined
+    and let their runs continue. Returns how many expired."""
+    now = now or datetime.now(UTC)
+    expired = 0
+    async with get_sessionmaker()() as db:
+        stale = await db.scalars(
+            select(Approval)
+            .where(Approval.status == "pending", Approval.created_at < now - APPROVAL_TTL)
+            .with_for_update(skip_locked=True)
+        )
+        for approval in list(stale):
+            run = await db.scalar(select(Run).where(Run.id == approval.run_id).with_for_update())
+            if run is None or run.status != "waiting_approval":
+                continue
+            approval.status, approval.decided_at = "expired", now
+            expired += 1
+            await queue.enqueue(db, "run.execute", {"run_id": str(run.id)}, lane="background")
+            await set_status(db, run, "queued")  # commits
+        await db.commit()
+    return expired

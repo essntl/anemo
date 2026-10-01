@@ -9,9 +9,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Scope
 
+from app import __version__
 from app.api.router import api_router
 from app.api.security import OriginCheckMiddleware
 from app.core.config import get_settings
@@ -35,7 +38,7 @@ def create_app() -> FastAPI:
     configure_logging(settings.log_level)
     app = FastAPI(
         title="anemo",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
         docs_url="/api/docs" if settings.env != "production" else None,
         redoc_url=None,
@@ -43,9 +46,23 @@ def create_app() -> FastAPI:
     )
     install_error_handlers(app)
     app.add_middleware(OriginCheckMiddleware)
+    # Compress the app's JavaScript and JSON answers (about a third of the size on the
+    # wire). Event streams are left alone by this middleware, so they stay live.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.include_router(api_router)
     _mount_spa(app, Path(settings.static_dir))
     return app
+
+
+class _ImmutableFiles(StaticFiles):
+    """The build's assets have their content hash in the file name, so a browser may
+    keep them for good: a new build has new names."""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
 
 _ALWAYS_REVALIDATE = {
@@ -61,7 +78,7 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
     if not index.exists():
         return
     if (static_dir / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+        app.mount("/assets", _ImmutableFiles(directory=static_dir / "assets"), name="assets")
 
     # Sync handler: FastAPI runs it in a threadpool, so filesystem checks don't block the loop.
     @app.get("/{path:path}", include_in_schema=False)

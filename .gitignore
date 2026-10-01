@@ -24,3 +24,10 @@ frontend/src/api/schema.d.ts.bak
 # e2e artifacts
 e2e/test-results/
 e2e/playwright-report/
+
+# throwaway test stack and local backups
+e2e/.tmp/
+/backups/
+
+# A filled-in compose file for your own server (contains passwords).
+*.local.yml

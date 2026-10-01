@@ -1,51 +1,34 @@
+import type { ComponentType } from 'react'
 import { createBrowserRouter } from 'react-router'
-import { PermissionsPage } from '@/features/agents/PermissionsPage'
-import { ProfilesPage } from '@/features/profiles/pages/ProfilesPage'
-import { RunDetailPage } from '@/features/runs/pages/RunDetailPage'
-import { RunsPage } from '@/features/runs/pages/RunsPage'
-import { SearchPage } from '@/features/search/SearchPage'
-import { UsagePage } from '@/features/usage/UsagePage'
 import { LoginPage } from '@/features/auth/LoginPage'
-import { AutomationsPage } from '@/features/automations/AutomationsPage'
-import { DocumentsPage } from '@/features/documents/DocumentsPage'
-import { FilesPage } from '@/features/files/FilesPage'
-import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
-import { McpSettingsPage } from '@/features/mcp/McpSettingsPage'
-import { MemoryPage } from '@/features/memory/MemoryPage'
-import { MemorySettingsPage } from '@/features/memory/MemorySettingsPage'
-import { NotificationSettingsPage } from '@/features/notifications/NotificationSettingsPage'
-import { NotificationsPage } from '@/features/notifications/NotificationsPage'
-import { TasksPage } from '@/features/tasks/TasksPage'
-import { WebSettingsPage } from '@/features/web/WebSettingsPage'
-import { ProvidersPage } from '@/features/providers/ProvidersPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
-import { BrowserPage } from '@/features/browser/BrowserPage'
-import { CalendarPage } from '@/features/calendar/CalendarPage'
 import { ConversationPage } from '@/features/chat/pages/ConversationPage'
 import { NewChatPage } from '@/features/chat/pages/NewChatPage'
-import { AppearancePage } from '@/features/settings/pages/AppearancePage'
-import { GeneralPage } from '@/features/settings/pages/GeneralPage'
 import { SettingsIndex, SettingsLayout } from '@/features/settings/pages/SettingsLayout'
-import { SETTINGS_SECTIONS } from '@/features/settings/sections'
 import { AppLayout } from './AppLayout'
 import type { RouteHandle } from './mobileNavStore'
-import { PlaceholderPage } from './PlaceholderPage'
+import { RouteError } from './RouteError'
 
-const placeholder = (path: string, title: string) => ({
-  path,
-  element: <PlaceholderPage title={title} />,
-})
-
-const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory', 'notifications', 'mcp', 'usage']
+/**
+ * Loads a page's code only when it is first opened. Chat is in the main bundle;
+ * everything else (the calendar, the document editor, settings, …) arrives when
+ * you go there, which keeps the first load small, especially on a phone.
+ *
+ *   { path: 'files', ...page(() => import('@/features/files/FilesPage'), 'FilesPage') }
+ */
+function page<Module, Name extends keyof Module>(load: () => Promise<Module>, name: Name) {
+  return { lazy: async () => ({ Component: (await load())[name] as ComponentType }) }
+}
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
     // Everything below requires a logged-in session.
     element: <RequireAuth />,
+    errorElement: <RouteError />,
     children: [
       // The agent's browser on its own (a separate window, or a phone): no sidebar.
-      { path: 'browser/:conversationId', element: <BrowserPage /> },
+      { path: 'browser/:conversationId', ...page(() => import('@/features/browser/BrowserPage'), 'BrowserPage') },
       {
         element: <AppLayout />,
         children: [
@@ -55,36 +38,34 @@ export const router = createBrowserRouter([
             element: <ConversationPage />,
             handle: { ownMobileHeader: true } satisfies RouteHandle,
           },
-          { path: 'search', element: <SearchPage /> },
-          { path: 'files', element: <FilesPage /> },
-          { path: 'documents', element: <DocumentsPage /> },
-          { path: 'documents/:documentId', element: <DocumentsPage /> },
-          { path: 'tasks', element: <TasksPage /> },
-          { path: 'calendar', element: <CalendarPage /> },
-          { path: 'runs', element: <RunsPage /> },
-          { path: 'runs/:runId', element: <RunDetailPage /> },
-          { path: 'automations', element: <AutomationsPage /> },
-          { path: 'agents', element: <ProfilesPage /> },
-          { path: 'memory', element: <MemoryPage /> },
-          { path: 'notifications', element: <NotificationsPage /> },
+          { path: 'search', ...page(() => import('@/features/search/SearchPage'), 'SearchPage') },
+          { path: 'files', ...page(() => import('@/features/files/FilesPage'), 'FilesPage') },
+          { path: 'documents', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage') },
+          { path: 'documents/:documentId', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage') },
+          { path: 'tasks', ...page(() => import('@/features/tasks/TasksPage'), 'TasksPage') },
+          { path: 'calendar', ...page(() => import('@/features/calendar/CalendarPage'), 'CalendarPage') },
+          { path: 'runs', ...page(() => import('@/features/runs/pages/RunsPage'), 'RunsPage') },
+          { path: 'runs/:runId', ...page(() => import('@/features/runs/pages/RunDetailPage'), 'RunDetailPage') },
+          { path: 'automations', ...page(() => import('@/features/automations/AutomationsPage'), 'AutomationsPage') },
+          { path: 'agents', ...page(() => import('@/features/profiles/pages/ProfilesPage'), 'ProfilesPage') },
+          { path: 'memory', ...page(() => import('@/features/memory/MemoryPage'), 'MemoryPage') },
+          { path: 'notifications', ...page(() => import('@/features/notifications/NotificationsPage'), 'NotificationsPage') },
           {
             path: 'settings',
             element: <SettingsLayout />,
             children: [
               { index: true, element: <SettingsIndex /> },
-              { path: 'general', element: <GeneralPage /> },
-              { path: 'appearance', element: <AppearancePage /> },
-              { path: 'providers', element: <ProvidersPage /> },
-              { path: 'permissions', element: <PermissionsPage /> },
-              { path: 'workspace', element: <WorkspaceSettingsPage /> },
-              { path: 'web', element: <WebSettingsPage /> },
-              { path: 'memory', element: <MemorySettingsPage /> },
-              { path: 'mcp', element: <McpSettingsPage /> },
-              { path: 'usage', element: <UsagePage /> },
-              { path: 'notifications', element: <NotificationSettingsPage /> },
-              ...SETTINGS_SECTIONS.filter((s) => !BUILT_SETTINGS.includes(s.to)).map((s) =>
-                placeholder(s.to, s.label),
-              ),
+              { path: 'general', ...page(() => import('@/features/settings/pages/GeneralPage'), 'GeneralPage') },
+              { path: 'appearance', ...page(() => import('@/features/settings/pages/AppearancePage'), 'AppearancePage') },
+              { path: 'providers', ...page(() => import('@/features/providers/ProvidersPage'), 'ProvidersPage') },
+              { path: 'permissions', ...page(() => import('@/features/agents/PermissionsPage'), 'PermissionsPage') },
+              { path: 'workspace', ...page(() => import('@/features/files/WorkspaceSettingsPage'), 'WorkspaceSettingsPage') },
+              { path: 'web', ...page(() => import('@/features/web/WebSettingsPage'), 'WebSettingsPage') },
+              { path: 'mcp', ...page(() => import('@/features/mcp/McpSettingsPage'), 'McpSettingsPage') },
+              { path: 'notifications', ...page(() => import('@/features/notifications/NotificationSettingsPage'), 'NotificationSettingsPage') },
+              { path: 'memory', ...page(() => import('@/features/memory/MemorySettingsPage'), 'MemorySettingsPage') },
+              { path: 'usage', ...page(() => import('@/features/usage/UsagePage'), 'UsagePage') },
+              { path: 'advanced', ...page(() => import('@/features/settings/pages/AdvancedPage'), 'AdvancedPage') },
             ],
           },
         ],

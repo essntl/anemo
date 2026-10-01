@@ -82,17 +82,32 @@ class CancelFlag:
 async def _watch_for_cancel(
     run_id: uuid.UUID, target: "asyncio.Task[Any]", flag: CancelFlag
 ) -> None:
-    """Cancels `target` when a cancel signal arrives (Redis), or the DB flag is set."""
+    """Cancels `target` when a cancel signal arrives (Redis), or the DB flag is set.
+
+    The signal makes stopping immediate; the flag is checked every few seconds as
+    well, so stopping still works when Redis is down."""
     pubsub = get_redis().pubsub()
+    signals = True  # False once Redis fails: from then on only the flag is checked
     try:
         await pubsub.subscribe(bus.control_channel(run_id))
+    except Exception:  # noqa: BLE001
+        signals = False
+        log.warning("no cancel signals for this run (redis unavailable); polling the database")
+    try:
         waited = 0.0
         while not target.done():
-            msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-            if msg and msg.get("data") == "cancel":
-                flag.requested = True
-                target.cancel()
-                return
+            if signals:
+                try:
+                    msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                except Exception:  # noqa: BLE001
+                    signals, msg = False, None
+                    log.warning("cancel signals lost (redis unavailable); polling the database")
+                if msg and msg.get("data") == "cancel":
+                    flag.requested = True
+                    target.cancel()
+                    return
+            else:
+                await asyncio.sleep(1.0)
             waited += 1.0
             if waited >= CANCEL_POLL_S:
                 waited = 0.0
@@ -105,7 +120,10 @@ async def _watch_for_cancel(
     except Exception:  # noqa: BLE001 - never let the watcher crash the run
         log.warning("cancel watcher stopped", exc_info=True)
     finally:
-        await pubsub.aclose()
+        try:
+            await pubsub.aclose()
+        except Exception:  # noqa: BLE001, S110 - closing a dead connection may fail too
+            pass
 
 
 async def _finish(

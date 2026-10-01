@@ -1,0 +1,86 @@
+# Runs on every push and pull request: the same checks as locally (see the Makefile).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint, types, tests, migrations)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Settings for a throwaway stack
+        run: |
+          cat > .env <<EOF
+          APP_SECRET_KEY=$(openssl rand -hex 32)
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          ADMIN_PASSWORD=$(openssl rand -hex 12)
+          WORKSPACE_PATH=./workspace-dev
+          EOF
+          mkdir -p workspace-dev && chmod 777 workspace-dev
+      - name: Lint, type-check, test (in the dev container, with Postgres and Valkey)
+        run: >
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm -e ENV=test app
+          sh -c "ruff check . && ruff format --check . && mypy app && pytest -q -p no:logging && alembic check"
+
+  frontend:
+    name: Frontend (types, lint, tests, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  browser-service:
+    name: Browser service (real Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Settings so compose can read the file
+        run: printf 'APP_SECRET_KEY=%s\nPOSTGRES_PASSWORD=x\n' "$(openssl rand -hex 32)" > .env
+      - run: docker compose --profile browser build browser
+      - name: Tests inside the browser image
+        run: >
+          docker compose --profile browser run --rm --no-deps -T
+          -v "$PWD/browser:/src:ro" --entrypoint sh browser /src/tests/run.sh
+
+  e2e:
+    name: End-to-end (throwaway stack, scripted model)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - run: sh e2e/run-isolated.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-traces
+          path: e2e/test-results
+          retention-days: 7

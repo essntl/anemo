@@ -7,6 +7,7 @@ How a client follows a run:
   3. reconnects send Last-Event-ID and continue from there
 """
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
@@ -15,6 +16,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Header, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from redis.exceptions import RedisError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +35,7 @@ from app.runtime import outputs
 router = APIRouter(tags=["runs"])
 
 BLOCK_MS = 15_000
+DEGRADED_POLL_S = 2.0  # how often a run's status is re-read while Redis is down
 
 
 class RunTotals(BaseModel):
@@ -351,7 +354,18 @@ async def _stream_run(run_id: uuid.UUID, request: Request, cursor: str) -> Async
     first = True
     while not await request.is_disconnected():
         # First read does not block, so a finished run is reported immediately.
-        batch = await bus.read({key: cursor}, None if first else BLOCK_MS, 200)
+        try:
+            batch = await bus.read({key: cursor}, None if first else BLOCK_MS, 200)
+        except (RedisError, OSError):
+            # No live events without Redis: report the status from the database every
+            # two seconds instead, so the page still notices when the run is done.
+            status = await _run_status(run_id)
+            final = status is None or status in TERMINAL_STATUSES
+            yield frame("run.status", {"status": status or "unknown", "final": final})
+            if final:
+                return
+            await asyncio.sleep(DEGRADED_POLL_S)
+            continue
         first = False
         if not batch:
             status = await _run_status(run_id)
@@ -384,7 +398,12 @@ async def run_events(
 async def _stream_global(request: Request, cursor: str) -> AsyncIterator[str]:
     yield comment("connected")
     while not await request.is_disconnected():
-        batch = await bus.read({bus.GLOBAL_STREAM: cursor}, BLOCK_MS, 100)
+        try:
+            batch = await bus.read({bus.GLOBAL_STREAM: cursor}, BLOCK_MS, 100)
+        except (RedisError, OSError):
+            yield comment("events unavailable")  # keeps the connection open; retried below
+            await asyncio.sleep(DEGRADED_POLL_S * 3)
+            continue
         if not batch:
             yield comment()
             continue

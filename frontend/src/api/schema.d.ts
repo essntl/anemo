@@ -2126,6 +2126,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_system_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2493,6 +2510,20 @@ export interface components {
             default_level: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
             /** Workspace Scoped */
             workspace_scoped: boolean;
+        };
+        /** Check */
+        Check: {
+            /** Name */
+            name: string;
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+            /**
+             * Optional
+             * @default false
+             */
+            optional: boolean;
         };
         /** ContentOut */
         ContentOut: {
@@ -4419,6 +4450,15 @@ export interface components {
             detail: string;
             /** Available */
             available: boolean;
+        };
+        /** SystemStatus */
+        SystemStatus: {
+            /** Version */
+            version: string;
+            /** Database Version */
+            database_version: string | null;
+            /** Checks */
+            checks: components["schemas"]["Check"][];
         };
         /** TaskIn */
         TaskIn: {
@@ -9946,6 +9986,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageRecordOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_system_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
                 };
             };
             /** @description Validation Error */

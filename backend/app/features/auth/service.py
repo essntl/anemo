@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
+from redis.exceptions import RedisError
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,24 +70,38 @@ def verify_password(password: str) -> bool:
     return verify_credentials(get_settings().admin_username, password)
 
 
+# The counters live in Redis. If Redis is down, logging in still works (you may need
+# to, to see what is wrong); attempts are then only slowed by the password hashing.
+
+
 async def check_rate_limit(ip: str) -> None:
     redis = get_redis()
-    ip_fails = int(await redis.get(f"login:fail:{ip}") or 0)
-    all_fails = int(await redis.get("login:fail:all") or 0)
+    try:
+        ip_fails = int(await redis.get(f"login:fail:{ip}") or 0)
+        all_fails = int(await redis.get("login:fail:all") or 0)
+    except (RedisError, OSError):
+        log.warning("login rate limit not checked: redis unavailable")
+        return
     if ip_fails >= MAX_FAILS_PER_IP or all_fails >= MAX_FAILS_GLOBAL:
         raise TooManyRequests("Too many failed attempts. Try again in a minute.")
 
 
 async def register_failure(ip: str) -> None:
     redis = get_redis()
-    for key in (f"login:fail:{ip}", "login:fail:all"):
-        count = await redis.incr(key)
-        if count == 1:
-            await redis.expire(key, FAIL_WINDOW_S)
+    try:
+        for key in (f"login:fail:{ip}", "login:fail:all"):
+            count = await redis.incr(key)
+            if count == 1:
+                await redis.expire(key, FAIL_WINDOW_S)
+    except (RedisError, OSError):
+        log.warning("failed login not counted: redis unavailable")
 
 
 async def clear_failures(ip: str) -> None:
-    await get_redis().delete(f"login:fail:{ip}")
+    try:
+        await get_redis().delete(f"login:fail:{ip}")
+    except (RedisError, OSError):
+        pass
 
 
 async def create_session(

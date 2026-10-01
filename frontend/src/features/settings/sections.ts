@@ -16,5 +16,5 @@ export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'notifications', label: 'Notifications' },
   { to: 'memory', label: 'Memory' },
   { to: 'usage', label: 'Usage' },
-  { to: 'advanced', label: 'Advanced', sensitive: true },
+  { to: 'advanced', label: 'Advanced' },
 ]

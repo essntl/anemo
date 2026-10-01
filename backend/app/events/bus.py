@@ -5,17 +5,34 @@
   run:{id}:control pub/sub channel carrying "cancel" to the worker executing the run
 
 Redis only holds ephemeral data; if it is flushed, clients fall back to the DB snapshot.
+Publishing never fails a run: when Redis is down, events are dropped (and logged
+once in a while), the run still finishes, and the browser follows it by polling.
 """
 
 import json
 import logging
+import time
 import uuid
 from collections.abc import Mapping
 from typing import Any, cast
 
+from redis.exceptions import RedisError
+
 from app.core.redis import get_redis
 
 log = logging.getLogger(__name__)
+
+_last_warning = 0.0
+
+
+def _warn_unavailable(what: str) -> None:
+    """Log that Redis is unreachable, at most every 30 seconds (events come in bursts)."""
+    global _last_warning
+    now = time.monotonic()
+    if now - _last_warning > 30:
+        _last_warning = now
+        log.warning("redis unavailable: %s", what, exc_info=True)
+
 
 RUN_STREAM_MAXLEN = 5000
 RUN_STREAM_TTL_S = 24 * 3600
@@ -40,15 +57,20 @@ def decode(fields: Mapping[str, str]) -> tuple[str, dict[str, Any]]:
 
 
 async def publish_run_event(run_id: uuid.UUID, event_type: str, data: Mapping[str, Any]) -> str:
+    """Returns the event's id, or "" when Redis is unavailable (the event is dropped)."""
     redis = get_redis()
     key = run_stream_key(run_id)
-    event_id = cast(
-        str,
-        await redis.xadd(
-            key, _encode(event_type, data), maxlen=RUN_STREAM_MAXLEN, approximate=True
-        ),
-    )
-    await redis.expire(key, RUN_STREAM_TTL_S)
+    try:
+        event_id = cast(
+            str,
+            await redis.xadd(
+                key, _encode(event_type, data), maxlen=RUN_STREAM_MAXLEN, approximate=True
+            ),
+        )
+        await redis.expire(key, RUN_STREAM_TTL_S)
+    except (RedisError, OSError):
+        _warn_unavailable("a run event was not published")
+        return ""
     return event_id
 
 
@@ -77,4 +99,9 @@ async def read(streams: dict[str, str], block_ms: int | None, count: int) -> Str
 
 
 async def send_control(run_id: uuid.UUID, command: str) -> None:
-    await get_redis().publish(control_channel(run_id), command)
+    """Tell the worker running the run to do something now ("cancel"). Best-effort:
+    the worker also notices the flag in the database a few seconds later."""
+    try:
+        await get_redis().publish(control_channel(run_id), command)
+    except (RedisError, OSError):
+        _warn_unavailable("a control signal was not sent")

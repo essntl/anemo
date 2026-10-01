@@ -16,11 +16,13 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.features.automations import service as automations
     from app.features.calendar import reminders
     from app.features.notifications import service as notifications
+    from app.features.runs import service as runs
 
     return [
         ("reminders", reminders.fire_due),
         ("automations", automations.fire_due),
         ("notifications.prune", notifications.prune),
+        ("approvals.expire", runs.expire_stale_approvals),
     ]
 
 

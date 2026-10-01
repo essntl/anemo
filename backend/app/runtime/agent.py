@@ -944,6 +944,12 @@ class AgentRun:
 
 
 def _denial(approval: Approval) -> ToolResult:
+    if approval.status == "expired":
+        return ToolResult(
+            content="Nobody answered the approval request within a day, so this was not "
+            "allowed. Continue without it and say what you could not do.",
+            is_error=True,
+        )
     note = f" Their feedback: {approval.reason}" if approval.reason else ""
     if approval.kind == "plan":
         return ToolResult(

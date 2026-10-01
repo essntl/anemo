@@ -1,24 +1,26 @@
 # Anemo
 
+[![Docker Hub](https://img.shields.io/docker/pulls/essntl/anemo?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/essntl/anemo)
+
 **Anemo** is a self-hosted, single-user AI workspace and agent operating environment: chat,
 autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–16 done: login, settings & theming, providers/models with encrypted
-> keys, streaming chat run by a background worker (survives reloads and worker
-> restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
-> server-enforced permission system and approvals, and a **file manager** plus agent
-> file tools with change history and one-click revert. Works on phones and can be
-> installed to your home screen. Agents can run **shell commands in an isolated
-> sandbox**, follow **agent profiles** and **skills**, have their plans reviewed,
-> be paused and resumed, and every run is in the **Runs** history. They can
-> **search the web** (SearXNG), read pages and call APIs, and the assistant has a
-> **memory** you control. **Documents** are Markdown files with a rich editor and
-> history, and there are **tasks** and a **calendar**. **Automations** run agents
-> on a schedule and report back through **notifications** (in the app, on your
-> desktop, on Discord). **MCP servers** add more tools, and agents can drive a real **browser**. **Search** covers everything, **Usage** shows what the models cost, and agents can hand work to **sub-agents**. Hardening for a first release follows in
-> `docs/architecture.md`.
+> Status: **1.0**. All phases in `docs/architecture.md` are built: streaming chat run by a
+> background worker (survives reloads and restarts), **Agent mode** with a
+> server-enforced permission system and approvals, a **file manager**, **documents**,
+> **tasks** and a **calendar**, a **memory** you control, a sandboxed **shell**, **web
+> search**, a **browser** for agents, **MCP servers**, **sub-agents**, scheduled
+> **automations** with **notifications**, **search** across everything and **usage**
+> numbers. Works on phones and can be installed to your home screen.
+
+Not built yet: a first-run setup wizard (you add a provider in Settings instead),
+the OpenAI *Responses* API (OpenAI works through the chat completions adapter), and
+searching inside workspace files that are not documents.
+
+Guides: [deployment](docs/deployment.md) · [backup and restore](docs/backup.md) ·
+[security and permissions](docs/security.md) · [architecture](docs/architecture.md)
 
 ### Chat vs. Agent mode
 
@@ -370,16 +372,24 @@ you will be asked to confirm your password.
 
 ### ZimaOS / CasaOS (prebuilt images)
 
-Images are on Docker Hub: `essntl/anemo:latest` (app and worker) and
-`essntl/anemo:sandbox` (the shell sandbox), for 64-bit Intel/AMD machines.
+Images are on Docker Hub for 64-bit Intel/AMD machines: `essntl/anemo:latest` (app
+and worker), `:sandbox` (the shell sandbox), `:browser` (the agents' browser) and
+`:mcp-host` (local MCP servers).
 [`deploy/zimaos/docker-compose.yml`](deploy/zimaos/docker-compose.yml) uses them
 and needs no `.env` file:
 
 1. Open the file and replace every `CHANGE_ME` (the comments at the top say what
    goes where), and set `PUBLIC_URL` to your ZimaOS address with port `8484`.
-2. In ZimaOS: App Store → **+** → *Install a customized app* → *Import*, paste the
-   file and install.
+2. From a terminal on the server, save it as `/DATA/AppData/anemo/docker-compose.yml`
+   and run `docker compose up -d` in that folder.
 3. Open `http://<your-zimaos-address>:8484` and log in.
+
+Update with `docker compose pull && docker compose up -d` in the same folder.
+
+Installing through the ZimaOS screen (App Store → **+** → *Install a customized
+app* → *Import*) is possible, but ZimaOS rewrites the file and keeps only one
+network per service, which cuts the worker off from the sandbox, the browser and
+the MCP host. The terminal keeps the file as written.
 
 Data is kept in `/DATA/AppData/anemo` (workspace, uploads, database).
 
@@ -396,6 +406,22 @@ proxy_read_timeout 1h;
 
 Set `PUBLIC_URL` to your public address and `TRUSTED_PROXIES` to NPM's address.
 
+### Backups
+
+```bash
+sh scripts/backup.sh            # database, uploads and workspace into ./backups/
+sh scripts/restore.sh backups/anemo-<date>-<time>
+```
+
+Keep a copy of `.env` as well: saved API keys are encrypted with `APP_SECRET_KEY`.
+Details, nightly backups and moving to another machine: [docs/backup.md](docs/backup.md).
+
+### Is everything running?
+
+**Settings → Advanced** shows the version, a check of every part (database, live
+events, worker, folders, browser) and the security log. What happens when a part
+is down is listed in [docs/deployment.md](docs/deployment.md).
+
 ## Services
 
 | Service    | Purpose                                              |
@@ -407,6 +433,8 @@ Set `PUBLIC_URL` to your public address and `TRUSTED_PROXIES` to NPM's address.
 | `migrate`  | Applies database migrations, then exits              |
 | `sandbox`  | Runs agent shell commands, with no network            |
 | `sandbox-net` | Runs agent shell commands that need the internet   |
+| `browser`  | Optional (`--profile browser`): a browser agents can drive |
+| `mcp-host` | Optional (`--profile mcp`): runs local MCP servers    |
 
 ## Development
 
@@ -421,15 +449,21 @@ make revision m="describe change"   # new Alembic migration
 make gen-api        # regenerate frontend API types after backend changes
 ```
 
-Set `ENABLE_FAKE_PROVIDER=true` in `.env` to get a "Fake provider" that answers
-without any API key (models `echo`, `reasoning`, `slow`, `agent`); useful for UI
-work. The chat end-to-end tests need it added and enabled in Settings, and skip
-themselves otherwise (they never fall back to a real model):
+End-to-end tests run against a throwaway copy of the app (its own containers,
+port 8090, volumes and passwords) with a scripted "fake" model, so nothing real
+is touched and no model is called:
 
 ```bash
-cd e2e && npm install && npx playwright install chromium
-E2E_PASSWORD=<your ADMIN_PASSWORD> npx playwright test
+cd e2e && npm install && npx playwright install chromium && cd ..
+sh e2e/run-isolated.sh              # start, test, remove
+KEEP=1 sh e2e/run-isolated.sh       # leave it running to look around
+E2E_BROWSER=1 sh e2e/run-isolated.sh  # also test the agents' browser
 ```
+
+You can also point the tests at a running install
+(`cd e2e && E2E_PASSWORD=<password> npx playwright test`). Tests that need a model
+only run if the fake provider (`ENABLE_FAKE_PROVIDER=true`) is added there, and skip
+themselves otherwise; they never fall back to a real model.
 
 The `mobile` project repeats the key flows on a phone-sized touch screen
 (`npx playwright test --project mobile`). App icons are generated from one SVG by

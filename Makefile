@@ -2,7 +2,7 @@
 DEV = docker compose -f docker-compose.yml -f docker-compose.dev.yml
 RUN = $(DEV) run --rm --no-deps -e ENV=test app
 
-.PHONY: up down dev build logs test test-backend test-frontend lint fmt migrate revision gen-api
+.PHONY: up down dev build logs test test-backend test-frontend e2e lint fmt migrate revision gen-api backup
 
 up:            ## Production stack
 	docker compose up -d --build
@@ -18,6 +18,8 @@ test-backend:  ## needs postgres/valkey; starts them if necessary
 	$(DEV) run --rm -e ENV=test app pytest -q
 test-frontend:
 	cd frontend && npm run typecheck && npm run lint && npm test
+e2e:           ## every end-to-end test, against a throwaway stack
+	sh e2e/run-isolated.sh
 
 lint:
 	$(RUN) sh -c "ruff check . && ruff format --check . && mypy app"
@@ -32,3 +34,6 @@ revision:      ## make revision m="add conversations"
 gen-api:       ## Regenerate frontend API types from the backend's OpenAPI schema
 	$(RUN) python -m app.cli export-openapi > frontend/src/api/openapi.json
 	cd frontend && npm run gen-api
+
+backup:        ## database, uploads and workspace into ./backups (see docs/backup.md)
+	sh scripts/backup.sh
