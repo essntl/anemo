@@ -125,6 +125,18 @@ export function RunDetailPage() {
         <p className="mt-4 rounded-xl bg-error/10 px-3 py-2 text-[13px] text-error">{String(data.error.message)}</p>
       )}
 
+      {data.memories_used.length > 0 && (
+        <details className="mt-4 rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[13px]">
+          <summary className="cursor-pointer text-[12.5px] font-medium text-muted hover:text-text">
+            {data.memories_used.length} memor{data.memories_used.length === 1 ? 'y' : 'ies'} in context
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {data.memories_used.map((m) => <li key={m.id}>{m.content}</li>)}
+          </ul>
+          <Link to="/memory" className="mt-2 inline-block text-[12.5px] text-accent hover:underline">Manage memories</Link>
+        </details>
+      )}
+
       <div className="mt-6">
         {data.kind === 'agent' && <RunActivity runId={runId} live={active} />}
         {answer ? (

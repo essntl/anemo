@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { useLogout, useMe } from '@/features/auth/api'
 import { ConversationList } from '@/features/chat/components/ConversationList'
+import { useMemorySummary } from '@/features/memory/api'
 import { useRunsSummary } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
 
@@ -67,6 +68,18 @@ function RunsBadge() {
   return null
 }
 
+/** Memory suggestions waiting for the user's decision. */
+function MemoryBadge() {
+  const pending = useMemorySummary().data?.pending ?? 0
+  if (!pending) return null
+  return (
+    <span title={`${pending} suggestion${pending === 1 ? '' : 's'} to review`}
+      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-[11px] font-semibold text-white">
+      {pending}
+    </span>
+  )
+}
+
 /** `onClose` is set when the sidebar is shown in the phone drawer. */
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const navigate = useNavigate()
@@ -112,7 +125,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           <NavItem to="/agents" icon={<Bot />}>Profiles & Skills</NavItem>
         </Section>
         <Section label="You">
-          <NavItem to="/memory" icon={<Brain />}>Memory</NavItem>
+          <NavItem to="/memory" icon={<Brain />} badge={<MemoryBadge />}>Memory</NavItem>
         </Section>
       </nav>
 

@@ -92,6 +92,7 @@ const EVENT_TYPES = [
   'run.pause_requested',
   'run.pause_cancelled',
   'context.compacted',
+  'memory.saved', // a memory tool saved something (shown as a notice with Undo)
 ]
 
 /** Subscribes to a run's events while `runId` is set. Calls `onFinished` once at the end. */

@@ -193,7 +193,15 @@ class ProviderError(Exception):
         self.status = status
 
 
+@dataclass
+class EmbedResult:
+    vectors: list[list[float]]  # one per input text, in order
+    input_tokens: int | None = None
+
+
 class ProviderAdapter(Protocol):
     def stream_chat(self, req: ChatRequest) -> AsyncIterator[ProviderEvent]: ...
+
+    async def embed(self, model: str, texts: list[str]) -> EmbedResult: ...
 
     async def list_models(self) -> list[DiscoveredModel]: ...

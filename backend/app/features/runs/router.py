@@ -70,8 +70,15 @@ class RunListItem(RunOut):
     model_label: str | None = None
 
 
+class MemoryUsed(BaseModel):
+    id: str
+    content: str
+
+
 class RunDetail(RunListItem):
     answer: str | None = None  # the final (or, while running, the partial) answer
+    # Memories that were in the model's context ("why did it know that?").
+    memories_used: list[MemoryUsed] = []
 
 
 def totals_out(r: Run) -> RunTotals:
@@ -185,6 +192,7 @@ async def get_run(run_id: uuid.UUID, db: Db) -> RunDetail:
         conversation_title=conv.title if conv else None,
         model_label=model.display_name if model else None,
         answer=(message.text_plain if message else None) or run.totals.get("text") or None,
+        memories_used=[MemoryUsed(**m) for m in run.options.get("memory_context", [])],
     )
 
 

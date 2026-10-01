@@ -24,14 +24,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.images import PreparedImage
-from app.features.conversations.models import ChatMessage
+from app.features.conversations.models import ChatMessage, Conversation
+from app.features.memory import extraction
+from app.features.memory import service as memory
 from app.features.profiles import service as profiles
 from app.features.profiles.models import AgentProfile
 from app.features.runs import service as runs
@@ -57,7 +59,10 @@ from app.providers.base import (
 )
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
 from app.runtime import citations, compaction, outputs
-from app.runtime.chat import CancelFlag, _watch_for_cancel
+from app.runtime.chat import (
+    SYSTEM_PROMPT as CHAT_SYSTEM_PROMPT,
+)
+from app.runtime.chat import CancelFlag, _maybe_enqueue_title, _watch_for_cancel
 from app.runtime.history import (
     estimate_tokens,
     latest_user_attachment_kinds,
@@ -184,8 +189,12 @@ class AgentRun:
         system: str | None = None,
         plan_review: str = "off",
         skills: list[str] | None = None,
+        usage_kind: str = "agent",
     ) -> None:
         self.run_id = run_id
+        self.usage_kind = usage_kind  # "agent", or "chat" for chat turns with memory tools
+        # The model call in flight; kept so a cancelled answer keeps what was streamed.
+        self.progress = StreamProgress()
         self.candidates = candidates
         self.policy = policy
         self.ceiling = ceiling
@@ -319,8 +328,9 @@ class AgentRun:
             if had_text:
                 await self._emit("message.delta", {"text": "\n\n"})
             try:
+                self.progress = StreamProgress()
                 result = await stream_with_fallback(
-                    self.run_id, self.candidates, self._builder(rendered), StreamProgress()
+                    self.run_id, self.candidates, self._builder(rendered), self.progress
                 )
             except ProviderError as exc:
                 # The context was too long after all: compact harder and retry once.
@@ -338,6 +348,7 @@ class AgentRun:
             async with get_sessionmaker()() as db:
                 run = await _get_run(db, self.run_id)
                 self._save_model_output(db, run, result)
+                self.progress.current = None  # saved
                 await _save_progress(db, run)
                 await db.commit()
             if result.stop_reason == "refusal":
@@ -380,7 +391,9 @@ class AgentRun:
         run.step += 1
         self._append_text(run, result)
         run.model_id = result.model.model_id
-        self._add_usage(db, run, result.model, result.usage, "agent")
+        label = f"{result.model.display_name} · {result.model.provider_name}"
+        run.totals = {**run.totals, "model_label": label}
+        self._add_usage(db, run, result.model, result.usage, self.usage_kind)
         self._checkpoint_time(run)
 
     @staticmethod
@@ -841,6 +854,12 @@ async def _finalize(
         message.error = error
         message.run_id = run.id
         message.model_id = run.model_id
+        message.model_label = run.totals.get("model_label") or message.model_label
+        await db.execute(
+            update(Conversation)
+            .where(Conversation.id == message.conversation_id)
+            .values(last_message_at=datetime.now(UTC))
+        )
     # Tool calls still open when the run ends can never complete.
     for row in await db.scalars(
         select(ToolCall).where(
@@ -860,15 +879,40 @@ async def _finalize(
     await runs.set_status(db, run, status, error={"message": error} if error else None)
 
 
-async def _snapshot(db: AsyncSession, run: Run) -> None:
-    """Freeze what the run may do (permissions, folder access, profile, skills, prompt):
-    changing settings later does not affect a run that has already started."""
+# Chat turns run through the same loop, but only with memory tools and tight limits.
+CHAT_LIMITS = Limits(max_steps=8, max_tool_calls=16, max_runtime_s=900)
+
+
+def _last_user_text(transcript: list[Message]) -> str:
+    for message in reversed(transcript):
+        if message.role == "user":
+            return " ".join(b.text for b in message.content if isinstance(b, TextBlock))
+    return ""
+
+
+async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> None:
+    """Freeze what the run may do and know (permissions, folder access, profile, skills,
+    memories, prompt): changing settings later does not affect a run that has started."""
+    chat = run.kind == "chat"
     profile = await db.get(AgentProfile, run.profile_id) if run.profile_id else None
     settings = await profiles.effective_settings(db, profile)
+    if chat:
+        settings = settings.model_copy(update={"limits": CHAT_LIMITS, "plan_review": "off"})
     ws_settings = await settings_service.get_section(db, WorkspaceSettings, "workspace")
     web_settings = await settings_service.get_section(db, WebSettings, "web")
     snap_policy, snap_ceiling = compile_policy(settings), compile_ceiling(settings)
-    skills = [s.meta() for s in await skills_for_profile(db, profile)]
+    skills = [] if chat else [s.meta() for s in await skills_for_profile(db, profile)]
+    if chat:
+        system = CHAT_SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
+    else:
+        system = build_system_prompt(profile, skills, settings.plan_review)
+    # Memories relevant to this message, and the instructions for the memory tools.
+    memory_settings = await memory.get_settings(db)
+    section, used = await memory.build_context(db, _last_user_text(transcript), memory_settings)
+    system += section
+    if memory_settings.enabled:
+        system += memory.MEMORY_TOOLS_HINT
+    run.options = {**run.options, "memory_context": used}
     run.policy = {
         "policy": snap_policy.model_dump(by_alias=True),
         "ceiling": snap_ceiling.model_dump(by_alias=True) if snap_ceiling else None,
@@ -877,7 +921,8 @@ async def _snapshot(db: AsyncSession, run: Run) -> None:
         "plan_review": settings.plan_review,
         "skills": skills,
         "profile": {"id": str(profile.id), "name": profile.name} if profile else None,
-        "system": build_system_prompt(profile, skills, settings.plan_review),
+        "system": system,
+        "memory": memory_settings.enabled,
         "default_model_id": str(profile.default_model_id)
         if profile and profile.default_model_id
         else None,
@@ -886,6 +931,20 @@ async def _snapshot(db: AsyncSession, run: Run) -> None:
 
 async def _resolve_models(db: AsyncSession, run: Run, needs: set[str]) -> list[ResolvedModel]:
     """The conversation's chosen model, else the profile's default, else Settings."""
+    if run.kind == "chat":
+        candidates = await resolve(
+            db,
+            RouteRequest(
+                task="chat",
+                explicit_model_id=run.requested_model_id,
+                required_capabilities=frozenset(needs - {"tools"}),
+            ),
+        )
+        # Tools are sent along, so only models that accept them can answer.
+        usable = [c for c in candidates if c.capabilities.get("tools")]
+        if not usable:
+            raise NoModelAvailable("The chat model no longer supports tools.")
+        return usable
     profile_default = run.policy.get("default_model_id") if run.policy else None
     if run.requested_model_id is None and profile_default:
         try:
@@ -937,8 +996,16 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             if run.totals.get("text"):
                 await runs.emit(db, run, "message.delta", {"text": run.totals["text"]})
 
+        if not run.transcript:
+            assert run.conversation_id is not None
+            message = await db.get(ChatMessage, run.assistant_message_id)
+            assert message is not None
+            history = await load_history(db, run.conversation_id, before_seq=message.seq)
+            run.transcript = [m.model_dump() for m in history]
+        transcript = [Message.model_validate(m) for m in run.transcript]
+
         if run.policy is None:
-            await _snapshot(db, run)
+            await _snapshot(db, run, transcript)
         assert run.policy is not None
         policy = Policy.model_validate(run.policy["policy"])
         ceiling = (
@@ -948,14 +1015,6 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         web = WebSettings.model_validate(run.policy.get("web") or {})
         skills = [s["slug"] for s in run.policy.get("skills") or []]
 
-        if not run.transcript:
-            assert run.conversation_id is not None
-            message = await db.get(ChatMessage, run.assistant_message_id)
-            assert message is not None
-            history = await load_history(db, run.conversation_id, before_seq=message.seq)
-            run.transcript = [m.model_dump() for m in history]
-
-        transcript = [Message.model_validate(m) for m in run.transcript]
         needs = {"tools"}
         if "image" in latest_user_attachment_kinds(transcript):
             needs.add("vision")
@@ -965,7 +1024,12 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             await _finalize(db, run, "failed", error=exc.message)
             return
         tools = registry.toolset_for(
-            "agent", policy, ceiling, has_skills=bool(skills), has_search=bool(web.search_url())
+            run.kind,
+            policy,
+            ceiling,
+            has_skills=bool(skills),
+            has_search=bool(web.search_url()),
+            has_memory=bool(run.policy.get("memory")),
         )
         await runs.set_status(db, run, "running")  # commits
 
@@ -980,6 +1044,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         system=run.policy.get("system"),
         plan_review=run.policy.get("plan_review", "off"),
         skills=skills,
+        usage_kind=run.kind,
     )
     task = asyncio.create_task(agent.drive())
     flag = CancelFlag()
@@ -999,6 +1064,9 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
     async with sessionmaker() as db:
         run = await _get_run(db, run_id)
         agent._checkpoint_time(run)
+        partial = agent.progress.current
+        if outcome in ("cancelled", "failed") and partial is not None:
+            AgentRun._append_text(run, partial)  # keep what was streamed before it stopped
         if outcome in ("waiting", "paused"):
             await _save_progress(db, run)
             if outcome == "paused":
@@ -1017,7 +1085,23 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         elif outcome.startswith("limit:"):
             note = limit_message(outcome.removeprefix("limit:"), policy.limits)
             await _finalize(db, run, "completed", note=f"\n\n_{note}_")
+            await _after_answer(db, run)
         elif outcome == "refused":
             await _finalize(db, run, "failed", error="The model declined to continue.")
         else:
             await _finalize(db, run, outcome, error=error)
+            if outcome == "completed":
+                await _after_answer(db, run)
+
+
+async def _after_answer(db: AsyncSession, run: Run) -> None:
+    """Follow-up work once an answer is complete: name a new conversation, and let
+    memory extraction look at it later."""
+    if run.conversation_id is None or run.assistant_message_id is None:
+        return
+    message = await db.get(ChatMessage, run.assistant_message_id)
+    if message is None:
+        return
+    await _maybe_enqueue_title(db, run.conversation_id, message.seq)
+    await extraction.schedule(db, run.conversation_id, message.seq)
+    await db.commit()

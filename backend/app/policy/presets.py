@@ -61,6 +61,7 @@ CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 INTERNAL_RULES = [
     Rule(cap="agent.plan", decision="allow"),
     Rule(cap="util.*", decision="allow"),
+    Rule(cap="memory.read", decision="allow"),  # looking up memories changes nothing
 ]
 
 

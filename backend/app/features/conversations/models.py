@@ -34,6 +34,8 @@ class Conversation(Base, IdMixin, TimestampMixin):
     profile_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agent_profiles.id", ondelete="SET NULL")
     )
+    # Messages up to this seq were already read by memory extraction.
+    memory_extracted_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     last_message_at: Mapped[datetime] = mapped_column(

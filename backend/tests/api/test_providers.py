@@ -61,7 +61,7 @@ async def test_discover_import_and_test_model(authed):
     assert (await authed.post(f"/api/providers/{pid}/test")).json()["ok"] is True
 
     found = (await authed.get(f"/api/providers/{pid}/discover")).json()
-    assert {m["model_key"] for m in found} == {"echo", "reasoning", "slow", "agent"}
+    assert {m["model_key"] for m in found} == {"echo", "reasoning", "slow", "agent", "embed"}
 
     models = (
         await authed.post(f"/api/providers/{pid}/models/import", json={"model_keys": ["echo"]})

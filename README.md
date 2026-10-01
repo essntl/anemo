@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–8 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–9 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -13,8 +13,9 @@ Docker Compose on a homelab.
 > installed to your home screen. Agents can run **shell commands in an isolated
 > sandbox**, follow **agent profiles** and **skills**, have their plans reviewed,
 > be paused and resumed, and every run is in the **Runs** history. They can
-> **search the web** (SearXNG), read pages and call APIs. Memory, documents etc.
-> follow the phases in `docs/architecture.md`.
+> **search the web** (SearXNG), read pages and call APIs, and the assistant has a
+> **memory** you control. Documents, tasks etc. follow the phases in
+> `docs/architecture.md`.
 
 ### Chat vs. Agent mode
 
@@ -61,6 +62,30 @@ page through it, and you can download it from the run.
 
 **Runs** lists every agent run with its status, profile, time, tokens and cost, and
 opens each one with its plan, tool calls, approvals, file changes and answer.
+
+### Memory
+
+The assistant remembers things about you across conversations, and everything it
+remembers is on the **Memory** page, where you can add, edit, archive and delete it.
+
+- **Say it:** "remember that I prefer TypeScript", "forget where I used to live".
+  This works in Chat and Agent mode (the model needs tool support) and is saved at
+  once, with a notice and *Undo*.
+- **Noticed in conversations:** a few minutes after a chat goes quiet, the *Memory*
+  model reads it for lasting facts and preferences. By default these are
+  **suggestions** you approve on the Memory page (sidebar badge); in **Settings →
+  Memory** you can have them saved automatically, or switch this off.
+- **Used when relevant:** for each message, memories that fit it are put into the
+  model's context, plus those marked *Always in context* and all *Instructions*.
+  A run's page lists which memories it was given.
+- **Search by meaning** needs an embedding model (Settings → Providers & Models →
+  Embeddings, e.g. `text-embedding-3-small` or a local model in Ollama). Without
+  one, memories are found by their words. After changing the model, use *Index all
+  memories again* in Settings → Memory.
+- Things that look like passwords, keys or tokens are never stored as memories.
+
+Memories are sent to the model provider as part of your messages, like the rest
+of the conversation.
 
 ### Web search and web pages
 

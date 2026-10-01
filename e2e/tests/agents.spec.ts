@@ -111,3 +111,48 @@ test('web settings: the search test reports an unreachable SearXNG without savin
   await expect(page.getByText(/not reachable/)).toBeVisible()
   await expect(page.getByLabel('Allowed hosts')).toBeVisible()
 })
+
+test('memory page: add, edit, archive and delete a memory', async ({ page }) => {
+  const text = `e2e memory ${suffix()}`
+  await login(page)
+  try {
+    await page.goto('/memory')
+    await page.getByRole('button', { name: 'Add memory' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('What to remember').fill(text)
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog).toHaveCount(0)
+    const row = page.locator('div.rounded-card', { hasText: text })
+    await expect(row).toBeVisible()
+
+    // Secrets are refused with an explanation.
+    await page.getByRole('button', { name: 'Add memory' }).click()
+    await dialog.getByLabel('What to remember').fill('my password is hunter2-e2e')
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog.getByText(/Secrets are not stored/)).toBeVisible()
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+
+    await row.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('button', { name: 'Always in context' }).click()
+    await expect(row.getByText('Always')).toBeVisible()
+
+    await row.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('button', { name: 'Archive' }).click()
+    await expect(row).toHaveCount(0)
+    await page.getByRole('tab', { name: 'Archived' }).click()
+    await expect(row).toBeVisible()
+
+    await row.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('button', { name: 'Delete' }).click()
+    await confirmWith(page, 'Delete')
+    await expect(row).toHaveCount(0)
+
+    await page.goto('/settings/memory')
+    await expect(page.getByRole('switch', { name: 'Remember things about me' })).toBeVisible()
+  } finally {
+    for (const status of ['active', 'archived']) {
+      const items = (await (await page.request.get(`/api/memories?status=${status}`)).json()) as { id: string; content: string }[]
+      for (const m of items.filter((i) => i.content === text)) await page.request.delete(`/api/memories/${m.id}`)
+    }
+  }
+})

@@ -22,6 +22,8 @@ from app.core.db import get_sessionmaker
 from app.core.redis import get_redis
 from app.events import bus
 from app.features.conversations.models import ChatMessage, Conversation
+from app.features.memory import extraction
+from app.features.memory import service as memory
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Run
 from app.features.usage import service as usage
@@ -203,9 +205,20 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
             vision: await resolve_attachments(db, history, {"vision": vision})
             for vision in {bool(m.capabilities.get("vision")) for m in candidates}
         }
+        # Relevant memories go into the system prompt (this model has no memory tools).
+        query = next(
+            (
+                " ".join(b.text for b in m.content if isinstance(b, TextBlock))
+                for m in reversed(history)
+                if m.role == "user"
+            ),
+            "",
+        )
+        section, used = await memory.build_context(db, query, await memory.get_settings(db))
+        run.options = {**run.options, "memory_context": used}
         await db.commit()
 
-    system = SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
+    system = SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat()) + section
     progress = StreamProgress()
     stream_task = asyncio.create_task(
         stream_with_fallback(
@@ -240,6 +253,9 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         await _finish(db, run, message, result or progress.current, status=status, error=error)
         if status == "completed":
             await _maybe_enqueue_title(db, run.conversation_id, message.seq)
+            if run.conversation_id is not None:
+                await extraction.schedule(db, run.conversation_id, message.seq)
+                await db.commit()
 
 
 async def _maybe_enqueue_title(

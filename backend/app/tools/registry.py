@@ -1,11 +1,13 @@
 """All tools the runtime can offer. A run's toolset is chosen per mode:
-chat mode gets none (it answers directly); agent mode gets every tool whose
-capability is not denied by policy (denied tools are not even offered)."""
+agent mode gets every tool whose capability is not denied by policy (denied tools
+are not even offered); chat mode only gets the memory tools, and only those it
+may use without asking (chat has no approval step)."""
 
 from app.policy.engine import evaluate
 from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
+from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.web import HttpRequest, ReadWebPage, WebSearch
@@ -35,6 +37,7 @@ BUILTIN_TOOLS: list[Tool] = [
     WebSearch(),
     ReadWebPage(),
     HttpRequest(),
+    *MEMORY_TOOLS,
     CurrentTime(),
     LoadSkill(),
     ReadToolOutput(),
@@ -61,17 +64,21 @@ def toolset_for(
     *,
     has_skills: bool = False,
     has_search: bool = False,
+    has_memory: bool = False,
 ) -> list[Tool]:
-    if mode != "agent":
-        return []
     offered = []
     for tool in BUILTIN_TOOLS:
+        is_memory = tool in MEMORY_TOOLS
         # Tools that cannot work in this setup are not offered at all.
-        if (tool.name == "load_skill" and not has_skills) or (
-            tool.name == "web_search" and not has_search
+        if (
+            (tool.name == "load_skill" and not has_skills)
+            or (tool.name == "web_search" and not has_search)
+            or (is_memory and not has_memory)
+            or (mode != "agent" and not is_memory)
         ):
             continue
         probe = Action(capability=tool.capability, resource="", risk="safe")
-        if evaluate(probe, policy, ceiling=ceiling).decision != "deny":
+        decision = evaluate(probe, policy, ceiling=ceiling).decision
+        if decision == "allow" or (decision == "ask" and mode == "agent"):
             offered.append(tool)
     return offered

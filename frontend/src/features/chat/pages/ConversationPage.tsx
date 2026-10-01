@@ -9,6 +9,7 @@ import { timelineKey } from '@/features/agents/api'
 import { useShellOutput } from '@/features/agents/shellOutput'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
+import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
@@ -87,6 +88,7 @@ export function ConversationPage() {
   }
   const appendShellOutput = useShellOutput((s) => s.append)
   const onEvent = (event: RunEvent) => {
+    noticeMemoryEvent(event, () => void qc.invalidateQueries({ queryKey: ['memories'] }))
     if (event.type === 'tool.progress') {
       appendShellOutput(String(event.data.tool_call_id), String(event.data.text ?? ''))
       return

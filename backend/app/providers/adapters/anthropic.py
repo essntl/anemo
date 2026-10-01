@@ -18,6 +18,7 @@ from app.providers.base import (
     ChatRequest,
     DiscoveredModel,
     Done,
+    EmbedResult,
     ImageBlock,
     Message,
     ProviderConfig,
@@ -172,6 +173,9 @@ class AnthropicAdapter:
             cached_tokens=u.cache_read_input_tokens,
         )
         yield Done(_STOP.get(final.stop_reason or "end_turn", "end"))
+
+    async def embed(self, model: str, texts: list[str]) -> EmbedResult:
+        raise ProviderError("Anthropic does not offer embedding models.", retryable=False)
 
     async def list_models(self) -> list[DiscoveredModel]:
         models: list[DiscoveredModel] = []

@@ -13,6 +13,7 @@ from app.features.audit.router import router as audit_router
 from app.features.auth.router import router as auth_router
 from app.features.conversations.router import router as conversations_router
 from app.features.files.router import router as files_router
+from app.features.memory.router import router as memory_router
 from app.features.permissions_router import router as permissions_router
 from app.features.profiles.router import router as profiles_router
 from app.features.providers.router import router as providers_router
@@ -41,4 +42,5 @@ protected.include_router(shell_router)
 protected.include_router(profiles_router)
 protected.include_router(skills_router)
 protected.include_router(web_router)
+protected.include_router(memory_router)
 api_router.include_router(protected)

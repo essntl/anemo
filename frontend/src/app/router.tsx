@@ -6,6 +6,8 @@ import { RunsPage } from '@/features/runs/pages/RunsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { FilesPage } from '@/features/files/FilesPage'
 import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
+import { MemoryPage } from '@/features/memory/MemoryPage'
+import { MemorySettingsPage } from '@/features/memory/MemorySettingsPage'
 import { WebSettingsPage } from '@/features/web/WebSettingsPage'
 import { ProvidersPage } from '@/features/providers/ProvidersPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
@@ -24,7 +26,7 @@ const placeholder = (path: string, title: string) => ({
   element: <PlaceholderPage title={title} />,
 })
 
-const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web']
+const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory']
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -50,7 +52,7 @@ export const router = createBrowserRouter([
           { path: 'runs/:runId', element: <RunDetailPage /> },
           placeholder('automations', 'Automations'),
           { path: 'agents', element: <ProfilesPage /> },
-          placeholder('memory', 'Memory'),
+          { path: 'memory', element: <MemoryPage /> },
           {
             path: 'settings',
             element: <SettingsLayout />,
@@ -62,6 +64,7 @@ export const router = createBrowserRouter([
               { path: 'permissions', element: <PermissionsPage /> },
               { path: 'workspace', element: <WorkspaceSettingsPage /> },
               { path: 'web', element: <WebSettingsPage /> },
+              { path: 'memory', element: <MemorySettingsPage /> },
               ...SETTINGS_SECTIONS.filter((s) => !BUILT_SETTINGS.includes(s.to)).map((s) =>
                 placeholder(s.to, s.label),
               ),

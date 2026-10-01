@@ -117,15 +117,29 @@ async def test_agent_uses_tools_and_plan(authed):
         "run_shell",
         "read_web_page",  # web_search only appears once SearXNG is set up
         "http_request",
+        "remember",
+        "update_memory",
+        "forget_memory",
+        "search_memory",
         "get_current_time",
         "read_tool_output",
     ]
 
 
-async def test_chat_mode_offers_no_tools(authed):
+async def test_chat_mode_only_offers_memory_tools(authed):
     cid = await setup(authed)
     script("hi", [TextDelta("hello"), Done("end")])
     r = await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})
+    await execute_run(uuid.UUID(r.json()["run_id"]))
+    assert [t.name for t in FakeAdapter.requests[-1].tools] == [
+        "remember",
+        "update_memory",
+        "forget_memory",
+        "search_memory",
+    ]
+    # With memory switched off, chat is a plain model call again.
+    await authed.put("/api/settings/memory", json={"enabled": False})
+    r = await authed.post(f"/api/conversations/{cid}/turns", json={"text": "again"})
     await execute_run(uuid.UUID(r.json()["run_id"]))
     assert FakeAdapter.requests[-1].tools == []
 

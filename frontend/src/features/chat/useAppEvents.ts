@@ -30,6 +30,8 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: approvalsKey })
       refreshConversation(e)
     }) as EventListener)
+    // Memories changed (a tool saved one, or background extraction found some).
+    source.addEventListener('memory.changed', () => void qc.invalidateQueries({ queryKey: ['memories'] }))
     return () => source.close()
   }, [qc])
 }

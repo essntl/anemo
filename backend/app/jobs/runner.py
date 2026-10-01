@@ -37,7 +37,22 @@ def default_handlers() -> dict[str, Handler]:
     async def conversation_title(payload: dict[str, Any]) -> None:
         await generate_title(uuid.UUID(payload["conversation_id"]))
 
-    return {"run.execute": run_execute, "conversation.title": conversation_title}
+    async def memory_extract(payload: dict[str, Any]) -> None:
+        from app.features.memory import extraction
+
+        await extraction.extract(uuid.UUID(payload["conversation_id"]), int(payload["upto_seq"]))
+
+    async def memory_reindex(payload: dict[str, Any]) -> None:
+        from app.features.memory import service as memory
+
+        await memory.reindex_all()
+
+    return {
+        "run.execute": run_execute,
+        "conversation.title": conversation_title,
+        "memory.extract": memory_extract,
+        "memory.reindex": memory_reindex,
+    }
 
 
 class JobRunner:

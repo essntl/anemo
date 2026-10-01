@@ -265,6 +265,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Memory Settings */
+        put: operations["put_memory_settings_api_settings_memory_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -1259,6 +1276,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/memories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Memories */
+        get: operations["list_memories_api_memories_get"];
+        put?: never;
+        /** Create Memory */
+        post: operations["create_memory_api_memories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary */
+        get: operations["summary_api_memories_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Memories
+         * @description All memories as a JSON file (a backup you can read).
+         */
+        get: operations["export_memories_api_memories_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reindex
+         * @description Embed every memory again, e.g. after choosing another embedding model.
+         */
+        post: operations["reindex_api_memories_reindex_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Memory */
+        delete: operations["delete_memory_api_memories__memory_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Memory */
+        patch: operations["update_memory_api_memories__memory_id__patch"];
+        trace?: never;
+    };
+    "/api/memories/{memory_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Memory */
+        post: operations["approve_memory_api_memories__memory_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Suggestions
+         * @description Approve or dismiss every pending suggestion at once.
+         */
+        post: operations["handle_suggestions_api_memories_suggestions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1271,6 +1418,7 @@ export interface components {
             permissions: components["schemas"]["PermissionSettings"];
             workspace: components["schemas"]["WorkspaceSettings"];
             web: components["schemas"]["WebSettings"];
+            memory: components["schemas"]["MemorySettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -1326,6 +1474,11 @@ export interface components {
             created_at: string;
             /** Decided At */
             decided_at: string | null;
+        };
+        /** ApproveIn */
+        ApproveIn: {
+            /** Content */
+            content?: string | null;
         };
         /** AttachmentOut */
         AttachmentOut: {
@@ -1402,6 +1555,19 @@ export interface components {
              * @default
              */
             folder: string;
+        };
+        /** BulkIn */
+        BulkIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "approve_all" | "dismiss_all";
+        };
+        /** BulkOut */
+        BulkOut: {
+            /** Changed */
+            changed: number;
         };
         /** CatalogOut */
         CatalogOut: {
@@ -1671,6 +1837,133 @@ export interface components {
             session_id: string;
             /** Recent Auth */
             recent_auth: boolean;
+        };
+        /** MemoryIn */
+        MemoryIn: {
+            /** Content */
+            content: string;
+            /**
+             * Kind
+             * @default fact
+             * @enum {string}
+             */
+            kind: "preference" | "fact" | "instruction" | "project";
+            /**
+             * Importance
+             * @default 0.5
+             */
+            importance: number;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+        };
+        /** MemoryOut */
+        MemoryOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Content */
+            content: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "preference" | "fact" | "instruction" | "project";
+            /** Importance */
+            importance: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "pending" | "archived";
+            /** Pinned */
+            pinned: boolean;
+            /** Source */
+            source: string;
+            /** Source Conversation Id */
+            source_conversation_id: string | null;
+            /** Replaces Id */
+            replaces_id?: string | null;
+            /** Replaces Content */
+            replaces_content?: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Use Count */
+            use_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** MemoryPatch */
+        MemoryPatch: {
+            /** Content */
+            content?: string | null;
+            /** Kind */
+            kind?: ("preference" | "fact" | "instruction" | "project") | null;
+            /** Importance */
+            importance?: number | null;
+            /** Pinned */
+            pinned?: boolean | null;
+            /** Status */
+            status?: ("active" | "archived") | null;
+        };
+        /**
+         * MemorySettings
+         * @description Stored in app_settings["memory"].
+         */
+        MemorySettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Extraction
+             * @default suggest
+             * @enum {string}
+             */
+            extraction: "off" | "suggest" | "auto";
+            /**
+             * Max Injected
+             * @default 8
+             */
+            max_injected: number;
+            /**
+             * Min Similarity
+             * @default 0.3
+             */
+            min_similarity: number;
+        };
+        /** MemorySummary */
+        MemorySummary: {
+            /** Active */
+            active: number;
+            /** Pending */
+            pending: number;
+            /** Archived */
+            archived: number;
+            /** Embedding Model */
+            embedding_model: string | null;
+            /** Indexed */
+            indexed: number;
+        };
+        /** MemoryUsed */
+        MemoryUsed: {
+            /** Id */
+            id: string;
+            /** Content */
+            content: string;
         };
         /** MessageOut */
         MessageOut: {
@@ -2106,6 +2399,11 @@ export interface components {
             /** Needs Key */
             needs_key: boolean;
         };
+        /** ReindexOut */
+        ReindexOut: {
+            /** Queued */
+            queued: boolean;
+        };
         /** ResumeIn */
         ResumeIn: {
             /** Message */
@@ -2199,6 +2497,11 @@ export interface components {
             model_label?: string | null;
             /** Answer */
             answer?: string | null;
+            /**
+             * Memories Used
+             * @default []
+             */
+            memories_used: components["schemas"]["MemoryUsed"][];
         };
         /** RunListItem */
         RunListItem: {
@@ -3179,6 +3482,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_memory_settings_api_settings_memory_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemorySettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemorySettings"];
                 };
             };
             /** @description Validation Error */
@@ -5529,6 +5867,310 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_memories_api_memories_get: {
+        parameters: {
+            query?: {
+                status?: "active" | "pending" | "archived";
+                kind?: ("preference" | "fact" | "instruction" | "project") | null;
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_memory_api_memories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_memories_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemorySummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_memories_api_memories_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reindex_api_memories_reindex_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReindexOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_memory_api_memories__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_memory_api_memories__memory_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_memory_api_memories__memory_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApproveIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_suggestions_api_memories_suggestions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOut"];
                 };
             };
             /** @description Validation Error */

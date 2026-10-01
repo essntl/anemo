@@ -14,6 +14,7 @@ from app.providers.base import (
     ChatRequest,
     DiscoveredModel,
     Done,
+    EmbedResult,
     ImageBlock,
     Message,
     ProviderConfig,
@@ -224,6 +225,15 @@ class OpenAIChatAdapter:
         if pending and finish == "end":
             finish = "tool_use"
         yield Done(finish)
+
+    async def embed(self, model: str, texts: list[str]) -> EmbedResult:
+        try:
+            response = await self.client.embeddings.create(model=model, input=texts)
+        except Exception as exc:  # noqa: BLE001
+            raise _map_error(exc) from exc
+        ordered = sorted(response.data, key=lambda d: d.index)
+        tokens = response.usage.prompt_tokens if response.usage else None
+        return EmbedResult(vectors=[list(d.embedding) for d in ordered], input_tokens=tokens)
 
     async def list_models(self) -> list[DiscoveredModel]:
         if self.is_openrouter:

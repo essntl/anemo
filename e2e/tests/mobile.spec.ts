@@ -22,6 +22,9 @@ const SCREENS = [
   '/settings/permissions',
   '/settings/workspace',
   '/settings/web',
+  '/settings/memory',
+  '/memory',
+  '/memory?tab=pending',
 ]
 
 async function horizontalOverflow(page: Page): Promise<number> {
