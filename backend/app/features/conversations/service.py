@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import browser_client
 from app.core.errors import Conflict, NotFound
 from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
@@ -124,6 +125,7 @@ async def delete_conversations(db: AsyncSession, ids: list[uuid.UUID]) -> None:
         await attachments.delete_files_for_conversation(db, conv.id)
         run_ids += list(await db.scalars(select(Run.id).where(Run.conversation_id == conv.id)))
         await db.delete(conv)
+        await browser_client.close(conv.id)  # its browser session, if it has one
     await db.flush()
     outputs.delete_for_runs(run_ids)
 

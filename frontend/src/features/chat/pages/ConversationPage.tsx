@@ -1,12 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useParams } from 'react-router'
-import { Pin, PinOff } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router'
+import { AppWindow, ExternalLink, Pin, PinOff, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { MenuButton, NewChatButton } from '@/app/mobileNav'
 import { Button } from '@/components/ui/Button'
 import { timelineKey } from '@/features/agents/api'
 import { useShellOutput } from '@/features/agents/shellOutput'
+import { useBrowserStatus } from '@/features/browser/api'
+import { BrowserView } from '@/features/browser/BrowserView'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
 import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
@@ -50,8 +53,20 @@ function useStickToBottom(dep: unknown) {
   return ref
 }
 
+/** From this width up there is room for the browser next to the chat. */
+const WIDE = '(min-width: 1024px)'
+
+/** Opens the agent's browser for this chat in a window of its own. */
+function popOutBrowser(conversationId: string) {
+  window.open(`/browser/${conversationId}`, `anemo-browser-${conversationId}`, 'popup,width=1320,height=940')
+}
+
 export function ConversationPage() {
   const { conversationId = '' } = useParams()
+  const navigate = useNavigate()
+  const browser = useBrowserStatus()
+  const wide = useMediaQuery(WIDE)
+  const [browserOpen, setBrowserOpen] = useState(false)
   const qc = useQueryClient()
   const conversation = useConversation(conversationId)
   const messages = useMessages(conversationId)
@@ -117,10 +132,18 @@ export function ConversationPage() {
   const paused = Boolean(activeRunId) && live.status === 'paused'
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+    <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:h-14 md:px-6">
         <MenuButton />
         <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{conversation.data?.title ?? ' '}</h1>
+        {browser.data?.available && (
+          // The agent's browser: beside the chat when there is room, else on its own page.
+          <Button size="icon" variant={browserOpen && wide ? 'secondary' : 'ghost'} aria-label="Browser" aria-pressed={browserOpen && wide}
+            title="The agent’s browser" onClick={() => (wide ? setBrowserOpen(!browserOpen) : void navigate(`/browser/${conversationId}`))}>
+            <AppWindow className="h-4 w-4" />
+          </Button>
+        )}
         {conversation.data && (
           <Button
             size="icon"
@@ -190,6 +213,23 @@ export function ConversationPage() {
           }
         />
       </div>
+    </div>
+    {browserOpen && wide && (
+      <aside aria-label="The agent’s browser" className="h-full w-[46%] min-w-[420px] max-w-[900px] shrink-0 border-l border-border">
+        <BrowserView conversationId={conversationId}
+          actions={
+            <>
+              <Button size="icon" variant="ghost" aria-label="Open in a separate window" title="Open in a separate window"
+                onClick={() => { popOutBrowser(conversationId); setBrowserOpen(false) }}>
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" aria-label="Hide browser" onClick={() => setBrowserOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          } />
+      </aside>
+    )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.automation import AUTOMATION_TOOLS
+from app.tools.builtin.browser import BROWSER_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.memory import MEMORY_TOOLS
@@ -43,6 +44,7 @@ BUILTIN_TOOLS: list[Tool] = [
     WebSearch(),
     ReadWebPage(),
     HttpRequest(),
+    *BROWSER_TOOLS,
     *TASK_TOOLS,
     *EVENT_TOOLS,
     SendNotification(),
@@ -76,6 +78,7 @@ def toolset_for(
     has_search: bool = False,
     has_memory: bool = False,
     is_automation: bool = False,
+    has_browser: bool = False,
 ) -> list[Tool]:
     offered = []
     for tool in BUILTIN_TOOLS:
@@ -86,6 +89,7 @@ def toolset_for(
             or (tool.name == "web_search" and not has_search)
             or (is_memory and not has_memory)
             or (tool in AUTOMATION_TOOLS and not is_automation)
+            or (tool in BROWSER_TOOLS and not has_browser)
             or (mode != "agent" and not is_memory)
         ):
             continue

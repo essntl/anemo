@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–13 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–14 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -17,7 +17,7 @@ Docker Compose on a homelab.
 > **memory** you control. **Documents** are Markdown files with a rich editor and
 > history, and there are **tasks** and a **calendar**. **Automations** run agents
 > on a schedule and report back through **notifications** (in the app, on your
-> desktop, on Discord). **MCP servers** add more tools. Browser automation etc. follow the phases in
+> desktop, on Discord). **MCP servers** add more tools, and agents can drive a real **browser**. Search etc. follow the phases in
 > `docs/architecture.md`.
 
 ### Chat vs. Agent mode
@@ -217,6 +217,39 @@ as are this server's own containers. To let agents use a service at home (say
 Home Assistant), add its host name, IP address or range under **Allowed hosts**.
 Page contents are marked as untrusted for the model, but a page can still try to
 mislead it, so keep approvals on for anything that changes things.
+
+### Browser
+
+For pages that need JavaScript, clicking or forms, agents can drive a real
+headless browser (Chromium): open a page, click, type, scroll and take
+screenshots. After each step the agent gets the page as text with a numbered
+list of what it can click or type into, and a screenshot of every step is kept
+in the run's timeline for you.
+
+The browser runs in its own container, which is off by default. Start it with
+`docker compose --profile browser up -d` (about 1.3 GB); agents only get the
+browser tools while it is running (Settings → Agent Permissions shows "browser
+not running" otherwise). To have it start with everything else, add
+`COMPOSE_PROFILES=browser` to your `.env` (or `browser,mcp` for both).
+
+- Each chat has its own private browser, kept open between the agent's turns and
+  closed after 30 idle minutes (or with the bin button). Nothing is shared between
+  chats, and downloads are refused.
+- **You can use that browser too.** The window button in a chat's header shows the
+  agent's browser live next to the chat (or in a separate window; on a phone, on its
+  own page). Click, type and scroll in it, or enter an address. This is how you log
+  in somewhere for the agent, or answer an "are you human" check yourself: the agent
+  never tries to get past those, and continues in the same browser afterwards.
+- All of the browser's traffic passes a guard inside that container that refuses
+  addresses on your own network (your router, NAS, other containers) unless you
+  allowed the host in **Settings → Web & Search**. This also holds for redirects,
+  embedded content and DNS tricks.
+- The *Browser automation* permission is **Always ask** by default. Choosing
+  "allow for this run" on the first request covers the rest of that run's
+  browsing.
+
+What a page shows is untrusted: it can try to steer the agent, which is why
+actions with consequences stay behind your permissions.
 
 ### Shell commands
 

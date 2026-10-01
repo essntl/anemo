@@ -53,6 +53,9 @@ class ToolContext:
     skills: list[str] = field(default_factory=list)  # short names of skills the run may load
     web: WebSettings = field(default_factory=WebSettings)  # search & network allowlist (snapshot)
     automation_id: uuid.UUID | None = None  # set in runs started by an automation
+    has_browser: bool = False  # the run was offered the browser tools
+    # The browser session the run uses: its conversation's (shared with the user).
+    browser_session: uuid.UUID | None = None
 
 
 class ToolResult(BaseModel):

@@ -61,7 +61,10 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
                   <div className="text-[13.5px] font-medium">
                     {cat.label}
                     {item && !item.available && (
-                      <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-subtle">no tools yet</span>
+                      <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-subtle"
+                        title={cat.capability === 'browser.use' ? 'Start it with: docker compose --profile browser up -d' : undefined}>
+                        {cat.capability === 'browser.use' ? 'browser not running' : 'no tools yet'}
+                      </span>
                     )}
                   </div>
                   <div className="text-[12px] text-muted">{cat.description}</div>

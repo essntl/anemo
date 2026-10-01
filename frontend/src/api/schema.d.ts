@@ -2004,6 +2004,68 @@ export interface paths {
         patch: operations["update_tool_api_mcp_tools__tool_id__patch"];
         trace?: never;
     };
+    "/api/browser/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_browser_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * View
+         * @description What the conversation's browser shows right now.
+         */
+        get: operations["view_api_conversations__conversation_id__browser_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Close
+         * @description Close the conversation's browser: its cookies and logins are gone.
+         */
+        delete: operations["close_api_conversations__conversation_id__browser_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/browser/input": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * User Input
+         * @description Something the user does in the browser. Opening an address starts a session
+         *     if there is none; everything else needs one.
+         */
+        post: operations["user_input_api_conversations__conversation_id__browser_input_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2281,6 +2343,60 @@ export interface components {
         Body_upload_asset_api_documents_assets_post: {
             /** File */
             file: string;
+        };
+        /** BrowserInput */
+        BrowserInput: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "click" | "type" | "key" | "scroll" | "open" | "back" | "reload";
+            /** X */
+            x?: number | null;
+            /** Y */
+            y?: number | null;
+            /** Text */
+            text?: string | null;
+            /** Key */
+            key?: string | null;
+            /** Dy */
+            dy?: number | null;
+            /** Url */
+            url?: string | null;
+        };
+        /** BrowserStatus */
+        BrowserStatus: {
+            /** Available */
+            available: boolean;
+        };
+        /** BrowserView */
+        BrowserView: {
+            /** Available */
+            available: boolean;
+            /** Open */
+            open: boolean;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Screenshot */
+            screenshot?: string | null;
+            /**
+             * Width
+             * @default 1280
+             */
+            width: number;
+            /**
+             * Height
+             * @default 800
+             */
+            height: number;
         };
         /** BulkIn */
         BulkIn: {
@@ -9356,6 +9472,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["McpToolOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_browser_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_api_conversations__conversation_id__browser_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_api_conversations__conversation_id__browser_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    user_input_api_conversations__conversation_id__browser_input_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserView"];
                 };
             };
             /** @description Validation Error */

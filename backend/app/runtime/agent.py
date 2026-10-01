@@ -32,6 +32,7 @@ from pydantic import ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import browser_client
 from app.core.db import get_sessionmaker
 from app.events import bus
 from app.features.attachments import service as attachments
@@ -161,6 +162,19 @@ AUTOMATION_ON_ASK = {
     "fail": "If an action needs the user's approval, the run stops. Avoid such actions.",
 }
 
+BROWSER_HINT = """
+## Browser
+You have a real browser (the browser_* tools). read_web_page is faster and fine for \
+articles and documentation. Switch to browser_open when a page comes back empty or \
+without the content you need (many sites build their content with JavaScript), when \
+you have to click, scroll or fill in a form, or when you need to see the page. Do not \
+work around such pages with http_request or shell commands.
+The browser stays open between your turns in this conversation, and the user can see \
+and use it too (the Browser panel of the chat), for example to log in for you.
+Some sites refuse automated browsers with a bot check or CAPTCHA. Never try to solve \
+or get around one: use another source, or ask the user to answer it in the Browser panel.
+"""
+
 LIMIT_NOTICE = (
     "[System notice: this run has reached its limit ({reason}). Do not call any tools. "
     "In a few sentences, tell the user what you did, what is left, and what they could "
@@ -227,6 +241,8 @@ class AgentRun:
         usage_kind: str = "agent",
         automation_id: uuid.UUID | None = None,
         on_ask: str = "pause",
+        has_browser: bool = False,
+        browser_session: uuid.UUID | None = None,
     ) -> None:
         self.run_id = run_id
         # Unattended runs: what to do when an action needs approval (pause|deny|fail).
@@ -254,6 +270,8 @@ class AgentRun:
             skills=list(skills or []),
             web=web or WebSettings(),
             automation_id=automation_id,
+            has_browser=has_browser,
+            browser_session=browser_session,
         )
         self.current_call: uuid.UUID | None = None
         # Active time is counted per worker segment and added up in run.totals, so
@@ -990,6 +1008,11 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     system += section
     if memory_settings.enabled:
         system += memory.MEMORY_TOOLS_HINT
+    has_browser = (
+        not chat and browser_client.available() and level_for(settings, "browser.use") != "deny"
+    )
+    if has_browser:
+        system += BROWSER_HINT
     if automation is not None:
         system += AUTOMATION_SECTION.format(name=automation.name)
         system += AUTOMATION_ON_ASK[automation.on_ask] + "\n"
@@ -1005,6 +1028,8 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
         "system": system,
         "memory": memory_settings.enabled,
         "mcp_tools": mcp_refs,
+        # Browser tools are only offered when the browser container is running.
+        "browser": has_browser,
         "automation": {
             "id": str(automation.id),
             "name": automation.name,
@@ -1123,7 +1148,11 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             has_search=bool(web.search_url()),
             has_memory=bool(run.policy.get("memory")),
             is_automation=run.automation_id is not None,
+            has_browser=bool(run.policy.get("browser")),
         )
+        uses_browser = bool(run.policy.get("browser"))
+        # The browser belongs to the conversation, so it survives between turns.
+        browser_session = run.conversation_id or run.id
         if run.kind == "agent":
             for tool in await mcp_tool.for_run(db, run.policy.get("mcp_tools") or []):
                 probe = Action(capability=tool.capability, risk="safe")
@@ -1147,6 +1176,8 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         usage_kind=run.kind,
         automation_id=automation_id,
         on_ask=on_ask,
+        has_browser=uses_browser,
+        browser_session=browser_session,
     )
     task = asyncio.create_task(agent.drive())
     flag = CancelFlag()

@@ -20,6 +20,12 @@ otters is called a raft.</p>
 HOOK_CALLS: list[dict] = []
 
 
+# A page whose content only appears once its JavaScript has run.
+JS_APP = """<!doctype html><html><head><title>Dashboard</title></head><body>
+<div id="root"></div><script>document.getElementById('root').innerText = 'Loaded by script'</script>
+</body></html>"""
+
+
 def _response(status: str, body: bytes, content_type: str, extra: str = "") -> bytes:
     head = (
         f"HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\n"
@@ -41,6 +47,8 @@ async def web_server() -> AsyncIterator[str]:
         body = await reader.readexactly(int(headers.get("content-length", "0")))
         if path == "/page":
             out = _response("200 OK", ARTICLE.encode(), "text/html; charset=utf-8")
+        elif path == "/app":
+            out = _response("200 OK", JS_APP.encode(), "text/html; charset=utf-8")
         elif path == "/text":
             out = _response("200 OK", b"plain " * 5000, "text/plain")
         elif path == "/binary":

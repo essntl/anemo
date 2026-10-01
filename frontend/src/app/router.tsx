@@ -17,6 +17,7 @@ import { TasksPage } from '@/features/tasks/TasksPage'
 import { WebSettingsPage } from '@/features/web/WebSettingsPage'
 import { ProvidersPage } from '@/features/providers/ProvidersPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
+import { BrowserPage } from '@/features/browser/BrowserPage'
 import { CalendarPage } from '@/features/calendar/CalendarPage'
 import { ConversationPage } from '@/features/chat/pages/ConversationPage'
 import { NewChatPage } from '@/features/chat/pages/NewChatPage'
@@ -41,6 +42,8 @@ export const router = createBrowserRouter([
     // Everything below requires a logged-in session.
     element: <RequireAuth />,
     children: [
+      // The agent's browser on its own (a separate window, or a phone): no sidebar.
+      { path: 'browser/:conversationId', element: <BrowserPage /> },
       {
         element: <AppLayout />,
         children: [

@@ -6,6 +6,7 @@ import uuid
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app import browser_client
 from app.api.deps import Db
 from app.features.mcp import service as mcp
 from app.features.profiles import service as profiles
@@ -61,6 +62,8 @@ async def _capabilities(db: Db) -> set[str]:
     """Capabilities some tool actually uses: the built-in ones, plus MCP once a
     connected server offers tools."""
     caps = registry.available_capabilities()
+    if not browser_client.available():
+        caps.discard("browser.use")  # the optional browser container is not running
     if await mcp.any_tools(db):
         caps.add("mcp.connected")
     return caps

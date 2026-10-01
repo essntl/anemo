@@ -35,6 +35,9 @@ os.environ.update(
         "REDIS_URL": _redis_url,
         "DATA_PATH": tempfile.mkdtemp(prefix="aiw-test-data-"),
         "WORKSPACE_PATH": tempfile.mkdtemp(prefix="aiw-test-ws-") + "/workspace",
+        # Tests never use the optional containers, even when they happen to be running.
+        "BROWSER_TOKEN_FILE": "/nonexistent/browser-token",
+        "MCP_HOST_TOKEN_FILE": "/nonexistent/mcp-host-token",
     }
 )
 if _base_db_url:

@@ -107,6 +107,9 @@ services:
       - ${WORKSPACE_PATH:-./workspace-dev}:/workspace
       # Read-only, to show the agents' SSH public key in Settings.
       - sandbox-ssh:/run/sandbox-ssh:ro
+      # Read-only: the access token of the optional browser container (Browser panel).
+      - browser-token:/run/browser-token:ro
+    networks: [core, browser_int]
     ports:
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
     depends_on:
@@ -131,7 +134,8 @@ services:
       - sandbox-token:/run/sandbox-token/sandbox:ro
       - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
       - mcp-host-token:/run/mcp-host-token:ro
-    networks: [core, sandbox_int, sandbox_net_int, mcp_int]
+      - browser-token:/run/browser-token:ro
+    networks: [core, sandbox_int, sandbox_net_int, mcp_int, browser_int]
     stop_grace_period: 30s
     depends_on:
       migrate:
@@ -202,6 +206,37 @@ services:
       retries: 3
     networks: [mcp_int, egress]
 
+  # Optional: a headless browser that agents can drive (open pages, click, type,
+  # take screenshots). Start it with `docker compose --profile browser up -d`.
+  # Its traffic passes a guard that refuses addresses on your own network unless
+  # you allowed them in Settings > Web & Search. No workspace, no database, no secrets.
+  browser:
+    profiles: ["browser"]
+    image: ai-workspace-browser:${APP_VERSION:-latest}
+    build:
+      context: ./browser
+      args:
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 1024
+    mem_limit: ${BROWSER_MEMORY:-2g}
+    cpus: ${BROWSER_CPUS:-2}
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+      - /home/browser:size=256m,mode=1777
+    volumes:
+      - browser-token:/run/browserd
+    healthcheck:
+      test: ["CMD", "/opt/browserd/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7090/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [browser_int, egress]
+
 volumes:
   pgdata:
   appdata:
@@ -212,6 +247,7 @@ volumes:
   sandbox-ssh:
   mcp-host-home:
   mcp-host-token:
+  browser-token:
 
 networks:
   core:
@@ -221,5 +257,7 @@ networks:
   sandbox_net_int:
     internal: true
   mcp_int:
+    internal: true
+  browser_int:
     internal: true
   egress:

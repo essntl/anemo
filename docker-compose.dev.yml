@@ -29,7 +29,10 @@ services:
       - ./sandbox/execd:/opt/execd-src:ro
       # hostd source, likewise (tests/api/test_mcp.py).
       - ./mcp-host/hostd:/opt/hostd-src:ro
+      # the browser's network guard, likewise (tests/unit/test_browser_guard.py).
+      - ./browser/browserd:/opt/browserd-src:ro
       - sandbox-ssh:/run/sandbox-ssh:ro
+      - browser-token:/run/browser-token:ro
 
   worker:
     image: ai-workspace-backend:dev
@@ -46,6 +49,7 @@ services:
       - sandbox-token:/run/sandbox-token/sandbox:ro
       - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
       - mcp-host-token:/run/mcp-host-token:ro
+      - browser-token:/run/browser-token:ro
 
   postgres:
     ports:

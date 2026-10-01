@@ -41,7 +41,9 @@ CATEGORIES: list[Category] = [
     Category("shell.network", "Shell with network", "Commands that need internet access.", "ask"),
     Category("net.search", "Web search", "Search the web (SearXNG).", "autonomous"),
     Category("net.fetch", "Read web pages", "Download and read web pages.", "ask_dangerous"),
-    Category("browser.use", "Browser automation", "Control a headless browser.", "ask"),
+    Category(
+        "browser.use", "Browser automation", "Open pages, click and type in a browser.", "ask"
+    ),
     Category("http.request", "External API calls", "Send HTTP requests to other services.", "ask"),
     Category("docs.write", "Edit documents", "Create and change documents.", "ask"),
     Category("tasks.write", "Manage tasks", "Create, edit and complete tasks.", "ask_dangerous"),

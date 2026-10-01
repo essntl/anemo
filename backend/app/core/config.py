@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     mcp_host_url: str = "http://mcp-host:7080"
     mcp_host_token_file: str = "/run/mcp-host-token/token"  # noqa: S105 (a path)
 
+    # The agents' browser runs in the optional browser container (worker only).
+    browser_url: str = "http://browser:7090"
+    browser_token_file: str = "/run/browser-token/token"  # noqa: S105 (a path)
+
     @model_validator(mode="after")
     def _check_secret_key(self) -> "Settings":
         if self.env != "test" and len(self.app_secret_key.get_secret_value()) < 32:
