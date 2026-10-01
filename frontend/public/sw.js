@@ -8,11 +8,14 @@
  *  - Pages are fetched from the network; if the server can't be reached, a small
  *    offline page is shown instead of the browser's error.
  *
- * Bump VERSION to drop old caches after changing this file.
+ * Bump VERSION to drop old caches after changing this file or the icons.
+ * Icons keep their file names, so when they change also raise the `?v=` number
+ * here, in index.html, offline.html and manifest.webmanifest: browsers hold on to
+ * tab icons for a long time otherwise.
  */
-const VERSION = 'v1'
+const VERSION = 'v2'
 const CACHE = `anemo-shell-${VERSION}`
-const PRECACHE = ['/offline.html', '/favicon.svg', '/icons/icon-192.png']
+const PRECACHE = ['/offline.html', '/favicon.svg?v=2', '/icons/icon-192.png?v=2']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)))
