@@ -22,6 +22,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import ValidationError
 from sqlalchemy import select, update
@@ -39,6 +40,7 @@ from app.features.profiles.models import AgentProfile
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Approval, FileChange, Run, ToolCall
 from app.features.settings import service as settings_service
+from app.features.settings.sections import GeneralSettings
 from app.features.skills.service import skills_for_profile
 from app.features.usage import service as usage
 from app.jobs import queue
@@ -95,7 +97,7 @@ KEEP_RECENT_FORCED = 0.2
 
 AGENT_SYSTEM_PROMPT = """\
 You are an autonomous assistant working inside the user's personal, self-hosted AI \
-workspace. You can use tools to act. Today's date is {date}.
+workspace. You can use tools to act. It is {date} in the user's time zone ({tz}).
 
 How to work:
 - For tasks with several steps, first call update_plan with a short plan, and keep it \
@@ -143,9 +145,16 @@ LIMIT_NOTICE = (
 
 
 def build_system_prompt(
-    profile: AgentProfile | None, skills: list[dict[str, str]], plan_review: str
+    profile: AgentProfile | None,
+    skills: list[dict[str, str]],
+    plan_review: str,
+    tz: str = "UTC",
 ) -> str:
-    system = AGENT_SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
+    try:
+        now = datetime.now(ZoneInfo(tz))
+    except (ZoneInfoNotFoundError, ValueError):
+        now, tz = datetime.now(UTC), "UTC"
+    system = AGENT_SYSTEM_PROMPT.format(date=f"{now:%A, %Y-%m-%d %H:%M}", tz=tz)
     if profile is not None and profile.instructions.strip():
         system += PROFILE_SECTION.format(
             name=profile.name, instructions=profile.instructions.strip()
@@ -907,7 +916,8 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     if chat:
         system = CHAT_SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
     else:
-        system = build_system_prompt(profile, skills, settings.plan_review)
+        general = await settings_service.get_section(db, GeneralSettings, "general")
+        system = build_system_prompt(profile, skills, settings.plan_review, general.timezone)
     # Memories relevant to this message, and the instructions for the memory tools.
     memory_settings = await memory.get_settings(db)
     section, used = await memory.build_context(db, _last_user_text(transcript), memory_settings)

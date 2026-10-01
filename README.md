@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–10 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–11 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -15,7 +15,8 @@ Docker Compose on a homelab.
 > be paused and resumed, and every run is in the **Runs** history. They can
 > **search the web** (SearXNG), read pages and call APIs, and the assistant has a
 > **memory** you control. **Documents** are Markdown files with a rich editor and
-> history. Tasks, calendar etc. follow the phases in `docs/architecture.md`.
+> history, and there are **tasks** and a **calendar**. Notifications, automations
+> etc. follow the phases in `docs/architecture.md`.
 
 ### Chat vs. Agent mode
 
@@ -86,6 +87,32 @@ on the same files. Sub-folders are groups; images you drop in go to
   category, *Edit documents* (asks by default). Their changes are in the history
   and can be reverted from the run.
 - **Delete** moves the file to the workspace trash (Files → Trash).
+
+### Tasks and calendar
+
+**Tasks** have a status, priority, due date (with an optional time), project and
+tags. The list groups them by when they are due (overdue, today, next 7 days,
+later, no date); the board shows one column per status and lets you drag cards
+between them.
+
+**Calendar** has month, week, day and agenda views. Events can be timed or
+all-day and can repeat (daily, weekdays, weekly, every 2 weeks, monthly, yearly,
+optionally until a date). For a repeating event you choose whether a change
+applies to that one occurrence or the whole series. Tasks with a due date appear
+on the calendar too (dashed outline). Click a day to add an event; drag entries to
+move them.
+
+Times follow the time zone of your browser. A repeating event keeps its local
+time when the clocks change. Tasks without a time, and times given by agents
+without a zone, use the time zone from **Settings → General**.
+
+**Reminders** (on events and tasks) currently show as a notice in the app while it
+is open in a tab. Notifications that reach you when it is closed (Discord and
+others) come with the next phase.
+
+**Agents** can list, add, change and delete tasks and events. Changes follow the
+*Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
+action, so the default level asks you first.
 
 ### Memory
 

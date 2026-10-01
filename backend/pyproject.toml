@@ -23,6 +23,8 @@ dependencies = [
   "pillow>=11",
   "pyyaml>=6",
   "trafilatura>=2.0",
+  "python-dateutil>=2.9",
+  "tzdata>=2025.1",
 ]
 
 [dependency-groups]

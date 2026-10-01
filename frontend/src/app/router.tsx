@@ -9,9 +9,11 @@ import { FilesPage } from '@/features/files/FilesPage'
 import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
 import { MemoryPage } from '@/features/memory/MemoryPage'
 import { MemorySettingsPage } from '@/features/memory/MemorySettingsPage'
+import { TasksPage } from '@/features/tasks/TasksPage'
 import { WebSettingsPage } from '@/features/web/WebSettingsPage'
 import { ProvidersPage } from '@/features/providers/ProvidersPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
+import { CalendarPage } from '@/features/calendar/CalendarPage'
 import { ConversationPage } from '@/features/chat/pages/ConversationPage'
 import { NewChatPage } from '@/features/chat/pages/NewChatPage'
 import { AppearancePage } from '@/features/settings/pages/AppearancePage'
@@ -48,8 +50,8 @@ export const router = createBrowserRouter([
           { path: 'files', element: <FilesPage /> },
           { path: 'documents', element: <DocumentsPage /> },
           { path: 'documents/:documentId', element: <DocumentsPage /> },
-          placeholder('tasks', 'Tasks'),
-          placeholder('calendar', 'Calendar'),
+          { path: 'tasks', element: <TasksPage /> },
+          { path: 'calendar', element: <CalendarPage /> },
           { path: 'runs', element: <RunsPage /> },
           { path: 'runs/:runId', element: <RunDetailPage /> },
           placeholder('automations', 'Automations'),

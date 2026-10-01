@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.core.db import dispose_engine
 from app.core.logging import configure_logging
 from app.core.redis import close_redis, get_redis
+from app.jobs import scheduler
 from app.jobs.runner import JobRunner
 
 log = logging.getLogger("worker")
@@ -51,11 +52,13 @@ async def main() -> None:
 
     log.info("worker starting", extra={"ctx": {"worker_id": wid}})
     beat = asyncio.create_task(heartbeat_loop(wid, stop))
+    periodic = asyncio.create_task(scheduler.run(stop))  # reminders, ...
     # Returns after `stop` is set and in-flight jobs have finished or been handed back.
     await JobRunner(wid, settings.worker_concurrency).run(stop)
     log.info("worker stopped")
     beat.cancel()
-    await asyncio.gather(beat, return_exceptions=True)
+    periodic.cancel()
+    await asyncio.gather(beat, periodic, return_exceptions=True)
     await dispose_engine()
     await close_redis()
 

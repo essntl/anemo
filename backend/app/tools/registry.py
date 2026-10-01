@@ -8,9 +8,11 @@ from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.docs import DOCUMENT_TOOLS
+from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.shell import RunShell
+from app.tools.builtin.tasks import TASK_TOOLS
 from app.tools.builtin.web import HttpRequest, ReadWebPage, WebSearch
 from app.tools.builtin.workspace import (
     CreateFolder,
@@ -39,6 +41,8 @@ BUILTIN_TOOLS: list[Tool] = [
     WebSearch(),
     ReadWebPage(),
     HttpRequest(),
+    *TASK_TOOLS,
+    *EVENT_TOOLS,
     *MEMORY_TOOLS,
     CurrentTime(),
     LoadSkill(),

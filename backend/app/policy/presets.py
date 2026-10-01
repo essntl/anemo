@@ -62,6 +62,8 @@ INTERNAL_RULES = [
     Rule(cap="agent.plan", decision="allow"),
     Rule(cap="util.*", decision="allow"),
     Rule(cap="memory.read", decision="allow"),  # looking up memories changes nothing
+    Rule(cap="tasks.read", decision="allow"),
+    Rule(cap="calendar.read", decision="allow"),
 ]
 
 

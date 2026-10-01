@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from '@/components/ui/toast'
 import { approvalsKey } from '@/features/agents/api'
 import { conversationKey, conversationsKey, messagesKey } from './api'
 import { TERMINAL } from './runStream'
@@ -37,6 +38,21 @@ export function useAppEvents() {
       const data = JSON.parse(e.data) as { document_id?: string }
       void qc.invalidateQueries({ queryKey: ['documents'] })
       if (data.document_id) void qc.invalidateQueries({ queryKey: ['document', data.document_id] })
+    }) as EventListener)
+    // Tasks and calendar changed (another tab, or an agent).
+    source.addEventListener('tasks.changed', () => {
+      void qc.invalidateQueries({ queryKey: ['tasks'] })
+      void qc.invalidateQueries({ queryKey: ['projects'] })
+    })
+    source.addEventListener('calendar.changed', () => void qc.invalidateQueries({ queryKey: ['calendar'] }))
+    // A reminder for an event or task became due.
+    source.addEventListener('reminder', ((e: MessageEvent<string>) => {
+      const data = JSON.parse(e.data) as { kind: string; title: string; starts_at: string; all_day: boolean }
+      const when = new Date(data.starts_at)
+      const time = data.all_day
+        ? when.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+        : when.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+      toast({ message: `Reminder: ${data.title} (${data.kind === 'task' ? 'due ' : ''}${time})`, duration: 30_000 })
     }) as EventListener)
     return () => source.close()
   }, [qc])

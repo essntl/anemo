@@ -172,3 +172,34 @@
     font-size: 16px;
   }
 }
+
+/* Calendar (FullCalendar): its colours come from our theme tokens. Not in a layer:
+   FullCalendar adds its own styles without one, and those would win otherwise. */
+.fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--surface-2);
+  --fc-list-event-hover-bg-color: var(--surface-hover);
+  --fc-today-bg-color: color-mix(in oklch, var(--accent) 9%, transparent);
+  --fc-event-bg-color: var(--accent);
+  --fc-event-border-color: var(--accent);
+  --fc-event-text-color: var(--accent-contrast);
+  --fc-now-indicator-color: var(--error);
+  --fc-highlight-color: var(--selection);
+  font-size: 13px;
+}
+.fc .fc-col-header-cell-cushion, .fc .fc-daygrid-day-number, .fc .fc-list-day-cushion a { color: var(--text-muted); text-decoration: none; }
+.fc .fc-day-today .fc-daygrid-day-number { color: var(--accent); font-weight: 600; }
+.fc .fc-event { cursor: pointer; border-radius: 6px; padding: 0 3px; }
+.fc .fc-daygrid-dot-event:hover, .fc .fc-daygrid-more-link:hover { background: var(--surface-hover); }
+.fc .fc-daygrid-dot-event { color: var(--text); }
+.fc .fc-list-day-cushion { background: var(--surface-2); }
+.fc .fc-list-empty { background: transparent; color: var(--text-muted); }
+.fc .fc-popover { background: var(--card); border-color: var(--border); border-radius: 12px; box-shadow: var(--shadow-float); }
+/* Tasks on their due date: outlined, to tell them apart from events. */
+.fc .fc-task, .fc .fc-task .fc-event-main { background: transparent; color: var(--text); }
+.fc .fc-task { border: 1px dashed var(--border-strong); }
+.fc .fc-task .fc-event-title::before, .fc .fc-task .fc-list-event-title a::before { content: '☐ '; }
+.fc .fc-task-done .fc-event-title { text-decoration: line-through; opacity: 0.6; }
+.fc .fc-task-done .fc-event-title::before, .fc .fc-task-done .fc-list-event-title a::before { content: '☑ '; }
+.fc .fc-task .fc-list-event-dot { border-style: dashed; border-color: var(--border-strong); border-width: 1px; }

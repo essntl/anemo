@@ -11,6 +11,7 @@ from app.api.deps import require_session
 from app.features.attachments.router import router as attachments_router
 from app.features.audit.router import router as audit_router
 from app.features.auth.router import router as auth_router
+from app.features.calendar.router import router as calendar_router
 from app.features.conversations.router import router as conversations_router
 from app.features.documents.router import router as documents_router
 from app.features.files.router import router as files_router
@@ -23,6 +24,7 @@ from app.features.runs.router import router as runs_router
 from app.features.settings.router import router as settings_router
 from app.features.shell.router import router as shell_router
 from app.features.skills.router import router as skills_router
+from app.features.tasks.router import router as tasks_router
 from app.web.router import router as web_router
 
 api_router = APIRouter(prefix="/api")
@@ -45,4 +47,6 @@ protected.include_router(skills_router)
 protected.include_router(web_router)
 protected.include_router(memory_router)
 protected.include_router(documents_router)
+protected.include_router(tasks_router)
+protected.include_router(calendar_router)
 api_router.include_router(protected)
