@@ -1,6 +1,6 @@
-# anemo
+# Anemo
 
-**anemo** is a self-hosted, single-user AI workspace and agent operating environment: chat,
+**Anemo** is a self-hosted, single-user AI workspace and agent operating environment: chat,
 autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
@@ -213,7 +213,7 @@ The whole app works at phone size: the sidebar becomes a menu (top-left button),
 dialogs slide up from the bottom, and on touch screens Enter adds a new line
 (send with the arrow button).
 
-To install it like an app, open anemo in your phone's browser over **HTTPS**
+To install it like an app, open Anemo in your phone's browser over **HTTPS**
 (for example through Nginx Proxy Manager) and choose *Add to Home Screen*
 (Safari: Share menu; Chrome: ⋮ menu → *Install app*). It then opens full-screen.
 Only the app's own files are cached on the phone, never your chats, files or

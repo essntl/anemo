@@ -32,7 +32,7 @@ export function MobileTopBar() {
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:hidden">
       <MenuButton />
-      <span className="flex-1 text-center text-[15px] font-semibold">anemo</span>
+      <span className="flex-1 text-center text-[15px] font-semibold">Anemo</span>
       <NewChatButton />
     </header>
   )

@@ -148,7 +148,7 @@ test('installable: manifest, icons and a service worker that never caches /api',
   await context.setOffline(true)
   try {
     await page.goto('/files').catch(() => undefined)
-    await expect(page.getByRole('heading', { name: "Can't reach anemo" })).toBeVisible()
+    await expect(page.getByRole('heading', { name: "Can't reach Anemo" })).toBeVisible()
   } finally {
     await context.setOffline(false)
   }

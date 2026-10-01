@@ -1,5 +1,5 @@
 /*
- * anemo service worker. Deliberately minimal:
+ * Anemo service worker. Deliberately minimal:
  *
  *  - /api/* is never touched: chats, files and settings always come live from
  *    your server and are never stored on the device.

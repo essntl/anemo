@@ -91,7 +91,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-accent-contrast">
           <Bot className="h-4.5 w-4.5" />
         </div>
-        <span className="flex-1 text-[15px] font-semibold">anemo</span>
+        <span className="flex-1 text-[15px] font-semibold">Anemo</span>
         {onClose && (
           <button type="button" aria-label="Close menu" onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
