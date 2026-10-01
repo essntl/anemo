@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
-import { Bot } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
@@ -30,9 +30,7 @@ export function LoginPage() {
         }}
       >
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-contrast">
-            <Bot className="h-6 w-6" />
-          </div>
+          <Logo className="mb-2 h-14 w-14 text-accent" />
           <h1 className="text-lg font-semibold">Anemo</h1>
           <p className="text-[13px] text-muted">Sign in to continue</p>
         </div>

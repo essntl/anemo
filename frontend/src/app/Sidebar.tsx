@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Logo } from '@/components/ui/Logo'
 import { useLogout, useMe } from '@/features/auth/api'
 import { ConversationList } from '@/features/chat/components/ConversationList'
 import { useMemorySummary } from '@/features/memory/api'
@@ -105,10 +106,8 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   return (
     <aside className={cn('h-full shrink-0 flex-col border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
       <div className="mb-4 flex items-center gap-2 px-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-accent-contrast">
-          <Bot className="h-4.5 w-4.5" />
-        </div>
-        <span className="flex-1 text-[15px] font-semibold">Anemo</span>
+        <Logo className="h-8 w-8 text-accent pointer-coarse:h-9 pointer-coarse:w-9" />
+        <span className="flex-1 text-[19px] font-semibold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
         {onClose && (
           <button type="button" aria-label="Close menu" onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
