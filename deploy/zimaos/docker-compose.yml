@@ -1,9 +1,26 @@
 # Anemo on ZimaOS (or CasaOS), using the images from Docker Hub:
-#   essntl/anemo:latest   the app and its background worker
-#   essntl/anemo:sandbox  the isolated shell that agents run commands in
+#   essntl/anemo:latest    the app and its background worker
+#   essntl/anemo:sandbox   the isolated shell that agents run commands in
+#   essntl/anemo:browser   a browser that agents can drive (about 1.3 GB)
+#   essntl/anemo:mcp-host  runs local MCP servers (`npx ...`, `uvx ...`)
+# The last two are optional: delete the `browser` or `mcp-host` service below if
+# you do not want it; the app then shows that feature as "not running".
 #
-# ZimaOS: App Store > "+" > Install a customized app > Import > paste this file.
 # No .env file is needed; everything is set below.
+#
+# HOW TO INSTALL
+# Recommended, from a terminal on the server (SSH), because it keeps the file as it is:
+#   mkdir -p /DATA/AppData/anemo && cd /DATA/AppData/anemo
+#   (save this file there as docker-compose.yml)
+#   docker compose up -d
+#   update later with:  docker compose pull && docker compose up -d
+#
+# The ZimaOS screen (App Store > "+" > Install a customized app > Import) also
+# works for a first start, BUT ZimaOS rewrites the file and keeps only ONE network
+# per service. The worker, the app, the internet sandbox, the browser and the MCP
+# host each need two or more (see `networks:` on each service). Without them
+# agents cannot run commands, use the browser or start MCP servers. If you install
+# that way, export the file afterwards and compare the `networks:` lines.
 #
 # BEFORE YOU START, replace every CHANGE_ME (there are four):
 #   APP_SECRET_KEY     at least 32 random characters (letters and digits)
@@ -67,7 +84,7 @@ services:
     volumes:
       - /DATA/AppData/anemo/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aiw -d aiw"]
+      test: ["CMD-SHELL", "pg_isready -U aiw -d aiw -h 127.0.0.1"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -105,6 +122,8 @@ services:
       - /DATA/AppData/anemo/data:/data
       - /DATA/AppData/anemo/workspace:/workspace
       - sandbox-ssh:/run/sandbox-ssh:ro
+      # Read-only: the access token of the browser container (for the Browser panel).
+      - browser-token:/run/browser-token:ro
     depends_on:
       init:
         condition: service_completed_successfully
@@ -118,7 +137,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    networks: [core]
+    networks: [core, browser_int]
 
   # Runs chats, agents, automations and reminders in the background.
   worker:
@@ -131,6 +150,8 @@ services:
       - /DATA/AppData/anemo/workspace:/workspace
       - sandbox-token:/run/sandbox-token/sandbox:ro
       - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
+      - mcp-host-token:/run/mcp-host-token:ro
+      - browser-token:/run/browser-token:ro
     stop_grace_period: 30s
     depends_on:
       init:
@@ -145,7 +166,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-    networks: [core, sandbox_int, sandbox_net_int]
+    networks: [core, sandbox_int, sandbox_net_int, mcp_int, browser_int]
 
   # Where agents run shell commands: no root, no network, only the workspace.
   sandbox:
@@ -204,12 +225,65 @@ services:
       retries: 3
     networks: [sandbox_net_int, egress]
 
+  # Optional: runs local MCP servers (programs like `npx some-server`) that you add
+  # in Settings > MCP. MCP servers reached by a URL do not need it. It has internet
+  # access, but no route to the database, no workspace and none of the app's secrets.
+  mcp-host:
+    image: essntl/anemo:mcp-host
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 1024
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      # Downloaded servers (npx, uvx) are cached here.
+      - mcp-host-home:/home/mcp
+      - mcp-host-token:/run/hostd
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [mcp_int, egress]
+
+  # Optional: a browser that agents can drive (open pages, click, type, take
+  # screenshots) and that you can take over from the chat. It refuses addresses on
+  # your own network unless you allow them in Settings > Web & Search.
+  # No workspace, no database, no secrets.
+  browser:
+    image: essntl/anemo:browser
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 1024
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+      - /home/browser:size=256m,mode=1777
+    volumes:
+      - browser-token:/run/browserd
+    healthcheck:
+      test: ["CMD", "/opt/browserd/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7090/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [browser_int, egress]
+
 volumes:
   sandbox-home:
   sandbox-net-home:
   sandbox-token:
   sandbox-net-token:
   sandbox-ssh:
+  mcp-host-home:
+  mcp-host-token:
+  browser-token:
 
 networks:
   core:
@@ -218,6 +292,11 @@ networks:
     internal: true
   sandbox_net_int:
     internal: true
+  mcp_int:
+    internal: true
+  browser_int:
+    internal: true
+  # The way out to the internet for the internet sandbox, the browser and the MCP host.
   egress:
 
 # How the app appears on the ZimaOS / CasaOS dashboard.
