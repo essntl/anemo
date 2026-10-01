@@ -15,7 +15,9 @@ jobs:
     name: Backend (lint, types, tests, migrations)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      # The source folder is mounted into the container, and the tools write their
+      # caches there, so the container must run as the user that owns the checkout.
       - name: Settings for a throwaway stack
         run: |
           cat > .env <<EOF
@@ -23,6 +25,7 @@ jobs:
           POSTGRES_PASSWORD=$(openssl rand -hex 16)
           ADMIN_PASSWORD=$(openssl rand -hex 12)
           WORKSPACE_PATH=./workspace-dev
+          PUID=$(id -u)
           EOF
           mkdir -p workspace-dev && chmod 777 workspace-dev
       - name: Lint, type-check, test (in the dev container, with Postgres and Valkey)
@@ -37,8 +40,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -53,7 +56,7 @@ jobs:
     name: Browser service (real Chromium)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Settings so compose can read the file
         run: printf 'APP_SECRET_KEY=%s\nPOSTGRES_PASSWORD=x\n' "$(openssl rand -hex 32)" > .env
       - run: docker compose --profile browser build browser
@@ -67,8 +70,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
