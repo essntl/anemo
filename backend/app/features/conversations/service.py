@@ -54,7 +54,9 @@ async def active_runs(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID,
         return {}
     rows = await db.execute(
         select(Run.conversation_id, Run.id).where(
-            Run.conversation_id.in_(ids), Run.status.in_(ACTIVE_STATUSES)
+            Run.conversation_id.in_(ids),
+            Run.status.in_(ACTIVE_STATUSES),
+            Run.parent_run_id.is_(None),  # not a sub-agent
         )
     )
     return {cid: rid for cid, rid in rows.all() if cid is not None}

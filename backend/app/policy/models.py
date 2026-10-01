@@ -41,6 +41,9 @@ class Limits(BaseModel):
     max_cost_usd: float | None = Field(None, ge=0, le=10_000)
     # Stop when this many tool calls in a row failed or were blocked.
     max_consecutive_errors: int = Field(5, ge=1, le=100)
+    # How deep sub-agents may nest: 1 = an agent may start sub-agents, but those may
+    # not start their own. (Whether sub-agents are allowed at all is a permission.)
+    max_subagent_depth: int = Field(1, ge=0, le=3)
 
 
 class Policy(BaseModel):

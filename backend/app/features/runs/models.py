@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, TimestampMixin
 
-ACTIVE_STATUSES = ("queued", "running", "paused", "waiting_approval")
+ACTIVE_STATUSES = ("queued", "running", "paused", "waiting_approval", "waiting_subagent")
 TERMINAL_STATUSES = ("completed", "failed", "cancelled")
 
 
@@ -24,7 +24,9 @@ class Run(Base, IdMixin, TimestampMixin):
         Index(
             "ix_runs_active",
             "status",
-            postgresql_where=text("status IN ('queued','running','paused','waiting_approval')"),
+            postgresql_where=text(
+                "status IN ('queued','running','paused','waiting_approval','waiting_subagent')"
+            ),
         ),
         Index("ix_runs_conversation", "conversation_id", "created_at"),
         Index("ix_runs_created", "created_at"),
@@ -51,6 +53,13 @@ class Run(Base, IdMixin, TimestampMixin):
     automation_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("automations.id", ondelete="SET NULL"), index=True
     )
+    # Sub-agents: the run that started this one, the top-level run of the whole
+    # task, and how deep this run is (0 = started by the user or an automation).
+    parent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    root_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    depth: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     attempt: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     totals: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
@@ -106,7 +115,8 @@ class ToolCall(Base, IdMixin, TimestampMixin):
     risk: Mapped[str | None] = mapped_column(String(20))
     decision: Mapped[str | None] = mapped_column(String(10))  # allow | ask | deny
     decision_reason: Mapped[str | None] = mapped_column(String(300))
-    # pending | waiting_approval | running | succeeded | failed | denied | cancelled | interrupted
+    # pending | waiting_approval | waiting_child | running | succeeded | failed | denied |
+    # cancelled | interrupted
     status: Mapped[str] = mapped_column(String(20), default="pending")
     result: Mapped[str | None] = mapped_column(Text)
     result_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)

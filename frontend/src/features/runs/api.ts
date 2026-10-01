@@ -39,10 +39,15 @@ export function useRuns(filters: { status: RunStatusFilter; kind: RunKindFilter;
   })
 }
 
-export function useRun(id: string | null) {
+const FINISHED = ['completed', 'failed', 'cancelled']
+
+/** `pollWhileActive`: fetch again every 2 s until the run has finished. */
+export function useRun(id: string | null, options: { pollWhileActive?: boolean } = {}) {
   return useQuery({
     queryKey: runKey(id ?? 'none'),
     enabled: Boolean(id),
+    refetchInterval: (query) =>
+      options.pollWhileActive && !FINISHED.includes(query.state.data?.status ?? '') ? 2000 : false,
     queryFn: async () => unwrap(await api.GET('/api/runs/{run_id}', { params: { path: { run_id: id! } } })),
   })
 }

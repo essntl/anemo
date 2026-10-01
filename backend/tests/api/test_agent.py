@@ -310,8 +310,8 @@ async def test_permission_summary(authed):
     assert by_cap["fs.read"]["group"] == "partly" and by_cap["fs.read"]["available"]
     assert by_cap["agent.spawn"]["group"] == "never"
     assert by_cap["shell.exec"]["available"] and by_cap["shell.network"]["available"]
-    # The optional browser container is not running here; sub-agents do not exist yet.
-    assert not by_cap["browser.use"]["available"] and not by_cap["agent.spawn"]["available"]
+    # The optional browser container is not running here.
+    assert not by_cap["browser.use"]["available"] and by_cap["agent.spawn"]["available"]
     preview = (
         await authed.post(
             "/api/permissions/preview",

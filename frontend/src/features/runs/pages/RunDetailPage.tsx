@@ -81,6 +81,11 @@ export function RunDetailPage() {
       <div className="flex flex-wrap items-center gap-2">
         <RunStatusBadge status={data.status} />
         <span className="text-[12px] text-muted">{formatWhen(data.created_at)}</span>
+        {data.parent_run_id && (
+          <Link to={`/runs/${data.parent_run_id}`} className="text-[12px] text-accent hover:underline">
+            Sub-agent of another run
+          </Link>
+        )}
       </div>
       <h1 className="mt-2 whitespace-pre-wrap break-words text-lg font-semibold">{data.request || '(no request)'}</h1>
 

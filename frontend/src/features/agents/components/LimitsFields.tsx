@@ -29,6 +29,10 @@ export function LimitsFields({ value, onChange }: { value: Limits; onChange: (li
         <Input type="number" min={1} value={value.max_consecutive_errors}
           onChange={(e) => set({ max_consecutive_errors: num(e.target.value) })} />
       </Field>
+      <Field label="Sub-agent levels" hint="1: sub-agents cannot start their own. Needs the “Start sub-agents” permission.">
+        <Input type="number" min={0} max={3} value={value.max_subagent_depth}
+          onChange={(e) => set({ max_subagent_depth: Math.min(3, Math.max(0, num(e.target.value))) })} />
+      </Field>
     </div>
   )
 }

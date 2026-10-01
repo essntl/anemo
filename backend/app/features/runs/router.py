@@ -56,6 +56,8 @@ class RunOut(BaseModel):
     profile_name: str | None = None
     automation_id: uuid.UUID | None = None
     automation_name: str | None = None
+    parent_run_id: uuid.UUID | None = None  # set for a sub-agent
+    depth: int = 0
     request: str
     pause_requested: bool
     plan_version: int
@@ -112,6 +114,8 @@ def run_out(r: Run) -> RunOut:
         profile_name=profile.get("name"),
         automation_id=r.automation_id,
         automation_name=(snapshot.get("automation") or {}).get("name"),
+        parent_run_id=r.parent_run_id,
+        depth=r.depth,
         request=r.request,
         pause_requested=r.pause_requested,
         plan_version=r.plan_version,
@@ -131,11 +135,13 @@ async def list_runs(
     status: Literal["active", "waiting", "completed", "failed", "cancelled", "all"] = "all",
     profile_id: uuid.UUID | None = None,
     automation_id: uuid.UUID | None = None,
+    parent_run_id: uuid.UUID | None = Query(None, description="The sub-agents of this run"),
     q: str | None = Query(None, max_length=200, description="Search in the request text"),
     before: datetime | None = Query(None, description="Only runs created before this time"),
     limit: int = Query(50, ge=1, le=200),
 ) -> list[RunListItem]:
-    """Run history, newest first. Page with `before` = the last item's created_at."""
+    """Run history, newest first. Page with `before` = the last item's created_at.
+    Sub-agent runs are listed under their parent (`parent_run_id`), not on their own."""
     stmt = (
         select(Run, Conversation.title, Model.display_name)
         .outerjoin(Conversation, Conversation.id == Run.conversation_id)
@@ -143,10 +149,13 @@ async def list_runs(
         .order_by(Run.created_at.desc())
         .limit(limit)
     )
+    stmt = stmt.where(
+        Run.parent_run_id == parent_run_id if parent_run_id else Run.parent_run_id.is_(None)
+    )
     if kind != "all":
         stmt = stmt.where(Run.kind == kind)
     if status == "active":
-        stmt = stmt.where(Run.status.in_(("queued", "running")))
+        stmt = stmt.where(Run.status.in_(("queued", "running", "waiting_subagent")))
     elif status == "waiting":
         stmt = stmt.where(Run.status.in_(("waiting_approval", "paused")))
     elif status != "all":
@@ -173,17 +182,21 @@ class RunCounts(BaseModel):
 
 @router.get("/runs-summary", response_model=RunCounts)
 async def runs_summary(db: Db) -> RunCounts:
-    """Agent run counts for the sidebar badge."""
+    """Agent run counts for the sidebar badge. A task counts once as working, however
+    many sub-agents it has; but a sub-agent that needs the user counts as waiting."""
+    is_child = Run.parent_run_id.is_not(None)
     result = await db.execute(
-        select(Run.status, func.count())
+        select(Run.status, is_child, func.count())
         .where(Run.kind == "agent", Run.status.in_(ACTIVE_STATUSES))
-        .group_by(Run.status)
+        .group_by(Run.status, is_child)
     )
-    counts: dict[str, int] = {status: n for status, n in result.all()}
-    return RunCounts(
-        active=counts.get("queued", 0) + counts.get("running", 0),
-        waiting=counts.get("waiting_approval", 0) + counts.get("paused", 0),
-    )
+    active = waiting = 0
+    for status, child, n in result.all():
+        if status in ("waiting_approval", "paused"):
+            waiting += n
+        elif not child:
+            active += n
+    return RunCounts(active=active, waiting=waiting)
 
 
 @router.get("/runs/{run_id}", response_model=RunDetail)
@@ -307,8 +320,9 @@ async def cancel_run(run_id: uuid.UUID, db: Db) -> RunOut:
     if run.status in TERMINAL_STATUSES:
         return run_out(run)
     run.cancel_requested = True
-    if run.status in ("queued", "waiting_approval", "paused"):
+    if run.status in ("queued", "waiting_approval", "paused", "waiting_subagent"):
         # No worker holds it: finish it here. A worker that picks it up later skips it.
+        # (Ending a run also stops its sub-agents.)
         if run.kind == "agent":
             from app.runtime.agent import _finalize
 

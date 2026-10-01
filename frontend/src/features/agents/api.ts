@@ -14,10 +14,12 @@ export const timelineKey = (runId: string) => ['timeline', runId] as const
 export const approvalsKey = ['approvals'] as const
 export const permissionSummaryKey = ['permissions', 'summary'] as const
 
-export function useTimeline(runId: string | null) {
+/** `poll`: fetch again every 2 s (for a run nothing else keeps up to date, i.e. a sub-agent). */
+export function useTimeline(runId: string | null, poll = false) {
   return useQuery({
     queryKey: timelineKey(runId ?? 'none'),
     enabled: Boolean(runId),
+    refetchInterval: poll ? 2000 : false,
     queryFn: async () =>
       unwrap(await api.GET('/api/runs/{run_id}/timeline', { params: { path: { run_id: runId! } } })),
   })

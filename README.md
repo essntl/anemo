@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–15 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–16 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -17,7 +17,7 @@ Docker Compose on a homelab.
 > **memory** you control. **Documents** are Markdown files with a rich editor and
 > history, and there are **tasks** and a **calendar**. **Automations** run agents
 > on a schedule and report back through **notifications** (in the app, on your
-> desktop, on Discord). **MCP servers** add more tools, and agents can drive a real **browser**. **Search** covers everything, and **Usage** shows what the models cost. Sub-agents etc. follow the phases in
+> desktop, on Discord). **MCP servers** add more tools, and agents can drive a real **browser**. **Search** covers everything, **Usage** shows what the models cost, and agents can hand work to **sub-agents**. Hardening for a first release follows in
 > `docs/architecture.md`.
 
 ### Chat vs. Agent mode
@@ -65,6 +65,25 @@ page through it, and you can download it from the run.
 
 **Runs** lists every agent run with its status, profile, time, tokens and cost, and
 opens each one with its plan, tool calls, approvals, file changes and answer.
+
+### Sub-agents
+
+An agent can hand a self-contained part of a task to a sub-agent and continue
+with its result; several can work at the same time. This is **off by default**:
+set *Start sub-agents* in Settings → Agent Permissions to allow it (or to ask
+first).
+
+- A sub-agent only gets the task it was given, and may use another agent profile.
+- It can never do more than the agent that started it: every action is checked
+  against its own permissions and those of every agent above it, and the
+  strictest answer wins. If it needs your approval, the request appears inside the
+  parent's activity in the chat.
+- It works within what the parent had left of its limits (steps, tool calls,
+  time, cost), and what it uses is counted against the parent.
+- At most 3 sub-agents of one agent work at once, at most 10 per task, and
+  sub-agents cannot start their own unless you raise *Sub-agent levels* in the
+  limits (up to 3).
+- Stopping a run stops its sub-agents.
 
 ### Documents
 

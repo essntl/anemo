@@ -5,6 +5,7 @@ const STATUS: Record<string, { label: string; tone: 'neutral' | 'accent' | 'succ
   running: { label: 'Running', tone: 'accent' },
   paused: { label: 'Paused', tone: 'warning' },
   waiting_approval: { label: 'Needs you', tone: 'warning' },
+  waiting_subagent: { label: 'Sub-agent working', tone: 'accent' },
   completed: { label: 'Done', tone: 'success' },
   failed: { label: 'Failed', tone: 'error' },
   cancelled: { label: 'Cancelled', tone: 'neutral' },

@@ -577,6 +577,7 @@ export interface paths {
         /**
          * List Runs
          * @description Run history, newest first. Page with `before` = the last item's created_at.
+         *     Sub-agent runs are listed under their parent (`parent_run_id`), not on their own.
          */
         get: operations["list_runs_api_runs_get"];
         put?: never;
@@ -596,7 +597,8 @@ export interface paths {
         };
         /**
          * Runs Summary
-         * @description Agent run counts for the sidebar badge.
+         * @description Agent run counts for the sidebar badge. A task counts once as working, however
+         *     many sub-agents it has; but a sub-agent that needs the user counts as waiting.
          */
         get: operations["runs_summary_api_runs_summary_get"];
         put?: never;
@@ -2929,6 +2931,11 @@ export interface components {
              * @default 5
              */
             max_consecutive_errors: number;
+            /**
+             * Max Subagent Depth
+             * @default 1
+             */
+            max_subagent_depth: number;
         };
         /** ListingOut */
         ListingOut: {
@@ -3958,6 +3965,13 @@ export interface components {
             automation_id?: string | null;
             /** Automation Name */
             automation_name?: string | null;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            /**
+             * Depth
+             * @default 0
+             */
+            depth: number;
             /** Request */
             request: string;
             /** Pause Requested */
@@ -4021,6 +4035,13 @@ export interface components {
             automation_id?: string | null;
             /** Automation Name */
             automation_name?: string | null;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            /**
+             * Depth
+             * @default 0
+             */
+            depth: number;
             /** Request */
             request: string;
             /** Pause Requested */
@@ -4077,6 +4098,13 @@ export interface components {
             automation_id?: string | null;
             /** Automation Name */
             automation_name?: string | null;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            /**
+             * Depth
+             * @default 0
+             */
+            depth: number;
             /** Request */
             request: string;
             /** Pause Requested */
@@ -6122,6 +6150,8 @@ export interface operations {
                 status?: "active" | "waiting" | "completed" | "failed" | "cancelled" | "all";
                 profile_id?: string | null;
                 automation_id?: string | null;
+                /** @description The sub-agents of this run */
+                parent_run_id?: string | null;
                 /** @description Search in the request text */
                 q?: string | null;
                 /** @description Only runs created before this time */

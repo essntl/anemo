@@ -83,7 +83,7 @@ export function AssistantMessage({
   activity,
 }: AssistantProps) {
   const [copied, setCopied] = useState(false)
-  const live = ['streaming', 'queued', 'running', 'waiting_approval', 'paused'].includes(status)
+  const live = ['streaming', 'queued', 'running', 'waiting_approval', 'waiting_subagent', 'paused'].includes(status)
   const suspended = status === 'waiting_approval' || status === 'paused'
   const waiting = live && !text && !reasoning && !suspended
 

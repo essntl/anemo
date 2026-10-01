@@ -2231,7 +2231,7 @@
           "runs"
         ],
         "summary": "List Runs",
-        "description": "Run history, newest first. Page with `before` = the last item's created_at.",
+        "description": "Run history, newest first. Page with `before` = the last item's created_at.\nSub-agent runs are listed under their parent (`parent_run_id`), not on their own.",
         "operationId": "list_runs_api_runs_get",
         "parameters": [
           {
@@ -2300,6 +2300,25 @@
               ],
               "title": "Automation Id"
             }
+          },
+          {
+            "name": "parent_run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The sub-agents of this run",
+              "title": "Parent Run Id"
+            },
+            "description": "The sub-agents of this run"
           },
           {
             "name": "q",
@@ -2402,7 +2421,7 @@
           "runs"
         ],
         "summary": "Runs Summary",
-        "description": "Agent run counts for the sidebar badge.",
+        "description": "Agent run counts for the sidebar badge. A task counts once as working, however\nmany sub-agents it has; but a sub-agent that needs the user counts as waiting.",
         "operationId": "runs_summary_api_runs_summary_get",
         "parameters": [
           {
@@ -11656,6 +11675,13 @@
             "minimum": 1.0,
             "title": "Max Consecutive Errors",
             "default": 5
+          },
+          "max_subagent_depth": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Max Subagent Depth",
+            "default": 1
           }
         },
         "type": "object",
@@ -14556,6 +14582,23 @@
             ],
             "title": "Automation Name"
           },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth",
+            "default": 0
+          },
           "request": {
             "type": "string",
             "title": "Request"
@@ -14788,6 +14831,23 @@
             ],
             "title": "Automation Name"
           },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth",
+            "default": 0
+          },
           "request": {
             "type": "string",
             "title": "Request"
@@ -15000,6 +15060,23 @@
               }
             ],
             "title": "Automation Name"
+          },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth",
+            "default": 0
           },
           "request": {
             "type": "string",

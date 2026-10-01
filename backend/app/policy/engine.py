@@ -4,8 +4,9 @@ No IO, no globals: easy to test exhaustively (see tests/unit/test_policy_engine.
 
 Evaluation order:
   1. Hard floor (code, not configuration): some things are never allowed.
-  2. Each policy layer (the selected policy, the global ceiling, a parent agent's
-     policy) is evaluated with its most specific matching rule.
+  2. Each policy layer (the selected policy, the global ceiling, and for a
+     sub-agent the policy of every agent above it) is evaluated with its most
+     specific matching rule.
   3. Layers combine as "most restrictive wins": deny > ask > allow.
   4. An `ask` may become `allow` through a run grant, but only if the ceiling
      itself allows the action. Grants never override deny.
@@ -85,6 +86,7 @@ def evaluate(
     *,
     ceiling: Policy | None = None,
     parent: Policy | None = None,
+    ancestors: Iterable[Policy] = (),
     grants: Iterable[Grant] = (),
 ) -> Evaluation:
     # 1. Hard floor.
@@ -106,6 +108,8 @@ def evaluate(
         results.append(ceiling_eval)
     if parent:
         results.append(evaluate_policy(parent, action))
+    # A sub-agent may do nothing that an agent above it may not.
+    results.extend(evaluate_policy(layer, action) for layer in ancestors)
     worst = max(results, key=lambda e: _RANK[e.decision])
 
     # 4. Run grants may lift an `ask`, never a deny, and only below the ceiling.

@@ -10,4 +10,5 @@ export const DEFAULT_LIMITS: Limits = {
   max_shell_timeout_s: 600,
   max_cost_usd: null,
   max_consecutive_errors: 5,
+  max_subagent_depth: 1,
 }

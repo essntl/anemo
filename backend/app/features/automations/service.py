@@ -69,6 +69,7 @@ _LIVE_STATUS = {
     "queued": "running",
     "running": "running",
     "waiting_approval": "waiting",
+    "waiting_subagent": "running",
     "paused": "paused",
 }
 
@@ -443,11 +444,15 @@ async def on_run_finished(db: AsyncSession, run: Run, status: str, error: str | 
     await notify_changed()
 
 
-async def on_needs_approval(db: AsyncSession, run: Run) -> None:
-    """An unattended run stopped to ask: tell the user, wherever they are."""
-    if run.automation_id is None:
+async def on_needs_approval(
+    db: AsyncSession, run: Run, automation_id: uuid.UUID | None = None
+) -> None:
+    """An unattended run stopped to ask: tell the user, wherever they are.
+    `automation_id`: for a sub-agent, the automation its top-level run belongs to."""
+    automation_id = automation_id or run.automation_id
+    if automation_id is None:
         return
-    automation = await db.get(Automation, run.automation_id)
+    automation = await db.get(Automation, automation_id)
     if automation is None:
         return
     pending = list(

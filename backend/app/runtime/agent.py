@@ -67,7 +67,7 @@ from app.providers.base import (
     Usage,
 )
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
-from app.runtime import citations, compaction, outputs
+from app.runtime import citations, compaction, outputs, subagents
 from app.runtime.chat import (
     SYSTEM_PROMPT as CHAT_SYSTEM_PROMPT,
 )
@@ -243,7 +243,10 @@ class AgentRun:
         on_ask: str = "pause",
         has_browser: bool = False,
         browser_session: uuid.UUID | None = None,
+        ancestors: list[Policy] | None = None,
     ) -> None:
+        # For a sub-agent: the policies of the agents above it (it may do no more).
+        self.ancestors = ancestors or []
         self.run_id = run_id
         # Unattended runs: what to do when an action needs approval (pause|deny|fail).
         self.on_ask = on_ask
@@ -312,8 +315,8 @@ class AgentRun:
     def _limit_reached(self, run: Run) -> str | None:
         limits = self.policy.limits
         totals = run.totals
-        if run.step >= limits.max_steps:
-            return "steps"
+        if run.step + int(totals.get("child_steps", 0)) >= limits.max_steps:
+            return "steps"  # steps of sub-agents count as well
         if totals.get("tool_calls", 0) >= limits.max_tool_calls:
             return "tool_calls"
         active = float(totals.get("active_s", 0.0)) + (time.monotonic() - self.segment_start)
@@ -366,7 +369,7 @@ class AgentRun:
                 uses = [b for b in last.content if isinstance(b, ToolUseBlock)]
                 if last.role == "assistant" and uses:
                     outcome = await self._process_tools(db, run, uses)
-                    if outcome in ("waiting", "paused", "blocked"):
+                    if outcome in ("waiting", "paused", "blocked", "waiting_child"):
                         return outcome
                     continue
                 if last.role == "assistant":
@@ -589,6 +592,9 @@ class AgentRun:
                 rows[use.id] = row
             if row.status in DONE_TOOL_STATUSES:
                 continue
+            if row.status == "waiting_child":
+                await self._collect_subagent(db, run, row)  # done if the sub-agent is
+                continue
             tool = self.tools.get(use.name)
 
             if row.status == "waiting_approval":
@@ -656,7 +662,16 @@ class AgentRun:
 
             actions = tool.actions(args, self.ctx)
             verdict = combine(
-                [evaluate(a, self.policy, ceiling=self.ceiling, grants=grants) for a in actions]
+                [
+                    evaluate(
+                        a,
+                        self.policy,
+                        ceiling=self.ceiling,
+                        ancestors=self.ancestors,
+                        grants=grants,
+                    )
+                    for a in actions
+                ]
             )
             row.capability = tool.capability
             row.actions = [a.model_dump() for a in actions]
@@ -700,6 +715,10 @@ class AgentRun:
                     return "blocked"
                 continue
             await self._execute(db, run, row, tool, args)
+
+        if any(r.status == "waiting_child" for r in rows.values()):
+            await db.commit()
+            return "waiting_child"  # continue when the sub-agents are done
 
         # Every call of this step is settled: hand the results to the model.
         ordered = sorted(rows.values(), key=lambda r: r.position)
@@ -828,6 +847,9 @@ class AgentRun:
                 ),
             )
             return
+        if tool.name == "run_subagent":
+            await self._start_subagent(db, run, row, args)
+            return
         row.status, row.started_at = "running", datetime.now(UTC)
         await db.commit()  # checkpoint: a crash from here on is detected on resume
         self.current_call = self.ctx.call_id = row.id
@@ -857,6 +879,50 @@ class AgentRun:
             run.plan = new_plan
             run.plan_version += 1
         self._checkpoint_time(run)
+        await self._finish_row(db, row, "failed" if result.is_error else "succeeded", result)
+
+    # -- sub-agents ----------------------------------------------------------------
+
+    async def _start_subagent(self, db: AsyncSession, run: Run, row: ToolCall, args: Any) -> None:
+        """Start a sub-agent for this tool call. The call stays open ("waiting_child")
+        until the sub-agent has finished; see runtime/subagents.py."""
+        active = float(run.totals.get("active_s", 0.0)) + (time.monotonic() - self.segment_start)
+        try:
+            child = await subagents.spawn(
+                db,
+                run,
+                task=args.task,
+                profile_name=args.profile,
+                max_depth=self.policy.limits.max_subagent_depth,
+                budget=subagents.remaining_budget(run, self.policy.limits, active),
+            )
+        except subagents.SpawnRefused as exc:
+            await self._finish_row(db, row, "failed", ToolResult(content=str(exc), is_error=True))
+            return
+        row.status, row.started_at = "waiting_child", datetime.now(UTC)
+        row.result_data = {"child_run_id": str(child.id)}
+        await db.commit()
+        await self._emit("tool.started", {"tool_call_id": str(row.id), "tool": "run_subagent"})
+        await self._emit("subrun.started", {"tool_call_id": str(row.id), "run_id": str(child.id)})
+
+    async def _collect_subagent(self, db: AsyncSession, run: Run, row: ToolCall) -> None:
+        """If the call's sub-agent has finished, turn its answer into the call's result
+        and charge what it used to this run. Otherwise leave the call waiting."""
+        child = await subagents.child_of(db, row)
+        if child is None:
+            await self._finish_row(
+                db,
+                row,
+                "failed",
+                ToolResult(content="The sub-agent no longer exists.", is_error=True),
+            )
+            return
+        await db.refresh(child)
+        if child.status not in TERMINAL_STATUSES:
+            return
+        answer = citations.render(child.totals.get("text", ""), child.options.get("sources"))
+        result = subagents.result_for_parent(child, answer.strip())
+        subagents.charge_parent(run, child)
         await self._finish_row(db, row, "failed" if result.is_error else "succeeded", result)
 
     async def _finish_row(
@@ -939,11 +1005,15 @@ async def _finalize(
             .where(Conversation.id == message.conversation_id)
             .values(last_message_at=datetime.now(UTC))
         )
+    elif note:
+        # No chat message (a sub-agent): the note becomes part of its answer instead.
+        text = (run.totals.get("text", "") + note).strip()
+        run.totals = {**run.totals, "text": text}
     # Tool calls still open when the run ends can never complete.
     for row in await db.scalars(
         select(ToolCall).where(
             ToolCall.run_id == run.id,
-            ToolCall.status.in_(("pending", "waiting_approval", "running")),
+            ToolCall.status.in_(("pending", "waiting_approval", "waiting_child", "running")),
         )
     ):
         row.status = "cancelled"
@@ -962,6 +1032,23 @@ async def _finalize(
         except Exception:  # noqa: BLE001 - delivering the result must not break the run
             log.exception("automation follow-up failed", extra={"ctx": {"run_id": str(run.id)}})
             await db.rollback()
+    await _stop_subagents(db, run)
+    if run.parent_run_id is not None:
+        await subagents.wake_parent(db, run.parent_run_id)  # it may be waiting for this one
+
+
+async def _stop_subagents(db: AsyncSession, run: Run) -> None:
+    """A run that has ended takes its sub-agents with it (they have no one to report to)."""
+    children = await db.scalars(
+        select(Run).where(Run.parent_run_id == run.id, Run.status.not_in(TERMINAL_STATUSES))
+    )
+    for child in list(children):
+        child.cancel_requested = True
+        if child.status == "running":
+            await db.commit()
+            await bus.send_control(child.id, "cancel")  # its worker stops it
+        else:
+            await _finalize(db, child, "cancelled")  # no worker holds it: end it here
 
 
 # Chat turns run through the same loop, but only with memory tools and tight limits.
@@ -987,6 +1074,11 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     if automation is not None:
         # Nobody is there to review a plan; each action is still checked on its own.
         settings = settings.model_copy(update={"plan_review": "off"})
+    sub = run.options.get("subagent")
+    if sub is not None:
+        # A sub-agent gets at most the budget its parent had left, and no plan review.
+        limits = subagents.clamp_limits(settings.limits, sub["budget"])
+        settings = settings.model_copy(update={"limits": limits, "plan_review": "off"})
     ws_settings = await settings_service.get_section(db, WorkspaceSettings, "workspace")
     web_settings = await settings_service.get_section(db, WebSettings, "web")
     snap_policy, snap_ceiling = compile_policy(settings), compile_ceiling(settings)
@@ -1016,6 +1108,12 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     if automation is not None:
         system += AUTOMATION_SECTION.format(name=automation.name)
         system += AUTOMATION_ON_ASK[automation.on_ask] + "\n"
+    # A sub-agent of an unattended run is unattended too.
+    inherited = (sub or {}).get("automation")
+    if sub is not None:
+        system += subagents.SUBAGENT_SECTION
+        if inherited:
+            system += AUTOMATION_ON_ASK[inherited["on_ask"]] + "\n"
     run.options = {**run.options, "memory_context": used}
     run.policy = {
         "policy": snap_policy.model_dump(by_alias=True),
@@ -1036,7 +1134,9 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
             "on_ask": automation.on_ask,
         }
         if automation
-        else None,
+        else inherited,
+        # For a sub-agent: the policies of the agents above it.
+        "ancestors": [p for p in (sub or {}).get("ancestors", []) if p],
         "default_model_id": str(profile.default_model_id)
         if profile and profile.default_model_id
         else None,
@@ -1091,8 +1191,8 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         run = await db.get(Run, run_id)
         if run is None or run.status in TERMINAL_STATUSES:
             return
-        if run.status in ("paused", "waiting_approval"):
-            return  # a stale job: the run continues when it is resumed or approved
+        if run.status in ("paused", "waiting_approval", "waiting_subagent"):
+            return  # a stale job: the run continues when it is resumed, approved or woken
         if run.cancel_requested:
             await _finalize(db, run, "cancelled")
             return
@@ -1131,6 +1231,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         workspace = WorkspaceSettings.model_validate(run.policy.get("workspace") or {})
         web = WebSettings.model_validate(run.policy.get("web") or {})
         skills = [s["slug"] for s in run.policy.get("skills") or []]
+        ancestors = [Policy.model_validate(p) for p in run.policy.get("ancestors") or []]
 
         needs = {"tools"}
         if "image" in latest_user_attachment_kinds(transcript):
@@ -1149,6 +1250,9 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             has_memory=bool(run.policy.get("memory")),
             is_automation=run.automation_id is not None,
             has_browser=bool(run.policy.get("browser")),
+            can_spawn=run.kind == "agent"
+            and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),
+            ancestors=ancestors,
         )
         uses_browser = bool(run.policy.get("browser"))
         # The browser belongs to the conversation, so it survives between turns.
@@ -1156,7 +1260,8 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         if run.kind == "agent":
             for tool in await mcp_tool.for_run(db, run.policy.get("mcp_tools") or []):
                 probe = Action(capability=tool.capability, risk="safe")
-                if evaluate(probe, policy, ceiling=ceiling).decision != "deny":
+                verdict = evaluate(probe, policy, ceiling=ceiling, ancestors=ancestors)
+                if verdict.decision != "deny":
                     tools.append(tool)
         automation_id = run.automation_id
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
@@ -1178,6 +1283,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         on_ask=on_ask,
         has_browser=uses_browser,
         browser_session=browser_session,
+        ancestors=ancestors,
     )
     task = asyncio.create_task(agent.drive())
     flag = CancelFlag()
@@ -1215,7 +1321,15 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
                         else None,
                     },
                 )
-                await automations.on_needs_approval(db, run)
+                unattended = ((run.policy or {}).get("automation") or {}).get("id")
+                await automations.on_needs_approval(
+                    db, run, uuid.UUID(unattended) if unattended else None
+                )
+        elif outcome == "waiting_child":
+            await _save_progress(db, run)
+            await runs.set_status(db, run, "waiting_subagent")
+            # They may all have finished in the meantime: then continue right away.
+            await subagents.wake_parent(db, run.id)
         elif outcome == "blocked":
             run.options = {**run.options, "no_retry": True}  # it would stop the same way
             await _finalize(

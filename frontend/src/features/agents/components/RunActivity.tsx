@@ -36,11 +36,13 @@ import { PlanEditor } from './PlanEditor'
 import { PlanReviewCard } from './PlanReviewCard'
 import { RunControls } from './RunControls'
 import { ShellDetails } from './ShellCall'
+import { SubagentRun } from './SubagentRun'
 
 const STATUS: Record<string, { icon: typeof Circle; tone: string; label: string }> = {
   pending: { icon: Clock, tone: 'text-muted', label: 'Queued' },
   waiting_approval: { icon: ShieldAlert, tone: 'text-tool-waiting', label: 'Needs approval' },
   running: { icon: Loader2, tone: 'text-tool-running', label: 'Running' },
+  waiting_child: { icon: Loader2, tone: 'text-tool-running', label: 'Sub-agent working' },
   succeeded: { icon: CheckCircle2, tone: 'text-tool-ok', label: 'Done' },
   failed: { icon: XCircle, tone: 'text-error', label: 'Failed' },
   denied: { icon: Ban, tone: 'text-tool-denied', label: 'Blocked' },
@@ -136,7 +138,10 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
   const shell = call.tool_name === 'run_shell'
   // null = not toggled by the user: shell commands open by themselves while running.
   const [toggled, setOpen] = useState<boolean | null>(null)
-  const open = toggled ?? (shell && call.status === 'running')
+  // A sub-agent started by this call (its run is shown nested, see SubagentRun).
+  const childRunId = call.tool_name === 'run_subagent' ? (call.result_data?.child_run_id as string | undefined) : undefined
+  // Open while the sub-agent works, so an approval it asks for is not hidden.
+  const open = toggled ?? ((shell && call.status === 'running') || call.status === 'waiting_child')
   const image = shownImage(call)
   const s = STATUS[call.status] ?? STATUS.pending
   const Icon = s.icon
@@ -147,7 +152,7 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
     <div className="py-1">
       <button type="button" onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] hover:bg-surface-hover pointer-coarse:py-2.5">
-        <Icon className={cn('h-3.5 w-3.5 shrink-0', s.tone, call.status === 'running' && 'animate-spin')} />
+        <Icon className={cn('h-3.5 w-3.5 shrink-0', s.tone, (call.status === 'running' || call.status === 'waiting_child') && 'animate-spin')} />
         <span className="min-w-0 flex-1 truncate">{describe(call)}</span>
         <span className={cn('shrink-0 text-[11.5px]', s.tone)}>{s.label}</span>
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-subtle transition-transform', open && 'rotate-90')} />
@@ -159,6 +164,7 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
             {call.decision && <> · permission: {call.decision} ({call.decision_reason})</>}
           </div>
           {shell && <ShellDetails call={call} />}
+          {childRunId && <SubagentRun runId={childRunId} />}
           {web && <WebDetails data={web} />}
           {!shell && Object.keys(call.args).length > 0 && (
             <pre className="overflow-x-auto rounded-lg bg-surface-2 p-2 font-mono text-[11.5px]">
@@ -292,11 +298,19 @@ function headline(data: Timeline, live: boolean): string {
   return `${n} action${n === 1 ? '' : 's'}`
 }
 
-export function RunActivity({ runId, live }: { runId: string; live: boolean }) {
-  const timeline = useTimeline(runId)
+interface RunActivityProps {
+  runId: string
+  /** The run is still going: show it expanded. */
+  live: boolean
+  /** Refresh every 2 s (for a sub-agent, which no chat message follows live). */
+  poll?: boolean
+}
+
+export function RunActivity({ runId, live, poll }: RunActivityProps) {
+  const timeline = useTimeline(runId, poll)
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const data = timeline.data
-  const active = Boolean(data && ['queued', 'running', 'paused'].includes(data.status))
+  const active = Boolean(data && ['queued', 'running', 'paused', 'waiting_subagent'].includes(data.status))
   if (!data || (data.tool_calls.length === 0 && !data.plan && data.file_changes.length === 0 && !active)) return null
 
   const calls = data.tool_calls
