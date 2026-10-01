@@ -533,6 +533,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Runs
+         * @description Run history, newest first. Page with `before` = the last item's created_at.
+         */
+        get: operations["list_runs_api_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Runs Summary
+         * @description Agent run counts for the sidebar badge.
+         */
+        get: operations["runs_summary_api_runs_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -542,6 +582,85 @@ export interface paths {
         };
         /** Get Run */
         get: operations["get_run_api_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Run
+         * @description Pauses an agent run at the next safe point: the current model answer or tool
+         *     call finishes, nothing new starts. Resume it later, optionally with a message.
+         */
+        post: operations["pause_run_api_runs__run_id__pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume Run */
+        post: operations["resume_run_api_runs__run_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit Plan
+         * @description Change the plan of a paused run. The agent is told about the change when it
+         *     resumes. (A plan waiting for review is edited when approving it instead.)
+         */
+        put: operations["edit_plan_api_runs__run_id__plan_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/outputs/{tool_call_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tool Output
+         * @description The full text of a tool result that was shortened for the model.
+         */
+        get: operations["tool_output_api_runs__run_id__outputs__tool_call_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -736,7 +855,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Summary */
+        /**
+         * Summary
+         * @description What an agent run may do: the global settings, or those of an agent profile.
+         */
         get: operations["summary_api_permissions_summary_get"];
         put?: never;
         post?: never;
@@ -975,6 +1097,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Profiles */
+        get: operations["list_profiles_api_profiles_get"];
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile_api_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile */
+        get: operations["get_profile_api_profiles__profile_id__get"];
+        /** Update Profile */
+        put: operations["update_profile_api_profiles__profile_id__put"];
+        post?: never;
+        /** Delete Profile */
+        delete: operations["delete_profile_api_profiles__profile_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Skills */
+        get: operations["list_skills_api_skills_get"];
+        put?: never;
+        /** Create Skill */
+        post: operations["create_skill_api_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Skill */
+        post: operations["import_skill_api_skills_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Skill */
+        get: operations["get_skill_api_skills__skill_id__get"];
+        /** Update Skill */
+        put: operations["update_skill_api_skills__skill_id__put"];
+        post?: never;
+        /** Delete Skill */
+        delete: operations["delete_skill_api_skills__skill_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Skill
+         * @description The skill as a SKILL.md-style Markdown file.
+         */
+        get: operations["export_skill_api_skills__skill_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1024,6 +1257,8 @@ export interface components {
              * Format: uuid
              */
             tool_call_id: string;
+            /** Kind */
+            kind: string;
             /** Status */
             status: string;
             /** Scope */
@@ -1189,6 +1424,8 @@ export interface components {
              * @default chat
              */
             default_mode: string;
+            /** Profile Id */
+            profile_id?: string | null;
             /** Snippet */
             snippet?: string | null;
         };
@@ -1202,6 +1439,8 @@ export interface components {
             archived?: boolean | null;
             /** Model Id */
             model_id?: string | null;
+            /** Profile Id */
+            profile_id?: string | null;
         };
         /** DecisionIn */
         DecisionIn: {
@@ -1218,6 +1457,7 @@ export interface components {
             scope: "once" | "run";
             /** Reason */
             reason?: string | null;
+            plan?: components["schemas"]["PlanIn"] | null;
         };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
@@ -1299,6 +1539,16 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** ImportIn */
+        ImportIn: {
+            /** Content */
+            content: string;
+            /**
+             * Replace
+             * @default false
+             */
+            replace: boolean;
+        };
         /** ImportModelsIn */
         ImportModelsIn: {
             /** Model Keys */
@@ -1336,6 +1586,13 @@ export interface components {
              * @default 600
              */
             max_shell_timeout_s: number;
+            /** Max Cost Usd */
+            max_cost_usd?: number | null;
+            /**
+             * Max Consecutive Errors
+             * @default 5
+             */
+            max_consecutive_errors: number;
         };
         /** ListingOut */
         ListingOut: {
@@ -1549,6 +1806,8 @@ export interface components {
              * Format: uuid
              */
             tool_call_id: string;
+            /** Kind */
+            kind: string;
             /** Status */
             status: string;
             /** Scope */
@@ -1585,6 +1844,12 @@ export interface components {
             /** Extra Rules */
             extra_rules?: components["schemas"]["Rule"][];
             limits?: components["schemas"]["Limits"];
+            /**
+             * Plan Review
+             * @default off
+             * @enum {string}
+             */
+            plan_review: "off" | "always";
         };
         /** PermissionSummary */
         PermissionSummary: {
@@ -1596,6 +1861,108 @@ export interface components {
             max_tool_calls: number;
             /** Max Runtime S */
             max_runtime_s: number;
+            /** Max Cost Usd */
+            max_cost_usd?: number | null;
+            /**
+             * Plan Review
+             * @default off
+             */
+            plan_review: string;
+        };
+        /** PlanIn */
+        PlanIn: {
+            /** Steps */
+            steps: components["schemas"]["PlanStepIn"][];
+        };
+        /** PlanStepIn */
+        PlanStepIn: {
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @default pending
+             * @enum {string}
+             */
+            status: "pending" | "in_progress" | "done" | "skipped";
+        };
+        /** ProfileIn */
+        ProfileIn: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /**
+             * Icon
+             * @default bot
+             */
+            icon: string;
+            /** Default Model Id */
+            default_model_id?: string | null;
+            /** Permission Levels */
+            permission_levels?: {
+                [key: string]: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
+            };
+            limits?: components["schemas"]["Limits"] | null;
+            /** Plan Review */
+            plan_review?: ("off" | "always") | null;
+            /**
+             * Skill Mode
+             * @default all
+             * @enum {string}
+             */
+            skill_mode: "all" | "selected" | "none";
+            /** Skill Ids */
+            skill_ids?: string[];
+        };
+        /** ProfileOut */
+        ProfileOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Instructions */
+            instructions: string;
+            /** Icon */
+            icon: string;
+            /** Default Model Id */
+            default_model_id: string | null;
+            /** Permission Levels */
+            permission_levels: {
+                [key: string]: "deny" | "ask" | "ask_dangerous" | "workspace" | "autonomous";
+            };
+            limits: components["schemas"]["Limits"] | null;
+            /** Plan Review */
+            plan_review: ("off" | "always") | null;
+            /**
+             * Skill Mode
+             * @enum {string}
+             */
+            skill_mode: "all" | "selected" | "none";
+            /** Skill Ids */
+            skill_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ProviderIn */
         ProviderIn: {
@@ -1687,6 +2054,11 @@ export interface components {
             /** Needs Key */
             needs_key: boolean;
         };
+        /** ResumeIn */
+        ResumeIn: {
+            /** Message */
+            message?: string | null;
+        };
         /** RevertOut */
         RevertOut: {
             /** Message */
@@ -1715,6 +2087,119 @@ export interface components {
              */
             else: "allow" | "ask" | "deny";
         };
+        /** RunCounts */
+        RunCounts: {
+            /** Active */
+            active: number;
+            /** Waiting */
+            waiting: number;
+        };
+        /** RunDetail */
+        RunDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Step */
+            step: number;
+            /** Status */
+            status: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Assistant Message Id */
+            assistant_message_id: string | null;
+            /** Model Id */
+            model_id: string | null;
+            /** Profile Id */
+            profile_id: string | null;
+            /** Profile Name */
+            profile_name?: string | null;
+            /** Request */
+            request: string;
+            /** Pause Requested */
+            pause_requested: boolean;
+            /** Plan Version */
+            plan_version: number;
+            totals: components["schemas"]["RunTotals"];
+            /** Limits */
+            limits?: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /** Model Label */
+            model_label?: string | null;
+            /** Answer */
+            answer?: string | null;
+        };
+        /** RunListItem */
+        RunListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Step */
+            step: number;
+            /** Status */
+            status: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Assistant Message Id */
+            assistant_message_id: string | null;
+            /** Model Id */
+            model_id: string | null;
+            /** Profile Id */
+            profile_id: string | null;
+            /** Profile Name */
+            profile_name?: string | null;
+            /** Request */
+            request: string;
+            /** Pause Requested */
+            pause_requested: boolean;
+            /** Plan Version */
+            plan_version: number;
+            totals: components["schemas"]["RunTotals"];
+            /** Limits */
+            limits?: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /** Model Label */
+            model_label?: string | null;
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -1734,6 +2219,21 @@ export interface components {
             assistant_message_id: string | null;
             /** Model Id */
             model_id: string | null;
+            /** Profile Id */
+            profile_id: string | null;
+            /** Profile Name */
+            profile_name?: string | null;
+            /** Request */
+            request: string;
+            /** Pause Requested */
+            pause_requested: boolean;
+            /** Plan Version */
+            plan_version: number;
+            totals: components["schemas"]["RunTotals"];
+            /** Limits */
+            limits?: {
+                [key: string]: unknown;
+            } | null;
             /** Error */
             error: {
                 [key: string]: unknown;
@@ -1747,6 +2247,36 @@ export interface components {
             started_at: string | null;
             /** Ended At */
             ended_at: string | null;
+        };
+        /** RunTotals */
+        RunTotals: {
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /** Cost Usd */
+            cost_usd?: number | null;
+            /**
+             * Tool Calls
+             * @default 0
+             */
+            tool_calls: number;
+            /**
+             * Active S
+             * @default 0
+             */
+            active_s: number;
+            /**
+             * Compactions
+             * @default 0
+             */
+            compactions: number;
         };
         /** SaveIn */
         SaveIn: {
@@ -1805,6 +2335,70 @@ export interface components {
             /** Has Chat Default */
             has_chat_default: boolean;
         };
+        /** SkillIn */
+        SkillIn: {
+            /** Slug */
+            slug?: string | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /** Required Capabilities */
+            required_capabilities?: string[];
+            /** Tags */
+            tags?: string[];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** SkillOut */
+        SkillOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Instructions */
+            instructions: string;
+            /** Required Capabilities */
+            required_capabilities: string[];
+            /** Tags */
+            tags: string[];
+            /** Enabled */
+            enabled: boolean;
+            /** Source */
+            source: string;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Blocked Capabilities
+             * @default []
+             */
+            blocked_capabilities: string[];
+        };
         /** SshKeyOut */
         SshKeyOut: {
             /** Available */
@@ -1861,10 +2455,14 @@ export interface components {
             kind: string;
             /** Status */
             status: string;
+            /** Pause Requested */
+            pause_requested: boolean;
             /** Plan */
             plan: {
                 [key: string]: unknown;
             }[] | null;
+            /** Plan Version */
+            plan_version: number;
             /** Tool Calls */
             tool_calls: components["schemas"]["ToolCallOut"][];
             /** File Changes */
@@ -1956,6 +2554,8 @@ export interface components {
              * @enum {string}
              */
             mode: "chat" | "agent";
+            /** Profile Id */
+            profile_id?: string | null;
         };
         /** TurnOut */
         TurnOut: {
@@ -3219,7 +3819,111 @@ export interface operations {
             };
         };
     };
+    list_runs_api_runs_get: {
+        parameters: {
+            query?: {
+                kind?: "agent" | "chat" | "all";
+                status?: "active" | "waiting" | "completed" | "failed" | "cancelled" | "all";
+                profile_id?: string | null;
+                /** @description Search in the request text */
+                q?: string | null;
+                /** @description Only runs created before this time */
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runs_summary_api_runs_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunCounts"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_run_api_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_run_api_runs__run_id__pause_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3240,6 +3944,112 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RunOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_run_api_runs__run_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ResumeIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_plan_api_runs__run_id__plan_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_output_api_runs__run_id__outputs__tool_call_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                tool_call_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -3587,7 +4397,9 @@ export interface operations {
     };
     summary_api_permissions_summary_get: {
         parameters: {
-            query?: never;
+            query?: {
+                profile_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: {
@@ -4100,6 +4912,408 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SshKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_profiles_api_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_profile_api_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_profile_api_profiles__profile_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_profile_api_profiles__profile_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_profile_api_profiles__profile_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_skills_api_skills_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_skill_api_skills_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_skill_api_skills_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_skill_api_skills__skill_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_skill_api_skills__skill_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_skill_api_skills__skill_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_skill_api_skills__skill_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

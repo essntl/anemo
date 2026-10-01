@@ -13,7 +13,10 @@ import {
   ChevronRight,
   Circle,
   CircleDot,
+  Download,
   FileDiff,
+  Pause,
+  Pencil,
   Undo2,
   Clock,
   Loader2,
@@ -25,8 +28,13 @@ import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Input } from '@/components/ui/Input'
+import { toolOutputUrl, useEditPlan } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
-import { type FileChangeView, type ToolCallView, useDecide, useRevertChange, useTimeline } from '../api'
+import { type FileChangeView, type Timeline, type ToolCallView, useDecide, useRevertChange, useTimeline } from '../api'
+import { type EditableStep, planIsValid, toEditable } from '../plan'
+import { PlanEditor } from './PlanEditor'
+import { PlanReviewCard } from './PlanReviewCard'
+import { RunControls } from './RunControls'
 import { ShellDetails } from './ShellCall'
 
 const STATUS: Record<string, { icon: typeof Circle; tone: string; label: string }> = {
@@ -41,6 +49,8 @@ const STATUS: Record<string, { icon: typeof Circle; tone: string; label: string 
 }
 
 function describe(call: ToolCallView): string {
+  if (call.tool_name === 'load_skill') return `Load skill “${String(call.args.name ?? '')}”`
+  if (call.tool_name === 'update_plan' && call.approval?.kind === 'plan') return 'Propose a plan'
   const summary = call.actions.map((a) => (a as { summary?: string }).summary).find(Boolean)
   return summary && summary !== call.tool_name ? summary : call.tool_name.replaceAll('_', ' ')
 }
@@ -113,6 +123,7 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
   const s = STATUS[call.status] ?? STATUS.pending
   const Icon = s.icon
   const needsApproval = call.status === 'waiting_approval' && call.approval?.status === 'pending'
+  const output = call.result_data?.output as { chars: number } | undefined
   return (
     <div className="py-1">
       <button type="button" onClick={() => setOpen(!open)}
@@ -140,6 +151,12 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
               {call.result}
             </pre>
           )}
+          {output && (
+            <a href={toolOutputUrl(runId, call.id)} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1 text-accent hover:underline">
+              <Download className="h-3.5 w-3.5" /> Full output ({output.chars.toLocaleString()} characters)
+            </a>
+          )}
         </div>
       )}
       {image && (
@@ -149,7 +166,8 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
             className="max-h-32 max-w-56 rounded-lg border border-border object-contain" />
         </a>
       )}
-      {needsApproval && <ApprovalCard runId={runId} call={call} />}
+      {needsApproval &&
+        (call.approval?.kind === 'plan' ? <PlanReviewCard runId={runId} call={call} /> : <ApprovalCard runId={runId} call={call} />)}
     </div>
   )
 }
@@ -198,14 +216,71 @@ function FileChangeRow({ runId, change }: { runId: string; change: FileChangeVie
   )
 }
 
+function PlanSection({ runId, data }: { runId: string; data: Timeline }) {
+  const edit = useEditPlan()
+  const [draft, setDraft] = useState<EditableStep[] | null>(null)
+  const plan = data.plan ?? []
+  // A plan waiting for review is shown (and edited) in its review card instead.
+  const inReview = data.tool_calls.some((c) => c.approval?.kind === 'plan' && c.approval.status === 'pending')
+  if (!plan.length || inReview) return null
+  return (
+    <div className="mb-2 px-2">
+      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-subtle">
+        Plan
+        {data.status === 'paused' && !draft && (
+          <button type="button" onClick={() => setDraft(toEditable(plan))}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 normal-case tracking-normal text-muted hover:bg-surface-hover hover:text-text">
+            <Pencil className="h-3 w-3" /> Edit
+          </button>
+        )}
+      </div>
+      {draft ? (
+        <div className="rounded-lg border border-border bg-surface p-2">
+          <PlanEditor steps={draft} onChange={setDraft} />
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="primary" loading={edit.isPending} disabled={!planIsValid(draft)}
+              onClick={() => edit.mutate({ runId, steps: draft }, { onSuccess: () => setDraft(null) })}>
+              Save plan
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>Cancel</Button>
+          </div>
+          <p className="mt-1.5 text-[12px] text-muted">The agent follows the new plan when you resume.</p>
+          {edit.isError && <p className="text-[12px] text-error">{errorMessage(edit.error)}</p>}
+        </div>
+      ) : (
+        plan.map((step, i) => {
+          const st = String(step.status)
+          const StepIcon = st === 'done' ? CheckCircle2 : st === 'in_progress' ? CircleDot : Circle
+          return (
+            <div key={i} className={cn('flex items-center gap-2 py-0.5 text-[13px]', st === 'skipped' && 'line-through opacity-60')}>
+              <StepIcon className={cn('h-3.5 w-3.5 shrink-0', st === 'done' ? 'text-tool-ok' : st === 'in_progress' ? 'text-accent' : 'text-subtle')} />
+              {String(step.title)}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+function headline(data: Timeline, live: boolean): string {
+  const pending = data.tool_calls.find((c) => c.status === 'waiting_approval' && c.approval?.status === 'pending')
+  if (pending) return pending.approval?.kind === 'plan' ? 'Waiting for you to review the plan' : 'Waiting for your approval'
+  if (data.status === 'paused') return 'Paused'
+  if (live) return 'Working…'
+  const n = data.tool_calls.length
+  return `${n} action${n === 1 ? '' : 's'}`
+}
+
 export function RunActivity({ runId, live }: { runId: string; live: boolean }) {
   const timeline = useTimeline(runId)
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const data = timeline.data
-  if (!data || (data.tool_calls.length === 0 && !data.plan && data.file_changes.length === 0)) return null
+  const active = Boolean(data && ['queued', 'running', 'paused'].includes(data.status))
+  if (!data || (data.tool_calls.length === 0 && !data.plan && data.file_changes.length === 0 && !active)) return null
 
   const calls = data.tool_calls
-  const waiting = calls.some((c) => c.status === 'waiting_approval')
+  const waiting = calls.some((c) => c.status === 'waiting_approval') || data.status === 'paused'
   // Expanded while working or waiting; collapsed afterwards unless the user opened it.
   const isOpen = expanded ?? (live || waiting)
 
@@ -213,27 +288,18 @@ export function RunActivity({ runId, live }: { runId: string; live: boolean }) {
     <div className="mb-3 rounded-xl border border-border bg-surface-2/50">
       <button type="button" onClick={() => setExpanded(!isOpen)}
         className="flex w-full items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-muted hover:text-text pointer-coarse:py-3">
-        <Wrench className="h-3.5 w-3.5" />
-        {waiting ? 'Waiting for your approval' : live ? 'Working…' : `${calls.length} action${calls.length === 1 ? '' : 's'}`}
+        {data.status === 'paused' ? <Pause className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
+        {headline(data, live)}
         <ChevronRight className={cn('ml-auto h-3.5 w-3.5 transition-transform', isOpen && 'rotate-90')} />
       </button>
+      {active && (
+        <div className="border-t border-border px-3 py-2">
+          <RunControls runId={runId} status={data.status} pauseRequested={data.pause_requested} />
+        </div>
+      )}
       {isOpen && (
         <div className="border-t border-border px-2 py-2">
-          {data.plan && data.plan.length > 0 && (
-            <div className="mb-2 px-2">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">Plan</div>
-              {data.plan.map((step, i) => {
-                const st = String(step.status)
-                const StepIcon = st === 'done' ? CheckCircle2 : st === 'in_progress' ? CircleDot : Circle
-                return (
-                  <div key={i} className={cn('flex items-center gap-2 py-0.5 text-[13px]', st === 'skipped' && 'line-through opacity-60')}>
-                    <StepIcon className={cn('h-3.5 w-3.5', st === 'done' ? 'text-tool-ok' : st === 'in_progress' ? 'text-accent' : 'text-subtle')} />
-                    {String(step.title)}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <PlanSection runId={runId} data={data} />
           {calls.map((c) => <ToolRow key={c.id} runId={runId} call={c} />)}
           {data.file_changes.length > 0 && (
             <div className="mt-2 border-t border-border pt-2">

@@ -12,7 +12,13 @@ from app.events import bus
 from app.features.runs.models import ACTIVE_STATUSES, TERMINAL_STATUSES, Run, RunEvent
 
 # Event types stored durably in run_events (everything else is live-only).
-DURABLE_EVENTS = {"run.status", "run.error", "run.fallback", "message.completed"}
+DURABLE_EVENTS = {
+    "run.status",
+    "run.error",
+    "run.fallback",
+    "message.completed",
+    "context.compacted",
+}
 
 
 async def get_run(db: AsyncSession, run_id: uuid.UUID) -> Run:

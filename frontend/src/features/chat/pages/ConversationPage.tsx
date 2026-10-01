@@ -9,6 +9,8 @@ import { timelineKey } from '@/features/agents/api'
 import { useShellOutput } from '@/features/agents/shellOutput'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
+import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
+import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
 import {
   type ChatMessage,
@@ -60,6 +62,10 @@ export function ConversationPage() {
   const [modelOverride, setModelOverride] = useState<string | null>(null)
   const [modeOverride, setModeOverride] = useState<Mode | null>(null)
   const mode: Mode = modeOverride ?? (conversation.data?.default_mode === 'agent' ? 'agent' : 'chat')
+  // undefined: not changed here, use the conversation's profile.
+  const [profileOverride, setProfileOverride] = useState<string | null | undefined>(undefined)
+  const profileId = profileOverride !== undefined ? profileOverride : (conversation.data?.profile_id ?? null)
+  const resume = useResumeRun()
 
   const activeRunId = conversation.data?.active_run_id ?? null
   const modelId = modelOverride ?? conversation.data?.model_id ?? null
@@ -85,7 +91,7 @@ export function ConversationPage() {
       appendShellOutput(String(event.data.tool_call_id), String(event.data.text ?? ''))
       return
     }
-    if (activeRunId && /^(tool|approval|plan)\./.test(event.type)) {
+    if (activeRunId && /^(tool|approval|plan)\.|^run\.(status|pause)/.test(event.type)) {
       void qc.invalidateQueries({ queryKey: timelineKey(activeRunId) })
     }
   }
@@ -104,7 +110,9 @@ export function ConversationPage() {
 
   const list = messages.data ?? []
   const lastAssistant = [...list].reverse().find((m) => m.role === 'assistant')
-  const actionError = send.error ?? regenerate.error ?? cancel.error
+  const actionError = send.error ?? regenerate.error ?? cancel.error ?? resume.error
+  // A paused agent run: a message resumes it (the agent reads the message first).
+  const paused = Boolean(activeRunId) && live.status === 'paused'
 
   return (
     <div className="flex h-full flex-col">
@@ -163,14 +171,18 @@ export function ConversationPage() {
       <div className="mx-auto w-full max-w-3xl px-2 pb-2 md:px-6 md:pb-6">
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
         <Composer
-          running={Boolean(activeRunId)}
+          running={Boolean(activeRunId) && !paused}
+          placeholder={paused ? 'Paused. Send a message to resume with it…' : undefined}
           onSend={(text, attachmentIds) =>
-            send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, mode })
+            paused && activeRunId
+              ? resume.mutate({ runId: activeRunId, message: text })
+              : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, mode, profileId })
           }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           toolbar={
             <>
-              <ModeSwitch mode={mode} onChange={setModeOverride} />
+              <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
+              {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileOverride} />}
               <ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} />
             </>
           }

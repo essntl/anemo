@@ -10,6 +10,7 @@ from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.conversations.schemas import AttachmentSummary, ConversationOut, MessageOut
+from app.features.profiles.models import AgentProfile
 from app.features.runs.models import ACTIVE_STATUSES, Run
 from app.jobs import queue
 
@@ -70,6 +71,7 @@ def conversation_out(
         created_at=c.created_at,
         active_run_id=active.get(c.id),
         default_mode=c.default_mode,
+        profile_id=c.profile_id,
         snippet=snippet,
     )
 
@@ -174,6 +176,7 @@ async def _start_run(
         kind=mode,
         status="queued",
         conversation_id=conv.id,
+        profile_id=conv.profile_id if mode == "agent" else None,
         user_message_id=user_message_id,
         assistant_message_id=assistant.id,
         requested_model_id=model_id,
@@ -195,10 +198,15 @@ async def send_turn(
     model_id: uuid.UUID | None,
     attachment_ids: list[uuid.UUID] | None = None,
     mode: str = "chat",
+    profile_id: uuid.UUID | None = None,
 ) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     conv = await _lock_idle_conversation(db, conversation_id)
     if model_id is not None:
         conv.model_id = model_id  # remember the last explicit choice for this conversation
+    if mode == "agent":
+        if profile_id is not None and await db.get(AgentProfile, profile_id) is None:
+            raise NotFound("Agent profile not found")
+        conv.profile_id = profile_id
     seq = await _next_seq(db, conv.id)
     user = ChatMessage(
         conversation_id=conv.id,

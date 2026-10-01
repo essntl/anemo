@@ -5,14 +5,15 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–6 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–7 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
 > file tools with change history and one-click revert. Works on phones and can be
 > installed to your home screen. Agents can run **shell commands in an isolated
-> sandbox**. Web search, memory, documents etc. follow the phases in
-> `docs/architecture.md`.
+> sandbox**, follow **agent profiles** and **skills**, have their plans reviewed,
+> be paused and resumed, and every run is in the **Runs** history. Web search,
+> memory, documents etc. follow the phases in `docs/architecture.md`.
 
 ### Chat vs. Agent mode
 
@@ -25,6 +26,40 @@ the server against **Settings → Agent Permissions**: per category you choose
 and an approval card appears in the chat: *Allow once*, *Allow for this run* (same
 kind of action, same folder) or *Deny*. Paths outside the workspace and anything
 touching settings or secrets are always refused, whatever the settings say.
+
+### Profiles, skills, plans and runs
+
+**Profiles & Skills** (sidebar) holds reusable agent setups:
+
+- A **profile** has a name, instructions (added to the agent's system prompt), an
+  optional model, and optional overrides of the permission levels and limits. Pick
+  it in the chat next to the mode switch (Agent mode). A profile can be given more
+  autonomy than the global settings, but never more than the global *ceiling*, and
+  changing its permissions asks for your password like the settings do.
+- A **skill** is a set of instructions for one kind of task. Agents only see its
+  name and description until a task needs it; then they load it with a tool. Import
+  `SKILL.md`-style files (front matter with `name` and `description`, then Markdown)
+  or write your own; export turns them back into such files.
+
+**Plan review** (Settings → Agent Permissions, or per profile): the agent proposes
+a plan and waits before taking any action. You can approve it, edit the steps first,
+or send it back with feedback. If the agent later changes the steps, it asks again.
+
+**Pause** stops an agent run at the next safe point (the current step finishes,
+nothing new starts); no worker is held while it is paused. **Resume** it from the
+chat or the run's page, optionally with a message the agent reads first; while a
+run is paused you can also edit its plan. Stop cancels it for good.
+
+**Limits** end a run gracefully: steps, tool calls, working time (paused time does
+not count), cost (for models with known prices) and failed actions in a row. The
+agent then writes a short summary of where it got to. Long conversations are
+**compacted**: older steps are summarized by the *Summaries* model (Settings → Providers &
+Models) so the agent keeps working within the model's context window. Very long
+tool results are shortened for the model; the full text is saved, the agent can
+page through it, and you can download it from the run.
+
+**Runs** lists every agent run with its status, profile, time, tokens and cost, and
+opens each one with its plan, tool calls, approvals, file changes and answer.
 
 ### Shell commands
 

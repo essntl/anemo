@@ -42,6 +42,11 @@ class Run(Base, IdMixin, TimestampMixin):
     request: Mapped[str] = mapped_column(Text, default="")
     options: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Set by the user; the worker pauses at the next safe point (between steps/tool calls).
+    pause_requested: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_profiles.id", ondelete="SET NULL")
+    )
     attempt: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     totals: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
@@ -51,6 +56,7 @@ class Run(Base, IdMixin, TimestampMixin):
     )
     step: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     plan: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    plan_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Permission policy snapshot taken when the run started (later edits don't change it).
     policy: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     grants: Mapped[list[dict[str, Any]]] = mapped_column(
@@ -119,6 +125,8 @@ class Approval(Base, IdMixin, TimestampMixin):
     tool_call_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tool_calls.id", ondelete="CASCADE")
     )
+    # "action": may the agent do this? "plan": does the user accept the agent's plan?
+    kind: Mapped[str] = mapped_column(String(10), default="action", server_default="action")
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|approved|denied
     scope: Mapped[str | None] = mapped_column(String(10))  # once | run
     summary: Mapped[str] = mapped_column(String(500))

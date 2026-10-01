@@ -33,11 +33,23 @@ export function usePendingApprovals() {
 export function useDecide(runId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (v: { approvalId: string; decision: 'approve' | 'deny'; scope?: 'once' | 'run'; reason?: string }) =>
+    mutationFn: async (v: {
+      approvalId: string
+      decision: 'approve' | 'deny'
+      scope?: 'once' | 'run'
+      reason?: string
+      /** Plan reviews: the steps as edited by the user. */
+      plan?: { title: string; status?: 'pending' | 'in_progress' | 'done' | 'skipped' }[]
+    }) =>
       unwrap(
         await api.POST('/api/approvals/{approval_id}', {
           params: { path: { approval_id: v.approvalId } },
-          body: { decision: v.decision, scope: v.scope ?? 'once', reason: v.reason ?? null },
+          body: {
+            decision: v.decision,
+            scope: v.scope ?? 'once',
+            reason: v.reason ?? null,
+            plan: v.plan ? { steps: v.plan.map((s) => ({ title: s.title, status: s.status ?? 'pending' })) } : null,
+          },
         }),
       ),
     onSettled: () => {
@@ -47,10 +59,16 @@ export function useDecide(runId: string) {
   })
 }
 
-export function usePermissionSummary() {
+/** What an agent run may do: global settings, or those of an agent profile. */
+export function usePermissionSummary(profileId: string | null = null) {
   return useQuery({
-    queryKey: permissionSummaryKey,
-    queryFn: async () => unwrap(await api.GET('/api/permissions/summary')),
+    queryKey: [...permissionSummaryKey, profileId],
+    queryFn: async () =>
+      unwrap(
+        await api.GET('/api/permissions/summary', {
+          params: { query: profileId ? { profile_id: profileId } : {} },
+        }),
+      ),
   })
 }
 

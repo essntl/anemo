@@ -1,5 +1,8 @@
 import { createBrowserRouter } from 'react-router'
 import { PermissionsPage } from '@/features/agents/PermissionsPage'
+import { ProfilesPage } from '@/features/profiles/pages/ProfilesPage'
+import { RunDetailPage } from '@/features/runs/pages/RunDetailPage'
+import { RunsPage } from '@/features/runs/pages/RunsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { FilesPage } from '@/features/files/FilesPage'
 import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
@@ -42,9 +45,10 @@ export const router = createBrowserRouter([
           placeholder('documents', 'Documents'),
           placeholder('tasks', 'Tasks'),
           placeholder('calendar', 'Calendar'),
-          placeholder('runs', 'Runs'),
+          { path: 'runs', element: <RunsPage /> },
+          { path: 'runs/:runId', element: <RunDetailPage /> },
           placeholder('automations', 'Automations'),
-          placeholder('agents', 'Profiles & Skills'),
+          { path: 'agents', element: <ProfilesPage /> },
           placeholder('memory', 'Memory'),
           {
             path: 'settings',

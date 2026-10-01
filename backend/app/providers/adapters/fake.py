@@ -9,6 +9,8 @@ Enabled only when ENABLE_FAKE_PROVIDER=true (or ENV=test). Behaviour by model:
   scripted   replays FakeAdapter.scripts[<first user text>] (tests only). A script is a
              list of events, or a list of such lists: one per model call in a run
              (selected by how many assistant turns the request already contains).
+
+Any model answers the context-compaction prompt with a short fixed summary.
 """
 
 import asyncio
@@ -60,6 +62,11 @@ class FakeAdapter:
     async def stream_chat(self, req: ChatRequest) -> AsyncIterator[ProviderEvent]:
         prompt = _last_user_text(req)
         FakeAdapter.requests = [*FakeAdapter.requests[-19:], req]
+        if _first_user_text(req).startswith("Summarize the agent history below"):
+            yield TextDelta("- Fake summary of the earlier work.")
+            yield Usage(input_tokens=100, output_tokens=10)
+            yield Done("end")
+            return
         if req.model == "scripted":
             script = self.scripts.get(_first_user_text(req), [Done("end")])
             if script and isinstance(script[0], list):

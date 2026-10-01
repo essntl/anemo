@@ -33,6 +33,8 @@ class PermissionSummary(BaseModel):
     max_steps: int
     max_tool_calls: int
     max_runtime_s: int
+    max_cost_usd: float | None = None
+    plan_review: str = "off"
 
 
 def effective_level(settings: PermissionSettings, cap: str) -> Level:
@@ -80,4 +82,6 @@ def summarize(settings: PermissionSettings, available_caps: set[str]) -> Permiss
         max_steps=settings.limits.max_steps,
         max_tool_calls=settings.limits.max_tool_calls,
         max_runtime_s=settings.limits.max_runtime_s,
+        max_cost_usd=settings.limits.max_cost_usd,
+        plan_review=settings.plan_review,
     )

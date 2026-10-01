@@ -5,6 +5,7 @@ capability is not denied by policy (denied tools are not even offered)."""
 from app.policy.engine import evaluate
 from app.policy.models import Action, Policy
 from app.tools.base import Tool
+from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.workspace import (
@@ -31,6 +32,8 @@ BUILTIN_TOOLS: list[Tool] = [
     DeletePath(),
     RunShell(),
     CurrentTime(),
+    LoadSkill(),
+    ReadToolOutput(),
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 
@@ -47,11 +50,15 @@ def available_capabilities() -> set[str]:
     return {c for t in BUILTIN_TOOLS for c in (t.capability, *t.extra_capabilities)}
 
 
-def toolset_for(mode: str, policy: Policy, ceiling: Policy | None) -> list[Tool]:
+def toolset_for(
+    mode: str, policy: Policy, ceiling: Policy | None, *, has_skills: bool = False
+) -> list[Tool]:
     if mode != "agent":
         return []
     offered = []
     for tool in BUILTIN_TOOLS:
+        if tool.name == "load_skill" and not has_skills:
+            continue
         probe = Action(capability=tool.capability, resource="", risk="safe")
         if evaluate(probe, policy, ceiling=ceiling).decision != "deny":
             offered.append(tool)

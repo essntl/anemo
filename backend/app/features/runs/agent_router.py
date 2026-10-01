@@ -20,6 +20,7 @@ from app.events import bus
 from app.features.audit import service as audit
 from app.features.runs import service
 from app.features.runs.models import Approval, FileChange, Run, ToolCall
+from app.features.runs.router import PlanIn
 from app.jobs import queue
 from app.policy.models import Grant
 from app.workspace import revert
@@ -31,6 +32,7 @@ class ApprovalOut(BaseModel):
     id: uuid.UUID
     run_id: uuid.UUID
     tool_call_id: uuid.UUID
+    kind: str  # "action" or "plan"
     status: str
     scope: str | None
     summary: str
@@ -73,7 +75,9 @@ class TimelineOut(BaseModel):
     run_id: uuid.UUID
     kind: str
     status: str
+    pause_requested: bool
     plan: list[dict[str, Any]] | None
+    plan_version: int
     tool_calls: list[ToolCallOut]
     file_changes: list[FileChangeOut]
 
@@ -99,7 +103,9 @@ async def timeline(run_id: uuid.UUID, db: Db) -> TimelineOut:
         run_id=run.id,
         kind=run.kind,
         status=run.status,
+        pause_requested=run.pause_requested,
         plan=run.plan,
+        plan_version=run.plan_version,
         file_changes=[FileChangeOut.model_validate(c, from_attributes=True) for c in changes],
         tool_calls=[
             ToolCallOut.model_validate(c, from_attributes=True).model_copy(
@@ -142,6 +148,8 @@ class DecisionIn(BaseModel):
     # rest of this run without asking again.
     scope: Literal["once", "run"] = "once"
     reason: str | None = Field(None, max_length=500)
+    # Plan reviews: the steps as edited by the user (omit to accept the plan as proposed).
+    plan: PlanIn | None = None
 
 
 def grant_for(call: ToolCall) -> Grant:
@@ -172,7 +180,11 @@ async def decide(approval_id: uuid.UUID, body: DecisionIn, request: Request, db:
     approval.scope = body.scope if body.decision == "approve" else None
     approval.reason = body.reason
     approval.decided_at = datetime.now(UTC)
-    if body.decision == "approve" and body.scope == "run":
+    if approval.kind == "plan":
+        approval.scope = "once" if body.decision == "approve" else None
+        if body.decision == "approve" and body.plan is not None:
+            call.args = {"steps": [s.model_dump() for s in body.plan.steps]}
+    elif body.decision == "approve" and body.scope == "run":
         run.grants = [*run.grants, grant_for(call).model_dump()]
     audit.record(
         db,

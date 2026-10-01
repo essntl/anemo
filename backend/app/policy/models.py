@@ -37,6 +37,10 @@ class Limits(BaseModel):
     max_runtime_s: int = Field(1800, ge=10, le=86_400)
     # Longest a single shell command may run before it is stopped.
     max_shell_timeout_s: int = Field(600, ge=10, le=3600)
+    # Stop when the run's model costs reach this (only counts calls with a known cost).
+    max_cost_usd: float | None = Field(None, ge=0, le=10_000)
+    # Stop when this many tool calls in a row failed or were blocked.
+    max_consecutive_errors: int = Field(5, ge=1, le=100)
 
 
 class Policy(BaseModel):

@@ -116,6 +116,7 @@ async def test_agent_uses_tools_and_plan(authed):
         "delete_path",
         "run_shell",
         "get_current_time",
+        "read_tool_output",
     ]
 
 

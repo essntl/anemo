@@ -30,6 +30,10 @@ class Conversation(Base, IdMixin, TimestampMixin):
     model_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
     )
+    # The agent profile last used in this conversation (agent mode).
+    profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_profiles.id", ondelete="SET NULL")
+    )
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     last_message_at: Mapped[datetime] = mapped_column(

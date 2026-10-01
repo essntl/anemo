@@ -17,6 +17,8 @@ export interface RunView {
   modelLabel: string | null
   notice: string | null
   error: string | null
+  /** Agent runs: the user asked to pause; it takes effect at the next safe point. */
+  pauseRequested: boolean
 }
 
 export const initialRunView: RunView = {
@@ -26,6 +28,7 @@ export const initialRunView: RunView = {
   modelLabel: null,
   notice: null,
   error: null,
+  pauseRequested: false,
 }
 
 export interface RunEvent {
@@ -41,8 +44,20 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
   switch (event.type) {
     case 'run.status': {
       const error = data.error as { message?: string } | undefined
-      return { ...state, status: str(data.status) || state.status, error: error?.message ?? state.error }
+      const status = str(data.status) || state.status
+      return {
+        ...state,
+        status,
+        error: error?.message ?? state.error,
+        pauseRequested: status === 'running' ? state.pauseRequested : false,
+      }
     }
+    case 'run.pause_requested':
+      return { ...state, pauseRequested: true }
+    case 'run.pause_cancelled':
+      return { ...state, pauseRequested: false }
+    case 'context.compacted':
+      return { ...state, notice: 'Older steps were summarized to keep the context small' }
     case 'message.delta':
       return { ...state, text: state.text + str(data.text) }
     case 'reasoning.delta':
@@ -74,6 +89,9 @@ const EVENT_TYPES = [
   'approval.resolved',
   'plan.updated',
   'tool.progress', // live shell output
+  'run.pause_requested',
+  'run.pause_cancelled',
+  'context.compacted',
 ]
 
 /** Subscribes to a run's events while `runId` is set. Calls `onFinished` once at the end. */

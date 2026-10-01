@@ -3,11 +3,13 @@ import { ShieldCheck } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
-import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { Switch } from '@/components/ui/Switch'
 import { useSettings } from '@/features/settings/api'
 import { type Level, type PermissionSettings, type PermissionSummary, previewPermissions, usePermissionCatalog, useSavePermissions } from './api'
+import { LimitsFields } from './components/LimitsFields'
 import { SshKeyCard } from './components/SshKeyCard'
+import { DEFAULT_LIMITS } from './limits'
 
 const GROUP_TONE: Record<string, string> = {
   allowed: 'text-success',
@@ -40,7 +42,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
     else delete ceiling[cap]
     setForm({ ...form, ceiling })
   }
-  const limits = form.limits ?? { max_steps: 25, max_tool_calls: 100, max_runtime_s: 1800, max_shell_timeout_s: 600 }
+  const limits = { ...DEFAULT_LIMITS, ...form.limits }
 
   return (
     <div className="flex flex-col gap-5">
@@ -84,24 +86,24 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
       </Card>
 
       <Card>
-        <CardHeader title="Limits" description="A run stops gracefully when it reaches one of these." />
-        <CardBody className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Max steps">
-            <Input type="number" min={1} value={limits.max_steps}
-              onChange={(e) => setForm({ ...form, limits: { ...limits, max_steps: Number(e.target.value) } })} />
-          </Field>
-          <Field label="Max tool calls">
-            <Input type="number" min={1} value={limits.max_tool_calls}
-              onChange={(e) => setForm({ ...form, limits: { ...limits, max_tool_calls: Number(e.target.value) } })} />
-          </Field>
-          <Field label="Max minutes">
-            <Input type="number" min={1} value={Math.round(limits.max_runtime_s / 60)}
-              onChange={(e) => setForm({ ...form, limits: { ...limits, max_runtime_s: Number(e.target.value) * 60 } })} />
-          </Field>
-          <Field label="Max minutes per shell command">
-            <Input type="number" min={1} max={60} value={Math.round(limits.max_shell_timeout_s / 60)}
-              onChange={(e) => setForm({ ...form, limits: { ...limits, max_shell_timeout_s: Number(e.target.value) * 60 } })} />
-          </Field>
+        <CardHeader title="Plan review" description="See what the agent intends to do before it does anything." />
+        <CardBody className="flex items-center justify-between gap-4 text-[13px]">
+          <div>
+            <div className="font-medium">Review the agent's plan first</div>
+            <div className="text-[12px] text-muted">
+              For tasks with actions, the agent proposes a plan and waits; you can edit, approve or reject it.
+              Agent profiles can override this.
+            </div>
+          </div>
+          <Switch label="Review the agent's plan first" checked={form.plan_review === 'always'}
+            onChange={(on) => setForm({ ...form, plan_review: on ? 'always' : 'off' })} />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Limits" description="A run stops when it reaches one of these, and the agent sums up where it got to." />
+        <CardBody>
+          <LimitsFields value={limits} onChange={(l) => setForm({ ...form, limits: l })} />
         </CardBody>
       </Card>
 

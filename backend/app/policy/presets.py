@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 from app.policy.models import Limits, Policy, Rule, Scope
 
 Level = Literal["deny", "ask", "ask_dangerous", "workspace", "autonomous"]
+# "always": the agent's plan must be approved by the user before it takes any action.
+PlanReview = Literal["off", "always"]
 
 LEVEL_LABELS: dict[Level, str] = {
     "deny": "Never",
@@ -70,6 +72,25 @@ class PermissionSettings(BaseModel):
     ceiling: dict[str, Level] = Field(default_factory=dict)
     extra_rules: list[Rule] = Field(default_factory=list)  # advanced, evaluated as-is
     limits: Limits = Field(default_factory=Limits)
+    plan_review: PlanReview = "off"
+
+
+def with_profile(
+    settings: PermissionSettings,
+    levels: dict[str, Level] | None = None,
+    limits: Limits | None = None,
+    plan_review: PlanReview | None = None,
+) -> PermissionSettings:
+    """The settings a run with an agent profile uses: the profile's levels override the
+    global ones (the ceiling is kept, so a profile can never exceed it)."""
+    known = {k: v for k, v in (levels or {}).items() if k in CATEGORY_BY_CAP}
+    return settings.model_copy(
+        update={
+            "levels": {**settings.levels, **known},
+            "limits": limits or settings.limits,
+            "plan_review": plan_review or settings.plan_review,
+        }
+    )
 
 
 def level_for(settings: PermissionSettings, cap: str) -> Level:

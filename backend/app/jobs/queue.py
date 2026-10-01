@@ -13,7 +13,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from sqlalchemy import select, text, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.jobs.models import Job
@@ -139,3 +139,19 @@ async def release(db: AsyncSession, job_id: uuid.UUID) -> None:
         .values(status="queued", lease_owner=None, lease_expires_at=None, run_at=_now())
     )
     await db.commit()
+
+
+async def other_worker_has_run(db: AsyncSession, run_id: uuid.UUID) -> bool:
+    """True when two live leases exist for this run's execution: the caller's own job
+    and another one (e.g. a duplicate job queued by approve + resume)."""
+    count = await db.scalar(
+        select(func.count())
+        .select_from(Job)
+        .where(
+            Job.type == "run.execute",
+            Job.payload["run_id"].astext == str(run_id),
+            Job.status == "leased",
+            Job.lease_expires_at > _now(),
+        )
+    )
+    return (count or 0) > 1

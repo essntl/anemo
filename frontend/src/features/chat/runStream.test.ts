@@ -37,6 +37,20 @@ describe('runReducer', () => {
     expect(view.error).toBe('boom')
   })
 
+  it('tracks a requested pause until the run pauses or the request is withdrawn', () => {
+    const requested = apply([
+      { type: 'run.status', data: { status: 'running' } },
+      { type: 'run.pause_requested', data: {} },
+    ])
+    expect(requested.pauseRequested).toBe(true)
+    expect(runReducer(requested, { type: 'run.status', data: { status: 'paused' } }).pauseRequested).toBe(false)
+    expect(runReducer(requested, { type: 'run.pause_cancelled', data: {} }).pauseRequested).toBe(false)
+  })
+
+  it('notes when older steps were summarized', () => {
+    expect(apply([{ type: 'context.compacted', data: {} }]).notice).toMatch(/summarized/)
+  })
+
   it('ignores unknown events', () => {
     expect(apply([{ type: 'something.new', data: {} }])).toEqual(initialRunView)
   })

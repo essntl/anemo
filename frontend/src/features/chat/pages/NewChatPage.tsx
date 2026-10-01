@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { Sparkles } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
+import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useSetupStatus } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
 import { conversationKey, conversationsKey, createConversation, messagesKey } from '../api'
@@ -18,6 +19,7 @@ export function NewChatPage() {
   const [modelId, setModelId] = useState<string | null>(null)
   const [modeOverride, setModeOverride] = useState<Mode | null>(null)
   const mode: Mode = modeOverride ?? settings.data?.general.default_chat_mode ?? 'chat'
+  const [profileId, setProfileId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,7 +31,7 @@ export function NewChatPage() {
       const turn = unwrap(
         await api.POST('/api/conversations/{conversation_id}/turns', {
           params: { path: { conversation_id: conv.id } },
-          body: { text, model_id: modelId, attachment_ids: attachmentIds, mode },
+          body: { text, model_id: modelId, attachment_ids: attachmentIds, mode, profile_id: profileId },
         }),
       )
       // Seed the cache so the conversation page renders instantly and starts streaming.
@@ -68,7 +70,8 @@ export function NewChatPage() {
           onSend={start}
           toolbar={
             <>
-              <ModeSwitch mode={mode} onChange={setModeOverride} />
+              <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
+              {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileId} />}
               <ModelPicker value={modelId} defaultModelId={settings.data?.models.chat ?? null} onChange={setModelId} />
             </>
           }

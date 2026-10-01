@@ -18,7 +18,7 @@ def estimate_tokens(messages: list[Message]) -> int:
     chars, images = 0, 0
     for m in messages:
         for b in m.content:
-            if isinstance(b, ImageBlock):
+            if isinstance(b, ImageBlock) or (isinstance(b, AttachmentRef) and b.kind == "image"):
                 images += 1  # its base64 length says nothing about its token cost
             else:
                 chars += len(b.model_dump_json())

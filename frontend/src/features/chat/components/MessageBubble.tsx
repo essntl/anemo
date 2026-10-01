@@ -83,8 +83,9 @@ export function AssistantMessage({
   activity,
 }: AssistantProps) {
   const [copied, setCopied] = useState(false)
-  const live = ['streaming', 'queued', 'running', 'waiting_approval'].includes(status)
-  const waiting = live && !text && !reasoning && status !== 'waiting_approval'
+  const live = ['streaming', 'queued', 'running', 'waiting_approval', 'paused'].includes(status)
+  const suspended = status === 'waiting_approval' || status === 'paused'
+  const waiting = live && !text && !reasoning && !suspended
 
   const copy = async () => {
     await navigator.clipboard.writeText(text)
@@ -105,7 +106,7 @@ export function AssistantMessage({
         </div>
       )}
       {text && <Markdown text={text} />}
-      {live && text && status !== 'waiting_approval' && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
+      {live && text && !suspended && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
 
       {status === 'failed' && (
         <div className="mt-2 flex items-start gap-2 rounded-xl bg-error/10 px-3 py-2 text-[13px] text-error">

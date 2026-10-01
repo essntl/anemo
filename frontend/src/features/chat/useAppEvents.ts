@@ -15,6 +15,8 @@ export function useAppEvents() {
     const refreshConversation = (e: MessageEvent<string>) => {
       const data = JSON.parse(e.data) as { conversation_id?: string | null; status?: string }
       void qc.invalidateQueries({ queryKey: conversationsKey })
+      void qc.invalidateQueries({ queryKey: ['runs'] })
+      void qc.invalidateQueries({ queryKey: ['runs-summary'] })
       if (!data.conversation_id) return
       void qc.invalidateQueries({ queryKey: conversationKey(data.conversation_id) })
       if (data.status && TERMINAL.includes(data.status)) {

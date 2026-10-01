@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Query
+from sqlalchemy import select
 
 from app.api.deps import Db
 from app.features.attachments import service as attachments
@@ -14,6 +15,9 @@ from app.features.conversations.schemas import (
     TurnIn,
     TurnOut,
 )
+from app.features.profiles import service as profiles
+from app.features.runs.models import Run
+from app.runtime import outputs
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -59,6 +63,10 @@ async def update_conversation(
         conv.archived = body.archived
     if "model_id" in fields:
         conv.model_id = body.model_id
+    if "profile_id" in fields:
+        if body.profile_id is not None:
+            await profiles.get_profile(db, body.profile_id)  # 404 for unknown profiles
+        conv.profile_id = body.profile_id
     await db.commit()
     await db.refresh(conv)
     return service.conversation_out(conv, await service.active_runs(db, [conv.id]))
@@ -68,8 +76,10 @@ async def update_conversation(
 async def delete_conversation(conversation_id: uuid.UUID, db: Db) -> None:
     conv = await service.get_conversation(db, conversation_id)
     await attachments.delete_files_for_conversation(db, conv.id)
+    run_ids = list(await db.scalars(select(Run.id).where(Run.conversation_id == conv.id)))
     await db.delete(conv)
     await db.commit()
+    outputs.delete_for_runs(run_ids)
 
 
 @router.get("/{conversation_id}/messages", response_model=list[MessageOut])
@@ -82,7 +92,13 @@ async def list_messages(conversation_id: uuid.UUID, db: Db) -> list[MessageOut]:
 async def send_turn(conversation_id: uuid.UUID, body: TurnIn, db: Db) -> TurnOut:
     """Queues the answer; follow it live at GET /api/runs/{run_id}/events."""
     run, user, assistant, files = await service.send_turn(
-        db, conversation_id, body.text, body.model_id, body.attachment_ids, body.mode
+        db,
+        conversation_id,
+        body.text,
+        body.model_id,
+        body.attachment_ids,
+        body.mode,
+        profile_id=body.profile_id,
     )
     return TurnOut(
         run_id=run.id,

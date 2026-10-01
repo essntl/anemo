@@ -15,6 +15,7 @@ class ConversationPatch(BaseModel):
     pinned: bool | None = None
     archived: bool | None = None
     model_id: uuid.UUID | None = None
+    profile_id: uuid.UUID | None = None
 
 
 class ConversationOut(BaseModel):
@@ -27,6 +28,7 @@ class ConversationOut(BaseModel):
     created_at: datetime
     active_run_id: uuid.UUID | None = None
     default_mode: str = "chat"
+    profile_id: uuid.UUID | None = None
     snippet: str | None = None  # matching text when listed with a search query
 
 
@@ -58,6 +60,9 @@ class TurnIn(BaseModel):
     model_id: uuid.UUID | None = None
     attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=10)
     mode: Literal["chat", "agent"] = "chat"
+    # Agent mode: the agent profile to use (None: the default agent). Remembered
+    # by the conversation. Ignored in chat mode.
+    profile_id: uuid.UUID | None = None
 
 
 class TurnOut(BaseModel):

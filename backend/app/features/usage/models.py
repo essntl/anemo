@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,6 +15,7 @@ class UsageRecord(Base, IdMixin):
     __table_args__ = (
         Index("ix_usage_records_ts", "ts"),
         Index("ix_usage_records_model_ts", "model_id", "ts"),
+        Index("ix_usage_records_run", "run_id", postgresql_where=text("run_id IS NOT NULL")),
     )
 
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

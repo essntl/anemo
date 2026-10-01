@@ -17,9 +17,10 @@ import {
 import { Button } from '@/components/ui/Button'
 import { useLogout, useMe } from '@/features/auth/api'
 import { ConversationList } from '@/features/chat/components/ConversationList'
+import { useRunsSummary } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
 
-function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children: ReactNode }) {
+function NavItem({ to, icon, children, badge }: { to: string; icon: ReactNode; children: ReactNode; badge?: ReactNode }) {
   return (
     <NavLink
       to={to}
@@ -33,7 +34,8 @@ function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children
       }
     >
       <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
-      {children}
+      <span className="flex-1">{children}</span>
+      {badge}
     </NavLink>
   )
 }
@@ -47,6 +49,22 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
       <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   )
+}
+
+/** Agent runs that are working, or that wait for the user (approval or paused). */
+function RunsBadge() {
+  const summary = useRunsSummary()
+  const { active = 0, waiting = 0 } = summary.data ?? {}
+  if (waiting) {
+    return (
+      <span title={`${waiting} waiting for you`}
+        className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-[11px] font-semibold text-white">
+        {waiting}
+      </span>
+    )
+  }
+  if (active) return <span title={`${active} running`} className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+  return null
 }
 
 /** `onClose` is set when the sidebar is shown in the phone drawer. */
@@ -89,7 +107,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           <NavItem to="/calendar" icon={<CalendarDays />}>Calendar</NavItem>
         </Section>
         <Section label="Agents">
-          <NavItem to="/runs" icon={<History />}>Runs</NavItem>
+          <NavItem to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</NavItem>
           <NavItem to="/automations" icon={<Clock />}>Automations</NavItem>
           <NavItem to="/agents" icon={<Bot />}>Profiles & Skills</NavItem>
         </Section>

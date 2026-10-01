@@ -63,6 +63,7 @@ export function useSendTurn() {
       modelId: string | null
       attachmentIds?: string[]
       mode?: 'chat' | 'agent'
+      profileId?: string | null
     }) =>
       unwrap(
         await api.POST('/api/conversations/{conversation_id}/turns', {
@@ -72,6 +73,7 @@ export function useSendTurn() {
             model_id: v.modelId,
             attachment_ids: v.attachmentIds ?? [],
             mode: v.mode ?? 'chat',
+            profile_id: v.profileId ?? null,
           },
         }),
       ),

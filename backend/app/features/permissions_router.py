@@ -1,11 +1,13 @@
 """Read-only views of agent permissions for the UI. Saving happens through
 PUT /api/settings/permissions (a security-sensitive settings section)."""
 
+import uuid
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.deps import Db
-from app.features.settings import service as settings_service
+from app.features.profiles import service as profiles
 from app.policy.presets import CATEGORIES, LEVEL_LABELS, Level, PermissionSettings
 from app.policy.summary import PermissionSummary, summarize
 from app.tools import registry
@@ -55,9 +57,12 @@ async def catalog() -> CatalogOut:
 
 
 @router.get("/permissions/summary", response_model=PermissionSummary)
-async def summary(db: Db) -> PermissionSummary:
-    stored = await settings_service.get_section(db, PermissionSettings, "permissions")
-    return summarize(stored, registry.available_capabilities())
+async def summary(db: Db, profile_id: uuid.UUID | None = None) -> PermissionSummary:
+    """What an agent run may do: the global settings, or those of an agent profile."""
+    profile = await profiles.get_profile(db, profile_id) if profile_id else None
+    return summarize(
+        await profiles.effective_settings(db, profile), registry.available_capabilities()
+    )
 
 
 @router.post("/permissions/preview", response_model=PermissionSummary)
