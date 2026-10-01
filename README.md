@@ -5,7 +5,7 @@ autonomous agents with a granular permission system, persistent memory,
 documents, files, tasks, calendar and scheduled automations — deployed with
 Docker Compose on a homelab.
 
-> Status: phases 0–12 done: login, settings & theming, providers/models with encrypted
+> Status: phases 0–13 done: login, settings & theming, providers/models with encrypted
 > keys, streaming chat run by a background worker (survives reloads and worker
 > restarts), chat attachments (images, PDFs, text/code), **Agent mode** with a
 > server-enforced permission system and approvals, and a **file manager** plus agent
@@ -17,7 +17,7 @@ Docker Compose on a homelab.
 > **memory** you control. **Documents** are Markdown files with a rich editor and
 > history, and there are **tasks** and a **calendar**. **Automations** run agents
 > on a schedule and report back through **notifications** (in the app, on your
-> desktop, on Discord). MCP, browser automation etc. follow the phases in
+> desktop, on Discord). **MCP servers** add more tools. Browser automation etc. follow the phases in
 > `docs/architecture.md`.
 
 ### Chat vs. Agent mode
@@ -149,6 +149,30 @@ document (for example `briefings/{date}`). An automation can keep short notes
 between its runs, so "tell me when this page changes" works. Failed runs can be
 retried. If the app was off when a run was due, that run is skipped rather than
 caught up later, and a run still going when the next one is due is not stacked.
+
+### MCP servers
+
+MCP servers give agents extra tools (GitHub, a database, your smart home, …).
+Add them in **Settings → MCP**:
+
+- **Remote servers** are reached by URL (Streamable HTTP, or the older SSE type),
+  with optional headers such as an API key.
+- **Local servers** are programs (`npx …`, `uvx …`). They run in a separate
+  container, the MCP host, which has internet access but no route to the database,
+  no workspace and none of the app's secrets. It is off by default; start it with
+  `docker compose --profile mcp up -d`.
+
+Headers and environment variables are stored encrypted and never shown again.
+
+Each MCP tool goes through the same permission system as built-in tools. The
+*MCP tools* level in Agent Permissions is **Always ask** by default; per tool you
+can turn it off, let it run without asking, or never allow it. Servers describe
+their tools as read-only or destructive; those are only hints, which you can
+correct. If a server later changes a tool, or adds one, it asks every time until
+you have looked at it, and runs already in progress do not get the changed tool.
+
+Only add servers you trust: a server sees what agents send to its tools, and its
+answers can try to steer the agent.
 
 ### Memory
 

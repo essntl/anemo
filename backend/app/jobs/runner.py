@@ -64,8 +64,14 @@ def default_handlers() -> dict[str, Handler]:
 
         await automations.retry_run(uuid.UUID(payload["automation_id"]), int(payload["retry"]))
 
+    async def mcp_refresh(payload: dict[str, Any]) -> None:
+        from app.features.mcp import service as mcp
+
+        await mcp.refresh(uuid.UUID(payload["server_id"]))
+
     return {
         "automation.retry": automation_retry,
+        "mcp.refresh": mcp_refresh,
         "notify.deliver": notify_deliver,
         "document.index": document_index,
         "run.execute": run_execute,

@@ -28,6 +28,7 @@ const SCREENS = [
   '/settings/web',
   '/settings/memory',
   '/settings/notifications',
+  '/settings/mcp',
   '/automations',
   '/notifications',
   '/memory',

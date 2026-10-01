@@ -8,6 +8,7 @@ import { AutomationsPage } from '@/features/automations/AutomationsPage'
 import { DocumentsPage } from '@/features/documents/DocumentsPage'
 import { FilesPage } from '@/features/files/FilesPage'
 import { WorkspaceSettingsPage } from '@/features/files/WorkspaceSettingsPage'
+import { McpSettingsPage } from '@/features/mcp/McpSettingsPage'
 import { MemoryPage } from '@/features/memory/MemoryPage'
 import { MemorySettingsPage } from '@/features/memory/MemorySettingsPage'
 import { NotificationSettingsPage } from '@/features/notifications/NotificationSettingsPage'
@@ -32,7 +33,7 @@ const placeholder = (path: string, title: string) => ({
   element: <PlaceholderPage title={title} />,
 })
 
-const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory', 'notifications']
+const BUILT_SETTINGS = ['general', 'appearance', 'providers', 'permissions', 'workspace', 'web', 'memory', 'notifications', 'mcp']
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -73,6 +74,7 @@ export const router = createBrowserRouter([
               { path: 'workspace', element: <WorkspaceSettingsPage /> },
               { path: 'web', element: <WebSettingsPage /> },
               { path: 'memory', element: <MemorySettingsPage /> },
+              { path: 'mcp', element: <McpSettingsPage /> },
               { path: 'notifications', element: <NotificationSettingsPage /> },
               ...SETTINGS_SECTIONS.filter((s) => !BUILT_SETTINGS.includes(s.to)).map((s) =>
                 placeholder(s.to, s.label),

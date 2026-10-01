@@ -51,8 +51,8 @@ from app.features.skills.service import skills_for_profile
 from app.features.usage import service as usage
 from app.jobs import queue
 from app.policy.engine import combine, evaluate
-from app.policy.models import Grant, Limits, Policy
-from app.policy.presets import compile_ceiling, compile_policy
+from app.policy.models import Action, Grant, Limits, Policy
+from app.policy.presets import compile_ceiling, compile_policy, level_for
 from app.providers.base import (
     AttachmentRef,
     ChatRequest,
@@ -84,7 +84,7 @@ from app.runtime.streaming import (
     StreamResult,
     stream_with_fallback,
 )
-from app.tools import registry
+from app.tools import mcp_tool, registry
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.plan import PlanInput
 from app.web.settings import WebSettings
@@ -973,6 +973,12 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     web_settings = await settings_service.get_section(db, WebSettings, "web")
     snap_policy, snap_ceiling = compile_policy(settings), compile_ceiling(settings)
     skills = [] if chat else [s.meta() for s in await skills_for_profile(db, profile)]
+    # MCP tools (agent mode only, and not when "MCP tools" is set to Never). The user's
+    # per-tool choices become rules that come before the general ones.
+    mcp_refs: list[dict[str, str]] = []
+    if not chat and level_for(settings, "mcp.*") != "deny":
+        mcp_refs, mcp_rules = await mcp_tool.snapshot(db)
+        snap_policy.rules = [*mcp_rules, *snap_policy.rules]
     if chat:
         system = CHAT_SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
     else:
@@ -998,6 +1004,7 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
         "profile": {"id": str(profile.id), "name": profile.name} if profile else None,
         "system": system,
         "memory": memory_settings.enabled,
+        "mcp_tools": mcp_refs,
         "automation": {
             "id": str(automation.id),
             "name": automation.name,
@@ -1117,6 +1124,11 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             has_memory=bool(run.policy.get("memory")),
             is_automation=run.automation_id is not None,
         )
+        if run.kind == "agent":
+            for tool in await mcp_tool.for_run(db, run.policy.get("mcp_tools") or []):
+                probe = Action(capability=tool.capability, risk="safe")
+                if evaluate(probe, policy, ceiling=ceiling).decision != "deny":
+                    tools.append(tool)
         automation_id = run.automation_id
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         await runs.set_status(db, run, "running")  # commits

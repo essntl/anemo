@@ -1911,6 +1911,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mcp/servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Servers */
+        get: operations["list_servers_api_mcp_servers_get"];
+        put?: never;
+        /**
+         * Create Server
+         * @description Saves the server and queues a first look at its tools (see `status`).
+         */
+        post: operations["create_server_api_mcp_servers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mcp/servers/{server_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Server */
+        delete: operations["delete_server_api_mcp_servers__server_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Server */
+        patch: operations["update_server_api_mcp_servers__server_id__patch"];
+        trace?: never;
+    };
+    "/api/mcp/servers/{server_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Server
+         * @description Re-reads the server's tools in the background; `status` shows the outcome.
+         */
+        post: operations["refresh_server_api_mcp_servers__server_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mcp/servers/{server_id}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tools */
+        get: operations["list_tools_api_mcp_servers__server_id__tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mcp/tools/{tool_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Tool */
+        patch: operations["update_tool_api_mcp_tools__tool_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2684,6 +2777,154 @@ export interface components {
         MarkReadIn: {
             /** Ids */
             ids?: string[] | null;
+        };
+        /** McpServerIn */
+        McpServerIn: {
+            /** Name */
+            name: string;
+            /**
+             * Transport
+             * @enum {string}
+             */
+            transport: "http" | "sse" | "stdio";
+            /** Url */
+            url?: string | null;
+            /** Command */
+            command?: string | null;
+            /** Args */
+            args?: string[];
+            /** Headers */
+            headers?: {
+                [key: string]: string;
+            } | null;
+            /** Env */
+            env?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** McpServerOut */
+        McpServerOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Transport
+             * @enum {string}
+             */
+            transport: "http" | "sse" | "stdio";
+            /** Url */
+            url: string | null;
+            /** Command */
+            command: string | null;
+            /** Args */
+            args: string[];
+            /** Header Names */
+            header_names: string[];
+            /** Env Names */
+            env_names: string[];
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "checking" | "ok" | "error";
+            /** Last Error */
+            last_error: string | null;
+            /** Last Connected At */
+            last_connected_at: string | null;
+            /**
+             * Tool Count
+             * @default 0
+             */
+            tool_count: number;
+            /**
+             * Review Count
+             * @default 0
+             */
+            review_count: number;
+        };
+        /** McpServerPatch */
+        McpServerPatch: {
+            /** Name */
+            name?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Command */
+            command?: string | null;
+            /** Args */
+            args?: string[] | null;
+            /** Headers */
+            headers?: {
+                [key: string]: string;
+            } | null;
+            /** Env */
+            env?: {
+                [key: string]: string;
+            } | null;
+            /** Enabled */
+            enabled?: boolean | null;
+        };
+        /** McpToolOut */
+        McpToolOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Server Id
+             * Format: uuid
+             */
+            server_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Input Schema */
+            input_schema: {
+                [key: string]: unknown;
+            };
+            /** Enabled */
+            enabled: boolean;
+            /** Permission */
+            permission: ("ask" | "allow" | "deny") | null;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "safe" | "moderate" | "dangerous";
+            /**
+             * Risk From Server
+             * @enum {string}
+             */
+            risk_from_server: "safe" | "moderate" | "dangerous";
+            /** Risk Override */
+            risk_override: ("safe" | "moderate" | "dangerous") | null;
+            /** Needs Review */
+            needs_review: boolean;
+        };
+        /** McpToolPatch */
+        McpToolPatch: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Permission */
+            permission?: ("ask" | "allow" | "deny") | null;
+            /** Risk Override */
+            risk_override?: ("safe" | "moderate" | "dangerous") | null;
+            /** Reviewed */
+            reviewed?: true | null;
         };
         /** MeOut */
         MeOut: {
@@ -8878,6 +9119,243 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunStarted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_servers_api_mcp_servers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_server_api_mcp_servers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpServerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_server_api_mcp_servers__server_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_server_api_mcp_servers__server_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpServerPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_server_api_mcp_servers__server_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tools_api_mcp_servers__server_id__tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpToolOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_tool_api_mcp_tools__tool_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpToolPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpToolOut"];
                 };
             };
             /** @description Validation Error */

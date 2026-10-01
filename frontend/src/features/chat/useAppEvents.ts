@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { toast } from '@/components/ui/toast'
 import { approvalsKey } from '@/features/agents/api'
 import { automationsKey } from '@/features/automations/api'
+import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
 import { showDesktopNotification } from '@/features/notifications/desktop'
 import { conversationKey, conversationsKey, messagesKey } from './api'
@@ -50,6 +51,8 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: ['projects'] })
     })
     source.addEventListener('calendar.changed', () => void qc.invalidateQueries({ queryKey: ['calendar'] }))
+    // An MCP server was checked, or its tools changed.
+    source.addEventListener('mcp.changed', () => void qc.invalidateQueries({ queryKey: mcpKey }))
     source.addEventListener('automations.changed', () => void qc.invalidateQueries({ queryKey: automationsKey }))
     // A new notification (a reminder, an automation's result, ...): show it as a
     // desktop notification when the tab is in the background, else as a notice here.

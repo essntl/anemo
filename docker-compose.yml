@@ -130,7 +130,8 @@ services:
       # Each sandbox writes a fresh access token here on start; only the worker reads it.
       - sandbox-token:/run/sandbox-token/sandbox:ro
       - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
-    networks: [core, sandbox_int, sandbox_net_int]
+      - mcp-host-token:/run/mcp-host-token:ro
+    networks: [core, sandbox_int, sandbox_net_int, mcp_int]
     stop_grace_period: 30s
     depends_on:
       migrate:
@@ -169,6 +170,38 @@ services:
       - sandbox-net-token:/run/execd
     networks: [sandbox_net_int, egress]
 
+  # Optional: runs local ("stdio") MCP servers, i.e. programs like `npx some-server`.
+  # Start it with `docker compose --profile mcp up -d`. Remote MCP servers (reached
+  # by URL) do not need it. It has internet access, but no route to the database,
+  # no workspace and none of the app's secrets.
+  mcp-host:
+    profiles: ["mcp"]
+    image: ai-workspace-mcp-host:${APP_VERSION:-latest}
+    build:
+      context: ./mcp-host
+      args:
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 1024
+    mem_limit: ${MCP_HOST_MEMORY:-2g}
+    cpus: ${MCP_HOST_CPUS:-2}
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      # Downloaded servers (npx, uvx) are cached here.
+      - mcp-host-home:/home/mcp
+      - mcp-host-token:/run/hostd
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [mcp_int, egress]
+
 volumes:
   pgdata:
   appdata:
@@ -177,6 +210,8 @@ volumes:
   sandbox-token:
   sandbox-net-token:
   sandbox-ssh:
+  mcp-host-home:
+  mcp-host-token:
 
 networks:
   core:
@@ -184,5 +219,7 @@ networks:
   sandbox_int:
     internal: true
   sandbox_net_int:
+    internal: true
+  mcp_int:
     internal: true
   egress:

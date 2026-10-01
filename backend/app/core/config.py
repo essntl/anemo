@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     sandbox_net_token_file: str = "/run/sandbox-token/sandbox-net/token"  # noqa: S105
     sandbox_ssh_dir: str = "/run/sandbox-ssh"  # app: the agents' SSH key (public half shown)
 
+    # Local MCP servers run in the optional mcp-host container (worker only).
+    mcp_host_url: str = "http://mcp-host:7080"
+    mcp_host_token_file: str = "/run/mcp-host-token/token"  # noqa: S105 (a path)
+
     @model_validator(mode="after")
     def _check_secret_key(self) -> "Settings":
         if self.env != "test" and len(self.app_secret_key.get_secret_value()) < 32:
