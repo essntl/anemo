@@ -38,7 +38,12 @@ async def enqueue(
     max_attempts: int = 3,
     dedupe_key: str | None = None,
 ) -> Job:
-    """Adds the job to the current transaction. Workers are notified on commit."""
+    """Adds the job to the current transaction. Workers are notified on commit.
+    With a `dedupe_key` that was used before, nothing is added and that job is returned."""
+    if dedupe_key is not None:
+        existing = await db.scalar(select(Job).where(Job.dedupe_key == dedupe_key))
+        if existing is not None:
+            return existing
     job = Job(
         type=job_type,
         payload=payload,

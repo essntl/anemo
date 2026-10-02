@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 
 from app.core.db import get_sessionmaker
 from app.jobs import queue
@@ -56,11 +56,11 @@ async def test_expired_lease_is_reaped_and_heartbeat_detects_loss(db_clean):
 
 
 async def test_dedupe_key_prevents_duplicates(db_clean):
-    import pytest
-    from sqlalchemy.exc import IntegrityError
-
     async with get_sessionmaker()() as db:
-        await queue.enqueue(db, "t", {}, dedupe_key="once")
+        first = await queue.enqueue(db, "t", {}, dedupe_key="once")
         await db.commit()
-        with pytest.raises(IntegrityError):
-            await queue.enqueue(db, "t", {}, dedupe_key="once")
+        # Asking again is not an error: the job that already exists is returned.
+        again = await queue.enqueue(db, "t", {"other": 1}, dedupe_key="once")
+        await db.commit()
+        assert again.id == first.id
+        assert await db.scalar(select(func.count()).select_from(queue.Job)) == 1
