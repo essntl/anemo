@@ -16,6 +16,7 @@ import {
   useUpdateProvider,
 } from '../api'
 import { CapabilityChips } from './CapabilityChips'
+import { CapabilityDialog } from './CapabilityDialog'
 import { DiscoverDialog } from './DiscoverDialog'
 import { ProviderDialog } from './ProviderDialog'
 import { confirmDialog } from '@/components/ui/dialogs'
@@ -33,6 +34,7 @@ function ModelRow({ model }: { model: Model }) {
   const update = useUpdateModel()
   const remove = useDeleteModel()
   const test = useTestModel()
+  const [editingCapabilities, setEditingCapabilities] = useState(false)
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3 md:px-5">
       <Switch
@@ -48,7 +50,13 @@ function ModelRow({ model }: { model: Model }) {
           {model.pricing ? ` · $${model.pricing.input_per_mtok?.toFixed(2)}/$${model.pricing.output_per_mtok?.toFixed(2)} per M` : ''}
         </div>
       </div>
-      <CapabilityChips capabilities={model.capabilities} />
+      {/* What the model can do is a starting guess for most providers: press to correct it. */}
+      <button type="button" aria-label={`Change what ${model.display_name} can do`} title="Change what this model can do"
+        onClick={() => setEditingCapabilities(true)}
+        className="-m-1 rounded-control p-1 text-left hover:bg-surface-hover">
+        <CapabilityChips capabilities={model.capabilities} />
+      </button>
+      {editingCapabilities && <CapabilityDialog model={model} onOpenChange={setEditingCapabilities} />}
       <div className="flex items-center gap-1">
         {test.data && <TestOutcome ok={test.data.ok} message={test.data.ok ? `${test.data.latency_ms} ms` : test.data.message} />}
         {test.isError && <TestOutcome ok={false} message={errorMessage(test.error)} />}

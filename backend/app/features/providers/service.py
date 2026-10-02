@@ -266,6 +266,14 @@ async def update_model(db: AsyncSession, model: Model, data: ModelPatch) -> Mode
     return model
 
 
+async def set_capability(db: AsyncSession, model_id: uuid.UUID, name: str, value: bool) -> None:
+    """Records something learned about a model while using it (e.g. it refused tools)."""
+    model = await db.get(Model, model_id)
+    if model is not None and model.capabilities.get(name) != value:
+        model.capabilities = {**model.capabilities, name: value}
+        await db.flush()
+
+
 async def test_model(db: AsyncSession, model: Model) -> tuple[TestResult, Usage | None]:
     """Runs a tiny streamed completion. Returns the result and the Usage (if any)."""
     adapter = make_adapter(await build_config(db, model.provider))

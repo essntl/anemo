@@ -5,6 +5,7 @@ types. Each adapter translates them to and from one vendor API. Adding a new
 provider means writing one adapter; nothing else changes.
 """
 
+import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, Protocol
@@ -191,6 +192,8 @@ class ProviderError(Exception):
         super().__init__(message)
         self.retryable = retryable
         self.status = status
+        # Set by the runtime: the model the failed request was sent to.
+        self.model_id: uuid.UUID | None = None
 
 
 @dataclass

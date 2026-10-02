@@ -132,6 +132,7 @@ async def stream_with_fallback(
                 await _stream_once(run_id, model, build(model), result)
                 return result
             except ProviderError as exc:
+                exc.model_id = model.model_id
                 last_error = exc
                 produced = bool(result.text or result.reasoning_text)
                 log.warning(

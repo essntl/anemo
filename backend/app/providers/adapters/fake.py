@@ -6,6 +6,8 @@ Enabled only when ENABLE_FAKE_PROVIDER=true (or ENV=test). Behaviour by model:
   reasoning  streams a short reasoning section, then echoes
   slow       like echo but slower (for testing cancel / reconnect)
   agent      a tiny tool-using agent: plans, lists the workspace, then summarizes
+  no-tools   refuses any request that carries tools (like a server without tool
+             calling), otherwise echoes
   scripted   replays FakeAdapter.scripts[<first user text>] (tests only). A script is a
              list of events, or a list of such lists: one per model call in a run
              (selected by how many assistant turns the request already contains).
@@ -91,6 +93,10 @@ class FakeAdapter:
                     raise event
                 yield event
             return
+        if req.model == "no-tools" and req.tools:
+            raise ProviderError(
+                "400: fake/no-tools does not support tools", retryable=False, status=400
+            )
         if req.model == "agent":
             async for event in self._agent_demo(req):
                 yield event

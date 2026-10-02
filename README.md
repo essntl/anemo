@@ -367,6 +367,12 @@ Open `http://<server>:8080`, log in, then go to **Settings → Providers & Model
 add a provider (OpenAI, Anthropic, OpenRouter or any OpenAI-compatible server such
 as Ollama), use **Add models** to pick models, and choose a default chat model.
 
+Each model shows what it can do (tools, vision, reasoning, …). OpenRouter reports
+this per model. Other providers do not, so Anemo assumes a chat model can use tools
+(which Agent mode needs) and guesses the rest from its name. If a provider then
+refuses tools, Anemo switches that off for the model by itself. Press a model's
+tags to correct any of them by hand.
+
 Provider changes are security-sensitive: if you logged in more than 15 minutes ago
 you will be asked to confirm your password.
 

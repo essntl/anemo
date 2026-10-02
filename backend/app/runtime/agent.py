@@ -44,6 +44,7 @@ from app.features.memory import extraction
 from app.features.memory import service as memory
 from app.features.profiles import service as profiles
 from app.features.profiles.models import AgentProfile
+from app.features.providers import service as providers_service
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Approval, FileChange, Run, ToolCall
 from app.features.settings import service as settings_service
@@ -66,6 +67,7 @@ from app.providers.base import (
     ToolUseBlock,
     Usage,
 )
+from app.providers.catalog import rejects_tools
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
 from app.runtime import citations, compaction, outputs, subagents
 from app.runtime.chat import (
@@ -258,6 +260,8 @@ class AgentRun:
         self.policy = policy
         self.ceiling = ceiling
         self.tools = {t.name: t for t in tools}
+        # Set when the provider refused tools and the run (a chat) goes on without them.
+        self.tools_off = False
         self.system = system or build_system_prompt(None, [], plan_review)
         self.plan_review = plan_review
         self.ctx = ToolContext(
@@ -396,6 +400,16 @@ class AgentRun:
                     self.run_id, self.candidates, self._builder(rendered), self.progress
                 )
             except ProviderError as exc:
+                if not self.tools_off and rejects_tools(str(exc), exc.status):
+                    if await self._tools_rejected(exc):
+                        continue  # a chat: answer without tools
+                    raise ProviderError(
+                        f"{exc}. This model did not accept tools, which Agent mode needs. "
+                        "It is now marked as not supporting tools; if that is wrong, turn it "
+                        "back on under Settings > Providers & Models.",
+                        retryable=False,
+                        status=exc.status,
+                    ) from exc
                 # The context was too long after all: compact harder and retry once.
                 if forced_compaction or not compaction.is_context_error(exc):
                     raise
@@ -419,8 +433,25 @@ class AgentRun:
             if not result.tool_calls:
                 return "completed"
 
+    async def _tools_rejected(self, exc: ProviderError) -> bool:
+        """The provider refused the request because of its tools. Remember that for the
+        model, so the next request is right from the start. Returns whether this run can
+        carry on without tools: a chat can (it only loses the memory tools), an agent cannot."""
+        async with get_sessionmaker()() as db:
+            run = await _get_run(db, self.run_id)
+            if exc.model_id is not None:
+                await providers_service.set_capability(db, exc.model_id, "tools", False)
+            is_chat = run.kind == "chat"
+            await db.commit()
+        log.info(
+            "model refused tools",
+            extra={"ctx": {"run_id": str(self.run_id), "model_id": str(exc.model_id)}},
+        )
+        self.tools_off = is_chat
+        return is_chat
+
     def _builder(self, rendered: dict[bool, list[Message]]) -> RequestBuilder:
-        specs = [t.spec() for t in self.tools.values()]
+        specs = [] if self.tools_off else [t.spec() for t in self.tools.values()]
 
         def build(model: ResolvedModel) -> ChatRequest:
             history = rendered[bool(model.capabilities.get("vision"))]
