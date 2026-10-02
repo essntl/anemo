@@ -1,17 +1,18 @@
 /**
  * Tasks: a list grouped by when things are due, or a board by status.
- * View and filters are kept in the URL (?view=board&project=…&tag=…).
+ * View and tag filter are kept in the URL (?view=board&tag=…); the project filter is
+ * the project chosen in the sidebar (changing it here changes it everywhere).
  */
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { CheckSquare, ChevronRight, FolderKanban, KanbanSquare, List, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
+import { useCurrentProject, useProjectStore } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/cn'
 import { type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
-import { ProjectsDialog } from './components/ProjectsDialog'
 import { TaskBoard } from './components/TaskBoard'
 import { TaskDialog } from './components/TaskDialog'
 import { TaskRow } from './components/TaskRow'
@@ -33,7 +34,8 @@ type Editing = { task: Task | null; status?: TaskStatus } | null
 export function TasksPage() {
   const [params, setParams] = useSearchParams()
   const view = params.get('view') === 'board' ? 'board' : 'list'
-  const projectFilter = params.get('project') ?? ''
+  const projectFilter = useCurrentProject()?.id ?? ''
+  const setProjectId = useProjectStore((s) => s.setProjectId)
   const tagFilter = params.get('tag') ?? ''
   const tasks = useTasks()
   const projects = useProjects()
@@ -42,7 +44,6 @@ export function TasksPage() {
   const [search, setSearch] = useState('')
   const [showDone, setShowDone] = useState(false)
   const [chosen, setEditing] = useState<Editing>(null)
-  const [projectsOpen, setProjectsOpen] = useState(false)
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params)
@@ -101,15 +102,15 @@ export function TasksPage() {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" aria-label="Search tasks"
           className="h-9 min-w-32 flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
-        <Select className="h-9 w-full sm:w-44" aria-label="Project" value={projectFilter} onValueChange={(v) => setParam('project', v)}
+        <Select className="h-9 w-full sm:w-44" aria-label="Project" value={projectFilter} onValueChange={(v) => setProjectId(v || null)}
           options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
         {tags.length > 0 && (
           <Select className="h-9 w-full sm:w-36" aria-label="Tag" value={tagFilter} onValueChange={(v) => setParam('tag', v)}
             options={[{ value: '', label: 'All tags' }, ...tags.map((t) => ({ value: t, label: `#${t}` }))]} />
         )}
-        <Button size="sm" variant="ghost" icon={<FolderKanban className="h-3.5 w-3.5" />} onClick={() => setProjectsOpen(true)}>
-          Projects
-        </Button>
+        <Link to="/projects" className="flex h-8 items-center gap-1.5 rounded-control px-2.5 text-[12.5px] font-medium text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10">
+          <FolderKanban className="h-3.5 w-3.5" /> Projects
+        </Link>
       </div>
 
       {(tasks.error ?? create.error) && <p className="mb-2 text-[13px] text-error">{errorMessage(tasks.error ?? create.error)}</p>}
@@ -168,7 +169,6 @@ export function TasksPage() {
             defaults={{ status: shown.status, project_id: projectFilter || null }} />
         )}
       </Lingering>
-      <Lingering value={projectsOpen}>{() => <ProjectsDialog onClose={() => setProjectsOpen(false)} />}</Lingering>
     </div>
   )
 }

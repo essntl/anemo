@@ -56,6 +56,8 @@ class ToolContext:
     has_browser: bool = False  # the run was offered the browser tools
     # The browser session the run uses: its conversation's (shared with the user).
     browser_session: uuid.UUID | None = None
+    # The project of the run's chat: new tasks and events are filed under it.
+    project_id: uuid.UUID | None = None
 
 
 class ToolResult(BaseModel):

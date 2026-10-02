@@ -494,6 +494,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tags */
+        get: operations["list_tags_api_conversations_tags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk
+         * @description Archive, favorite, tag, move or delete several chats at once.
+         */
+        post: operations["bulk_api_conversations_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}": {
         parameters: {
             query?: never;
@@ -561,6 +598,86 @@ export interface paths {
         put?: never;
         /** Regenerate */
         post: operations["regenerate_api_conversations__conversation_id__regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/edit-last": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Edit Last
+         * @description Change the last message you sent and have it answered again.
+         */
+        post: operations["edit_last_api_conversations__conversation_id__edit_last_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Branch
+         * @description Start a new chat from a copy of this one up to a message.
+         */
+        post: operations["branch_api_conversations__conversation_id__branch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export
+         * @description The chat as a Markdown file to download.
+         */
+        get: operations["export_api_conversations__conversation_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/save-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Document
+         * @description Save the chat as a document in the workspace (in its project's folder, if any).
+         */
+        post: operations["save_document_api_conversations__conversation_id__save_document_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1643,7 +1760,8 @@ export interface paths {
         post?: never;
         /**
          * Delete Project
-         * @description Deletes the project; its tasks stay, without a project.
+         * @description Deletes the project. Its chats, tasks and events stay, without a project, and
+         *     its folders with files and documents are left in place.
          */
         delete: operations["delete_project_api_projects__project_id__delete"];
         options?: never;
@@ -2421,6 +2539,14 @@ export interface components {
             /** File */
             file: string;
         };
+        /** BranchIn */
+        BranchIn: {
+            /**
+             * Upto Seq
+             * @description Copy the messages up to and including this one
+             */
+            upto_seq: number;
+        };
         /** BrowserInput */
         BrowserInput: {
             /**
@@ -2511,6 +2637,28 @@ export interface components {
             /** Workspace Scoped */
             workspace_scoped: boolean;
         };
+        /**
+         * ChatBulkIn
+         * @description One change applied to several chats at once.
+         */
+        ChatBulkIn: {
+            /** Ids */
+            ids: string[];
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "archive" | "unarchive" | "favorite" | "unfavorite" | "set_project" | "add_tag" | "remove_tag" | "delete";
+            /** Project Id */
+            project_id?: string | null;
+            /** Tag */
+            tag?: string | null;
+        };
+        /** ChatBulkOut */
+        ChatBulkOut: {
+            /** Changed */
+            changed: number;
+        };
         /** Check */
         Check: {
             /** Name */
@@ -2542,6 +2690,8 @@ export interface components {
             title?: string | null;
             /** Model Id */
             model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
         };
         /** ConversationOut */
         ConversationOut: {
@@ -2556,6 +2706,15 @@ export interface components {
             pinned: boolean;
             /** Archived */
             archived: boolean;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
+            /** Branched From Id */
+            branched_from_id?: string | null;
             /** Model Id */
             model_id: string | null;
             /**
@@ -2594,6 +2753,10 @@ export interface components {
             model_id?: string | null;
             /** Profile Id */
             profile_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Tags */
+            tags?: string[] | null;
         };
         /** CreateIn */
         CreateIn: {
@@ -2749,6 +2912,16 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * EditLastIn
+         * @description Replace the text of the last message you sent and have it answered again.
+         */
+        EditLastIn: {
+            /** Text */
+            text: string;
+            /** Model Id */
+            model_id?: string | null;
+        };
         /** EntryOut */
         EntryOut: {
             /** Name */
@@ -2815,6 +2988,8 @@ export interface components {
             color?: string | null;
             /** Task Id */
             task_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
         };
         /**
          * EventOut
@@ -2858,6 +3033,8 @@ export interface components {
             color: string | null;
             /** Task Id */
             task_id: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** Created By */
             created_by: string;
         };
@@ -3310,6 +3487,11 @@ export interface components {
              * @default []
              */
             attachments: components["schemas"]["AttachmentSummary"][];
+            /**
+             * References
+             * @default []
+             */
+            references: components["schemas"]["ReferenceSummary"][];
             /** Mode */
             mode?: string | null;
         };
@@ -3529,6 +3711,8 @@ export interface components {
             color: string | null;
             /** Task Id */
             task_id: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** Created By */
             created_by: string;
             /**
@@ -3745,6 +3929,15 @@ export interface components {
              * @default false
              */
             archived: boolean;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /** Default Model Id */
+            default_model_id?: string | null;
+            /** Default Profile Id */
+            default_profile_id?: string | null;
         };
         /** ProjectOut */
         ProjectOut: {
@@ -3761,15 +3954,45 @@ export interface components {
              */
             archived: boolean;
             /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /** Default Model Id */
+            default_model_id?: string | null;
+            /** Default Profile Id */
+            default_profile_id?: string | null;
+            /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Slug */
+            slug: string;
+            /** Files Path */
+            files_path: string;
+            /** Documents Path */
+            documents_path: string;
             /**
              * Open Tasks
              * @default 0
              */
             open_tasks: number;
+            /**
+             * Chats
+             * @default 0
+             */
+            chats: number;
+            /**
+             * Events
+             * @default 0
+             */
+            events: number;
+            /**
+             * Documents
+             * @default 0
+             */
+            documents: number;
         };
         /** ProviderIn */
         ProviderIn: {
@@ -3860,6 +4083,19 @@ export interface components {
             default_base_url: string | null;
             /** Needs Key */
             needs_key: boolean;
+        };
+        /**
+         * ReferenceSummary
+         * @description Another chat that was attached to a message as context.
+         */
+        ReferenceSummary: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Title */
+            title: string;
         };
         /** ReindexOut */
         ReindexOut: {
@@ -4211,6 +4447,16 @@ export interface components {
             /** Hash */
             hash: string;
         };
+        /** SavedDocument */
+        SavedDocument: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Path */
+            path: string;
+        };
         /** Schedule */
         Schedule: {
             /**
@@ -4460,6 +4706,13 @@ export interface components {
             /** Checks */
             checks: components["schemas"]["Check"][];
         };
+        /** TagCount */
+        TagCount: {
+            /** Tag */
+            tag: string;
+            /** Count */
+            count: number;
+        };
         /** TaskIn */
         TaskIn: {
             /** Title */
@@ -4679,6 +4932,8 @@ export interface components {
             model_id?: string | null;
             /** Attachment Ids */
             attachment_ids?: string[];
+            /** Reference Ids */
+            reference_ids?: string[];
             /**
              * Mode
              * @default chat
@@ -5913,6 +6168,17 @@ export interface operations {
                 q?: string | null;
                 archived?: boolean;
                 limit?: number;
+                offset?: number;
+                project_id?: string | null;
+                /** @description Only chats that are in no project */
+                no_project?: boolean;
+                tag?: string | null;
+                favorite?: boolean | null;
+                sort?: "recent" | "created" | "oldest" | "title";
+                /** @description Last message at or after this */
+                active_after?: string | null;
+                /** @description Last message before this */
+                active_before?: string | null;
             };
             header?: never;
             path?: never;
@@ -5964,6 +6230,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tags_api_conversations_tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagCount"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_api_conversations_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatBulkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatBulkOut"];
                 };
             };
             /** @description Validation Error */
@@ -6170,6 +6502,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_last_api_conversations__conversation_id__edit_last_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditLastIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    branch_api_conversations__conversation_id__branch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BranchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_api_conversations__conversation_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_document_api_conversations__conversation_id__save_document_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedDocument"];
                 };
             };
             /** @description Validation Error */
@@ -8750,6 +9222,7 @@ export interface operations {
                 start: string;
                 /** @description Range end (exclusive), with UTC offset */
                 end: string;
+                project_id?: string | null;
             };
             header?: never;
             path?: never;

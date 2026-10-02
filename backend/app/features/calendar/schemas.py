@@ -26,6 +26,7 @@ class EventIn(BaseModel):
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
     color: str | None = Field(None, pattern=COLOR)
     task_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
 
     @field_validator("tz")
     @classmethod
@@ -74,6 +75,7 @@ class EventOut(BaseModel):
     remind_minutes: int | None
     color: str | None
     task_id: uuid.UUID | None
+    project_id: uuid.UUID | None = None
     created_by: str
 
 

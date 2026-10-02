@@ -29,7 +29,10 @@ class CalendarEvent(Base, IdMixin, TimestampMixin):
     """
 
     __tablename__ = "calendar_events"
-    __table_args__ = (Index("ix_calendar_events_range", "start_at", "end_at"),)
+    __table_args__ = (
+        Index("ix_calendar_events_range", "start_at", "end_at"),
+        Index("ix_calendar_events_project", "project_id"),
+    )
 
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str] = mapped_column(Text, default="")
@@ -46,6 +49,9 @@ class CalendarEvent(Base, IdMixin, TimestampMixin):
     color: Mapped[str | None] = mapped_column(String(7))
     task_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL")
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL")
     )
     created_by: Mapped[str] = mapped_column(String(10), default="user")  # user | agent
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))

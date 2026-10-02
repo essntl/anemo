@@ -12,14 +12,18 @@ export const calendarKey = ['calendar'] as const
 export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
 /** Event occurrences in a range (ISO instants); repeating events come expanded. */
-export function useOccurrences(range: { start: string; end: string } | null) {
+export function useOccurrences(range: { start: string; end: string } | null, projectId: string | null = null) {
   return useQuery({
-    queryKey: [...calendarKey, 'range', range?.start, range?.end],
+    queryKey: [...calendarKey, 'range', range?.start, range?.end, projectId],
     enabled: range !== null,
     // Keep showing the previous range while the next one loads (no flicker when paging).
     placeholderData: (previous) => previous,
     queryFn: async () =>
-      unwrap(await api.GET('/api/calendar/events', { params: { query: { start: range!.start, end: range!.end } } })),
+      unwrap(
+        await api.GET('/api/calendar/events', {
+          params: { query: { start: range!.start, end: range!.end, ...(projectId ? { project_id: projectId } : {}) } },
+        }),
+      ),
   })
 }
 

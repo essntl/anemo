@@ -44,6 +44,7 @@ from app.features.memory import extraction
 from app.features.memory import service as memory
 from app.features.profiles import service as profiles
 from app.features.profiles.models import AgentProfile
+from app.features.projects import service as projects
 from app.features.providers import service as providers_service
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Approval, FileChange, Run, ToolCall
@@ -246,6 +247,7 @@ class AgentRun:
         has_browser: bool = False,
         browser_session: uuid.UUID | None = None,
         ancestors: list[Policy] | None = None,
+        project_id: uuid.UUID | None = None,
     ) -> None:
         # For a sub-agent: the policies of the agents above it (it may do no more).
         self.ancestors = ancestors or []
@@ -279,6 +281,7 @@ class AgentRun:
             automation_id=automation_id,
             has_browser=has_browser,
             browser_session=browser_session,
+            project_id=project_id,
         )
         self.current_call: uuid.UUID | None = None
         # Active time is counted per worker segment and added up in run.totals, so
@@ -1137,6 +1140,9 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     system += section
     if memory_settings.enabled:
         system += memory.MEMORY_TOOLS_HINT
+    # The chat's project: where its files are, and the user's instructions for it.
+    project = await projects.for_conversation(db, run.conversation_id)
+    system += projects.prompt_section(project)
     has_browser = (
         not chat and browser_client.available() and level_for(settings, "browser.use") != "deny"
     )
@@ -1160,6 +1166,7 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
         "plan_review": settings.plan_review,
         "skills": skills,
         "profile": {"id": str(profile.id), "name": profile.name} if profile else None,
+        "project": {"id": str(project.id), "name": project.name} if project else None,
         "system": system,
         "memory": memory_settings.enabled,
         "mcp_tools": mcp_refs,
@@ -1292,6 +1299,8 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             ancestors=ancestors,
         )
         uses_browser = bool(run.policy.get("browser"))
+        in_project = run.policy.get("project")
+        project_id = uuid.UUID(in_project["id"]) if in_project else None
         # The browser belongs to the conversation, so it survives between turns.
         browser_session = run.conversation_id or run.id
         if run.kind == "agent":
@@ -1321,6 +1330,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         has_browser=uses_browser,
         browser_session=browser_session,
         ancestors=ancestors,
+        project_id=project_id,
     )
     task = asyncio.create_task(agent.drive())
     flag = CancelFlag()

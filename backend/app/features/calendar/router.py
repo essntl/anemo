@@ -27,8 +27,9 @@ async def list_occurrences(
     db: Db,
     start: datetime = Query(description="Range start (inclusive), with UTC offset"),
     end: datetime = Query(description="Range end (exclusive), with UTC offset"),
+    project_id: uuid.UUID | None = None,
 ) -> list[OccurrenceOut]:
-    found = await service.occurrences(db, _aware(start, "start"), _aware(end, "end"))
+    found = await service.occurrences(db, _aware(start, "start"), _aware(end, "end"), project_id)
     return [o.out() for o in found]
 
 

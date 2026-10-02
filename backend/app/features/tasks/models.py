@@ -20,13 +20,25 @@ from app.db.base import Base, IdMixin, TimestampMixin
 
 
 class Project(Base, IdMixin, TimestampMixin):
-    """A group of tasks."""
+    """A piece of work with its own chats, tasks, events, documents and files
+    (see features/projects/service.py)."""
 
     __tablename__ = "projects"
 
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    # Folder name under projects/ and documents/. Set once; renaming keeps it.
+    slug: Mapped[str] = mapped_column(String(80), unique=True)
     color: Mapped[str] = mapped_column(String(7), default="#6b7280")  # #rrggbb
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Extra instructions for the assistant in every chat of this project.
+    instructions: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # What a new chat in this project starts with.
+    default_model_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
+    )
+    default_profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_profiles.id", ondelete="SET NULL")
+    )
 
 
 class Task(Base, IdMixin, TimestampMixin):

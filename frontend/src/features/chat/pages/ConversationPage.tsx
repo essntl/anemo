@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router'
-import { AppWindow, ExternalLink, Pin, PinOff, X } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { AppWindow, ExternalLink, GitBranch, Star, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { MenuButton, NewChatButton } from '@/app/mobileNav'
+import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { timelineKey } from '@/features/agents/api'
 import { useShellOutput } from '@/features/agents/shellOutput'
@@ -16,18 +17,24 @@ import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
+import { useProjects } from '@/features/tasks/api'
+import { cn } from '@/lib/cn'
 import {
   type ChatMessage,
+  type Conversation,
   conversationKey,
   conversationsKey,
   messagesKey,
+  useBranch,
   useCancelRun,
   useConversation,
+  useEditLast,
   useMessages,
   useRegenerate,
   useSendTurn,
   useUpdateConversation,
 } from '../api'
+import { useChatActions } from '../chatActions'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { ModelPicker } from '../components/ModelPicker'
@@ -61,6 +68,11 @@ function popOutBrowser(conversationId: string) {
   window.open(`/browser/${conversationId}`, `anemo-browser-${conversationId}`, 'popup,width=1320,height=940')
 }
 
+/** The chat's menu in its header: the same actions as in the sidebar and the overview. */
+function ChatMenu({ conversation }: { conversation: Conversation }) {
+  return <ActionMenu actions={useChatActions(conversation)} label="Chat actions" />
+}
+
 export function ConversationPage() {
   const { conversationId = '' } = useParams()
   const navigate = useNavigate()
@@ -74,6 +86,9 @@ export function ConversationPage() {
   const send = useSendTurn()
   const cancel = useCancelRun()
   const regenerate = useRegenerate()
+  const editLast = useEditLast()
+  const branch = useBranch()
+  const projects = useProjects()
   const update = useUpdateConversation()
   const [modelOverride, setModelOverride] = useState<string | null>(null)
   const [modeOverride, setModeOverride] = useState<Mode | null>(null)
@@ -127,7 +142,11 @@ export function ConversationPage() {
 
   const list = messages.data ?? []
   const lastAssistant = [...list].reverse().find((m) => m.role === 'assistant')
-  const actionError = send.error ?? regenerate.error ?? cancel.error ?? resume.error
+  const lastUser = [...list].reverse().find((m) => m.role === 'user')
+  // The last message can be edited when it is the one the last answer replied to.
+  const canEditLast = !activeRunId && lastUser && lastAssistant && lastAssistant.seq === lastUser.seq + 1
+  const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
+  const actionError = send.error ?? regenerate.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
 
@@ -136,7 +155,14 @@ export function ConversationPage() {
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:h-14 md:px-6">
         <MenuButton />
-        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{conversation.data?.title ?? ' '}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+          {conversation.data?.title ?? ' '}
+          {project && (
+            <span className="ml-2 hidden items-center gap-1 align-middle text-[12px] font-normal text-muted sm:inline-flex">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} /> {project.name}
+            </span>
+          )}
+        </h1>
         {browser.data?.available && (
           // The agent's browser: beside the chat when there is room, else on its own page.
           <Button size="icon" variant={browserOpen && wide ? 'secondary' : 'ghost'} aria-label="Browser" aria-pressed={browserOpen && wide}
@@ -148,19 +174,34 @@ export function ConversationPage() {
           <Button
             size="icon"
             variant="ghost"
-            aria-label={conversation.data.pinned ? 'Unpin' : 'Pin'}
+            aria-label={conversation.data.pinned ? 'Remove from favorites' : 'Add to favorites'}
+            aria-pressed={conversation.data.pinned}
             onClick={() => update.mutate({ id: conversationId, body: { pinned: !conversation.data?.pinned } })}
           >
-            {conversation.data.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+            <Star className={cn('h-4 w-4', conversation.data.pinned && 'fill-current text-warning')} />
           </Button>
         )}
+        {conversation.data && <ChatMenu conversation={conversation.data} />}
         <NewChatButton />
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-5 md:px-6 md:py-8">
+          {conversation.data?.branched_from_id && (
+            <Link to={`/c/${conversation.data.branched_from_id}`}
+              className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-[12px] text-muted hover:text-text">
+              <GitBranch className="h-3.5 w-3.5" /> Branched from another chat
+            </Link>
+          )}
           {list.map((m) => {
-            if (m.role === 'user') return <UserBubble key={m.id} text={m.text} attachments={m.attachments} />
+            if (m.role === 'user') {
+              return (
+                <UserBubble key={m.id} text={m.text} attachments={m.attachments} references={m.references}
+                  onEdit={canEditLast && m.id === lastUser?.id
+                    ? (text) => editLast.mutate({ conversationId, text, modelId: modelOverride })
+                    : undefined} />
+              )
+            }
             const isLive = m.run_id === activeRunId && m.status === 'streaming'
             return isLive ? (
               <AssistantMessage
@@ -187,6 +228,9 @@ export function ConversationPage() {
                     ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
                     : undefined
                 }
+                onBranch={() =>
+                  branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
+                }
               />
             )
           })}
@@ -198,10 +242,11 @@ export function ConversationPage() {
         <Composer
           running={Boolean(activeRunId) && !paused}
           placeholder={paused ? 'Paused. Send a message to resume with it…' : undefined}
-          onSend={(text, attachmentIds) =>
+          conversationId={conversationId}
+          onSend={(text, attachmentIds, referenceIds) =>
             paused && activeRunId
               ? resume.mutate({ runId: activeRunId, message: text })
-              : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, mode, profileId })
+              : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId })
           }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           toolbar={

@@ -4,6 +4,7 @@ import { Outlet, useLocation, useMatches } from 'react-router'
 import { DialogHost } from '@/components/ui/DialogHost'
 import { ToastHost } from '@/components/ui/ToastHost'
 import { ReauthDialog } from '@/features/auth/ReauthDialog'
+import { MoveChatsDialog } from '@/features/chat/components/MoveChatsDialog'
 import { useAppEvents } from '@/features/chat/useAppEvents'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
@@ -55,6 +56,7 @@ export function AppLayout() {
       </div>
       <ReauthDialog />
       <DialogHost />
+      <MoveChatsDialog />
       <ToastHost />
       <CommandPalette />
     </div>

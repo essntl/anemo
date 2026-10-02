@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Sparkles } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
+import { useCurrentProject } from '@/app/projectStore'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useSetupStatus } from '@/features/providers/api'
@@ -23,19 +24,22 @@ export function NewChatPage() {
   const [params] = useSearchParams()
   const aboutDoc = params.get('doc')
   const mode: Mode = modeOverride ?? (aboutDoc ? 'agent' : (settings.data?.general.default_chat_mode ?? 'chat'))
-  const [profileId, setProfileId] = useState<string | null>(null)
+  // A chat started while a project is chosen belongs to it, and starts with its defaults.
+  const project = useCurrentProject()
+  const [profileOverride, setProfileId] = useState<string | null | undefined>(undefined)
+  const profileId = profileOverride !== undefined ? profileOverride : (project?.default_profile_id ?? null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const start = async (text: string, attachmentIds: string[]) => {
+  const start = async (text: string, attachmentIds: string[], referenceIds: string[]) => {
     setBusy(true)
     setError(null)
     try {
-      const conv = await createConversation(modelId)
+      const conv = await createConversation(modelId, project?.id ?? null)
       const turn = unwrap(
         await api.POST('/api/conversations/{conversation_id}/turns', {
           params: { path: { conversation_id: conv.id } },
-          body: { text, model_id: modelId, attachment_ids: attachmentIds, mode, profile_id: profileId },
+          body: { text, model_id: modelId, attachment_ids: attachmentIds, reference_ids: referenceIds, mode, profile_id: profileId },
         }),
       )
       // Seed the cache so the conversation page renders instantly and starts streaming.
@@ -61,6 +65,12 @@ export function NewChatPage() {
             <Sparkles className="h-6 w-6" />
           </div>
           <h1 className="text-xl font-semibold md:text-2xl">How can I help today?</h1>
+          {project && (
+            <p className="mt-2 flex items-center gap-1.5 text-[13px] text-muted">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
+              New chat in <span className="font-medium text-text">{project.name}</span>
+            </p>
+          )}
           {needsSetup && (
             <p className="mt-2 text-[13px] text-muted">
               First, <Link to="/settings/providers" className="text-accent underline">connect a provider and pick a default model</Link>.
@@ -77,7 +87,7 @@ export function NewChatPage() {
             <>
               <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
               {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileId} />}
-              <ModelPicker value={modelId} defaultModelId={settings.data?.models.chat ?? null} onChange={setModelId} />
+              <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} />
             </>
           }
         />

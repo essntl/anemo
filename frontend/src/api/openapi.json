@@ -1739,6 +1739,133 @@
             }
           },
           {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "no_project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only chats that are in no project",
+              "default": false,
+              "title": "No Project"
+            },
+            "description": "Only chats that are in no project"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          },
+          {
+            "name": "favorite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Favorite"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "recent",
+                "created",
+                "oldest",
+                "title"
+              ],
+              "type": "string",
+              "default": "recent",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "active_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last message at or after this",
+              "title": "Active After"
+            },
+            "description": "Last message at or after this"
+          },
+          {
+            "name": "active_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last message before this",
+              "title": "Active Before"
+            },
+            "description": "Last message before this"
+          },
+          {
             "name": "aiw_session",
             "in": "cookie",
             "required": false,
@@ -1823,6 +1950,119 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/tags": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List Tags",
+        "operationId": "list_tags_api_conversations_tags_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagCount"
+                  },
+                  "title": "Response List Tags Api Conversations Tags Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/bulk": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Bulk",
+        "description": "Archive, favorite, tag, move or delete several chats at once.",
+        "operationId": "bulk_api_conversations_bulk_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatBulkIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatBulkOut"
                 }
               }
             }
@@ -2208,6 +2448,266 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TurnOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/edit-last": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Edit Last",
+        "description": "Change the last message you sent and have it answered again.",
+        "operationId": "edit_last_api_conversations__conversation_id__edit_last_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditLastIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/branch": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Branch",
+        "description": "Start a new chat from a copy of this one up to a message.",
+        "operationId": "branch_api_conversations__conversation_id__branch_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/export": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Export",
+        "description": "The chat as a Markdown file to download.",
+        "operationId": "export_api_conversations__conversation_id__export_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/save-document": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Save Document",
+        "description": "Save the chat as a document in the workspace (in its project's folder, if any).",
+        "operationId": "save_document_api_conversations__conversation_id__save_document_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedDocument"
                 }
               }
             }
@@ -6776,7 +7276,7 @@
     "/api/projects": {
       "get": {
         "tags": [
-          "tasks"
+          "projects"
         ],
         "summary": "List Projects",
         "operationId": "list_projects_api_projects_get",
@@ -6827,7 +7327,7 @@
       },
       "post": {
         "tags": [
-          "tasks"
+          "projects"
         ],
         "summary": "Create Project",
         "operationId": "create_project_api_projects_post",
@@ -6886,7 +7386,7 @@
     "/api/projects/{project_id}": {
       "put": {
         "tags": [
-          "tasks"
+          "projects"
         ],
         "summary": "Update Project",
         "operationId": "update_project_api_projects__project_id__put",
@@ -6953,10 +7453,10 @@
       },
       "delete": {
         "tags": [
-          "tasks"
+          "projects"
         ],
         "summary": "Delete Project",
-        "description": "Deletes the project; its tasks stay, without a project.",
+        "description": "Deletes the project. Its chats, tasks and events stay, without a project, and\nits folders with files and documents are left in place.",
         "operationId": "delete_project_api_projects__project_id__delete",
         "parameters": [
           {
@@ -7034,6 +7534,23 @@
               "title": "End"
             },
             "description": "Range end (exclusive), with UTC offset"
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
           },
           {
             "name": "aiw_session",
@@ -10269,6 +10786,21 @@
         ],
         "title": "Body_upload_asset_api_documents_assets_post"
       },
+      "BranchIn": {
+        "properties": {
+          "upto_seq": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Upto Seq",
+            "description": "Copy the messages up to and including this one"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upto_seq"
+        ],
+        "title": "BranchIn"
+      },
       "BrowserInput": {
         "properties": {
           "kind": {
@@ -10522,6 +11054,78 @@
         ],
         "title": "CategoryOut"
       },
+      "ChatBulkIn": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Ids"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "archive",
+              "unarchive",
+              "favorite",
+              "unfavorite",
+              "set_project",
+              "add_tag",
+              "remove_tag",
+              "delete"
+            ],
+            "title": "Action"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids",
+          "action"
+        ],
+        "title": "ChatBulkIn",
+        "description": "One change applied to several chats at once."
+      },
+      "ChatBulkOut": {
+        "properties": {
+          "changed": {
+            "type": "integer",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changed"
+        ],
+        "title": "ChatBulkOut"
+      },
       "Check": {
         "properties": {
           "name": {
@@ -10603,6 +11207,18 @@
               }
             ],
             "title": "Model Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
           }
         },
         "type": "object",
@@ -10626,6 +11242,38 @@
           "archived": {
             "type": "boolean",
             "title": "Archived"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "branched_from_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branched From Id"
           },
           "model_id": {
             "anyOf": [
@@ -10774,6 +11422,32 @@
               }
             ],
             "title": "Profile Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
           }
         },
         "type": "object",
@@ -11217,6 +11891,34 @@
         ],
         "title": "DocumentOut"
       },
+      "EditLastIn": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "EditLastIn",
+        "description": "Replace the text of the last message you sent and have it answered again."
+      },
       "EntryOut": {
         "properties": {
           "name": {
@@ -11392,6 +12094,18 @@
               }
             ],
             "title": "Task Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
           }
         },
         "type": "object",
@@ -11506,6 +12220,18 @@
               }
             ],
             "title": "Task Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
           },
           "created_by": {
             "type": "string",
@@ -12745,6 +13471,14 @@
             "title": "Attachments",
             "default": []
           },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/ReferenceSummary"
+            },
+            "type": "array",
+            "title": "References",
+            "default": []
+          },
           "mode": {
             "anyOf": [
               {
@@ -13442,6 +14176,18 @@
             ],
             "title": "Task Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "created_by": {
             "type": "string",
             "title": "Created By"
@@ -14007,6 +14753,36 @@
             "type": "boolean",
             "title": "Archived",
             "default": false
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Instructions",
+            "default": ""
+          },
+          "default_model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Model Id"
+          },
+          "default_profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Profile Id"
           }
         },
         "type": "object",
@@ -14034,21 +14810,81 @@
             "title": "Archived",
             "default": false
           },
+          "instructions": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Instructions",
+            "default": ""
+          },
+          "default_model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Model Id"
+          },
+          "default_profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Profile Id"
+          },
           "id": {
             "type": "string",
             "format": "uuid",
             "title": "Id"
           },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "files_path": {
+            "type": "string",
+            "title": "Files Path"
+          },
+          "documents_path": {
+            "type": "string",
+            "title": "Documents Path"
+          },
           "open_tasks": {
             "type": "integer",
             "title": "Open Tasks",
+            "default": 0
+          },
+          "chats": {
+            "type": "integer",
+            "title": "Chats",
+            "default": 0
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events",
+            "default": 0
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents",
             "default": 0
           }
         },
         "type": "object",
         "required": [
           "name",
-          "id"
+          "id",
+          "slug",
+          "files_path",
+          "documents_path"
         ],
         "title": "ProjectOut"
       },
@@ -14317,6 +15153,26 @@
           "needs_key"
         ],
         "title": "ProviderTypeOut"
+      },
+      "ReferenceSummary": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "title"
+        ],
+        "title": "ReferenceSummary",
+        "description": "Another chat that was attached to a message as context."
       },
       "ReindexOut": {
         "properties": {
@@ -15325,6 +16181,25 @@
         ],
         "title": "SaveOut"
       },
+      "SavedDocument": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "path"
+        ],
+        "title": "SavedDocument"
+      },
       "Schedule": {
         "properties": {
           "kind": {
@@ -15970,6 +16845,24 @@
           "checks"
         ],
         "title": "SystemStatus"
+      },
+      "TagCount": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "title": "Tag"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "count"
+        ],
+        "title": "TagCount"
       },
       "TaskIn": {
         "properties": {
@@ -16706,6 +17599,15 @@
             "type": "array",
             "maxItems": 10,
             "title": "Attachment Ids"
+          },
+          "reference_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Reference Ids"
           },
           "mode": {
             "type": "string",

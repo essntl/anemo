@@ -78,6 +78,11 @@ class FakeAdapter:
             yield Usage(input_tokens=100, output_tokens=10)
             yield Done("end")
             return
+        if _first_user_text(req).startswith("Summarize the earlier chat below"):
+            yield TextDelta("- Fake summary of the earlier chat.")
+            yield Usage(input_tokens=100, output_tokens=10)
+            yield Done("end")
+            return
         if _first_user_text(req).startswith("Extract durable memories"):
             yield TextDelta(FakeAdapter.extraction_reply)
             yield Usage(input_tokens=200, output_tokens=30)

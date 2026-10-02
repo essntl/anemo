@@ -31,6 +31,8 @@ const SCREENS = [
   '/settings/mcp',
   '/settings/usage',
   '/search?q=test',
+  '/chats',
+  '/projects',
   '/automations',
   '/notifications',
   '/memory',
@@ -58,6 +60,11 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await page.getByRole('button', { name: 'Open menu' }).click()
   const drawer = page.getByRole('dialog', { name: 'Menu' })
   await expect(drawer).toBeVisible()
+  // On a phone the menu under the chats starts closed: just chats, with room for them.
+  const more = drawer.getByRole('button', { name: /Workspace & agents/ })
+  await expect(more).toHaveAttribute('aria-expanded', 'false')
+  await expect(drawer.getByRole('link', { name: 'Files', exact: true })).toBeHidden()
+  await more.click()
   await drawer.getByRole('link', { name: 'Files', exact: true }).click()
   await expect(page).toHaveURL(/\/files/)
   await expect(drawer).toBeHidden()

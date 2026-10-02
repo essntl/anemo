@@ -62,8 +62,23 @@ class AttachmentRef(BaseModel):
     kind: str = ""
 
 
+class ConversationRef(BaseModel):
+    """Reference to another chat, attached by the user as context. Like AttachmentRef,
+    the runtime replaces it with text before a request is sent (runtime/references.py)."""
+
+    type: Literal["conversation"] = "conversation"
+    conversation_id: str
+    title: str = ""
+
+
 ContentBlock = Annotated[
-    TextBlock | ImageBlock | ToolUseBlock | ToolResultBlock | ReasoningBlock | AttachmentRef,
+    TextBlock
+    | ImageBlock
+    | ToolUseBlock
+    | ToolResultBlock
+    | ReasoningBlock
+    | AttachmentRef
+    | ConversationRef,
     Field(discriminator="type"),
 ]
 

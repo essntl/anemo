@@ -3,6 +3,7 @@
  * list and the editor are separate screens (/documents and /documents/:id).
  */
 import { useParams } from 'react-router'
+import { useCurrentProject } from '@/app/projectStore'
 import { FileText } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/cn'
@@ -14,11 +15,13 @@ export function DocumentsPage() {
   const { documentId } = useParams()
   const documents = useDocuments()
   const open = documents.data?.documents.find((d) => d.id === documentId)
+  // A project's documents live in the folder documents/<its folder name>/.
+  const project = useCurrentProject()
 
   return (
     <div className="flex h-full">
       <aside className={cn('w-full shrink-0 border-r border-border md:w-72', documentId && 'hidden md:block')}>
-        <DocumentList currentFolder={open?.folder ?? ''} />
+        <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} />
       </aside>
       <section className={cn('min-w-0 flex-1', !documentId && 'hidden md:block')}>
         {documentId ? (

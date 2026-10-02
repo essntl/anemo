@@ -100,11 +100,21 @@ export function useReorderTasks() {
   })
 }
 
+export type ProjectInput = Schemas['ProjectIn']
+
+/** Create a project, or change one. Fields that are left out keep their defaults. */
 export function useSaveProject() {
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: async (v: { id?: string; name: string; color: string; archived?: boolean }) => {
-      const body = { name: v.name, color: v.color, archived: v.archived ?? false }
+    mutationFn: async (v: Partial<ProjectInput> & { id?: string; name: string }) => {
+      const body: ProjectInput = {
+        name: v.name,
+        color: v.color ?? '#6b7280',
+        archived: v.archived ?? false,
+        instructions: v.instructions ?? '',
+        default_model_id: v.default_model_id ?? null,
+        default_profile_id: v.default_profile_id ?? null,
+      }
       return v.id
         ? unwrap(await api.PUT('/api/projects/{project_id}', { params: { path: { project_id: v.id } }, body }))
         : unwrap(await api.POST('/api/projects', { body }))

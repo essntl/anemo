@@ -257,6 +257,34 @@ async def claim_for_message(
     return rows
 
 
+async def duplicate(
+    db: AsyncSession, att: Attachment, conversation_id: uuid.UUID, message_id: uuid.UUID
+) -> Attachment:
+    """A copy of an attachment (row and file) for a message in another chat. Each chat
+    owns its files: they are deleted with it, so a branch cannot share them."""
+    data = await asyncio.to_thread(file_path(att).read_bytes)
+    copy_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    rel = Path("uploads") / f"{now:%Y}" / f"{now:%m}" / str(copy_id)
+    await asyncio.to_thread(_write, Path(get_settings().data_path) / rel, data)
+    copy = Attachment(
+        id=copy_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        filename=att.filename,
+        mime=att.mime,
+        size=att.size,
+        sha256=att.sha256,
+        kind=att.kind,
+        storage_path=str(rel),
+        extracted_text=att.extracted_text,
+        extraction_note=att.extraction_note,
+    )
+    db.add(copy)
+    await db.flush()
+    return copy
+
+
 def ref_block(att: Attachment) -> dict[str, object]:
     """How an attachment is referenced inside a stored message's content."""
     return {

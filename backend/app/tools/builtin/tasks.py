@@ -9,10 +9,11 @@ from datetime import date, time
 from typing import Any
 
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
+from app.features.projects import service as projects
 from app.features.tasks import service
 from app.features.tasks.models import Project, Task
 from app.features.tasks.schemas import TaskStatus, clean_tags
@@ -44,13 +45,7 @@ async def _project_id(db: Any, name: str | None) -> uuid.UUID | None:
     """The project with this name; created when it does not exist yet."""
     if not name or not name.strip():
         return None
-    name = name.strip()[:100]
-    project = await db.scalar(select(Project).where(func.lower(Project.name) == name.lower()))
-    if project is None:
-        project = Project(name=name)
-        db.add(project)
-        await db.flush()
-    found: uuid.UUID = project.id
+    found: uuid.UUID = (await projects.get_or_create_by_name(db, name)).id
     return found
 
 
@@ -130,7 +125,8 @@ class CreateTask(Tool):
             try:
                 fields = args.model_dump(exclude={"project", "tags"})
                 fields["tags"] = clean_tags(args.tags)
-                fields["project_id"] = await _project_id(db, args.project)
+                # Without a named project: the project of the chat this run belongs to.
+                fields["project_id"] = await _project_id(db, args.project) or ctx.project_id
                 task = await service.create_task(db, fields, created_by="agent", run_id=ctx.run_id)
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)

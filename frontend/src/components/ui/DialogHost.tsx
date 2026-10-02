@@ -20,12 +20,13 @@ function RequestDialog({ request }: { request: Request }) {
   const finish = (answer: boolean) => {
     useDialogQueue.setState((s) => ({ queue: s.queue.slice(1) }))
     if (request.kind === 'confirm') request.resolve(answer)
-    else request.resolve(answer && value.trim() ? value.trim() : null)
+    else if (!answer) request.resolve(null)
+    else request.resolve(value.trim() || (request.allowEmpty ? '' : null))
   }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (request.kind === 'prompt' && !value.trim()) return
+    if (request.kind === 'prompt' && !value.trim() && !request.allowEmpty) return
     finish(true)
   }
 
@@ -63,7 +64,7 @@ function RequestDialog({ request }: { request: Request }) {
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="ghost" onClick={() => finish(false)}>Cancel</Button>
           <Button type="submit" variant={request.kind === 'confirm' && request.danger ? 'danger' : 'primary'}
-            disabled={request.kind === 'prompt' && !value.trim()}>
+            disabled={request.kind === 'prompt' && !value.trim() && !request.allowEmpty}>
             {confirmLabel}
           </Button>
         </div>

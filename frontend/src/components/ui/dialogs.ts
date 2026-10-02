@@ -26,6 +26,8 @@ export interface PromptOptions {
   confirmLabel?: string
   /** Pre-select only the name part of "notes.md", like a file manager does. */
   selectName?: boolean
+  /** An empty answer is allowed and returned as "" (e.g. to clear a list of tags). */
+  allowEmpty?: boolean
 }
 
 export type Request = { id: number } & (

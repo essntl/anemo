@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
@@ -57,6 +57,7 @@ def _apply(event: CalendarEvent, body: EventIn) -> None:
     event.remind_minutes = body.remind_minutes
     event.color = body.color
     event.task_id = body.task_id
+    event.project_id = body.project_id
     event.repeat_until = None
     if body.rrule:
         last = recurrence.last_start(event.start_at, event.tz, body.rrule)
@@ -111,6 +112,7 @@ def event_out(event: CalendarEvent) -> EventOut:
         remind_minutes=event.remind_minutes,
         color=event.color,
         task_id=event.task_id,
+        project_id=event.project_id,
         created_by=event.created_by,
     )
 
@@ -173,14 +175,19 @@ def _with_override(occ: Occurrence, override: dict[str, Any]) -> Occurrence:
 
 
 async def occurrences(
-    db: AsyncSession, range_start: datetime, range_end: datetime
+    db: AsyncSession,
+    range_start: datetime,
+    range_end: datetime,
+    project_id: uuid.UUID | None = None,
 ) -> list[Occurrence]:
-    """Every event occurrence overlapping [range_start, range_end), sorted by start."""
+    """Every event occurrence overlapping [range_start, range_end), sorted by start.
+    With `project_id`, only that project's events."""
     if range_end <= range_start or range_end - range_start > MAX_RANGE:
         raise AppError("Choose a range of at most 400 days", code="invalid_range")
     events = list(
         await db.scalars(
             select(CalendarEvent).where(
+                CalendarEvent.project_id == project_id if project_id else true(),
                 CalendarEvent.start_at < range_end,
                 or_(
                     # one-off events that overlap the range

@@ -34,6 +34,35 @@ and an approval card appears in the chat: *Allow once*, *Allow for this run* (sa
 kind of action, same folder) or *Deny*. Paths outside the workspace and anything
 touching settings or secrets are always refused, whatever the settings say.
 
+### Projects and organising chats
+
+A **project** keeps one piece of work together: its chats, tasks, calendar events,
+documents and files. Pick one in the switcher at the top of the sidebar and every
+screen narrows to it; **All projects** shows everything again.
+
+- New chats, tasks and events are created in the chosen project. A project's files live
+  in `projects/<name>/` and its documents in `documents/<name>/`; renaming a project
+  keeps those folders, and deleting it leaves them (and its chats, tasks and events)
+  in place, without a project.
+- A project can have **instructions** for the assistant (added to every chat in it, in
+  Chat and Agent mode) and a default model and agent profile.
+- It is a way to look at your data, not a wall: what an agent may touch is still decided
+  by Settings → Agent Permissions and the folder access under Settings → Workspace.
+
+Chats can be filed in a project, given **tags**, marked as **favorites** and
+**archived**. **All chats** lists every chat with search, filters, sorting, and actions
+on several at once. The menu under the chat list (Files, Tasks, Runs, …) can be
+closed, which leaves the sidebar to your chats; it starts closed on phones.
+
+In a chat you can:
+
+- **reference another chat** (the button next to the paperclip): the assistant gets that
+  chat as background, in full when it is short and as a summary when it is long. The
+  summary is written once by the summarization model and reused;
+- **edit** your last message and have it answered again;
+- **branch** from any answer into a new chat that starts as a copy up to that point;
+- **download** the chat as Markdown or **save it as a document** in the workspace.
+
 ### Profiles, skills, plans and runs
 
 **Profiles & Skills** (sidebar) holds reusable agent setups:

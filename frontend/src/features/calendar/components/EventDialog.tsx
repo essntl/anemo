@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { useCurrentProject } from '@/app/projectStore'
+import { useProjects } from '@/features/tasks/api'
 import { Switch } from '@/components/ui/Switch'
 import { addDays, dayOf, REMINDER_OPTIONS, today } from '@/features/tasks/dates'
 import {
@@ -66,6 +68,10 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
   const [remind, setRemind] = useState(source?.remind_minutes != null ? String(source.remind_minutes) : '')
   const [location, setLocation] = useState(source?.location ?? '')
   const [description, setDescription] = useState(source?.description ?? '')
+  // A new event belongs to the project chosen in the sidebar, unless changed here.
+  const projects = useProjects()
+  const currentProject = useCurrentProject()
+  const [projectId, setProjectId] = useState(source ? (source.project_id ?? '') : (currentProject?.id ?? ''))
 
   const startInstant = new Date(`${startDate}T${allDay ? '00:00' : startTime}`)
   const endInstant = allDay ? new Date(`${addDays(endDate, 1)}T00:00`) : new Date(`${endDate}T${endTime}`)
@@ -110,6 +116,7 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
       remind_minutes: remindMinutes,
       color: source?.color ?? null,
       task_id: source?.task_id ?? null,
+      project_id: projectId || null,
     }
     save.mutate({ id: mode === 'event' ? source?.id : undefined, body }, { onSuccess: onClose })
   }
@@ -194,6 +201,12 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
         <Field label="Location">
           <Input value={location} maxLength={300} onChange={(e) => setLocation(e.target.value)} />
         </Field>
+        {mode !== 'occurrence' && (projects.data?.length ?? 0) > 0 && (
+          <Field label="Project">
+            <Select value={projectId} onValueChange={setProjectId}
+              options={[{ value: '', label: 'No project' }, ...(projects.data ?? []).filter((p) => !p.archived || p.id === projectId).map((p) => ({ value: p.id, label: p.name }))]} />
+          </Field>
+        )}
         <Field label="Notes">
           <Textarea rows={3} value={description} maxLength={20_000} onChange={(e) => setDescription(e.target.value)} />
         </Field>

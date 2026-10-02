@@ -149,9 +149,9 @@ class CreateEvent(Tool):
         async with get_sessionmaker()() as db:
             tz = await _user_tz(db)
             try:
-                event = await service.create_event(
-                    db, _event_in(args, tz), created_by="agent", run_id=ctx.run_id
-                )
+                # Filed under the project of the chat this run belongs to.
+                body = _event_in(args, tz).model_copy(update={"project_id": ctx.project_id})
+                event = await service.create_event(db, body, created_by="agent", run_id=ctx.run_id)
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
             line = _describe(service._base(event, event.start_at), tz)  # noqa: SLF001
@@ -222,7 +222,11 @@ class UpdateEvent(Tool):
             )
             try:
                 body = _event_in(merged, tz).model_copy(
-                    update={"color": event.color, "task_id": event.task_id}
+                    update={
+                        "color": event.color,
+                        "task_id": event.task_id,
+                        "project_id": event.project_id,
+                    }
                 )
                 event = await service.update_event(db, event, body)
             except ValidationError as exc:

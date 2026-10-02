@@ -1,18 +1,30 @@
 """Conversations and messages. Sending a turn creates a run and a job; the worker answers."""
 
+import asyncio
 import uuid
+from datetime import datetime
 
 from sqlalchemy import func, or_, select
+from sqlalchemy import text as sql
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import browser_client
-from app.core.errors import Conflict, NotFound
+from app.core.errors import AppError, Conflict, NotFound
 from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
 from app.features.conversations.models import ChatMessage, Conversation
-from app.features.conversations.schemas import AttachmentSummary, ConversationOut, MessageOut
+from app.features.conversations.schemas import (
+    AttachmentSummary,
+    ConversationOut,
+    MessageOut,
+    ReferenceSummary,
+)
+from app.features.documents import service as documents
+from app.features.documents.models import Document
 from app.features.profiles.models import AgentProfile
+from app.features.projects import service as projects
 from app.features.runs.models import ACTIVE_STATUSES, Run
+from app.features.tasks.schemas import clean_tags
 from app.jobs import queue
 from app.runtime import outputs
 
@@ -37,6 +49,11 @@ def message_out(
         attachments=[
             AttachmentSummary(id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size)
             for a in files or []
+        ],
+        references=[
+            ReferenceSummary(conversation_id=b["conversation_id"], title=b.get("title", ""))
+            for b in m.content
+            if isinstance(b, dict) and b.get("type") == "conversation"
         ],
         mode=mode,
     )
@@ -70,6 +87,9 @@ def conversation_out(
         title=c.title,
         pinned=c.pinned,
         archived=c.archived,
+        project_id=c.project_id,
+        tags=c.tags,
+        branched_from_id=c.branched_from_id,
         model_id=c.model_id,
         last_message_at=c.last_message_at,
         created_at=c.created_at,
@@ -81,13 +101,47 @@ def conversation_out(
     )
 
 
+SORTS = {
+    # Favorites first only in the default order (the sidebar); the others are plain.
+    "recent": (Conversation.pinned.desc(), Conversation.last_message_at.desc()),
+    "created": (Conversation.created_at.desc(),),
+    "oldest": (Conversation.created_at,),
+    "title": (func.lower(Conversation.title), Conversation.last_message_at.desc()),
+}
+
+
 async def list_conversations(
-    db: AsyncSession, *, q: str | None, archived: bool, limit: int
+    db: AsyncSession,
+    *,
+    q: str | None,
+    archived: bool,
+    limit: int,
+    offset: int = 0,
+    project_id: uuid.UUID | None = None,
+    no_project: bool = False,
+    tag: str | None = None,
+    favorite: bool | None = None,
+    sort: str = "recent",
+    active_after: datetime | None = None,
+    active_before: datetime | None = None,
 ) -> list[ConversationOut]:
     snippets: dict[uuid.UUID, str] = {}
     stmt = select(Conversation).where(
         Conversation.archived == archived, Conversation.automation_id.is_(None)
     )
+    if project_id is not None:
+        stmt = stmt.where(Conversation.project_id == project_id)
+    elif no_project:
+        stmt = stmt.where(Conversation.project_id.is_(None))
+    if tag:
+        stmt = stmt.where(Conversation.tags.contains([tag.strip().lower()]))
+    if favorite is not None:
+        stmt = stmt.where(Conversation.pinned == favorite)
+    # By when the chat last had a message (the client works out the day boundaries).
+    if active_after is not None:
+        stmt = stmt.where(Conversation.last_message_at >= active_after)
+    if active_before is not None:
+        stmt = stmt.where(Conversation.last_message_at < active_before)
     if q:
         tsq = func.websearch_to_tsquery("english", q)
         hits = await db.execute(
@@ -109,12 +163,79 @@ async def list_conversations(
         stmt = stmt.where(
             or_(Conversation.id.in_(list(snippets)), Conversation.title.ilike(f"%{q}%"))
         )
-    stmt = stmt.order_by(Conversation.pinned.desc(), Conversation.last_message_at.desc()).limit(
-        limit
-    )
+    stmt = stmt.order_by(*SORTS.get(sort, SORTS["recent"])).limit(limit).offset(offset)
     convs = list(await db.scalars(stmt))
     active = await active_runs(db, [c.id for c in convs])
     return [conversation_out(c, active, snippets.get(c.id)) for c in convs]
+
+
+async def create_conversation(
+    db: AsyncSession, title: str | None, model_id: uuid.UUID | None, project_id: uuid.UUID | None
+) -> Conversation:
+    conv = Conversation(title=title or "New chat", title_is_auto=not title, model_id=model_id)
+    if project_id is not None:
+        project = await projects.get(db, project_id)
+        conv.project_id = project.id
+        # The project's defaults, unless the chat was started with a model of its own.
+        if model_id is None:
+            conv.model_id = project.default_model_id
+        conv.profile_id = project.default_profile_id
+    db.add(conv)
+    await db.flush()
+    return conv
+
+
+async def list_tags(db: AsyncSession) -> list[tuple[str, int]]:
+    """Every tag used on a chat, most used first."""
+    rows = await db.execute(
+        sql(
+            "SELECT tag, count(*) AS n "
+            "FROM conversations, jsonb_array_elements_text(tags) AS tag "
+            "WHERE automation_id IS NULL GROUP BY tag ORDER BY n DESC, tag"
+        )
+    )
+    return [(name, n) for name, n in rows.all()]
+
+
+async def bulk(
+    db: AsyncSession,
+    ids: list[uuid.UUID],
+    action: str,
+    project_id: uuid.UUID | None,
+    tag: str | None,
+) -> int:
+    """Apply one change to several chats. Returns how many were found. The caller commits."""
+    convs = list(
+        await db.scalars(
+            select(Conversation).where(
+                Conversation.id.in_(ids), Conversation.automation_id.is_(None)
+            )
+        )
+    )
+    if action == "delete":
+        await delete_conversations(db, [c.id for c in convs])
+        return len(convs)
+    if action == "set_project" and project_id is not None:
+        await projects.get(db, project_id)  # 404 for an unknown project
+    cleaned = "".join(clean_tags([tag or ""]))  # "" when there is no usable tag
+    if action in ("add_tag", "remove_tag") and not cleaned:
+        raise AppError("Name the tag to add or remove.", code="tag_missing")
+    for conv in convs:
+        if action == "archive":
+            conv.archived = True
+        elif action == "unarchive":
+            conv.archived = False
+        elif action == "favorite":
+            conv.pinned = True
+        elif action == "unfavorite":
+            conv.pinned = False
+        elif action == "set_project":
+            conv.project_id = project_id
+        elif action == "add_tag" and cleaned not in conv.tags:
+            conv.tags = clean_tags([*conv.tags, cleaned])
+        elif action == "remove_tag":
+            conv.tags = [t for t in conv.tags if t != cleaned]
+    return len(convs)
 
 
 async def delete_conversations(db: AsyncSession, ids: list[uuid.UUID]) -> None:
@@ -213,6 +334,23 @@ async def _start_run(
     return run
 
 
+async def _reference_blocks(
+    db: AsyncSession, own_id: uuid.UUID, ids: list[uuid.UUID]
+) -> list[dict[str, object]]:
+    """Content blocks for the chats a message refers to (see runtime/references.py)."""
+    blocks: list[dict[str, object]] = []
+    for ref_id in dict.fromkeys(ids):
+        other = await db.get(Conversation, ref_id)
+        if other is None or other.automation_id is not None:
+            raise NotFound("The referenced chat was not found")
+        if other.id == own_id:
+            raise AppError("A chat cannot reference itself.", code="self_reference")
+        blocks.append(
+            {"type": "conversation", "conversation_id": str(other.id), "title": other.title}
+        )
+    return blocks
+
+
 async def send_turn(
     db: AsyncSession,
     conversation_id: uuid.UUID,
@@ -221,8 +359,10 @@ async def send_turn(
     attachment_ids: list[uuid.UUID] | None = None,
     mode: str = "chat",
     profile_id: uuid.UUID | None = None,
+    reference_ids: list[uuid.UUID] | None = None,
 ) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     conv = await _lock_idle_conversation(db, conversation_id)
+    references = await _reference_blocks(db, conv.id, reference_ids or [])
     if model_id is not None:
         conv.model_id = model_id  # remember the last explicit choice for this conversation
     if mode == "agent":
@@ -252,6 +392,8 @@ async def send_turn(
         files = await attachments.claim_for_message(db, attachment_ids, conv.id, user.id)
         # Files come before the text, as if dropped in and then described.
         user.content = [attachments.ref_block(a) for a in files] + list(user.content)
+    if references:
+        user.content = references + list(user.content)
     conv.default_mode = mode
     run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, mode)
     conv.last_message_at = func.now()
@@ -281,3 +423,139 @@ async def regenerate(
     await db.commit()
     await db.refresh(last)
     return run, last
+
+
+async def _last_exchange(
+    db: AsyncSession, conversation_id: uuid.UUID
+) -> tuple[ChatMessage, ChatMessage] | None:
+    """The last user message and the answer to it, when the chat ends with those."""
+    last_two = list(
+        await db.scalars(
+            select(ChatMessage)
+            .where(ChatMessage.conversation_id == conversation_id)
+            .order_by(ChatMessage.seq.desc())
+            .limit(2)
+        )
+    )
+    if len(last_two) == 2 and last_two[0].role == "assistant" and last_two[1].role == "user":
+        return last_two[1], last_two[0]
+    return None
+
+
+async def edit_last(
+    db: AsyncSession, conversation_id: uuid.UUID, text: str, model_id: uuid.UUID | None
+) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
+    """Change the text of the last user message and answer it again. Its attachments
+    and referenced chats stay."""
+    conv = await _lock_idle_conversation(db, conversation_id)
+    if model_id is not None:
+        conv.model_id = model_id
+    exchange = await _last_exchange(db, conv.id)
+    if exchange is None:
+        raise Conflict("There is no message to edit", code="nothing_to_edit")
+    user, assistant = exchange
+    kept = [b for b in user.content if isinstance(b, dict) and b.get("type") != "text"]
+    user.content = [*kept, {"type": "text", "text": text}]
+    user.text_plain = text
+    assistant.content, assistant.text_plain = [], ""
+    assistant.status, assistant.error = "streaming", None
+    run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, conv.default_mode)
+    conv.last_message_at = func.now()
+    files = list(await db.scalars(select(Attachment).where(Attachment.message_id == user.id)))
+    await db.commit()
+    await db.refresh(user)
+    await db.refresh(assistant)
+    return run, user, assistant, files
+
+
+async def branch(db: AsyncSession, conversation_id: uuid.UUID, upto_seq: int) -> Conversation:
+    """A new chat that starts as a copy of this one up to (and including) a message.
+    The original is not changed. Attachments are copied, because each chat owns its files."""
+    source = await get_conversation(db, conversation_id)
+    rows = list(
+        await db.scalars(
+            select(ChatMessage)
+            .where(ChatMessage.conversation_id == source.id, ChatMessage.seq <= upto_seq)
+            .order_by(ChatMessage.seq)
+        )
+    )
+    # Unfinished or failed answers are not part of what the new chat continues from.
+    rows = [m for m in rows if m.role == "user" or m.status in ("complete", "cancelled")]
+    if not rows:
+        raise Conflict("There is nothing to branch from", code="nothing_to_branch")
+    copy = Conversation(
+        title=f"{source.title[:190]} (branch)",
+        title_is_auto=False,
+        default_mode=source.default_mode,
+        model_id=source.model_id,
+        profile_id=source.profile_id,
+        project_id=source.project_id,
+        tags=list(source.tags),
+        branched_from_id=source.id,
+    )
+    db.add(copy)
+    await db.flush()
+    for seq, m in enumerate(rows, start=1):
+        message = ChatMessage(
+            conversation_id=copy.id,
+            seq=seq,
+            role=m.role,
+            content=[],
+            text_plain=m.text_plain,
+            status="complete" if m.role == "user" else m.status,
+            model_id=m.model_id,
+            model_label=m.model_label,
+            created_at=m.created_at,
+        )
+        db.add(message)
+        await db.flush()
+        content: list[dict[str, object]] = []
+        for block in m.content:
+            if isinstance(block, dict) and block.get("type") == "attachment":
+                original = await db.get(Attachment, uuid.UUID(str(block["attachment_id"])))
+                if original is None:
+                    continue
+                block = attachments.ref_block(
+                    await attachments.duplicate(db, original, copy.id, message.id)
+                )
+            content.append(block)
+        message.content = content
+    await db.commit()
+    await db.refresh(copy)
+    return copy
+
+
+async def export_markdown(db: AsyncSession, conv: Conversation) -> str:
+    """The chat as a Markdown document: what was said, without the tool activity."""
+    rows = await db.scalars(
+        select(ChatMessage).where(ChatMessage.conversation_id == conv.id).order_by(ChatMessage.seq)
+    )
+    parts = [f"# {conv.title}", f"_Chat from {conv.created_at:%Y-%m-%d}, exported from Anemo._"]
+    for m in rows:
+        if m.role == "assistant" and m.status not in ("complete", "cancelled"):
+            continue
+        who = "You" if m.role == "user" else "Assistant"
+        if m.role == "assistant" and m.model_label:
+            who += f" ({m.model_label})"
+        lines = [f"## {who}"]
+        for block in m.content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "attachment":
+                lines.append(f"_Attached: {block.get('filename', 'file')}_")
+            elif block.get("type") == "conversation":
+                lines.append(f"_Referenced chat: {block.get('title', '')}_")
+        if m.text_plain.strip():
+            lines.append(m.text_plain.strip())
+        if len(lines) > 1:
+            parts.append("\n\n".join(lines))
+    return "\n\n".join(parts) + "\n"
+
+
+async def save_as_document(db: AsyncSession, conv: Conversation) -> Document:
+    """Write the chat into the workspace as a document: in its project's documents
+    folder when it has a project, otherwise at the top of Documents."""
+    project = await projects.for_conversation(db, conv.id)
+    folder = project.slug if project else ""
+    path = await asyncio.to_thread(documents.unique_path, folder, conv.title)
+    return await documents.create(db, path, await export_markdown(db, conv), author="user")

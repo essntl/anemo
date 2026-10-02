@@ -15,17 +15,6 @@ def clean_tags(tags: list[str]) -> list[str]:
     return list(dict.fromkeys(t for t in cleaned if t))[:20]
 
 
-class ProjectIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    color: str = Field("#6b7280", pattern=COLOR)
-    archived: bool = False
-
-
-class ProjectOut(ProjectIn):
-    id: uuid.UUID
-    open_tasks: int = 0
-
-
 class TaskIn(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     description: str = Field("", max_length=20_000)

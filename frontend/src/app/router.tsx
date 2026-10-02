@@ -38,6 +38,8 @@ export const router = createBrowserRouter([
             element: <ConversationPage />,
             handle: { ownMobileHeader: true } satisfies RouteHandle,
           },
+          { path: 'chats', ...page(() => import('@/features/chat/pages/ChatsPage'), 'ChatsPage') },
+          { path: 'projects', ...page(() => import('@/features/projects/ProjectsPage'), 'ProjectsPage') },
           { path: 'search', ...page(() => import('@/features/search/SearchPage'), 'SearchPage') },
           { path: 'files', ...page(() => import('@/features/files/FilesPage'), 'FilesPage') },
           { path: 'documents', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage') },

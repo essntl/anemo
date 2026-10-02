@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.providers.base import (
     AttachmentRef,
     ChatRequest,
+    ConversationRef,
     Message,
     ProviderError,
     ReasoningBlock,
@@ -71,7 +72,7 @@ def is_context_error(exc: ProviderError) -> bool:
     return any(hint in text for hint in CONTEXT_ERROR_HINTS)
 
 
-def _clip(text: str, limit: int) -> str:
+def clip(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     half = limit // 2
@@ -88,13 +89,15 @@ def render(messages: list[Message], max_chars: int) -> str:
                 if isinstance(b, TextBlock) and b.text.strip():
                     lines.append(b.text.strip())
                 elif isinstance(b, ToolUseBlock):
-                    args = _clip(json.dumps(b.input, ensure_ascii=False), 800)
+                    args = clip(json.dumps(b.input, ensure_ascii=False), 800)
                     lines.append(f"[tool call {b.name}: {args}]")
                 elif isinstance(b, ToolResultBlock):
                     status = "error" if b.is_error else "result"
-                    lines.append(f"[tool {status}]\n{_clip(b.content, result_limit)}")
+                    lines.append(f"[tool {status}]\n{clip(b.content, result_limit)}")
                 elif isinstance(b, AttachmentRef):
                     lines.append(f"[attached {b.kind or 'file'}: {b.filename}]")
+                elif isinstance(b, ConversationRef):
+                    lines.append(f"[referenced another chat: {b.title}]")
                 elif isinstance(b, ReasoningBlock):
                     continue  # the agent's own reasoning is not needed to continue
             if lines:
@@ -102,7 +105,7 @@ def render(messages: list[Message], max_chars: int) -> str:
         text = "\n\n".join(parts)
         if len(text) <= max_chars:
             return text
-    return _clip(text, max_chars)
+    return clip(text, max_chars)
 
 
 def find_cut(transcript: list[Message], keep_tokens: int) -> int | None:
@@ -166,7 +169,7 @@ async def compact(
             continue
         text = SUMMARY_HEADER + summary
         if request.strip():
-            text += f"\n\nThe user's current request:\n{_clip(request, 4_000)}"
+            text += f"\n\nThe user's current request:\n{clip(request, 4_000)}"
         return Compaction(
             transcript=[Message.user(text), *transcript[cut:]],
             model=model,

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { ArrowUp, Paperclip, Square } from 'lucide-react'
+import { ArrowUp, MessagesSquare, Paperclip, Square } from 'lucide-react'
+import { Lingering } from '@/components/ui/Lingering'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
+import { type ChatRef, ChatPickerDialog, MAX_REFERENCES, ReferenceChip } from './ChatReference'
 
 interface ComposerProps {
-  onSend: (text: string, attachmentIds: string[]) => void
+  /** `referenceIds`: other chats to give the model as context for this message. */
+  onSend: (text: string, attachmentIds: string[], referenceIds: string[]) => void
   onStop?: () => void
   running: boolean
   disabled?: boolean
@@ -15,17 +18,21 @@ interface ComposerProps {
   initialText?: string
   /** Controls shown under the text box (model picker, mode switch). */
   toolbar?: ReactNode
+  /** The chat this composer belongs to: it cannot reference itself. */
+  conversationId?: string
 }
 
 const ACCEPT =
   'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/*,.md,.csv,.json,.yaml,.yml,.toml,.py,.js,.ts,.tsx,.jsx,.go,.rs,.java,.c,.cpp,.h,.cs,.rb,.php,.sh,.sql,.html,.css,.xml,.log'
 
-export function Composer({ onSend, onStop, running, disabled, placeholder, initialText, toolbar }: ComposerProps) {
+export function Composer({ onSend, onStop, running, disabled, placeholder, initialText, toolbar, conversationId }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
   const textRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const files = useAttachments()
+  const [references, setReferences] = useState<ChatRef[]>([])
+  const [picking, setPicking] = useState(false)
   // Touch screens: the on-screen keyboard has its own send flow, so Enter adds a line
   // and the box doesn't grab focus (which would pop the keyboard up on every visit).
   const touch = useMediaQuery('(pointer: coarse)')
@@ -42,9 +49,10 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, initi
 
   const send = () => {
     if (!canSend) return
-    onSend(text.trim(), files.readyIds)
+    onSend(text.trim(), files.readyIds, references.map((r) => r.id))
     setText('')
     files.clear()
+    setReferences([])
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -82,6 +90,13 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, initi
         dragging ? 'border-accent bg-accent-soft' : 'border-border',
       )}
     >
+      {references.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-2 pb-1 pt-2">
+          {references.map((r) => (
+            <ReferenceChip key={r.id} chat={r} onRemove={() => setReferences(references.filter((x) => x.id !== r.id))} />
+          ))}
+        </div>
+      )}
       {files.items.length > 0 && (
         <div className="flex flex-wrap gap-2 px-2 pb-1 pt-2">
           {files.items.map((f) => (
@@ -121,6 +136,16 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, initi
           >
             <Paperclip className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            aria-label="Reference a chat"
+            title="Reference another chat as context"
+            disabled={disabled || references.length >= MAX_REFERENCES}
+            onClick={() => setPicking(true)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10"
+          >
+            <MessagesSquare className="h-4 w-4" />
+          </button>
           <input
             ref={fileRef}
             type="file"
@@ -158,6 +183,15 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, initi
           </button>
         )}
       </div>
+      <Lingering value={picking}>
+        {() => (
+          <ChatPickerDialog
+            exclude={[...(conversationId ? [conversationId] : []), ...references.map((r) => r.id)]}
+            onPick={(chat) => setReferences([...references, chat])}
+            onClose={() => setPicking(false)}
+          />
+        )}
+      </Lingering>
     </div>
   )
 }

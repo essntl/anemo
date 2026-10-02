@@ -19,6 +19,7 @@ import {
   MoveRight,
 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
+import { useCurrentProject } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
@@ -134,7 +135,11 @@ function Row({ entry, selected, onOpen, showPath }: { entry: Entry; selected: bo
 
 export function FilesPage() {
   const [params, setParams] = useSearchParams()
-  const path = params.get('path') ?? ''
+  // With a project chosen in the sidebar, the file manager starts in its folder.
+  // '.' in the address means the workspace root (so you can still go up from there).
+  const project = useCurrentProject()
+  const requested = params.get('path')
+  const path = requested === '.' ? '' : (requested ?? project?.files_path ?? '')
   const openFile = params.get('file')
   const [query, setQuery] = useState('')
   const [trashOpen, setTrashOpen] = useState(false)
@@ -150,6 +155,7 @@ export function FilesPage() {
     const p = new URLSearchParams()
     const nextPath = next.path ?? path
     if (nextPath) p.set('path', nextPath)
+    else if (project) p.set('path', '.')
     const nextFile = next.file === undefined ? openFile : next.file
     if (nextFile) p.set('file', nextFile)
     setParams(p)

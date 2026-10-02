@@ -47,6 +47,7 @@ export function TaskRow({ task, project, onOpen }: { task: Task; project?: Proje
       onSuccess: () =>
         toast({
           message: `Deleted “${task.title}”`,
+          duration: 10_000, // time to notice and undo
           action: {
             label: 'Undo',
             onClick: () =>

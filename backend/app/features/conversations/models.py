@@ -22,7 +22,10 @@ from app.db.base import Base, IdMixin, TimestampMixin
 
 class Conversation(Base, IdMixin, TimestampMixin):
     __tablename__ = "conversations"
-    __table_args__ = (Index("ix_conversations_list", "archived", "pinned", "last_message_at"),)
+    __table_args__ = (
+        Index("ix_conversations_list", "archived", "pinned", "last_message_at"),
+        Index("ix_conversations_project", "project_id"),
+    )
 
     title: Mapped[str] = mapped_column(String(200), default="New chat")
     title_is_auto: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -41,8 +44,22 @@ class Conversation(Base, IdMixin, TimestampMixin):
     )
     # Messages up to this seq were already read by memory extraction.
     memory_extracted_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # "Favorites" in the UI.
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Organisation: at most one project (its "folder"), and any number of tags.
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL")
+    )
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
+    # A summary for when this chat is referenced from another one and is too long to
+    # include in full; valid while summary_seq is the seq of its last message.
+    summary: Mapped[str | None] = mapped_column(Text)
+    summary_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Set when the chat was started with "Branch from here" in another chat.
+    branched_from_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL")
+    )
     last_message_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

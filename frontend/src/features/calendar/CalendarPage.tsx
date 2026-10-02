@@ -13,6 +13,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import { useSearchParams } from 'react-router'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
+import { useCurrentProject } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { type Task, useTasksDue, useUpdateTask } from '@/features/tasks/api'
@@ -46,7 +47,9 @@ export function CalendarPage() {
   const [range, setRange] = useState<{ start: string; end: string } | null>(null)
   const [title, setTitle] = useState('')
   const [open, setOpen] = useState<Open>(null)
-  const occurrences = useOccurrences(range)
+  // With a project chosen in the sidebar: only its events and its tasks.
+  const project = useCurrentProject()
+  const occurrences = useOccurrences(range, project?.id ?? null)
   const tasks = useTasksDue(range ? dayOf(new Date(range.start)) : null, range ? dayOf(new Date(range.end)) : null)
   const saveEvent = useSaveEvent()
   const changeOccurrence = useChangeOccurrence()
@@ -64,7 +67,7 @@ export function CalendarPage() {
       extendedProps: { occurrence: o },
       ...(o.color ? { backgroundColor: o.color, borderColor: o.color } : {}),
     }))
-    const due = (tasks.data ?? []).map((t) => ({
+    const due = (tasks.data ?? []).filter((t) => !project || t.project_id === project.id).map((t) => ({
       id: `task:${t.id}`,
       title: t.title,
       start: t.due_time ? `${t.due_date}T${t.due_time}` : t.due_date!,
@@ -74,7 +77,7 @@ export function CalendarPage() {
       extendedProps: { task: t },
     }))
     return [...events, ...due]
-  }, [occurrences.data, tasks.data])
+  }, [occurrences.data, tasks.data, project])
 
   const api = () => calendar.current?.getApi()
   const changeView = (next: string) => {
