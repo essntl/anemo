@@ -64,14 +64,27 @@ x-settings: &settings
   SEARXNG_URL: ""
 
 services:
-  # Makes the data folders writable for the app (it does not run as root).
+  # Makes the folders that the other containers write to belong to them (they do not
+  # run as root). Needed when a folder or volume was created by root, which is what
+  # happens when a tool such as ZimaOS turns the volumes below into host folders.
   init:
     image: busybox:1.37
     restart: "no"
-    command: ["sh", "-c", "mkdir -p /workspace /data && chown 1000:1000 /workspace /data"]
+    command:
+      - sh
+      - -c
+      - mkdir -p /workspace /data && chown 1000:1000 /workspace /data /own/* && chmod 700 /own/sandbox-ssh
     volumes:
       - /DATA/AppData/anemo/workspace:/workspace
       - /DATA/AppData/anemo/data:/data
+      - sandbox-home:/own/sandbox-home
+      - sandbox-net-home:/own/sandbox-net-home
+      - sandbox-token:/own/sandbox-token
+      - sandbox-net-token:/own/sandbox-net-token
+      - sandbox-ssh:/own/sandbox-ssh
+      - mcp-host-home:/own/mcp-host-home
+      - mcp-host-token:/own/mcp-host-token
+      - browser-token:/own/browser-token
     network_mode: none
 
   postgres:
@@ -243,6 +256,9 @@ services:
       # Downloaded servers (npx, uvx) are cached here.
       - mcp-host-home:/home/mcp
       - mcp-host-token:/run/hostd
+    depends_on:
+      init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7080/health')"]
       interval: 30s
@@ -268,6 +284,9 @@ services:
       - /home/browser:size=256m,mode=1777
     volumes:
       - browser-token:/run/browserd
+    depends_on:
+      init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "/opt/browserd/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7090/health')"]
       interval: 30s
