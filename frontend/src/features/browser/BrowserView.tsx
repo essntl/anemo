@@ -101,7 +101,7 @@ export function BrowserView({ conversationId, actions, className }: Props) {
         {actions}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-bg">
+      <div className="min-h-0 flex-1 overflow-auto bg-bg" data-no-swipe>
         {data && !data.available && (
           <Message title="The browser is not running">
             Start it on the server with <code className="font-mono">docker compose --profile browser up -d</code>.

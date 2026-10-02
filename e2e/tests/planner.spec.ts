@@ -45,6 +45,12 @@ test('tasks: quick add, due date, complete, board', async ({ page }) => {
     await page.getByRole('checkbox', { name: `Complete “${title}”` }).click()
     await page.getByRole('button', { name: /Finished/ }).click()
     await expect(page.getByRole('checkbox', { name: `Reopen “${title}”` })).toBeVisible()
+
+    // A finished task is deleted with one press, and Undo puts it back.
+    await page.getByRole('button', { name: `Delete “${title}”` }).click()
+    await expect(page.getByRole('checkbox', { name: `Reopen “${title}”` })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(page.getByRole('checkbox', { name: `Reopen “${title}”` })).toBeVisible()
   } finally {
     await deleteTasks(page, title)
   }

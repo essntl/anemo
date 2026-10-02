@@ -66,6 +66,55 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Menu' })).toBeHidden()
 })
 
+/** A quick one-finger swipe along a horizontal line, as real touch events. */
+async function swipe(page: Page, fromX: number, toX: number, y: number) {
+  const cdp = await page.context().newCDPSession(page)
+  const at = (x: number) => ({ touchPoints: [{ x, y }] })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', ...at(fromX) })
+  for (const part of [0.25, 0.5, 0.75, 1]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', ...at(fromX + (toX - fromX) * part) })
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+}
+
+test('swiping opens and closes the menu, but not from a text field', async ({ page }) => {
+  await login(page)
+  await page.goto('/tasks')
+  const drawer = page.getByRole('dialog', { name: 'Menu' })
+  const field = await page.getByLabel('Add a task').boundingBox()
+
+  // Starting on a text field moves the cursor there, not the menu.
+  await swipe(page, field!.x + 20, field!.x + 260, field!.y + field!.height / 2)
+  await expect(drawer).toBeHidden()
+  // Scrolling down the page is not a swipe either.
+  await swipe(page, 200, 200, 600)
+  await expect(drawer).toBeHidden()
+
+  await swipe(page, 60, 320, 600)
+  await expect(drawer).toBeVisible()
+  await swipe(page, 300, 40, 600)
+  await expect(drawer).toBeHidden()
+})
+
+test('adding models: capability tags are behind one button per model', async ({ page }) => {
+  await login(page)
+  await fakeModels(page.request) // skips without the fake provider
+  await page.goto('/settings/providers')
+  const card = page.locator('div.rounded-card').filter({ has: page.getByRole('heading', { name: 'Fake models' }) }).first()
+  await card.getByRole('button', { name: 'Add models' }).click()
+  const dialog = page.getByRole('dialog')
+  const model = dialog.getByRole('checkbox', { name: /Echo with reasoning/ })
+  await expect(model).toBeVisible()
+  const wasChecked = await model.isChecked()
+  // The tags are not in the row; the name has the room.
+  await expect(dialog.getByText('Reasoning', { exact: true })).toBeHidden()
+  await dialog.getByRole('button', { name: 'What Echo with reasoning can do' }).click()
+  await expect(page.getByText('Reasoning', { exact: true }).filter({ visible: true })).toHaveCount(1)
+  // Looking at the tags does not tick the model.
+  expect(await model.isChecked()).toBe(wasChecked)
+})
+
 test('settings is a list of sections with a way back', async ({ page }) => {
   await login(page)
   await page.goto('/settings')

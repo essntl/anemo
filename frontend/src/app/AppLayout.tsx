@@ -10,8 +10,10 @@ import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
 import { MobileTopBar } from './mobileNav'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
 import { Sidebar } from './Sidebar'
+import { useSidebarSwipe } from './useSidebarSwipe'
 
-/** On phones the sidebar slides in from the left; the scrim, Esc or navigating closes it. */
+/** On phones the sidebar slides in from the left (menu button, or swipe right); the
+ *  scrim, Esc, navigating or a swipe left closes it. See useSidebarSwipe. */
 function SidebarDrawer() {
   const { open, setOpen } = useMobileNav()
   return (
@@ -33,6 +35,7 @@ function SidebarDrawer() {
 export function AppLayout() {
   useAppearanceSync()
   useAppEvents()
+  useSidebarSwipe()
   const location = useLocation()
   const setOpen = useMobileNav((s) => s.setOpen)
   // Close the phone menu whenever the page changes (e.g. after tapping a link in it).

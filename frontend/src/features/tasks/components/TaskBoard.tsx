@@ -42,7 +42,7 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <div className="flex gap-3 overflow-x-auto pb-2" data-no-swipe>
       {COLUMNS.map((status) => {
         const items = column(status)
         const isTarget = target?.status === status

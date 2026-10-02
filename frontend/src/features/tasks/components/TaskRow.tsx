@@ -1,6 +1,7 @@
-import { Bell, CalendarDays, Check, Flag } from 'lucide-react'
+import { Bell, CalendarDays, Check, Flag, Trash2 } from 'lucide-react'
+import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/cn'
-import { PRIORITY_LABELS, type Project, type Task, useUpdateTask } from '../api'
+import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask, useUpdateTask } from '../api'
 import { bucketOf, formatDue } from '../dates'
 
 const PRIORITY_TONE = ['', 'text-muted', 'text-warning', 'text-error']
@@ -35,7 +36,28 @@ export function TaskMeta({ task, project }: { task: Task; project?: Project }) {
 /** One line in the task list: a checkbox to complete it, and the task itself (opens it). */
 export function TaskRow({ task, project, onOpen }: { task: Task; project?: Project; onOpen: (task: Task) => void }) {
   const update = useUpdateTask()
+  const remove = useDeleteTask()
+  const create = useCreateTask()
   const done = task.status === 'done'
+  const finished = done || task.status === 'cancelled'
+
+  // No question asked: it is a finished task, and Undo puts it back as it was.
+  const removeNow = () =>
+    remove.mutate(task.id, {
+      onSuccess: () =>
+        toast({
+          message: `Deleted “${task.title}”`,
+          action: {
+            label: 'Undo',
+            onClick: () =>
+              create.mutate({
+                title: task.title, description: task.description, status: task.status, priority: task.priority,
+                due_date: task.due_date, due_time: task.due_time, remind_minutes: task.remind_minutes,
+                tags: task.tags, project_id: task.project_id,
+              }),
+          },
+        }),
+    })
   return (
     <div className="flex items-start gap-3 rounded-control px-2 py-2 hover:bg-surface-hover">
       <button type="button" role="checkbox" aria-checked={done} aria-label={done ? `Reopen “${task.title}”` : `Complete “${task.title}”`}
@@ -52,6 +74,12 @@ export function TaskRow({ task, project, onOpen }: { task: Task; project?: Proje
       </button>
       {task.status === 'in_progress' && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">In progress</span>}
       {task.status === 'blocked' && <span className="shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">Blocked</span>}
+      {finished && (
+        <button type="button" aria-label={`Delete “${task.title}”`} title="Delete" disabled={remove.isPending} onClick={removeNow}
+          className="-my-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-subtle hover:bg-surface-2 hover:text-error disabled:opacity-50 pointer-coarse:-my-2 pointer-coarse:h-10 pointer-coarse:w-10">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
     </div>
   )
 }
