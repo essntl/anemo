@@ -113,6 +113,12 @@ test('adding models: capability tags are behind one button per model', async ({ 
   await expect(page.getByText('Reasoning', { exact: true }).filter({ visible: true })).toHaveCount(1)
   // Looking at the tags does not tick the model.
   expect(await model.isChecked()).toBe(wasChecked)
+  // Scrolling the list puts the tags away instead of dragging them along.
+  await dialog.locator('.overflow-y-auto').last().evaluate((list) => {
+    list.style.maxHeight = '120px' // short enough to scroll with only a few models
+    list.scrollTop = 40
+  })
+  await expect(page.getByText('Reasoning', { exact: true }).filter({ visible: true })).toHaveCount(0)
 })
 
 test('settings is a list of sections with a way back', async ({ page }) => {

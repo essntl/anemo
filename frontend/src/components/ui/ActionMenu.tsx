@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { MoreHorizontal } from 'lucide-react'
+import { useCloseOnScroll } from '@/hooks/useCloseOnScroll'
 import { cn } from '@/lib/cn'
 
 export interface MenuAction {
@@ -18,6 +19,7 @@ export interface MenuAction {
  */
 export function ActionMenu({ actions, label = 'More actions', className }: { actions: MenuAction[]; label?: string; className?: string }) {
   const [open, setOpen] = useState(false)
+  useCloseOnScroll(open, useCallback(() => setOpen(false), []))
   const item = (danger?: boolean) =>
     cn('flex h-11 w-full items-center gap-3 rounded-control px-3 text-left text-[15px] hover:bg-surface-hover [&>svg]:h-4 [&>svg]:w-4',
       danger ? 'text-error' : 'text-text')

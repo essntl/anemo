@@ -1,6 +1,8 @@
+import { useCallback, useState } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Info } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
+import { useCloseOnScroll } from '@/hooks/useCloseOnScroll'
 
 const CAPABILITY_LABELS: Record<string, string> = {
   tools: 'Tools',
@@ -28,8 +30,10 @@ export function CapabilityChips({ capabilities }: { capabilities: Record<string,
  * model's name (lists on a phone). Press it to see them.
  */
 export function CapabilityInfo({ name, capabilities }: { name: string; capabilities: Record<string, boolean> }) {
+  const [open, setOpen] = useState(false)
+  useCloseOnScroll(open, useCallback(() => setOpen(false), []))
   return (
-    <Popover.Root>
+    <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
         aria-label={`What ${name} can do`}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text"
