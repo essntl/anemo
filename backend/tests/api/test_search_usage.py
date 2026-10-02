@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.features.documents import service as documents
 from app.features.documents.models import Document
+from app.features.search import service as search_service
 from app.features.usage.models import UsageRecord
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
@@ -118,6 +119,23 @@ async def test_search_finds_every_kind(authed):
         "otter-plan.md": "/files?path=notes&file=notes/otter-plan.md",
     }
     assert titles(result, "automation") == ["Otter news"]
+
+
+async def test_snippets_read_as_plain_text_not_markdown(authed):
+    notes = (
+        "## Plan\n\nAsk for the **heirloom** ones, see "
+        "[Planting plan](/documents/0190aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee).\n\n"
+        "- [ ] check the `price`\n> quoted\n"
+    )
+    await authed.post("/api/tasks", json={"title": "Buy seeds", "description": notes})
+    r = await authed.get("/api/search?q=heirloom&kinds=task")
+    hit = r.json()["groups"][0]["hits"][0]
+    assert hit["snippet"] == (
+        "Plan Ask for the heirloom ones, see Planting plan. check the price quoted"
+    )
+    # A link whose address was cut off loses it too, and ordinary punctuation stays.
+    assert search_service.plain("see [the plan](/documents/0190aa") == "see the plan"
+    assert search_service.plain("2 * 3 - 1, a_b, [note]") == "2 * 3 - 1, a_b, [note]"
 
 
 async def test_search_words_limits_and_kinds(authed):

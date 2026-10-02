@@ -10,7 +10,10 @@ describe('search box pages', () => {
     expect(matchingPages('todo').map((p) => p.to)).toEqual(['/tasks'])
     expect(matchingPages('settings mcp').map((p) => p.to)).toEqual(['/settings/mcp'])
     expect(matchingPages('settings zeppelin')).toEqual([])
-    expect(matchingPages('').length).toBeGreaterThan(10) // no query: everything
+    // No query: the main pages; the sections of Settings only once something is typed.
+    expect(matchingPages('').length).toBeGreaterThan(10)
+    expect(matchingPages('').some((p) => p.to.startsWith('/settings/'))).toBe(false)
+    expect(matchingPages('settings').length).toBeGreaterThan(5)
   })
 })
 

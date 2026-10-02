@@ -11,7 +11,8 @@ import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
 import { ShareDialog } from '@/features/shares/ShareDialog'
 import { MobileTopBar } from './mobileNav'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
-import { Sidebar } from './Sidebar'
+import { Sidebar, SidebarRail } from './Sidebar'
+import { useSidebar } from './sidebarStore'
 import { useSidebarSwipe } from './useSidebarSwipe'
 
 /** On phones the sidebar slides in from the left (menu button, or swipe right); the
@@ -39,6 +40,19 @@ export function AppLayout() {
   useAppEvents()
   useSidebarSwipe()
   const location = useLocation()
+  // Desktop: the sidebar can be folded to a strip of icons (its button, or Ctrl+\).
+  const collapsed = useSidebar((s) => s.collapsed)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+        e.preventDefault()
+        const { collapsed: now, setCollapsed } = useSidebar.getState()
+        setCollapsed(!now)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const setOpen = useMobileNav((s) => s.setOpen)
   // Close the phone menu whenever the page changes (e.g. after tapping a link in it).
   useEffect(() => setOpen(false), [location.pathname, location.search, setOpen])
@@ -47,7 +61,7 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full">
-      <Sidebar className="hidden w-64 md:flex" />
+      {collapsed ? <SidebarRail className="hidden md:flex" /> : <Sidebar className="hidden w-64 md:flex" />}
       <SidebarDrawer />
       <div className="flex min-w-0 flex-1 flex-col">
         {!ownHeader && <MobileTopBar />}

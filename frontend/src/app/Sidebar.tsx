@@ -14,6 +14,8 @@ import {
   History,
   LogOut,
   MessagesSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
@@ -62,6 +64,11 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
       <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   )
+}
+
+/** A thin line in the accent colour that fades out: sets the parts of the sidebar apart. */
+function Divider({ className }: { className?: string }) {
+  return <div aria-hidden className={cn('h-px shrink-0 bg-[linear-gradient(to_right,var(--accent),transparent)] opacity-50', className)} />
 }
 
 /** Agent runs that are working, or that wait for the user (approval or paused). */
@@ -141,22 +148,75 @@ function MenuBadge() {
   )
 }
 
+/** One page in the folded sidebar: an icon, with its name as a tooltip. */
+function RailLink({ to, label, icon, badge }: { to: string; label: string; icon: ReactNode; badge?: ReactNode }) {
+  return (
+    <NavLink to={to} title={label} aria-label={label}
+      className={({ isActive }) =>
+        cn('relative flex h-9 w-9 shrink-0 items-center justify-center rounded-control transition-colors [&>svg]:h-4 [&>svg]:w-4',
+          isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+      {icon}
+      {badge && <span className="absolute -right-1 -top-1 scale-75">{badge}</span>}
+    </NavLink>
+  )
+}
+
+/** The sidebar folded to a strip of icons (desktop only). */
+export function SidebarRail({ className }: { className?: string }) {
+  const navigate = useNavigate()
+  const openSearch = usePalette((s) => s.setOpen)
+  const setCollapsed = useSidebar((s) => s.setCollapsed)
+  const button = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
+  return (
+    <nav aria-label="Menu" className={cn('h-full w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-border bg-surface py-4', className)}>
+      <button type="button" aria-label="Show the sidebar" title="Show the sidebar (Ctrl+\)" onClick={() => setCollapsed(false)} className={button}>
+        <PanelLeftOpen className="h-4 w-4" />
+      </button>
+      <Button variant="primary" size="icon" className="mt-2 shrink-0" aria-label="New chat" title="New chat" onClick={() => navigate('/')}>
+        <Plus className="h-4 w-4" />
+      </Button>
+      <button type="button" aria-label="Search everything" title="Search everything (Ctrl+K)" onClick={() => openSearch(true)} className={button}>
+        <Search className="h-4 w-4" />
+      </button>
+      <RailLink to="/chats" label="All chats" icon={<MessagesSquare />} />
+      <Divider className="my-2 w-8" />
+      <RailLink to="/projects" label="Projects" icon={<FolderKanban />} />
+      <RailLink to="/files" label="Files" icon={<FolderOpen />} />
+      <RailLink to="/documents" label="Documents" icon={<FileText />} />
+      <RailLink to="/tasks" label="Tasks" icon={<CheckSquare />} />
+      <RailLink to="/calendar" label="Calendar" icon={<CalendarDays />} />
+      <RailLink to="/runs" label="Runs" icon={<History />} badge={<RunsBadge />} />
+      <RailLink to="/automations" label="Automations" icon={<Clock />} />
+      <RailLink to="/agents" label="Profiles & Skills" icon={<Bot />} />
+      <RailLink to="/memory" label="Memory" icon={<Brain />} badge={<MemoryBadge />} />
+      <Divider className="mb-2 mt-auto w-8" />
+      <RailLink to="/notifications" label="Notifications" icon={<Bell />} badge={<NotificationsBadge />} />
+      <RailLink to="/settings" label="Settings" icon={<Settings />} />
+    </nav>
+  )
+}
+
 /** `onClose` is set when the sidebar is shown in the phone drawer. */
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const navigate = useNavigate()
   const me = useMe()
   const logout = useLogout()
   const openSearch = usePalette((s) => s.setOpen)
-  const { menuOpen, setMenuOpen } = useSidebar()
+  const { menuOpen, setMenuOpen, setCollapsed } = useSidebar()
   return (
     <aside className={cn('h-full shrink-0 flex-col border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
       <div className="mb-4 flex items-center gap-2 px-2">
         <Logo className="h-8 w-8 text-accent pointer-coarse:h-9 pointer-coarse:w-9" />
         <span className="flex-1 text-[19px] font-semibold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
-        {onClose && (
+        {onClose ? (
           <button type="button" aria-label="Close menu" onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
             <X className="h-5 w-5" />
+          </button>
+        ) : (
+          <button type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+\)" onClick={() => setCollapsed(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-control text-subtle hover:bg-surface-hover hover:text-text">
+            <PanelLeftClose className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -172,7 +232,9 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </Button>
         {/* Search everything (also Ctrl+K). The box below only filters the chat list. */}
         <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" aria-label="Search everything"
-          title="Search everything (Ctrl+K)" onClick={() => openSearch(true)}>
+          title="Search everything (Ctrl+K)"
+          // On a phone the search takes the screen, so the menu makes way for it.
+          onClick={() => { onClose?.(); openSearch(true) }}>
           <Search className="h-4 w-4" />
         </Button>
       </div>
@@ -185,13 +247,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <ConversationList fill={!menuOpen} />
         <NavLink to="/chats"
           className={({ isActive }) =>
-            cn('mt-1 flex h-8 shrink-0 items-center gap-2 rounded-control px-3 text-[12.5px] pointer-coarse:h-10 pointer-coarse:text-[14px]',
-              isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
-          <MessagesSquare className="h-3.5 w-3.5" /> All chats
+            cn('mt-1 flex h-9 shrink-0 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium pointer-coarse:h-11 pointer-coarse:text-[15px]',
+              isActive ? 'bg-accent-soft text-accent' : 'text-text hover:bg-surface-hover')}>
+          <MessagesSquare className="h-4 w-4 text-accent" />
+          <span className="flex-1">All chats</span>
+          <ChevronRight className="h-3.5 w-3.5 text-subtle" />
         </NavLink>
 
+        <Divider className="mx-1 mt-3" />
         <button type="button" aria-expanded={menuOpen} aria-controls="sidebar-menu" onClick={() => setMenuOpen(!menuOpen)}
-          className="mt-3 flex h-8 shrink-0 items-center gap-1.5 rounded-control px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-10">
+          className="mt-2 flex h-8 shrink-0 items-center gap-1.5 rounded-control px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-10">
           <ChevronRight className={cn('h-3.5 w-3.5 transition-transform duration-150', menuOpen && 'rotate-90')} />
           <span className="flex-1 text-left">Workspace &amp; agents</span>
           {!menuOpen && <MenuBadge />}
@@ -217,7 +282,8 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </div>
       </nav>
 
-      <div className="flex flex-col gap-0.5 border-t border-border pt-3">
+      <Divider className="mx-1" />
+      <div className="flex flex-col gap-0.5 pt-3">
         <NavItem to="/notifications" icon={<Bell />} badge={<NotificationsBadge />}>Notifications</NavItem>
         <NavItem to="/settings" icon={<Settings />}>Settings</NavItem>
         <button

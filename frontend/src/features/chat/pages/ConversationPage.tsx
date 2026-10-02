@@ -6,6 +6,7 @@ import { errorMessage } from '@/api/client'
 import { MenuButton, NewChatButton } from '@/app/mobileNav'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
+import { promptDialog } from '@/components/ui/dialogs'
 import { timelineKey } from '@/features/agents/api'
 import { useShellOutput } from '@/features/agents/shellOutput'
 import { useBrowserStatus } from '@/features/browser/api'
@@ -90,6 +91,12 @@ export function ConversationPage() {
   const branch = useBranch()
   const projects = useProjects()
   const update = useUpdateConversation()
+  const rename = async () => {
+    const current = conversation.data
+    if (!current) return
+    const title = await promptDialog({ title: 'Rename chat', label: 'Title', initial: current.title, confirmLabel: 'Rename' })
+    if (title && title !== current.title) update.mutate({ id: current.id, body: { title } })
+  }
   const [modelOverride, setModelOverride] = useState<string | null>(null)
   const [modeOverride, setModeOverride] = useState<Mode | null>(null)
   const mode: Mode = modeOverride ?? (conversation.data?.default_mode === 'agent' ? 'agent' : 'chat')
@@ -156,7 +163,13 @@ export function ConversationPage() {
       <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:h-14 md:px-6">
         <MenuButton />
         <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
-          {conversation.data?.title ?? ' '}
+          {/* The title is a button: press it to rename the chat. */}
+          {conversation.data ? (
+            <button type="button" title="Rename" aria-label={`Rename “${conversation.data.title}”`} onClick={() => void rename()}
+              className="-mx-1.5 max-w-full truncate rounded-md px-1.5 py-1 align-middle font-semibold hover:bg-surface-hover">
+              {conversation.data.title}
+            </button>
+          ) : ' '}
           {project && (
             <span className="ml-2 hidden items-center gap-1 align-middle text-[12px] font-normal text-muted sm:inline-flex">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} /> {project.name}

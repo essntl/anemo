@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { NavLink } from 'react-router'
-import { Loader2, Search, Star } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, useMatch } from 'react-router'
+import { Loader2, Search, Star, X } from 'lucide-react'
 import { useCurrentProject } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { cn } from '@/lib/cn'
@@ -19,14 +19,20 @@ function useDebounced<T>(value: T, ms: number): T {
 
 function Item({ conv }: { conv: Conversation }) {
   const actions = useChatActions(conv)
+  // The open chat stays in sight, also when it is further down than the list shows.
+  const open = useMatch(`/c/${conv.id}`) !== null
+  const row = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (open) row.current?.scrollIntoView({ block: 'nearest' })
+  }, [open])
   return (
-    <div className="group relative">
+    <div ref={row} className="group relative">
       <NavLink
         to={`/c/${conv.id}`}
         className={({ isActive }) =>
           cn(
             'flex h-9 items-center gap-2 rounded-control pl-3 pr-9 text-[13px] pointer-coarse:h-11 pointer-coarse:pr-11 pointer-coarse:text-[15px]',
-            isActive ? 'bg-surface-hover text-text' : 'text-muted hover:bg-surface-hover hover:text-text',
+            isActive ? 'bg-accent-soft font-medium text-text' : 'text-muted hover:bg-surface-hover hover:text-text',
           )
         }
       >
@@ -93,10 +99,17 @@ export function ConversationList({ fill }: { fill: boolean }) {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
           placeholder={project ? `Search chats in ${project.name}` : 'Search chats'}
           aria-label="Search chats"
-          className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-3 pointer-coarse:h-10 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
+          className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-8 pointer-coarse:h-10 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
         />
+        {query && (
+          <button type="button" aria-label="Clear the search" onClick={() => setQuery('')}
+            className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-8 pointer-coarse:w-8">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       {/* Menu open: tall enough for 7 chats and their headings, the rest by scrolling.
           --row matches the height of one chat (taller on touch screens). */}

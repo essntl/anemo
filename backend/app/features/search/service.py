@@ -84,9 +84,24 @@ def contains_all(
     return and_(*[or_(*[col.ilike(like(w), escape="\\") for col in columns]) for w in words])
 
 
+# Markdown that would only be noise in a one-line result: [text](address) and images
+# (also when the address was cut off), the marks at the start of a line (headings, list
+# bullets, check boxes, quotes), and bold, strike-through and code marks.
+_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*(?:\)|$)")
+_LINE_START = re.compile(
+    r"^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+(?:\[[ xX]\][ \t]+)?)", re.MULTILINE
+)
+_MARKS = re.compile(r"\*\*|__|~~|`")
+
+
+def plain(text: str) -> str:
+    """`text` without its Markdown notation, as it reads: for snippets in results."""
+    return _MARKS.sub("", _LINE_START.sub("", _LINK.sub(r"\1", text)))
+
+
 def snippet(text: str, words: list[str]) -> str:
-    """A short piece of `text` around the first word found."""
-    flat = " ".join(text.split())
+    """A short piece of `text` (read as plain text) around the first word found."""
+    flat = " ".join(plain(text).split())
     if len(flat) <= SNIPPET_CHARS:
         return flat
     lower = flat.lower()
@@ -125,7 +140,7 @@ async def _chats(db: AsyncSession, q: Query) -> list[SearchHit]:
             kind="chat",
             id=str(c.id),
             title=c.title,
-            snippet=" ".join(snippets.get(c.id, "").split()),
+            snippet=" ".join(plain(snippets.get(c.id, "")).split()),
             url=f"/c/{c.id}",
             when=c.last_message_at,
         )

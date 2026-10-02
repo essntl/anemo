@@ -52,7 +52,9 @@ screen narrows to it; **All projects** shows everything again.
 Chats can be filed in a project, given **tags**, marked as **favorites** and
 **archived**. **All chats** lists every chat with search, filters, sorting, and actions
 on several at once. The menu under the chat list (Files, Tasks, Runs, …) can be
-closed, which leaves the sidebar to your chats; it starts closed on phones.
+closed, which leaves the sidebar to your chats; it starts closed on phones. On a
+desktop the whole sidebar can be folded to a strip of icons (the button next to the
+name, or Ctrl+\), which leaves more room for the page.
 
 In a chat you can:
 
