@@ -24,6 +24,7 @@ from app.events import bus
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.memory import extraction
 from app.features.memory import service as memory
+from app.features.projects import service as projects
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Run
 from app.features.usage import service as usage
@@ -234,6 +235,8 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         )
         section, used = await memory.build_context(db, query, await memory.get_settings(db))
         run.options = {**run.options, "memory_context": used}
+        # The chat's project: where its files are, and the user's instructions for it.
+        section += projects.prompt_section(await projects.for_conversation(db, run.conversation_id))
         await db.commit()
 
     system = SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat()) + section
@@ -334,9 +337,16 @@ async def generate_title(conversation_id: uuid.UUID) -> None:
                 used = event
         title = " ".join("".join(parts).split()).strip(" \"'.#*")[:80]
         usage.record(db, model, used, "title", conversation_id=conversation_id)
-        if title and conv.title_is_auto:
-            conv.title = title
+        if title:
+            # Only if it still has its automatic title: the model call took a while, and
+            # the user may have renamed the chat in the meantime (their title wins).
+            await db.execute(
+                update(Conversation)
+                .where(Conversation.id == conversation_id, Conversation.title_is_auto.is_(True))
+                .values(title=title)
+            )
         await db.commit()
+        await db.refresh(conv)
         await bus.publish_global(
             "conversation.updated", {"conversation_id": str(conversation_id), "title": conv.title}
         )

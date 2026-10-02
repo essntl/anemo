@@ -195,6 +195,26 @@ async def test_title_is_generated_after_first_exchange(authed):
     assert conv["title"] != "New chat" and len(conv["title"]) <= 80
 
 
+async def test_a_title_typed_while_one_is_being_generated_is_kept(authed, monkeypatch):
+    """The title model takes a moment. A rename in that moment must not be overwritten."""
+    await _setup_models(authed)
+    cid = await _new_conversation(authed)
+    turn = (await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})).json()
+    await execute_chat_run(uuid.UUID(turn["run_id"]))
+
+    original = FakeAdapter.stream_chat
+
+    async def rename_meanwhile(self, req):
+        r = await authed.patch(f"/api/conversations/{cid}", json={"title": "My own title"})
+        assert r.status_code == 200
+        async for event in original(self, req):
+            yield event
+
+    monkeypatch.setattr(FakeAdapter, "stream_chat", rename_meanwhile)
+    await generate_title(uuid.UUID(cid))
+    assert (await authed.get(f"/api/conversations/{cid}")).json()["title"] == "My own title"
+
+
 async def test_search_finds_message_text(authed):
     await _setup_models(authed)
     cid = await _new_conversation(authed)
