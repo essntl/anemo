@@ -100,20 +100,26 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
     // Laid out like a document: the title, status and notes take most of the window; what
     // files the task (schedule, project, priority, tags) and the buttons are in a panel
     // at the side. On a phone the panel comes below the notes and the buttons stay in view.
+    // Beside the panel the notes are exactly as tall as it is (the left column takes no
+    // height of its own), and longer notes scroll inside their box.
     <Dialog open onOpenChange={(open) => !open && onClose()} className="max-md:pb-0 md:w-[min(96vw,1020px)]" title={task ? 'Task' : 'New task'}>
-      <div className="flex flex-col gap-5 md:grid md:grid-cols-[minmax(0,1fr)_18rem] md:gap-6">
-        <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-col gap-5 md:grid md:min-h-[min(68dvh,44rem)] md:grid-cols-[minmax(0,1fr)_18rem] md:gap-6">
+        <div className="relative min-w-0">
+        <div className="flex flex-col gap-3 md:absolute md:inset-0">
           <input aria-label="Title" autoFocus={!task} value={title} maxLength={300} placeholder="What needs doing?"
             onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && save()}
             className="w-full bg-transparent text-xl font-semibold placeholder:font-medium placeholder:text-subtle focus:outline-none md:text-2xl" />
-          <div className="flex flex-wrap items-center gap-2">
+          {/* The status and the notes box are moved out by their own padding, so their text
+              starts on the same line as the heading and the title above them. */}
+          <div className="flex flex-wrap items-center gap-2 md:-ml-3">
             <Select variant="pill" aria-label="Status" value={status} onValueChange={(v) => setStatus(v as TaskStatus)}
               options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))} />
             {task?.created_by === 'agent' && <span className="text-[12px] text-muted">Added by an agent.</span>}
           </div>
           {/* Stored as Markdown, like documents. An empty editor gives an empty text. */}
-          <RichEditor variant="notes" label="Notes" initial={task?.description ?? ''} onOpenAppLink={openLink}
+          <RichEditor variant="notes" className="md:-ml-3 md:flex-1" label="Notes" initial={task?.description ?? ''} onOpenAppLink={openLink}
             onChange={(markdown) => setDescription(markdown.trim() ? tidyMarkdown(markdown) : '')} />
+        </div>
         </div>
 
         <aside aria-label="Details" className="flex flex-col gap-4 md:border-l md:border-border md:pl-6">

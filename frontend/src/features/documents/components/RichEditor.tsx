@@ -25,9 +25,12 @@ interface RichEditorProps {
   onError?: (message: string) => void
   /**
    * `document` (default) fills the page and takes images. `notes` is a bordered box
-   * that grows with its text up to a limit (then scrolls), without images or tables.
+   * without images or tables: it grows with its text up to a limit and then scrolls,
+   * or, given a height by `className` (e.g. `flex-1`), fills it and scrolls inside.
    */
   variant?: 'document' | 'notes'
+  /** Extra classes for the box of the `notes` variant. */
+  className?: string
   /** What the text is, for screen readers. */
   label?: string
   /**
@@ -37,7 +40,7 @@ interface RichEditorProps {
   onOpenAppLink?: (path: string) => void
 }
 
-export function RichEditor({ initial, onChange, onError, variant = 'document', label = 'Document text', onOpenAppLink }: RichEditorProps) {
+export function RichEditor({ initial, onChange, onError, variant = 'document', label = 'Document text', onOpenAppLink, className }: RichEditorProps) {
   const notes = variant === 'notes'
   const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -78,7 +81,7 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
     onUpdate: ({ editor: e }) => onChange(e.getMarkdown()),
     editorProps: {
       attributes: {
-        class: cn('markdown focus:outline-none', notes ? 'min-h-40 px-3 py-2.5 md:min-h-80' : 'min-h-[55vh] px-4 py-5 md:px-8 md:py-7'),
+        class: cn('markdown focus:outline-none', notes ? 'min-h-40 flex-1 px-3 py-2.5' : 'min-h-[55vh] px-4 py-5 md:px-8 md:py-7'),
         'aria-label': label,
       },
       handleClick: (_view, _pos, event) => {
@@ -123,10 +126,12 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   )
   if (notes) {
     return (
-      <div className="overflow-hidden rounded-control border border-border bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
+      // Columns all the way down, so the text area fills whatever height the box has and
+      // a click anywhere in it lands in the editor.
+      <div className={cn('flex min-h-0 flex-col overflow-hidden rounded-control border border-border bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft', className)}>
         <EditorToolbar editor={editor} onPickLink={() => setPickingLink(true)} />
-        <div className="max-h-[45dvh] overflow-y-auto md:max-h-[58dvh]">
-          <EditorContent editor={editor} />
+        <div className="flex max-h-[45dvh] min-h-0 flex-1 flex-col overflow-y-auto md:max-h-none">
+          <EditorContent editor={editor} className="flex flex-1 flex-col" />
         </div>
         {picker}
       </div>
