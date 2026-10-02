@@ -2,21 +2,24 @@
  * What someone sees when they open a share link (/s/<token>): a read-only copy of a
  * chat, a document or a project. No login, no sidebar, nothing to press that changes
  * anything. The page only asks the server for this one copy. In a shared project, a
- * document opens on the same page (`?doc=2` is the third document of the copy).
+ * document or a task with notes opens on the same page (`?doc=2` is the third document
+ * of the copy, `?task=0` its first task); links between them use the same addresses.
  */
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { ArrowLeft, CalendarDays, CheckCircle2, ChevronRight, Circle, FileText, Link2Off, MessageSquare, Paperclip } from 'lucide-react'
 import { ApiError } from '@/api/client'
 import { Logo } from '@/components/ui/Logo'
 import { Markdown } from '@/components/ui/Markdown'
 import { splitFrontMatter } from '@/features/documents/markdown'
+import { cn } from '@/lib/cn'
 import { formatUpcoming } from '@/lib/format'
 import { type Shared, useShared } from './api'
 
 type SharedMessage = NonNullable<Shared['messages']>[number]
 type SharedProject = NonNullable<Shared['project']>
 type SharedEvent = NonNullable<SharedProject['events']>[number]
+type SharedTask = NonNullable<SharedProject['tasks']>[number]
 
 const KIND = { chat: 'Chat', document: 'Document', project: 'Project' } as const
 const STATUS: Record<string, string> = { todo: 'To do', in_progress: 'In progress', blocked: 'Blocked', done: 'Done' }
@@ -74,19 +77,44 @@ function Section({ title, empty, children }: { title: string; empty: string; chi
       {children.length === 0 ? (
         <p className="text-[13.5px] text-subtle">{empty}</p>
       ) : (
-        <ul className="divide-y divide-border rounded-card border border-border bg-card">{children}</ul>
+        <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-card">{children}</ul>
       )}
     </section>
   )
 }
 
-function Row({ icon, children, aside }: { icon: ReactNode; children: ReactNode; aside?: ReactNode }) {
-  return (
-    <li className="flex items-center gap-3 px-3.5 py-2.5 text-[14px] [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-muted">
+const ROW = 'flex items-center gap-3 px-3.5 py-2.5 text-[14px] [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-muted'
+
+/** One line of a list. With `to` it is a link that opens that entry on this page. */
+function Row({ icon, children, aside, to }: { icon: ReactNode; children: ReactNode; aside?: ReactNode; to?: string }) {
+  const body = (
+    <>
       {icon}
       <span className="min-w-0 flex-1 break-words">{children}</span>
       {aside && <span className="shrink-0 text-[12.5px] text-muted">{aside}</span>}
+    </>
+  )
+  if (!to) return <li className={ROW}>{body}</li>
+  return (
+    <li>
+      <Link to={to} className={cn(ROW, 'hover:bg-surface-hover pointer-coarse:py-3')}>
+        {body}
+        <ChevronRight className="text-subtle" />
+      </Link>
     </li>
+  )
+}
+
+const taskState = (task: SharedTask) =>
+  [STATUS[task.status] ?? task.status, task.due_date ? `due ${day(task.due_date)}` : ''].filter(Boolean).join(' · ')
+
+/** A task in the list. One with notes opens on its own page, however long they are. */
+function TaskItem({ task, index }: { task: SharedTask; index: number }) {
+  const done = task.status === 'done'
+  return (
+    <Row icon={done ? <CheckCircle2 /> : <Circle />} aside={taskState(task)} to={task.description?.trim() ? `?task=${index}` : undefined}>
+      <span className={done ? 'text-muted line-through' : undefined}>{task.title}</span>
+    </Row>
   )
 }
 
@@ -100,12 +128,7 @@ function ProjectOverview({ project }: { project: SharedProject }) {
     <div className="flex flex-col gap-7">
       {project.tasks && (
         <Section title="Tasks" empty="No tasks.">
-          {project.tasks.map((t, i) => (
-            <Row key={i} icon={t.status === 'done' ? <CheckCircle2 /> : <Circle />}
-              aside={[STATUS[t.status] ?? t.status, t.due_date ? `due ${day(t.due_date)}` : ''].filter(Boolean).join(' · ')}>
-              <span className={t.status === 'done' ? 'text-muted line-through' : undefined}>{t.title}</span>
-            </Row>
-          ))}
+          {project.tasks.map((t, i) => <TaskItem key={i} task={t} index={i} />)}
         </Section>
       )}
       {project.events && (
@@ -115,15 +138,7 @@ function ProjectOverview({ project }: { project: SharedProject }) {
       )}
       {project.documents && (
         <Section title="Documents" empty="No documents.">
-          {project.documents.map((d, i) => (
-            <li key={i}>
-              <Link to={`?doc=${i}`} className="flex items-center gap-3 px-3.5 py-2.5 text-[14px] hover:bg-surface-hover pointer-coarse:py-3">
-                <FileText className="h-4 w-4 shrink-0 text-muted" />
-                <span className="min-w-0 flex-1 break-words">{d.title}</span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-subtle" />
-              </Link>
-            </li>
-          ))}
+          {project.documents.map((d, i) => <Row key={i} icon={<FileText />} to={`?doc=${i}`}>{d.title}</Row>)}
         </Section>
       )}
     </div>
@@ -150,13 +165,21 @@ export function SharedPage() {
   const { token = '' } = useParams()
   const shared = useShared(token)
   const data = shared.data
-  // A document of a shared project, when one is open.
+  // A document or a task of a shared project, when one is open.
   const [params] = useSearchParams()
-  const opened = params.has('doc') ? data?.project?.documents?.[Number(params.get('doc'))] : undefined
+  const at = (key: string) => (params.has(key) ? Number(params.get(key)) : -1)
+  const document_ = data?.project?.documents?.[at('doc')]
+  const task = document_ ? undefined : data?.project?.tasks?.[at('task')]
+  const opened = document_ ?? task
   const title = opened?.title ?? data?.title
   useEffect(() => {
     if (title) document.title = `${title} · Anemo`
   }, [title])
+  // Each entry starts at its top, also when reached through a link far down another one.
+  const scroller = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    scroller.current?.scrollTo(0, 0)
+  }, [params])
 
   if (shared.isError) {
     return <Unavailable tooMany={shared.error instanceof ApiError && shared.error.status === 429} />
@@ -164,7 +187,7 @@ export function SharedPage() {
   if (!data) return null
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div ref={scroller} className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-4 pb-16 pt-6 md:px-8 md:pt-10">
         <header className="mb-7 border-b border-border pb-5">
           <div className="mb-3 flex items-center gap-2 text-[13px] text-muted">
@@ -180,6 +203,7 @@ export function SharedPage() {
           <h1 className="break-words text-2xl font-semibold">{title}</h1>
           <p className="mt-1 text-[13px] text-muted">
             {data.kind === 'chat' && data.started_at && <>Started {day(data.started_at)} · </>}
+            {task && <>{taskState(task)} · </>}
             A copy from {day(data.shared_at)}. It does not change when the original does.
           </p>
         </header>
@@ -192,7 +216,9 @@ export function SharedPage() {
         )}
         {data.kind === 'document' && <Markdown text={documentBody(data.markdown ?? '', data.title)} />}
         {data.kind === 'project' && data.project && (
-          opened ? <Markdown text={documentBody(opened.markdown, opened.title)} /> : <ProjectOverview project={data.project} />
+          document_ ? <Markdown text={documentBody(document_.markdown, document_.title)} />
+            : task ? <Markdown text={task.description ?? ''} />
+            : <ProjectOverview project={data.project} />
         )}
       </div>
     </div>

@@ -32,9 +32,11 @@ test('search: Ctrl+K finds a task and a page, the results page filters by kind',
     await expect(hit).toHaveAttribute('aria-selected', 'true') // the first result is selected
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(new RegExp(`/tasks\\?task=${task.id}`))
-    await expect(page.getByRole('dialog').getByLabel('Title')).toHaveValue(title)
-    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
-    await expect(page).toHaveURL(/\/tasks$/)
+    // It is shown in the list, marked and with its notes open; the editor stays closed.
+    const shownTask = page.locator('[aria-current="true"]')
+    await expect(shownTask.getByRole('button', { name: title, exact: true })).toBeVisible()
+    await expect(shownTask.getByText('Bring the big ladder')).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
 
     // The results page: every word must match, and kinds can be filtered.
     await page.goto(`/search?q=${word}`)

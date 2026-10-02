@@ -8,6 +8,7 @@ run, calls a model or touches a tool.
 """
 
 import logging
+import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -54,6 +55,37 @@ def _now() -> datetime:
 
 # -- making the copy ----------------------------------------------------------------------
 
+_UUID = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
+# A Markdown link to a document or a task of this app: [text](/documents/<id>) or
+# [text](/tasks?task=<id>), as the editors write them.
+_APP_LINK = re.compile(
+    rf"\[((?:\\.|[^\]\\\n])*)\]\((?:/documents/({_UUID})|/tasks\?task=({_UUID}))\)"
+)
+
+
+def relink(
+    text: str,
+    document_at: dict[uuid.UUID, int] | None = None,
+    task_at: dict[uuid.UUID, int] | None = None,
+) -> str:
+    """Rewrite links between tasks and documents for a copy.
+
+    In the app they hold an id and an address that needs a login; a visitor gets
+    neither. A link to something that is part of the same copy points to its place
+    there (`?doc=2`, `?task=0`, which the share page opens); any other keeps its text
+    and loses the link.
+    """
+
+    def swap(match: re.Match[str]) -> str:
+        label, document_id, task_id = match.groups()
+        if document_id:
+            key, place = "doc", (document_at or {}).get(uuid.UUID(document_id))
+        else:
+            key, place = "task", (task_at or {}).get(uuid.UUID(task_id))
+        return label if place is None else f"[{label}](?{key}={place})"
+
+    return _APP_LINK.sub(swap, text)
+
 
 async def _chat(db: AsyncSession, conversation_id: uuid.UUID) -> tuple[str, Snapshot]:
     conv = await db.get(Conversation, conversation_id)
@@ -78,7 +110,7 @@ async def _chat(db: AsyncSession, conversation_id: uuid.UUID) -> tuple[str, Snap
             continue
         shared = SharedMessage(
             role=m.role,  # type: ignore[arg-type]
-            text=m.text_plain.strip(),
+            text=relink(m.text_plain.strip()),
             model=m.model_label if m.role == "assistant" else None,
             attachments=names.get(m.id, []),
             references=[
@@ -95,7 +127,7 @@ async def _chat(db: AsyncSession, conversation_id: uuid.UUID) -> tuple[str, Snap
 async def _document(db: AsyncSession, document_id: uuid.UUID) -> tuple[str, Snapshot]:
     doc = await documents.get(db, document_id)
     content = await documents.read(db, doc)
-    return doc.title, Snapshot(markdown=content)
+    return doc.title, Snapshot(markdown=relink(content))
 
 
 async def _project(
@@ -103,15 +135,44 @@ async def _project(
 ) -> tuple[str, Snapshot]:
     project = await projects.get(db, project_id)
     shared = SharedProject()
+    # First what is in the copy and where, so links between its tasks and documents
+    # can point to each other (see relink).
+    tasks: list[Task] = []
+    document_ids: list[uuid.UUID] = []
     if "tasks" in sections:
-        rows = await db.scalars(
-            select(Task)
-            .where(Task.project_id == project.id, Task.status != "cancelled")
-            .order_by(Task.status.in_(OPEN_STATUSES).desc(), Task.due_date.nulls_last(), Task.title)
-            .limit(MAX_ROWS)
+        tasks = list(
+            await db.scalars(
+                select(Task)
+                .where(Task.project_id == project.id, Task.status != "cancelled")
+                .order_by(
+                    Task.status.in_(OPEN_STATUSES).desc(), Task.due_date.nulls_last(), Task.title
+                )
+                .limit(MAX_ROWS)
+            )
         )
+    if "documents" in sections:
+        await documents.reconcile(db)  # files added or removed outside the app
+        prefix = projects.documents_path(project) + "/"
+        document_ids = list(
+            await db.scalars(
+                select(Document.id)
+                .where(Document.path.startswith(prefix, autoescape=True))
+                .order_by(func.lower(Document.title))
+                .limit(MAX_ROWS)
+            )
+        )
+    task_at = {task.id: n for n, task in enumerate(tasks)}
+    document_at = {document_id: n for n, document_id in enumerate(document_ids)}
+
+    if "tasks" in sections:
         shared.tasks = [
-            SharedTask(title=t.title, status=t.status, due_date=t.due_date) for t in rows
+            SharedTask(
+                title=t.title,
+                description=relink(t.description, document_at, task_at),
+                status=t.status,
+                due_date=t.due_date,
+            )
+            for t in tasks
         ]
     if "events" in sections:
         now = _now()
@@ -130,18 +191,10 @@ async def _project(
                 )
             )
     if "documents" in sections:
-        await documents.reconcile(db)  # files added or removed outside the app
-        prefix = projects.documents_path(project) + "/"
-        ids = await db.scalars(
-            select(Document.id)
-            .where(Document.path.startswith(prefix, autoescape=True))
-            .order_by(func.lower(Document.title))
-            .limit(MAX_ROWS)
-        )
         shared.documents = []
-        for document_id in list(ids):
+        for document_id in document_ids:
             doc = await documents.get(db, document_id)
-            markdown = await documents.read(db, doc)
+            markdown = relink(await documents.read(db, doc), document_at, task_at)
             shared.documents.append(SharedDocument(title=doc.title, markdown=markdown))
     return project.name, Snapshot(project=shared)
 

@@ -130,13 +130,22 @@ test('a shared document, and a shared project whose documents can be read in ful
   try {
     const project = (await (await page.request.post('/api/projects', { data: { name, instructions: 'never shown' } })).json()) as { id: string; slug: string }
     projectId = project.id
-    await page.request.post('/api/tasks', { data: { title: `Buy seeds ${name}`, project_id: project.id } })
     const doc = (await (
       await page.request.post('/api/documents', {
         data: { title: `Planting plan ${name}`, folder: project.slug, content: `# Planting plan ${name}\n\nTomatoes go by the **south wall**.\n` },
       })
     ).json()) as { id: string }
     documentId = doc.id
+    // Long notes with a wide table and a long word, and a link to the document.
+    const notes = [
+      `Ask for the **heirloom** ones, see [the plan](/documents/${doc.id}).`,
+      '| Variety | Sow | Plant out | Harvest | Notes |\n|---|---|---|---|---|\n| San Marzano | March | May | August | needs the warmest bed by the wall |',
+      `https://example.com/${'a-very-long-address-'.repeat(8)}`,
+      ...Array.from({ length: 30 }, (_, i) => `Paragraph ${i + 1} of the notes, with enough words to fill more than one line on a phone.`),
+      'The last line of the notes.',
+    ].join('\n\n')
+    await page.request.post('/api/tasks', { data: { title: `Buy seeds ${name}`, project_id: project.id, description: notes } })
+    await page.request.post('/api/tasks', { data: { title: `Dig beds ${name}`, project_id: project.id } })
 
     // The document by itself, from its own menu.
     await page.goto(`/documents/${doc.id}`)
@@ -165,11 +174,28 @@ test('a shared document, and a shared project whose documents can be read in ful
     await expect(visitor.getByText(`Buy seeds ${name}`)).toBeVisible()
     await expect(visitor.getByRole('heading', { name: 'Upcoming events' })).toHaveCount(0)
     await expect(visitor.getByText('never shown')).toHaveCount(0)
+    const fitsTheScreen = () => visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    // A task without notes is just a line; one with notes opens on its own page, where
+    // long notes have the whole width and the page still fits a phone.
+    await expect(visitor.getByRole('link', { name: `Dig beds ${name}` })).toHaveCount(0)
+    await visitor.getByRole('link', { name: `Buy seeds ${name}` }).click()
+    await expect(visitor).toHaveURL(/\?task=0$/)
+    await expect(visitor.getByRole('heading', { name: `Buy seeds ${name}` })).toBeVisible()
+    await expect(visitor.getByText('To do ·')).toBeVisible()
+    await expect(visitor.getByRole('cell', { name: 'San Marzano' })).toBeVisible()
+    await expect(visitor.getByText('The last line of the notes.')).toBeAttached()
+    expect(await fitsTheScreen()).toBe(true)
+    // The link in the notes leads to the document inside the same copy, and back.
+    await visitor.getByRole('link', { name: 'the plan' }).click()
+    await expect(visitor).toHaveURL(/\?doc=0$/)
+    await expect(visitor.getByText('Tomatoes go by the south wall.')).toBeVisible()
+    await visitor.getByRole('link', { name, exact: true }).click()
+    await expect(visitor.getByRole('link', { name: `Buy seeds ${name}` })).toBeVisible()
     // Open the document from the project, read it, and go back.
     await visitor.getByRole('link', { name: `Planting plan ${name}` }).click()
     await expect(visitor).toHaveURL(/\?doc=0$/)
     await expect(visitor.getByText('Tomatoes go by the south wall.')).toBeVisible()
-    expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await fitsTheScreen()).toBe(true)
     await visitor.getByRole('link', { name, exact: true }).click()
     await expect(visitor.getByText(`Buy seeds ${name}`)).toBeVisible()
     await visitor.reload() // the address of a document also works when opened directly

@@ -4,6 +4,7 @@ import {
   Bold,
   Code,
   CodeSquare,
+  FileSymlink,
   Heading1,
   Heading2,
   Heading3,
@@ -45,8 +46,17 @@ function ToolButton({ label, active, disabled, onClick, children }: {
 
 const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-border" />
 
-/** Formatting buttons for the rich editor. Scrolls sideways on narrow screens. */
-export function EditorToolbar({ editor, onPickImage }: { editor: Editor; onPickImage: () => void }) {
+/**
+ * Formatting buttons for the rich editor. Scrolls sideways on narrow screens.
+ * Without `onPickImage` (short notes) the buttons for whole-document things are left
+ * out: the largest heading, images, tables and divider lines.
+ */
+export function EditorToolbar({ editor, onPickLink, onPickImage }: {
+  editor: Editor
+  /** Opens the picker for a link to a document or task of the app. */
+  onPickLink: () => void
+  onPickImage?: () => void
+}) {
   // Re-render when the selection's formatting changes (the editor itself does not re-render React).
   const state = useEditorState({
     editor,
@@ -84,7 +94,7 @@ export function EditorToolbar({ editor, onPickImage }: { editor: Editor; onPickI
       <ToolButton label="Undo" disabled={!state.canUndo} onClick={() => chain().undo().run()}><Undo2 /></ToolButton>
       <ToolButton label="Redo" disabled={!state.canRedo} onClick={() => chain().redo().run()}><Redo2 /></ToolButton>
       <Divider />
-      <ToolButton label="Heading 1" active={state.h1} onClick={() => chain().toggleHeading({ level: 1 }).run()}><Heading1 /></ToolButton>
+      {onPickImage && <ToolButton label="Heading 1" active={state.h1} onClick={() => chain().toggleHeading({ level: 1 }).run()}><Heading1 /></ToolButton>}
       <ToolButton label="Heading 2" active={state.h2} onClick={() => chain().toggleHeading({ level: 2 }).run()}><Heading2 /></ToolButton>
       <ToolButton label="Heading 3" active={state.h3} onClick={() => chain().toggleHeading({ level: 3 }).run()}><Heading3 /></ToolButton>
       <Divider />
@@ -93,19 +103,24 @@ export function EditorToolbar({ editor, onPickImage }: { editor: Editor; onPickI
       <ToolButton label="Strikethrough" active={state.strike} onClick={() => chain().toggleStrike().run()}><Strikethrough /></ToolButton>
       <ToolButton label="Inline code" active={state.code} onClick={() => chain().toggleCode().run()}><Code /></ToolButton>
       <ToolButton label="Link" active={state.link} onClick={() => void editLink()}><Link2 /></ToolButton>
+      <ToolButton label="Link to a document or task" onClick={onPickLink}><FileSymlink /></ToolButton>
       <Divider />
       <ToolButton label="Bullet list" active={state.bullet} onClick={() => chain().toggleBulletList().run()}><List /></ToolButton>
       <ToolButton label="Numbered list" active={state.ordered} onClick={() => chain().toggleOrderedList().run()}><ListOrdered /></ToolButton>
       <ToolButton label="Checklist" active={state.task} onClick={() => chain().toggleTaskList().run()}><ListChecks /></ToolButton>
       <ToolButton label="Quote" active={state.quote} onClick={() => chain().toggleBlockquote().run()}><Quote /></ToolButton>
       <ToolButton label="Code block" active={state.codeBlock} onClick={() => chain().toggleCodeBlock().run()}><CodeSquare /></ToolButton>
-      <Divider />
-      <ToolButton label="Image" onClick={onPickImage}><ImagePlus /></ToolButton>
-      <ToolButton label="Table" active={state.table}
-        onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
-        <Table />
-      </ToolButton>
-      <ToolButton label="Divider line" onClick={() => chain().setHorizontalRule().run()}><Minus /></ToolButton>
+      {onPickImage && (
+        <>
+          <Divider />
+          <ToolButton label="Image" onClick={onPickImage}><ImagePlus /></ToolButton>
+          <ToolButton label="Table" active={state.table}
+            onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
+            <Table />
+          </ToolButton>
+          <ToolButton label="Divider line" onClick={() => chain().setHorizontalRule().run()}><Minus /></ToolButton>
+        </>
+      )}
       {state.table && (
         <>
           <Divider />

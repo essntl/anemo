@@ -112,18 +112,48 @@
   .markdown ol { @apply my-3 list-decimal pl-6; }
   .markdown li { @apply my-1; }
   .markdown a { @apply text-accent underline underline-offset-2; }
+
+  /* A link to a document or a task of the app (see lib/appLinks.ts) is shown as a small
+     chip with an icon, in the editors and wherever Markdown is rendered. On a share page
+     the same links are "?doc=2" / "?task=0" within "/s/<token>". The icons are Lucide's
+     file-text and square-check-big, drawn in the accent colour through a mask. */
+  .markdown a:is([href^='/documents/'], [href^='/tasks?task='], [href^='/s/'][href*='?doc='], [href^='/s/'][href*='?task=']) {
+    @apply rounded-md border border-border bg-surface-2 px-1.5 py-0.5 text-[0.92em] font-medium text-text no-underline hover:border-border-strong hover:bg-surface-hover;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone; /* a chip that wraps keeps its padding on both lines */
+    --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='M10 9H8'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E");
+  }
+  .markdown a:is([href^='/tasks?task='], [href^='/s/'][href*='?task=']) {
+    --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5'/%3E%3Cpath d='m9 11 3 3L22 4'/%3E%3C/svg%3E");
+  }
+  .markdown a:is([href^='/documents/'], [href^='/tasks?task='], [href^='/s/'][href*='?doc='], [href^='/s/'][href*='?task='])::before {
+    content: '';
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: 0.3em;
+    vertical-align: -0.14em;
+    background-color: var(--accent);
+    -webkit-mask: var(--chip-icon) center / contain no-repeat;
+    mask: var(--chip-icon) center / contain no-repeat;
+  }
   .markdown blockquote { @apply my-3 border-l-4 border-border-strong pl-4 text-muted; }
   .markdown hr { @apply my-6 border-border; }
-  .markdown table { @apply my-3 block overflow-x-auto border-collapse text-[13.5px]; }
+  /* A table keeps a readable width and scrolls sideways inside its wrapper on a
+     narrow screen, instead of squeezing every cell into a column of single words. */
+  .markdown .table-scroll { @apply my-3 overflow-x-auto; }
+  .markdown table { @apply w-max max-w-2xl border-collapse text-[13.5px]; }
   .markdown th, .markdown td { @apply border border-border px-3 py-1.5 text-left; }
   .markdown th { @apply bg-surface-2 font-semibold; }
   .markdown :not(pre) > code { @apply rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[0.88em]; }
   .markdown input[type='checkbox'] { @apply mr-1.5 align-middle; }
+  /* A checklist item has its box instead of a bullet. */
+  .markdown li.task-list-item { @apply -ml-5 list-none; }
   .markdown img { @apply my-3 max-w-full rounded-lg; }
 
   /* The rich document editor (TipTap) uses .markdown too; these are its extras. */
   .tiptap pre { @apply my-3 overflow-x-auto rounded-xl border border-border bg-surface-2 p-3 font-mono text-[12.5px] leading-relaxed; }
-  .tiptap table { @apply table w-full; }
+  .tiptap table { @apply my-3 w-full max-w-full; }
   .tiptap td > p, .tiptap th > p { @apply my-0; }
   .tiptap .selectedCell { background: var(--selection); }
   .tiptap ul[data-type='taskList'] { @apply list-none pl-1; }
@@ -171,6 +201,9 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* quick start, soft landing */
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
 }
+/* Marks what a link led to (a task in the list) for a moment. */
+.flash { animation: flash 2.2s ease-out; }
+@keyframes flash { from, 35% { background-color: var(--accent-soft); } }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes fade-out { to { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; scale: 0.96; } }

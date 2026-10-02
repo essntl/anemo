@@ -181,7 +181,7 @@ async def test_a_shared_project_shows_the_chosen_sections_and_its_documents_in_f
     await new_chat(authed, title="Which seeds?", project_id=p["id"])
     await new_chat(authed, title="Unrelated chat")
     for title, extra in (
-        ("Buy seeds", {"due_date": "2031-03-01"}),
+        ("Buy seeds", {"due_date": "2031-03-01", "description": "Ask for **heirloom** ones."}),
         ("Dig beds", {"status": "done"}),
         ("Sell the shed", {"status": "cancelled"}),
     ):
@@ -212,6 +212,8 @@ async def test_a_shared_project_shows_the_chosen_sections_and_its_documents_in_f
         ("Dig beds", "done"),
     ]
     assert overview["tasks"][0]["due_date"] == "2031-03-01"
+    # A task's notes are part of it.
+    assert [t["description"] for t in overview["tasks"]] == ["Ask for **heirloom** ones.", ""]
     assert [e["title"] for e in overview["events"]] == ["Plant day"]
     assert overview["documents"] == [
         {"title": "Planting plan", "markdown": "# Planting plan\n\nTomatoes by the wall.\n"}
@@ -244,6 +246,62 @@ async def test_a_shared_project_shows_the_chosen_sections_and_its_documents_in_f
     await authed.delete(f"/api/projects/{p['id']}")
     assert (await view(link["token"])).status_code == 404
     assert (await authed.get("/api/shares")).json() == []
+
+
+async def test_links_between_tasks_and_documents_work_inside_a_copy_and_leak_no_ids(authed):
+    p = await project(authed, "Kitchen")
+    doc = (
+        await authed.post(
+            "/api/documents", json={"title": "Paint colours", "folder": p["slug"], "content": "x"}
+        )
+    ).json()
+    outside = (await authed.post("/api/documents", json={"title": "Private diary"})).json()
+    paint = (
+        await authed.post(
+            "/api/tasks",
+            json={
+                "title": "Buy paint",
+                "project_id": p["id"],
+                "description": (
+                    f"See [the colours](/documents/{doc['id']}) "
+                    f"and [my diary](/documents/{outside['id']}), or [the web](https://example.com)."
+                ),
+            },
+        )
+    ).json()
+    elsewhere = (await authed.post("/api/tasks", json={"title": "Unrelated"})).json()
+    await authed.put(
+        f"/api/documents/{doc['id']}",
+        json={
+            "content": (
+                f"# Paint colours\n\nFor [buying paint](/tasks?task={paint['id']}), "
+                f"not [that](/tasks?task={elsewhere['id']}).\n"
+            )
+        },
+    )
+
+    link = await share(authed, "project", p["id"])
+    r = await view(link["token"])
+    overview = r.json()["project"]
+    # Inside the copy the two point to each other; links to anything else are plain text.
+    assert overview["tasks"][0]["description"] == (
+        "See [the colours](?doc=0) and my diary, or [the web](https://example.com)."
+    )
+    assert overview["documents"][0]["markdown"] == (
+        "# Paint colours\n\nFor [buying paint](?task=0), not that.\n"
+    )
+    for private in (doc["id"], outside["id"], paint["id"], elsewhere["id"]):
+        assert private not in r.text
+
+    # Without the documents in the copy, a link to one is only its text; the same for a
+    # document shared by itself.
+    only_tasks = await share(authed, "project", p["id"], sections=["tasks"])
+    described = (await view(only_tasks["token"])).json()["project"]["tasks"][0]["description"]
+    assert described.startswith("See the colours and my diary")
+    alone = await share(authed, "document", doc["id"])
+    assert (await view(alone["token"])).json()["markdown"] == (
+        "# Paint colours\n\nFor buying paint, not that.\n"
+    )
 
 
 async def test_deleting_a_chat_removes_its_links_and_all_links_can_be_revoked(authed):

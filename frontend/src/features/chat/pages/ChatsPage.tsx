@@ -34,8 +34,6 @@ const SHOW = [
   { value: 'archived', label: 'Archived' },
 ]
 /** A filter as a small pill that is only as wide as its text, so four fit on a phone. */
-const PILL = 'h-8 w-auto max-w-[11rem] gap-1 rounded-full bg-surface-2 border-transparent pl-3 pr-2 text-[12.5px] pointer-coarse:h-9'
-
 /** One action for the selected chats: an outlined button; on a phone just its icon. */
 function BulkButton({ label, icon, disabled, onClick }: { label: string; icon: ReactNode; disabled: boolean; onClick: () => void }) {
   return (
@@ -166,15 +164,15 @@ export function ChatsPage() {
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search in titles and messages" aria-label="Search chats"
         className="mb-2 h-10 w-full rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        <Select className={PILL} aria-label="Project" value={projectId} onValueChange={(v) => setParam('project', v)}
+        <Select variant="pill" aria-label="Project" value={projectId} onValueChange={(v) => setParam('project', v)}
           options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
         {(tags.data?.length ?? 0) > 0 && (
-          <Select className={PILL} aria-label="Tag" value={tag} onValueChange={(v) => setParam('tag', v)}
+          <Select variant="pill" aria-label="Tag" value={tag} onValueChange={(v) => setParam('tag', v)}
             options={[{ value: '', label: 'All tags' }, ...(tags.data ?? []).map((t) => ({ value: t.tag, label: `#${t.tag} (${t.count})` }))]} />
         )}
-        <Select className={PILL} aria-label="Show" value={show} onValueChange={(v) => setParam('show', v)} options={SHOW} />
-        <Select className={PILL} aria-label="Last active" value={age} onValueChange={(v) => setParam('age', v)} options={AGES} />
-        <Select className={PILL} aria-label="Sort by" value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={SORTS} />
+        <Select variant="pill" aria-label="Show" value={show} onValueChange={(v) => setParam('show', v)} options={SHOW} />
+        <Select variant="pill" aria-label="Last active" value={age} onValueChange={(v) => setParam('age', v)} options={AGES} />
+        <Select variant="pill" aria-label="Sort by" value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={SORTS} />
       </div>
 
       {(chats.error ?? bulk.error) && <p className="mb-2 text-[13px] text-error">{errorMessage(chats.error ?? bulk.error)}</p>}

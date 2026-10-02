@@ -1,6 +1,7 @@
 /**
- * Board view: one column per status. Drag a card to another column (or to another
- * position) with the mouse; on touch screens open the task and change its status.
+ * Board view: one column per status, side by side; on a phone they are stacked, so
+ * nothing scrolls sideways. Drag a card to another column (or to another position)
+ * with the mouse; on touch screens open the task and change its status.
  */
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
@@ -42,7 +43,7 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2" data-no-swipe>
+    <div className="flex flex-col gap-3 md:flex-row md:overflow-x-auto md:pb-2">
       {COLUMNS.map((status) => {
         const items = column(status)
         const isTarget = target?.status === status
@@ -53,7 +54,7 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
               if (target?.status !== status) setTarget({ status, before: null })
             }}
             onDrop={drop}
-            className={cn('flex w-72 shrink-0 flex-col rounded-card border border-border bg-surface-2/50 p-2 transition-colors',
+            className={cn('flex flex-col rounded-card md:w-72 md:shrink-0 border border-border bg-surface-2/50 p-2 transition-colors',
               isTarget && dragged && 'border-accent bg-accent-soft/40')}>
             <header className="flex items-center justify-between px-1.5 pb-2 pt-1 text-[12.5px] font-semibold text-muted">
               <span>{STATUS_LABELS[status]} <span className="font-normal text-subtle">{items.length}</span></span>
@@ -64,7 +65,7 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
                 </button>
               )}
             </header>
-            <div className="flex min-h-16 flex-col gap-1.5">
+            <div className="flex min-h-12 flex-col gap-1.5 md:min-h-16">
               {items.map((task) => (
                 <div key={task.id} draggable
                   onDragStart={(e) => {

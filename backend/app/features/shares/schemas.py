@@ -5,8 +5,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 ShareKind = Literal["chat", "document", "project"]
-# What a shared project may show: its tasks and coming events (titles and dates) and
-# its documents (to read in full). Never its chats, files or instructions.
+# What a shared project may show: its tasks (with their notes), its coming events
+# (titles and dates) and its documents (to read in full). Never its chats, files or
+# instructions.
 Section = Literal["tasks", "events", "documents"]
 
 # -- the frozen copy: what is stored with a link and what a visitor receives --------------
@@ -24,6 +25,7 @@ class SharedMessage(BaseModel):
 
 class SharedTask(BaseModel):
     title: str
+    description: str = ""  # the task's notes (Markdown)
     status: str
     due_date: date | None = None
 

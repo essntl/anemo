@@ -1,8 +1,10 @@
 import { memo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { Link } from 'react-router'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { Check, Copy } from 'lucide-react'
+import { isAppLink } from '@/lib/appLinks'
 import { stripCitationMarkup } from '@/lib/citations'
 
 function CodeBlock({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) {
@@ -35,7 +37,18 @@ function CodeBlock({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) {
   )
 }
 
-/** Renders assistant Markdown (GFM tables, task lists, highlighted code). */
+/** A link to a page of the app opens here; a link to another site opens in a new tab. */
+function Anchor({ href, children }: ComponentPropsWithoutRef<'a'>) {
+  if (href && isAppLink(href)) return <Link to={href}>{children}</Link>
+  return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+}
+
+/** Wide tables scroll sideways by themselves (see .table-scroll in app.css). */
+function Table({ children }: ComponentPropsWithoutRef<'table'>) {
+  return <div className="table-scroll"><table>{children}</table></div>
+}
+
+/** Renders Markdown (GFM tables, task lists, highlighted code). */
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
   return (
     <div className="markdown">
@@ -44,7 +57,8 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
         rehypePlugins={[[rehypeHighlight, { detect: false, ignoreMissing: true }]]}
         components={{
           pre: CodeBlock,
-          a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+          a: Anchor,
+          table: Table,
         }}
       >
         {stripCitationMarkup(text)}

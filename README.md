@@ -72,9 +72,11 @@ project: **Share** in its menu creates a link that works without logging in.
 - The link shows a **copy made at that moment**. It does not follow later changes
   unless you press **Update copy**, and it never includes attached files, the model's
   reasoning or agent activity.
-- A shared **project** shows what you tick: its tasks, its upcoming events, and its
-  documents, which the visitor can open and read in full. Its chats, files and
-  instructions are never part of a link.
+- A shared **project** shows what you tick: its tasks with their notes, its upcoming
+  events, and its documents, which the visitor can open and read in full. Links
+  between its tasks and documents work inside the copy; links to anything that is
+  not part of it are shown as plain text. Its chats, files and instructions are
+  never part of a link.
 - A visitor can read, nothing else. No model, agent or tool is reachable from a link.
 - Links expire (7 days by default) and can be revoked at any time. **Settings →
   Shared links** lists them all.
@@ -157,6 +159,11 @@ on the same files. Sub-folders are groups; images you drop in go to
   file-read permission and the folder access for `documents`; writing has its own
   category, *Edit documents* (asks by default). Their changes are in the history
   and can be reverted from the run.
+- **Links to tasks and other documents:** the toolbar button *Link to a document or
+  task* inserts a link to one of them, shown as a small labelled chip. Clicking a link
+  in the editor opens it: a document here, a task in the task list, another site in a
+  new tab. They are ordinary Markdown links
+  (`/documents/<id>`, `/tasks?task=<id>`).
 - **Delete** moves the file to the workspace trash (Files → Trash).
 
 ### Tasks and calendar
@@ -164,7 +171,15 @@ on the same files. Sub-folders are groups; images you drop in go to
 **Tasks** have a status, priority, due date (with an optional time), project and
 tags. The list groups them by when they are due (overdue, today, next 7 days,
 later, no date); the board shows one column per status and lets you drag cards
-between them.
+between them (on a phone the columns are stacked).
+
+A task opens in a wide editor laid out like a document: the title, status and
+**notes** take most of it, and a side panel holds the schedule, project, priority and
+tags. Notes are written in the same rich text editor as documents and saved as
+Markdown; they can link to a document or another task, and a document can link to a
+task. In the list, a task with notes has an arrow that shows the start of them. A
+link to a task (from a document, other notes or search) shows it in the list, marked
+and with its notes open, rather than opening the editor.
 
 **Calendar** has month, week, day and agenda views. Events can be timed or
 all-day and can repeat (daily, weekdays, weekly, every 2 weeks, monthly, yearly,

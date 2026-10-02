@@ -4829,6 +4829,11 @@ export interface components {
         SharedTask: {
             /** Title */
             title: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
             /** Status */
             status: string;
             /** Due Date */

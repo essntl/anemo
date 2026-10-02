@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { login, signOutAfterEach } from './helpers'
+import { fakeModels, login, signOutAfterEach } from './helpers'
 
 /*
  * Tasks and Calendar in a real browser. Everything created has a unique name
@@ -53,6 +53,114 @@ test('tasks: quick add, due date, complete, board', async ({ page }) => {
     await expect(page.getByRole('checkbox', { name: `Reopen “${title}”` })).toBeVisible()
   } finally {
     await deleteTasks(page, title)
+  }
+})
+
+test('task notes are written with formatting and kept as Markdown', async ({ page }) => {
+  const title = `E2E notes ${suffix()}`
+  await login(page)
+  try {
+    await page.goto('/tasks')
+    await page.getByRole('button', { name: 'New task' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('Title').fill(title)
+    const notes = dialog.getByRole('textbox', { name: 'Notes' })
+    await notes.click()
+    await page.keyboard.type('Call the ')
+    await dialog.getByRole('button', { name: 'Bold' }).click()
+    await page.keyboard.type('plumber')
+    await dialog.getByRole('button', { name: 'Bold' }).click()
+    await page.keyboard.press('Enter')
+    await dialog.getByRole('button', { name: 'Bullet list' }).click()
+    await page.keyboard.type('before noon')
+    // Short notes: no images or tables here.
+    await expect(dialog.getByRole('button', { name: 'Image' })).toHaveCount(0)
+    await dialog.getByRole('button', { name: 'Add task' }).click()
+    await expect(dialog).toHaveCount(0)
+
+    const tasks = (await (await page.request.get('/api/tasks?status=all')).json()) as { title: string; description: string }[]
+    expect(tasks.find((t) => t.title === title)?.description).toBe('Call the **plumber**\n\n- before noon\n')
+
+    // In the list, the arrow shows the start of the notes under the task, and hides it again.
+    const arrow = page.getByRole('button', { name: `Notes of “${title}”` })
+    await expect(page.getByText('before noon')).toHaveCount(0)
+    await arrow.click()
+    await expect(arrow).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('main').locator('strong', { hasText: 'plumber' })).toBeVisible()
+    await expect(page.getByText('before noon')).toBeVisible()
+    await arrow.click()
+    await expect(page.getByText('before noon')).toHaveCount(0)
+
+    // Opening it again shows the formatted text. The details are in a panel of their own.
+    await page.getByRole('button', { name: title, exact: true }).click()
+    await expect(dialog.getByRole('complementary', { name: 'Details' }).getByLabel('Due date')).toBeVisible()
+    await expect(dialog.getByRole('textbox', { name: 'Notes' }).locator('strong')).toHaveText('plumber')
+    await expect(dialog.getByRole('textbox', { name: 'Notes' }).getByRole('listitem')).toHaveText('before noon')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+  } finally {
+    await deleteTasks(page, title)
+  }
+})
+
+test('a task links to a document, and the document links back', async ({ page }) => {
+  await login(page)
+  await fakeModels(page.request) // creates a document (a file in the workspace): test installs only
+  const mark = suffix()
+  const taskTitle = `E2E linked ${mark}`
+  const docTitle = `E2E plan ${mark}`
+  const pickerName = 'Link to a document or task'
+  let documentId = ''
+  try {
+    const doc = (await (await page.request.post('/api/documents', { data: { title: docTitle } })).json()) as { id: string }
+    documentId = doc.id
+
+    // In a new task's notes, link to the document.
+    await page.goto('/tasks')
+    await page.getByRole('button', { name: 'New task' }).click()
+    const dialog = page.getByRole('dialog', { name: 'New task', exact: true })
+    await dialog.getByLabel('Title').fill(taskTitle)
+    const notes = dialog.getByRole('textbox', { name: 'Notes' })
+    await notes.click()
+    await page.keyboard.type('Read ')
+    await dialog.getByRole('button', { name: pickerName }).click()
+    const picker = page.getByRole('dialog', { name: pickerName })
+    await picker.getByLabel('Search documents and tasks').fill(mark)
+    await picker.getByRole('button', { name: new RegExp(docTitle) }).click()
+    await expect(picker).toHaveCount(0)
+
+    // Clicking the link keeps the task (as Save would) and opens the document.
+    await notes.getByRole('link', { name: docTitle }).click()
+    await expect(page).toHaveURL(new RegExp(`/documents/${doc.id}$`))
+    const tasks = (await (await page.request.get('/api/tasks?status=all')).json()) as { id: string; title: string; description: string }[]
+    const task = tasks.find((t) => t.title === taskTitle)!
+    expect(task.description).toBe(`Read [${docTitle}](/documents/${doc.id})\n`)
+
+    // In the document, link back to the task; clicking it opens the task.
+    const text = page.getByRole('textbox', { name: 'Document text' })
+    await text.click()
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type(' for ')
+    await page.getByRole('button', { name: pickerName }).click()
+    await picker.getByLabel('Search documents and tasks').fill(mark)
+    await picker.getByRole('button', { name: new RegExp(taskTitle) }).click()
+    await text.getByRole('link', { name: taskTitle }).click()
+    await expect(page).toHaveURL(new RegExp(`/tasks\\?task=${task.id}`))
+    // The link shows the task in the list, marked and with its notes open, not in the editor.
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const shownTask = page.locator('[aria-current="true"]')
+    await expect(shownTask.getByRole('button', { name: taskTitle, exact: true })).toBeVisible()
+    await expect(shownTask.getByRole('link', { name: docTitle })).toBeVisible() // the notes, with their link
+    // Opening it is a click away.
+    await shownTask.getByRole('button', { name: 'Open task' }).click()
+    await expect(page.getByRole('dialog', { name: 'Task', exact: true }).getByLabel('Title')).toHaveValue(taskTitle)
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
+    // The document was saved on the way out, with an ordinary Markdown link.
+    await expect
+      .poll(async () => ((await (await page.request.get(`/api/documents/${doc.id}`)).json()) as { content: string }).content)
+      .toContain(`[${taskTitle}](/tasks?task=${task.id})`)
+  } finally {
+    if (documentId) await page.request.delete(`/api/documents/${documentId}`)
+    await deleteTasks(page, taskTitle)
   }
 })
 

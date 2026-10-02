@@ -21,7 +21,7 @@ export function swipeDirection({ dx, dy, ms }: Swipe): 'left' | 'right' | null {
 /**
  * Whether a touch that starts on `target` belongs to something that uses sideways
  * movement itself: a field you select text in, a slider, anything that scrolls
- * sideways (code blocks, tables, the task board), or an area marked `data-no-swipe`.
+ * sideways (code blocks, tables), or an area marked `data-no-swipe`.
  */
 export function ownsHorizontalTouch(target: EventTarget | null): boolean {
   for (let el = target instanceof Element ? target : null; el; el = el.parentElement) {

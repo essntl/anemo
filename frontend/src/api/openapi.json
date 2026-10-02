@@ -17342,6 +17342,11 @@
             "type": "string",
             "title": "Title"
           },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
           "status": {
             "type": "string",
             "title": "Status"

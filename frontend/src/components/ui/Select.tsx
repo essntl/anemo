@@ -18,8 +18,15 @@ interface SelectProps {
   id?: string
   className?: string
   'aria-label'?: string
-  /** `field` looks like an input (forms); `ghost` is a compact text button (toolbars). */
-  variant?: 'field' | 'ghost'
+  /** `field` looks like an input (forms); `ghost` is a compact text button (toolbars);
+   *  `pill` is a small rounded filter that is only as wide as its text. */
+  variant?: keyof typeof VARIANTS
+}
+
+const VARIANTS = {
+  field: 'h-10 w-full rounded-control border border-border bg-surface px-3 text-sm focus:border-accent focus:ring-2 focus:ring-accent-soft pointer-coarse:h-11',
+  ghost: 'h-8 rounded-lg px-2 text-[12.5px] text-muted hover:bg-surface-hover hover:text-text data-[state=open]:bg-surface-hover pointer-coarse:h-10',
+  pill: 'h-8 max-w-[11rem] gap-1 rounded-full border border-transparent bg-surface-2 pl-3 pr-2 text-[12.5px] focus:border-accent focus:ring-2 focus:ring-accent-soft pointer-coarse:h-9',
 }
 
 // Radix reserves "" for "nothing selected", but "" is a handy "use the default"
@@ -53,9 +60,7 @@ export function Select({
         className={cn(
           'group inline-flex min-w-0 items-center justify-between gap-2 text-left focus:outline-none disabled:opacity-60',
           'data-[placeholder]:text-subtle',
-          variant === 'field'
-            ? 'h-10 w-full rounded-control border border-border bg-surface px-3 text-sm focus:border-accent focus:ring-2 focus:ring-accent-soft pointer-coarse:h-11'
-            : 'h-8 rounded-lg px-2 text-[12.5px] text-muted hover:bg-surface-hover hover:text-text data-[state=open]:bg-surface-hover pointer-coarse:h-10',
+          VARIANTS[variant],
           className,
         )}
       >

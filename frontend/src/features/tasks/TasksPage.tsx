@@ -2,10 +2,14 @@
  * Tasks: a list grouped by when things are due, or a board by status.
  * View and tag filter are kept in the URL (?view=board&tag=…); the project filter is
  * the project chosen in the sidebar (changing it here changes it everywhere).
+ *
+ * A link to a task (/tasks?task=<id>: from a document, another task's notes, search)
+ * shows it in the list: scrolled to, marked for a moment and with its notes open. It
+ * does not open the editor; a click on the task does.
  */
-import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { CheckSquare, ChevronRight, FolderKanban, KanbanSquare, List, Plus } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
+import { CheckSquare, ChevronRight, KanbanSquare, List, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { useCurrentProject, useProjectStore } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
@@ -29,6 +33,7 @@ function byUrgency(a: Task, b: Task): number {
     || a.sort_order - b.sort_order
 }
 
+/** The task editor: an existing task, or a new one starting in a status. */
 type Editing = { task: Task | null; status?: TaskStatus } | null
 
 export function TasksPage() {
@@ -43,7 +48,15 @@ export function TasksPage() {
   const [quick, setQuick] = useState('')
   const [search, setSearch] = useState('')
   const [showDone, setShowDone] = useState(false)
-  const [chosen, setEditing] = useState<Editing>(null)
+  const [editing, setEditing] = useState<Editing>(null)
+  // Tasks whose notes are shown in the list.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  const toggleNotes = (id: string) =>
+    setExpanded((old) => {
+      const next = new Set(old)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params)
@@ -54,9 +67,30 @@ export function TasksPage() {
 
   const projectMap = useMemo(() => new Map<string, Project>((projects.data ?? []).map((p) => [p.id, p])), [projects.data])
   const all = useMemo(() => tasks.data ?? [], [tasks.data])
-  // A link to one task (/tasks?task=<id>, e.g. from search) opens it.
+  // The task a link points to. It is made visible whatever the list was showing:
+  // its notes opened, "Finished" unfolded, the search emptied (here, once per link),
+  // and filters or the board view that would hide it dropped (the effect below).
   const linked = all.find((t) => t.id === params.get('task'))
-  const editing: Editing = chosen ?? (linked ? { task: linked } : null)
+  const [revealed, setRevealed] = useState<string | null>(null)
+  if (linked && revealed !== linked.id) {
+    setRevealed(linked.id)
+    setExpanded((old) => new Set(old).add(linked.id))
+    setSearch('')
+    if (linked.status === 'done' || linked.status === 'cancelled') setShowDone(true)
+  }
+  useEffect(() => {
+    if (!linked) return
+    if (projectFilter && linked.project_id !== projectFilter) setProjectId(null)
+    const hiddenByTag = tagFilter !== '' && !linked.tags.includes(tagFilter)
+    if (hiddenByTag || view === 'board') {
+      const next = new URLSearchParams(params)
+      next.delete('view')
+      if (hiddenByTag) next.delete('tag')
+      setParams(next, { replace: true })
+    }
+    // Only when a link arrives; afterwards filters and views are the user's again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked?.id])
   const tags = useMemo(() => [...new Set(all.flatMap((t) => t.tags))].sort(), [all])
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -80,37 +114,38 @@ export function TasksPage() {
 
   return (
     <div className={cn('mx-auto p-4 md:p-8', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <CheckSquare className="h-5 w-5" />
         </div>
-        <h1 className="min-w-0 flex-1 text-xl font-semibold">Tasks</h1>
-        <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label="View">
-          {([['list', 'List', List], ['board', 'Board', KanbanSquare]] as const).map(([id, label, Icon]) => (
-            <button key={id} type="button" role="radio" aria-checked={view === id} onClick={() => setParam('view', id === 'list' ? '' : id)}
-              className={cn('flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium pointer-coarse:h-10',
-                view === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
-              <Icon className="h-3.5 w-3.5" /> {label}
-            </button>
-          ))}
-        </div>
-        <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>
+        <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">Tasks</h1>
+        <Button size="sm" variant="primary" className="shrink-0" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>
           New task
         </Button>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      {/* Search and the view switch share one line; the filters are small pills below. */}
+      <div className="mb-2 flex items-center gap-2">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" aria-label="Search tasks"
-          className="h-9 min-w-32 flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
-        <Select className="h-9 w-full sm:w-44" aria-label="Project" value={projectFilter} onValueChange={(v) => setProjectId(v || null)}
+          className="h-9 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
+        <div className="inline-flex shrink-0 rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label="View">
+          {([['list', 'List', List], ['board', 'Board', KanbanSquare]] as const).map(([id, label, Icon]) => (
+            <button key={id} type="button" role="radio" aria-checked={view === id} title={label} onClick={() => setParam('view', id === 'list' ? '' : id)}
+              className={cn('flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium pointer-coarse:h-9 pointer-coarse:px-3',
+                view === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
+              {/* On a phone just the icon; the name stays for screen readers. */}
+              <Icon className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="max-sm:sr-only">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        <Select variant="pill" aria-label="Project" value={projectFilter} onValueChange={(v) => setProjectId(v || null)}
           options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
         {tags.length > 0 && (
-          <Select className="h-9 w-full sm:w-36" aria-label="Tag" value={tagFilter} onValueChange={(v) => setParam('tag', v)}
+          <Select variant="pill" aria-label="Tag" value={tagFilter} onValueChange={(v) => setParam('tag', v)}
             options={[{ value: '', label: 'All tags' }, ...tags.map((t) => ({ value: t, label: `#${t}` }))]} />
         )}
-        <Link to="/projects" className="flex h-8 items-center gap-1.5 rounded-control px-2.5 text-[12.5px] font-medium text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10">
-          <FolderKanban className="h-3.5 w-3.5" /> Projects
-        </Link>
       </div>
 
       {(tasks.error ?? create.error) && <p className="mb-2 text-[13px] text-error">{errorMessage(tasks.error ?? create.error)}</p>}
@@ -142,7 +177,8 @@ export function TasksPage() {
                 </h2>
                 {items.map((t) => (
                   <TaskRow key={t.id} task={t} project={t.project_id ? projectMap.get(t.project_id) : undefined}
-                    onOpen={(task) => setEditing({ task })} />
+                    onOpen={(task) => setEditing({ task })}
+                    expanded={expanded.has(t.id)} onToggleNotes={() => toggleNotes(t.id)} linked={t.id === linked?.id} />
                 ))}
               </section>
             )
@@ -156,7 +192,8 @@ export function TasksPage() {
               </button>
               {showDone && finished.slice(0, 100).map((t) => (
                 <TaskRow key={t.id} task={t} project={t.project_id ? projectMap.get(t.project_id) : undefined}
-                  onOpen={(task) => setEditing({ task })} />
+                  onOpen={(task) => setEditing({ task })}
+                  expanded={expanded.has(t.id)} onToggleNotes={() => toggleNotes(t.id)} linked={t.id === linked?.id} />
               ))}
             </section>
           )}
@@ -165,7 +202,7 @@ export function TasksPage() {
 
       <Lingering value={editing}>
         {(shown) => (
-          <TaskDialog task={shown.task} onClose={() => { setEditing(null); setParam('task', '') }}
+          <TaskDialog task={shown.task} onClose={() => setEditing(null)}
             defaults={{ status: shown.status, project_id: projectFilter || null }} />
         )}
       </Lingering>

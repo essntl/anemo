@@ -10,7 +10,7 @@ export const EXPIRY_OPTIONS = [
 
 /** What a shared project can show. */
 export const PROJECT_SECTIONS = [
-  { value: 'tasks', label: 'Tasks', hint: 'titles, status and due dates' },
+  { value: 'tasks', label: 'Tasks', hint: 'with their notes, status and due dates' },
   { value: 'events', label: 'Upcoming events', hint: 'the next 90 days' },
   { value: 'documents', label: 'Documents', hint: 'to read in full' },
 ] as const

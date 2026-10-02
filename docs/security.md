@@ -28,10 +28,12 @@ page itself.
   file, no setting. It changes only when you press **Update copy**.
 - **What a copy contains.** A chat: the messages, the model's name, and the *names* of
   attached files and referenced chats. A document: its text. A project: the
-  sections you tick, which are its tasks and upcoming events (titles and dates) and
+  sections you tick, which are its tasks (with their notes), its upcoming events and
   its documents (the text of each, to read in full). Never included: attached files
   and workspace images, the model's reasoning, what an agent did, and a project's
-  chats, files and instructions.
+  chats, files and instructions. Links from a task or document to another one are
+  rewritten for the copy: to its place in the same copy when it is part of it,
+  otherwise to plain text, so no internal address or id reaches a visitor.
 - **A visitor can only read.** There is nothing to write to, no model is called and no
   agent or tool can be reached through a link.
 - **The address is the secret.** It contains 256 random bits; anyone who has it can read
