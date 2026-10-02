@@ -2,6 +2,7 @@ import * as RadixDialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { useClosing } from './closing'
 
 interface DialogProps {
   open: boolean
@@ -21,12 +22,16 @@ interface DialogProps {
  * bottom edge where thumbs reach, scrollable if tall. From `md` up it is centered.
  */
 export function Dialog({ open, onOpenChange, title, description, children, footer, className, onOpenAutoFocus }: DialogProps) {
+  // Inside <Lingering>, the dialog stays for a moment after it was closed, to animate out.
+  const { closing, done } = useClosing()
   return (
-    <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
+    <RadixDialog.Root open={open && !closing} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fade fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" />
         <RadixDialog.Content
           onOpenAutoFocus={onOpenAutoFocus}
+          // The closing animation has ended: <Lingering> can remove the dialog now.
+          onAnimationEnd={(e) => closing && e.target === e.currentTarget && done()}
           className={cn(
             'sheet fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-panel border border-border bg-card p-5 shadow-float focus:outline-none',
             'pb-[max(1.25rem,env(safe-area-inset-bottom))]',

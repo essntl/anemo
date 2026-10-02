@@ -42,7 +42,7 @@ export function CapabilityInfo({ name, capabilities }: { name: string; capabilit
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content align="end" sideOffset={4} collisionPadding={12}
-          className="z-50 max-w-[16rem] rounded-card border border-border bg-card p-3 shadow-float">
+          className="pop z-50 max-w-[16rem] rounded-card border border-border bg-card p-3 shadow-float">
           <CapabilityChips capabilities={capabilities} />
         </Popover.Content>
       </Popover.Portal>

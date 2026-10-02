@@ -16,6 +16,7 @@ import { formatWhen } from '@/lib/format'
 import { type Destination, type NotificationKind, useDeleteDestination, useDestinations, useSaveDestination, useTestDestination } from './api'
 import { DestinationDialog } from './components/DestinationDialog'
 import { desktopEnabled, desktopSupport, setDesktopEnabled } from './desktop'
+import { Lingering } from '@/components/ui/Lingering'
 
 const UNAVAILABLE = {
   unsupported: 'This browser does not support desktop notifications. On an iPhone or iPad, use a Discord channel instead.',
@@ -151,7 +152,7 @@ export function NotificationSettingsPage() {
         </CardBody>
       </Card>
 
-      {editing && <DestinationDialog destination={editing.destination} onClose={() => setEditing(null)} />}
+      <Lingering value={editing}>{(shown) => <DestinationDialog destination={shown.destination} onClose={() => setEditing(null)} />}</Lingering>
     </div>
   )
 }

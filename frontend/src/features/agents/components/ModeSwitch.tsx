@@ -63,7 +63,7 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content side="top" align="start" sideOffset={8} collisionPadding={12}
-          className="z-50 w-80 max-w-[calc(100vw-24px)] rounded-card border border-border bg-card p-4 text-[13px] shadow-float">
+          className="pop z-50 w-80 max-w-[calc(100vw-24px)] rounded-card border border-border bg-card p-4 text-[13px] shadow-float">
           <div className="mb-2 font-semibold">What the agent may do</div>
           {GROUPS.map((g) => {
             const group = items.filter((i) => i.group === g.key)

@@ -20,6 +20,7 @@ import { CapabilityDialog } from './CapabilityDialog'
 import { DiscoverDialog } from './DiscoverDialog'
 import { ProviderDialog } from './ProviderDialog'
 import { confirmDialog } from '@/components/ui/dialogs'
+import { Lingering } from '@/components/ui/Lingering'
 
 function TestOutcome({ ok, message }: { ok: boolean; message: string }) {
   return (
@@ -56,7 +57,7 @@ function ModelRow({ model }: { model: Model }) {
         className="-m-1 rounded-control p-1 text-left hover:bg-surface-hover">
         <CapabilityChips capabilities={model.capabilities} />
       </button>
-      {editingCapabilities && <CapabilityDialog model={model} onOpenChange={setEditingCapabilities} />}
+      <Lingering value={editingCapabilities}>{() => <CapabilityDialog model={model} onOpenChange={setEditingCapabilities} />}</Lingering>
       <div className="flex items-center gap-1">
         {test.data && <TestOutcome ok={test.data.ok} message={test.data.ok ? `${test.data.latency_ms} ms` : test.data.message} />}
         {test.isError && <TestOutcome ok={false} message={errorMessage(test.error)} />}
@@ -138,8 +139,8 @@ export function ProviderCard({ provider, models }: { provider: Provider; models:
         </Button>
       </div>
 
-      {editing && <ProviderDialog open onOpenChange={setEditing} provider={provider} />}
-      {discovering && <DiscoverDialog open onOpenChange={setDiscovering} provider={provider} />}
+      <Lingering value={editing}>{() => <ProviderDialog open onOpenChange={setEditing} provider={provider} />}</Lingering>
+      <Lingering value={discovering}>{() => <DiscoverDialog open onOpenChange={setDiscovering} provider={provider} />}</Lingering>
     </Card>
   )
 }

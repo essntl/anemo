@@ -18,6 +18,7 @@ import { cn } from '@/lib/cn'
 import { type McpServer, useDeleteMcpServer, useMcpServers, useRefreshMcpServer, useSetMcpServerEnabled } from './api'
 import { ServerDialog } from './components/ServerDialog'
 import { ToolList } from './components/ToolList'
+import { Lingering } from '@/components/ui/Lingering'
 
 function StatusBadge({ server }: { server: McpServer }) {
   if (!server.enabled) return <Badge>Off</Badge>
@@ -121,7 +122,7 @@ export function McpSettingsPage() {
       )}
       {items.map((server) => <ServerCard key={server.id} server={server} onEdit={() => setEditing({ server })} />)}
 
-      {editing && <ServerDialog server={editing.server} onClose={() => setEditing(null)} />}
+      <Lingering value={editing}>{(shown) => <ServerDialog server={shown.server} onClose={() => setEditing(null)} />}</Lingering>
     </div>
   )
 }

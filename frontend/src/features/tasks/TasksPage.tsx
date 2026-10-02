@@ -16,6 +16,7 @@ import { TaskBoard } from './components/TaskBoard'
 import { TaskDialog } from './components/TaskDialog'
 import { TaskRow } from './components/TaskRow'
 import { type Bucket, BUCKET_LABELS, bucketOf } from './dates'
+import { Lingering } from '@/components/ui/Lingering'
 
 const BUCKETS: Bucket[] = ['overdue', 'today', 'upcoming', 'later', 'none']
 
@@ -161,11 +162,13 @@ export function TasksPage() {
         </>
       )}
 
-      {editing && (
-        <TaskDialog task={editing.task} onClose={() => { setEditing(null); setParam('task', '') }}
-          defaults={{ status: editing.status, project_id: projectFilter || null }} />
-      )}
-      {projectsOpen && <ProjectsDialog onClose={() => setProjectsOpen(false)} />}
+      <Lingering value={editing}>
+        {(shown) => (
+          <TaskDialog task={shown.task} onClose={() => { setEditing(null); setParam('task', '') }}
+            defaults={{ status: shown.status, project_id: projectFilter || null }} />
+        )}
+      </Lingering>
+      <Lingering value={projectsOpen}>{() => <ProjectsDialog onClose={() => setProjectsOpen(false)} />}</Lingering>
     </div>
   )
 }

@@ -21,6 +21,7 @@ import { addDays, dayOf } from '@/features/tasks/dates'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { browserTimeZone, type Occurrence, useChangeOccurrence, useOccurrences, useSaveEvent } from './api'
 import { EventDialog, type NewEventDefaults } from './components/EventDialog'
+import { Lingering } from '@/components/ui/Lingering'
 
 const VIEWS = [
   { value: 'dayGridMonth', label: 'Month' },
@@ -169,8 +170,10 @@ export function CalendarPage() {
         />
       </div>
 
-      {open?.kind === 'event' && <EventDialog occurrence={open.occurrence} defaults={open.defaults} onClose={() => setOpen(null)} />}
-      {open?.kind === 'task' && <TaskDialog task={open.task} onClose={() => setOpen(null)} />}
+      <Lingering value={open?.kind === 'event' && open}>
+        {(shown) => <EventDialog occurrence={shown.occurrence} defaults={shown.defaults} onClose={() => setOpen(null)} />}
+      </Lingering>
+      <Lingering value={open?.kind === 'task' && open}>{(shown) => <TaskDialog task={shown.task} onClose={() => setOpen(null)} />}</Lingering>
     </div>
   )
 }

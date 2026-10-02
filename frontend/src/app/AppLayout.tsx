@@ -49,7 +49,7 @@ export function AppLayout() {
       <SidebarDrawer />
       <div className="flex min-w-0 flex-1 flex-col">
         {!ownHeader && <MobileTopBar />}
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <main className="page min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

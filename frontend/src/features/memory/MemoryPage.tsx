@@ -26,6 +26,7 @@ import {
   useUpdateMemory,
 } from './api'
 import { MemoryDialog } from './MemoryDialog'
+import { Lingering } from '@/components/ui/Lingering'
 
 const TABS: { id: MemoryStatus; label: string }[] = [
   { id: 'active', label: 'Memories' },
@@ -191,7 +192,7 @@ export function MemoryPage() {
         {items.map((m) => <MemoryRow key={m.id} memory={m} onEdit={(memory) => setEditing({ memory })} />)}
       </div>
 
-      {editing && <MemoryDialog memory={editing.memory} onClose={() => setEditing(null)} />}
+      <Lingering value={editing}>{(shown) => <MemoryDialog memory={shown.memory} onClose={() => setEditing(null)} />}</Lingering>
     </div>
   )
 }

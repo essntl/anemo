@@ -25,6 +25,7 @@ import {
   useSetAutomationEnabled,
 } from './api'
 import { AutomationDialog } from './components/AutomationDialog'
+import { Lingering } from '@/components/ui/Lingering'
 
 const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'error'> = {
   running: 'accent',
@@ -161,7 +162,7 @@ export function AutomationsPage() {
         {items.map((a) => <AutomationCard key={a.id} automation={a} onEdit={() => setEditing({ automation: a })} />)}
       </div>
 
-      {editing && <AutomationDialog automation={editing.automation} onClose={() => setEditing(null)} />}
+      <Lingering value={editing}>{(shown) => <AutomationDialog automation={shown.automation} onClose={() => setEditing(null)} />}</Lingering>
     </div>
   )
 }

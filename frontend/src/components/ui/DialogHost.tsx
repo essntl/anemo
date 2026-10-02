@@ -4,12 +4,12 @@ import { Button } from './Button'
 import { Dialog } from './Dialog'
 import { type Request, useDialogQueue } from './dialogs'
 import { Input } from './Input'
+import { Lingering } from './Lingering'
 
 export function DialogHost() {
   const current = useDialogQueue((s) => s.queue[0])
-  if (!current) return null
   // key: a fresh component (and input state) for every request.
-  return <RequestDialog key={current.id} request={current} />
+  return <Lingering value={current}>{(request) => <RequestDialog key={request.id} request={request} />}</Lingering>
 }
 
 function RequestDialog({ request }: { request: Request }) {

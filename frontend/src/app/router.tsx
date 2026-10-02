@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, type To } from 'react-router'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { ConversationPage } from '@/features/chat/pages/ConversationPage'
@@ -73,3 +73,30 @@ export const router = createBrowserRouter([
     ],
   },
 ])
+
+/*
+ * Page changes cross-fade (the .page rules in styles/app.css). React Router does this
+ * per navigation (`viewTransition: true`), so it is switched on here for all of them,
+ * except where it would get in the way:
+ *  - the address only changes after the `?` or `#` (tabs, filters, search as you type);
+ *  - a dialog, menu or the phone drawer is open: it has its own closing animation, and
+ *    the page area would be drawn on top of it during a transition;
+ *  - the user asked the system for less motion.
+ */
+function samePage(to: To | null): boolean {
+  if (to === null) return true
+  const path = typeof to === 'string' ? to : to.pathname
+  if (path === undefined || path === '' || path.startsWith('?') || path.startsWith('#')) return true
+  return path.split(/[?#]/)[0] === window.location.pathname
+}
+
+const navigate = router.navigate.bind(router)
+router.navigate = ((to: To | number | null, options?: Parameters<typeof navigate>[1]) => {
+  if (typeof to === 'number') return navigate(to)
+  const still =
+    samePage(to) ||
+    document.querySelector('[role="dialog"]') !== null ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  // Links pass `viewTransition: undefined`, so it has to be filled in after their options.
+  return navigate(to, still ? options : { ...options, viewTransition: options?.viewTransition ?? true })
+}) as typeof router.navigate

@@ -78,3 +78,17 @@ export function signOutAfterEach() {
     await page.request.post('/api/auth/logout').catch(() => undefined)
   })
 }
+
+/**
+ * Records the name of every CSS animation that starts on the page from now on (also
+ * after reloads). Returns a function that reads the names seen so far. Call it before
+ * `login`. Used to check that something animated, however briefly.
+ */
+export async function recordAnimations(page: Page): Promise<() => Promise<string[]>> {
+  await page.addInitScript(() => {
+    const seen: string[] = []
+    ;(window as unknown as { animationsSeen: string[] }).animationsSeen = seen
+    document.addEventListener('animationstart', (e) => seen.push(e.animationName), true)
+  })
+  return () => page.evaluate(() => (window as unknown as { animationsSeen: string[] }).animationsSeen)
+}

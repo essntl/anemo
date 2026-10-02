@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { answerPrompt, confirmWith, fakeModels, login, pickModel, signOutAfterEach } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, pickModel, recordAnimations, signOutAfterEach } from './helpers'
 
 /*
  * Phone layout and installable-app checks. Runs in the "mobile" project
@@ -51,6 +51,7 @@ test('no screen scrolls sideways on a phone', async ({ page }) => {
 })
 
 test('the menu drawer opens, navigates and closes', async ({ page }) => {
+  const seen = await recordAnimations(page)
   await login(page)
   // The desktop sidebar is hidden; the drawer holds the navigation.
   await expect(page.getByRole('link', { name: 'Files', exact: true })).toBeHidden()
@@ -61,9 +62,19 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await expect(page).toHaveURL(/\/files/)
   await expect(drawer).toBeHidden()
 
+  // Closing slides it back out instead of making it vanish.
   await page.getByRole('button', { name: 'Open menu' }).click()
   await page.getByRole('button', { name: 'Close menu' }).click()
   await expect(page.getByRole('dialog', { name: 'Menu' })).toBeHidden()
+  expect(await seen()).toContain('drawer-out')
+
+  // Dialogs are bottom sheets on a phone: they slide down when closed.
+  await page.goto('/tasks')
+  await page.getByRole('button', { name: 'New task' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByRole('button', { name: 'Close' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(await seen()).toEqual(expect.arrayContaining(['sheet-in', 'sheet-out']))
 })
 
 /** A quick one-finger swipe along a horizontal line, as real touch events. */

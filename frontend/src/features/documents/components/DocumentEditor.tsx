@@ -23,6 +23,7 @@ import { imagesToEditor, imagesToFile, joinFrontMatter, needsSourceMode, splitFr
 import { type SaveState, useAutosave } from '../useAutosave'
 import { RevisionsDialog } from './RevisionsDialog'
 import { RichEditor } from './RichEditor'
+import { Lingering } from '@/components/ui/Lingering'
 
 const STATUS: Record<SaveState, string> = {
   saved: 'Saved',
@@ -159,9 +160,9 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther }: SessionPro
         </div>
       )}
 
-      {historyOpen && (
-        <RevisionsDialog documentId={doc.id} unsaved={busy} onClose={() => setHistoryOpen(false)} />
-      )}
+      <Lingering value={historyOpen}>
+        {() => <RevisionsDialog documentId={doc.id} unsaved={busy} onClose={() => setHistoryOpen(false)} />}
+      </Lingering>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { useModels, useProviders, useSetupStatus } from './api'
 import { ModelDefaultsCard } from './components/ModelDefaultsCard'
 import { ProviderCard } from './components/ProviderCard'
 import { ProviderDialog } from './components/ProviderDialog'
+import { Lingering } from '@/components/ui/Lingering'
 
 export function ProvidersPage() {
   const providers = useProviders()
@@ -64,7 +65,7 @@ export function ProvidersPage() {
         />
       )}
 
-      {adding && <ProviderDialog open onOpenChange={setAdding} />}
+      <Lingering value={adding}>{() => <ProviderDialog open onOpenChange={setAdding} />}</Lingering>
     </div>
   )
 }

@@ -33,7 +33,7 @@ export function ActionMenu({ actions, label = 'More actions', className }: { act
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content align="end" sideOffset={4} collisionPadding={12}
-          className="z-50 min-w-48 rounded-card border border-border bg-card p-1.5 shadow-float">
+          className="pop z-50 min-w-48 rounded-card border border-border bg-card p-1.5 shadow-float">
           {actions.map((a) =>
             a.download ? (
               <a key={a.label} href={a.download} download className={item(a.danger)} onClick={() => setOpen(false)}>

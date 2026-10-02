@@ -48,15 +48,23 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', onKey)
   }, [setOpen])
 
+  const [session, setSession] = useState(0)
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setSession(session + 1)
+  }
+
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fade fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" />
         <RadixDialog.Content aria-describedby={undefined}
-          className="fade fixed inset-x-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 mx-auto flex max-h-[min(80dvh,560px)] max-w-xl flex-col overflow-hidden rounded-panel border border-border bg-card shadow-float focus:outline-none md:top-[12vh]">
+          className="pop fixed inset-x-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 mx-auto flex max-h-[min(80dvh,560px)] max-w-xl flex-col overflow-hidden rounded-panel border border-border bg-card shadow-float focus:outline-none md:top-[12vh]">
           <RadixDialog.Title className="sr-only">Search</RadixDialog.Title>
-          {/* Remounted each time it opens, so it starts empty. */}
-          <PaletteBody key={String(open)} onDone={() => setOpen(false)} />
+          {/* Remounted each time it opens, so it starts empty (but not while it closes,
+              or the results would vanish before the closing animation). */}
+          <PaletteBody key={session} onDone={() => setOpen(false)} />
         </RadixDialog.Content>
       </RadixDialog.Portal>
     </RadixDialog.Root>

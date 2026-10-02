@@ -12,6 +12,7 @@ import { ProfileDialog } from '../components/ProfileDialog'
 import { ProfileList } from '../components/ProfileList'
 import { SkillDialog } from '../components/SkillDialog'
 import { SkillList } from '../components/SkillList'
+import { Lingering } from '@/components/ui/Lingering'
 
 // Which dialog is open; `item` null means "create a new one".
 type Editing = { kind: 'profile'; item: Profile | null } | { kind: 'skill'; item: Skill | null } | null
@@ -61,8 +62,8 @@ export function ProfilesPage() {
       ) : (
         <SkillList onEdit={(item) => setEditing({ kind: 'skill', item })} />
       )}
-      {editing?.kind === 'profile' && <ProfileDialog profile={editing.item} onClose={() => setEditing(null)} />}
-      {editing?.kind === 'skill' && <SkillDialog skill={editing.item} onClose={() => setEditing(null)} />}
+      <Lingering value={editing?.kind === 'profile' && editing}>{(shown) => <ProfileDialog profile={shown.item} onClose={() => setEditing(null)} />}</Lingering>
+      <Lingering value={editing?.kind === 'skill' && editing}>{(shown) => <SkillDialog skill={shown.item} onClose={() => setEditing(null)} />}</Lingering>
     </div>
   )
 }

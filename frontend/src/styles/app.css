@@ -149,17 +149,76 @@
   .hljs-deletion { color: var(--error); }
 }
 
-/* Phone drawer and sheets: slide/fade in (Radix sets data-state). */
-@keyframes drawer-in { from { transform: translateX(-100%); } }
-@keyframes sheet-in { from { transform: translateY(100%); } }
-@keyframes fade-in { from { opacity: 0; } }
-.drawer[data-state='open'] { animation: drawer-in 200ms ease-out; }
-.fade[data-state='open'] { animation: fade-in 200ms ease-out; }
-@media (max-width: 767px) {
-  .sheet[data-state='open'] { animation: sheet-in 220ms ease-out; }
+/*
+ * Motion. Everything that appears also leaves the same way, a little faster.
+ * One class per kind of surface; Radix sets data-state="open|closed" and keeps a
+ * closing element in the page until its animation has ended.
+ *
+ *   .fade    the dimmed background behind dialogs and the drawer
+ *   .pop     menus, dropdowns, the search palette: grow from the button that opened them
+ *   .sheet   dialogs: slide up from the bottom on phones, pop in the middle from `md`
+ *   .drawer  the phone menu: slides in from the left
+ *   .toast   notices at the bottom: rise in, sink out (data-leaving, see toast.ts)
+ *   .page    the page area: cross-fades when you go to another page (view transition)
+ *
+ * Dialogs opened with `{value && <Dialog/>}` need <Lingering> to get their closing
+ * animation (see components/ui/Lingering.tsx).
+ */
+:root {
+  --motion-in: 180ms;
+  --motion-out: 130ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* quick start, soft landing */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
 }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes pop-in { from { opacity: 0; scale: 0.96; } }
+@keyframes pop-out { to { opacity: 0; scale: 0.97; } }
+@keyframes drawer-in { from { transform: translateX(-100%); } }
+@keyframes drawer-out { to { transform: translateX(-100%); } }
+@keyframes sheet-in { from { transform: translateY(100%); } }
+@keyframes sheet-out { to { transform: translateY(100%); } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(0.75rem); } }
+@keyframes rise-out { to { opacity: 0; transform: translateY(0.5rem); } }
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } }
+
+.fade[data-state='open'] { animation: fade-in var(--motion-in) ease-out; }
+.fade[data-state='closed'] { animation: fade-out var(--motion-out) var(--ease-in) forwards; }
+
+.pop {
+  transform-origin: var(--radix-popover-content-transform-origin, var(--radix-select-content-transform-origin, center));
+}
+.pop[data-state='open'] { animation: pop-in var(--motion-in) var(--ease-out); }
+.pop[data-state='closed'] { animation: pop-out var(--motion-out) var(--ease-in) forwards; }
+
+.drawer[data-state='open'] { animation: drawer-in 220ms var(--ease-out); }
+.drawer[data-state='closed'] { animation: drawer-out 160ms var(--ease-in) forwards; }
+
+.sheet[data-state='open'] { animation: pop-in var(--motion-in) var(--ease-out); }
+.sheet[data-state='closed'] { animation: pop-out var(--motion-out) var(--ease-in) forwards; }
+@media (max-width: 767px) {
+  .sheet[data-state='open'] { animation: sheet-in 260ms var(--ease-out); }
+  .sheet[data-state='closed'] { animation: sheet-out 150ms var(--ease-in) forwards; }
+}
+
+.toast { animation: rise-in var(--motion-in) var(--ease-out); }
+.toast[data-leaving] { animation: rise-out var(--motion-out) var(--ease-in) forwards; }
+
+/* Something on its way out no longer takes clicks. */
+.fade[data-state='closed'], .pop[data-state='closed'], .sheet[data-state='closed'],
+.drawer[data-state='closed'], .toast[data-leaving] { pointer-events: none; }
+
+/* Going to another page: only the page area changes, the sidebar stays still.
+   React Router starts the view transition (see app/router.tsx). */
+.page { view-transition-name: page; }
+::view-transition-old(root) { display: none; }
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(page) { animation: fade-out 90ms var(--ease-in) both; }
+::view-transition-new(page) { animation: page-in 180ms var(--ease-out) 60ms both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .drawer, .fade, .sheet { animation: none !important; }
+  .drawer, .fade, .sheet, .pop, .toast { animation: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
 /* iOS zooms into any text field whose font is smaller than 16px. Unlayered, so it

@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { toast, useToasts } from './toast'
@@ -13,7 +13,8 @@ describe('toasts', () => {
     expect(screen.getByText('Saved to memory: Likes tea.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(undo).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('Saved to memory: Likes tea.')).not.toBeInTheDocument()
+    // It animates out first, then it is gone.
+    await waitFor(() => expect(screen.queryByText('Saved to memory: Likes tea.')).not.toBeInTheDocument())
   })
 
   it('keeps at most three on screen', () => {
