@@ -4,7 +4,13 @@ from tests.conftest import TEST_PASSWORD, requires_db
 
 pytestmark = requires_db
 
-PUBLIC_PATHS = {"/api/health", "/api/ready", "/api/auth/login"}
+PUBLIC_PATHS = {
+    "/api/health",
+    "/api/ready",
+    "/api/auth/login",
+    # Viewing a share link: a frozen copy, found by a secret token (tests/api/test_shares.py).
+    "/api/public/shares/{token}",
+}
 
 
 async def test_login_success_sets_http_only_cookie(client):

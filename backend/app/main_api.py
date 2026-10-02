@@ -95,7 +95,12 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
                     headers={"Cache-Control": "no-cache"},
                 )
             return FileResponse(candidate)
-        return FileResponse(index, headers={"Cache-Control": "no-cache"})
+        headers = {"Cache-Control": "no-cache"}
+        if path.startswith("s/"):
+            # A share link: its address is the secret. Keep it out of search engines and
+            # out of the Referer sent to sites the shared text links to.
+            headers |= {"Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow"}
+        return FileResponse(index, headers=headers)
 
 
 app = create_app()

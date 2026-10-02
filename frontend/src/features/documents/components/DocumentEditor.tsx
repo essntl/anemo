@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { AlertTriangle, ArrowLeft, Check, Code2, Download, FolderInput, History, Loader2, MessageSquare, Pencil, Trash2, Type } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, Code2, Download, FolderInput, History, Link2, Loader2, MessageSquare, Pencil, Trash2, Type } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
@@ -17,6 +17,7 @@ import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { toast } from '@/components/ui/toast'
 import { downloadUrl } from '@/features/files/api'
 import { CodeEditor } from '@/features/files/components/CodeEditor'
+import { useShareDialog } from '@/features/shares/shareStore'
 import { cn } from '@/lib/cn'
 import { type DocumentContent, useDeleteDocument, useDocument, useMoveDocument } from '../api'
 import { imagesToEditor, imagesToFile, joinFrontMatter, needsSourceMode, splitFrontMatter, tidyMarkdown } from '../markdown'
@@ -55,6 +56,7 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther }: SessionPro
   const move = useMoveDocument()
   const remove = useDeleteDocument()
   const [historyOpen, setHistoryOpen] = useState(false)
+  const askShare = useShareDialog((s) => s.ask)
   const start = useMemo(() => splitFrontMatter(doc.content), [doc.content])
   // Documents the rich editor would damage (raw HTML, footnotes) open as Markdown source.
   const richIsLossy = useMemo(() => needsSourceMode(start.body), [start.body])
@@ -131,6 +133,7 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther }: SessionPro
             onSelect: () => (mode === 'rich' ? switchMode('source') : richIsLossy ? toast({ message: 'This document uses HTML or footnotes, which only the Markdown editor keeps.' }) : switchMode('rich')) },
           { label: 'Rename file', icon: <Pencil />, onSelect: () => void rename() },
           { label: 'Move to folder', icon: <FolderInput />, onSelect: () => void moveToFolder() },
+          { label: 'Share', icon: <Link2 />, onSelect: () => askShare({ kind: 'document', id: doc.id, title: server.title }) },
           { label: 'Download .md', icon: <Download />, download: downloadUrl(server.path) },
           { label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
         ]} />

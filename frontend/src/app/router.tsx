@@ -22,6 +22,8 @@ function page<Module, Name extends keyof Module>(load: () => Promise<Module>, na
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  // A share link: a read-only copy for anyone who has the address. No login.
+  { path: '/s/:token', errorElement: <RouteError />, ...page(() => import('@/features/shares/SharedPage'), 'SharedPage') },
   {
     // Everything below requires a logged-in session.
     element: <RequireAuth />,
@@ -66,6 +68,7 @@ export const router = createBrowserRouter([
               { path: 'mcp', ...page(() => import('@/features/mcp/McpSettingsPage'), 'McpSettingsPage') },
               { path: 'notifications', ...page(() => import('@/features/notifications/NotificationSettingsPage'), 'NotificationSettingsPage') },
               { path: 'memory', ...page(() => import('@/features/memory/MemorySettingsPage'), 'MemorySettingsPage') },
+              { path: 'sharing', ...page(() => import('@/features/shares/SharedLinksPage'), 'SharedLinksPage') },
               { path: 'usage', ...page(() => import('@/features/usage/UsagePage'), 'UsagePage') },
               { path: 'advanced', ...page(() => import('@/features/settings/pages/AdvancedPage'), 'AdvancedPage') },
             ],

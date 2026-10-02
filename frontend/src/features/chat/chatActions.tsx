@@ -1,10 +1,11 @@
 import { useNavigate, useParams } from 'react-router'
-import { Archive, ArchiveRestore, Download, FileText, FolderInput, Pencil, Star, StarOff, Tags, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Download, FileText, FolderInput, Link2, Pencil, Star, StarOff, Tags, Trash2 } from 'lucide-react'
 import { create } from 'zustand'
 import { errorMessage } from '@/api/client'
 import type { MenuAction } from '@/components/ui/ActionMenu'
 import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { toast } from '@/components/ui/toast'
+import { useShareDialog } from '@/features/shares/shareStore'
 import { type Conversation, useDeleteConversation, useSaveAsDocument, useUpdateConversation } from './api'
 
 /** "work, ideas" -> ["work", "ideas"]. The server tidies them further (lowercase, no #). */
@@ -38,6 +39,7 @@ export function useChatActions(conv: Conversation): MenuAction[] {
   const remove = useDeleteConversation()
   const saveDocument = useSaveAsDocument()
   const askMove = useMoveChats((s) => s.ask)
+  const askShare = useShareDialog((s) => s.ask)
 
   const rename = async () => {
     const title = await promptDialog({ title: 'Rename chat', label: 'Title', initial: conv.title, confirmLabel: 'Rename' })
@@ -75,6 +77,7 @@ export function useChatActions(conv: Conversation): MenuAction[] {
     conv.archived
       ? { label: 'Unarchive', icon: <ArchiveRestore />, onSelect: () => update.mutate({ id: conv.id, body: { archived: false } }) }
       : { label: 'Archive', icon: <Archive />, onSelect: () => update.mutate({ id: conv.id, body: { archived: true } }) },
+    { label: 'Share', icon: <Link2 />, onSelect: () => askShare({ kind: 'chat', id: conv.id, title: conv.title }) },
     { label: 'Download as Markdown', icon: <Download />, download: `/api/conversations/${conv.id}/export` },
     { label: 'Save as document', icon: <FileText />, onSelect: saveAsDocument },
     { label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => void del() },

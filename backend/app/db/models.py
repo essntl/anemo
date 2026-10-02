@@ -19,6 +19,7 @@ from app.features.providers import models as providers_models
 from app.features.runs import models as runs_models
 from app.features.secrets import models as secrets_models
 from app.features.settings import models as settings_models
+from app.features.shares import models as shares_models
 from app.features.skills import models as skills_models
 from app.features.tasks import models as tasks_models
 from app.features.usage import models as usage_models
@@ -44,6 +45,7 @@ __all__ = [
     "runs_models",
     "secrets_models",
     "settings_models",
+    "shares_models",
     "skills_models",
     "tasks_models",
     "usage_models",

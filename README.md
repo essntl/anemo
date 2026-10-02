@@ -61,7 +61,26 @@ In a chat you can:
   summary is written once by the summarization model and reused;
 - **edit** your last message and have it answered again;
 - **branch** from any answer into a new chat that starts as a copy up to that point;
-- **download** the chat as Markdown or **save it as a document** in the workspace.
+- **download** the chat as Markdown or **save it as a document** in the workspace;
+- **share** it by link (below).
+
+### Share links
+
+Anemo is for one person, but you can let someone read a single chat, document or
+project: **Share** in its menu creates a link that works without logging in.
+
+- The link shows a **copy made at that moment**. It does not follow later changes
+  unless you press **Update copy**, and it never includes attached files, the model's
+  reasoning or agent activity.
+- A shared **project** shows what you tick: its tasks, its upcoming events, and its
+  documents, which the visitor can open and read in full. Its chats, files and
+  instructions are never part of a link.
+- A visitor can read, nothing else. No model, agent or tool is reachable from a link.
+- Links expire (7 days by default) and can be revoked at any time. **Settings →
+  Shared links** lists them all.
+- A link only works for people who can reach your server.
+
+Details in [docs/security.md](docs/security.md#share-links).
 
 ### Profiles, skills, plans and runs
 

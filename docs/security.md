@@ -16,6 +16,37 @@ what is not.
 - Logins, setting changes, approvals and denials are in the security log under
   **Settings → Advanced**.
 
+## Share links
+
+Anemo has one user, but you can let someone **read** a single chat, document or
+project by giving them a link (**Share** in the menu of a chat, a document or
+a project). This is the only thing reachable without logging in, apart from the login
+page itself.
+
+- **A link shows a frozen copy.** The copy is made when you create the link and is
+  stored with it. Opening a link reads that copy and nothing else: no live chat, no
+  file, no setting. It changes only when you press **Update copy**.
+- **What a copy contains.** A chat: the messages, the model's name, and the *names* of
+  attached files and referenced chats. A document: its text. A project: the
+  sections you tick, which are its tasks and upcoming events (titles and dates) and
+  its documents (the text of each, to read in full). Never included: attached files
+  and workspace images, the model's reasoning, what an agent did, and a project's
+  chats, files and instructions.
+- **A visitor can only read.** There is nothing to write to, no model is called and no
+  agent or tool can be reached through a link.
+- **The address is the secret.** It contains 256 random bits; anyone who has it can read
+  the copy, so share it the way you would share the text itself. The page is marked as
+  not to be indexed and does not pass its address on to sites it links to.
+- **Links end.** They expire after 1, 7 or 30 days (7 by default) unless you choose
+  "until I revoke it". **Revoke** stops a link at once, deleting the chat, document or
+  project deletes its links, and **Settings → Shared links** lists every link with how
+  often it was opened, and can revoke them all. Missing, expired and revoked links
+  look the same to a visitor. Wrong addresses are limited to 30 a minute per IP.
+- Creating and revoking links is in the security log.
+
+A link only works for people who can reach your server. If Anemo is only on your home
+network, so are its links.
+
 ## Permission levels
 
 **Settings → Agent Permissions** has one level per kind of action:
@@ -109,6 +140,10 @@ searching every response, record and stored file for it.
   official API.
 - **A stolen `.env` plus a database dump** reveals the saved keys. Protect both.
 - **One user only.** There are no roles; whoever has the password has everything.
+  Share links (above) are read-only copies, not accounts.
+- **A share link in the wrong hands.** Whoever gets the address can read that copy
+  until it expires or you revoke it. It is also kept in the browser history of
+  whoever opened it, and in your proxy's access log.
 
 ## Reporting a problem
 

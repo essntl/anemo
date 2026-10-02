@@ -5,7 +5,7 @@
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Archive, ArchiveRestore, FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, FolderKanban, Link2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { useProjectStore } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
@@ -20,6 +20,7 @@ import { Lingering } from '@/components/ui/Lingering'
 import { Select } from '@/components/ui/Select'
 import { useProfiles } from '@/features/profiles/api'
 import { useModels } from '@/features/providers/api'
+import { useShareDialog } from '@/features/shares/shareStore'
 import { type Project, useDeleteProject, useProjects, useSaveProject } from '@/features/tasks/api'
 
 const COLORS = ['#6b7280', '#ef4444', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
@@ -103,6 +104,7 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: () => void
   const save = useSaveProject()
   const remove = useDeleteProject()
   const { projectId, setProjectId } = useProjectStore()
+  const askShare = useShareDialog((s) => s.ask)
   const current = projectId === project.id
 
   const confirmDelete = async () => {
@@ -143,6 +145,7 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: () => void
           label={`Actions for ${project.name}`}
           actions={[
             { label: 'Edit', icon: <Pencil />, onSelect: onEdit },
+            { label: 'Share', icon: <Link2 />, onSelect: () => askShare({ kind: 'project', id: project.id, title: project.name }) },
             project.archived
               ? { label: 'Use again', icon: <ArchiveRestore />, onSelect: () => save.mutate({ ...project, archived: false }) }
               : { label: 'Archive', icon: <Archive />, onSelect: () => save.mutate({ ...project, archived: true }, { onSuccess: () => current && setProjectId(null) }) },

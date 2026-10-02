@@ -8,6 +8,7 @@ import { MoveChatsDialog } from '@/features/chat/components/MoveChatsDialog'
 import { useAppEvents } from '@/features/chat/useAppEvents'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
+import { ShareDialog } from '@/features/shares/ShareDialog'
 import { MobileTopBar } from './mobileNav'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
 import { Sidebar } from './Sidebar'
@@ -57,6 +58,7 @@ export function AppLayout() {
       <ReauthDialog />
       <DialogHost />
       <MoveChatsDialog />
+      <ShareDialog />
       <ToastHost />
       <CommandPalette />
     </div>

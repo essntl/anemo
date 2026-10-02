@@ -1,7 +1,8 @@
 """Aggregates every feature router under /api.
 
 Routers in `protected` require a logged-in session for every endpoint.
-Only health checks and the login flow are reachable without one.
+Only health checks, the login flow and viewing a share link (a frozen copy the owner
+chose to share, see features/shares/public_router.py) are reachable without one.
 """
 
 from fastapi import APIRouter, Depends
@@ -28,6 +29,8 @@ from app.features.runs.agent_router import router as agent_router
 from app.features.runs.router import router as runs_router
 from app.features.search.router import router as search_router
 from app.features.settings.router import router as settings_router
+from app.features.shares.public_router import router as shares_public_router
+from app.features.shares.router import router as shares_router
 from app.features.shell.router import router as shell_router
 from app.features.skills.router import router as skills_router
 from app.features.system_router import router as system_router
@@ -38,6 +41,7 @@ from app.web.router import router as web_router
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
 api_router.include_router(auth_router)  # endpoints declare their own session requirement
+api_router.include_router(shares_public_router)  # read-only, by secret link
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
@@ -57,6 +61,7 @@ protected.include_router(memory_router)
 protected.include_router(documents_router)
 protected.include_router(tasks_router)
 protected.include_router(projects_router)
+protected.include_router(shares_router)
 protected.include_router(calendar_router)
 protected.include_router(notifications_router)
 protected.include_router(automations_router)
