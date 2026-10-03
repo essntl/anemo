@@ -60,6 +60,12 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await page.getByRole('button', { name: 'Open menu' }).click()
   const drawer = page.getByRole('dialog', { name: 'Menu' })
   await expect(drawer).toBeVisible()
+  // Most of the menu is chats: Notifications and Settings are header icons, the pages small tiles.
+  const box = (await drawer.locator('aside').boundingBox())!
+  const list = (await drawer.getByLabel('Chats', { exact: true }).boundingBox())!
+  expect(list.height / box.height).toBeGreaterThan(0.4)
+  await expect(drawer.getByRole('link', { name: 'Notifications' })).toBeVisible()
+  await expect(drawer.getByRole('combobox', { name: 'Project' })).toBeVisible()
   // The pages are right there, under the chats.
   await drawer.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Files', exact: true }).click()
   await expect(page).toHaveURL(/\/files/)

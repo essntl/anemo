@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { NavLink, useMatch } from 'react-router'
 import { Loader2, Search, Star, Timer, X } from 'lucide-react'
 import { useCurrentProject } from '@/app/projectStore'
@@ -81,9 +81,10 @@ function groupChats(all: Conversation[], searching: boolean): Group[] {
 
 /**
  * The chats in the sidebar, for the project chosen in the switcher (or all of them).
- * They take all the free height and scroll on their own.
+ * They take all the free height and scroll on their own. `beside`: shown next to the
+ * search box (the project picker, in the phone menu).
  */
-export function ConversationList() {
+export function ConversationList({ beside }: { beside?: ReactNode }) {
   const [query, setQuery] = useState('')
   const q = useDebounced(query.trim(), 250)
   const project = useCurrentProject()
@@ -93,22 +94,25 @@ export function ConversationList() {
 
   return (
     <div className="mt-3 flex min-h-0 flex-1 flex-col">
-      <div className="relative mb-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-          placeholder={project ? `Search chats in ${project.name}` : 'Search chats'}
-          aria-label="Search chats"
-          className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-8 pointer-coarse:h-10 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
-        />
-        {query && (
-          <button type="button" aria-label="Clear the search" onClick={() => setQuery('')}
-            className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-8 pointer-coarse:w-8">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
+      <div className="mb-1 flex items-center gap-1.5">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+            placeholder={project && !beside ? `Search chats in ${project.name}` : 'Search chats'}
+            aria-label="Search chats"
+            className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-8 pointer-coarse:h-10 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
+          />
+          {query && (
+            <button type="button" aria-label="Clear the search" onClick={() => setQuery('')}
+              className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-8 pointer-coarse:w-8">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {beside}
       </div>
       <div aria-label="Chats" className="mt-2 min-h-0 flex-1 overflow-y-auto">
         {groups.map((group) => (

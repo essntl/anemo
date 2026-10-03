@@ -49,6 +49,33 @@ function PageLink({ to, icon, children, title, badge }: { to: string; icon: Reac
   )
 }
 
+/** One page in the phone menu's grid: the icon above a short name, badge on the corner. */
+function PageTile({ to, icon, children, title, badge }: { to: string; icon: ReactNode; children: ReactNode; title?: string; badge?: ReactNode }) {
+  return (
+    <NavLink to={to} title={title}
+      className={({ isActive }) =>
+        cn('relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-control px-1 text-[12px] font-medium transition-colors',
+          isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+      <span className="[&>svg]:h-5 [&>svg]:w-5">{icon}</span>
+      <span className="w-full truncate text-center">{children}</span>
+      {badge && <span className="absolute right-1.5 top-1 scale-90">{badge}</span>}
+    </NavLink>
+  )
+}
+
+/** A round icon button in the phone menu's header. */
+function HeaderLink({ to, label, icon, badge, onClick }: { to: string; label: string; icon: ReactNode; badge?: ReactNode; onClick?: () => void }) {
+  return (
+    <NavLink to={to} aria-label={label} title={label} onClick={onClick}
+      className={({ isActive }) =>
+        cn('relative flex h-10 w-10 items-center justify-center rounded-control [&>svg]:h-5 [&>svg]:w-5',
+          isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+      {icon}
+      {badge && <span className="absolute -right-0.5 -top-0.5 scale-75">{badge}</span>}
+    </NavLink>
+  )
+}
+
 /** A thin line in the accent colour that fades out: sets the parts of the sidebar apart. */
 function Divider({ className }: { className?: string }) {
   return <div aria-hidden className={cn('h-px shrink-0 bg-[linear-gradient(to_right,var(--accent),transparent)] opacity-50', className)} />
@@ -94,8 +121,9 @@ function NotificationsBadge() {
   )
 }
 
-/** The project you are working in. "All projects" shows everything together. */
-function ProjectSwitcher() {
+/** The project you are working in. "All projects" shows everything together.
+ *  `compact`: a small pill beside the chat search (the phone menu). */
+function ProjectSwitcher({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
   const projects = useProjects()
   const current = useCurrentProject()
@@ -105,7 +133,8 @@ function ProjectSwitcher() {
   return (
     <Select
       aria-label="Project"
-      className="mt-2 h-9"
+      variant={compact ? 'pill' : 'field'}
+      className={compact ? 'max-w-[9rem] shrink-0 pointer-coarse:h-10' : 'mt-2 h-9'}
       value={current?.id ?? ''}
       onValueChange={(value) => (value === MANAGE ? void navigate('/projects') : setProjectId(value || null))}
       options={[
@@ -173,18 +202,24 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   const logout = useLogout()
   const openSearch = usePalette((s) => s.setOpen)
   const setCollapsed = useSidebar((s) => s.setCollapsed)
+  const Page = onClose ? PageTile : PageLink
   return (
     // Normally nothing here scrolls but the chats; in a very low window the sidebar as a
     // whole does, rather than squeezing the chats away.
     <aside className={cn('h-full shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
-      <div className="mb-4 flex items-center gap-2 px-2">
+      <div className={cn('flex items-center gap-2 px-2', onClose ? 'mb-3 gap-1' : 'mb-4')}>
         <Logo className="h-8 w-8 text-accent pointer-coarse:h-9 pointer-coarse:w-9" />
-        <span className="flex-1 text-[19px] font-semibold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
+        <span className="ml-1 flex-1 text-[19px] font-semibold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
         {onClose ? (
-          <button type="button" aria-label="Close menu" onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
-            <X className="h-5 w-5" />
-          </button>
+          // On a phone Notifications and Settings sit up here, so the chats get the room.
+          <>
+            <HeaderLink to="/notifications" label="Notifications" icon={<Bell />} badge={<NotificationsBadge />} />
+            <HeaderLink to="/settings" label="Settings" icon={<Settings />} />
+            <button type="button" aria-label="Close menu" onClick={onClose}
+              className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
+              <X className="h-5 w-5" />
+            </button>
+          </>
         ) : (
           <button type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+\)" onClick={() => setCollapsed(true)}
             className="flex h-8 w-8 items-center justify-center rounded-control text-subtle hover:bg-surface-hover hover:text-text">
@@ -211,11 +246,11 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </Button>
       </div>
 
-      <ProjectSwitcher />
+      {!onClose && <ProjectSwitcher />}
 
       {/* The chats take all the free height and are the only thing that scrolls. */}
       <div className="mt-1 flex min-h-52 flex-1 flex-col">
-        <ConversationList />
+        <ConversationList beside={onClose && <ProjectSwitcher compact />} />
         <NavLink to="/chats"
           className={({ isActive }) =>
             cn('mt-1 flex h-9 shrink-0 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium pointer-coarse:h-11 pointer-coarse:text-[15px]',
@@ -228,20 +263,22 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
 
       {/* The pages, pinned: always in the same place, one tap away. */}
       <Divider className="mx-1 my-2" />
-      <nav aria-label="Pages" className="grid shrink-0 grid-cols-2 gap-0.5">
-        <PageLink to="/projects" icon={<FolderKanban />}>Projects</PageLink>
-        <PageLink to="/files" icon={<FolderOpen />}>Files</PageLink>
-        <PageLink to="/documents" icon={<FileText />}>Documents</PageLink>
-        <PageLink to="/tasks" icon={<CheckSquare />}>Tasks</PageLink>
-        <PageLink to="/calendar" icon={<CalendarDays />}>Calendar</PageLink>
-        <PageLink to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</PageLink>
-        <PageLink to="/automations" icon={<Clock />}>Automations</PageLink>
-        <PageLink to="/agents" icon={<Bot />} title="Profiles & Skills">Agents</PageLink>
-        <PageLink to="/memory" icon={<Brain />} badge={<MemoryBadge />}>Memory</PageLink>
+      {/* On a phone: three columns of small tiles, three rows instead of five. */}
+      <nav aria-label="Pages" className={cn('grid shrink-0 gap-0.5', onClose ? 'grid-cols-3' : 'grid-cols-2')}>
+        <Page to="/projects" icon={<FolderKanban />}>Projects</Page>
+        <Page to="/files" icon={<FolderOpen />}>Files</Page>
+        <Page to="/documents" icon={<FileText />}>Documents</Page>
+        <Page to="/tasks" icon={<CheckSquare />}>Tasks</Page>
+        <Page to="/calendar" icon={<CalendarDays />}>Calendar</Page>
+        <Page to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</Page>
+        <Page to="/automations" icon={<Clock />}>Automations</Page>
+        <Page to="/agents" icon={<Bot />} title="Profiles & Skills">Agents</Page>
+        <Page to="/memory" icon={<Brain />} badge={<MemoryBadge />}>Memory</Page>
       </nav>
 
-      <Divider className="mx-1 my-2" />
-      <div className="grid shrink-0 grid-cols-2 gap-0.5">
+      {/* Sign out is under Settings > General too; on a phone this row would only take room. */}
+      {!onClose && <Divider className="mx-1 my-2" />}
+      {!onClose && <div className="grid shrink-0 grid-cols-2 gap-0.5">
         <div className="col-span-2">
           <PageLink to="/notifications" icon={<Bell />} badge={<NotificationsBadge />}>Notifications</PageLink>
         </div>
@@ -251,7 +288,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           <LogOut className="h-4 w-4 shrink-0" />
           <span className="truncate">Sign out</span>
         </button>
-      </div>
+      </div>}
     </aside>
   )
 }
