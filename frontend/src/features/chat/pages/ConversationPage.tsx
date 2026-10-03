@@ -36,6 +36,7 @@ import {
   useUpdateConversation,
 } from '../api'
 import { useChatActions } from '../chatActions'
+import { TemporaryLabel } from '../temporary'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { ModelPicker } from '../components/ModelPicker'
@@ -162,16 +163,17 @@ export function ConversationPage() {
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:h-14 md:px-6">
         <MenuButton />
-        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+        <h1 className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold">
           {/* The title is a button: press it to rename the chat. */}
           {conversation.data ? (
             <button type="button" title="Rename" aria-label={`Rename “${conversation.data.title}”`} onClick={() => void rename()}
-              className="-mx-1.5 max-w-full truncate rounded-md px-1.5 py-1 align-middle font-semibold hover:bg-surface-hover">
+              className="-mx-1.5 min-w-0 truncate rounded-md px-1.5 py-1 font-semibold hover:bg-surface-hover">
               {conversation.data.title}
             </button>
           ) : ' '}
+          {conversation.data?.temporary && <TemporaryLabel conversation={conversation.data} />}
           {project && (
-            <span className="ml-2 hidden items-center gap-1 align-middle text-[12px] font-normal text-muted sm:inline-flex">
+            <span className="hidden shrink-0 items-center gap-1 text-[12px] font-normal text-muted sm:inline-flex">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} /> {project.name}
             </span>
           )}

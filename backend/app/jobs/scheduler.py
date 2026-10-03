@@ -15,6 +15,7 @@ TICK_S = 30.0
 def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.features.automations import service as automations
     from app.features.calendar import reminders
+    from app.features.conversations import service as conversations
     from app.features.notifications import service as notifications
     from app.features.runs import service as runs
 
@@ -23,6 +24,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
         ("automations", automations.fire_due),
         ("notifications.prune", notifications.prune),
         ("approvals.expire", runs.expire_stale_approvals),
+        ("chats.temporary", conversations.delete_expired_temporary),
     ]
 
 

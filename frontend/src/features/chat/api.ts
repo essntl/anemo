@@ -74,9 +74,12 @@ export function useMessages(id: string) {
   })
 }
 
-/** A new chat; in a project it starts with the project's default model and agent profile. */
-export async function createConversation(modelId: string | null, projectId: string | null = null): Promise<Conversation> {
-  return unwrap(await api.POST('/api/conversations', { body: { model_id: modelId, project_id: projectId } }))
+/**
+ * A new chat; in a project it starts with the project's default model and agent profile.
+ * A temporary one is deleted five minutes after its last message unless it is kept.
+ */
+export async function createConversation(modelId: string | null, projectId: string | null = null, temporary = false): Promise<Conversation> {
+  return unwrap(await api.POST('/api/conversations', { body: { model_id: modelId, project_id: projectId, temporary } }))
 }
 
 /** Puts the new messages and the active run into the cache so the UI updates at once. */

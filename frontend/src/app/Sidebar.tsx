@@ -35,34 +35,17 @@ import { cn } from '@/lib/cn'
 import { useCurrentProject, useProjectStore } from './projectStore'
 import { useSidebar } from './sidebarStore'
 
-function NavItem({ to, icon, children, badge }: { to: string; icon: ReactNode; children: ReactNode; badge?: ReactNode }) {
+/** One page in the pinned grid under the chats: an icon and a short name. */
+function PageLink({ to, icon, children, title, badge }: { to: string; icon: ReactNode; children: ReactNode; title?: string; badge?: ReactNode }) {
   return (
-    <NavLink
-      to={to}
+    <NavLink to={to} title={title}
       className={({ isActive }) =>
-        cn(
-          'flex h-9 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium transition-colors pointer-coarse:h-11 pointer-coarse:text-[15px]',
-          isActive
-            ? 'bg-accent-soft text-accent'
-            : 'text-muted hover:bg-surface-hover hover:text-text',
-        )
-      }
-    >
-      <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
-      <span className="flex-1">{children}</span>
+        cn('flex h-8 min-w-0 items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium transition-colors pointer-coarse:h-10 pointer-coarse:text-[14px]',
+          isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+      <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
       {badge}
     </NavLink>
-  )
-}
-
-function Section({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="mt-3 first:mt-1">
-      <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
-        {label}
-      </div>
-      <div className="flex flex-col gap-0.5">{children}</div>
-    </div>
   )
 }
 
@@ -135,19 +118,6 @@ function ProjectSwitcher() {
 }
 const MANAGE = '__manage__'
 
-/** What the closed menu would hide: runs waiting for you and memory suggestions. */
-function MenuBadge() {
-  const waiting = useRunsSummary().data?.waiting ?? 0
-  const pending = useMemorySummary().data?.pending ?? 0
-  if (!waiting && !pending) return null
-  return (
-    <span title="Something in here is waiting for you"
-      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-[11px] font-semibold text-white">
-      {waiting + pending}
-    </span>
-  )
-}
-
 /** One page in the folded sidebar: an icon, with its name as a tooltip. */
 function RailLink({ to, label, icon, badge }: { to: string; label: string; icon: ReactNode; badge?: ReactNode }) {
   return (
@@ -202,9 +172,11 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   const me = useMe()
   const logout = useLogout()
   const openSearch = usePalette((s) => s.setOpen)
-  const { menuOpen, setMenuOpen, setCollapsed } = useSidebar()
+  const setCollapsed = useSidebar((s) => s.setCollapsed)
   return (
-    <aside className={cn('h-full shrink-0 flex-col border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
+    // Normally nothing here scrolls but the chats; in a very low window the sidebar as a
+    // whole does, rather than squeezing the chats away.
+    <aside className={cn('h-full shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
       <div className="mb-4 flex items-center gap-2 px-2">
         <Logo className="h-8 w-8 text-accent pointer-coarse:h-9 pointer-coarse:w-9" />
         <span className="flex-1 text-[19px] font-semibold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
@@ -241,10 +213,9 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
 
       <ProjectSwitcher />
 
-      {/* Menu open: chats (up to seven), then the menu; the whole column scrolls.
-          Menu closed: the chats take all the room and scroll on their own. */}
-      <nav className={cn('mt-1 flex min-h-0 flex-1 flex-col', menuOpen && 'overflow-y-auto')}>
-        <ConversationList fill={!menuOpen} />
+      {/* The chats take all the free height and are the only thing that scrolls. */}
+      <div className="mt-1 flex min-h-52 flex-1 flex-col">
+        <ConversationList />
         <NavLink to="/chats"
           className={({ isActive }) =>
             cn('mt-1 flex h-9 shrink-0 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium pointer-coarse:h-11 pointer-coarse:text-[15px]',
@@ -253,46 +224,32 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           <span className="flex-1">All chats</span>
           <ChevronRight className="h-3.5 w-3.5 text-subtle" />
         </NavLink>
+      </div>
 
-        <Divider className="mx-1 mt-3" />
-        <button type="button" aria-expanded={menuOpen} aria-controls="sidebar-menu" onClick={() => setMenuOpen(!menuOpen)}
-          className="mt-2 flex h-8 shrink-0 items-center gap-1.5 rounded-control px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-10">
-          <ChevronRight className={cn('h-3.5 w-3.5 transition-transform duration-150', menuOpen && 'rotate-90')} />
-          <span className="flex-1 text-left">Workspace &amp; agents</span>
-          {!menuOpen && <MenuBadge />}
-        </button>
-        <div id="sidebar-menu" className="collapsible shrink-0" data-open={menuOpen} inert={!menuOpen}>
-          <div>
-            <Section label="Workspace">
-              <NavItem to="/projects" icon={<FolderKanban />}>Projects</NavItem>
-              <NavItem to="/files" icon={<FolderOpen />}>Files</NavItem>
-              <NavItem to="/documents" icon={<FileText />}>Documents</NavItem>
-              <NavItem to="/tasks" icon={<CheckSquare />}>Tasks</NavItem>
-              <NavItem to="/calendar" icon={<CalendarDays />}>Calendar</NavItem>
-            </Section>
-            <Section label="Agents">
-              <NavItem to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</NavItem>
-              <NavItem to="/automations" icon={<Clock />}>Automations</NavItem>
-              <NavItem to="/agents" icon={<Bot />}>Profiles & Skills</NavItem>
-            </Section>
-            <Section label="You">
-              <NavItem to="/memory" icon={<Brain />} badge={<MemoryBadge />}>Memory</NavItem>
-            </Section>
-          </div>
-        </div>
+      {/* The pages, pinned: always in the same place, one tap away. */}
+      <Divider className="mx-1 my-2" />
+      <nav aria-label="Pages" className="grid shrink-0 grid-cols-2 gap-0.5">
+        <PageLink to="/projects" icon={<FolderKanban />}>Projects</PageLink>
+        <PageLink to="/files" icon={<FolderOpen />}>Files</PageLink>
+        <PageLink to="/documents" icon={<FileText />}>Documents</PageLink>
+        <PageLink to="/tasks" icon={<CheckSquare />}>Tasks</PageLink>
+        <PageLink to="/calendar" icon={<CalendarDays />}>Calendar</PageLink>
+        <PageLink to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</PageLink>
+        <PageLink to="/automations" icon={<Clock />}>Automations</PageLink>
+        <PageLink to="/agents" icon={<Bot />} title="Profiles & Skills">Agents</PageLink>
+        <PageLink to="/memory" icon={<Brain />} badge={<MemoryBadge />}>Memory</PageLink>
       </nav>
 
-      <Divider className="mx-1" />
-      <div className="flex flex-col gap-0.5 pt-3">
-        <NavItem to="/notifications" icon={<Bell />} badge={<NotificationsBadge />}>Notifications</NavItem>
-        <NavItem to="/settings" icon={<Settings />}>Settings</NavItem>
-        <button
-          type="button"
-          onClick={() => logout.mutate()}
-          className="flex h-9 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-11 pointer-coarse:text-[15px]"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out {me.data && <span className="truncate text-subtle">({me.data.username})</span>}
+      <Divider className="mx-1 my-2" />
+      <div className="grid shrink-0 grid-cols-2 gap-0.5">
+        <div className="col-span-2">
+          <PageLink to="/notifications" icon={<Bell />} badge={<NotificationsBadge />}>Notifications</PageLink>
+        </div>
+        <PageLink to="/settings" icon={<Settings />}>Settings</PageLink>
+        <button type="button" onClick={() => logout.mutate()} title={me.data ? `Signed in as ${me.data.username}` : undefined}
+          className="flex h-8 min-w-0 items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:text-[14px]">
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span className="truncate">Sign out</span>
         </button>
       </div>
     </aside>

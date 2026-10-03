@@ -68,6 +68,9 @@ async def schedule(db: AsyncSession, conversation_id: uuid.UUID, upto_seq: int) 
     settings = await service.get_settings(db)
     if not settings.enabled or settings.extraction == "off":
         return
+    # Nothing is learned from a temporary chat (once kept, its next answer is looked at).
+    if await db.scalar(select(Conversation.temporary).where(Conversation.id == conversation_id)):
+        return
     key = f"memory.extract:{conversation_id}:{upto_seq}"
     if await db.scalar(select(queue.Job.id).where(queue.Job.dedupe_key == key)):
         return  # e.g. a regenerated answer with the same position

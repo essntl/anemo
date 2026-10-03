@@ -2,14 +2,16 @@
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy import text as sql
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import browser_client
+from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict, NotFound
+from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
 from app.features.conversations.models import ChatMessage, Conversation
@@ -79,6 +81,11 @@ async def active_runs(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID,
     return {cid: rid for cid, rid in rows.all() if cid is not None}
 
 
+# A temporary chat is deleted this long after its last message (an answer that is
+# still being written counts as activity: it waits for that).
+TEMPORARY_FOR = timedelta(minutes=5)
+
+
 def conversation_out(
     c: Conversation, active: dict[uuid.UUID, uuid.UUID], snippet: str | None = None
 ) -> ConversationOut:
@@ -97,6 +104,8 @@ def conversation_out(
         default_mode=c.default_mode,
         profile_id=c.profile_id,
         automation_id=c.automation_id,
+        temporary=c.temporary,
+        expires_at=c.last_message_at + TEMPORARY_FOR if c.temporary else None,
         snippet=snippet,
     )
 
@@ -170,9 +179,15 @@ async def list_conversations(
 
 
 async def create_conversation(
-    db: AsyncSession, title: str | None, model_id: uuid.UUID | None, project_id: uuid.UUID | None
+    db: AsyncSession,
+    title: str | None,
+    model_id: uuid.UUID | None,
+    project_id: uuid.UUID | None,
+    temporary: bool = False,
 ) -> Conversation:
-    conv = Conversation(title=title or "New chat", title_is_auto=not title, model_id=model_id)
+    conv = Conversation(
+        title=title or "New chat", title_is_auto=not title, model_id=model_id, temporary=temporary
+    )
     if project_id is not None:
         project = await projects.get(db, project_id)
         conv.project_id = project.id
@@ -251,6 +266,29 @@ async def delete_conversations(db: AsyncSession, ids: list[uuid.UUID]) -> None:
         await browser_client.close(conv.id)  # its browser session, if it has one
     await db.flush()
     outputs.delete_for_runs(run_ids)
+
+
+async def delete_expired_temporary(now: datetime | None = None) -> int:
+    """Periodic: delete temporary chats whose last message is older than TEMPORARY_FOR,
+    except while an answer is still being written in them."""
+    now = now or datetime.now(UTC)
+    async with get_sessionmaker()() as db:
+        due = list(
+            await db.scalars(
+                select(Conversation.id).where(
+                    Conversation.temporary.is_(True),
+                    Conversation.last_message_at < now - TEMPORARY_FOR,
+                )
+            )
+        )
+        busy = await active_runs(db, due)
+        ids = [i for i in due if i not in busy]
+        if not ids:
+            return 0
+        await delete_conversations(db, ids)
+        await db.commit()
+    await bus.publish_global("conversations.changed", {"deleted": [str(i) for i in ids]})
+    return len(ids)
 
 
 async def list_messages(db: AsyncSession, conversation_id: uuid.UUID) -> list[MessageOut]:

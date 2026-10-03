@@ -44,10 +44,12 @@ function ToolButton({ label, active, disabled, onClick, children }: {
   )
 }
 
-const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-border" />
+// On a phone the buttons wrap onto rows instead, where dividers would only be in the way.
+const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-border max-md:hidden" />
 
 /**
- * Formatting buttons for the rich editor. Scrolls sideways on narrow screens.
+ * Formatting buttons for the rich editor. On a phone they wrap onto as many rows as
+ * they need (nothing scrolls sideways).
  * Without `onPickImage` (short notes) the buttons for whole-document things are left
  * out: the largest heading, images, tables and divider lines.
  */
@@ -90,7 +92,7 @@ export function EditorToolbar({ editor, onPickLink, onPickImage }: {
   }
 
   return (
-    <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border px-2 py-1.5" role="toolbar" aria-label="Formatting">
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1.5 md:flex-nowrap md:overflow-x-auto" role="toolbar" aria-label="Formatting">
       <ToolButton label="Undo" disabled={!state.canUndo} onClick={() => chain().undo().run()}><Undo2 /></ToolButton>
       <ToolButton label="Redo" disabled={!state.canRedo} onClick={() => chain().redo().run()}><Redo2 /></ToolButton>
       <Divider />

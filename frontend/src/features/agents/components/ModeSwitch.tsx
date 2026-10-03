@@ -1,6 +1,33 @@
+import { useState } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
-import { Bot, MessageSquare, ShieldCheck } from 'lucide-react'
+import {
+  AppWindow,
+  Ban,
+  Bell,
+  Bot,
+  Brain,
+  CalendarDays,
+  CheckSquare,
+  Check,
+  CircleHelp,
+  Contrast,
+  FilePen,
+  FileSearch,
+  Globe,
+  type LucideIcon,
+  MessageSquare,
+  Network,
+  NotebookPen,
+  Plug,
+  Search,
+  ShieldCheck,
+  Terminal,
+  Trash2,
+  Users,
+  Webhook,
+  Wrench,
+} from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { usePermissionSummary } from '../api'
 
@@ -42,19 +69,50 @@ export function ModeSwitch({
   )
 }
 
-const GROUPS = [
-  { key: 'allowed', title: 'Can do without asking' },
-  { key: 'partly', title: 'Mostly without asking' },
-  { key: 'ask', title: 'Asks you first' },
-  { key: 'never', title: 'Not allowed' },
-] as const
+/** The four answers to "may it do this?", with how each looks. */
+const GROUPS = {
+  allowed: { title: 'Without asking', short: 'Free', icon: Check, tone: 'text-success', tint: 'bg-success/12' },
+  partly: { title: 'Mostly without asking', short: 'Mostly', icon: Contrast, tone: 'text-success', tint: 'bg-success/8' },
+  ask: { title: 'Asks you first', short: 'Asks', icon: CircleHelp, tone: 'text-warning', tint: 'bg-warning/12' },
+  never: { title: 'Not allowed', short: 'Never', icon: Ban, tone: 'text-error', tint: 'bg-error/10' },
+} as const
+type GroupKey = keyof typeof GROUPS
+const ORDER: GroupKey[] = ['allowed', 'partly', 'ask', 'never']
 
-/** Shows, before starting, exactly what an agent run may do. */
+/** An icon for each kind of thing an agent can do (see policy/presets.py). */
+const ICONS: Record<string, LucideIcon> = {
+  'fs.read': FileSearch,
+  'fs.write': FilePen,
+  'fs.delete': Trash2,
+  'shell.exec': Terminal,
+  'shell.network': Network,
+  'net.search': Search,
+  'net.fetch': Globe,
+  'browser.use': AppWindow,
+  'http.request': Webhook,
+  'docs.write': NotebookPen,
+  'tasks.write': CheckSquare,
+  'calendar.write': CalendarDays,
+  'memory.write': Brain,
+  'notify.send': Bell,
+  'mcp.*': Plug,
+  'agent.spawn': Users,
+}
+
+/**
+ * Shows, before starting, exactly what an agent run may do: one small tile per kind of
+ * action, coloured by whether it happens without asking, mostly without asking, only
+ * after asking, or never. Pointing at (or tapping) a tile explains it below the grid.
+ */
 function PermissionChip({ profileId }: { profileId: string | null }) {
   const summary = usePermissionSummary(profileId)
-  const items = (summary.data?.items ?? []).filter((i) => i.available)
+  const items = (summary.data?.items ?? [])
+    .filter((i) => i.available)
+    .sort((a, b) => ORDER.indexOf(a.group) - ORDER.indexOf(b.group))
+  const [focused, setFocused] = useState<string | null>(null)
+  const shown = items.find((i) => i.capability === focused)
   return (
-    <Popover.Root>
+    <Popover.Root onOpenChange={() => setFocused(null)}>
       <Popover.Trigger asChild>
         <button type="button" aria-label="Permissions"
           className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-9">
@@ -63,29 +121,66 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content side="top" align="start" sideOffset={8} collisionPadding={12}
-          className="pop z-50 w-80 max-w-[calc(100vw-24px)] rounded-card border border-border bg-card p-4 text-[13px] shadow-float">
-          <div className="mb-2 font-semibold">What the agent may do</div>
-          {GROUPS.map((g) => {
-            const group = items.filter((i) => i.group === g.key)
-            if (!group.length) return null
-            return (
-              <div key={g.key} className="mb-2">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">{g.title}</div>
-                {group.map((i) => (
-                  <div key={i.capability} className="flex justify-between gap-3 py-0.5">
-                    <span>{i.label}</span>
-                    <span className="text-right text-[12px] text-muted">{g.key === 'partly' ? i.detail : ''}</span>
-                  </div>
-                ))}
-              </div>
-            )
-          })}
+          className="pop z-50 max-h-[var(--radix-popover-content-available-height)] w-[26rem] max-w-[calc(100vw-24px)] overflow-y-auto rounded-card border border-border bg-card p-3.5 text-[13px] shadow-float">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-accent" />
+            <span className="flex-1 font-semibold">What the agent may do</span>
+          </div>
+          {/* The legend, with how many of each. */}
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {ORDER.map((key) => {
+              const count = items.filter((i) => i.group === key).length
+              if (!count) return null
+              const g = GROUPS[key]
+              return (
+                <span key={key} title={g.title}
+                  className={cn('flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium', g.tint, g.tone)}>
+                  <g.icon className="h-3 w-3" /> {g.short} <span className="tabular-nums opacity-70">{count}</span>
+                </span>
+              )
+            })}
+          </div>
+          <ul className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3" aria-label="Permissions">
+            {items.map((i) => {
+              const g = GROUPS[i.group]
+              const Icon = ICONS[i.capability] ?? Wrench
+              return (
+                <li key={i.capability}>
+                  <button type="button" aria-label={`${i.label}: ${i.detail}`} aria-pressed={focused === i.capability}
+                    onMouseEnter={() => setFocused(i.capability)} onFocus={() => setFocused(i.capability)}
+                    onClick={() => setFocused(i.capability)}
+                    className={cn('relative flex h-full w-full items-center gap-2 rounded-lg border py-1.5 pl-2 pr-3.5 text-left transition-colors',
+                      focused === i.capability ? 'border-border-strong bg-surface-hover' : 'border-border hover:bg-surface-hover')}>
+                    <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', g.tint, g.tone)}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className={cn('min-w-0 flex-1 text-[12px] leading-tight', i.group === 'never' && 'text-muted line-through')}>
+                      {i.label}
+                    </span>
+                    <g.icon className={cn('absolute right-1 top-1 h-2.5 w-2.5', g.tone)} aria-hidden />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          {/* What the tile pointed at means; without one, how to find out. Tall enough for the
+              longest explanation (two lines; three on a phone), so the card keeps its size, instead
+              of jumping, while the pointer moves over the tiles. */}
+          <p className="mt-2.5 min-h-[calc(2*1.5em+0.75rem)] rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12px] leading-[1.5] text-muted max-sm:min-h-[calc(3*1.5em+0.75rem)]" aria-live="polite">
+            {shown ? (
+              <><span className="font-medium text-text">{shown.label}:</span> {shown.detail}. {shown.description}</>
+            ) : (
+              'Point at or tap a permission to see what it covers.'
+            )}
+          </p>
           {summary.data && (
-            <div className="mt-2 border-t border-border pt-2 text-[12px] text-muted">
-              Limits: {summary.data.max_steps} steps, {summary.data.max_tool_calls} tool calls,{' '}
-              {Math.round(summary.data.max_runtime_s / 60)} min.
-              {summary.data.plan_review === 'always' && ' You review its plan first.'}{' '}
-              <Link to={profileId ? '/agents' : '/settings/permissions'} className="text-accent underline">Change</Link>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-1 border-t border-border pt-2.5 text-[12px] text-muted">
+              <span>
+                Limits: {summary.data.max_steps} steps, {summary.data.max_tool_calls} tool calls,{' '}
+                {Math.round(summary.data.max_runtime_s / 60)} min.
+                {summary.data.plan_review === 'always' && ' You review its plan first.'}
+              </span>
+              <Link to={profileId ? '/agents' : '/settings/permissions'} className="ml-auto text-accent underline">Change</Link>
             </div>
           )}
           <Popover.Arrow className="fill-card" />

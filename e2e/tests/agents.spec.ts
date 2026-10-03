@@ -39,8 +39,12 @@ test('create an agent profile and pick it in the chat', async ({ page }) => {
     await page.getByRole('option', { name }).click()
     await page.getByRole('button', { name: 'Permissions' }).click()
     const chip = page.getByRole('dialog')
-    await expect(chip.getByText('Not allowed')).toBeVisible()
-    await expect(chip.getByText('Shell with network')).toBeVisible()
+    // Each permission is a tile; this one is in the "Never" group, and says so when tapped.
+    const tile = chip.getByRole('button', { name: 'Shell with network: Not allowed' })
+    await expect(tile).toBeVisible()
+    await expect(chip.getByTitle('Not allowed')).toContainText('Never')
+    await tile.click()
+    await expect(chip.getByText('Shell with network:')).toBeVisible()
   } finally {
     await deleteByName(page, 'profiles', name)
   }

@@ -2765,6 +2765,11 @@ export interface components {
             model_id?: string | null;
             /** Project Id */
             project_id?: string | null;
+            /**
+             * Temporary
+             * @default false
+             */
+            temporary: boolean;
         };
         /** ConversationOut */
         ConversationOut: {
@@ -2811,6 +2816,13 @@ export interface components {
             profile_id?: string | null;
             /** Automation Id */
             automation_id?: string | null;
+            /**
+             * Temporary
+             * @default false
+             */
+            temporary: boolean;
+            /** Expires At */
+            expires_at?: string | null;
             /** Snippet */
             snippet?: string | null;
         };
@@ -2830,6 +2842,8 @@ export interface components {
             project_id?: string | null;
             /** Tags */
             tags?: string[] | null;
+            /** Temporary */
+            temporary?: false | null;
         };
         /** CreateIn */
         CreateIn: {

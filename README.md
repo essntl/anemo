@@ -51,10 +51,15 @@ screen narrows to it; **All projects** shows everything again.
 
 Chats can be filed in a project, given **tags**, marked as **favorites** and
 **archived**. **All chats** lists every chat with search, filters, sorting, and actions
-on several at once. The menu under the chat list (Files, Tasks, Runs, …) can be
-closed, which leaves the sidebar to your chats; it starts closed on phones. On a
+on several at once. In the sidebar the chats take the free room and scroll on
+their own; the pages (Files, Tasks, Runs, …) are pinned in a grid under them. On a
 desktop the whole sidebar can be folded to a strip of icons (the button next to the
 name, or Ctrl+\), which leaves more room for the page.
+
+A **temporary chat** (the switch on the new-chat page) is listed under *Temporary* in
+the sidebar with the time it has left, and is deleted 5 minutes after its last message
+(never while an answer is still being written). Nothing is remembered from it.
+**Keep chat** turns it into an ordinary chat.
 
 In a chat you can:
 

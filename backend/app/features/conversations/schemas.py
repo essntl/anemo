@@ -15,6 +15,8 @@ class ConversationIn(BaseModel):
     # Start the chat in this project: it takes the project's default model and agent
     # profile unless a model is given here.
     project_id: uuid.UUID | None = None
+    # Deleted a few minutes after its last message, unless it is kept.
+    temporary: bool = False
 
 
 class ConversationPatch(BaseModel):
@@ -25,6 +27,8 @@ class ConversationPatch(BaseModel):
     profile_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None  # null takes it out of its project
     tags: Tags | None = None
+    # false keeps a temporary chat. A kept chat cannot be made temporary again.
+    temporary: Literal[False] | None = None
 
 
 class ConversationOut(BaseModel):
@@ -42,6 +46,9 @@ class ConversationOut(BaseModel):
     default_mode: str = "chat"
     profile_id: uuid.UUID | None = None
     automation_id: uuid.UUID | None = None  # set for the conversation of an automation run
+    temporary: bool = False
+    # A temporary chat is deleted at this time unless something happens in it first.
+    expires_at: datetime | None = None
     snippet: str | None = None  # matching text when listed with a search query
 
 

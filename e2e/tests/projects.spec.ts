@@ -90,29 +90,18 @@ test('the all-chats overview filters, sorts and changes several chats at once', 
   }
 })
 
-test('the menu under the chat list can be closed, and stays that way', async ({ page }) => {
+test('the pages are pinned under the chats, which are the only thing that scrolls', async ({ page }) => {
   await login(page)
   const sidebar = page.locator('aside').first()
-  const toggle = sidebar.getByRole('button', { name: /Workspace & agents/ })
-  const files = sidebar.getByRole('link', { name: 'Files', exact: true })
+  const pages = sidebar.getByRole('navigation', { name: 'Pages' })
+  await expect(pages.getByRole('link')).toHaveCount(9)
+  await expect(pages.getByRole('link', { name: 'Files', exact: true })).toBeVisible()
+  // The chat list takes the free height and scrolls by itself; the column around it does not.
   const list = sidebar.getByLabel('Chats', { exact: true })
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  await expect(files).toBeVisible()
-  // Open: the list is as tall as its chats (up to seven). Closed: it takes the free room.
-  const grows = () => list.evaluate((el) => getComputedStyle(el).flexGrow)
-  expect(await grows()).toBe('0')
-
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await expect(files).toBeHidden()
-  expect(await grows()).toBe('1')
-  expect(await list.evaluate((el) => el.style.maxHeight)).toBe('')
-  await page.reload()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await expect(files).toBeHidden()
-
-  await toggle.click()
-  await expect(files).toBeVisible()
+  expect(await list.evaluate((el) => [getComputedStyle(el).flexGrow, getComputedStyle(el).overflowY])).toEqual(['1', 'auto'])
+  expect(await sidebar.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true)
+  // Short names in the grid; the full one is the tooltip.
+  await expect(pages.getByRole('link', { name: 'Agents' })).toHaveAttribute('title', 'Profiles & Skills')
 })
 
 test('a project narrows the chat list, and new chats start in it', async ({ page }) => {

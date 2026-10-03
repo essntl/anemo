@@ -4,6 +4,7 @@
  */
 import { Link } from 'react-router'
 import { Menu, SquarePen } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/cn'
 import { useMobileNav } from './mobileNavStore'
 
@@ -32,7 +33,9 @@ export function MobileTopBar() {
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:hidden">
       <MenuButton />
-      <span className="flex-1 text-center text-[15px] font-semibold">Anemo</span>
+      <span className="flex flex-1 items-center justify-center gap-2 text-[16px] font-semibold tracking-tight">
+        <Logo className="h-6 w-6 text-accent" /> Anemo
+      </span>
       <NewChatButton />
     </header>
   )

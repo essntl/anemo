@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router'
-import { Archive, ArchiveRestore, Download, FileText, FolderInput, Link2, Pencil, Star, StarOff, Tags, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Download, FileText, FolderInput, Link2, Pencil, Save, Star, StarOff, Tags, Trash2 } from 'lucide-react'
 import { create } from 'zustand'
 import { errorMessage } from '@/api/client'
 import type { MenuAction } from '@/components/ui/ActionMenu'
@@ -68,6 +68,10 @@ export function useChatActions(conv: Conversation): MenuAction[] {
   }
 
   return [
+    // A temporary chat is deleted a few minutes after its last message unless kept.
+    ...(conv.temporary
+      ? [{ label: 'Keep chat', icon: <Save />, onSelect: () => update.mutate({ id: conv.id, body: { temporary: false } }) }]
+      : []),
     { label: 'Rename', icon: <Pencil />, onSelect: () => void rename() },
     conv.pinned
       ? { label: 'Remove from favorites', icon: <StarOff />, onSelect: () => update.mutate({ id: conv.id, body: { pinned: false } }) }

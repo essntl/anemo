@@ -61,7 +61,9 @@ async def list_conversations(
 
 @router.post("", response_model=ConversationOut, status_code=201)
 async def create_conversation(body: ConversationIn, db: Db) -> ConversationOut:
-    conv = await service.create_conversation(db, body.title, body.model_id, body.project_id)
+    conv = await service.create_conversation(
+        db, body.title, body.model_id, body.project_id, temporary=body.temporary
+    )
     await db.commit()
     await db.refresh(conv)
     return service.conversation_out(conv, {})
@@ -111,6 +113,8 @@ async def update_conversation(
         conv.project_id = body.project_id
     if body.tags is not None:
         conv.tags = body.tags
+    if body.temporary is False:
+        conv.temporary = False  # kept: no longer deleted
     await db.commit()
     await db.refresh(conv)
     return service.conversation_out(conv, await service.active_runs(db, [conv.id]))

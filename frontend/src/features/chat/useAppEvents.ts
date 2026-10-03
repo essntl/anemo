@@ -37,6 +37,20 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: approvalsKey })
       refreshConversation(e)
     }) as EventListener)
+    // Chats were deleted elsewhere (temporary chats whose time ran out). Leave one that
+    // is open here, and say why.
+    source.addEventListener('conversations.changed', ((e: MessageEvent<string>) => {
+      const deleted = (JSON.parse(e.data) as { deleted?: string[] }).deleted ?? []
+      void qc.invalidateQueries({ queryKey: conversationsKey })
+      for (const id of deleted) {
+        qc.removeQueries({ queryKey: conversationKey(id) })
+        qc.removeQueries({ queryKey: messagesKey(id) })
+        if (window.location.pathname === `/c/${id}`) {
+          void navigate('/')
+          toast({ message: 'The temporary chat was deleted.' })
+        }
+      }
+    }) as EventListener)
     // Memories changed (a tool saved one, or background extraction found some).
     source.addEventListener('memory.changed', () => void qc.invalidateQueries({ queryKey: ['memories'] }))
     // A document was saved (here, in another tab, or by an agent).

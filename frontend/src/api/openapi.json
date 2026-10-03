@@ -11584,6 +11584,11 @@
               }
             ],
             "title": "Project Id"
+          },
+          "temporary": {
+            "type": "boolean",
+            "title": "Temporary",
+            "default": false
           }
         },
         "type": "object",
@@ -11703,6 +11708,23 @@
             ],
             "title": "Automation Id"
           },
+          "temporary": {
+            "type": "boolean",
+            "title": "Temporary",
+            "default": false
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "snippet": {
             "anyOf": [
               {
@@ -11813,6 +11835,18 @@
               }
             ],
             "title": "Tags"
+          },
+          "temporary": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "const": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temporary"
           }
         },
         "type": "object",

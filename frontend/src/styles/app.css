@@ -189,7 +189,6 @@
  *   .sheet   dialogs: slide up from the bottom on phones, pop in the middle from `md`
  *   .drawer  the phone menu: slides in from the left
  *   .toast   notices at the bottom: rise in, sink out (data-leaving, see toast.ts)
- *   .collapsible  the sidebar menu: grows open, shrinks closed
  *   .page    the page area: cross-fades when you go to another page (view transition)
  *
  * Dialogs opened with `{value && <Dialog/>}` need <Lingering> to get their closing
@@ -238,18 +237,6 @@
 .toast { animation: rise-in var(--motion-in) var(--ease-out); }
 .toast[data-leaving] { animation: rise-out var(--motion-out) var(--ease-in) forwards; }
 
-/* A section that opens and closes by growing from zero height (the sidebar menu).
-   Its one child is what gets clipped. */
-.collapsible {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--motion-in) var(--ease-out);
-}
-.collapsible[data-open='true'] { grid-template-rows: 1fr; }
-/* Closed, the content is really hidden (not just clipped) once it has shrunk. */
-.collapsible > * { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear var(--motion-in); }
-.collapsible[data-open='true'] > * { visibility: visible; transition-delay: 0s; }
-
 /* Something on its way out no longer takes clicks. */
 .fade[data-state='closed'], .pop[data-state='closed'], .sheet[data-state='closed'],
 .drawer[data-state='closed'], .toast[data-leaving] { pointer-events: none; }
@@ -264,7 +251,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .drawer, .fade, .sheet, .pop, .toast { animation: none !important; }
-  .collapsible { transition: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 

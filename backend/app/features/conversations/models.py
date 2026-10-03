@@ -46,6 +46,9 @@ class Conversation(Base, IdMixin, TimestampMixin):
     memory_extracted_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # "Favorites" in the UI.
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    # A temporary chat is deleted a few minutes after its last message (see
+    # service.TEMPORARY_FOR) unless it is kept; nothing is learned from it meanwhile.
+    temporary: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     # Organisation: at most one project (its "folder"), and any number of tags.
     project_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useMatch } from 'react-router'
-import { Loader2, Search, Star, X } from 'lucide-react'
+import { Loader2, Search, Star, Timer, X } from 'lucide-react'
 import { useCurrentProject } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { cn } from '@/lib/cn'
 import { dayLabel } from '@/lib/format'
 import { type Conversation, useConversations } from '../api'
 import { useChatActions } from '../chatActions'
+import { formatRemaining, useNow } from '../remaining'
 
 function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -15,6 +16,16 @@ function useDebounced<T>(value: T, ms: number): T {
     return () => window.clearTimeout(t)
   }, [value, ms])
   return debounced
+}
+
+/** How long a temporary chat has left, at a glance ("4m"). */
+function TimeLeft({ expiresAt }: { expiresAt: string }) {
+  const now = useNow(15_000)
+  return (
+    <span className="shrink-0 text-[11px] tabular-nums text-subtle group-hover:invisible" title="Deleted unless you keep it">
+      {formatRemaining(new Date(expiresAt).getTime() - now, 'short')}
+    </span>
+  )
 }
 
 function Item({ conv }: { conv: Conversation }) {
@@ -38,6 +49,7 @@ function Item({ conv }: { conv: Conversation }) {
       >
         {conv.active_run_id && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />}
         <span className="min-w-0 flex-1 truncate" title={conv.snippet ?? conv.title}>{conv.title}</span>
+        {conv.temporary && conv.expires_at && !conv.active_run_id && <TimeLeft expiresAt={conv.expires_at} />}
       </NavLink>
       {/* Hover (or keyboard focus) reveals the menu; touch screens always show it. */}
       <ActionMenu actions={actions} label={`Actions for ${conv.title}`}
@@ -46,45 +58,32 @@ function Item({ conv }: { conv: Conversation }) {
   )
 }
 
-/** With the menu below it open, the list shows this many chats; more than that and it scrolls. */
-const VISIBLE_CHATS = 7
+type Group = { label: string; kind?: 'temporary' | 'favorites'; chats: Conversation[] }
 
-type Group = { label: string; favorites?: boolean; chats: Conversation[] }
-
-/** Favorites first, then one group per day: Today, Yesterday, Past week, then dates.
+/** Temporary chats first (they go soon), then favorites, then one group per day:
+ *  Today, Yesterday, Past week, then dates.
  *  The server already sorts by latest message, so chats of one day are next to each other. */
 function groupChats(all: Conversation[], searching: boolean): Group[] {
   if (searching) return all.length ? [{ label: 'Results', chats: all }] : []
   const groups: Group[] = []
-  const favorites = all.filter((c) => c.pinned)
-  if (favorites.length) groups.push({ label: 'Favorites', favorites: true, chats: favorites })
-  for (const chat of all.filter((c) => !c.pinned)) {
+  const temporary = all.filter((c) => c.temporary)
+  if (temporary.length) groups.push({ label: 'Temporary', kind: 'temporary', chats: temporary })
+  const favorites = all.filter((c) => c.pinned && !c.temporary)
+  if (favorites.length) groups.push({ label: 'Favorites', kind: 'favorites', chats: favorites })
+  for (const chat of all.filter((c) => !c.pinned && !c.temporary)) {
     const label = dayLabel(chat.last_message_at)
     const last = groups[groups.length - 1]
-    if (last && !last.favorites && last.label === label) last.chats.push(chat)
+    if (last && !last.kind && last.label === label) last.chats.push(chat)
     else groups.push({ label, chats: [chat] })
   }
   return groups
 }
 
-/** How many group headings sit above or between the first `VISIBLE_CHATS` chats. */
-function headingsInView(groups: Group[]): number {
-  let chats = 0
-  let headings = 0
-  for (const group of groups) {
-    if (chats >= VISIBLE_CHATS) break
-    headings += 1
-    chats += group.chats.length
-  }
-  return headings
-}
-
 /**
  * The chats in the sidebar, for the project chosen in the switcher (or all of them).
- * `fill`: take all the free height (the menu below is closed) instead of stopping
- * at seven chats.
+ * They take all the free height and scroll on their own.
  */
-export function ConversationList({ fill }: { fill: boolean }) {
+export function ConversationList() {
   const [query, setQuery] = useState('')
   const q = useDebounced(query.trim(), 250)
   const project = useCurrentProject()
@@ -93,7 +92,7 @@ export function ConversationList({ fill }: { fill: boolean }) {
   const groups = groupChats(all, Boolean(q))
 
   return (
-    <div className={cn('mt-3', fill && 'flex min-h-0 flex-1 flex-col')}>
+    <div className="mt-3 flex min-h-0 flex-1 flex-col">
       <div className="relative mb-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
         <input
@@ -111,21 +110,12 @@ export function ConversationList({ fill }: { fill: boolean }) {
           </button>
         )}
       </div>
-      {/* Menu open: tall enough for 7 chats and their headings, the rest by scrolling.
-          --row matches the height of one chat (taller on touch screens). */}
-      <div
-        aria-label="Chats"
-        className={cn('mt-2 overflow-y-auto [--row:2.25rem] pointer-coarse:[--row:2.75rem]', fill && 'min-h-0 flex-1')}
-        style={
-          !fill && all.length > VISIBLE_CHATS
-            ? { maxHeight: `calc(${VISIBLE_CHATS} * var(--row) + ${headingsInView(groups)} * 1.75rem)` }
-            : undefined
-        }
-      >
+      <div aria-label="Chats" className="mt-2 min-h-0 flex-1 overflow-y-auto">
         {groups.map((group) => (
           <section key={group.label}>
             <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
-              {group.favorites && <Star className="h-3 w-3" />} {group.label}
+              {group.kind === 'favorites' && <Star className="h-3 w-3" />}
+              {group.kind === 'temporary' && <Timer className="h-3 w-3 text-accent" />} {group.label}
             </div>
             {group.chats.map((c) => <Item key={c.id} conv={c} />)}
           </section>
