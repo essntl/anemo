@@ -214,6 +214,8 @@
 @keyframes rise-in { from { opacity: 0; transform: translateY(0.75rem); } }
 @keyframes rise-out { to { opacity: 0; transform: translateY(0.5rem); } }
 @keyframes page-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes wave { 0%, 60%, 100% { opacity: 0.35; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }
 
 .fade[data-state='open'] { animation: fade-in var(--motion-in) ease-out; }
 .fade[data-state='closed'] { animation: fade-out var(--motion-out) var(--ease-in) forwards; }
@@ -237,6 +239,20 @@
 .toast { animation: rise-in var(--motion-in) var(--ease-out); }
 .toast[data-leaving] { animation: rise-out var(--motion-out) var(--ease-in) forwards; }
 
+/* Chat: a new message rises into place; a status that is still going has a light
+   sweeping across its text; three dots breathe in a wave while the model starts. */
+.msg-in { animation: rise-in 260ms var(--ease-out); }
+.shimmer {
+  background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 40%, var(--text) 50%, var(--text-muted) 60%, var(--text-muted) 100%);
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2s linear infinite;
+}
+.wave > span { animation: wave 1.2s ease-in-out infinite; }
+.wave > span:nth-child(2) { animation-delay: 0.15s; }
+.wave > span:nth-child(3) { animation-delay: 0.3s; }
+
 /* Something on its way out no longer takes clicks. */
 .fade[data-state='closed'], .pop[data-state='closed'], .sheet[data-state='closed'],
 .drawer[data-state='closed'], .toast[data-leaving] { pointer-events: none; }
@@ -250,7 +266,8 @@
 ::view-transition-new(page) { animation: page-in 180ms var(--ease-out) 60ms both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer, .fade, .sheet, .pop, .toast { animation: none !important; }
+  .drawer, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span { animation: none !important; }
+  .shimmer { color: var(--text-muted); background: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 

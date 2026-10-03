@@ -149,6 +149,12 @@ export function ConversationPage() {
   const scrollRef = useStickToBottom([messages.data?.length, live.text, live.reasoning])
 
   const list = messages.data ?? []
+  // Messages already there when the chat opened stay still; new ones rise into place.
+  const [seen, setSeen] = useState<{ chat: string; ids: Set<string> } | null>(null)
+  if (messages.data && seen?.chat !== conversationId) {
+    setSeen({ chat: conversationId, ids: new Set(messages.data.map((m) => m.id)) })
+  }
+  const enter = (id: string) => (seen?.ids.has(id) ? undefined : 'msg-in')
   const lastAssistant = [...list].reverse().find((m) => m.role === 'assistant')
   const lastUser = [...list].reverse().find((m) => m.role === 'user')
   // The last message can be edited when it is the one the last answer replied to.
@@ -201,7 +207,7 @@ export function ConversationPage() {
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-5 md:px-6 md:py-8">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6 px-3 py-5 md:px-6 md:py-8">
           {conversation.data?.branched_from_id && (
             <Link to={`/c/${conversation.data.branched_from_id}`}
               className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-[12px] text-muted hover:text-text">
@@ -211,48 +217,52 @@ export function ConversationPage() {
           {list.map((m) => {
             if (m.role === 'user') {
               return (
-                <UserBubble key={m.id} text={m.text} attachments={m.attachments} references={m.references}
-                  onEdit={canEditLast && m.id === lastUser?.id
-                    ? (text) => editLast.mutate({ conversationId, text, modelId: modelOverride })
-                    : undefined} />
+                <div key={m.id} className={enter(m.id)}>
+                  <UserBubble text={m.text} attachments={m.attachments} references={m.references}
+                    onEdit={canEditLast && m.id === lastUser?.id
+                      ? (text) => editLast.mutate({ conversationId, text, modelId: modelOverride })
+                      : undefined} />
+                </div>
               )
             }
             const isLive = m.run_id === activeRunId && m.status === 'streaming'
-            return isLive ? (
-              <AssistantMessage
-                key={m.id}
-                text={live.text}
-                reasoning={live.reasoning}
-                status={live.status === 'queued' || live.status === 'running' ? 'streaming' : live.status}
-                error={live.error}
-                modelLabel={live.modelLabel}
-                notice={live.notice}
-                activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live /> : undefined}
-              />
-            ) : (
-              <AssistantMessage
-                key={m.id}
-                text={m.text}
-                reasoning={m.reasoning}
-                status={m.status}
-                error={m.error}
-                modelLabel={m.model_label}
-                activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live={false} /> : undefined}
-                onRegenerate={
-                  m.id === lastAssistant?.id && !activeRunId
-                    ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
-                    : undefined
-                }
-                onBranch={() =>
-                  branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
-                }
-              />
+            return (
+              <div key={m.id} className={enter(m.id)}>
+                {isLive ? (
+                  <AssistantMessage
+                    text={live.text}
+                    reasoning={live.reasoning}
+                    status={live.status === 'queued' || live.status === 'running' ? 'streaming' : live.status}
+                    error={live.error}
+                    modelLabel={live.modelLabel}
+                    notice={live.notice}
+                    activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live /> : undefined}
+                  />
+                ) : (
+                  <AssistantMessage
+                    text={m.text}
+                    reasoning={m.reasoning}
+                    status={m.status}
+                    error={m.error}
+                    modelLabel={m.model_label}
+                    activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live={false} /> : undefined}
+                    onRegenerate={
+                      m.id === lastAssistant?.id && !activeRunId
+                        ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
+                        : undefined
+                    }
+                    onBranch={() =>
+                      branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
+                    }
+                  />
+                )}
+              </div>
             )
           })}
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl px-2 pb-2 md:px-6 md:pb-6">
+      <div className="mx-auto w-full max-w-3xl px-3 pb-2 md:px-6 md:pb-6">
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
         <Composer
           running={Boolean(activeRunId) && !paused}

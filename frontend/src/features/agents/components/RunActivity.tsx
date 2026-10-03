@@ -317,22 +317,28 @@ export function RunActivity({ runId, live, poll }: RunActivityProps) {
   const waiting = calls.some((c) => c.status === 'waiting_approval') || data.status === 'paused'
   // Expanded while working or waiting; collapsed afterwards unless the user opened it.
   const isOpen = expanded ?? (live || waiting)
+  // Nothing to list yet (the agent has only just started): no empty box under the bar.
+  const hasDetails = calls.length > 0 || (data.plan?.length ?? 0) > 0 || data.file_changes.length > 0
+  // Still going by the run's own status, even if this message no longer follows it live.
+  const going = live || active
+  const working = going && data.status !== 'paused' && !waiting
 
   return (
     <div className="mb-3 rounded-xl border border-border bg-surface-2/50">
       <button type="button" onClick={() => setExpanded(!isOpen)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-muted hover:text-text pointer-coarse:py-3">
-        {data.status === 'paused' ? <Pause className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
-        {headline(data, live)}
-        <ChevronRight className={cn('ml-auto h-3.5 w-3.5 transition-transform', isOpen && 'rotate-90')} />
+        className="flex w-full items-center gap-2 px-5 py-2 text-[12.5px] font-medium text-muted hover:text-text pointer-coarse:py-3">
+        {data.status === 'paused' ? <Pause className="h-3.5 w-3.5" /> : <Wrench className={cn('h-3.5 w-3.5', working && 'animate-pulse text-accent')} />}
+        <span className={cn(working && 'shimmer')}>{headline(data, going)}</span>
+        {hasDetails && <ChevronRight className={cn('ml-auto h-3.5 w-3.5 transition-transform', isOpen && 'rotate-90')} />}
       </button>
+      {/* px-2 plus the buttons' own padding puts their icons on the text line. */}
       {active && (
-        <div className="border-t border-border px-3 py-2">
+        <div className="border-t border-border px-2 py-2">
           <RunControls runId={runId} status={data.status} pauseRequested={data.pause_requested} />
         </div>
       )}
-      {isOpen && (
-        <div className="border-t border-border px-2 py-2">
+      {isOpen && hasDetails && (
+        <div className="border-t border-border px-3 py-2">
           <PlanSection runId={runId} data={data} />
           {calls.map((c) => <ToolRow key={c.id} runId={runId} call={c} />)}
           {data.file_changes.length > 0 && (
