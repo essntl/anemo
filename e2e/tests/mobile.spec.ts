@@ -141,6 +141,14 @@ test('adding models: capability tags are behind one button per model', async ({ 
   await expect(page.getByText('Reasoning', { exact: true }).filter({ visible: true })).toHaveCount(0)
 })
 
+test('on a phone you sign out under Settings > General', async ({ page }) => {
+  await login(page)
+  await page.goto('/settings/general')
+  const current = page.locator('div').filter({ hasText: 'This browser' }).filter({ has: page.getByRole('button', { name: 'Sign out' }) }).last()
+  await current.getByRole('button', { name: 'Sign out' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+})
+
 test('settings is a list of sections with a way back', async ({ page }) => {
   await login(page)
   await page.goto('/settings')

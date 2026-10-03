@@ -8,6 +8,15 @@ test('login is required', async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=/)
 })
 
+test('signing out goes to the login page, and the app stays closed', async ({ page }) => {
+  await login(page)
+  await page.locator('aside').first().getByRole('button', { name: 'Sign out' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByLabel('Password')).toBeVisible()
+  await page.goto('/chats')
+  await expect(page).toHaveURL(/\/login\?next=/)
+})
+
 test('chat streams a reply and survives a reload mid-stream', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)

@@ -35,9 +35,12 @@ export function useLogout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => unwrap(await api.POST('/api/auth/logout')),
+    // A fresh page load at the login page: nothing of the session stays in memory
+    // (cached data, live streams). Only clearing the cache left the page open but
+    // empty, as the app still watched the "who am I" entry the clear had dropped.
     onSettled: () => {
       qc.clear()
-      qc.setQueryData(meKey, null)
+      window.location.replace('/login')
     },
   })
 }

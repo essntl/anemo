@@ -4,7 +4,7 @@ import { errorMessage, type Schemas } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Field, Input } from '@/components/ui/Input'
-import { useRevokeSession, useSessions } from '@/features/auth/api'
+import { useLogout, useRevokeSession, useSessions } from '@/features/auth/api'
 import { useSaveGeneral, useSettings } from '../api'
 import { Select } from '@/components/ui/Select'
 
@@ -57,6 +57,7 @@ function GeneralForm({ initial }: { initial: General }) {
 function SessionsCard() {
   const sessions = useSessions()
   const revoke = useRevokeSession()
+  const logout = useLogout()
   return (
     <Card>
       <CardHeader title="Active sessions" description="Browsers currently signed in to this workspace." />
@@ -73,11 +74,12 @@ function SessionsCard() {
                 {s.ip ?? 'unknown IP'} · last active {new Date(s.last_seen_at).toLocaleString()}
               </div>
             </div>
-            {!s.current && (
-              <Button size="sm" variant="ghost" icon={<LogOut className="h-3.5 w-3.5" />} onClick={() => revoke.mutate(s.id)}>
-                Sign out
-              </Button>
-            )}
+            {/* This browser too: on a phone this is where you sign out. */}
+            <Button size="sm" variant="ghost" icon={<LogOut className="h-3.5 w-3.5" />}
+              loading={s.current ? logout.isPending : false}
+              onClick={() => (s.current ? logout.mutate() : revoke.mutate(s.id))}>
+              Sign out
+            </Button>
           </div>
         ))}
       </CardBody>
