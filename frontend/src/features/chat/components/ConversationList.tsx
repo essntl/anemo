@@ -1,6 +1,6 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { NavLink, useMatch } from 'react-router'
-import { Loader2, Search, Star, Timer, X } from 'lucide-react'
+import { Loader2, Star, Timer } from 'lucide-react'
 import { useCurrentProject } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { cn } from '@/lib/cn'
@@ -8,15 +8,6 @@ import { dayLabel } from '@/lib/format'
 import { type Conversation, useConversations } from '../api'
 import { useChatActions } from '../chatActions'
 import { formatRemaining, useNow } from '../remaining'
-
-function useDebounced<T>(value: T, ms: number): T {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(value), ms)
-    return () => window.clearTimeout(t)
-  }, [value, ms])
-  return debounced
-}
 
 /** How long a temporary chat has left, at a glance ("4m"). */
 function TimeLeft({ expiresAt }: { expiresAt: string }) {
@@ -63,8 +54,7 @@ type Group = { label: string; kind?: 'temporary' | 'favorites'; chats: Conversat
 /** Temporary chats first (they go soon), then favorites, then one group per day:
  *  Today, Yesterday, Past week, then dates.
  *  The server already sorts by latest message, so chats of one day are next to each other. */
-function groupChats(all: Conversation[], searching: boolean): Group[] {
-  if (searching) return all.length ? [{ label: 'Results', chats: all }] : []
+function groupChats(all: Conversation[]): Group[] {
   const groups: Group[] = []
   const temporary = all.filter((c) => c.temporary)
   if (temporary.length) groups.push({ label: 'Temporary', kind: 'temporary', chats: temporary })
@@ -81,40 +71,18 @@ function groupChats(all: Conversation[], searching: boolean): Group[] {
 
 /**
  * The chats in the sidebar, for the project chosen in the switcher (or all of them).
- * They take all the free height and scroll on their own. `beside`: shown next to the
- * search box (the project picker, in the phone menu).
+ * They take all the free height and scroll on their own. Finding a chat is up to the
+ * search (Ctrl+K) or the All chats page; a filter here would only be a weaker copy.
  */
-export function ConversationList({ beside }: { beside?: ReactNode }) {
-  const [query, setQuery] = useState('')
-  const q = useDebounced(query.trim(), 250)
+export function ConversationList() {
   const project = useCurrentProject()
-  const conversations = useConversations(q, { projectId: project?.id })
+  const conversations = useConversations('', { projectId: project?.id })
   const all = conversations.data ?? []
-  const groups = groupChats(all, Boolean(q))
+  const groups = groupChats(all)
 
   return (
     <div className="mt-3 flex min-h-0 flex-1 flex-col">
-      <div className="mb-1 flex items-center gap-1.5">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-            placeholder={project && !beside ? `Search chats in ${project.name}` : 'Search chats'}
-            aria-label="Search chats"
-            className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-8 pointer-coarse:h-10 text-[12.5px] placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent-soft"
-          />
-          {query && (
-            <button type="button" aria-label="Clear the search" onClick={() => setQuery('')}
-              className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-8 pointer-coarse:w-8">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        {beside}
-      </div>
-      <div aria-label="Chats" className="mt-2 min-h-0 flex-1 overflow-y-auto">
+      <div aria-label="Chats" className="min-h-0 flex-1 overflow-y-auto">
         {groups.map((group) => (
           <section key={group.label}>
             <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
@@ -126,7 +94,7 @@ export function ConversationList({ beside }: { beside?: ReactNode }) {
         ))}
         {conversations.data && all.length === 0 && (
           <p className="px-3 py-2 text-[12px] text-subtle">
-            {q ? 'No matches.' : project ? `No chats in ${project.name} yet.` : 'No chats yet.'}
+            {project ? `No chats in ${project.name} yet.` : 'No chats yet.'}
           </p>
         )}
       </div>

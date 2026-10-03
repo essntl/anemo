@@ -24,9 +24,9 @@ interface SelectProps {
 }
 
 const VARIANTS = {
-  field: 'h-10 w-full rounded-control border border-border bg-surface px-3 text-sm focus:border-accent focus:ring-2 focus:ring-accent-soft pointer-coarse:h-11',
+  field: 'h-10 w-full rounded-control border border-border bg-surface px-3 text-sm hover:border-border-strong data-[state=open]:border-border-strong focus:border-accent focus:ring-2 focus:ring-accent-soft pointer-coarse:h-11',
   ghost: 'h-8 rounded-lg px-2 text-[12.5px] text-muted hover:bg-surface-hover hover:text-text data-[state=open]:bg-surface-hover pointer-coarse:h-10',
-  pill: 'h-8 max-w-[11rem] gap-1 rounded-full border border-transparent bg-surface-2 pl-3 pr-2 text-[12.5px] focus:border-accent focus:ring-2 focus:ring-accent-soft pointer-coarse:h-9',
+  pill: 'h-8 max-w-[11rem] gap-1 rounded-full border border-transparent bg-surface-2 pl-3 pr-2 text-[12.5px] hover:bg-surface-hover data-[state=open]:bg-surface-hover focus:border-accent focus:ring-2 focus:ring-accent-soft pointer-coarse:h-9',
 }
 
 // Radix reserves "" for "nothing selected", but "" is a handy "use the default"

@@ -121,9 +121,8 @@ function NotificationsBadge() {
   )
 }
 
-/** The project you are working in. "All projects" shows everything together.
- *  `compact`: a small pill beside the chat search (the phone menu). */
-function ProjectSwitcher({ compact = false }: { compact?: boolean }) {
+/** The project you are working in. "All projects" shows everything together. */
+function ProjectSwitcher() {
   const navigate = useNavigate()
   const projects = useProjects()
   const current = useCurrentProject()
@@ -133,8 +132,7 @@ function ProjectSwitcher({ compact = false }: { compact?: boolean }) {
   return (
     <Select
       aria-label="Project"
-      variant={compact ? 'pill' : 'field'}
-      className={compact ? 'max-w-[9rem] shrink-0 pointer-coarse:h-10' : 'mt-2 h-9'}
+      className="mt-2 h-9"
       value={current?.id ?? ''}
       onValueChange={(value) => (value === MANAGE ? void navigate('/projects') : setProjectId(value || null))}
       options={[
@@ -237,7 +235,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         >
           New chat
         </Button>
-        {/* Search everything (also Ctrl+K). The box below only filters the chat list. */}
+        {/* Search everything (also Ctrl+K): chats by title and text, documents, files, tasks, … */}
         <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" aria-label="Search everything"
           title="Search everything (Ctrl+K)"
           // On a phone the search takes the screen, so the menu makes way for it.
@@ -246,11 +244,11 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </Button>
       </div>
 
-      {!onClose && <ProjectSwitcher />}
+      <ProjectSwitcher />
 
       {/* The chats take all the free height and are the only thing that scrolls. */}
       <div className="mt-1 flex min-h-52 flex-1 flex-col">
-        <ConversationList beside={onClose && <ProjectSwitcher compact />} />
+        <ConversationList />
         <NavLink to="/chats"
           className={({ isActive }) =>
             cn('mt-1 flex h-9 shrink-0 items-center gap-2.5 rounded-control px-3 text-[13px] font-medium pointer-coarse:h-11 pointer-coarse:text-[15px]',
