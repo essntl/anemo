@@ -196,6 +196,11 @@ test('chat on a phone: send with the button, Enter adds a new line', async ({ pa
   await page.getByRole('radio', { name: 'Chat' }).click()
   await pickModel(page, models.echo)
   const box = page.getByPlaceholder('Message the assistant…')
+  // The message box only scrolls once the text is taller than the box can grow.
+  const scrolls = () => box.evaluate((el) => getComputedStyle(el).overflowY)
+  expect(await scrolls()).toBe('hidden')
+  await box.fill('a line\n'.repeat(20))
+  expect(await scrolls()).toBe('auto')
   await box.fill('first line')
   await box.press('Enter')
   await box.pressSequentially('second line')
@@ -203,6 +208,16 @@ test('chat on a phone: send with the button, Enter adds a new line', async ({ pa
   await page.getByRole('button', { name: 'Send' }).click()
   await expect(page.getByText(/You said: first line/)).toBeVisible()
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+
+  // A chat longer than the screen scrolls inside its own area; the window itself never
+  // does (there was empty space to scroll into under the message box).
+  for (const n of [1, 2, 3, 4, 5]) {
+    await box.fill(`message ${n} ${'with some more words '.repeat(8)}`)
+    await page.getByRole('button', { name: 'Send' }).click()
+    await expect(page.getByText(`You said: message ${n}`, { exact: false })).toBeVisible()
+  }
+  await expect(page.getByRole('button', { name: 'Regenerate' })).toBeVisible()
+  expect(await page.evaluate(() => document.scrollingElement!.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(0)
 })
 
 test('installable: manifest, icons and a service worker that never caches /api', async ({ page, context }) => {

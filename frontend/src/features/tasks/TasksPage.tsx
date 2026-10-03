@@ -131,7 +131,7 @@ export function TasksPage() {
         <div className="inline-flex shrink-0 rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label="View">
           {([['list', 'List', List], ['board', 'Board', KanbanSquare]] as const).map(([id, label, Icon]) => (
             <button key={id} type="button" role="radio" aria-checked={view === id} title={label} onClick={() => setParam('view', id === 'list' ? '' : id)}
-              className={cn('flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium pointer-coarse:h-9 pointer-coarse:px-3',
+              className={cn('relative flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium pointer-coarse:h-9 pointer-coarse:px-3',
                 view === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
               {/* On a phone just the icon; the name stays for screen readers. */}
               <Icon className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="max-sm:sr-only">{label}</span>

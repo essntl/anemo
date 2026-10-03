@@ -65,7 +65,9 @@ export function AppLayout() {
       <SidebarDrawer />
       <div className="flex min-w-0 flex-1 flex-col">
         {!ownHeader && <MobileTopBar />}
-        <main className="page min-h-0 flex-1 overflow-y-auto">
+        {/* relative: anything absolutely placed inside a page is held (and clipped) here,
+            so it can never make the whole window scroll. */}
+        <main className="page relative min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

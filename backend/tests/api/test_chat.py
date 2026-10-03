@@ -77,6 +77,27 @@ async def test_turn_streams_and_persists(authed):
         assert rec.output_tokens and rec.cost_source == "unknown"
 
 
+async def test_finished_is_announced_only_once_saved(authed, monkeypatch):
+    # A page reloads the chat when it hears the run finished; at that moment the
+    # database must already say so (else the chat still looks busy).
+    await _setup_models(authed)
+    cid = await _new_conversation(authed)
+    turn = (await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})).json()
+    seen: list[str] = []
+    publish = bus.publish_run_event
+
+    async def check(run_id, event_type, data):
+        if event_type == "run.status" and data.get("status") == "completed":
+            async with get_sessionmaker()() as db:
+                seen.append((await db.get(Run, run_id)).status)
+        await publish(run_id, event_type, data)
+
+    monkeypatch.setattr(bus, "publish_run_event", check)
+    await execute_chat_run(uuid.UUID(turn["run_id"]))
+    assert seen == ["completed"]
+    assert (await authed.get(f"/api/conversations/{cid}")).json()["active_run_id"] is None
+
+
 async def test_sse_replays_full_stream(authed):
     await _setup_models(authed)
     cid = await _new_conversation(authed)

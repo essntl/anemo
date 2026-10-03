@@ -23,6 +23,10 @@ test('a temporary chat is marked as such, counts down, and can be kept', async (
     await send(page, `a passing thought ${mark}`)
     await expect(page).toHaveURL(/\/c\//)
     await expect(page.getByText(`You said: a passing thought ${mark}`)).toBeVisible()
+    // The last words show a moment before the answer counts as finished (until then the
+    // card rightly says "5 minutes after the answer"): wait for that.
+    const id = page.url().split('/c/')[1]
+    await expect.poll(async () => ((await (await page.request.get(`/api/conversations/${id}`)).json()) as { active_run_id: string | null }).active_run_id).toBeNull()
 
     // A label beside the chat's name shows the time left; pointing at it says what it
     // means. The sidebar lists the chat under "Temporary".

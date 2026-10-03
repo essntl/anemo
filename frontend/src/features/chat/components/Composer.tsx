@@ -25,6 +25,9 @@ interface ComposerProps {
 const ACCEPT =
   'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/*,.md,.csv,.json,.yaml,.yml,.toml,.py,.js,.ts,.tsx,.jsx,.go,.rs,.java,.c,.cpp,.h,.cs,.rb,.php,.sh,.sql,.html,.css,.xml,.log'
 
+/** The box grows with the text up to this height (px), then scrolls. */
+const MAX_HEIGHT = 240
+
 export function Composer({ onSend, onStop, running, disabled, placeholder, initialText, toolbar, conversationId }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
@@ -37,12 +40,14 @@ export function Composer({ onSend, onStop, running, disabled, placeholder, initi
   // and the box doesn't grab focus (which would pop the keyboard up on every visit).
   const touch = useMediaQuery('(pointer: coarse)')
 
-  // Grow with the content up to a limit.
+  // Grow with the content up to a limit; only then can it scroll. (On phones the measured
+  // height can come out a fraction short, which left an empty box scrollable by a pixel.)
   useEffect(() => {
     const el = textRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 240)}px`
+    el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
+    el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
   }, [text])
 
   const canSend = Boolean(text.trim()) && !running && !disabled && !files.uploading

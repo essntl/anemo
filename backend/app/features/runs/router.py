@@ -392,7 +392,7 @@ async def run_events(
     last_event_id: str | None = Header(None),
 ) -> StreamingResponse:
     await service.get_run(db, run_id)  # 404 for unknown runs
-    return sse_response(_stream_run(run_id, request, last_event_id or "0-0"))
+    return await sse_response(db, _stream_run(run_id, request, last_event_id or "0-0"))
 
 
 async def _stream_global(request: Request, cursor: str) -> AsyncIterator[str]:
@@ -416,7 +416,7 @@ async def _stream_global(request: Request, cursor: str) -> AsyncIterator[str]:
 
 @router.get("/events", response_class=StreamingResponse)
 async def global_events(
-    request: Request, last_event_id: str | None = Header(None)
+    request: Request, db: Db, last_event_id: str | None = Header(None)
 ) -> StreamingResponse:
     """App-wide notices (run status changes, new titles, ...) for every open tab."""
-    return sse_response(_stream_global(request, last_event_id or "$"))
+    return await sse_response(db, _stream_global(request, last_event_id or "$"))

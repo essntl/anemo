@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -30,5 +31,10 @@ def comment(text: str = "ping") -> str:
     return f": {text}\n\n"
 
 
-def sse_response(stream: AsyncIterator[str]) -> StreamingResponse:
+async def sse_response(db: AsyncSession, stream: AsyncIterator[str]) -> StreamingResponse:
+    """`db`: the request's session (the one the login check used). It is closed here,
+    before streaming: the request's dependencies only end with the response, so an open
+    stream would otherwise keep a database connection for as long as a tab stays open,
+    and a few tabs and running answers would use up the pool and stall every request."""
+    await db.close()
     return StreamingResponse(stream, media_type="text/event-stream", headers=SSE_HEADERS)

@@ -66,12 +66,12 @@ export function UserBubble({ text, attachments = [], references = [], onEdit }: 
           )}
         </div>
       )}
-      <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-5 py-2.5 text-[14.5px]">
+      <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
         {text}
       </div>
       {onEdit && (
         <button type="button" onClick={() => setDraft(text)}
-          className="-mt-1 mr-3.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-subtle opacity-70 transition-opacity hover:bg-surface-hover hover:text-text group-hover:opacity-100">
+          className="-mr-1.5 -mt-1 flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-subtle opacity-70 transition-opacity hover:bg-surface-hover hover:text-text group-hover:opacity-100">
           <Pencil className="h-3.5 w-3.5" /> Edit
         </button>
       )}
@@ -88,14 +88,14 @@ function ReasoningPanel({ text, active }: { text: string; active: boolean }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-5 py-2 text-[12.5px] font-medium text-muted hover:text-text"
+        className="flex w-full items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-muted hover:text-text"
       >
         <Brain className={cn('h-3.5 w-3.5', active && 'animate-pulse text-accent')} />
         {active ? <span className="shimmer">Reasoning…</span> : 'Reasoning'}
         <ChevronRight className={cn('ml-auto h-3.5 w-3.5 transition-transform', expanded && 'rotate-90')} />
       </button>
       {expanded && (
-        <div className="max-h-72 overflow-y-auto whitespace-pre-wrap border-t border-border px-5 py-2 text-[12.5px] leading-relaxed text-muted">
+        <div className="max-h-72 overflow-y-auto whitespace-pre-wrap border-t border-border px-3 py-2 text-[12.5px] leading-relaxed text-muted">
           {text}
         </div>
       )}
@@ -103,8 +103,14 @@ function ReasoningPanel({ text, active }: { text: string; active: boolean }) {
   )
 }
 
+// relative: the label hidden on phones (sr-only, absolute) stays inside the button
+// instead of stretching the page.
+/** How far an answer's text sits in from the edge of the bars above it: a little, so the
+ *  text doesn't look pushed against the edge, but less than the bars' own padding. */
+const ANSWER_INSET = 'px-1'
+
 const FOOTER_BUTTON =
-  'flex shrink-0 items-center justify-center gap-1 rounded-md px-1.5 py-1 hover:bg-surface-hover hover:text-text max-md:h-9 max-md:w-9 max-md:px-0'
+  'relative flex shrink-0 items-center justify-center gap-1 rounded-md px-1.5 py-1 hover:bg-surface-hover hover:text-text max-md:h-9 max-md:w-9 max-md:px-0'
 
 interface AssistantProps {
   text: string
@@ -145,11 +151,11 @@ export function AssistantMessage({
 
   return (
     <div className="group">
-      {notice && <div className="mb-2 px-5 text-[12px] text-warning">{notice}</div>}
+      {notice && <div className={cn('mb-2 text-[12px] text-warning', ANSWER_INSET)}>{notice}</div>}
       {activity}
       {reasoning && <ReasoningPanel text={reasoning} active={live && !text} />}
       {waiting && (
-        <div className="flex h-7 items-center gap-2.5 px-5 text-[13px]" role="status" aria-label="Waiting for the model">
+        <div className={cn('flex h-7 items-center gap-2.5 text-[13px]', ANSWER_INSET)} role="status" aria-label="Waiting for the model">
           <span className="wave flex items-center gap-1" aria-hidden>
             <span className="h-1.5 w-1.5 rounded-full bg-accent" />
             <span className="h-1.5 w-1.5 rounded-full bg-accent" />
@@ -159,21 +165,22 @@ export function AssistantMessage({
         </div>
       )}
       {text && (
-        <div className="px-5">
+        <div className={ANSWER_INSET}>
           <Markdown text={text} />
           {live && !suspended && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
         </div>
       )}
 
       {status === 'failed' && (
-        <div className="mt-2 flex items-start gap-2 rounded-xl bg-error/10 px-5 py-2 text-[13px] text-error">
+        <div className="mt-2 flex items-start gap-2 rounded-xl bg-error/10 px-3 py-2 text-[13px] text-error">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error ?? 'Something went wrong.'}</span>
         </div>
       )}
 
+      {/* 1px less in than the text above: the smaller, fainter letters otherwise look indented. */}
       {!live && (
-        <div className="mt-2 flex items-center gap-1 pl-5 pr-3 text-[12px] text-subtle opacity-70 transition-opacity group-hover:opacity-100">
+        <div className="mt-2 flex items-center gap-1 pl-[3px] text-[12px] text-subtle opacity-70 transition-opacity group-hover:opacity-100">
           {status === 'cancelled' && <span className="mr-2 shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-muted">Stopped</span>}
           {/* On a phone the buttons are just icons, so the model's name has the room. */}
           {modelLabel && <span className="mr-2 min-w-0 flex-1 break-words leading-snug md:flex-none" title={modelLabel}>{modelLabel}</span>}
