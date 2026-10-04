@@ -178,8 +178,7 @@ test('calendar: add an event, see it, open and delete it', async ({ page }) => {
 
     // It is on today's date in every view.
     for (const view of ['Month', 'Week', 'Agenda']) {
-      await page.getByRole('combobox', { name: 'View' }).click()
-      await page.getByRole('option', { name: view }).click()
+      await page.getByRole('radiogroup', { name: 'View' }).getByRole('radio', { name: view }).click()
       await expect(page.locator('.fc').getByText(title).first()).toBeVisible()
     }
     await page.locator('.fc').getByText(title).first().click()

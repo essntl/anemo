@@ -32,25 +32,31 @@ function RunRow({ run }: { run: RunListItem }) {
   const meta = [run.automation_id ? 'Automation' : null, who, run.conversation_title, run.model_label]
     .filter(Boolean)
     .join(' · ')
+  const numbers = run.kind === 'agent'
+    ? [
+        `${run.totals.tool_calls} action${run.totals.tool_calls === 1 ? '' : 's'}`,
+        run.totals.active_s > 0 ? formatDuration(run.totals.active_s) : null,
+        run.totals.cost_usd != null ? formatCost(run.totals.cost_usd) : null,
+      ].filter(Boolean).join(' · ')
+    : ''
+  // The request has the full width; who, when and what it cost go on the lines below
+  // (on a desktop, when and cost on the right).
   return (
     <Link to={`/runs/${run.id}`}
       className="flex items-start gap-3 rounded-card border border-border bg-card px-4 py-3 shadow-soft transition-colors hover:border-border-strong hover:bg-surface-hover">
       <div className="min-w-0 flex-1">
         <div className="line-clamp-2 break-words text-[14px] font-medium">{run.request || '(no request)'}</div>
-        <div className="mt-1 flex min-w-0 items-center gap-2">
+        <div className="mt-1.5 flex min-w-0 items-center gap-2">
           <RunStatusBadge status={run.status} />
           <span className="min-w-0 truncate text-[12px] text-muted">{meta}</span>
         </div>
+        <div className="mt-1 text-[12px] text-subtle md:hidden">
+          {formatWhen(run.created_at)}{numbers && ` · ${numbers}`}
+        </div>
       </div>
-      <div className="shrink-0 text-right text-[12px] text-muted">
+      <div className="hidden shrink-0 text-right text-[12px] text-muted md:block">
         <div>{formatWhen(run.created_at)}</div>
-        {run.kind === 'agent' && (
-          <div className="text-subtle">
-            {run.totals.tool_calls} action{run.totals.tool_calls === 1 ? '' : 's'}
-            {run.totals.active_s > 0 && <> · {formatDuration(run.totals.active_s)}</>}
-            {run.totals.cost_usd != null && <> · {formatCost(run.totals.cost_usd)}</>}
-          </div>
-        )}
+        {numbers && <div className="text-subtle">{numbers}</div>}
       </div>
     </Link>
   )
@@ -84,16 +90,17 @@ export function RunsPage() {
         </div>
       </div>
 
+      {/* The search, then the two filters as small pills next to each other. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <form className="relative min-w-48 flex-1" onSubmit={(e) => { e.preventDefault(); setParam('q', query.trim(), '') }}>
+        <form className="relative w-full md:w-auto md:min-w-48 md:flex-1" onSubmit={(e) => { e.preventDefault(); setParam('q', query.trim(), '') }}>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} onBlur={() => setParam('q', query.trim(), '')}
             placeholder="Search requests" aria-label="Search requests"
             className="h-10 w-full rounded-control border border-border bg-surface pl-9 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
         </form>
-        <Select className="w-full sm:w-52" aria-label="Status" value={status} options={STATUS_OPTIONS}
+        <Select variant="pill" aria-label="Status" value={status} options={STATUS_OPTIONS}
           onValueChange={(v) => setParam('status', v, 'all')} />
-        <Select className="w-full sm:w-44" aria-label="Kind" value={kind} options={KIND_OPTIONS}
+        <Select variant="pill" aria-label="Kind" value={kind} options={KIND_OPTIONS}
           onValueChange={(v) => setParam('kind', v, 'agent')} />
       </div>
 

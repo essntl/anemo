@@ -88,14 +88,17 @@ function MemoryRow({ memory, onEdit }: { memory: Memory; onEdit: (m: Memory) => 
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-muted">
             <Badge tone={memory.kind === 'instruction' ? 'accent' : 'neutral'}>{KIND_LABELS[memory.kind]}</Badge>
             {memory.pinned && <Badge tone="accent"><Pin className="mr-1 h-3 w-3" />Always</Badge>}
-            {memory.source === 'extracted' && <span>Noticed in a chat</span>}
-            {memory.source === 'explicit' && <span>You asked to remember</span>}
+            {/* Where it came from and how often it was used, as one phrase; the chat as an icon link. */}
+            <span>
+              {[memory.source === 'extracted' ? 'Noticed in a chat' : memory.source === 'explicit' ? 'You asked to remember' : null,
+                memory.use_count > 0 ? `used ${memory.use_count}×` : null].filter(Boolean).join(' · ')}
+            </span>
             {memory.source_conversation_id && (
-              <Link to={`/c/${memory.source_conversation_id}`} className="inline-flex items-center gap-1 text-accent hover:underline">
-                <MessageSquare className="h-3 w-3" /> Open chat
+              <Link to={`/c/${memory.source_conversation_id}`} aria-label="Open the chat it came from" title="Open the chat it came from"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-accent hover:bg-surface-hover pointer-coarse:h-8 pointer-coarse:w-8">
+                <MessageSquare className="h-3.5 w-3.5" />
               </Link>
             )}
-            {memory.use_count > 0 && <span>· used {memory.use_count}×</span>}
           </div>
         </div>
         <ActionMenu actions={actions} />
@@ -141,14 +144,22 @@ export function MemoryPage() {
             <Link to="/settings/memory" className="text-accent underline">Settings</Link>
           </p>
         </div>
+        {/* Adding and exporting belong to the page, so they sit by its title. */}
+        <div className="flex shrink-0 items-center gap-1">
+          <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} aria-label="Add memory" onClick={() => setEditing({ memory: null })}
+            className="max-sm:h-10 max-sm:w-10 max-sm:justify-center max-sm:rounded-full max-sm:px-0 max-sm:[&>span]:sr-only">
+            <span>Add memory</span>
+          </Button>
+          <ActionMenu actions={[{ label: 'Export all (JSON)', icon: <Download />, download: memoryExportUrl }]} />
+        </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="tablist" aria-label="Memory lists">
+      <div className="mb-3">
+        <div className="flex rounded-lg bg-surface-2 p-0.5 sm:inline-flex" role="tablist" aria-label="Memory lists">
           {TABS.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
               onClick={() => setParams(t.id === 'active' ? {} : { tab: t.id }, { replace: true })}
-              className={cn('flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors pointer-coarse:h-10',
+              className={cn('flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors pointer-coarse:h-10 max-sm:flex-1',
                 tab === t.id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
               {t.label}
               {t.id === 'pending' && Boolean(summary.data?.pending) && (
@@ -156,12 +167,6 @@ export function MemoryPage() {
               )}
             </button>
           ))}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ memory: null })}>
-            Add memory
-          </Button>
-          <ActionMenu actions={[{ label: 'Export all (JSON)', icon: <Download />, download: memoryExportUrl }]} />
         </div>
       </div>
 

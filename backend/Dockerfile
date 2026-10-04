@@ -36,4 +36,7 @@ USER app
 EXPOSE 8080
 ENTRYPOINT ["/usr/bin/tini", "--"]
 # Proxy headers are trusted only from FORWARDED_ALLOW_IPS (set from TRUSTED_PROXIES in compose).
-CMD ["uvicorn", "app.main_api:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
+# Keep idle connections open longer than browsers and reverse proxies do (5 s by
+# default): otherwise one can reuse a connection just as it is closed, and a request
+# fails ("socket hang up", or a 502 from the proxy).
+CMD ["uvicorn", "app.main_api:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--timeout-keep-alive", "75"]

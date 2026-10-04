@@ -124,13 +124,16 @@ class FileInfo:
     mtime: float
 
 
-def _scan() -> tuple[list[FileInfo], list[str]]:
-    """All documents on disk, and the sub-folders (for the folder picker)."""
+def _scan() -> tuple[list[FileInfo], list[str], bool]:
+    """All documents on disk, the sub-folders (for the folder picker), and whether the
+    scan is complete: a file can be moved or deleted while we look (by an agent, the
+    file manager or another request), and then it is simply left out."""
     base = files.root() / DOCS_DIR
     found: list[FileInfo] = []
     folders: list[str] = []
+    complete = True
     if not base.is_dir():
-        return found, folders
+        return found, folders, complete
     for path in sorted(base.rglob("*")):
         rel_parts = path.relative_to(base).parts
         if any(p.startswith(".") or p == ASSETS_DIR for p in rel_parts) or path.is_symlink():
@@ -138,10 +141,14 @@ def _scan() -> tuple[list[FileInfo], list[str]]:
         if path.is_dir():
             folders.append("/".join(rel_parts))
         elif path.suffix.lower() == ".md":
-            st = path.stat()
+            try:
+                st = path.stat()
+            except FileNotFoundError:
+                complete = False
+                continue
             if st.st_size <= MAX_DOC_BYTES:
                 found.append(FileInfo(files.rel(path), st.st_size, st.st_mtime))
-    return found, folders
+    return found, folders, complete
 
 
 def _read(path: str) -> str:
@@ -150,7 +157,7 @@ def _read(path: str) -> str:
 
 async def reconcile(db: AsyncSession) -> list[str]:
     """Bring the index in line with the folder. Returns the sub-folders."""
-    on_disk, folders = await asyncio.to_thread(_scan)
+    on_disk, folders, complete = await asyncio.to_thread(_scan)
     rows = {d.path: d for d in await db.scalars(select(Document))}
     disk_paths = {f.path for f in on_disk}
     gone = {p: d for p, d in rows.items() if p not in disk_paths}
@@ -183,7 +190,9 @@ async def reconcile(db: AsyncSession) -> list[str]:
             changed = True
         else:
             doc.size, doc.mtime = info.size, info.mtime  # e.g. touched, same content
-    for doc in gone.values():
+    # A file that vanished mid-scan may just be moving: forget nothing this time (the
+    # next look sees where it went, and keeps its history).
+    for doc in gone.values() if complete else []:
         await index.delete_source(db, SOURCE_TYPE, [doc.id])
         await db.delete(doc)
         changed = True

@@ -339,4 +339,41 @@
 .fc .fc-task .fc-event-title::before, .fc .fc-task .fc-list-event-title a::before { content: '☐ '; }
 .fc .fc-task-done .fc-event-title { text-decoration: line-through; opacity: 0.6; }
 .fc .fc-task-done .fc-event-title::before, .fc .fc-task-done .fc-list-event-title a::before { content: '☑ '; }
-.fc .fc-task .fc-list-event-dot { border-style: dashed; border-color: var(--border-strong); border-width: 1px; }
+.fc .fc-task .fc-list-event-dot { border-style: dashed; border-color: var(--border-strong); }
+
+/* Agenda: one label per day ("Sat, Oct 3 · Today"), a colour bar instead of a dot,
+   titles up to two lines. */
+.fc .fc-list-day-cushion { font-weight: 600; font-size: 12px; letter-spacing: 0.02em; }
+.fc .fc-list-day.fc-day-today .fc-list-day-text::after { content: ' · Today'; color: var(--accent); }
+.fc .fc-list-event-dot { width: 0; height: 1.3em; border-width: 0 0 0 3px; border-radius: 2px; vertical-align: middle; }
+.fc .fc-list-event-time { white-space: nowrap; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.fc .fc-list-event-title a { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+/* Phones (CalendarPage adds .fc-phone around the calendar). */
+.fc-phone .fc { font-size: 13.5px; }
+.fc-phone .fc-list { border: 0; }
+.fc-phone .fc-list-table td { padding: 11px 8px; }
+.fc-phone .fc-list-event-time { width: 3.6rem; }
+.fc-phone .fc-list-event-graphic { padding-right: 4px; }
+/* Month: the day number, centred, with dots under it; the chosen day is a filled circle. */
+.fc-phone .fc-daygrid-day-frame { min-height: 52px; }
+.fc-phone .fc-daygrid-day-top { justify-content: center; }
+.fc-phone .fc-daygrid-day-number { width: 100%; padding: 0; }
+/* No event chips in the phone month (dots instead): drop the room kept for them. */
+.fc-phone .fc .fc-daygrid-body-natural .fc-daygrid-day-events,
+.fc-phone .fc .fc-daygrid-body-unbalanced .fc-daygrid-day-events { min-height: 0; margin: 0; }
+.fc-phone .fc .fc-daygrid-day-bottom { display: none; }
+/* Room under the agenda for the floating "+". */
+.fc-phone .fc-list-table { margin-bottom: 72px; }
+.fc-phone .fc-daygrid-day.fc-day-today { background: none; }
+.fc-phone .fc-phone-day-number {
+  display: flex; height: 28px; width: 28px; align-items: center; justify-content: center;
+  border-radius: 999px; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.fc-phone .fc-day-other .fc-phone-day-number { color: var(--text-subtle); }
+.fc-phone .fc-day-today .fc-phone-day-number { color: var(--accent); font-weight: 700; }
+.fc-phone .fc-day-selected .fc-phone-day-number { background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.fc-phone .fc-col-header-cell-cushion { padding: 6px 2px; font-size: 12px; }
+/* Three days / one day: slim hour labels, compact entries. */
+.fc-phone .fc-timegrid-slot-label-cushion, .fc-phone .fc-timegrid-axis-cushion { padding: 0 4px; font-size: 11px; }
+.fc-phone .fc-timegrid-event .fc-event-main { font-size: 12px; line-height: 1.25; }

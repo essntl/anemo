@@ -190,6 +190,48 @@ test('files: open a file full screen, go back, and use the row menu', async ({ p
   }
 })
 
+test('calendar on a phone: month with dots and the chosen day listed, + adds to that day', async ({ page }) => {
+  await login(page)
+  const title = `E2E phone event ${Math.random().toString(36).slice(2, 8)}`
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const d = new Date()
+  const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  try {
+    await page.goto('/calendar')
+    const views = page.getByRole('radiogroup', { name: 'View' })
+    // Phones start in the agenda; "Week" is three days.
+    await expect(views.getByRole('radio', { name: 'Agenda' })).toHaveAttribute('aria-checked', 'true')
+    await expect(views.getByRole('radio', { name: '3 days' })).toBeVisible()
+    await views.getByRole('radio', { name: 'Month' }).click()
+
+    // Today is chosen; "+" adds an event to the chosen day.
+    const dayList = page.getByRole('region', { name: /^On / })
+    await expect(dayList).toContainText('Nothing planned')
+    await page.getByRole('button', { name: 'New event' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('Title').fill(title)
+    await dialog.getByRole('button', { name: 'Add event' }).click()
+    await expect(dialog).toHaveCount(0)
+    // It is listed under the grid, and today has a dot instead of cut-off text.
+    await expect(dayList.getByRole('button', { name: new RegExp(title) })).toBeVisible()
+    await expect(page.locator('.fc').getByText(title)).toHaveCount(0)
+    await expect(page.locator(`.fc [data-date="${today}"]`).getByLabel('1 planned')).toBeVisible()
+    // Tapping another day shows that day instead.
+    await page.locator('.fc-day-future').first().click()
+    await expect(dayList.getByRole('button', { name: new RegExp(title) })).toHaveCount(0)
+
+    // The agenda lists it too; nothing scrolls sideways.
+    await views.getByRole('radio', { name: 'Agenda' }).click()
+    await expect(page.locator('.fc').getByText(title)).toBeVisible()
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+  } finally {
+    const start = new Date(Date.now() - 2 * 86_400_000).toISOString()
+    const end = new Date(Date.now() + 2 * 86_400_000).toISOString()
+    const found = (await (await page.request.get(`/api/calendar/events?start=${start}&end=${end}`)).json()) as { title: string; event_id: string }[]
+    for (const o of found.filter((x) => x.title === title)) await page.request.delete(`/api/calendar/events/${o.event_id}`)
+  }
+})
+
 test('chat on a phone: send with the button, Enter adds a new line', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)

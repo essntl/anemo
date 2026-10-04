@@ -1,5 +1,6 @@
 """Documents: Markdown files with an index, revisions, conflict detection and agent tools."""
 
+import errno
 import uuid
 from datetime import timedelta
 
@@ -165,6 +166,31 @@ async def test_index_follows_the_folder(authed, docs):
     )
     (docs / "b.md").unlink()
     assert [d["title"] for d in (await listing(authed))["documents"]] == ["Alpha v2"]
+
+
+async def test_a_file_moving_during_the_listing_is_not_forgotten(authed, docs, monkeypatch):
+    (docs / "a.md").write_text("# Alpha")
+    (docs / "b.md").write_text("# Beta")
+    alpha = next(d for d in (await listing(authed))["documents"] if d["title"] == "Alpha")
+
+    # a.md vanishes between listing the folder and looking at the file (being moved):
+    # the scan leaves it out and says it is not complete...
+    path_type = type(docs)
+    real_stat = path_type.stat
+
+    def stat(path, *args, **kwargs):
+        if path.name == "a.md":
+            raise FileNotFoundError(errno.ENOENT, "No such file or directory", str(path))
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(path_type, "stat", stat)
+    found, _, complete = service._scan()
+    assert [f.path for f in found] == ["documents/b.md"] and not complete
+    # ...and the listing works, without forgetting the document (or its history).
+    assert (await authed.get("/api/documents")).status_code == 200
+    monkeypatch.undo()
+    ids = {d["id"] for d in (await listing(authed))["documents"]}
+    assert alpha["id"] in ids
 
 
 async def test_agent_document_tools(authed, docs):
