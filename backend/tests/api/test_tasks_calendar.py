@@ -1,11 +1,12 @@
 """Tasks, projects, calendar events (with repeating ones), reminders and the agent tools."""
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from app.core.redis import get_redis
 from app.events import bus
 from app.features.calendar import reminders
-from app.providers.base import Done, TextDelta
+from app.providers.base import Done, TextDelta, ToolCall
 from tests.api.test_agent import (
     agent_turn,
     call,
@@ -306,6 +307,47 @@ async def test_agent_manages_tasks_and_events(authed):
         .system
     )
     assert "in the user's time zone (Europe/Amsterdam)" in system
+
+
+def project_call(tool: str, **args) -> ToolCall:
+    """Like call(), for tools that have an argument called "name"."""
+    return ToolCall(id=f"c_{uuid.uuid4().hex[:8]}", name=tool, arguments=args)
+
+
+async def test_agent_creates_and_changes_projects(authed):
+    cid = await setup(authed, **{"tasks.write": "autonomous"})
+    script(
+        "set up my thesis",
+        [
+            project_call(
+                "create_project", name="Thesis", color="#3366ff", instructions="Be brief."
+            ),
+            project_call("create_project", name="thesis"),  # the name is taken
+            Done("tool_use"),
+        ],
+        [
+            project_call("update_project", project="Thesis", name="Master thesis", archived=False),
+            project_call("update_project", project="Nope", name="x"),
+            Done("tool_use"),
+        ],
+        [call("list_projects"), Done("tool_use")],
+        [TextDelta("Done."), Done("end")],
+    )
+    await agent_turn(authed, cid, "set up my thesis")
+    results = tool_results_sent_to_model()
+    assert results[0].startswith("Created: Thesis (documents in documents/thesis/")
+    assert "already exists" in results[1]
+    assert results[2].startswith("Updated: Master thesis")
+    assert "No project 'Nope'" in results[3]
+    assert "Master thesis (documents in documents/thesis/; files in projects/thesis/" in results[4]
+    [project] = (await authed.get("/api/projects")).json()
+    # Renaming keeps the folders; the colour and instructions stay as they were set.
+    assert (project["name"], project["slug"], project["color"]) == (
+        "Master thesis",
+        "thesis",
+        "#3366ff",
+    )
+    assert project["instructions"] == "Be brief."
 
 
 async def test_agent_updates_and_deletes_with_the_right_risk(authed):

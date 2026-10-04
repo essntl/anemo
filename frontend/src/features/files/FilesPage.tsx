@@ -2,28 +2,34 @@
  * File manager for the AI workspace: the same folders agents work in.
  * The URL holds the state (?path=folder&file=path) so views can be linked and reloaded.
  */
-import { useState, type DragEvent } from 'react'
+import { useEffect, useState, type DragEvent } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   ChevronRight,
+  ClipboardPaste,
+  Copy,
   Download,
   File,
   FilePlus,
   Folder,
+  FolderKanban,
   FolderPlus,
   HardDrive,
   Pencil,
+  Scissors,
   Search,
   Trash2,
   Upload,
-  MoveRight,
+  X,
 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { useCurrentProject } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
-import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
+import { chooseDialog, confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { toast } from '@/components/ui/toast'
+import { useProjects } from '@/features/tasks/api'
 import { cn } from '@/lib/cn'
 import {
   downloadUrl,
@@ -32,12 +38,14 @@ import {
   parentOf,
   useFileSearch,
   useFolder,
+  useCopy,
   useMakeFolder,
   useMove,
   useSaveFile,
   useTrashPath,
   useUpload,
 } from './api'
+import { cannotPaste, useClipboard } from './clipboard'
 import { FilePreview } from './components/FilePreview'
 import { TrashDialog } from './components/TrashDialog'
 
@@ -67,10 +75,54 @@ function Breadcrumbs({ path, onOpen }: { path: string; onOpen: (path: string) =>
   )
 }
 
-function Row({ entry, selected, onOpen, showPath }: { entry: Entry; selected: boolean; onOpen: () => void; showPath?: boolean }) {
+/**
+ * Moves a file or folder into a project: a document (anything under documents/) into
+ * the project's documents folder, anything else into its files folder.
+ */
+function useMoveToProject(onShowFolder: (path: string) => void) {
+  const projects = useProjects()
+  const move = useMove()
+  const run = async (entry: Entry) => {
+    const active = (projects.data ?? []).filter((p) => !p.archived)
+    const isDocument = entry.path === 'documents' || entry.path.startsWith('documents/')
+    const folderOf = (p: (typeof active)[number]) => (isDocument ? p.documents_path : p.files_path)
+    const chosen = await chooseDialog({
+      title: `Move “${entry.name}” to a project`,
+      message: isDocument ? 'It goes into the project’s documents.' : 'It goes into the project’s files.',
+      empty: 'There are no projects yet. Create one under Projects.',
+      options: active.map((p) => ({
+        value: p.id,
+        label: p.name,
+        hint: folderOf(p),
+        icon: <span className="block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />,
+        disabled: parentOf(entry.path) === folderOf(p),
+      })),
+    })
+    const project = active.find((p) => p.id === chosen)
+    if (!project) return
+    const folder = folderOf(project)
+    // mutateAsync: the row is gone from this folder before the answer arrives.
+    void move.mutateAsync({ source: entry.path, destination: joinPath(folder, entry.name), keep_both: true }).then(
+      () => toast({ message: `Moved to ${project.name}.`, action: { label: 'Show', onClick: () => onShowFolder(folder) } }),
+      (err: unknown) => toast({ message: errorMessage(err) }),
+    )
+  }
+  return { run, error: move.error }
+}
+
+function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
+  entry: Entry
+  selected: boolean
+  onOpen: () => void
+  showPath?: boolean
+  onShowFolder: (path: string) => void
+}) {
   const move = useMove()
   const trash = useTrashPath()
+  const toProject = useMoveToProject(onShowFolder)
+  const clipboard = useClipboard()
   const folder = parentOf(entry.path)
+  const isCut = clipboard.mode === 'cut' && clipboard.item?.path === entry.path
 
   const rename = async () => {
     const name = await promptDialog({
@@ -79,13 +131,8 @@ function Row({ entry, selected, onOpen, showPath }: { entry: Entry; selected: bo
     })
     if (name && name !== entry.name) move.mutate({ source: entry.path, destination: joinPath(folder, name) })
   }
-  const moveTo = async () => {
-    const dest = (await promptDialog({
-      title: `Move "${entry.name}"`, label: 'New location (path inside the workspace)', initial: entry.path,
-      confirmLabel: 'Move',
-    }))?.replace(/^\/+/, '')
-    if (dest && dest !== entry.path) move.mutate({ source: entry.path, destination: dest })
-  }
+  const cut = () => clipboard.put(entry, 'cut')
+  const copy = () => clipboard.put(entry, 'copy')
   const remove = async () => {
     const ok = await confirmDialog({
       title: `Move "${entry.name}" to the trash?`, message: 'You can restore it from Trash later.',
@@ -93,13 +140,14 @@ function Row({ entry, selected, onOpen, showPath }: { entry: Entry; selected: bo
     })
     if (ok) trash.mutate(entry.path)
   }
-  const error = move.error ?? trash.error
+  const error = move.error ?? trash.error ?? toProject.error
+  const icon = 'rounded p-1.5 text-muted hover:bg-surface-2 hover:text-text'
 
   return (
     <div
       onDoubleClick={onOpen}
       className={cn('group flex items-center gap-3 border-b border-border px-4 py-2 text-[13px] last:border-0 max-md:py-1 max-md:pr-1 max-md:text-[15px]',
-        selected ? 'bg-accent-soft' : 'hover:bg-surface-hover')}
+        selected ? 'bg-accent-soft' : 'hover:bg-surface-hover', isCut && 'opacity-50')}
     >
       {entry.is_dir ? <Folder className="h-4 w-4 shrink-0 fill-accent/20 text-accent" /> : <File className="h-4 w-4 shrink-0 text-muted" />}
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 truncate py-1.5 text-left">
@@ -109,26 +157,71 @@ function Row({ entry, selected, onOpen, showPath }: { entry: Entry; selected: bo
       <span className="hidden w-20 text-right text-[12px] text-muted sm:block">{entry.is_dir ? '' : formatSize(entry.size)}</span>
       <span className="hidden w-36 text-right text-[12px] text-muted md:block">{new Date(entry.modified).toLocaleString()}</span>
       {/* Desktop: icons appear on hover (always on touch screens). Phones: a "⋯" menu. */}
-      <span className="hidden w-28 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100 md:flex">
+      <span className="hidden w-48 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100 md:flex">
         {!entry.is_dir && (
-          <a href={downloadUrl(entry.path)} download aria-label="Download" className="rounded p-1.5 text-muted hover:text-text">
+          <a href={downloadUrl(entry.path)} download aria-label="Download" title="Download" className={icon}>
             <Download className="h-3.5 w-3.5" />
           </a>
         )}
-        <button type="button" aria-label="Rename" onClick={() => void rename()} className="rounded p-1.5 text-muted hover:text-text"><Pencil className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Move" onClick={() => void moveTo()} className="rounded p-1.5 text-muted hover:text-text"><MoveRight className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Delete" onClick={() => void remove()} className="rounded p-1.5 text-muted hover:text-error"><Trash2 className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Cut" title="Cut (then paste in another folder)" onClick={cut} className={icon}><Scissors className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Copy" title="Copy (then paste in a folder)" onClick={copy} className={icon}><Copy className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Rename" title="Rename" onClick={() => void rename()} className={icon}><Pencil className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Move to a project" title="Move to a project" onClick={() => void toProject.run(entry)} className={icon}><FolderKanban className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label="Delete" title="Move to trash" onClick={() => void remove()} className={cn(icon, 'hover:text-error')}><Trash2 className="h-3.5 w-3.5" /></button>
       </span>
       <ActionMenu
         className="md:hidden"
         label={`Actions for ${entry.name}`}
         actions={[
           ...(entry.is_dir ? [] : [{ label: 'Download', icon: <Download />, download: downloadUrl(entry.path) }]),
+          { label: 'Cut', icon: <Scissors />, onSelect: cut },
+          { label: 'Copy', icon: <Copy />, onSelect: copy },
           { label: 'Rename', icon: <Pencil />, onSelect: () => void rename() },
-          { label: 'Move', icon: <MoveRight />, onSelect: () => void moveTo() },
+          { label: 'Move to a project', icon: <FolderKanban />, onSelect: () => void toProject.run(entry) },
           { label: 'Move to trash', icon: <Trash2 />, onSelect: () => void remove(), danger: true },
         ]}
       />
+    </div>
+  )
+}
+
+/** What was cut or copied, with "Paste here" for the folder you are in. */
+function PasteBar({ folder }: { folder: string }) {
+  const { item, mode, clear } = useClipboard()
+  const move = useMove()
+  const copy = useCopy()
+  const why = item ? cannotPaste(item, mode, folder, parentOf(item.path)) : 'Nothing to paste'
+  const paste = () => {
+    if (!item || why) return
+    const body = { source: item.path, destination: joinPath(folder, item.name), keep_both: true }
+    if (mode === 'cut') move.mutate(body, { onSuccess: clear })
+    else copy.mutate(body)
+  }
+  // Ctrl+V / Cmd+V pastes too, Escape cancels (not while typing somewhere).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, [contenteditable=true]')) return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') paste()
+      else if (e.key === 'Escape') clear()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+  if (!item) return null
+  const error = move.error ?? copy.error
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-accent-soft/40 px-4 py-2 text-[13px]" role="status">
+      {mode === 'cut' ? <Scissors className="h-4 w-4 shrink-0 text-accent" /> : <Copy className="h-4 w-4 shrink-0 text-accent" />}
+      <span className="min-w-0 flex-1 truncate">
+        <span className="font-medium">{item.name}</span>
+        <span className="text-muted"> {mode === 'cut' ? 'cut' : 'copied'}: open the folder it should go to, then paste</span>
+        {error && <span className="ml-2 text-error">{errorMessage(error)}</span>}
+      </span>
+      <Button size="sm" variant="primary" icon={<ClipboardPaste className="h-3.5 w-3.5" />} disabled={Boolean(why)}
+        title={why ?? 'Paste here (Ctrl+V)'} loading={move.isPending || copy.isPending} onClick={paste}>
+        Paste here
+      </Button>
+      <Button size="sm" variant="ghost" icon={<X className="h-3.5 w-3.5" />} onClick={clear}>Cancel</Button>
     </div>
   )
 }
@@ -217,6 +310,7 @@ export function FilesPage() {
           <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>
         </header>
         {error && <div className="border-b border-border bg-error/8 px-4 py-2 text-[12.5px] text-error">{errorMessage(error)}</div>}
+        {!searching && <PasteBar folder={path} />}
         <div
           className={cn('min-h-0 flex-1 overflow-y-auto', dragging && 'bg-accent-soft')}
           onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
@@ -230,7 +324,8 @@ export function FilesPage() {
             </button>
           )}
           {entries.map((e) => (
-            <Row key={e.path} entry={e} selected={e.path === openFile} onOpen={() => open(e)} showPath={searching} />
+            <Row key={e.path} entry={e} selected={e.path === openFile} onOpen={() => open(e)} showPath={searching}
+              onShowFolder={(p) => { setQuery(''); go({ path: p, file: null }) }} />
           ))}
           {!folder.isPending && entries.length === 0 && (
             <EmptyState

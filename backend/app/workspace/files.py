@@ -168,18 +168,36 @@ def make_dir(relative: str) -> Path:
     return path
 
 
-def move(src: str, dst: str) -> tuple[Path, Path]:
+def _source_and_target(src: str, dst: str, verb: str, keep_both: bool) -> tuple[Path, Path]:
     source, target = resolve(src), resolve(dst)
     if not source.exists():
         raise NotFound("Source not found")
     if source == root():
-        raise AppError("The workspace root cannot be moved", code="invalid_path")
-    if target.exists():
-        raise Conflict("Something already exists at the destination", code="exists")
+        raise AppError(f"The workspace root cannot be {verb}", code="invalid_path")
     if source.is_dir() and target.is_relative_to(source):
-        raise AppError("A folder cannot be moved into itself", code="invalid_path")
+        raise AppError(f"A folder cannot be {verb} into itself", code="invalid_path")
+    if target.exists():
+        if not keep_both:
+            raise Conflict("Something already exists at the destination", code="exists")
+        target = unique_name(target.parent, target.name)  # "notes (1).md"
     target.parent.mkdir(parents=True, exist_ok=True)
+    return source, target
+
+
+def move(src: str, dst: str, keep_both: bool = False) -> tuple[Path, Path]:
+    """`keep_both`: if the name is taken there, add a number instead of failing."""
+    source, target = _source_and_target(src, dst, "moved", keep_both)
     shutil.move(str(source), str(target))
+    return source, target
+
+
+def copy(src: str, dst: str, keep_both: bool = False) -> tuple[Path, Path]:
+    """A copy of a file or a whole folder (`keep_both` as for move)."""
+    source, target = _source_and_target(src, dst, "copied", keep_both)
+    if source.is_dir():
+        shutil.copytree(source, target, symlinks=True)
+    else:
+        shutil.copy2(source, target)
     return source, target
 
 

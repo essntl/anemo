@@ -114,7 +114,8 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: () => void
       confirmLabel: 'Delete project',
       danger: true,
     })
-    if (ok) remove.mutate(project.id, { onSuccess: () => current && setProjectId(null) })
+    // mutateAsync: this card is gone before the answer arrives.
+    if (ok) void remove.mutateAsync(project.id).then(() => current && setProjectId(null), () => undefined)
   }
   const open = () => {
     setProjectId(project.id)

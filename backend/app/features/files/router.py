@@ -65,6 +65,8 @@ class PathIn(BaseModel):
 class MoveIn(BaseModel):
     source: str = Field(min_length=1, max_length=1000)
     destination: str = Field(min_length=1, max_length=1000)
+    # The name is taken at the destination: add a number ("notes (1).md") instead of failing.
+    keep_both: bool = False
 
 
 class TrashItemOut(BaseModel):
@@ -159,7 +161,16 @@ async def make_folder(body: PathIn) -> EntryOut:
 
 @router.post("/move", response_model=EntryOut)
 async def move(body: MoveIn) -> EntryOut:
-    _, target = await asyncio.to_thread(files.move, body.source, body.destination)
+    """Rename or move (cut and paste). A document moved within documents/ keeps its
+    history: the documents index recognises it by its content."""
+    _, target = await asyncio.to_thread(files.move, body.source, body.destination, body.keep_both)
+    return _out(files.entry(target))
+
+
+@router.post("/copy", response_model=EntryOut, status_code=201)
+async def copy(body: MoveIn) -> EntryOut:
+    """Copy a file or a folder with everything in it (copy and paste)."""
+    _, target = await asyncio.to_thread(files.copy, body.source, body.destination, body.keep_both)
     return _out(files.entry(target))
 
 

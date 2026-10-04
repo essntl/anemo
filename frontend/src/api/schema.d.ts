@@ -1187,8 +1187,32 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move */
+        /**
+         * Move
+         * @description Rename or move (cut and paste). A document moved within documents/ keeps its
+         *     history: the documents index recognises it by its content.
+         */
         post: operations["move_api_files_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/files/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy
+         * @description Copy a file or a folder with everything in it (copy and paste).
+         */
+        post: operations["copy_api_files_copy_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5389,6 +5413,11 @@ export interface components {
             source: string;
             /** Destination */
             destination: string;
+            /**
+             * Keep Both
+             * @default false
+             */
+            keep_both: boolean;
         };
         /** SaveIn */
         app__features__files__router__SaveIn: {
@@ -7870,6 +7899,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_api_files_copy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__features__files__router__MoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

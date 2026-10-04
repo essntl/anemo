@@ -65,9 +65,11 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
   }, [linked])
 
   // No question asked: it is a finished task, and Undo puts it back as it was.
+  // (mutateAsync: this row is often gone before the answer arrives, and mutate's own
+  // onSuccess is skipped for a component that is no longer there.)
   const removeNow = () =>
-    remove.mutate(task.id, {
-      onSuccess: () =>
+    void remove.mutateAsync(task.id).then(
+      () =>
         toast({
           message: `Deleted “${task.title}”`,
           duration: 10_000, // time to notice and undo
@@ -81,7 +83,8 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
               }),
           },
         }),
-    })
+      () => undefined, // shown by the mutation's error state
+    )
   const side = '-my-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-subtle hover:bg-surface-2 disabled:opacity-50 pointer-coarse:-my-2 pointer-coarse:h-10 pointer-coarse:w-10'
 
   return (

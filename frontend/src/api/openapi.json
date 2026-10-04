@@ -4559,6 +4559,7 @@
           "files"
         ],
         "summary": "Move",
+        "description": "Rename or move (cut and paste). A document moved within documents/ keeps its\nhistory: the documents index recognises it by its content.",
         "operationId": "move_api_files_move_post",
         "parameters": [
           {
@@ -4590,6 +4591,66 @@
         },
         "responses": {
           "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/copy": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Copy",
+        "description": "Copy a file or a folder with everything in it (copy and paste).",
+        "operationId": "copy_api_files_copy_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__features__files__router__MoveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -18903,6 +18964,11 @@
             "maxLength": 1000,
             "minLength": 1,
             "title": "Destination"
+          },
+          "keep_both": {
+            "type": "boolean",
+            "title": "Keep Both",
+            "default": false
           }
         },
         "type": "object",

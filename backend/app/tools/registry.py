@@ -16,6 +16,7 @@ from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
+from app.tools.builtin.projects import PROJECT_TOOLS
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.subagent import RunSubagent
 from app.tools.builtin.tasks import TASK_TOOLS
@@ -49,6 +50,7 @@ BUILTIN_TOOLS: list[Tool] = [
     HttpRequest(),
     *BROWSER_TOOLS,
     *TASK_TOOLS,
+    *PROJECT_TOOLS,
     *EVENT_TOOLS,
     SendNotification(),
     *MEMORY_TOOLS,

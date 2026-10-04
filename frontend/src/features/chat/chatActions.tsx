@@ -64,7 +64,11 @@ export function useChatActions(conv: Conversation): MenuAction[] {
       confirmLabel: 'Delete', danger: true,
     })
     if (!ok) return
-    remove.mutate(conv.id, { onSuccess: () => conversationId === conv.id && navigate('/') })
+    // mutateAsync: the row this was started from may be gone before the answer arrives.
+    void remove.mutateAsync(conv.id).then(
+      () => conversationId === conv.id && navigate('/'),
+      (err: unknown) => toast({ message: errorMessage(err) }),
+    )
   }
 
   return [

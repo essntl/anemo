@@ -46,7 +46,12 @@ CATEGORIES: list[Category] = [
     ),
     Category("http.request", "External API calls", "Send HTTP requests to other services.", "ask"),
     Category("docs.write", "Edit documents", "Create and change documents.", "ask"),
-    Category("tasks.write", "Manage tasks", "Create, edit and complete tasks.", "ask_dangerous"),
+    Category(
+        "tasks.write",
+        "Manage tasks & projects",
+        "Create, edit and complete tasks; create and change projects.",
+        "ask_dangerous",
+    ),
     Category("calendar.write", "Manage calendar", "Create and change events.", "ask_dangerous"),
     Category(
         "memory.write", "Update memory", "Remember and forget things about you.", "autonomous"

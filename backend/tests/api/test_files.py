@@ -64,6 +64,27 @@ async def test_upload_folder_move_and_names(authed, clean_workspace):
     assert [h["path"] for h in hits] == ["docs/sub/b.txt"]
 
 
+async def test_copy_and_paste_keeping_both(authed, clean_workspace):
+    (clean_workspace / "docs" / "sub").mkdir()
+    (clean_workspace / "docs" / "sub" / "note.txt").write_text("hi")
+    # Copy a whole folder; the original stays.
+    r = await authed.post("/api/files/copy", json={"source": "docs/sub", "destination": "copy"})
+    assert r.status_code == 201 and r.json()["is_dir"]
+    assert (clean_workspace / "copy" / "note.txt").read_text() == "hi"
+    assert (clean_workspace / "docs" / "sub" / "note.txt").exists()
+    # Pasting onto a name that is taken: refused, unless both are kept.
+    body = {"source": "docs/readme.md", "destination": "copy/note.txt"}
+    assert (await authed.post("/api/files/copy", json=body)).status_code == 409
+    r = await authed.post("/api/files/copy", json={**body, "keep_both": True})
+    assert r.json()["path"] == "copy/note (1).txt"
+    r = await authed.post("/api/files/move", json={**body, "keep_both": True})
+    assert r.json()["path"] == "copy/note (2).txt"
+    assert not (clean_workspace / "docs" / "readme.md").exists()
+    # Not into itself.
+    r = await authed.post("/api/files/copy", json={"source": "copy", "destination": "copy/x"})
+    assert r.status_code == 400
+
+
 async def test_trash_restore_and_purge(authed, clean_workspace):
     item = (await authed.post("/api/files/trash", json={"path": "docs/readme.md"})).json()
     assert not (clean_workspace / "docs" / "readme.md").exists()

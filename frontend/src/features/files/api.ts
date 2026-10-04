@@ -67,11 +67,22 @@ export function useMakeFolder() {
   })
 }
 
+type MoveBody = { source: string; destination: string; /** add " (1)" if the name is taken */ keep_both?: boolean }
+
 export function useMove() {
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: async (body: { source: string; destination: string }) =>
-      unwrap(await api.POST('/api/files/move', { body })),
+    mutationFn: async ({ keep_both = false, ...body }: MoveBody) =>
+      unwrap(await api.POST('/api/files/move', { body: { ...body, keep_both } })),
+    onSuccess: refresh,
+  })
+}
+
+export function useCopy() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: async ({ keep_both = false, ...body }: MoveBody) =>
+      unwrap(await api.POST('/api/files/copy', { body: { ...body, keep_both } })),
     onSuccess: refresh,
   })
 }
