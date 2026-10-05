@@ -75,6 +75,8 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: notificationsKey })
       const open = () => void navigate(note.link ?? '/notifications')
       if (showDesktopNotification(note, open)) return
+      // About what is on screen already (e.g. the agent's question in the open chat).
+      if (note.link && window.location.pathname === note.link) return
       toast({ message: note.title, duration: 10_000, action: { label: 'Open', onClick: open } })
     }) as EventListener)
     source.addEventListener('notifications.changed', () => void qc.invalidateQueries({ queryKey: notificationsKey }))

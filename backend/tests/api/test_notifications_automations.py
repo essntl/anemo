@@ -353,6 +353,7 @@ async def test_scheduled_run_delivers_its_answer(authed):
     assert 'unattended run of the automation "Morning news"' in request.system
     names = [t.name for t in request.tools]
     assert "get_automation_state" in names and "set_automation_state" in names
+    assert "ask_user" not in names  # nobody is there to answer
     # No title or memory jobs for scheduled runs.
     async with get_sessionmaker()() as db:
         kinds = set(await db.scalars(select(Job.type)))

@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import Db, client_ip
-from app.core.errors import Conflict, NotFound
+from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.audit import service as audit
 from app.features.runs import service
@@ -32,7 +32,7 @@ class ApprovalOut(BaseModel):
     id: uuid.UUID
     run_id: uuid.UUID
     tool_call_id: uuid.UUID
-    kind: str  # "action" or "plan"
+    kind: str  # "action", "plan" or "question" (the agent asks the user something)
     status: str
     scope: str | None
     summary: str
@@ -150,6 +150,8 @@ class DecisionIn(BaseModel):
     reason: str | None = Field(None, max_length=500)
     # Plan reviews: the steps as edited by the user (omit to accept the plan as proposed).
     plan: PlanIn | None = None
+    # Questions: "approve" with the user's answer; "deny" leaves the choice to the agent.
+    answer: str | None = Field(None, max_length=4000)
 
 
 def grant_for(call: ToolCall) -> Grant:
@@ -180,7 +182,14 @@ async def decide(approval_id: uuid.UUID, body: DecisionIn, request: Request, db:
     approval.scope = body.scope if body.decision == "approve" else None
     approval.reason = body.reason
     approval.decided_at = datetime.now(UTC)
-    if approval.kind == "plan":
+    if approval.kind == "question":
+        answer = (body.answer or "").strip()
+        if body.decision == "approve" and not answer:
+            raise AppError("Write an answer, or leave it to the agent", code="answer_required")
+        approval.scope = None
+        if body.decision == "approve":
+            call.args = {**call.args, "answer": answer}
+    elif approval.kind == "plan":
         approval.scope = "once" if body.decision == "approve" else None
         if body.decision == "approve" and body.plan is not None:
             call.args = {"steps": [s.model_dump() for s in body.plan.steps]}

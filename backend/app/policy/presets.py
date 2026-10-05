@@ -67,6 +67,8 @@ CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 # Capabilities of internal helper tools that carry no risk (planning, clock, ...).
 INTERNAL_RULES = [
     Rule(cap="agent.plan", decision="allow"),
+    # Asking the user a question can do no harm.
+    Rule(cap="agent.ask", decision="allow"),
     Rule(cap="util.*", decision="allow"),
     Rule(cap="memory.read", decision="allow"),  # looking up memories changes nothing
     Rule(cap="tasks.read", decision="allow"),

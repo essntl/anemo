@@ -9901,6 +9901,71 @@
         }
       }
     },
+    "/api/conversations/{conversation_id}/browser/stream": {
+      "get": {
+        "tags": [
+          "browser"
+        ],
+        "summary": "Stream",
+        "description": "The picture live (Server-Sent Events): a \"frame\" (base64 JPEG, at most `width`\npixels wide) whenever the page changes, \"meta\" (url, title) every second, and\n\"closed\" or \"unavailable\" when there is nothing (more) to show.",
+        "operationId": "stream_api_conversations__conversation_id__browser_stream_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "width",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1280,
+              "minimum": 200,
+              "default": 1280,
+              "title": "Width"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{conversation_id}/browser/input": {
       "post": {
         "tags": [
@@ -11316,6 +11381,11 @@
               }
             ],
             "title": "Url"
+          },
+          "picture": {
+            "type": "boolean",
+            "title": "Picture",
+            "default": true
           }
         },
         "type": "object",
@@ -11986,6 +12056,18 @@
                 "type": "null"
               }
             ]
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
           }
         },
         "type": "object",

@@ -10,7 +10,7 @@ network; callers only pass along which private hosts the user allowed.
 """
 
 import uuid
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
@@ -116,6 +116,33 @@ async def view(session_id: uuid.UUID) -> dict[str, Any] | None:
         raise BrowserUnavailable(_detail(response))
     data: dict[str, Any] = response.json()
     return data
+
+
+CLOSED = b"event: closed\ndata: {}\n\n"  # no session (any more)
+UNAVAILABLE = b"event: unavailable\ndata: {}\n\n"  # the browser isn't running or reachable
+
+
+async def stream(session_id: uuid.UUID, width: int) -> AsyncIterator[bytes]:
+    """The session's picture, live: browserd's Server-Sent Events passed on as they come
+    (frames when the page changes, its address and title every second). Without a
+    session, or without the browser, it says so in one event and ends."""
+    try:
+        url, token, transport = _connection()
+        timeout = httpx.Timeout(10.0, read=None)  # frames come only when something changes
+        async with httpx.AsyncClient(base_url=url, transport=transport, timeout=timeout) as client:
+            async with client.stream(
+                "GET",
+                f"/sessions/{session_id}/stream",
+                params={"width": width},
+                headers={"Authorization": f"Bearer {token}"},
+            ) as response:
+                if response.status_code != 200:
+                    yield CLOSED
+                    return
+                async for chunk in response.aiter_raw():
+                    yield chunk
+    except (BrowserUnavailable, httpx.HTTPError):
+        yield UNAVAILABLE
 
 
 async def user_input(

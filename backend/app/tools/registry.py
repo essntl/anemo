@@ -9,6 +9,7 @@ from app.policy.engine import evaluate
 from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
+from app.tools.builtin.ask import AskUser
 from app.tools.builtin.automation import AUTOMATION_TOOLS
 from app.tools.builtin.browser import BROWSER_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
@@ -35,6 +36,7 @@ from app.tools.builtin.workspace import (
 
 BUILTIN_TOOLS: list[Tool] = [
     UpdatePlan(),
+    AskUser(),
     ListFiles(),
     ReadFile(),
     FindFiles(),
@@ -86,10 +88,12 @@ def toolset_for(
     is_automation: bool = False,
     has_browser: bool = False,
     can_spawn: bool = False,
+    can_ask: bool = False,
     ancestors: Iterable[Policy] = (),
 ) -> list[Tool]:
     """`ancestors`: for a sub-agent, the policies of the agents above it (a tool one of
-    them may not use is not offered). `can_spawn`: the run may start sub-agents."""
+    them may not use is not offered). `can_spawn`: the run may start sub-agents.
+    `can_ask`: someone is there to answer questions (not an automation or a sub-agent)."""
     offered = []
     for tool in BUILTIN_TOOLS:
         is_memory = tool in MEMORY_TOOLS
@@ -101,6 +105,7 @@ def toolset_for(
             or (tool in AUTOMATION_TOOLS and not is_automation)
             or (tool in BROWSER_TOOLS and not has_browser)
             or (tool.name == "run_subagent" and not can_spawn)
+            or (tool.name == "ask_user" and not can_ask)
             or (mode != "agent" and not is_memory)
         ):
             continue

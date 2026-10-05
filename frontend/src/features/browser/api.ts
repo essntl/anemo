@@ -3,8 +3,9 @@ import { api, type Schemas, unwrap } from '@/api/client'
 
 /** What the conversation's browser shows right now. */
 export type BrowserView = Schemas['BrowserView']
-/** Something the user does in it: a click, typed text, a key, scrolling, an address… */
-export type BrowserInput = Schemas['BrowserInput']
+/** Something the user does in it: a click, typed text, a key, scrolling, an address…
+ *  (`picture` is added when it is sent: see useInputQueue). */
+export type BrowserInput = Omit<Schemas['BrowserInput'], 'picture'>
 
 export const browserKey = (conversationId: string) => ['browser', conversationId] as const
 
@@ -18,14 +19,15 @@ export function useBrowserStatus() {
 }
 
 /**
- * The live view. While `watching`, it is fetched again every second, so the
- * picture follows what the agent (or you) does. It stops while the tab is hidden.
+ * The view (whether a page is open, its address, a picture). While `watching`, it is
+ * fetched again every `everyMs`: every second when there is no live picture
+ * (useBrowserStream), rarely when there is. It stops while the tab is hidden.
  */
-export function useBrowserView(conversationId: string, watching: boolean) {
+export function useBrowserView(conversationId: string, watching: boolean, everyMs = 1000) {
   return useQuery({
     queryKey: browserKey(conversationId),
     enabled: watching,
-    refetchInterval: watching ? 1000 : false,
+    refetchInterval: watching ? everyMs : false,
     refetchIntervalInBackground: false,
     queryFn: async () =>
       unwrap(
@@ -40,14 +42,16 @@ export function useBrowserView(conversationId: string, watching: boolean) {
 export function useBrowserInput(conversationId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: BrowserInput) =>
+    mutationFn: async (input: Schemas['BrowserInput']) =>
       unwrap(
         await api.POST('/api/conversations/{conversation_id}/browser/input', {
           params: { path: { conversation_id: conversationId } },
           body: input,
         }),
       ),
-    onSuccess: (view) => qc.setQueryData(browserKey(conversationId), view),
+    // Sent without a picture (the live stream shows it): keep the one we have.
+    onSuccess: (view) =>
+      qc.setQueryData<BrowserView>(browserKey(conversationId), (old) => ({ ...view, screenshot: view.screenshot ?? old?.screenshot ?? null })),
   })
 }
 

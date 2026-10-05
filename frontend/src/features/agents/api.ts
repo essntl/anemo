@@ -42,6 +42,8 @@ export function useDecide(runId: string) {
       reason?: string
       /** Plan reviews: the steps as edited by the user. */
       plan?: { title: string; status?: 'pending' | 'in_progress' | 'done' | 'skipped' }[]
+      /** Questions: the user's answer (with 'approve'; 'deny' leaves it to the agent). */
+      answer?: string
     }) =>
       unwrap(
         await api.POST('/api/approvals/{approval_id}', {
@@ -51,6 +53,7 @@ export function useDecide(runId: string) {
             scope: v.scope ?? 'once',
             reason: v.reason ?? null,
             plan: v.plan ? { steps: v.plan.map((s) => ({ title: s.title, status: s.status ?? 'pending' })) } : null,
+            answer: v.answer ?? null,
           },
         }),
       ),

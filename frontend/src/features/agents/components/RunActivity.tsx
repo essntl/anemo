@@ -20,6 +20,7 @@ import {
   Undo2,
   Clock,
   Loader2,
+  MessageCircleQuestion,
   ShieldAlert,
   Wrench,
   XCircle,
@@ -34,6 +35,8 @@ import { type FileChangeView, type Timeline, type ToolCallView, useDecide, useRe
 import { type EditableStep, planIsValid, toEditable } from '../plan'
 import { PlanEditor } from './PlanEditor'
 import { PlanReviewCard } from './PlanReviewCard'
+import { questionOf } from '../question'
+import { QuestionCard } from './QuestionCard'
 import { RunControls } from './RunControls'
 import { ShellDetails } from './ShellCall'
 import { SubagentRun } from './SubagentRun'
@@ -51,6 +54,7 @@ const STATUS: Record<string, { icon: typeof Circle; tone: string; label: string 
 }
 
 function describe(call: ToolCallView): string {
+  if (call.tool_name === 'ask_user') return `Ask you: ${questionOf(call).question}`
   if (call.tool_name === 'load_skill') return `Load skill “${String(call.args.name ?? '')}”`
   if (call.tool_name === 'update_plan' && call.approval?.kind === 'plan') return 'Propose a plan'
   const summary = call.actions.map((a) => (a as { summary?: string }).summary).find(Boolean)
@@ -143,7 +147,12 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
   // Open while the sub-agent works, so an approval it asks for is not hidden.
   const open = toggled ?? ((shell && call.status === 'running') || call.status === 'waiting_child')
   const image = shownImage(call)
-  const s = STATUS[call.status] ?? STATUS.pending
+  const asking = call.tool_name === 'ask_user'
+  const s = asking && call.status === 'waiting_approval'
+    ? { ...STATUS.waiting_approval, icon: MessageCircleQuestion, label: 'Waiting for you' }
+    : asking && call.status === 'succeeded'
+      ? { ...STATUS.succeeded, label: questionOf(call).answer ? 'Answered' : 'Left to the agent' }
+      : (STATUS[call.status] ?? STATUS.pending)
   const Icon = s.icon
   const needsApproval = call.status === 'waiting_approval' && call.approval?.status === 'pending'
   const output = call.result_data?.output as { chars: number } | undefined
@@ -166,7 +175,12 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
           {shell && <ShellDetails call={call} />}
           {childRunId && <SubagentRun runId={childRunId} />}
           {web && <WebDetails data={web} />}
-          {!shell && Object.keys(call.args).length > 0 && (
+          {asking && (
+            <div className="text-muted">
+              {questionOf(call).answer ? <>You answered: <span className="text-text">{questionOf(call).answer}</span></> : 'You left it to the agent.'}
+            </div>
+          )}
+          {!shell && !asking && Object.keys(call.args).length > 0 && (
             <pre className="overflow-x-auto rounded-lg bg-surface-2 p-2 font-mono text-[11.5px]">
               {JSON.stringify(call.args, null, 2)}
             </pre>
@@ -193,7 +207,9 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
         </a>
       )}
       {needsApproval &&
-        (call.approval?.kind === 'plan' ? <PlanReviewCard runId={runId} call={call} /> : <ApprovalCard runId={runId} call={call} />)}
+        (call.approval?.kind === 'plan' ? <PlanReviewCard runId={runId} call={call} />
+          : call.approval?.kind === 'question' ? <QuestionCard runId={runId} call={call} />
+            : <ApprovalCard runId={runId} call={call} />)}
     </div>
   )
 }
@@ -291,6 +307,7 @@ function PlanSection({ runId, data }: { runId: string; data: Timeline }) {
 
 function headline(data: Timeline, live: boolean): string {
   const pending = data.tool_calls.find((c) => c.status === 'waiting_approval' && c.approval?.status === 'pending')
+  if (pending?.approval?.kind === 'question') return 'The agent has a question for you'
   if (pending) return pending.approval?.kind === 'plan' ? 'Waiting for you to review the plan' : 'Waiting for your approval'
   if (data.status === 'paused') return 'Paused'
   if (live) return 'Working…'

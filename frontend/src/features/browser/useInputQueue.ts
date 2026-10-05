@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { type BrowserInput, useBrowserInput } from './api'
 import { mergeInputs } from './input'
 
@@ -10,14 +10,21 @@ const COLLECT_MS = 120
  * typing and scrolling are collected for a moment and sent together, so the
  * browser is not asked for a new picture after every single key.
  *
- *   const queue = useInputQueue(conversationId)
+ *   const queue = useInputQueue(conversationId, live)
  *   queue.push({ kind: 'click', x, y })
+ *
+ * `live`: the picture is streamed, so the browser need not send one back (or wait for
+ * the page to settle first): each input is answered at once.
  */
-export function useInputQueue(conversationId: string) {
+export function useInputQueue(conversationId: string, live = false) {
   const send = useBrowserInput(conversationId)
   const waiting = useRef<BrowserInput[]>([])
   const sending = useRef(false)
   const timer = useRef<number | undefined>(undefined)
+  const picture = useRef(!live)
+  useEffect(() => {
+    picture.current = !live
+  }, [live])
 
   const flush = async () => {
     if (sending.current) return // the running flush picks up what was added meanwhile
@@ -28,7 +35,7 @@ export function useInputQueue(conversationId: string) {
         waiting.current = []
         for (const input of batch) {
           if (input.kind === 'scroll') input.dy = Math.max(-5000, Math.min(5000, input.dy ?? 0))
-          await send.mutateAsync(input)
+          await send.mutateAsync({ ...input, picture: picture.current })
         }
       }
     } catch {

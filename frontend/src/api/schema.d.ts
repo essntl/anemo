@@ -2262,6 +2262,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversation_id}/browser/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream
+         * @description The picture live (Server-Sent Events): a "frame" (base64 JPEG, at most `width`
+         *     pixels wide) whenever the page changes, "meta" (url, title) every second, and
+         *     "closed" or "unavailable" when there is nothing (more) to show.
+         */
+        get: operations["stream_api_conversations__conversation_id__browser_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}/browser/input": {
         parameters: {
             query?: never;
@@ -2663,6 +2685,11 @@ export interface components {
             dy?: number | null;
             /** Url */
             url?: string | null;
+            /**
+             * Picture
+             * @default true
+             */
+            picture: boolean;
         };
         /** BrowserStatus */
         BrowserStatus: {
@@ -2897,6 +2924,8 @@ export interface components {
             /** Reason */
             reason?: string | null;
             plan?: components["schemas"]["PlanIn"] | null;
+            /** Answer */
+            answer?: string | null;
         };
         /** DestinationIn */
         DestinationIn: {
@@ -10818,6 +10847,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_api_conversations__conversation_id__browser_stream_get: {
+        parameters: {
+            query?: {
+                width?: number;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -4,11 +4,12 @@
  * uses, so what you do (logging in, answering an "are you human" check) is there
  * for the agent afterwards.
  *
- * How it works: the picture is a screenshot fetched every second (and after each
- * thing you do). Your clicks and keys are sent to the real browser, which runs
- * on the server.
+ * How it works: the picture is streamed live: the browser sends a new frame whenever
+ * the page changes (see useBrowserStream). Without the stream it falls back to a
+ * screenshot every second. Your clicks and keys are sent to the real browser, which
+ * runs on the server.
  */
-import { type FormEvent, type KeyboardEvent, type ReactNode, useRef, useState } from 'react'
+import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Globe, RotateCw, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
@@ -16,6 +17,7 @@ import { confirmDialog } from '@/components/ui/dialogs'
 import { cn } from '@/lib/cn'
 import { useBrowserView, useCloseBrowser } from './api'
 import { inputForKey, pagePoint } from './input'
+import { useBrowserStream } from './useBrowserStream'
 import { useInputQueue } from './useInputQueue'
 
 interface Props {
@@ -25,16 +27,49 @@ interface Props {
   className?: string
 }
 
+/** Frame width to ask for: what the panel shows (sharp on high-density screens), in
+ *  steps so resizing does not reconnect all the time; the browser itself is 1280 wide. */
+function streamWidth(boxWidth: number): number {
+  const wanted = boxWidth * Math.min(window.devicePixelRatio || 1, 2)
+  return Math.min(1280, Math.max(320, Math.ceil(wanted / 160) * 160))
+}
+
 export function BrowserView({ conversationId, actions, className }: Props) {
-  const view = useBrowserView(conversationId, true)
-  const queue = useInputQueue(conversationId)
   const close = useCloseBrowser(conversationId)
   const picture = useRef<HTMLImageElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(1280)
+  useEffect(() => {
+    if (!box.current) return
+    const observer = new ResizeObserver(([entry]) => setWidth(streamWidth(entry.contentRect.width)))
+    observer.observe(box.current)
+    return () => observer.disconnect()
+  }, [])
+  // Streamed frames go straight into the <img> (no re-render per frame). React only
+  // gets the first one, so the picture appears; while streaming its src stays put.
+  const [firstFrame, setFirstFrame] = useState<string | null>(null)
+  const [streaming, setStreaming] = useState(false)
+  const queue = useInputQueue(conversationId, streaming)
+  const view = useBrowserView(conversationId, true, streaming ? 5000 : 1000)
   // The address field shows the page's address unless you are typing in it.
   const [typedAddress, setTypedAddress] = useState<string | null>(null)
   const [touchText, setTouchText] = useState('')
   const data = view.data
   const open = Boolean(data?.open)
+  useBrowserStream(conversationId, open, width, {
+    onFrame: (jpeg) => {
+      const src = `data:image/jpeg;base64,${jpeg}`
+      if (picture.current) picture.current.src = src
+      setFirstFrame((had) => had ?? src)
+      setStreaming(true)
+    },
+    onStop: (reason) => {
+      setStreaming(false)
+      if (reason === 'closed') setFirstFrame(null) // no old picture next time
+    },
+  })
+  const screenshot = data?.screenshot ? `data:image/jpeg;base64,${data.screenshot}` : null
+  const shown = streaming && firstFrame ? firstFrame : (screenshot ?? firstFrame)
 
   /** A mouse position on the (scaled) picture as a position in the browser's page. */
   const pointAt = (clientX: number, clientY: number) =>
@@ -101,7 +136,7 @@ export function BrowserView({ conversationId, actions, className }: Props) {
         {actions}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-bg" data-no-swipe>
+      <div ref={box} className="min-h-0 flex-1 overflow-auto bg-bg" data-no-swipe>
         {data && !data.available && (
           <Message title="The browser is not running">
             Start it on the server with <code className="font-mono">docker compose --profile browser up -d</code>.
@@ -113,7 +148,7 @@ export function BrowserView({ conversationId, actions, className }: Props) {
             address above.
           </Message>
         )}
-        {open && data?.screenshot && (
+        {open && shown && (
           // The picture is the browser: clicks, the wheel and the keyboard go to the page.
           <div tabIndex={0} role="application" aria-label="The agent's browser. Click, type and scroll here."
             className="cursor-default outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
@@ -123,8 +158,8 @@ export function BrowserView({ conversationId, actions, className }: Props) {
               const text = e.clipboardData.getData('text')
               if (text) queue.push({ kind: 'type', text })
             }}>
-            <img ref={picture} alt={data.title || 'Browser page'} draggable={false}
-              src={`data:image/jpeg;base64,${data.screenshot}`}
+            <img ref={picture} alt={data?.title || 'Browser page'} draggable={false}
+              src={shown}
               className="block w-full select-none"
               onClick={(e) => queue.push({ kind: 'click', ...pointAt(e.clientX, e.clientY) })}
               onWheel={(e) => queue.push({ kind: 'scroll', dy: e.deltaY, ...pointAt(e.clientX, e.clientY) })} />

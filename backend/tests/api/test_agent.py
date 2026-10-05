@@ -106,6 +106,7 @@ async def test_agent_uses_tools_and_plan(authed):
     assert msg["text"] == "You have 2 todos." and msg["mode"] == "agent"
     assert [tool.name for tool in FakeAdapter.requests[-1].tools] == [
         "update_plan",
+        "ask_user",
         "list_files",
         "read_file",
         "find_files",
@@ -173,6 +174,64 @@ async def test_path_escape_is_denied_whatever_the_settings(authed):
     assert c["status"] == "denied" and c["decision"] == "deny"
     assert "outside the workspace" in c["decision_reason"]
     assert "TOP SECRET" not in str(FakeAdapter.requests[-1].messages)
+
+
+async def test_agent_asks_the_user_and_goes_on_with_the_answer(authed):
+    cid = await setup(authed)  # asking needs no permission
+    script(
+        "write a report",
+        [
+            call(
+                "ask_user",
+                question="Which style do you want?",
+                options=["Short", "Detailed", " short ", ""],
+            ),
+            Done("tool_use"),
+        ],
+        [TextDelta("Done, short."), Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "write a report")
+    assert await run_status(authed, run_id) == "waiting_approval"
+    [row] = (await timeline(authed, run_id))["tool_calls"]
+    assert row["tool_name"] == "ask_user" and row["status"] == "waiting_approval"
+    assert row["approval"]["kind"] == "question"
+    assert row["approval"]["summary"] == "Which style do you want?"
+    assert row["args"]["options"] == ["Short", "Detailed"]  # blanks and repeats dropped
+    # The user is told, wherever they are.
+    [note] = (await authed.get("/api/notifications")).json()
+    assert (
+        note["title"] == "The agent has a question" and note["body"] == "Which style do you want?"
+    )
+    assert note["link"] == f"/c/{cid}"
+
+    approval_id = row["approval"]["id"]
+    empty = await authed.post(f"/api/approvals/{approval_id}", json={"decision": "approve"})
+    assert empty.status_code == 400 and empty.json()["error"]["code"] == "answer_required"
+    r = await authed.post(
+        f"/api/approvals/{approval_id}", json={"decision": "approve", "answer": " Short, please "}
+    )
+    assert r.status_code == 200
+    await execute_run(uuid.UUID(run_id))
+    assert await run_status(authed, run_id) == "completed"
+    assert tool_results_sent_to_model() == ["The user answered: Short, please"]
+    [row] = (await timeline(authed, run_id))["tool_calls"]
+    assert row["status"] == "succeeded" and row["args"]["answer"] == "Short, please"
+
+
+async def test_the_user_can_leave_the_question_to_the_agent(authed):
+    cid = await setup(authed)
+    script(
+        "tidy up",
+        [call("ask_user", question="Delete old drafts too?"), Done("tool_use")],
+        [TextDelta("Kept them."), Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "tidy up")
+    approval = (await authed.get("/api/approvals")).json()[0]
+    await authed.post(f"/api/approvals/{approval['id']}", json={"decision": "deny"})
+    await execute_run(uuid.UUID(run_id))
+    assert tool_results_sent_to_model() == [
+        "The user left this to you. Use your best judgement, and say in your answer what you chose."
+    ]
 
 
 async def test_ask_then_approve_resumes(authed):

@@ -68,6 +68,34 @@ test('attach a text file and the model receives its content', async ({ page }) =
   await expect(page.getByRole('link', { name: /shopping\.txt/ })).toBeVisible()
 })
 
+test('the agent asks a question; tap a suggested answer, or type one in the message box', async ({ page }) => {
+  await login(page)
+  const models = await fakeModels(page.request)
+  await newChat(page, 'Agent', models.agent)
+  await send(page, 'Paint the fence, but ask me first')
+  await expect(page).toHaveURL(/\/c\//)
+  const card = page.getByRole('group', { name: "The agent's question" })
+  await expect(card.getByText('Which colour do you want?')).toBeVisible()
+  await expect(page.getByText('The agent has a question for you')).toBeVisible()
+  // Tap a suggestion: the agent goes on with it.
+  await card.getByRole('button', { name: 'Green' }).click()
+  await expect(card).toHaveCount(0)
+  await expect(page.getByText('Thanks. The user answered: Green')).toBeVisible()
+
+  // Next time, answer in the message box instead.
+  await send(page, 'And the gate? Ask me again')
+  await expect(card.getByText('Which colour do you want?')).toBeVisible()
+  const box = page.getByPlaceholder('Answer the agent’s question…')
+  await box.fill('Blue, with white edges')
+  await box.press('Enter')
+  await expect(card).toHaveCount(0)
+  await expect(page.getByText('Thanks. The user answered: Blue, with white edges')).toBeVisible()
+  // The question stays in the run's activity with the answer.
+  await page.getByRole('button', { name: '1 action', exact: true }).last().click()
+  await expect(page.getByText('Ask you: Which colour do you want?').last()).toBeVisible()
+  await page.request.delete(page.url().replace(/.*\/c\//, '/api/conversations/'))
+})
+
 test('agent asks for approval, then finishes after approval', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)

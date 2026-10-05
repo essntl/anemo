@@ -31,7 +31,7 @@ def comment(text: str = "ping") -> str:
     return f": {text}\n\n"
 
 
-async def sse_response(db: AsyncSession, stream: AsyncIterator[str]) -> StreamingResponse:
+async def sse_response(db: AsyncSession, stream: AsyncIterator[str | bytes]) -> StreamingResponse:
     """`db`: the request's session (the one the login check used). It is closed here,
     before streaming: the request's dependencies only end with the response, so an open
     stream would otherwise keep a database connection for as long as a tab stays open,

@@ -10,7 +10,7 @@ import uuid
 import httpx
 import pytest
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from PIL import Image
 
 from app import browser_client
@@ -47,6 +47,7 @@ class FakeBrowser:
         self.inputs: list[dict] = []  # what the user did in the Browser panel
         self.open: dict[str, str] = {}  # session id -> the address it shows
         self.closed: list[str] = []
+        self.streamed: list[int] = []  # widths the live picture was asked for
         self.app = FastAPI()
 
         @self.app.post("/sessions/{session_id}/act")
@@ -74,6 +75,14 @@ class FakeBrowser:
             if session_id not in self.open:
                 return JSONResponse({"detail": "no browser session"}, status_code=404)
             return JSONResponse(self.shown(self.open[session_id]))
+
+        @self.app.get("/sessions/{session_id}/stream")
+        async def stream(session_id: str, width: int) -> Response:
+            if session_id not in self.open:
+                return JSONResponse({"detail": "no browser session"}, status_code=404)
+            self.streamed.append(width)
+            body = f"event: frame\ndata: {jpeg()}\n\n" + 'event: meta\ndata: {"url": "x"}\n\n'
+            return Response(body, media_type="text/event-stream")
 
         @self.app.post("/sessions/{session_id}/input")
         async def user_input(session_id: str, request: Request) -> JSONResponse:
@@ -329,7 +338,14 @@ async def test_user_takes_over_the_conversations_browser(authed, browser):
         assert r.status_code == 200 and r.json()["open"], r.text
     assert browser.inputs[1] == {
         "session": cid, "allowed_hosts": ["nas.lan"], "kind": "click", "x": 213.5, "y": 337.0,
+        "picture": True,
     }  # fmt: skip
+    # Watching the live picture, the panel needs no screenshot back.
+    r = await authed.post(
+        f"/api/conversations/{cid}/browser/input",
+        json={"kind": "key", "key": "Tab", "picture": False},
+    )
+    assert r.status_code == 200 and browser.inputs[-1]["picture"] is False
 
     # The user can go somewhere else; a bare host name gets https://.
     r = await authed.post(
@@ -362,3 +378,25 @@ async def test_browser_panel_without_the_browser(authed):
         f"/api/conversations/{cid}/browser/input", json={"kind": "open", "url": "example.com"}
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "browser_unavailable"
+    # The live picture says so too, and ends.
+    r = await authed.get(f"/api/conversations/{cid}/browser/stream")
+    assert r.text == "event: unavailable\ndata: {}\n\n"
+
+
+async def test_the_picture_streams_through(authed, browser):
+    cid = await setup(authed)
+    url = f"/api/conversations/{cid}/browser/stream"
+    # No session yet: one "closed" event.
+    r = await authed.get(url)
+    assert r.headers["content-type"].startswith("text/event-stream")
+    assert r.text == "event: closed\ndata: {}\n\n"
+    # With one, browserd's events are passed on as they come, at the width asked for.
+    browser.open[cid] = "https://shop.example/"
+    r = await authed.get(url, params={"width": 640})
+    assert (
+        r.text.startswith("event: frame\ndata: /9j/")
+        and 'event: meta\ndata: {"url": "x"}' in r.text
+    )
+    assert browser.streamed == [640]
+    assert (await authed.get(url, params={"width": 5000})).status_code == 422
+    # (Signed in only, like every route but the public ones: see test_auth.)

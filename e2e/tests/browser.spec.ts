@@ -16,6 +16,9 @@ test('browser panel: open a page, use it, pop it out and close it', async ({ pag
   test.skip(!status.available, 'The browser container is not running')
   const created = await page.request.post('/api/conversations', { data: { title: 'E2E browser panel' } })
   const conversation = (await created.json()) as { id: string }
+  // The live picture's connection (it never ends, so it is caught as it starts).
+  const streams: string[] = []
+  page.on('request', (r) => r.url().includes('/browser/stream') && streams.push(r.url()))
   try {
     await page.goto(`/c/${conversation.id}`)
     await page.getByRole('button', { name: 'Browser', exact: true }).click()
@@ -30,6 +33,12 @@ test('browser panel: open a page, use it, pop it out and close it', async ({ pag
     await panel.getByRole('application').focus() // leave the address field, so it shows the page's address
     await expect(panel.getByLabel('Address')).toHaveValue('https://example.com/')
 
+    // The picture is streamed live, at the panel's size.
+    await expect.poll(() => streams.length).toBeGreaterThan(0)
+    expect(streams[0]).toMatch(/\/browser\/stream\?width=\d+$/)
+    const src = () => picture.evaluate((img) => (img as HTMLImageElement).src)
+    const before = await src()
+
     // Click the page's only link (found by where it is in the real page), in the scaled picture.
     const size = await picture.boundingBox()
     expect(size!.width).toBeGreaterThan(300)
@@ -37,6 +46,8 @@ test('browser panel: open a page, use it, pop it out and close it', async ({ pag
       data: { kind: 'key', key: 'Tab' }, // focus the link, as a user could with the keyboard
     })
     expect(state.ok()).toBeTruthy()
+    // The page changed (the link has focus): a new frame arrived by itself.
+    await expect.poll(src, { timeout: 10_000 }).not.toBe(before)
     await panel.getByRole('application').press('Enter')
     await expect(panel.getByLabel('Address')).not.toHaveValue('https://example.com/', { timeout: 30_000 })
     await panel.getByRole('button', { name: 'Back' }).click()

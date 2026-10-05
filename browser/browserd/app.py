@@ -10,6 +10,9 @@ API (all but /health need `Authorization: Bearer <token>`):
                                -> the page afterwards: url, title, text, elements,
                                   and a screenshot (base64 JPEG)
   GET    /sessions/{id}/view   for the user: url, title and a screenshot (404: no session)
+  GET    /sessions/{id}/stream for the user, live: Server-Sent Events with a JPEG "frame"
+                               whenever the page changes (Chrome's screencast), "meta"
+                               (url, title) every second, and "closed" when it ends
   POST   /sessions/{id}/input  for the user: a click at x/y, typed text, a key, scrolling,
                                an address to open, back or reload -> the view afterwards
   DELETE /sessions/{id}        close the session
@@ -26,6 +29,7 @@ this container and the worker mount.
 
 import asyncio
 import base64
+import json
 import os
 import secrets
 import time
@@ -35,7 +39,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from guard import GuardProxy, parse_allowlist
@@ -297,12 +302,13 @@ KEYS = {
 }  # fmt: skip
 
 
-async def _view(session: Session) -> dict[str, Any]:
+async def _view(session: Session, picture: bool = True) -> dict[str, Any]:
     page = session.page
     shot = ""
     with suppress(Exception):
-        image = await page.screenshot(type="jpeg", quality=70, timeout=ACTION_TIMEOUT_MS)
-        shot = base64.b64encode(image).decode()
+        if picture:
+            image = await page.screenshot(type="jpeg", quality=70, timeout=ACTION_TIMEOUT_MS)
+            shot = base64.b64encode(image).decode()
     title = ""
     with suppress(Exception):
         title = await page.title()
@@ -325,6 +331,110 @@ async def view(session_id: str, request: Request) -> dict[str, Any]:
     return await _view(session)
 
 
+# -- the live picture ----------------------------------------------------------------------
+
+STREAM_QUALITY = 60  # JPEG quality of streamed frames (a still page sends none)
+META_EVERY_S = 1.0  # how often the address and title are sent along
+STREAM_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+def _event(name: str, data: str) -> str:
+    return f"event: {name}\ndata: {data}\n\n"
+
+
+class _Screencast:
+    """Chrome's screencast of one page: it sends a frame whenever what the page shows
+    changes. Only the newest frame is kept; each is acknowledged at once, so Chrome
+    keeps sending while the newest one waits to be passed on."""
+
+    def __init__(self, width: int) -> None:
+        self.width = width
+        self.page: Any = None
+        self.cdp: Any = None
+        self.latest: str | None = None
+        self.ready = asyncio.Event()
+
+    async def start(self, session: Session) -> None:
+        await self.stop()
+        self.page = session.page
+        self.cdp = await session.context.new_cdp_session(self.page)
+        cdp = self.cdp
+
+        def on_frame(params: dict[str, Any]) -> None:
+            self.latest = params["data"]
+            self.ready.set()
+            asyncio.ensure_future(cdp.send("Page.screencastFrameAck", {"sessionId": params["sessionId"]}))
+
+        cdp.on("Page.screencastFrame", on_frame)
+        height = round(self.width * VIEWPORT["height"] / VIEWPORT["width"])
+        await cdp.send(
+            "Page.startScreencast",
+            {"format": "jpeg", "quality": STREAM_QUALITY, "maxWidth": self.width, "maxHeight": height},
+        )
+
+    async def stop(self) -> None:
+        if self.cdp is not None:
+            with suppress(Exception):
+                await self.cdp.send("Page.stopScreencast")
+            with suppress(Exception):
+                await self.cdp.detach()
+        self.cdp = None
+
+    def take(self) -> str | None:
+        frame, self.latest = self.latest, None
+        self.ready.clear()
+        return frame
+
+
+async def _stream(session_id: str, session: Session, width: int, request: Request) -> AsyncIterator[str]:
+    cast = _Screencast(width)
+    try:
+        # A still page sends nothing until it changes: start with the current picture.
+        with suppress(Exception):
+            image = await session.page.screenshot(type="jpeg", quality=STREAM_QUALITY, timeout=ACTION_TIMEOUT_MS)
+            yield _event("frame", base64.b64encode(image).decode())
+        last_meta = 0.0
+        while not await request.is_disconnected():
+            if _browser.sessions.get(session_id) is not session or session.page.is_closed():
+                yield _event("closed", "{}")
+                return
+            # First time round, or a link opened a new tab, which took over.
+            if session.page is not cast.page:
+                try:
+                    await cast.start(session)
+                except Exception:  # noqa: BLE001 - closed meanwhile: said on the next round
+                    await asyncio.sleep(0.2)
+                    continue
+            with suppress(TimeoutError):
+                await asyncio.wait_for(cast.ready.wait(), timeout=META_EVERY_S)
+            frame = cast.take()
+            if frame:
+                yield _event("frame", frame)
+            if time.monotonic() - last_meta >= META_EVERY_S:
+                title = ""
+                with suppress(Exception):
+                    title = await session.page.title()
+                yield _event("meta", json.dumps({"url": session.page.url, "title": title}))
+                last_meta = time.monotonic()
+    finally:
+        await cast.stop()
+
+
+@app.get("/sessions/{session_id}/stream")
+async def stream(
+    session_id: str, request: Request, width: int = Query(VIEWPORT["width"], ge=200, le=VIEWPORT["width"])
+) -> StreamingResponse:
+    """The session's picture, live, at most `width` pixels wide (a phone needs fewer).
+    Watching does not keep the session alive, like /view."""
+    _check_auth(request)
+    session = _browser.sessions.get(session_id)
+    if session is None or session.page.is_closed():
+        raise HTTPException(status_code=404, detail="no browser session")
+    return StreamingResponse(
+        _stream(session_id, session, width, request), media_type="text/event-stream", headers=STREAM_HEADERS
+    )
+
+
 class InputIn(BaseModel):
     kind: Literal["click", "type", "key", "scroll", "open", "back", "reload"]
     allowed_hosts: list[str] = Field(default_factory=list, max_length=200)
@@ -334,6 +444,9 @@ class InputIn(BaseModel):
     key: str | None = Field(None, max_length=20)
     dy: float | None = Field(None, ge=-5000, le=5000)
     url: str | None = Field(None, max_length=4000)
+    # False when the user watches the live stream: answer at once, without waiting for
+    # the page to settle and without a screenshot (the stream shows the result).
+    picture: bool = True
 
 
 @app.post("/sessions/{session_id}/input")
@@ -367,9 +480,10 @@ async def user_input(session_id: str, body: InputIn, request: Request) -> dict[s
                 await page.go_back(wait_until="domcontentloaded")
             elif body.kind == "reload":
                 await page.reload(wait_until="domcontentloaded")
-            await session.page.wait_for_timeout(250)
+            if body.picture:
+                await session.page.wait_for_timeout(250)
         session.last_used = time.monotonic()
-        return await _view(session)
+        return await _view(session, picture=body.picture)
 
 
 @app.delete("/sessions/{session_id}")

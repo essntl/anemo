@@ -83,6 +83,7 @@ async def test_parent_waits_for_its_sub_agent_and_gets_the_answer(authed):
     assert [b.text for m in request.messages for b in m.content] == ["count the otters"]
     assert "You are a sub-agent" in request.system
     assert "run_subagent" not in tools_offered()  # depth 1 is the default limit
+    assert "ask_user" not in tools_offered()  # nobody answers a sub-agent's questions
     assert await run_status(authed, child["id"]) == "completed"
     # Its end woke the parent: one job, queued.
     assert await run_status(authed, run_id) == "queued"

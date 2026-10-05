@@ -220,6 +220,48 @@ async def test_user_can_look_at_and_use_the_agents_session(api, site):
     assert seen["title"] == "Shop"
 
 
+class _Watcher:
+    """Stands in for the request of someone watching the stream: leaves after `polls`."""
+
+    def __init__(self, polls: int) -> None:
+        self.polls = polls
+
+    async def is_disconnected(self) -> bool:
+        self.polls -= 1
+        return self.polls < 0
+
+
+async def test_the_picture_streams_live(api, site):
+    assert (await api.get("/sessions/s1/stream", headers=AUTH)).status_code == 404
+    assert (await api.get("/sessions/s1/stream")).status_code == 401
+    await act(api, action="open", url=site + "/")
+    session = browserd._browser.sessions["s1"]
+
+    events: list[tuple[str, str]] = []
+
+    async def watch(polls: int, width: int = 640) -> None:
+        async for chunk in browserd._stream("s1", session, width, _Watcher(polls)):
+            lines = chunk.splitlines()
+            events.append((lines[0].removeprefix("event: "), lines[1].removeprefix("data: ")))
+
+    # Something changes on the page while it is watched: a new frame arrives.
+    async def change() -> None:
+        await asyncio.sleep(0.5)
+        await session.page.evaluate("document.body.style.background = 'rgb(200, 30, 30)'")
+
+    await asyncio.gather(watch(4), change())
+    frames = [base64.b64decode(d) for n, d in events if n == "frame"]
+    assert len(frames) >= 2 and all(f[:3] == b"\xff\xd8\xff" for f in frames)  # JPEGs
+    meta = [d for n, d in events if n == "meta"]
+    assert meta and '"title": "Shop"' in meta[0]
+
+    # The session closing ends the stream.
+    events.clear()
+    await browserd._browser.close("s1")
+    await watch(3)
+    assert ("closed", "{}") in events
+
+
 async def test_user_can_start_a_session_and_scroll(api, site):
     seen = await user(api, "mine", kind="open", url=site + "/long")
     assert seen["title"] == "Long"

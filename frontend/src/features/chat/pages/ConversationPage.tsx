@@ -7,7 +7,8 @@ import { MenuButton, NewChatButton } from '@/app/mobileNav'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { promptDialog } from '@/components/ui/dialogs'
-import { timelineKey } from '@/features/agents/api'
+import { timelineKey, useDecide, useTimeline } from '@/features/agents/api'
+import { pendingQuestion } from '@/features/agents/question'
 import { useShellOutput } from '@/features/agents/shellOutput'
 import { useBrowserStatus } from '@/features/browser/api'
 import { BrowserView } from '@/features/browser/BrowserView'
@@ -136,6 +137,9 @@ export function ConversationPage() {
     }
   }
   const live = useRunStream(activeRunId, onFinished, onEvent)
+  // The agent asked something: a message is the answer.
+  const question = pendingQuestion(useTimeline(activeRunId).data?.tool_calls)
+  const answer = useDecide(activeRunId ?? '')
 
   // Whichever signal arrives first (this run's stream or the app-wide event),
   // make sure the finished message is reloaded once the run is no longer active.
@@ -160,7 +164,7 @@ export function ConversationPage() {
   // The last message can be edited when it is the one the last answer replied to.
   const canEditLast = !activeRunId && lastUser && lastAssistant && lastAssistant.seq === lastUser.seq + 1
   const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
-  const actionError = send.error ?? regenerate.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error
+  const actionError = send.error ?? regenerate.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
 
@@ -265,13 +269,15 @@ export function ConversationPage() {
       <div className="mx-auto w-full max-w-3xl px-3 pb-2 md:px-6 md:pb-6">
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
         <Composer
-          running={Boolean(activeRunId) && !paused}
-          placeholder={paused ? 'Paused. Send a message to resume with it…' : undefined}
+          running={Boolean(activeRunId) && !paused && !question}
+          placeholder={question ? 'Answer the agent’s question…' : paused ? 'Paused. Send a message to resume with it…' : undefined}
           conversationId={conversationId}
           onSend={(text, attachmentIds, referenceIds) =>
-            paused && activeRunId
-              ? resume.mutate({ runId: activeRunId, message: text })
-              : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId })
+            question
+              ? answer.mutate({ approvalId: question.approval!.id, decision: 'approve', answer: text })
+              : paused && activeRunId
+                ? resume.mutate({ runId: activeRunId, message: text })
+                : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId })
           }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           toolbar={

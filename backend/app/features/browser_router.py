@@ -12,11 +12,13 @@ import uuid
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app import browser_client
 from app.api.deps import Db
+from app.api.sse import sse_response
 from app.core.errors import AppError
 from app.features.conversations import service as conversations
 from app.features.settings import service as settings_service
@@ -50,6 +52,8 @@ class BrowserInput(BaseModel):
     key: str | None = Field(None, max_length=20)
     dy: float | None = Field(None, ge=-5000, le=5000)
     url: str | None = Field(None, max_length=4000)
+    # False while the live picture is shown: answer at once, without a screenshot.
+    picture: bool = True
 
 
 def web_address(typed: str) -> str:
@@ -93,6 +97,17 @@ async def view(conversation_id: uuid.UUID, db: Db) -> BrowserView:
         return _shown(await browser_client.view(conversation_id))
     except browser_client.BrowserUnavailable:
         return BrowserView(available=False, open=False)
+
+
+@router.get("/conversations/{conversation_id}/browser/stream", response_class=StreamingResponse)
+async def stream(
+    conversation_id: uuid.UUID, db: Db, width: int = Query(1280, ge=200, le=1280)
+) -> StreamingResponse:
+    """The picture live (Server-Sent Events): a "frame" (base64 JPEG, at most `width`
+    pixels wide) whenever the page changes, "meta" (url, title) every second, and
+    "closed" or "unavailable" when there is nothing (more) to show."""
+    await conversations.get_conversation(db, conversation_id)
+    return await sse_response(db, browser_client.stream(conversation_id, width))
 
 
 @router.post("/conversations/{conversation_id}/browser/input", response_model=BrowserView)

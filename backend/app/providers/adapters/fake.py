@@ -6,6 +6,8 @@ Enabled only when ENABLE_FAKE_PROVIDER=true (or ENV=test). Behaviour by model:
   reasoning  streams a short reasoning section, then echoes
   slow       like echo but slower (for testing cancel / reconnect)
   agent      a tiny tool-using agent: plans, lists the workspace, then summarizes
+             (asked to "ask me" something: asks the user a question, then repeats
+             the answer)
   no-tools   refuses any request that carries tools (like a server without tool
              calling), otherwise echoes
   scripted   replays FakeAdapter.scripts[<first user text>] (tests only). A script is a
@@ -128,8 +130,32 @@ class FakeAdapter:
     async def _agent_demo(self, req: ChatRequest) -> AsyncIterator[ProviderEvent]:
         turn = sum(1 for m in req.messages if m.role == "assistant")
         results = [b.content for m in req.messages for b in m.content if b.type == "tool_result"]
+        # The user's latest message, and the tool results since then.
+        last = max(
+            (i for i, m in enumerate(req.messages) if m.role == "user"
+             and any(isinstance(b, TextBlock) for b in m.content)),
+            default=0,
+        )  # fmt: skip
+        answers = [
+            b.content
+            for m in req.messages[last + 1 :]
+            for b in m.content
+            if b.type == "tool_result"
+        ]
+        asks = "ask me" in _last_user_text(req).lower()
         if not req.tools:
             yield TextDelta("(The agent model needs Agent mode to use tools.)")
+        elif asks and not answers and any(t.name == "ask_user" for t in req.tools):
+            # "... ask me ...": the agent asks which way the user wants it first.
+            yield ToolCall(
+                "ask1",
+                "ask_user",
+                {"question": "Which colour do you want?", "options": ["Blue", "Green"]},
+            )
+            yield Done("tool_use")
+            return
+        elif asks:
+            yield TextDelta(f"Thanks. {answers[-1]}")
         elif turn == 0:
             yield TextDelta("Let me look at your workspace.")
             yield ToolCall(
