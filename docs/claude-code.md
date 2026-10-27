@@ -20,6 +20,14 @@ as before.
    docker compose --profile claude up -d
    ```
 
+   This builds the image on your machine. On x86-64 you can pull a prebuilt one
+   instead: add `CLAUDE_RUNNER_IMAGE=ghcr.io/essntl/anemo-claude-runner:latest` to
+   `.env`, then run `docker compose --profile claude pull claude-runner` before the
+   command above. The prebuilt image runs as user id 1000; if your `PUID` is
+   different, build it yourself so the worker can read the runner's token. It is
+   published by `.github/workflows/claude-runner-image.yml`; each image is also
+   tagged with the Claude Code version it contains (`claude-code-2.1.308`).
+
    To have it start with everything else, add `claude` to `COMPOSE_PROFILES` in
    `.env` (for example `COMPOSE_PROFILES=browser,claude`).
 
@@ -109,8 +117,12 @@ after the first:
 - Every Claude Code process starts from the same empty folder with the same flags,
   and the Claude Code version is pinned in the image (the auto-updater is off). A
   new version changes the cached prefix, so upgrades only happen when you rebuild.
-- Claude Code's cache lifetime for the conversation is set to 1 hour. After a
-  longer break, the first request writes the cache again.
+- Claude Code's cache lifetime for the conversation is set to 1 hour, the longest
+  Anthropic offers (the other choice is 5 minutes). Every request that reads the
+  cache starts the hour again, so a conversation stays cached as long as there is
+  less than an hour between turns. After a longer break, the first request writes
+  the cache again. Anemo does not send keep-alive requests to stretch this: each
+  one would read the whole conversation and count against your usage limits.
 
 Each model request is logged by the worker (`model request`, with the cache reads
 and writes). A request that reads nothing from the cache is logged as a **warning**

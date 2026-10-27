@@ -249,7 +249,10 @@ services:
   # See docs/claude-code.md.
   claude-runner:
     profiles: ["claude"]
-    image: ai-workspace-claude-runner:${APP_VERSION:-latest}
+    # Built here by default. To pull the prebuilt x86-64 image instead, set
+    # CLAUDE_RUNNER_IMAGE=ghcr.io/essntl/anemo-claude-runner:latest in .env and run
+    # `docker compose --profile claude pull claude-runner`.
+    image: ${CLAUDE_RUNNER_IMAGE:-ai-workspace-claude-runner:${APP_VERSION:-latest}}
     build:
       context: ./claude-runner
       args:
