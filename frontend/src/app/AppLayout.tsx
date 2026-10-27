@@ -6,10 +6,12 @@ import { ToastHost } from '@/components/ui/ToastHost'
 import { ReauthDialog } from '@/features/auth/ReauthDialog'
 import { MoveChatsDialog } from '@/features/chat/components/MoveChatsDialog'
 import { useAppEvents } from '@/features/chat/useAppEvents'
+import { Island } from '@/features/island/Island'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
 import { ShareDialog } from '@/features/shares/ShareDialog'
 import { MobileTopBar } from './mobileNav'
+import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
 import { Sidebar, SidebarRail } from './Sidebar'
 import { useSidebar } from './sidebarStore'
@@ -63,14 +65,18 @@ export function AppLayout() {
     <div className="flex h-full">
       {collapsed ? <SidebarRail className="hidden md:flex" /> : <Sidebar className="hidden w-64 md:flex" />}
       <SidebarDrawer />
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* The page column. The Dynamic Island floats at the top centre of it (not of the
+          window), over the page header; see features/island/Island.tsx. */}
+      <div id="main-column" className="relative flex min-w-0 flex-1 flex-col">
         {!ownHeader && <MobileTopBar />}
+        <Island />
         {/* relative: anything absolutely placed inside a page is held (and clipped) here,
             so it can never make the whole window scroll. */}
         <main className="page relative min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
+      <PersistentLayer />
       <ReauthDialog />
       <DialogHost />
       <MoveChatsDialog />

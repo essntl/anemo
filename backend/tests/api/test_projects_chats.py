@@ -10,7 +10,7 @@ from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.features.conversations.models import Conversation
 from app.providers.adapters.fake import FakeAdapter
-from app.providers.base import Done, TextBlock, TextDelta
+from app.providers.base import Done, TextBlock, TextDelta, ToolCall
 from app.runtime import references
 from app.runtime.dispatch import execute_run
 from tests.api.test_agent import (
@@ -18,6 +18,7 @@ from tests.api.test_agent import (
     call,
     script,
     setup,
+    tool_results_sent_to_model,
     workspace,  # noqa: F401 - autouse fixture
 )
 from tests.conftest import requires_db
@@ -286,6 +287,35 @@ async def test_tasks_and_events_made_by_an_agent_are_filed_under_the_chats_proje
     span = "start=2031-05-01T00:00:00Z&end=2031-05-02T00:00:00Z"
     events = (await authed.get(f"/api/calendar/events?{span}")).json()
     assert [(e["title"], e["project_id"]) for e in events] == [("Moving day", p["id"])]
+
+
+async def test_agents_find_a_renamed_project_by_its_folder_instead_of_making_a_second(authed):
+    root = Path(get_settings().workspace_path)
+    await setup(authed, **{"tasks.write": "autonomous"})
+    p = await project(authed, "Thesis")
+    await authed.put(f"/api/projects/{p['id']}", json={"name": "Dissertation", "color": "#aa0000"})
+    await authed.post("/api/tasks", json={"title": "Outline", "project_id": p["id"]})
+    cid = await new_chat(authed, project_id=p["id"])
+    script(
+        "plan",
+        [
+            call("create_task", title="Read papers", project="Thesis"),
+            ToolCall(id="c_dup", name="create_project", arguments={"name": "thesis!"}),
+            call("update_project", project="Dissertation", color="#00aa00"),
+            Done("tool_use"),
+        ],
+        [Done("end")],
+    )
+    await agent_turn(authed, cid, "plan")
+    projects = (await authed.get("/api/projects")).json()
+    assert [(x["name"], x["slug"]) for x in projects] == [("Dissertation", "thesis")]
+    assert not (root / "projects/thesis-2").exists()
+    tasks = {t["title"]: t["project_id"] for t in (await authed.get("/api/tasks")).json()}
+    assert tasks == {"Outline": p["id"], "Read papers": p["id"]}
+    _, created, updated = tool_results_sent_to_model()[-3:]
+    assert created.startswith("That project already exists: Dissertation")
+    # The counts are real, not the zeros of a project loaded without them.
+    assert "2 open tasks" in updated and "1 chats" in updated
 
 
 # -- referencing another chat -------------------------------------------------------------

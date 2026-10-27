@@ -14,8 +14,10 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
+from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.features.attachments import images
+from app.features.links import service as links
 from app.policy.models import Action, Risk
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.workspace import files, fs_guard
@@ -370,7 +372,16 @@ class MovePath(Tool):
             return ToolResult(content=exc.message, is_error=True)
         source, dest = fs_guard.relative(src), fs_guard.relative(dst)
         await ctx.record_change(op="move", path=source, dest_path=dest)
-        return ToolResult(content=f"Moved {source} to {dest}.", data={"path": dest})
+        # Attachments of tasks and links in tasks and documents follow the file.
+        async with get_sessionmaker()() as db:
+            changed = await links.on_moved(db, source, dest, author="agent", run_id=ctx.run_id)
+        note = ""
+        if changed["attachments"] or changed["tasks"] or changed["documents"]:
+            note = (
+                f" Updated links: {changed['attachments']} attachment(s), "
+                f"{changed['tasks']} task(s), {changed['documents']} document(s)."
+            )
+        return ToolResult(content=f"Moved {source} to {dest}.{note}", data={"path": dest})
 
 
 class DeleteInput(BaseModel):

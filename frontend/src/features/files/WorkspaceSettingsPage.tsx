@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { withReauth } from '@/features/auth/reauthStore'
-import { settingsKey, useSettings } from '@/features/settings/api'
+import { settingsKey, useSaveSection, useSettings } from '@/features/settings/api'
+import { Switch } from '@/components/ui/Switch'
 import { useFolder } from './api'
 
 type WorkspaceSettings = Schemas['WorkspaceSettings']
@@ -98,6 +99,29 @@ function WorkspaceForm({ initial }: { initial: WorkspaceSettings }) {
   )
 }
 
+/** How the Files page shows the workspace (not about agents: no password needed). */
+function FilesPageCard() {
+  const settings = useSettings()
+  const save = useSaveSection('files')
+  const qc = useQueryClient()
+  const files = settings.data?.files
+  if (!files) return null
+  return (
+    <Card>
+      <CardBody className="flex items-center justify-between gap-4">
+        <div>
+          <div className="text-[13.5px] font-medium">Show the documents folder in Files</div>
+          <div className="text-[12.5px] text-muted">
+            Documents live in documents/ and open in Documents. Turn this on to also browse that folder in Files. Agents see it either way.
+          </div>
+        </div>
+        <Switch label="Show the documents folder in Files" checked={files.show_documents_folder}
+          onChange={(v) => save.mutate({ ...files, show_documents_folder: v }, { onSuccess: () => void qc.invalidateQueries({ queryKey: ['files'] }) })} />
+      </CardBody>
+    </Card>
+  )
+}
+
 export function WorkspaceSettingsPage() {
   const settings = useSettings()
   return (
@@ -110,6 +134,7 @@ export function WorkspaceSettingsPage() {
         </p>
       </div>
       {settings.data && <WorkspaceForm key={JSON.stringify(settings.data.workspace)} initial={settings.data.workspace} />}
+      <FilesPageCard />
     </div>
   )
 }

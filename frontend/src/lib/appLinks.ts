@@ -5,6 +5,8 @@
  */
 export const documentLink = (id: string) => `/documents/${id}`
 export const taskLink = (id: string) => `/tasks?task=${id}`
+/** A file in Files: "/files?path=projects/thesis/draft.pdf" (slashes kept for readability). */
+export const fileLink = (path: string) => `/files?path=${encodeURIComponent(path).replace(/%2F/g, '/')}`
 
 /** An address inside this app ("/documents/…", "?doc=2") rather than another site. */
 export function isAppLink(href: string): boolean {

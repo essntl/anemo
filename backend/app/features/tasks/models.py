@@ -57,6 +57,9 @@ class Task(Base, IdMixin, TimestampMixin):
     due_date: Mapped[date | None] = mapped_column(Date)
     due_time: Mapped[time | None] = mapped_column(Time)
     remind_minutes: Mapped[int | None] = mapped_column(Integer)  # before it is due
+    # Repeats (RFC 5545, e.g. "FREQ=WEEKLY;BYDAY=MO"): finishing it makes the next one,
+    # due on the rule's next day, and the rule moves to that one.
+    rrule: Mapped[str | None] = mapped_column(String(500))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
     project_id: Mapped[uuid.UUID | None] = mapped_column(

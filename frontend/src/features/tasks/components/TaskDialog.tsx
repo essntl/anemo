@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Trash2 } from 'lucide-react'
+import { Timer, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
@@ -9,6 +9,10 @@ import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
+import { focusOnTask } from '@/features/focus/focusOnTask'
+import { BacklinkList } from '@/features/links/BacklinkList'
+import { TaskAttachments } from '@/features/links/TaskAttachments'
+import { useTaskBacklinks } from '@/features/links/api'
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -21,6 +25,7 @@ import {
   useUpdateTask,
 } from '../api'
 import { REMINDER_OPTIONS } from '../dates'
+import { repeatOptions } from '../repeat'
 
 const NEW_PROJECT = '__new__'
 
@@ -52,8 +57,10 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
   const [dueDate, setDueDate] = useState(task?.due_date ?? defaults?.due_date ?? '')
   const [dueTime, setDueTime] = useState(task?.due_time?.slice(0, 5) ?? '')
   const [remind, setRemind] = useState(task?.remind_minutes != null ? String(task.remind_minutes) : '')
+  const [repeat, setRepeat] = useState(task?.rrule ?? '')
   const [projectId, setProjectId] = useState(task?.project_id ?? defaults?.project_id ?? '')
   const [tags, setTags] = useState((task?.tags ?? []).join(', '))
+  const backlinks = useTaskBacklinks(task?.id ?? null)
   const pending = create.isPending || update.isPending
   const error = create.error ?? update.error ?? remove.error ?? saveProject.error
 
@@ -75,6 +82,7 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
       due_date: dueDate || null,
       due_time: dueDate && dueTime ? `${dueTime}:00` : null,
       remind_minutes: dueDate && remind !== '' ? Number(remind) : null,
+      rrule: dueDate && repeat ? repeat : null,
       project_id: projectId || null,
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
     }
@@ -132,6 +140,9 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
           <Field label="Reminder" hint={dueDate && !dueTime ? 'Counted from 09:00 on the due day' : undefined}>
             <Select value={remind} onValueChange={setRemind} disabled={!dueDate} options={reminderOptions(remind)} />
           </Field>
+          <Field label="Repeat" hint={repeat && dueDate ? 'Finishing it adds the next one' : undefined}>
+            <Select value={dueDate ? repeat : ''} onValueChange={setRepeat} disabled={!dueDate} options={repeatOptions(repeat)} />
+          </Field>
           <Field label="Project">
             <Select value={projectId} onValueChange={(v) => void chooseProject(v)}
               options={[
@@ -147,6 +158,13 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
           <Field label="Tags" hint="Comma-separated">
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="errands, phone" />
           </Field>
+          <TaskAttachments taskId={task?.id ?? null} projectId={projectId || null} />
+          <BacklinkList title="Linked from" links={backlinks.data} />
+          {task && status !== 'done' && status !== 'cancelled' && (
+            <Button variant="secondary" icon={<Timer className="h-4 w-4" />} onClick={() => focusOnTask(task)}>
+              Focus on this
+            </Button>
+          )}
           {error && <p className="text-[12.5px] text-error">{errorMessage(error)}</p>}
 
           {/* Phone: a bar that stays at the bottom of the sheet (which has no padding of its

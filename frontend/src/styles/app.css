@@ -45,6 +45,23 @@
   --color-tool-waiting: var(--tool-waiting);
   --color-tool-denied: var(--tool-denied);
 
+  --color-phase-focus: var(--phase-focus);
+  --color-phase-short: var(--phase-short);
+  --color-phase-long: var(--phase-long);
+
+  --color-island: var(--island-bg);
+  --color-island-fg: var(--island-fg);
+  --color-island-muted: var(--island-muted);
+  --color-island-ring: var(--island-ring);
+  --color-island-control: var(--island-control);
+  --color-island-control-hover: var(--island-control-hover);
+  --color-island-track: var(--island-track);
+
+  --color-live: var(--live);
+  --color-artwork: var(--artwork-bg);
+  --color-artwork-scrim: var(--artwork-scrim);
+  --color-on-artwork: var(--on-artwork);
+
   --shadow-soft: var(--shadow-soft);
   --shadow-float: var(--shadow-float);
 
@@ -145,16 +162,20 @@
      chip with an icon, in the editors and wherever Markdown is rendered. On a share page
      the same links are "?doc=2" / "?task=0" within "/s/<token>". The icons are Lucide's
      file-text and square-check-big, drawn in the accent colour through a mask. */
-  .markdown a:is([href^='/documents/'], [href^='/tasks?task='], [href^='/s/'][href*='?doc='], [href^='/s/'][href*='?task=']) {
+  .markdown a:is([href^='/documents/'], [href^='/tasks?task='], [href^='/files?path='], [href^='/s/'][href*='?doc='], [href^='/s/'][href*='?task=']) {
     @apply rounded-md border border-border bg-surface-2 px-1.5 py-0.5 text-[0.92em] font-medium text-text no-underline hover:border-border-strong hover:bg-surface-hover;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone; /* a chip that wraps keeps its padding on both lines */
     --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='M10 9H8'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E");
   }
+  /* A file in Files: Lucide's paperclip. */
+  .markdown a[href^='/files?path='] {
+    --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551'/%3E%3C/svg%3E");
+  }
   .markdown a:is([href^='/tasks?task='], [href^='/s/'][href*='?task=']) {
     --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5'/%3E%3Cpath d='m9 11 3 3L22 4'/%3E%3C/svg%3E");
   }
-  .markdown a:is([href^='/documents/'], [href^='/tasks?task='], [href^='/s/'][href*='?doc='], [href^='/s/'][href*='?task='])::before {
+  .markdown a:is([href^='/documents/'], [href^='/tasks?task='], [href^='/files?path='], [href^='/s/'][href*='?doc='], [href^='/s/'][href*='?task='])::before {
     content: '';
     display: inline-block;
     width: 1em;
@@ -281,6 +302,23 @@
 .wave > span:nth-child(2) { animation-delay: 0.15s; }
 .wave > span:nth-child(3) { animation-delay: 0.3s; }
 
+/*
+ * The Dynamic Island floats at the top centre of the page column (#main-column), which
+ * carries its width as --island-w (0px while hidden) and data-island="on|off".
+ *  .island-clear-left  a header's left part stops short of the Island; set
+ *                      --island-gap to the space between the column edge and it.
+ *  .island-reserve     pages whose toolbar starts at the very top (Files, Documents)
+ *                      move down by the header height while the Island shows (desktop).
+ */
+.island-clear-left { max-width: calc(50% - var(--island-w, 0px) / 2 - var(--island-gap, 1rem)); }
+@media (min-width: 768px) {
+  #main-column[data-island='on'] .island-reserve { padding-top: 3.5rem; transition: padding-top 180ms var(--ease-out); }
+}
+
+/* Music: the "now playing" bars bounce while a track plays (Equalizer.tsx). */
+@keyframes eq-bar { 0%, 100% { transform: scaleY(0.3); } 25% { transform: scaleY(1); } 50% { transform: scaleY(0.55); } 75% { transform: scaleY(0.85); } }
+.eq-bar { transform-origin: bottom; }
+
 /* Something on its way out no longer takes clicks. */
 .fade[data-state='closed'], .pop[data-state='closed'], .sheet[data-state='closed'],
 .drawer[data-state='closed'], .toast[data-leaving] { pointer-events: none; }
@@ -294,7 +332,7 @@
 ::view-transition-new(page) { animation: page-in 180ms var(--ease-out) 60ms both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span { animation: none !important; }
+  .drawer, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span, .eq-bar { animation: none !important; }
   .shimmer { color: var(--text-muted); background: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MotionConfig } from 'motion/react'
 import { RouterProvider } from 'react-router'
 import { router } from '@/app/router'
 import { applyAppearance, useThemeStore, watchSystemTheme } from '@/features/settings/theme'
@@ -24,7 +25,10 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      {/* Movement follows the system's "reduce motion" setting (see lib/motion.ts). */}
+      <MotionConfig reducedMotion="user">
+        <RouterProvider router={router} />
+      </MotionConfig>
     </QueryClientProvider>
   </StrictMode>,
 )

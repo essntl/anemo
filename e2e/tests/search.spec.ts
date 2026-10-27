@@ -46,6 +46,7 @@ test('search: Ctrl+K finds a task and a page, the results page filters by kind',
     await expect(page).toHaveURL(/kind=document/)
     await expect(page.getByText(`Nothing found for “${word}”`)).toBeVisible()
     await page.getByRole('tab', { name: 'Everything' }).click()
+    await expect(page).not.toHaveURL(/kind=/)
     await page.getByRole('textbox', { name: 'Search', exact: true }).fill(`ladder ${word}`) // found through the description
     await page.keyboard.press('Enter')
     await expect(page.getByRole('link', { name: new RegExp(title) })).toBeVisible()

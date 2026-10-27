@@ -7,6 +7,9 @@ import { automationsKey } from '@/features/automations/api'
 import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
 import { showDesktopNotification } from '@/features/notifications/desktop'
+import { alertApproval, alertRunStatus, type RunStatusEvent } from './agentAlerts'
+import { type FocusControl, type MusicControl, onFocusControl, onMusicControl } from './agentControl'
+import { tabId, watchUse } from './tab'
 import { conversationKey, conversationsKey, messagesKey } from './api'
 import { TERMINAL } from './runStream'
 
@@ -18,7 +21,11 @@ export function useAppEvents() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   useEffect(() => {
-    const source = new EventSource('/api/events')
+    const source = new EventSource(`/api/events?tab=${tabId()}`)
+    const stopWatching = watchUse()
+    // An agent asked this tab to start the timer or queue music.
+    source.addEventListener('focus.control', ((e: MessageEvent<string>) => void onFocusControl(JSON.parse(e.data) as FocusControl)) as EventListener)
+    source.addEventListener('music.control', ((e: MessageEvent<string>) => void onMusicControl(JSON.parse(e.data) as MusicControl)) as EventListener)
     const refreshConversation = (e: MessageEvent<string>) => {
       const data = JSON.parse(e.data) as { conversation_id?: string | null; status?: string }
       void qc.invalidateQueries({ queryKey: conversationsKey })
@@ -31,11 +38,15 @@ export function useAppEvents() {
         void qc.invalidateQueries({ queryKey: messagesKey(data.conversation_id) })
       }
     }
-    source.addEventListener('run.status', refreshConversation as EventListener)
+    source.addEventListener('run.status', ((e: MessageEvent<string>) => {
+      refreshConversation(e)
+      alertRunStatus(qc, JSON.parse(e.data) as RunStatusEvent)
+    }) as EventListener)
     source.addEventListener('conversation.updated', refreshConversation as EventListener)
     source.addEventListener('approval.requested', ((e: MessageEvent<string>) => {
       void qc.invalidateQueries({ queryKey: approvalsKey })
       refreshConversation(e)
+      alertApproval(qc, JSON.parse(e.data) as { conversation_id?: string | null })
     }) as EventListener)
     // Chats were deleted elsewhere (temporary chats whose time ran out). Leave one that
     // is open here, and say why.
@@ -64,6 +75,13 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: ['tasks'] })
       void qc.invalidateQueries({ queryKey: ['projects'] })
     })
+    // Focus sessions were recorded (this or another device).
+    source.addEventListener('focus.changed', () => {
+      void qc.invalidateQueries({ queryKey: ['focus'] })
+      void qc.invalidateQueries({ queryKey: ['stats'] })
+    })
+    // Playlists or the music library changed (this or another device).
+    source.addEventListener('music.changed', () => void qc.invalidateQueries({ queryKey: ['music'] }))
     source.addEventListener('calendar.changed', () => void qc.invalidateQueries({ queryKey: ['calendar'] }))
     // An MCP server was checked, or its tools changed.
     source.addEventListener('mcp.changed', () => void qc.invalidateQueries({ queryKey: mcpKey }))
@@ -71,8 +89,10 @@ export function useAppEvents() {
     // A new notification (a reminder, an automation's result, ...): show it as a
     // desktop notification when the tab is in the background, else as a notice here.
     source.addEventListener('notification', ((e: MessageEvent<string>) => {
-      const note = JSON.parse(e.data) as { id: string; title: string; body: string; link: string | null }
+      const note = JSON.parse(e.data) as { id: string; title: string; body: string; link: string | null; kind?: string }
       void qc.invalidateQueries({ queryKey: notificationsKey })
+      // The focus timer already chimed and told the user in this browser.
+      if (note.kind === 'focus') return
       const open = () => void navigate(note.link ?? '/notifications')
       if (showDesktopNotification(note, open)) return
       // About what is on screen already (e.g. the agent's question in the open chat).
@@ -80,6 +100,9 @@ export function useAppEvents() {
       toast({ message: note.title, duration: 10_000, action: { label: 'Open', onClick: open } })
     }) as EventListener)
     source.addEventListener('notifications.changed', () => void qc.invalidateQueries({ queryKey: notificationsKey }))
-    return () => source.close()
+    return () => {
+      stopWatching()
+      source.close()
+    }
   }, [qc, navigate])
 }

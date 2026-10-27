@@ -24,7 +24,7 @@ from app.api.deps import Db
 from app.api.sse import comment, frame, sse_response
 from app.core.db import get_sessionmaker
 from app.core.errors import Conflict, NotFound
-from app.events import bus
+from app.events import bus, presence
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.providers.models import Model
 from app.features.runs import service
@@ -395,28 +395,57 @@ async def run_events(
     return await sse_response(db, _stream_run(run_id, request, last_event_id or "0-0"))
 
 
-async def _stream_global(request: Request, cursor: str) -> AsyncIterator[str]:
+async def _stream_global(request: Request, cursor: str, tab: str | None) -> AsyncIterator[str]:
     yield comment("connected")
-    while not await request.is_disconnected():
-        try:
-            batch = await bus.read({bus.GLOBAL_STREAM: cursor}, BLOCK_MS, 100)
-        except (RedisError, OSError):
-            yield comment("events unavailable")  # keeps the connection open; retried below
-            await asyncio.sleep(DEGRADED_POLL_S * 3)
-            continue
-        if not batch:
-            yield comment()
-            continue
-        for _, entries in batch:
-            for event_id, fields in entries:
-                cursor = event_id
-                event_type, data = bus.decode(fields)
-                yield frame(event_type, data, event_id)
+    try:
+        while not await request.is_disconnected():
+            if tab:
+                await presence.seen(tab)  # this tab is open (for agent tools that act here)
+            async for chunk in _global_batch(cursor):
+                if isinstance(chunk, tuple):
+                    cursor = chunk[0]
+                    yield chunk[1]
+                else:
+                    yield chunk
+    finally:
+        if tab:
+            await presence.gone(tab)
+
+
+async def _global_batch(cursor: str) -> AsyncIterator[str | tuple[str, str]]:
+    """One read of the global stream: (event id, frame) pairs, or a keep-alive comment."""
+    try:
+        batch = await bus.read({bus.GLOBAL_STREAM: cursor}, BLOCK_MS, 100)
+    except (RedisError, OSError):
+        yield comment("events unavailable")  # keeps the connection open; retried next round
+        await asyncio.sleep(DEGRADED_POLL_S * 3)
+        return
+    if not batch:
+        yield comment()
+        return
+    for _, entries in batch:
+        for event_id, fields in entries:
+            event_type, data = bus.decode(fields)
+            yield event_id, frame(event_type, data, event_id)
 
 
 @router.get("/events", response_class=StreamingResponse)
 async def global_events(
-    request: Request, db: Db, last_event_id: str | None = Header(None)
+    request: Request,
+    db: Db,
+    last_event_id: str | None = Header(None),
+    tab: str | None = Query(None, max_length=64, pattern=r"^[A-Za-z0-9_-]+$"),
 ) -> StreamingResponse:
-    """App-wide notices (run status changes, new titles, ...) for every open tab."""
-    return await sse_response(db, _stream_global(request, last_event_id or "$"))
+    """App-wide notices (run status changes, new titles, ...) for every open tab.
+    `tab` identifies the tab, so agent tools can act in the one used last."""
+    return await sse_response(db, _stream_global(request, last_event_id or "$", tab))
+
+
+class PresenceIn(BaseModel):
+    tab: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+
+@router.post("/presence", status_code=204)
+async def tab_in_use(body: PresenceIn) -> None:
+    """This tab is being used (sent now and then while someone works in it)."""
+    await presence.active(body.tab)

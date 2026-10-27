@@ -13,7 +13,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Switch } from '@/components/ui/Switch'
 import { formatWhen } from '@/lib/format'
-import { type Destination, type NotificationKind, useDeleteDestination, useDestinations, useSaveDestination, useTestDestination } from './api'
+import { type Destination, KIND_LABELS, type NotificationKind, useDeleteDestination, useDestinations, useSaveDestination, useTestDestination } from './api'
 import { DestinationDialog } from './components/DestinationDialog'
 import { desktopEnabled, desktopSupport, setDesktopEnabled } from './desktop'
 import { Lingering } from '@/components/ui/Lingering'
@@ -83,7 +83,7 @@ function DestinationRow({ destination, onEdit }: { destination: Destination; onE
             {!destination.enabled && <Badge tone="warning">Off</Badge>}
           </div>
           <div className="mt-0.5 text-[12px] text-muted">
-            {destination.kinds.length === 0 ? 'Only automations that pick it' : `${destination.kinds.length} of 4 kinds`}
+            {destination.kinds.length === 0 ? 'Only automations that pick it' : `${destination.kinds.length} of ${Object.keys(KIND_LABELS).length} kinds`}
             {destination.last_sent_at && <> · last sent {formatWhen(destination.last_sent_at)}</>}
           </div>
         </div>

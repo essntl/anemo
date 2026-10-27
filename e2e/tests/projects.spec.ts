@@ -94,7 +94,7 @@ test('the pages are pinned under the chats, which are the only thing that scroll
   await login(page)
   const sidebar = page.locator('aside').first()
   const pages = sidebar.getByRole('navigation', { name: 'Pages' })
-  await expect(pages.getByRole('link')).toHaveCount(9)
+  await expect(pages.getByRole('link')).toHaveCount(12)
   await expect(pages.getByRole('link', { name: 'Files', exact: true })).toBeVisible()
   // The chat list takes the free height and scrolls by itself; the column around it does not.
   const list = sidebar.getByLabel('Chats', { exact: true })

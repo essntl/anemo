@@ -8,19 +8,25 @@ import uuid
 from datetime import date, time
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
+from app.features.links import service as links
 from app.features.projects import service as projects
 from app.features.tasks import service
 from app.features.tasks.models import Project, Task
-from app.features.tasks.schemas import TaskStatus, clean_tags
+from app.features.tasks.schemas import TaskStatus, clean_rrule, clean_tags
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin.workspace import path_action
 
 PRIORITY = {0: "", 1: "low", 2: "medium", 3: "high"}
+NOTES = (
+    "Notes (Markdown). Link a workspace file with [name](/files?path=<path>), a document "
+    "with [title](/documents/<id>), another task with [title](/tasks?task=<id>)"
+)
 
 
 def task_line(task: Task, projects: dict[uuid.UUID, str]) -> str:
@@ -32,6 +38,8 @@ def task_line(task: Task, projects: dict[uuid.UUID, str]) -> str:
         facts.append(f"due {when}")
     if task.project_id in projects:
         facts.append(f"project {projects[task.project_id]}")
+    if task.rrule:
+        facts.append(f"repeats {task.rrule}")
     if task.tags:
         facts.append("tags " + ", ".join(task.tags))
     return f"[{task.id}] {task.title} ({'; '.join(facts)})"
@@ -97,9 +105,15 @@ class ListTasks(Tool):
         return ToolResult(content="\n".join(task_line(t, projects) for t in tasks))
 
 
+REPEAT = (
+    "Repeat rule (RFC 5545), e.g. FREQ=DAILY, FREQ=WEEKLY;BYDAY=MO,TH or "
+    "FREQ=MONTHLY;BYMONTHDAY=1. Needs a due date; finishing the task adds the next one."
+)
+
+
 class CreateTaskInput(BaseModel):
     title: str = Field(min_length=1, max_length=300)
-    description: str = Field("", max_length=20_000, description="Notes (Markdown)")
+    description: str = Field("", max_length=20_000, description=NOTES)
     due_date: date | None = None
     due_time: time | None = Field(None, description="Local time of day, e.g. 14:30")
     priority: int = Field(0, ge=0, le=3, description="0 none, 1 low, 2 medium, 3 high")
@@ -108,6 +122,12 @@ class CreateTaskInput(BaseModel):
     remind_minutes: int | None = Field(
         None, ge=0, le=40_320, description="Remind this long before it is due"
     )
+    rrule: str | None = Field(None, max_length=500, description=REPEAT)
+
+    @field_validator("rrule")
+    @classmethod
+    def _rrule(cls, v: str | None) -> str | None:
+        return clean_rrule(v)
 
 
 class CreateTask(Tool):
@@ -139,7 +159,7 @@ class CreateTask(Tool):
 class UpdateTaskInput(BaseModel):
     id: str = Field(description="The task's id (from list_tasks)")
     title: str | None = Field(None, min_length=1, max_length=300)
-    description: str | None = Field(None, max_length=20_000)
+    description: str | None = Field(None, max_length=20_000, description=NOTES)
     status: TaskStatus | None = Field(None, description="Use 'done' to complete a task")
     priority: int | None = Field(None, ge=0, le=3)
     due_date: date | None = None
@@ -148,6 +168,12 @@ class UpdateTaskInput(BaseModel):
     project: str | None = None
     tags: list[str] | None = Field(None, max_length=20)
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    rrule: str | None = Field(None, max_length=500, description=REPEAT + " Empty: stop repeating.")
+
+    @field_validator("rrule")
+    @classmethod
+    def _rrule(cls, v: str | None) -> str | None:
+        return "" if v is not None and not v.strip() else clean_rrule(v)
 
 
 class UpdateTask(Tool):
@@ -171,17 +197,22 @@ class UpdateTask(Tool):
                 exclude_unset=True, exclude={"id", "project", "clear_due", "tags"}
             )
             changes = {k: v for k, v in changes.items() if v is not None}
+            if changes.get("rrule") == "":
+                changes["rrule"] = None
             if args.tags is not None:
                 changes["tags"] = clean_tags(args.tags)
             if args.project is not None:
                 changes["project_id"] = await _project_id(db, args.project)
             if args.clear_due:
                 changes["due_date"] = None
+            repeats = task.rrule is not None and task.status != "done"
             try:
                 task = await service.update_task(db, task, changes)
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)
             line = task_line(task, await _projects(db))
+            if repeats and task.status == "done":
+                line += " It repeats, so the next one was added."
         return ToolResult(
             content=f"Updated: {line}", data={"task": {"id": str(task.id), "title": task.title}}
         )
@@ -212,4 +243,72 @@ class DeleteTask(Tool):
         return ToolResult(content=f"Deleted the task “{title}”.")
 
 
-TASK_TOOLS: list[Tool] = [ListTasks(), CreateTask(), UpdateTask(), DeleteTask()]
+class TaskFilesInput(BaseModel):
+    task_id: str = Field(description="The task's id (from list_tasks)")
+
+
+class ListTaskFiles(Tool):
+    name = "list_task_files"
+    description = "The files attached to a task (workspace paths)."
+    capability = "tasks.read"
+    Input = TaskFilesInput
+
+    async def run(self, args: TaskFilesInput, ctx: ToolContext) -> ToolResult:
+        task_id = _id(args.task_id)
+        async with get_sessionmaker()() as db:
+            task = await db.get(Task, task_id) if task_id else None
+            if task is None:
+                return ToolResult(content=f"No task with id {args.task_id}.", is_error=True)
+            attached = await links.list_files(db, task.id)
+        if not attached:
+            return ToolResult(content=f"“{task.title}” has no attachments.")
+        return ToolResult(
+            content="\n".join(
+                f"{f.path}{'' if f.exists else ' (missing: moved to the trash?)'}" for f in attached
+            )
+        )
+
+
+class AttachFileInput(BaseModel):
+    task_id: str = Field(description="The task's id (from list_tasks)")
+    path: str = Field(description="A workspace file, e.g. projects/thesis/draft.pdf")
+
+
+class AttachFileToTask(Tool):
+    name = "attach_file_to_task"
+    description = (
+        "Attach a workspace file to a task. The file stays where it is; the task links to it "
+        "(and keeps doing so when the file is moved or renamed)."
+    )
+    capability = "tasks.write"
+    extra_capabilities = ("fs.read",)
+    Input = AttachFileInput
+    idempotent = True
+
+    def actions(self, args: AttachFileInput, ctx: ToolContext) -> list[Action]:
+        return [
+            Action(capability=self.capability, summary="Attach a file to a task"),
+            path_action(ctx, "fs.read", args.path, "Attach", "read"),
+        ]
+
+    async def run(self, args: AttachFileInput, ctx: ToolContext) -> ToolResult:
+        task_id = _id(args.task_id)
+        async with get_sessionmaker()() as db:
+            task = await db.get(Task, task_id) if task_id else None
+            if task is None:
+                return ToolResult(content=f"No task with id {args.task_id}.", is_error=True)
+            try:
+                await links.attach(db, task, args.path)
+            except AppError as exc:
+                return ToolResult(content=exc.message, is_error=True)
+        return ToolResult(content=f"Attached {args.path} to “{task.title}”.")
+
+
+TASK_TOOLS: list[Tool] = [
+    ListTasks(),
+    CreateTask(),
+    UpdateTask(),
+    DeleteTask(),
+    ListTaskFiles(),
+    AttachFileToTask(),
+]

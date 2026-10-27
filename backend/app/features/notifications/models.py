@@ -21,7 +21,9 @@ class Notification(Base, IdMixin):
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text, default="")
     level: Mapped[str] = mapped_column(String(10), default="info")  # info|success|warning|error
-    kind: Mapped[str] = mapped_column(String(20))  # reminder | automation | approval | agent
+    kind: Mapped[str] = mapped_column(
+        String(20)
+    )  # reminder | automation | approval | agent | focus
     link: Mapped[str | None] = mapped_column(String(300))  # a page in the app, e.g. /tasks
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

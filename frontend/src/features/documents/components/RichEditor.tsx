@@ -121,7 +121,10 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   if (!editor) return null
   const picker = (
     <Lingering value={pickingLink}>
-      {() => <LinkPickerDialog onPick={insertLink} onClose={() => setPickingLink(false)} />}
+      {() => (
+        <LinkPickerDialog onPick={insertLink} onClose={() => setPickingLink(false)}
+          onPickImage={notes ? undefined : (path, alt) => editor.chain().focus().insertContent({ type: 'image', attrs: { src: assetUrl(path), alt } }).run()} />
+      )}
     </Lingering>
   )
   if (notes) {

@@ -19,7 +19,7 @@ export function DocumentsPage() {
   const project = useCurrentProject()
 
   return (
-    <div className="flex h-full">
+    <div className="island-reserve flex h-full">
       <aside className={cn('w-full shrink-0 border-r border-border md:w-72', documentId && 'hidden md:block')}>
         <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} />
       </aside>

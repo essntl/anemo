@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { answerPrompt, confirmWith, fakeModels, login, pickModel, recordAnimations, signOutAfterEach } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic } from './helpers'
 
 /*
  * Phone layout and installable-app checks. Runs in the "mobile" project
@@ -10,11 +10,15 @@ signOutAfterEach()
 
 const SCREENS = [
   '/',
+  '/home',
   '/files',
   '/documents',
   '/tasks',
   '/tasks?view=board',
   '/calendar',
+  '/focus',
+  '/music',
+  '/settings/focus',
   '/runs',
   '/runs?kind=all',
   '/agents',
@@ -235,6 +239,7 @@ test('calendar on a phone: month with dots and the chosen day listed, + adds to 
 test('chat on a phone: send with the button, Enter adds a new line', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)
+  await page.goto('/') // the start page may be Home
   await page.getByRole('radio', { name: 'Chat' }).click()
   await pickModel(page, models.echo)
   const box = page.getByPlaceholder('Message the assistant…')
@@ -277,7 +282,7 @@ test('installable: manifest, icons and a service worker that never caches /api',
     await navigator.serviceWorker.ready
   })
   await page.reload() // now controlled by the service worker
-  await expect(page.getByRole('radiogroup', { name: 'Mode' })).toBeVisible()
+  await expect(page.locator('#main-column')).toBeVisible()
   await page.goto('/settings/general')
   await page.waitForLoadState('networkidle')
   const cached = await page.evaluate(async () => {
@@ -297,5 +302,60 @@ test('installable: manifest, icons and a service worker that never caches /api',
     await expect(page.getByRole('heading', { name: "Can't reach Anemo" })).toBeVisible()
   } finally {
     await context.setOffline(false)
+  }
+})
+
+test('the Island takes the middle of the top bar and plays and pauses', async ({ page, baseURL }) => {
+  await login(page)
+  try {
+    await startMusic(page, baseURL!)
+    const island = page.getByTestId('island')
+    // It replaces the Anemo name in the top bar, between the menu and new-chat buttons.
+    const bar = page.locator('header').filter({ has: page.getByRole('button', { name: 'Open menu' }) }).first()
+    await expect(bar.getByText('Anemo')).toBeHidden()
+    await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
+    // (once its change of shape has settled)
+    await expect.poll(async () => Math.round((await island.boundingBox())!.height)).toBeLessThanOrEqual(36)
+    const pill = (await island.boundingBox())!
+    const menu = (await page.getByRole('button', { name: 'Open menu' }).first().boundingBox())!
+    expect(pill.x).toBeGreaterThanOrEqual(menu.x + menu.width)
+    expect(pill.y + pill.height).toBeLessThanOrEqual(48)
+    // Go to another page through the menu: still playing.
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    await page.getByRole('link', { name: 'Tasks', exact: true }).click()
+    await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
+    await island.getByRole('button', { name: /Show controls/ }).tap()
+    await island.getByRole('button', { name: 'Pause music' }).tap()
+    await expect(island.getByRole('button', { name: 'Play music' })).toBeVisible()
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+  } finally {
+    await removeTrack(page, baseURL!)
+  }
+})
+
+test('Home on a phone: the saved layout in one column, same order', async ({ page }) => {
+  await login(page)
+  const before = (await (await page.request.get('/api/settings')).json()).home
+  const layout = [
+    { id: 'music', w: 2, h: 1, hidden: false, pinned: false, options: {} },
+    { id: 'tasks', w: 3, h: 2, hidden: false, pinned: false, options: {} },
+    { id: 'focus', w: 1, h: 2, hidden: false, pinned: false, options: {} },
+    { id: 'today', w: 1, h: 1, hidden: true, pinned: false, options: {} },
+  ]
+  try {
+    await page.request.put('/api/settings/home', { data: { layout } })
+    await page.goto('/home')
+    await expect(page.locator('[data-widget="music"]')).toBeVisible()
+    const widgets = page.locator('[data-widget]')
+    const ids = await widgets.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.widget))
+    expect(ids.slice(0, 3)).toEqual(['music', 'tasks', 'focus'])
+    expect(ids).not.toContain('today')
+    // One column: every widget starts at the same x and spans the width.
+    const boxes = await widgets.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.x), Math.round(r.width)]))
+    expect(new Set(boxes.map(([x]) => x)).size).toBe(1)
+    expect(new Set(boxes.map(([, w]) => w)).size).toBe(1)
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+  } finally {
+    await page.request.put('/api/settings/home', { data: before })
   }
 })

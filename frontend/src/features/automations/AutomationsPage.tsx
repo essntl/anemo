@@ -25,6 +25,7 @@ import {
   useSetAutomationEnabled,
 } from './api'
 import { AutomationDialog } from './components/AutomationDialog'
+import { type AutomationTemplate, TEMPLATES } from './templates'
 import { Lingering } from '@/components/ui/Lingering'
 
 const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'error'> = {
@@ -131,11 +132,12 @@ function AutomationCard({ automation, onEdit }: { automation: Automation; onEdit
 export function AutomationsPage() {
   const automations = useAutomations()
   // null: closed. { automation: null }: creating one.
-  const [editing, setEditing] = useState<{ automation: Automation | null } | null>(null)
+  const [editing, setEditing] = useState<{ automation: Automation | null; template?: AutomationTemplate } | null>(null)
   const items = automations.data ?? []
+  const templates = TEMPLATES.filter((t) => !items.some((a) => a.name === t.name))
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8">
+    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
       <div className="mb-5 flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <Clock className="h-5 w-5" />
@@ -162,7 +164,18 @@ export function AutomationsPage() {
         {items.map((a) => <AutomationCard key={a.id} automation={a} onEdit={() => setEditing({ automation: a })} />)}
       </div>
 
-      <Lingering value={editing}>{(shown) => <AutomationDialog automation={shown.automation} onClose={() => setEditing(null)} />}</Lingering>
+      {automations.isSuccess && templates.length > 0 && (
+        <section className="mt-6" aria-label="Templates">
+          <h2 className="mb-2 text-[13px] font-semibold text-muted">Start from a template</h2>
+          <div className="flex flex-wrap gap-2">
+            {templates.map((t) => (
+              <Button key={t.name} variant="secondary" size="sm" onClick={() => setEditing({ automation: null, template: t })}>{t.name}</Button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <Lingering value={editing}>{(shown) => <AutomationDialog automation={shown.automation} template={shown.template} onClose={() => setEditing(null)} />}</Lingering>
     </div>
   )
 }

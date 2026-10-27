@@ -49,6 +49,17 @@ test('going to another page cross-fades; changing a tab on the same page does no
   })
   const transitions = () => page.evaluate(() => (window as unknown as { transitions: number }).transitions)
   await login(page)
+  // The first page of a session may redirect to Home (with its own transition): wait
+  // until nothing more starts.
+  let last = -1
+  await expect
+    .poll(async () => {
+      const now = await transitions()
+      const settled = now === last
+      last = now
+      return settled
+    }, { intervals: [300] })
+    .toBe(true)
   const before = await transitions()
 
   await page.getByRole('link', { name: 'Tasks', exact: true }).click()

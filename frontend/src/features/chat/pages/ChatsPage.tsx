@@ -153,7 +153,7 @@ export function ChatsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8">
+    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
       <div className="mb-4 flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <MessagesSquare className="h-5 w-5" />

@@ -299,6 +299,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/focus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Focus Settings */
+        put: operations["put_focus_settings_api_settings_focus_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/music": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Music Settings */
+        put: operations["put_music_settings_api_settings_music_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Home Settings */
+        put: operations["put_home_settings_api_settings_home_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Files Settings */
+        put: operations["put_files_settings_api_settings_files_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -906,10 +974,31 @@ export interface paths {
         /**
          * Global Events
          * @description App-wide notices (run status changes, new titles, ...) for every open tab.
+         *     `tab` identifies the tab, so agent tools can act in the one used last.
          */
         get: operations["global_events_api_events_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tab In Use
+         * @description This tab is being used (sent now and then while someone works in it).
+         */
+        post: operations["tab_in_use_api_presence_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1095,6 +1184,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/{task_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Files */
+        get: operations["list_task_files_api_tasks__task_id__files_get"];
+        put?: never;
+        /**
+         * Attach File
+         * @description Attach a file that is already in the workspace.
+         */
+        post: operations["attach_file_api_tasks__task_id__files_post"];
+        /**
+         * Detach File
+         * @description Remove the attachment. The file stays in Files.
+         */
+        delete: operations["detach_file_api_tasks__task_id__files_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{task_id}/files/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Task Files
+         * @description Upload files and attach them. They go into the task's project folder
+         *     (projects/<name>/), or files/ when the task has no project.
+         */
+        post: operations["upload_task_files_api_tasks__task_id__files_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{task_id}/backlinks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Backlinks */
+        get: operations["task_backlinks_api_tasks__task_id__backlinks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/backlinks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Document Backlinks */
+        get: operations["document_backlinks_api_documents__document_id__backlinks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/files/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * File Backlinks
+         * @description Where a file is used: tasks it is attached to or linked from, and documents
+         *     that link to it. Asked before deleting it.
+         */
+        get: operations["file_backlinks_api_files_links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/files/upload-folder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upload Folder
+         * @description Where files added from a document or task go (created if missing).
+         */
+        get: operations["upload_folder_api_files_upload_folder_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/files": {
         parameters: {
             query?: never;
@@ -1210,7 +1420,8 @@ export interface paths {
         /**
          * Move
          * @description Rename or move (cut and paste). A document moved within documents/ keeps its
-         *     history: the documents index recognises it by its content.
+         *     history: the documents index recognises it by its content. Task attachments and
+         *     links to the file (or into the folder) in tasks and documents follow it.
          */
         post: operations["move_api_files_move_post"];
         delete?: never;
@@ -1586,6 +1797,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent Documents
+         * @description The last edited documents, with their first line. `folder` narrows to a folder
+         *     inside documents/ (a project's documents).
+         */
+        get: operations["recent_documents_api_documents_recent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/by-path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document By Path
+         * @description The document stored in a .md file under documents/ (Files and search open
+         *     documents in the Documents editor, never as plain text).
+         */
+        get: operations["document_by_path_api_documents_by_path_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents": {
         parameters: {
             query?: never;
@@ -1940,6 +2193,188 @@ export interface paths {
          */
         put: operations["change_occurrence_api_calendar_events__event_id__occurrences__original_start__put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/focus/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions */
+        get: operations["list_sessions_api_focus_sessions_get"];
+        put?: never;
+        /**
+         * Record Session
+         * @description Store a finished (or cut short) timer phase. Sending the same `client_id` again
+         *     returns the stored session instead of adding another.
+         */
+        post: operations["record_session_api_focus_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/focus/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Session */
+        delete: operations["delete_session_api_focus_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/focus/phase-ended": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Phase Ended
+         * @description Add "phase finished" to the Notifications list, if the user asked for that
+         *     (Focus settings). Otherwise the timer's notices stay in the browser.
+         */
+        post: operations["phase_ended_api_focus_phase_ended_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/music/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tracks */
+        get: operations["list_tracks_api_music_tracks_get"];
+        put?: never;
+        /**
+         * Add Tracks
+         * @description Add tracks to the library, or find them there. Same order as sent.
+         */
+        post: operations["add_tracks_api_music_tracks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/music/tracks/{track_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Track
+         * @description Removes the track from the library and from every playlist.
+         */
+        delete: operations["delete_track_api_music_tracks__track_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Track */
+        patch: operations["update_track_api_music_tracks__track_id__patch"];
+        trace?: never;
+    };
+    "/api/music/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Playlists */
+        get: operations["list_playlists_api_music_playlists_get"];
+        put?: never;
+        /** Create Playlist */
+        post: operations["create_playlist_api_music_playlists_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/music/playlists/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reorder Playlists */
+        post: operations["reorder_playlists_api_music_playlists_reorder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/music/playlists/{playlist_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Playlist
+         * @description Deletes the playlist. Its tracks stay in the library.
+         */
+        delete: operations["delete_playlist_api_music_playlists__playlist_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Playlist */
+        patch: operations["rename_playlist_api_music_playlists__playlist_id__patch"];
+        trace?: never;
+    };
+    "/api/music/playlists/{playlist_id}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Playlist Tracks
+         * @description The playlist's tracks, in order (reordering, removing, or replacing them all).
+         */
+        put: operations["set_playlist_tracks_api_music_playlists__playlist_id__tracks_put"];
+        /**
+         * Append Playlist Tracks
+         * @description Add tracks at the end; ones already in the playlist are skipped.
+         */
+        post: operations["append_playlist_tracks_api_music_playlists__playlist_id__tracks_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2383,6 +2818,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stats
+         * @description Focus, tasks, projects and agent activity from `from` to `to` (local days,
+         *     both included), grouped by day in the time zone of Settings → General.
+         */
+        get: operations["get_stats_api_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/status": {
         parameters: {
             query?: never;
@@ -2404,6 +2860,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentStats */
+        AgentStats: {
+            /** Runs By Day */
+            runs_by_day: components["schemas"]["DayValue"][];
+            /** Runs */
+            runs: number;
+            /** Documents By Agents */
+            documents_by_agents: number;
+            /** Documents By You */
+            documents_by_you: number;
+        };
         /** AllSettings */
         AllSettings: {
             general: components["schemas"]["GeneralSettings"];
@@ -2413,6 +2880,10 @@ export interface components {
             workspace: components["schemas"]["WorkspaceSettings"];
             web: components["schemas"]["WebSettings"];
             memory: components["schemas"]["MemorySettings"];
+            focus: components["schemas"]["FocusSettings"];
+            music: components["schemas"]["MusicSettings"];
+            home: components["schemas"]["HomeSettings"];
+            files: components["schemas"]["FilesSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -2476,6 +2947,11 @@ export interface components {
         };
         /** AssetOut */
         AssetOut: {
+            /** Path */
+            path: string;
+        };
+        /** AttachIn */
+        AttachIn: {
             /** Path */
             path: string;
         };
@@ -2658,6 +3134,13 @@ export interface components {
             /** Max Retries */
             max_retries?: number | null;
         };
+        /** Backlinks */
+        Backlinks: {
+            /** Tasks */
+            tasks: components["schemas"]["LinkedTask"][];
+            /** Documents */
+            documents: components["schemas"]["LinkedDocument"][];
+        };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
             /** File */
@@ -2677,6 +3160,11 @@ export interface components {
         Body_upload_asset_api_documents_assets_post: {
             /** File */
             file: string;
+        };
+        /** Body_upload_task_files_api_tasks__task_id__files_upload_post */
+        Body_upload_task_files_api_tasks__task_id__files_upload_post: {
+            /** Files */
+            files: string[];
         };
         /** BranchIn */
         BranchIn: {
@@ -2947,6 +3435,16 @@ export interface components {
             /** Content */
             content?: string | null;
         };
+        /** DayValue */
+        DayValue: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Value */
+            value: number;
+        };
         /** DecisionIn */
         DecisionIn: {
             /**
@@ -2984,7 +3482,7 @@ export interface components {
              */
             enabled: boolean;
             /** Kinds */
-            kinds?: ("reminder" | "automation" | "approval" | "agent")[];
+            kinds?: ("reminder" | "automation" | "approval" | "agent" | "focus")[];
         };
         /** DestinationOut */
         DestinationOut: {
@@ -3017,7 +3515,7 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
             /** Kinds */
-            kinds?: ("reminder" | "automation" | "approval" | "agent")[] | null;
+            kinds?: ("reminder" | "automation" | "approval" | "agent" | "focus")[] | null;
         };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
@@ -3240,6 +3738,172 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * FilesSettings
+         * @description The Files page.
+         */
+        FilesSettings: {
+            /**
+             * Show Documents Folder
+             * @default false
+             */
+            show_documents_folder: boolean;
+        };
+        /** FocusSessionIn */
+        FocusSessionIn: {
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Minutes */
+            minutes: number;
+            /**
+             * Phase
+             * @default focus
+             * @enum {string}
+             */
+            phase: "focus" | "short_break" | "long_break";
+            /** Task Id */
+            task_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Completed
+             * @default true
+             */
+            completed: boolean;
+            /** Client Id */
+            client_id?: string | null;
+        };
+        /** FocusSessionOut */
+        FocusSessionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Minutes */
+            minutes: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "focus" | "short_break" | "long_break";
+            /** Task Id */
+            task_id: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Completed */
+            completed: boolean;
+            /** Client Id */
+            client_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * FocusSettings
+         * @description The focus timer (Focus page, Home widget, Dynamic Island).
+         */
+        FocusSettings: {
+            /**
+             * Focus Minutes
+             * @default 25
+             */
+            focus_minutes: number;
+            /**
+             * Short Break Minutes
+             * @default 5
+             */
+            short_break_minutes: number;
+            /**
+             * Long Break Minutes
+             * @default 15
+             */
+            long_break_minutes: number;
+            /**
+             * Rounds Before Long Break
+             * @default 4
+             */
+            rounds_before_long_break: number;
+            /**
+             * Auto Start Breaks
+             * @default true
+             */
+            auto_start_breaks: boolean;
+            /**
+             * Auto Start Focus
+             * @default false
+             */
+            auto_start_focus: boolean;
+            /**
+             * Chime
+             * @default bell
+             * @enum {string}
+             */
+            chime: "bell" | "soft" | "none";
+            /**
+             * Chime Volume
+             * @default 0.6
+             */
+            chime_volume: number;
+            /**
+             * Title Countdown
+             * @default true
+             */
+            title_countdown: boolean;
+            /**
+             * Save To Notifications
+             * @default false
+             */
+            save_to_notifications: boolean;
+            /**
+             * Daily Goal Minutes
+             * @default 120
+             */
+            daily_goal_minutes: number;
+        };
+        /** FocusStats */
+        FocusStats: {
+            /** Total Minutes */
+            total_minutes: number;
+            /** Sessions */
+            sessions: number;
+            /** Completed */
+            completed: number;
+            /** Cut Short */
+            cut_short: number;
+            /** Daily Average Minutes */
+            daily_average_minutes: number;
+            /** Current Streak */
+            current_streak: number;
+            /** Longest Streak */
+            longest_streak: number;
+            /** By Day */
+            by_day: components["schemas"]["DayValue"][];
+            /** Heatmap */
+            heatmap: components["schemas"]["DayValue"][];
+            /** By Hour */
+            by_hour: number[];
+        };
         /** GeneralSettings */
         GeneralSettings: {
             /**
@@ -3258,11 +3922,25 @@ export interface components {
              * @default true
              */
             confirm_destructive_actions: boolean;
+            /**
+             * Start Page
+             * @default home
+             * @enum {string}
+             */
+            start_page: "home" | "new_chat";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HomeSettings
+         * @description The Home page layout, shared by every device (phones show one column).
+         */
+        HomeSettings: {
+            /** Layout */
+            layout?: components["schemas"]["WidgetLayout"][];
         };
         /** ImportIn */
         ImportIn: {
@@ -3323,6 +4001,30 @@ export interface components {
              * @default 1
              */
             max_subagent_depth: number;
+        };
+        /** LinkedDocument */
+        LinkedDocument: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Path */
+            path: string;
+        };
+        /** LinkedTask */
+        LinkedTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
         };
         /** ListingOut */
         ListingOut: {
@@ -3790,6 +4492,22 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
         };
+        /**
+         * MusicSettings
+         * @description How the music player looks and talks.
+         */
+        MusicSettings: {
+            /**
+             * Blur Backdrop
+             * @default true
+             */
+            blur_backdrop: boolean;
+            /**
+             * Track Alerts
+             * @default true
+             */
+            track_alerts: boolean;
+        };
         /** NotificationOut */
         NotificationOut: {
             /**
@@ -3810,7 +4528,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "reminder" | "automation" | "approval" | "agent";
+            kind: "reminder" | "automation" | "approval" | "agent" | "focus";
             /** Link */
             link: string | null;
             /** Read At */
@@ -3999,6 +4717,19 @@ export interface components {
              */
             plan_review: string;
         };
+        /**
+         * PhaseEndedIn
+         * @description The timer finished a phase in a browser (for the Notifications list).
+         */
+        PhaseEndedIn: {
+            /** Title */
+            title: string;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+        };
         /** PlanIn */
         PlanIn: {
             /** Steps */
@@ -4014,6 +4745,54 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "in_progress" | "done" | "skipped";
+        };
+        /** PlaylistIn */
+        PlaylistIn: {
+            /** Name */
+            name: string;
+            /** Track Ids */
+            track_ids?: string[];
+            /** Sort Order */
+            sort_order?: number | null;
+        };
+        /** PlaylistOut */
+        PlaylistOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Tracks */
+            tracks: components["schemas"]["TrackOut"][];
+        };
+        /** PlaylistPatch */
+        PlaylistPatch: {
+            /** Name */
+            name: string;
+        };
+        /** PlaylistTracksIn */
+        PlaylistTracksIn: {
+            /** Track Ids */
+            track_ids: string[];
+        };
+        /** PresenceIn */
+        PresenceIn: {
+            /** Tab */
+            tab: string;
         };
         /** ProfileIn */
         ProfileIn: {
@@ -4173,6 +4952,19 @@ export interface components {
              */
             documents: number;
         };
+        /** ProjectStats */
+        ProjectStats: {
+            /** Project Id */
+            project_id: string | null;
+            /** Name */
+            name: string;
+            /** Color */
+            color: string | null;
+            /** Focus Minutes */
+            focus_minutes: number;
+            /** Tasks Completed */
+            tasks_completed: number;
+        };
         /** ProviderIn */
         ProviderIn: {
             /** Name */
@@ -4263,6 +5055,31 @@ export interface components {
             /** Needs Key */
             needs_key: boolean;
         };
+        /** RecentDocument */
+        RecentDocument: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Path */
+            path: string;
+            /** Folder */
+            folder: string;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number;
+            /** Last Editor */
+            last_editor: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Excerpt */
+            excerpt: string;
+        };
         /**
          * ReferenceSummary
          * @description Another chat that was attached to a message as context.
@@ -4290,7 +5107,12 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+            status: "todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled";
+            /** Ordered Ids */
+            ordered_ids: string[];
+        };
+        /** ReorderPlaylistsIn */
+        ReorderPlaylistsIn: {
             /** Ordered Ids */
             ordered_ids: string[];
         };
@@ -5018,6 +5840,26 @@ export interface components {
             /** Fingerprint */
             fingerprint?: string | null;
         };
+        /** StatsOut */
+        StatsOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Timezone */
+            timezone: string;
+            focus: components["schemas"]["FocusStats"];
+            tasks: components["schemas"]["TaskStats"];
+            /** Projects */
+            projects: components["schemas"]["ProjectStats"][];
+            agents: components["schemas"]["AgentStats"];
+        };
         /** SummaryItem */
         SummaryItem: {
             /** Capability */
@@ -5059,6 +5901,24 @@ export interface components {
             /** Count */
             count: number;
         };
+        /** TaskFileOut */
+        TaskFileOut: {
+            /** Path */
+            path: string;
+            /** Name */
+            name: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+            /** Exists */
+            exists: boolean;
+            /** Size */
+            size: number | null;
+            /** Mime */
+            mime: string | null;
+        };
         /** TaskIn */
         TaskIn: {
             /** Title */
@@ -5073,7 +5933,7 @@ export interface components {
              * @default todo
              * @enum {string}
              */
-            status: "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+            status: "todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled";
             /**
              * Priority
              * @default 0
@@ -5085,6 +5945,11 @@ export interface components {
             due_time?: string | null;
             /** Remind Minutes */
             remind_minutes?: number | null;
+            /**
+             * Rrule
+             * @description Repeat, e.g. FREQ=WEEKLY;BYDAY=MO
+             */
+            rrule?: string | null;
             /** Tags */
             tags?: string[];
             /** Project Id */
@@ -5105,7 +5970,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+            status: "todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled";
             /** Priority */
             priority: number;
             /** Due Date */
@@ -5114,6 +5979,8 @@ export interface components {
             due_time: string | null;
             /** Remind Minutes */
             remind_minutes: number | null;
+            /** Rrule */
+            rrule: string | null;
             /** Completed At */
             completed_at: string | null;
             /** Tags */
@@ -5142,7 +6009,7 @@ export interface components {
             /** Description */
             description?: string | null;
             /** Status */
-            status?: ("todo" | "in_progress" | "blocked" | "done" | "cancelled") | null;
+            status?: ("todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled") | null;
             /** Priority */
             priority?: number | null;
             /** Due Date */
@@ -5151,10 +6018,37 @@ export interface components {
             due_time?: string | null;
             /** Remind Minutes */
             remind_minutes?: number | null;
+            /** Rrule */
+            rrule?: string | null;
             /** Tags */
             tags?: string[] | null;
             /** Project Id */
             project_id?: string | null;
+        };
+        /** TaskRef */
+        TaskRef: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Title */
+            title: string;
+            /** Minutes */
+            minutes: number;
+        };
+        /** TaskStats */
+        TaskStats: {
+            /** Completed By Day */
+            completed_by_day: components["schemas"]["DayValue"][];
+            /** Created */
+            created: number;
+            /** Completed */
+            completed: number;
+            /** Overdue Now */
+            overdue_now: number;
+            /** Top By Focus */
+            top_by_focus: components["schemas"]["TaskRef"][];
         };
         /** TestOut */
         TestOut: {
@@ -5251,6 +6145,82 @@ export interface components {
             description: string;
             /** Capability */
             capability: string;
+        };
+        /** TrackIn */
+        TrackIn: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "youtube" | "soundcloud" | "audio";
+            /** Ref */
+            ref: string;
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /**
+             * Artist
+             * @default
+             */
+            artist: string;
+            /** Artwork */
+            artwork?: string | null;
+            /**
+             * Live
+             * @default false
+             */
+            live: boolean;
+        };
+        /** TrackOut */
+        TrackOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "youtube" | "soundcloud" | "audio";
+            /** Ref */
+            ref: string;
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Artist */
+            artist: string;
+            /** Artwork */
+            artwork: string | null;
+            /** Live */
+            live: boolean;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+        };
+        /** TrackPatch */
+        TrackPatch: {
+            /** Title */
+            title?: string | null;
+            /** Artist */
+            artist?: string | null;
+            /** Artwork */
+            artwork?: string | null;
+            /** Live */
+            live?: boolean | null;
+        };
+        /**
+         * TracksIn
+         * @description Tracks to add to the library; ones already there (same source and ref) are
+         *     returned as they are, with better metadata filled in.
+         */
+        TracksIn: {
+            /** Tracks */
+            tracks: components["schemas"]["TrackIn"][];
         };
         /** TrashItemOut */
         TrashItemOut: {
@@ -5445,6 +6415,38 @@ export interface components {
             search_configured: boolean;
             /** Env Searxng Url */
             env_searxng_url: string | null;
+        };
+        /**
+         * WidgetLayout
+         * @description One widget on the Home page. `w` columns and `h` rows (1-3 each).
+         */
+        WidgetLayout: {
+            /** Id */
+            id: string;
+            /**
+             * W
+             * @default 1
+             */
+            w: number;
+            /**
+             * H
+             * @default 1
+             */
+            h: number;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Options */
+            options?: {
+                [key: string]: string | null;
+            };
         };
         /**
          * WorkspaceSettings
@@ -6035,6 +7037,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemorySettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_focus_settings_api_settings_focus_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FocusSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_music_settings_api_settings_music_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MusicSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_home_settings_api_settings_home_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HomeSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_files_settings_api_settings_files_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilesSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilesSettings"];
                 };
             };
             /** @description Validation Error */
@@ -7386,7 +8528,9 @@ export interface operations {
     };
     global_events_api_events_get: {
         parameters: {
-            query?: never;
+            query?: {
+                tab?: string | null;
+            };
             header?: {
                 "last-event-id"?: string | null;
             };
@@ -7399,6 +8543,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tab_in_use_api_presence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresenceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7737,6 +8914,278 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_task_files_api_tasks__task_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskFileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_file_api_tasks__task_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskFileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_file_api_tasks__task_id__files_delete: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_task_files_api_tasks__task_id__files_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_task_files_api_tasks__task_id__files_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskFileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_backlinks_api_tasks__task_id__backlinks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backlinks"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_backlinks_api_documents__document_id__backlinks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backlinks"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    file_backlinks_api_files_links_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backlinks"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_folder_api_files_upload_folder_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
                 };
             };
             /** @description Validation Error */
@@ -8988,6 +10437,73 @@ export interface operations {
             };
         };
     };
+    recent_documents_api_documents_recent_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                folder?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentDocument"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_by_path_api_documents_by_path_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_documents_api_documents_get: {
         parameters: {
             query?: never;
@@ -9331,7 +10847,7 @@ export interface operations {
     list_tasks_api_tasks_get: {
         parameters: {
             query?: {
-                status?: ("todo" | "in_progress" | "blocked" | "done" | "cancelled") | ("open" | "all");
+                status?: ("todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled") | ("open" | "all");
                 project_id?: string | null;
                 tag?: string | null;
                 q?: string | null;
@@ -10029,6 +11545,518 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_focus_sessions_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                project_id?: string | null;
+                task_id?: string | null;
+                phase?: ("focus" | "short_break" | "long_break") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_session_api_focus_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FocusSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_session_api_focus_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phase_ended_api_focus_phase_ended_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhaseEndedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tracks_api_music_tracks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_tracks_api_music_tracks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TracksIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_track_api_music_tracks__track_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                track_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_track_api_music_tracks__track_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                track_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_playlists_api_music_playlists_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_playlist_api_music_playlists_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_playlists_api_music_playlists_reorder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderPlaylistsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_playlist_api_music_playlists__playlist_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlist_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_playlist_api_music_playlists__playlist_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlist_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_playlist_tracks_api_music_playlists__playlist_id__tracks_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlist_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistTracksIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    append_playlist_tracks_api_music_playlists__playlist_id__tracks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlist_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistTracksIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -11109,6 +13137,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageRecordOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stats_api_stats_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsOut"];
                 };
             };
             /** @description Validation Error */

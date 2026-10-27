@@ -10,6 +10,10 @@ import {
   FolderKanban,
   FolderOpen,
   History,
+  House,
+  Music,
+  ChartColumn,
+  Timer,
   type LucideIcon,
   MessagesSquare,
   Settings,
@@ -28,7 +32,11 @@ export interface PageLink {
 }
 
 export const PAGES: PageLink[] = [
+  { label: 'Home', to: '/home', icon: House, keywords: 'start dashboard widgets today' },
   { label: 'New chat', to: '/', icon: SquarePen, keywords: 'start conversation' },
+  { label: 'Focus', to: '/focus', icon: Timer, keywords: 'timer pomodoro concentrate' },
+  { label: 'Music', to: '/music', icon: Music, keywords: 'player queue playlists songs ambient' },
+  { label: 'Stats', to: '/stats', icon: ChartColumn, keywords: 'statistics focus time streak heatmap' },
   { label: 'All chats', to: '/chats', icon: MessagesSquare, keywords: 'conversations history archive favorites' },
   { label: 'Projects', to: '/projects', icon: FolderKanban, keywords: 'workspace' },
   { label: 'Files', to: '/files', icon: FolderOpen, keywords: 'workspace folder upload' },

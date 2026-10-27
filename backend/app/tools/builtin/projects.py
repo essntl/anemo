@@ -8,7 +8,7 @@ Looking is always allowed; creating and changing need "Manage tasks & projects"
 """
 
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
@@ -74,6 +74,14 @@ class CreateProject(Tool):
 
     async def run(self, args: CreateProjectInput, ctx: ToolContext) -> ToolResult:
         async with get_sessionmaker()() as db:
+            existing = await service.find(db, args.name)
+            if existing is not None:
+                # Same name or same folder: the project is already there (perhaps renamed).
+                out = await service.one_out(db, existing)
+                return ToolResult(
+                    content=f"That project already exists: {project_line(out)}",
+                    data={"project": {"id": str(existing.id), "name": existing.name}},
+                )
             try:
                 project = await service.create(db, ProjectIn(**args.model_dump()))
             except AppError as exc:
@@ -110,9 +118,7 @@ class UpdateProject(Tool):
 
     async def run(self, args: UpdateProjectInput, ctx: ToolContext) -> ToolResult:
         async with get_sessionmaker()() as db:
-            project = await db.scalar(
-                select(Project).where(func.lower(Project.name) == args.project.strip().lower())
-            )
+            project = await service.find(db, args.project)
             if project is None:
                 names = ", ".join(p.name for p in await db.scalars(select(Project))) or "none"
                 return ToolResult(
@@ -128,7 +134,7 @@ class UpdateProject(Tool):
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)
             await db.commit()
-            out = service.to_out(project)
+            out = await service.one_out(db, project)
         await service.notify()
         return ToolResult(content=f"Updated: {project_line(out)}")
 

@@ -13,7 +13,8 @@ Docker Compose on a homelab.
 > **tasks** and a **calendar**, a **memory** you control, a sandboxed **shell**, **web
 > search**, a **browser** for agents, **MCP servers**, **sub-agents**, scheduled
 > **automations** with **notifications**, **search** across everything and **usage**
-> numbers. Works on phones and can be installed to your home screen.
+> numbers, plus a **Home** page of widgets, a **focus timer**, a **music** player, the
+> **Dynamic Island** and **stats**. Works on phones and can be installed to your home screen.
 
 Not built yet: a first-run setup wizard (you add a provider in Settings instead),
 the OpenAI *Responses* API (OpenAI works through the chat completions adapter), and
@@ -167,17 +168,20 @@ on the same files. Sub-folders are groups; images you drop in go to
   file-read permission and the folder access for `documents`; writing has its own
   category, *Edit documents* (asks by default). Their changes are in the history
   and can be reverted from the run.
-- **Links to tasks and other documents:** the toolbar button *Link to a document or
-  task* inserts a link to one of them, shown as a small labelled chip. Clicking a link
-  in the editor opens it: a document here, a task in the task list, another site in a
-  new tab. They are ordinary Markdown links
-  (`/documents/<id>`, `/tasks?task=<id>`).
+- **Links to tasks, files and other documents:** the toolbar button *Link to a
+  document, task or file* inserts a link to one of them, shown as a small labelled
+  chip. Clicking a link in the editor opens it: a document here, a task in the task
+  list, a file in Files, another site in a new tab. They are ordinary Markdown links
+  (`/documents/<id>`, `/tasks?task=<id>`, `/files?path=<path>`), and links to a file
+  are updated when it is renamed or moved in Files. A document lists what links to it.
 - **Delete** moves the file to the workspace trash (Files → Trash).
 
 ### Tasks and calendar
 
-**Tasks** have a status, priority, due date (with an optional time), project and
-tags. The list groups them by when they are due (overdue, today, next 7 days,
+**Tasks** have a status (to do, in progress, waiting, blocked, done), priority, due
+date (with an optional time), project and tags. A task with a due date can
+**repeat** (every day, weekday, week, 2 weeks, month or year): finishing it adds the
+next one. The list groups them by when they are due (overdue, today, next 7 days,
 later, no date); the board shows one column per status and lets you drag cards
 between them (on a phone the columns are stacked).
 
@@ -188,6 +192,15 @@ Markdown; they can link to a document or another task, and a document can link t
 task. In the list, a task with notes has an arrow that shows the start of them. A
 link to a task (from a document, other notes or search) shows it in the list, marked
 and with its notes open, rather than opening the editor.
+
+**Attachments:** a task can have files attached. Upload them in the task (they go to
+the project's folder, or `files/` without a project) or pick existing ones from Files.
+The file stays in Files; the task links to it, and the link keeps working when you
+rename or move the file there. Removing an attachment leaves the file alone. Notes
+and documents can link to files the same way (*Link* → *Files*), and a file's details
+in Files show which tasks and documents use it; deleting it says so first ("Linked
+from 2 tasks and 1 document."). Agents can attach files too (*Manage tasks*, plus
+read access to the file's folder).
 
 **Calendar** has month, week, day and agenda views. Events can be timed or
 all-day and can repeat (daily, weekdays, weekly, every 2 weeks, monthly, yearly,
@@ -205,6 +218,68 @@ without a zone, use the time zone from **Settings → General**.
 **Agents** can list, add, change and delete tasks and events. Changes follow the
 *Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
 action, so the default level asks you first.
+
+### Home
+
+**Home** is a page of widgets: the focus timer, the music player, today (what is due
+and what you have focused), open tasks, this week, recent documents, a box to ask
+Anemo something, **Needs you** (approvals, memory suggestions, failed automations,
+overdue tasks; hidden while empty), the latest result of an automation (**Briefing**) and what is coming up.
+Every widget follows the project switcher.
+
+**Edit layout** (or E) lets you drag widgets around, make them wider or taller, hide
+them and add them back; **Reset** goes back to the default. The layout is saved on the
+server, so every device shows the same one (a phone shows it as one column). Under
+**Settings → General** you choose what opens when you open Anemo: Home or a new chat.
+
+### Focus
+
+**Focus** is a pomodoro timer: focus, a short break, and after a few rounds a long
+break. Link it to a task (or start it from a task's menu with *Focus on this*), and
+the time counts for that task and its project. Space starts and pauses, R resets, S
+skips to the next phase and + adds a minute.
+
+The timer runs on timestamps, not by counting ticks, so it stays right in a background
+tab, after a reload, or with the laptop asleep. While it runs it lives on that device;
+each finished focus session is saved on the server (also when you were offline: it
+is sent when the connection comes back). Lengths, rounds, auto-start, the chime and a
+daily goal are under **Settings → Focus**, the same for every device.
+
+### Music
+
+**Music** plays what you paste: a YouTube video or playlist, a SoundCloud track or
+set, or a link to an audio file or internet radio stream. There are also ambient
+sounds (rain, ocean, brown, pink and white noise) to play on their own or under the
+music, each with its own volume.
+
+Tracks you add are kept in your **library** and can be put in **playlists**; both are
+stored on the server. The queue, what is playing, shuffle, repeat and the volume are
+per device, like a phone's own player. A track that won't play (removed, or blocked
+from playing on other sites) is skipped, up to three in a row; after an interruption
+the player picks up where it was. Music keeps playing while you move between pages.
+
+### Dynamic Island
+
+The **Dynamic Island** is the small dark pill at the top of the page while the timer
+or music is going. It shows the time left or what is playing; click it (or tap it on
+a phone) to open the controls: pause, skip, the next track, volume. It also shows
+short alerts: a focus phase ending, a new track, an agent that finished or is waiting
+for your approval (click to open that chat). With *reduce motion* turned on in your
+system, it fades instead of morphing.
+
+### Stats
+
+**Stats** counts your focus time per day, week, month or a range you pick: the total,
+daily average, streaks, a heatmap of the last six months, when in the day you focus,
+your top tasks and projects by focus time, tasks finished, and what agents did (runs
+and their cost). Days follow the time zone from Settings → General. It narrows to the
+project in the switcher.
+
+**Agents** can read your focus stats and sessions (*Focus & music*, allowed by
+default), and start the timer or queue music on the device you used last (*Control
+the timer and music*, asks first). With no Anemo tab open anywhere they say so. A
+ready-made **Daily summary** automation (Automations → *Start from a template*)
+sums up your focus and tasks each evening; it does nothing until you save it.
 
 ### Notifications
 
@@ -271,7 +346,9 @@ answers can try to steer the agent.
 Press **Ctrl+K** (⌘K on a Mac) anywhere, or the search button next to *New chat*,
 to search everything: chats, documents, memories, tasks, calendar events, files
 (by name) and automations. Typing a page name ("calendar", "settings mcp") jumps
-there. Arrow keys move, Enter opens.
+there. Arrow keys move, Enter opens. It also does things: *Start focus*, *Pause or
+resume the timer*, *Play or pause music*, *Next track*, *Paste a music link…* and
+*Edit home layout*.
 
 *All results* opens the search page, where you can filter by kind. Every word you
 type has to match. On that page documents and memories are also found by meaning
@@ -414,6 +491,9 @@ the workspace, or set *Run shell commands* to *Never*.
 code, move, and delete to a trash you can restore from. Saving is refused if the
 file changed since you opened it (for example, an agent edited it); you can then
 load the other version or overwrite it.
+
+Documents live in `documents/` but are shown under **Documents**, so Files hides that
+folder (turn it back on under Settings → Workspace).
 
 **Settings → Workspace** sets what agents may do in each top-level folder: *Hidden*,
 *Read only* or *Read and change*. This applies on top of Agent Permissions.

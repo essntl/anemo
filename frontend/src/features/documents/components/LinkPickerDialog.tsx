@@ -3,8 +3,10 @@ import { CheckSquare, FileText } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
+import { Segmented } from '@/components/ui/Segmented'
+import { FilesTab } from '@/features/links/FilesTab'
 import { STATUS_LABELS, useTasks } from '@/features/tasks/api'
-import { documentLink, taskLink } from '@/lib/appLinks'
+import { documentLink, fileLink, taskLink } from '@/lib/appLinks'
 import { useDocuments } from '../api'
 
 const MAX_SHOWN = 40 // per kind; search narrows it down
@@ -36,7 +38,13 @@ function Choice({ icon, title, detail, onPick }: { icon: ReactNode; title: strin
  * Pick a document or a task to link to from the text being written. The link is an
  * ordinary Markdown link to that page of the app, with the title as its text.
  */
-export function LinkPickerDialog({ onPick, onClose }: { onPick: (href: string, title: string) => void; onClose: () => void }) {
+export function LinkPickerDialog({ onPick, onPickImage, onClose }: {
+  onPick: (href: string, title: string) => void
+  /** Documents (not task notes) can show an image from Files in the text. */
+  onPickImage?: (path: string, alt: string) => void
+  onClose: () => void
+}) {
+  const [tab, setTab] = useState<'pages' | 'files'>('pages')
   const documents = useDocuments()
   const tasks = useTasks()
   const [search, setSearch] = useState('')
@@ -57,8 +65,14 @@ export function LinkPickerDialog({ onPick, onClose }: { onPick: (href: string, t
   const loaded = documents.isSuccess && tasks.isSuccess
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} title="Link to a document or task" className="md:w-[min(92vw,520px)]"
+    <Dialog open onOpenChange={(open) => !open && onClose()} title="Link to a document, task or file" className="md:w-[min(92vw,520px)]"
       description="Clicking the link opens it. Selected text becomes the link; otherwise its title is inserted.">
+      <Segmented label="Link to" kind="tabs" className="mb-3" value={tab} onChange={setTab}
+        options={[{ value: 'pages', label: 'Documents and tasks' }, { value: 'files', label: 'Files' }]} />
+      {tab === 'files' ? (
+        <FilesTab onLink={(entry) => pick(fileLink(entry.path), entry.name)}
+          onImage={onPickImage ? (entry) => { onPickImage(entry.path, entry.name.replace(/\.[^.]+$/, '')); onClose() } : undefined} />
+      ) : (<>
       <Input value={search} autoFocus placeholder="Search documents and tasks…" aria-label="Search documents and tasks"
         onChange={(e) => setSearch(e.target.value)} />
       <div className="mt-3 max-h-[45dvh] overflow-y-auto rounded-control border border-border">
@@ -76,6 +90,7 @@ export function LinkPickerDialog({ onPick, onClose }: { onPick: (href: string, t
           ))}
         </Group>
       </div>
+      </>)}
     </Dialog>
   )
 }

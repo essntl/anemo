@@ -854,6 +854,242 @@
         }
       }
     },
+    "/api/settings/focus": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Focus Settings",
+        "operationId": "put_focus_settings_api_settings_focus_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FocusSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FocusSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/music": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Music Settings",
+        "operationId": "put_music_settings_api_settings_music_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MusicSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/home": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Home Settings",
+        "operationId": "put_home_settings_api_settings_home_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/files": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Files Settings",
+        "operationId": "put_files_settings_api_settings_files_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilesSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilesSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -3522,9 +3758,27 @@
           "runs"
         ],
         "summary": "Global Events",
-        "description": "App-wide notices (run status changes, new titles, ...) for every open tab.",
+        "description": "App-wide notices (run status changes, new titles, ...) for every open tab.\n`tab` identifies the tab, so agent tools can act in the one used last.",
         "operationId": "global_events_api_events_get",
         "parameters": [
+          {
+            "name": "tab",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tab"
+            }
+          },
           {
             "name": "last-event-id",
             "in": "header",
@@ -3560,6 +3814,59 @@
         ],
         "responses": {
           "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presence": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Tab In Use",
+        "description": "This tab is being used (sent now and then while someone works in it).",
+        "operationId": "tab_in_use_api_presence_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresenceIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
             "description": "Successful Response"
           },
           "422": {
@@ -4187,6 +4494,523 @@
         }
       }
     },
+    "/api/tasks/{task_id}/files": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "List Task Files",
+        "operationId": "list_task_files_api_tasks__task_id__files_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskFileOut"
+                  },
+                  "title": "Response List Task Files Api Tasks  Task Id  Files Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Attach File",
+        "description": "Attach a file that is already in the workspace.",
+        "operationId": "attach_file_api_tasks__task_id__files_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskFileOut"
+                  },
+                  "title": "Response Attach File Api Tasks  Task Id  Files Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Detach File",
+        "description": "Remove the attachment. The file stays in Files.",
+        "operationId": "detach_file_api_tasks__task_id__files_delete",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1000,
+              "title": "Path"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/files/upload": {
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Upload Task Files",
+        "description": "Upload files and attach them. They go into the task's project folder\n(projects/<name>/), or files/ when the task has no project.",
+        "operationId": "upload_task_files_api_tasks__task_id__files_upload_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_task_files_api_tasks__task_id__files_upload_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskFileOut"
+                  },
+                  "title": "Response Upload Task Files Api Tasks  Task Id  Files Upload Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/backlinks": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Task Backlinks",
+        "operationId": "task_backlinks_api_tasks__task_id__backlinks_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backlinks"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/backlinks": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Document Backlinks",
+        "operationId": "document_backlinks_api_documents__document_id__backlinks_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backlinks"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/links": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "File Backlinks",
+        "description": "Where a file is used: tasks it is attached to or linked from, and documents\nthat link to it. Asked before deleting it.",
+        "operationId": "file_backlinks_api_files_links_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000,
+              "title": "Path"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backlinks"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/upload-folder": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Upload Folder",
+        "description": "Where files added from a document or task go (created if missing).",
+        "operationId": "upload_folder_api_files_upload_folder_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "title": "Response Upload Folder Api Files Upload Folder Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files": {
       "get": {
         "tags": [
@@ -4609,7 +5433,7 @@
           "files"
         ],
         "summary": "Move",
-        "description": "Rename or move (cut and paste). A document moved within documents/ keeps its\nhistory: the documents index recognises it by its content.",
+        "description": "Rename or move (cut and paste). A document moved within documents/ keeps its\nhistory: the documents index recognises it by its content. Task attachments and\nlinks to the file (or into the folder) in tasks and documents follow it.",
         "operationId": "move_api_files_move_post",
         "parameters": [
           {
@@ -6367,6 +7191,145 @@
         }
       }
     },
+    "/api/documents/recent": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Recent Documents",
+        "description": "The last edited documents, with their first line. `folder` narrows to a folder\ninside documents/ (a project's documents).",
+        "operationId": "recent_documents_api_documents_recent_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 8,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "folder",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Folder"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RecentDocument"
+                  },
+                  "title": "Response Recent Documents Api Documents Recent Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/by-path": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document By Path",
+        "description": "The document stored in a .md file under documents/ (Files and search open\ndocuments in the Documents editor, never as plain text).",
+        "operationId": "document_by_path_api_documents_by_path_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documents": {
       "get": {
         "tags": [
@@ -7000,6 +7963,7 @@
                   "enum": [
                     "todo",
                     "in_progress",
+                    "waiting",
                     "blocked",
                     "done",
                     "cancelled"
@@ -8366,6 +9330,979 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/focus/sessions": {
+      "post": {
+        "tags": [
+          "focus"
+        ],
+        "summary": "Record Session",
+        "description": "Store a finished (or cut short) timer phase. Sending the same `client_id` again\nreturns the stored session instead of adding another.",
+        "operationId": "record_session_api_focus_sessions_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FocusSessionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FocusSessionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "focus"
+        ],
+        "summary": "List Sessions",
+        "operationId": "list_sessions_api_focus_sessions_get",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "focus",
+                    "short_break",
+                    "long_break"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "focus",
+              "title": "Phase"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FocusSessionOut"
+                  },
+                  "title": "Response List Sessions Api Focus Sessions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/focus/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "focus"
+        ],
+        "summary": "Delete Session",
+        "operationId": "delete_session_api_focus_sessions__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/focus/phase-ended": {
+      "post": {
+        "tags": [
+          "focus"
+        ],
+        "summary": "Phase Ended",
+        "description": "Add \"phase finished\" to the Notifications list, if the user asked for that\n(Focus settings). Otherwise the timer's notices stay in the browser.",
+        "operationId": "phase_ended_api_focus_phase_ended_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhaseEndedIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/tracks": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "List Tracks",
+        "operationId": "list_tracks_api_music_tracks_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrackOut"
+                  },
+                  "title": "Response List Tracks Api Music Tracks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Add Tracks",
+        "description": "Add tracks to the library, or find them there. Same order as sent.",
+        "operationId": "add_tracks_api_music_tracks_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TracksIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrackOut"
+                  },
+                  "title": "Response Add Tracks Api Music Tracks Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/tracks/{track_id}": {
+      "patch": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Update Track",
+        "operationId": "update_track_api_music_tracks__track_id__patch",
+        "parameters": [
+          {
+            "name": "track_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Track Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Delete Track",
+        "description": "Removes the track from the library and from every playlist.",
+        "operationId": "delete_track_api_music_tracks__track_id__delete",
+        "parameters": [
+          {
+            "name": "track_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Track Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/playlists": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "List Playlists",
+        "operationId": "list_playlists_api_music_playlists_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaylistOut"
+                  },
+                  "title": "Response List Playlists Api Music Playlists Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Create Playlist",
+        "operationId": "create_playlist_api_music_playlists_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/playlists/reorder": {
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Reorder Playlists",
+        "operationId": "reorder_playlists_api_music_playlists_reorder_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderPlaylistsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/playlists/{playlist_id}": {
+      "patch": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Rename Playlist",
+        "operationId": "rename_playlist_api_music_playlists__playlist_id__patch",
+        "parameters": [
+          {
+            "name": "playlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Playlist Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Delete Playlist",
+        "description": "Deletes the playlist. Its tracks stay in the library.",
+        "operationId": "delete_playlist_api_music_playlists__playlist_id__delete",
+        "parameters": [
+          {
+            "name": "playlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Playlist Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/playlists/{playlist_id}/tracks": {
+      "put": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Set Playlist Tracks",
+        "description": "The playlist's tracks, in order (reordering, removing, or replacing them all).",
+        "operationId": "set_playlist_tracks_api_music_playlists__playlist_id__tracks_put",
+        "parameters": [
+          {
+            "name": "playlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Playlist Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistTracksIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Append Playlist Tracks",
+        "description": "Add tracks at the end; ones already in the playlist are skipped.",
+        "operationId": "append_playlist_tracks_api_music_playlists__playlist_id__tracks_post",
+        "parameters": [
+          {
+            "name": "playlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Playlist Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistTracksIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -10431,6 +12368,93 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Get Stats",
+        "description": "Focus, tasks, projects and agent activity from `from` to `to` (local days,\nboth included), grouped by day in the time zone of Settings \u2192 General.",
+        "operationId": "get_stats_api_stats_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "To"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/status": {
       "get": {
         "tags": [
@@ -10483,6 +12507,37 @@
   },
   "components": {
     "schemas": {
+      "AgentStats": {
+        "properties": {
+          "runs_by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "Runs By Day"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "documents_by_agents": {
+            "type": "integer",
+            "title": "Documents By Agents"
+          },
+          "documents_by_you": {
+            "type": "integer",
+            "title": "Documents By You"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs_by_day",
+          "runs",
+          "documents_by_agents",
+          "documents_by_you"
+        ],
+        "title": "AgentStats"
+      },
       "AllSettings": {
         "properties": {
           "general": {
@@ -10505,6 +12560,18 @@
           },
           "memory": {
             "$ref": "#/components/schemas/MemorySettings"
+          },
+          "focus": {
+            "$ref": "#/components/schemas/FocusSettings"
+          },
+          "music": {
+            "$ref": "#/components/schemas/MusicSettings"
+          },
+          "home": {
+            "$ref": "#/components/schemas/HomeSettings"
+          },
+          "files": {
+            "$ref": "#/components/schemas/FilesSettings"
           }
         },
         "type": "object",
@@ -10515,7 +12582,11 @@
           "permissions",
           "workspace",
           "web",
-          "memory"
+          "memory",
+          "focus",
+          "music",
+          "home",
+          "files"
         ],
         "title": "AllSettings"
       },
@@ -10663,6 +12734,21 @@
           "path"
         ],
         "title": "AssetOut"
+      },
+      "AttachIn": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "AttachIn"
       },
       "AttachmentOut": {
         "properties": {
@@ -11277,6 +13363,30 @@
         "type": "object",
         "title": "AutomationPatch"
       },
+      "Backlinks": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedTask"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedDocument"
+            },
+            "type": "array",
+            "title": "Documents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tasks",
+          "documents"
+        ],
+        "title": "Backlinks"
+      },
       "Body_upload_api_attachments_post": {
         "properties": {
           "file": {
@@ -11326,6 +13436,23 @@
           "file"
         ],
         "title": "Body_upload_asset_api_documents_assets_post"
+      },
+      "Body_upload_task_files_api_tasks__task_id__files_upload_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_upload_task_files_api_tasks__task_id__files_upload_post"
       },
       "BranchIn": {
         "properties": {
@@ -12117,6 +14244,25 @@
         ],
         "title": "CreateIn"
       },
+      "DayValue": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "value": {
+            "type": "integer",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "value"
+        ],
+        "title": "DayValue"
+      },
       "DecisionIn": {
         "properties": {
           "decision": {
@@ -12209,7 +14355,8 @@
                 "reminder",
                 "automation",
                 "approval",
-                "agent"
+                "agent",
+                "focus"
               ]
             },
             "type": "array",
@@ -12345,7 +14492,8 @@
                     "reminder",
                     "automation",
                     "approval",
-                    "agent"
+                    "agent",
+                    "focus"
                   ]
                 },
                 "type": "array"
@@ -12970,6 +15118,333 @@
         ],
         "title": "FileChangeOut"
       },
+      "FilesSettings": {
+        "properties": {
+          "show_documents_folder": {
+            "type": "boolean",
+            "title": "Show Documents Folder",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "FilesSettings",
+        "description": "The Files page."
+      },
+      "FocusSessionIn": {
+        "properties": {
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          },
+          "minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Minutes"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "focus",
+              "short_break",
+              "long_break"
+            ],
+            "title": "Phase",
+            "default": "focus"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed",
+            "default": true
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "started_at",
+          "ended_at",
+          "minutes"
+        ],
+        "title": "FocusSessionIn"
+      },
+      "FocusSessionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          },
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "focus",
+              "short_break",
+              "long_break"
+            ],
+            "title": "Phase"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "started_at",
+          "ended_at",
+          "minutes",
+          "phase",
+          "task_id",
+          "project_id",
+          "completed",
+          "client_id",
+          "created_at"
+        ],
+        "title": "FocusSessionOut"
+      },
+      "FocusSettings": {
+        "properties": {
+          "focus_minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 1.0,
+            "title": "Focus Minutes",
+            "default": 25
+          },
+          "short_break_minutes": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Short Break Minutes",
+            "default": 5
+          },
+          "long_break_minutes": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Long Break Minutes",
+            "default": 15
+          },
+          "rounds_before_long_break": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Rounds Before Long Break",
+            "default": 4
+          },
+          "auto_start_breaks": {
+            "type": "boolean",
+            "title": "Auto Start Breaks",
+            "default": true
+          },
+          "auto_start_focus": {
+            "type": "boolean",
+            "title": "Auto Start Focus",
+            "default": false
+          },
+          "chime": {
+            "type": "string",
+            "enum": [
+              "bell",
+              "soft",
+              "none"
+            ],
+            "title": "Chime",
+            "default": "bell"
+          },
+          "chime_volume": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Chime Volume",
+            "default": 0.6
+          },
+          "title_countdown": {
+            "type": "boolean",
+            "title": "Title Countdown",
+            "default": true
+          },
+          "save_to_notifications": {
+            "type": "boolean",
+            "title": "Save To Notifications",
+            "default": false
+          },
+          "daily_goal_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 0.0,
+            "title": "Daily Goal Minutes",
+            "default": 120
+          }
+        },
+        "type": "object",
+        "title": "FocusSettings",
+        "description": "The focus timer (Focus page, Home widget, Dynamic Island)."
+      },
+      "FocusStats": {
+        "properties": {
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "cut_short": {
+            "type": "integer",
+            "title": "Cut Short"
+          },
+          "daily_average_minutes": {
+            "type": "number",
+            "title": "Daily Average Minutes"
+          },
+          "current_streak": {
+            "type": "integer",
+            "title": "Current Streak"
+          },
+          "longest_streak": {
+            "type": "integer",
+            "title": "Longest Streak"
+          },
+          "by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "By Day"
+          },
+          "heatmap": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "Heatmap"
+          },
+          "by_hour": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "By Hour"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_minutes",
+          "sessions",
+          "completed",
+          "cut_short",
+          "daily_average_minutes",
+          "current_streak",
+          "longest_streak",
+          "by_day",
+          "heatmap",
+          "by_hour"
+        ],
+        "title": "FocusStats"
+      },
       "GeneralSettings": {
         "properties": {
           "timezone": {
@@ -12991,6 +15466,15 @@
             "type": "boolean",
             "title": "Confirm Destructive Actions",
             "default": true
+          },
+          "start_page": {
+            "type": "string",
+            "enum": [
+              "home",
+              "new_chat"
+            ],
+            "title": "Start Page",
+            "default": "home"
           }
         },
         "type": "object",
@@ -13008,6 +15492,21 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HomeSettings": {
+        "properties": {
+          "layout": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetLayout"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "title": "Layout"
+          }
+        },
+        "type": "object",
+        "title": "HomeSettings",
+        "description": "The Home page layout, shared by every device (phones show one column)."
       },
       "ImportIn": {
         "properties": {
@@ -13132,6 +15631,54 @@
         },
         "type": "object",
         "title": "Limits"
+      },
+      "LinkedDocument": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "path"
+        ],
+        "title": "LinkedDocument"
+      },
+      "LinkedTask": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status"
+        ],
+        "title": "LinkedTask"
       },
       "ListingOut": {
         "properties": {
@@ -14550,6 +17097,23 @@
         "type": "object",
         "title": "ModelPatch"
       },
+      "MusicSettings": {
+        "properties": {
+          "blur_backdrop": {
+            "type": "boolean",
+            "title": "Blur Backdrop",
+            "default": true
+          },
+          "track_alerts": {
+            "type": "boolean",
+            "title": "Track Alerts",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "MusicSettings",
+        "description": "How the music player looks and talks."
+      },
       "NotificationOut": {
         "properties": {
           "id": {
@@ -14581,7 +17145,8 @@
               "reminder",
               "automation",
               "approval",
-              "agent"
+              "agent",
+              "focus"
             ],
             "title": "Kind"
           },
@@ -15111,6 +17676,28 @@
         ],
         "title": "PermissionSummary"
       },
+      "PhaseEndedIn": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Body",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "PhaseEndedIn",
+        "description": "The timer finished a phase in a browser (for the Notifications list)."
+      },
       "PlanIn": {
         "properties": {
           "steps": {
@@ -15154,6 +17741,134 @@
           "title"
         ],
         "title": "PlanStepIn"
+      },
+      "PlaylistIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "track_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "title": "Track Ids"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PlaylistIn"
+      },
+      "PlaylistOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/TrackOut"
+            },
+            "type": "array",
+            "title": "Tracks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "sort_order",
+          "created_at",
+          "updated_at",
+          "tracks"
+        ],
+        "title": "PlaylistOut"
+      },
+      "PlaylistPatch": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PlaylistPatch"
+      },
+      "PlaylistTracksIn": {
+        "properties": {
+          "track_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "title": "Track Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "track_ids"
+        ],
+        "title": "PlaylistTracksIn"
+      },
+      "PresenceIn": {
+        "properties": {
+          "tab": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Tab"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tab"
+        ],
+        "title": "PresenceIn"
       },
       "ProfileIn": {
         "properties": {
@@ -15531,6 +18246,54 @@
         ],
         "title": "ProjectOut"
       },
+      "ProjectStats": {
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "focus_minutes": {
+            "type": "integer",
+            "title": "Focus Minutes"
+          },
+          "tasks_completed": {
+            "type": "integer",
+            "title": "Tasks Completed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "name",
+          "color",
+          "focus_minutes",
+          "tasks_completed"
+        ],
+        "title": "ProjectStats"
+      },
       "ProviderIn": {
         "properties": {
           "name": {
@@ -15800,6 +18563,56 @@
         ],
         "title": "ProviderTypeOut"
       },
+      "RecentDocument": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "word_count": {
+            "type": "integer",
+            "title": "Word Count"
+          },
+          "last_editor": {
+            "type": "string",
+            "title": "Last Editor"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "folder",
+          "title",
+          "word_count",
+          "last_editor",
+          "updated_at",
+          "excerpt"
+        ],
+        "title": "RecentDocument"
+      },
       "ReferenceSummary": {
         "properties": {
           "conversation_id": {
@@ -15840,6 +18653,7 @@
             "enum": [
               "todo",
               "in_progress",
+              "waiting",
               "blocked",
               "done",
               "cancelled"
@@ -15863,6 +18677,24 @@
         ],
         "title": "ReorderIn",
         "description": "The tasks of one board column, in their new order (moves them to `status`)."
+      },
+      "ReorderPlaylistsIn": {
+        "properties": {
+          "ordered_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Ordered Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ordered_ids"
+        ],
+        "title": "ReorderPlaylistsIn"
       },
       "ResumeIn": {
         "properties": {
@@ -17833,6 +20665,51 @@
         ],
         "title": "SshKeyOut"
       },
+      "StatsOut": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "focus": {
+            "$ref": "#/components/schemas/FocusStats"
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/TaskStats"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectStats"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "agents": {
+            "$ref": "#/components/schemas/AgentStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "timezone",
+          "focus",
+          "tasks",
+          "projects",
+          "agents"
+        ],
+        "title": "StatsOut"
+      },
       "SummaryItem": {
         "properties": {
           "capability": {
@@ -17945,6 +20822,59 @@
         ],
         "title": "TagCount"
       },
+      "TaskFileOut": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          },
+          "exists": {
+            "type": "boolean",
+            "title": "Exists"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "mime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "name",
+          "added_at",
+          "exists",
+          "size",
+          "mime"
+        ],
+        "title": "TaskFileOut"
+      },
       "TaskIn": {
         "properties": {
           "title": {
@@ -17964,6 +20894,7 @@
             "enum": [
               "todo",
               "in_progress",
+              "waiting",
               "blocked",
               "done",
               "cancelled"
@@ -18015,6 +20946,19 @@
             ],
             "title": "Remind Minutes"
           },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule",
+            "description": "Repeat, e.g. FREQ=WEEKLY;BYDAY=MO"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -18062,6 +21006,7 @@
             "enum": [
               "todo",
               "in_progress",
+              "waiting",
               "blocked",
               "done",
               "cancelled"
@@ -18106,6 +21051,17 @@
               }
             ],
             "title": "Remind Minutes"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
           },
           "completed_at": {
             "anyOf": [
@@ -18167,6 +21123,7 @@
           "due_date",
           "due_time",
           "remind_minutes",
+          "rrule",
           "completed_at",
           "tags",
           "project_id",
@@ -18211,6 +21168,7 @@
                 "enum": [
                   "todo",
                   "in_progress",
+                  "waiting",
                   "blocked",
                   "done",
                   "cancelled"
@@ -18272,6 +21230,18 @@
             ],
             "title": "Remind Minutes"
           },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
+          },
           "tags": {
             "anyOf": [
               {
@@ -18302,6 +21272,69 @@
         },
         "type": "object",
         "title": "TaskPatch"
+      },
+      "TaskRef": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "title",
+          "minutes"
+        ],
+        "title": "TaskRef"
+      },
+      "TaskStats": {
+        "properties": {
+          "completed_by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "Completed By Day"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "overdue_now": {
+            "type": "integer",
+            "title": "Overdue Now"
+          },
+          "top_by_focus": {
+            "items": {
+              "$ref": "#/components/schemas/TaskRef"
+            },
+            "type": "array",
+            "title": "Top By Focus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "completed_by_day",
+          "created",
+          "completed",
+          "overdue_now",
+          "top_by_focus"
+        ],
+        "title": "TaskStats"
       },
       "TestOut": {
         "properties": {
@@ -18612,6 +21645,208 @@
           "capability"
         ],
         "title": "ToolOut"
+      },
+      "TrackIn": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "youtube",
+              "soundcloud",
+              "audio"
+            ],
+            "title": "Source"
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Ref"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "artist": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Artist",
+            "default": ""
+          },
+          "artwork": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artwork"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "ref",
+          "url",
+          "title"
+        ],
+        "title": "TrackIn"
+      },
+      "TrackOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "youtube",
+              "soundcloud",
+              "audio"
+            ],
+            "title": "Source"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "artist": {
+            "type": "string",
+            "title": "Artist"
+          },
+          "artwork": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artwork"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "ref",
+          "url",
+          "title",
+          "artist",
+          "artwork",
+          "live",
+          "added_at"
+        ],
+        "title": "TrackOut"
+      },
+      "TrackPatch": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "artwork": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artwork"
+          },
+          "live": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live"
+          }
+        },
+        "type": "object",
+        "title": "TrackPatch"
+      },
+      "TracksIn": {
+        "properties": {
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/TrackIn"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Tracks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracks"
+        ],
+        "title": "TracksIn",
+        "description": "Tracks to add to the library; ones already there (same source and ref) are\nreturned as they are, with better metadata filled in."
       },
       "TrashItemOut": {
         "properties": {
@@ -19072,6 +22307,61 @@
           "env_searxng_url"
         ],
         "title": "WebStatus"
+      },
+      "WidgetLayout": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "w": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "W",
+            "default": 1
+          },
+          "h": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "H",
+            "default": 1
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden",
+            "default": false
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned",
+            "default": false
+          },
+          "options": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "maxProperties": 10,
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "WidgetLayout",
+        "description": "One widget on the Home page. `w` columns and `h` rows (1-3 each)."
       },
       "WorkspaceSettings": {
         "properties": {

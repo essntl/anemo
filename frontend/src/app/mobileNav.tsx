@@ -6,6 +6,7 @@ import { Link } from 'react-router'
 import { Menu, SquarePen } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/cn'
+import { useIslandVisible } from '@/features/island/islandStore'
 import { useMobileNav } from './mobileNavStore'
 
 const iconButton =
@@ -30,10 +31,13 @@ export function NewChatButton({ className }: { className?: string }) {
 
 /** The default phone top bar. Hidden from `md` up, where the sidebar is always visible. */
 export function MobileTopBar() {
+  // While the Dynamic Island shows, it takes the middle of this bar instead of the name.
+  const island = useIslandVisible((s) => s.visible)
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:hidden">
       <MenuButton />
-      <span className="flex flex-1 items-center justify-center gap-2 text-[16px] font-semibold tracking-tight">
+      <span className={cn('flex flex-1 items-center justify-center gap-2 text-[16px] font-semibold tracking-tight transition-opacity', island && 'invisible opacity-0')}
+        aria-hidden={island || undefined}>
         <Logo className="h-6 w-6 text-accent" /> Anemo
       </span>
       <NewChatButton />

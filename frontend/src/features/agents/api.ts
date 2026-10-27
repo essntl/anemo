@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
 import { withReauth } from '@/features/auth/reauthStore'
 import { settingsKey } from '@/features/settings/api'
@@ -12,6 +12,17 @@ export type FileChangeView = Schemas['FileChangeOut']
 
 export const timelineKey = (runId: string) => ['timeline', runId] as const
 export const approvalsKey = ['approvals'] as const
+
+/**
+ * Reload a run's timeline because something happened in the run. A plain invalidate
+ * is not enough while the first load is still in flight: TanStack Query then reuses
+ * that request, whose answer may predate the event (an approval would never show).
+ * Cancelling it first makes the reload start after the event.
+ */
+export async function refreshTimeline(qc: QueryClient, runId: string): Promise<void> {
+  await qc.cancelQueries({ queryKey: timelineKey(runId) })
+  await qc.invalidateQueries({ queryKey: timelineKey(runId) })
+}
 export const permissionSummaryKey = ['permissions', 'summary'] as const
 
 /** `poll`: fetch again every 2 s (for a run nothing else keeps up to date, i.e. a sub-agent). */

@@ -23,6 +23,63 @@ class GeneralSettings(BaseModel):
     timezone: str = Field("UTC", max_length=64)
     default_chat_mode: Literal["chat", "agent"] = "chat"
     confirm_destructive_actions: bool = True
+    # What opening the app shows: the Home page or a new chat.
+    start_page: Literal["home", "new_chat"] = "home"
+
+
+class FocusSettings(BaseModel):
+    """The focus timer (Focus page, Home widget, Dynamic Island)."""
+
+    focus_minutes: int = Field(25, ge=1, le=240)
+    short_break_minutes: int = Field(5, ge=1, le=60)
+    long_break_minutes: int = Field(15, ge=1, le=120)
+    # Focus sessions in a cycle; the break after the last one is a long break.
+    rounds_before_long_break: int = Field(4, ge=1, le=12)
+    auto_start_breaks: bool = True
+    auto_start_focus: bool = False
+    # Sound when a phase ends, and the sounds of start/reset ("none" for silence).
+    chime: Literal["bell", "soft", "none"] = "bell"
+    chime_volume: float = Field(0.6, ge=0, le=1)
+    title_countdown: bool = True
+    # Also add "phase finished" to the Notifications list (off: they only show here).
+    save_to_notifications: bool = False
+    daily_goal_minutes: int = Field(120, ge=0, le=1440)
+
+
+class MusicSettings(BaseModel):
+    """How the music player looks and talks."""
+
+    # A blurred copy of the cover behind the Now Playing card.
+    blur_backdrop: bool = True
+    # The Dynamic Island shows the title when a new track starts.
+    track_alerts: bool = True
+
+
+class WidgetLayout(BaseModel):
+    """One widget on the Home page. `w` columns and `h` rows (1-3 each)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    w: int = Field(1, ge=1, le=3)
+    h: int = Field(1, ge=1, le=3)
+    hidden: bool = False
+    # "Needs you" is hidden while empty, unless pinned.
+    pinned: bool = False
+    # Widget-specific choices, e.g. which automation the Briefing shows.
+    options: dict[str, str | None] = Field(default_factory=dict, max_length=10)
+
+
+class HomeSettings(BaseModel):
+    """The Home page layout, shared by every device (phones show one column)."""
+
+    # Empty means "the default layout" (the browser fills in the defaults).
+    layout: list[WidgetLayout] = Field(default_factory=list, max_length=40)
+
+
+class FilesSettings(BaseModel):
+    """The Files page."""
+
+    # documents/ holds the Documents library; Files hides it unless this is on.
+    show_documents_folder: bool = False
 
 
 class AppearanceSettings(BaseModel):
@@ -66,4 +123,8 @@ SECTIONS: dict[str, SectionSpec] = {
     "workspace": SectionSpec(WorkspaceSettings, sensitive=True),
     "web": SectionSpec(WebSettings, sensitive=True),
     "memory": SectionSpec(MemorySettings),
+    "focus": SectionSpec(FocusSettings),
+    "music": SectionSpec(MusicSettings),
+    "home": SectionSpec(HomeSettings),
+    "files": SectionSpec(FilesSettings),
 }

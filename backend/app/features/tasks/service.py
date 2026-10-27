@@ -1,14 +1,17 @@
 """Tasks and projects. Used by the API (the user) and by the agent tools."""
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo
 
+from dateutil.rrule import rrulestr
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
 from app.events import bus
+from app.features.settings.service import user_timezone
 from app.features.tasks.models import Project, Task
 from app.features.tasks.schemas import OPEN_STATUSES
 
@@ -71,6 +74,8 @@ async def _next_order(db: AsyncSession, status: str) -> int:
 def _check(task: Task) -> None:
     if task.due_time is not None and task.due_date is None:
         raise AppError("A due time needs a due date", code="invalid_due")
+    if task.rrule is not None and task.due_date is None:
+        raise AppError("A repeating task needs a due date", code="invalid_repeat")
     if task.remind_minutes is not None and task.due_date is None:
         raise AppError("A reminder needs a due date", code="invalid_reminder")
 
@@ -110,10 +115,50 @@ async def update_task(db: AsyncSession, task: Task, changes: dict[str, Any]) -> 
         task.due_time = None
         task.remind_minutes = None
     _check(task)
+    if task.status == "done" and old_status != "done":
+        await _repeat(db, task)
     await db.commit()
     await db.refresh(task)
     await notify()
     return task
+
+
+def next_due(rule: str, due: date, today: date) -> date | None:
+    """The day the next one is due: the rule's next day after `due`, but not in the
+    past (finishing a task that is three weeks late makes one, not three)."""
+    parsed = rrulestr(rule, dtstart=datetime.combine(due, time.min))  # noqa: DTZ001 - local days
+    after = parsed.after(datetime.combine(due, time.min))  # type: ignore[union-attr]  # noqa: DTZ001
+    if after is not None and after.date() < today:
+        after = parsed.after(datetime.combine(today, time.min), inc=True)  # type: ignore[union-attr]  # noqa: DTZ001
+    return after.date() if after is not None else None
+
+
+async def _repeat(db: AsyncSession, done: Task) -> None:
+    """A repeating task was just finished: add the next one and give it the rule."""
+    if done.rrule is None or done.due_date is None:
+        return
+    today = datetime.now(ZoneInfo(await user_timezone(db))).date()
+    due = next_due(done.rrule, done.due_date, today)
+    if due is not None:
+        db.add(
+            Task(
+                title=done.title,
+                description=done.description,
+                priority=done.priority,
+                due_date=due,
+                due_time=done.due_time,
+                remind_minutes=done.remind_minutes,
+                rrule=done.rrule,
+                tags=list(done.tags),
+                project_id=done.project_id,
+                status="todo",
+                sort_order=await _next_order(db, "todo"),
+                created_by=done.created_by,
+            )
+        )
+    # The finished one no longer repeats, so reopening and finishing it again does not
+    # make a second copy.
+    done.rrule = None
 
 
 async def delete_task(db: AsyncSession, task: Task) -> None:
@@ -132,6 +177,8 @@ async def reorder(db: AsyncSession, status: str, ordered_ids: list[uuid.UUID]) -
         if task.status != status:
             task.status = status
             task.completed_at = now if status == "done" else None
+            if status == "done":
+                await _repeat(db, task)
         task.sort_order = position
     await db.commit()
     await notify()

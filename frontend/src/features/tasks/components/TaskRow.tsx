@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react'
-import { Bell, CalendarDays, Check, ChevronRight, Flag, Trash2 } from 'lucide-react'
+import { Bell, CalendarDays, Check, ChevronRight, Flag, PanelRightOpen, Repeat, Timer, Trash2 } from 'lucide-react'
+import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
+import { focusOnTask } from '@/features/focus/focusOnTask'
 import { cn } from '@/lib/cn'
 import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask, useUpdateTask } from '../api'
 import { bucketOf, formatDue } from '../dates'
+import { describeRepeat } from '../repeat'
 
 const PRIORITY_TONE = ['', 'text-muted', 'text-warning', 'text-error']
 
@@ -18,6 +21,7 @@ export function TaskMeta({ task, project }: { task: Task; project?: Project }) {
         <span className={cn('flex items-center gap-1', overdue && 'font-medium text-error')}>
           <CalendarDays className="h-3 w-3" /> {formatDue(task)}
           {task.remind_minutes != null && <Bell className="h-3 w-3" aria-label="Has a reminder" />}
+          {task.rrule && <Repeat className="h-3 w-3" aria-label={describeRepeat(task.rrule)}><title>{describeRepeat(task.rrule)}</title></Repeat>}
         </span>
       )}
       {task.priority > 0 && (
@@ -89,7 +93,7 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
 
   return (
     <div ref={row} aria-current={linked || undefined} className={cn('rounded-control', linked && 'flash')}>
-      <div className="flex items-start gap-3 rounded-control px-2 py-2 hover:bg-surface-hover">
+      <div className="group flex items-start gap-3 rounded-control px-2 py-2 hover:bg-surface-hover">
         <button type="button" role="checkbox" aria-checked={done} aria-label={done ? `Reopen “${task.title}”` : `Complete “${task.title}”`}
           onClick={() => update.mutate({ id: task.id, body: { status: done ? 'todo' : 'done' } })}
           className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors pointer-coarse:h-6 pointer-coarse:w-6',
@@ -103,12 +107,21 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
           <TaskMeta task={task} project={project} />
         </button>
         {task.status === 'in_progress' && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">In progress</span>}
+        {task.status === 'waiting' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted">Waiting</span>}
         {task.status === 'blocked' && <span className="shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">Blocked</span>}
         {hasNotes && (
           <button type="button" aria-expanded={expanded} aria-label={`Notes of “${task.title}”`} title={expanded ? 'Hide notes' : 'Show notes'}
             onClick={onToggleNotes} className={cn(side, 'hover:text-text')}>
             <ChevronRight className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')} />
           </button>
+        )}
+        {!finished && (
+          <ActionMenu label={`More for “${task.title}”`}
+            className="-my-1 h-8 w-8 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:-my-2 pointer-coarse:h-10 pointer-coarse:w-10 pointer-coarse:opacity-100"
+            actions={[
+              { label: 'Focus on this', icon: <Timer />, onSelect: () => focusOnTask(task) },
+              { label: 'Open', icon: <PanelRightOpen />, onSelect: () => onOpen(task) },
+            ]} />
         )}
         {finished && (
           <button type="button" aria-label={`Delete “${task.title}”`} title="Delete" disabled={remove.isPending} onClick={removeNow}

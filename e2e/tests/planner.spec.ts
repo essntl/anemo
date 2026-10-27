@@ -108,7 +108,7 @@ test('a task links to a document, and the document links back', async ({ page })
   const mark = suffix()
   const taskTitle = `E2E linked ${mark}`
   const docTitle = `E2E plan ${mark}`
-  const pickerName = 'Link to a document or task'
+  const pickerName = 'Link to a document, task or file'
   let documentId = ''
   try {
     const doc = (await (await page.request.post('/api/documents', { data: { title: docTitle } })).json()) as { id: string }

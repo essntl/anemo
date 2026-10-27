@@ -12,13 +12,16 @@ import {
   FolderKanban,
   FolderOpen,
   History,
+  House,
   LogOut,
   MessagesSquare,
+  Music,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Search,
   Settings,
+  Timer,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -177,11 +180,14 @@ export function SidebarRail({ className }: { className?: string }) {
       </button>
       <RailLink to="/chats" label="All chats" icon={<MessagesSquare />} />
       <Divider className="my-2 w-8" />
+      <RailLink to="/home" label="Home" icon={<House />} />
       <RailLink to="/projects" label="Projects" icon={<FolderKanban />} />
       <RailLink to="/files" label="Files" icon={<FolderOpen />} />
       <RailLink to="/documents" label="Documents" icon={<FileText />} />
       <RailLink to="/tasks" label="Tasks" icon={<CheckSquare />} />
       <RailLink to="/calendar" label="Calendar" icon={<CalendarDays />} />
+      <RailLink to="/focus" label="Focus" icon={<Timer />} />
+      <RailLink to="/music" label="Music" icon={<Music />} />
       <RailLink to="/runs" label="Runs" icon={<History />} badge={<RunsBadge />} />
       <RailLink to="/automations" label="Automations" icon={<Clock />} />
       <RailLink to="/agents" label="Profiles & Skills" icon={<Bot />} />
@@ -263,11 +269,14 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
       <Divider className="mx-1 my-2" />
       {/* On a phone: three columns of small tiles, three rows instead of five. */}
       <nav aria-label="Pages" className={cn('grid shrink-0 gap-0.5', onClose ? 'grid-cols-3' : 'grid-cols-2')}>
+        <Page to="/home" icon={<House />}>Home</Page>
         <Page to="/projects" icon={<FolderKanban />}>Projects</Page>
         <Page to="/files" icon={<FolderOpen />}>Files</Page>
         <Page to="/documents" icon={<FileText />}>Documents</Page>
         <Page to="/tasks" icon={<CheckSquare />}>Tasks</Page>
         <Page to="/calendar" icon={<CalendarDays />}>Calendar</Page>
+        <Page to="/focus" icon={<Timer />}>Focus</Page>
+        <Page to="/music" icon={<Music />}>Music</Page>
         <Page to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</Page>
         <Page to="/automations" icon={<Clock />}>Automations</Page>
         <Page to="/agents" icon={<Bot />} title="Profiles & Skills">Agents</Page>

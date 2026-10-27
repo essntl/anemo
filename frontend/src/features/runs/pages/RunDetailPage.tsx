@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Markdown } from '@/components/ui/Markdown'
-import { timelineKey } from '@/features/agents/api'
+import { refreshTimeline } from '@/features/agents/api'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { RunControls } from '@/features/agents/components/RunControls'
 import { useShellOutput } from '@/features/agents/shellOutput'
@@ -42,7 +42,7 @@ export function RunDetailPage() {
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: runKey(runId) })
-    void qc.invalidateQueries({ queryKey: timelineKey(runId) })
+    void refreshTimeline(qc, runId)
   }
   const onEvent = (event: RunEvent) => {
     if (event.type === 'tool.progress') {
@@ -73,7 +73,7 @@ export function RunDetailPage() {
   const limits = data.limits as { max_steps?: number; max_runtime_s?: number } | null
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8">
+    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
       <Link to="/runs" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-text">
         <ArrowLeft className="h-4 w-4" /> Runs
       </Link>

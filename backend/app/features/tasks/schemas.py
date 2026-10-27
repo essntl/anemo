@@ -4,8 +4,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-TaskStatus = Literal["todo", "in_progress", "blocked", "done", "cancelled"]
-OPEN_STATUSES = ("todo", "in_progress", "blocked")
+from app.features.calendar.recurrence import normalize_rrule
+
+# "waiting": on someone or something else (an answer, a delivery); still open.
+TaskStatus = Literal["todo", "in_progress", "waiting", "blocked", "done", "cancelled"]
+OPEN_STATUSES = ("todo", "in_progress", "waiting", "blocked")
 COLOR = r"^#[0-9a-fA-F]{6}$"
 
 
@@ -13,6 +16,16 @@ def clean_tags(tags: list[str]) -> list[str]:
     """Lowercase, no '#', no blanks, no duplicates (order kept)."""
     cleaned = [t.strip().lstrip("#").lower()[:40] for t in tags]
     return list(dict.fromkeys(t for t in cleaned if t))[:20]
+
+
+def clean_rrule(rule: str | None) -> str | None:
+    """A repeat rule as stored (blank: none). COUNT is not supported: each task is one."""
+    if not rule or not rule.strip():
+        return None
+    rule = normalize_rrule(rule)
+    if "COUNT=" in rule:
+        raise ValueError("use UNTIL to end a repeating task, not COUNT")
+    return rule
 
 
 class TaskIn(BaseModel):
@@ -23,6 +36,7 @@ class TaskIn(BaseModel):
     due_date: date | None = None
     due_time: time | None = None  # only with a due_date
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    rrule: str | None = Field(None, max_length=500, description="Repeat, e.g. FREQ=WEEKLY;BYDAY=MO")
     tags: list[str] = Field(default_factory=list, max_length=20)
     project_id: uuid.UUID | None = None
 
@@ -30,6 +44,11 @@ class TaskIn(BaseModel):
     @classmethod
     def _tags(cls, v: list[str]) -> list[str]:
         return clean_tags(v)
+
+    @field_validator("rrule")
+    @classmethod
+    def _rrule(cls, v: str | None) -> str | None:
+        return clean_rrule(v)
 
 
 class TaskPatch(BaseModel):
@@ -40,6 +59,7 @@ class TaskPatch(BaseModel):
     due_date: date | None = None
     due_time: time | None = None
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    rrule: str | None = Field(None, max_length=500)
     tags: list[str] | None = Field(None, max_length=20)
     project_id: uuid.UUID | None = None
 
@@ -47,6 +67,11 @@ class TaskPatch(BaseModel):
     @classmethod
     def _tags(cls, v: list[str] | None) -> list[str] | None:
         return clean_tags(v) if v is not None else None
+
+    @field_validator("rrule")
+    @classmethod
+    def _rrule(cls, v: str | None) -> str | None:
+        return clean_rrule(v)
 
 
 class TaskOut(BaseModel):
@@ -58,6 +83,7 @@ class TaskOut(BaseModel):
     due_date: date | None
     due_time: time | None
     remind_minutes: int | None
+    rrule: str | None
     completed_at: datetime | None
     tags: list[str]
     project_id: uuid.UUID | None

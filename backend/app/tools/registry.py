@@ -14,6 +14,7 @@ from app.tools.builtin.automation import AUTOMATION_TOOLS
 from app.tools.builtin.browser import BROWSER_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
+from app.tools.builtin.focus import FOCUS_TOOLS
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
@@ -54,6 +55,7 @@ BUILTIN_TOOLS: list[Tool] = [
     *TASK_TOOLS,
     *PROJECT_TOOLS,
     *EVENT_TOOLS,
+    *FOCUS_TOOLS,
     SendNotification(),
     *MEMORY_TOOLS,
     *AUTOMATION_TOOLS,

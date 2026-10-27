@@ -15,7 +15,12 @@ export async function login(page: Page) {
   await page.getByLabel('Password').fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await page.waitForURL((url) => !url.pathname.startsWith('/login'))
-  await expect(page.getByRole('radiogroup', { name: 'Mode' })).toBeVisible()
+  // The first page of a session is the start page (Home, or a new chat: Settings → General).
+  // Wait until it is showing, not just on the way there (/ may still redirect to Home).
+  await expect(page.locator('#main-column')).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ }).or(page.getByPlaceholder('Message the assistant…')).first(),
+  ).toBeVisible()
 }
 
 /**
@@ -52,6 +57,9 @@ export async function newChat(page: Page, mode: 'Chat' | 'Agent', modelId: strin
 export async function pickModel(page: Page, modelId: string) {
   await page.getByRole('combobox', { name: 'Model' }).click()
   await page.locator(`[role="option"][data-value="${modelId}"]`).click()
+  // The list hands focus back to its button when its closing animation ends; typing
+  // before that would have Enter open the list again instead of sending.
+  await expect(page.getByRole('listbox')).toHaveCount(0)
 }
 
 /** Types an answer into the app's name dialog (e.g. "New folder") and submits it. */
@@ -92,3 +100,18 @@ export async function recordAnimations(page: Page): Promise<() => Promise<string
   })
   return () => page.evaluate(() => (window as unknown as { animationsSeen: string[] }).animationsSeen)
 }
+
+/** Adds the app's own sound file to the queue on the Music page (it starts playing). */
+export async function startMusic(page: Page, baseURL: string) {
+  await page.goto('/music')
+  await page.getByRole('textbox', { name: 'Music link' }).fill(`${baseURL}/sounds/timer.mp3`)
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(page.getByTestId('island')).toBeVisible()
+}
+
+/** Removes that track from the music library again. */
+export async function removeTrack(page: Page, baseURL: string) {
+  const tracks = (await (await page.request.get('/api/music/tracks')).json()) as { id: string; url: string }[]
+  for (const t of tracks.filter((x) => x.url === `${baseURL}/sounds/timer.mp3`)) await page.request.delete(`/api/music/tracks/${t.id}`)
+}
+

@@ -60,12 +60,17 @@ export function imagesToEditor(body: string, docPath: string): string {
   })
 }
 
-/** Editor text -> file text: our image URLs become paths relative to the document. */
+/**
+ * Editor text -> file text: images of the Documents library (documents/_assets) become
+ * paths relative to the document. Images from Files keep their app address, so moving
+ * or renaming them in Files can update the link (the server rewrites those).
+ */
 export function imagesToFile(body: string, docPath: string): string {
   const dir = dirname(docPath)
   return body.replace(IMAGE, (whole, open: string, src: string, close: string) => {
     if (!src.startsWith(DOWNLOAD)) return whole
     const path = decodeURIComponent(src.slice(DOWNLOAD.length))
+    if (!path.startsWith('documents/')) return whole
     return `${open}${encodeURI(relativePath(dir, path))}${close}`
   })
 }

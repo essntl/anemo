@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 import { type Project, STATUS_LABELS, type Task, type TaskStatus, useReorderTasks } from '../api'
 import { TaskMeta } from './TaskRow'
 
-const COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'blocked', 'done']
+const COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'waiting', 'blocked', 'done']
 const MAX_DONE = 30 // the Done column only shows the latest ones
 
 interface TaskBoardProps {

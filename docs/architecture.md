@@ -168,7 +168,7 @@ IDs are UUIDv7 (time-sortable). All timestamps are `timestamptz`. Rows have `cre
 
 **Config & auth**
 - `auth_sessions` (id, token_hash UNIQUE, created_at, last_seen_at, expires_at, user_agent, ip, reauth_at)
-- `app_settings` (section PK, value jsonb, version). Pydantic-typed sections: general, appearance, model_defaults, search, memory, workspace, limits, advanced.
+- `app_settings` (section PK, value jsonb, version). Pydantic-typed sections: general (incl. `start_page`), appearance, model_defaults, search, memory, workspace, limits, advanced, focus (timer lengths, rounds, auto-start, chime, daily goal), music (backdrop, track alerts), home (widget layout: id, w, h, hidden, pinned, options), files (`show_documents_folder`).
 - `secrets` (id, kind, ciphertext bytea, last4, created_at, rotated_at). Referenced by FK from providers, MCP servers and destinations.
 - `audit_log` (id, ts, actor enum user|agent|system, action, target_type, target_id, details jsonb). Index (ts DESC).
 
@@ -208,11 +208,17 @@ IDs are UUIDv7 (time-sortable). All timestamps are `timestamptz`. Rows have `cre
 - `document_revisions` (id, document_id, content text, content_hash, author enum user|agent|external, run_id?, created_at). Pruned to last N / age policy.
 
 **Tasks & calendar**
-- `projects` (id, name, color, archived)
-- `tasks` (id, title, description md, status enum todo|in_progress|blocked|done|cancelled, priority smallint 0–3, due_at?, completed_at?, tags text[], project_id?, sort_order, conversation_id?, run_id?, created_by enum user|agent). Indexes: (status, due_at); GIN(tags); (project_id); tsvector.
+- `projects` (id, name UNIQUE, slug UNIQUE (folder name, fixed at creation), color, archived, instructions, default_model_id?, default_profile_id?)
+- `tasks` (id, title, description md, status enum todo|in_progress|waiting|blocked|done|cancelled, priority smallint 0–3, due_date?, due_time?, rrule? (finishing it adds the next one, which takes the rule over), completed_at?, tags text[], project_id?, sort_order, conversation_id?, run_id?, created_by enum user|agent). Indexes: (status, due_at); GIN(tags); (project_id); tsvector.
 - `calendar_events` (id, title, description, location, start_at, end_at, all_day, start_date/end_date (all-day), tz, rrule?, task_id?, created_by, run_id?). Index (start_at), (end_at); recurring events are range-expanded in the service via dateutil.
 - `event_exceptions` (event_id, original_start, is_cancelled, override jsonb)
 - `reminders` (id, target_type enum event|task, target_id, occurrence_start?, remind_at, sent_at?, channel). Partial index (remind_at) WHERE sent_at IS NULL.
+- `task_files` (task_id FK CASCADE, path, added_at). PK(task_id, path). A task's attachments: links to workspace files, rewritten when the file is moved or renamed in Files.
+
+**Focus & music**
+- `focus_sessions` (id, started_at, ended_at, minutes, phase enum focus|short_break|long_break, task_id? SET NULL, project_id? SET NULL, completed, client_id UNIQUE (idempotent offline uploads)). Index (started_at). Only finished or stopped sessions are stored; a running timer lives on its device.
+- `music_tracks` (id, source enum youtube|soundcloud|audio, ref, url, title, artist, artwork?, live, added_at). UNIQUE(source, ref): the library.
+- `music_playlists` (id, name, description, sort_order) and `music_playlist_items` (playlist_id, track_id, position).
 
 **Automations & notifications**
 - `automations` (id, name, description, prompt, schedule jsonb {type: cron|interval|once, expr, tz}, enabled, profile_id, model_id?, toolset_override?, policy_id?, workspace_roots?, timeout_s, max_retries, on_ask enum pause_notify|deny_continue|fail, concurrency enum skip|queue, notify_destination_ids uuid[], output jsonb {type: notification|document|conversation|file, target}, state jsonb (key-value the agent can read/write via tool — enables "notify when changed"), next_run_at, last_run_at, last_status). Partial index (next_run_at) WHERE enabled.
@@ -284,7 +290,7 @@ queued ─► running ─┬─► completed
 ## G. Permission Architecture
 
 **Capabilities** (hierarchical strings; the tool registry declares them):
-`fs.read` `fs.write` `fs.delete` `shell.exec` `shell.network` `net.search` `net.fetch` `browser.use` `http.request` `docs.read` `docs.write` `docs.delete` `tasks.write` `calendar.write` `memory.read` `memory.write` `notify.send` `mcp.<server>.<tool>` `agent.spawn` `automation.state`. `settings.*` and `secrets.*` are **never grantable to agents** (hard floor).
+`fs.read` `fs.write` `fs.delete` `shell.exec` `shell.network` `net.search` `net.fetch` `browser.use` `http.request` `docs.read` `docs.write` `docs.delete` `tasks.write` `calendar.write` `memory.read` `memory.write` `notify.send` `focus.read` `focus.control` `mcp.<server>.<tool>` `agent.spawn` `automation.state`. `settings.*` and `secrets.*` are **never grantable to agents** (hard floor).
 
 **Risk** is computed per action by deterministic classifiers: `safe | moderate | dangerous`.
 - Shell classifier (shlex/bashlex parse): read-only commands are safe; build/dev commands moderate. These are dangerous: `rm -r`, `git push --force`, `git reset --hard`, `chmod -R`, `dd`, pipes into `sh`/`bash`, `eval`, `$(…)` with unknown commands, and anything unparsable. The classifier can only *raise* risk.
@@ -472,7 +478,7 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
   5. Heartbeat comment every 15 s (keeps NPM/proxies from timing out).
   6. The stream closes after a terminal status.
   7. Redis streams are `MAXLEN ~ 5000` with a 24 h TTL after completion.
-- **Global stream**: `GET /api/events`, for notifications, run status changes, approval requests, automation fired, and memory pending.
+- **Global stream**: `GET /api/events?tab=<id>`, for notifications, run status changes, approval requests, automation fired, memory pending, `focus.changed`, `music.changed`, and the agent's `focus.control` / `music.control` commands (addressed to one tab). Each open stream marks its tab as present in Valkey (see U).
 - **Envelope**: `{id, run_id, seq, ts, type, data}`.
 - **Types**: `run.status`, `run.plan`, `plan.step`, `message.delta`, `message.completed`, `reasoning.delta`, `reasoning.completed`, `tool.started`, `tool.progress` (e.g. shell stdout chunks, throttled to about 10/s), `tool.completed`, `approval.requested`, `approval.resolved`, `file.changed`, `browser.screenshot`, `usage`, `error`, `subrun.started`, `subrun.completed`.
 - Reasoning is **only** what the provider exposes (Anthropic thinking, OpenAI reasoning summaries, OpenRouter reasoning). Otherwise the UI shows the tool/plan progress timeline, which is factual execution data. Nothing is fabricated.
@@ -572,6 +578,11 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
 - **Notifications**: `GET /notifications`, `POST /notifications/read`, `CRUD /notification-destinations`, `POST /notification-destinations/{id}/test`
 - **MCP**: `CRUD /mcp/servers`, `POST /mcp/servers/{id}/refresh`, `GET /mcp/servers/{id}/tools`, `PATCH /mcp/tools/{id}`
 - **Usage**: `GET /usage/records`, `GET /usage/summary?group_by=day|model|provider|kind|profile|automation&from&to`
+- **Focus**: `POST/GET /focus/sessions`, `DELETE /focus/sessions/{id}`, `POST /focus/phase-ended`
+- **Music**: `GET/POST /music/tracks`, `PATCH/DELETE /music/tracks/{id}`, `CRUD /music/playlists`, `POST /music/playlists/reorder`, `PUT/POST /music/playlists/{id}/tracks`
+- **Stats**: `GET /stats?from&to&project_id` (grouped in SQL in the user's time zone)
+- **Links**: `GET/POST/DELETE /tasks/{id}/files`, `POST /tasks/{id}/files/upload`, `GET /tasks/{id}/backlinks`, `GET /documents/{id}/backlinks`, `GET /files/links?path`, `GET /files/upload-folder`, `GET /documents/recent`, `GET /documents/by-path`
+- **Presence**: `POST /presence {tab}` (the tab was just used)
 - **Ops**: `GET /health`, `GET /ready`, `GET /audit`, `GET /search-providers/test`
 
 **Errors**: a uniform `{error: {code, message, details?}}` with stable codes (`policy_denied`, `conflict_base_hash`, `capability_missing`, …).
@@ -705,3 +716,69 @@ This proves the backbone every later feature depends on: jobs, runs, events, pro
 - `npx playwright test` in `e2e/` against the running stack, including the phone-viewport project.
 - Manual: check each new or changed screen at phone width in the browser pane (mobile preset) and in dark mode.
 - Resilience: `docker compose restart worker` during a streaming run results in a correct `interrupted` → resumed/failed state and a UI that recovers.
+
+---
+
+## U. Focus layer: Home, focus timer, music, Dynamic Island, stats
+
+The focus features sit next to the workspace, not inside it. Their rule for state:
+**the server owns what should be the same everywhere** (finished focus sessions, timer
+settings, the music library and playlists, the Home layout); **each device owns what is
+happening on it** (the running timer, the queue and what is playing, volumes), kept in
+Zustand stores persisted to localStorage.
+
+**Mounted once.** `app/PersistentLayer.tsx` (in `AppLayout`) mounts `TimerEngine`,
+`PlayerEngine` and the hidden player host, so the timer and music survive navigation.
+`features/island/Island.tsx` sits at the top of the page column. Pages are lazy as usual.
+
+**Timer** (`features/focus/timer.ts`, pure and unit-tested): state is `{phase, status,
+startedAt, accumulated, duration, round, …}`; the remaining time is computed from
+timestamps on every tick, so background tabs, reloads and sleep can't drift it.
+`completeIfDue` ends a phase that ran out while the tab was closed. A finished focus
+phase is posted to `/focus/sessions` with a `client_id`; if offline it waits in an
+outbox (`outbox.ts`) and is retried, and the unique `client_id` makes the retry safe.
+
+**Player** (`features/music/player/`): one controller over three backends behind one
+interface (YouTube IFrame API, SoundCloud widget, `<audio>` for files and streams),
+plus generated ambient noise (Web Audio). `detect.ts` turns a pasted link into a
+source. An interrupted track resumes at its position; an unplayable one is skipped,
+at most `MAX_SKIPS` (3) in a row, so a dead playlist stops instead of spinning.
+
+**Dynamic Island** states: `hidden` (nothing going on) → `compact` (timer or track) →
+`expanded` (controls, on click/tap) and `alert` (a short message that morphs in and
+back: phase ended, new track, agent finished or waiting for approval). It reserves
+its width through `--island-w`; page headers use `island-clear-left` / `island-reserve`
+so titles never sit under it. Motion uses `motion/react` springs from `lib/motion.ts`,
+and `MotionConfig reducedMotion="user"` turns morphs into fades.
+
+**Home** (`features/home/`): `layout.ts` (pure, unit-tested) normalises whatever the
+server holds against the known widgets: unknown ids are dropped, missing ones added,
+sizes clamped. That makes old layouts and new widgets safe. Edits save debounced to
+`PUT /settings/home`.
+
+**Stats** (`features/stats/service.py`): totals, per-day, per-hour, heatmap and streaks
+are grouped in SQL after converting to the user's time zone, so a day is the user's
+day (tested across a DST change). Charts are hand-rolled SVG.
+
+**Linking** (`features/links/`): `task_files` holds attachments by path; `parse.py`
+finds and rewrites file links (`/files?path=…`, `/api/files/download?path=…`) in task
+notes and documents. Moving or renaming in Files (or with the agent's `move_path`)
+calls `links.on_moved`, which updates attachments, notes and documents (a document
+change is a revision by whoever moved the file). Files hides `documents/` unless
+`files.show_documents_folder` is on.
+
+**Agent control and presence** (`events/presence.py`): every open global stream marks
+its tab in a Valkey sorted set (`seen`), and using a tab marks it `active`.
+`start_focus` and `queue_music` publish a command addressed to the most recently
+active tab that is still open; with none they answer "Anemo isn't open on any
+device". They need `focus.control` (asks by default); `get_focus_stats` and
+`list_focus_sessions` need `focus.read` (allowed by default).
+
+**Agent and project fixes that came with it**
+- Agent tools look projects up by name *or* folder (`projects.service.find`), so a
+  renamed project, or a name spelled slightly differently, no longer gets a second
+  project and a `projects/<slug>-2/` folder. `create_project` answers that it already
+  exists; `update_project` reports real task and chat counts.
+- Repeating tasks: `tasks.rrule` (the calendar's rule format, without COUNT). Finishing
+  one (in the editor, the list, the board or by an agent) adds the next due date (not
+  in the past) and moves the rule to it, so reopening the old one cannot duplicate.

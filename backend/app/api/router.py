@@ -18,8 +18,11 @@ from app.features.calendar.router import router as calendar_router
 from app.features.conversations.router import router as conversations_router
 from app.features.documents.router import router as documents_router
 from app.features.files.router import router as files_router
+from app.features.focus.router import router as focus_router
+from app.features.links.router import router as links_router
 from app.features.mcp.router import router as mcp_router
 from app.features.memory.router import router as memory_router
+from app.features.music.router import router as music_router
 from app.features.notifications.router import router as notifications_router
 from app.features.permissions_router import router as permissions_router
 from app.features.profiles.router import router as profiles_router
@@ -33,6 +36,7 @@ from app.features.shares.public_router import router as shares_public_router
 from app.features.shares.router import router as shares_router
 from app.features.shell.router import router as shell_router
 from app.features.skills.router import router as skills_router
+from app.features.stats.router import router as stats_router
 from app.features.system_router import router as system_router
 from app.features.tasks.router import router as tasks_router
 from app.features.usage.router import router as usage_router
@@ -52,6 +56,7 @@ protected.include_router(runs_router)
 protected.include_router(attachments_router)
 protected.include_router(agent_router)
 protected.include_router(permissions_router)
+protected.include_router(links_router)
 protected.include_router(files_router)
 protected.include_router(shell_router)
 protected.include_router(profiles_router)
@@ -63,11 +68,14 @@ protected.include_router(tasks_router)
 protected.include_router(projects_router)
 protected.include_router(shares_router)
 protected.include_router(calendar_router)
+protected.include_router(focus_router)
+protected.include_router(music_router)
 protected.include_router(notifications_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)
 protected.include_router(search_router)
 protected.include_router(usage_router)
+protected.include_router(stats_router)
 protected.include_router(system_router)
 api_router.include_router(protected)
