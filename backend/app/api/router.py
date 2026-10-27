@@ -19,6 +19,7 @@ from app.features.conversations.router import router as conversations_router
 from app.features.documents.router import router as documents_router
 from app.features.files.router import router as files_router
 from app.features.focus.router import router as focus_router
+from app.features.links.router import router as links_router
 from app.features.mcp.router import router as mcp_router
 from app.features.memory.router import router as memory_router
 from app.features.music.router import router as music_router
@@ -55,6 +56,7 @@ protected.include_router(runs_router)
 protected.include_router(attachments_router)
 protected.include_router(agent_router)
 protected.include_router(permissions_router)
+protected.include_router(links_router)
 protected.include_router(files_router)
 protected.include_router(shell_router)
 protected.include_router(profiles_router)

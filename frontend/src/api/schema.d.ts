@@ -1163,6 +1163,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/{task_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Files */
+        get: operations["list_task_files_api_tasks__task_id__files_get"];
+        put?: never;
+        /**
+         * Attach File
+         * @description Attach a file that is already in the workspace.
+         */
+        post: operations["attach_file_api_tasks__task_id__files_post"];
+        /**
+         * Detach File
+         * @description Remove the attachment. The file stays in Files.
+         */
+        delete: operations["detach_file_api_tasks__task_id__files_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{task_id}/files/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Task Files
+         * @description Upload files and attach them. They go into the task's project folder
+         *     (projects/<name>/), or files/ when the task has no project.
+         */
+        post: operations["upload_task_files_api_tasks__task_id__files_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{task_id}/backlinks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Backlinks */
+        get: operations["task_backlinks_api_tasks__task_id__backlinks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/backlinks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Document Backlinks */
+        get: operations["document_backlinks_api_documents__document_id__backlinks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/files/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * File Backlinks
+         * @description Where a file is used: tasks it is attached to or linked from, and documents
+         *     that link to it. Asked before deleting it.
+         */
+        get: operations["file_backlinks_api_files_links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/files/upload-folder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upload Folder
+         * @description Where files added from a document or task go (created if missing).
+         */
+        get: operations["upload_folder_api_files_upload_folder_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/files": {
         parameters: {
             query?: never;
@@ -1278,7 +1399,8 @@ export interface paths {
         /**
          * Move
          * @description Rename or move (cut and paste). A document moved within documents/ keeps its
-         *     history: the documents index recognises it by its content.
+         *     history: the documents index recognises it by its content. Task attachments and
+         *     links to the file (or into the folder) in tasks and documents follow it.
          */
         post: operations["move_api_files_move_post"];
         delete?: never;
@@ -1667,6 +1789,27 @@ export interface paths {
          *     inside documents/ (a project's documents).
          */
         get: operations["recent_documents_api_documents_recent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/by-path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document By Path
+         * @description The document stored in a .md file under documents/ (Files and search open
+         *     documents in the Documents editor, never as plain text).
+         */
+        get: operations["document_by_path_api_documents_by_path_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2786,6 +2929,11 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** AttachIn */
+        AttachIn: {
+            /** Path */
+            path: string;
+        };
         /** AttachmentOut */
         AttachmentOut: {
             /**
@@ -2965,6 +3113,13 @@ export interface components {
             /** Max Retries */
             max_retries?: number | null;
         };
+        /** Backlinks */
+        Backlinks: {
+            /** Tasks */
+            tasks: components["schemas"]["LinkedTask"][];
+            /** Documents */
+            documents: components["schemas"]["LinkedDocument"][];
+        };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
             /** File */
@@ -2984,6 +3139,11 @@ export interface components {
         Body_upload_asset_api_documents_assets_post: {
             /** File */
             file: string;
+        };
+        /** Body_upload_task_files_api_tasks__task_id__files_upload_post */
+        Body_upload_task_files_api_tasks__task_id__files_upload_post: {
+            /** Files */
+            files: string[];
         };
         /** BranchIn */
         BranchIn: {
@@ -3820,6 +3980,30 @@ export interface components {
              * @default 1
              */
             max_subagent_depth: number;
+        };
+        /** LinkedDocument */
+        LinkedDocument: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Path */
+            path: string;
+        };
+        /** LinkedTask */
+        LinkedTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
         };
         /** ListingOut */
         ListingOut: {
@@ -5690,6 +5874,24 @@ export interface components {
             tag: string;
             /** Count */
             count: number;
+        };
+        /** TaskFileOut */
+        TaskFileOut: {
+            /** Path */
+            path: string;
+            /** Name */
+            name: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+            /** Exists */
+            exists: boolean;
+            /** Size */
+            size: number | null;
+            /** Mime */
+            mime: string | null;
         };
         /** TaskIn */
         TaskIn: {
@@ -8655,6 +8857,278 @@ export interface operations {
             };
         };
     };
+    list_task_files_api_tasks__task_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskFileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_file_api_tasks__task_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskFileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_file_api_tasks__task_id__files_delete: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_task_files_api_tasks__task_id__files_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_task_files_api_tasks__task_id__files_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskFileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_backlinks_api_tasks__task_id__backlinks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backlinks"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_backlinks_api_documents__document_id__backlinks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backlinks"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    file_backlinks_api_files_links_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backlinks"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_folder_api_files_upload_folder_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_folder_api_files_get: {
         parameters: {
             query?: {
@@ -9914,6 +10388,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecentDocument"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_by_path_api_documents_by_path_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
                 };
             };
             /** @description Validation Error */

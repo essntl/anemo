@@ -10,6 +10,9 @@ import { Select } from '@/components/ui/Select'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
 import { focusOnTask } from '@/features/focus/focusOnTask'
+import { BacklinkList } from '@/features/links/BacklinkList'
+import { TaskAttachments } from '@/features/links/TaskAttachments'
+import { useTaskBacklinks } from '@/features/links/api'
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -55,6 +58,7 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
   const [remind, setRemind] = useState(task?.remind_minutes != null ? String(task.remind_minutes) : '')
   const [projectId, setProjectId] = useState(task?.project_id ?? defaults?.project_id ?? '')
   const [tags, setTags] = useState((task?.tags ?? []).join(', '))
+  const backlinks = useTaskBacklinks(task?.id ?? null)
   const pending = create.isPending || update.isPending
   const error = create.error ?? update.error ?? remove.error ?? saveProject.error
 
@@ -148,6 +152,8 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
           <Field label="Tags" hint="Comma-separated">
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="errands, phone" />
           </Field>
+          <TaskAttachments taskId={task?.id ?? null} projectId={projectId || null} />
+          <BacklinkList title="Linked from" links={backlinks.data} />
           {task && status !== 'done' && status !== 'cancelled' && (
             <Button variant="secondary" icon={<Timer className="h-4 w-4" />} onClick={() => focusOnTask(task)}>
               Focus on this

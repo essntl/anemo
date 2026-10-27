@@ -12,6 +12,7 @@ from app.features.calendar import models as calendar_models
 from app.features.conversations import models as conversations_models
 from app.features.documents import models as documents_models
 from app.features.focus import models as focus_models
+from app.features.links import models as links_models
 from app.features.mcp import models as mcp_models
 from app.features.memory import models as memory_models
 from app.features.music import models as music_models
@@ -40,6 +41,7 @@ __all__ = [
     "focus_models",
     "jobs_models",
     "knowledge_models",
+    "links_models",
     "mcp_models",
     "memory_models",
     "music_models",

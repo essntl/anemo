@@ -17,6 +17,9 @@ from pydantic import BaseModel, Field
 from app.api.deps import Db, client_ip
 from app.core.errors import AppError
 from app.features.audit import service as audit
+from app.features.links import service as links
+from app.features.settings import service as settings
+from app.features.settings.sections import FilesSettings
 from app.workspace import files
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -82,15 +85,33 @@ def _out(e: files.Entry) -> EntryOut:
     return EntryOut(**e.__dict__)
 
 
+DOCUMENTS_DIR = "documents"
+
+
+async def _show_documents(db: Db) -> bool:
+    """Files hides documents/ (the Documents library) unless Settings → Workspace says
+    to show it. Agents and the documents themselves are not affected."""
+    return (await settings.get_section(db, FilesSettings, "files")).show_documents_folder
+
+
+def _in_documents(path: str) -> bool:
+    return path == DOCUMENTS_DIR or path.startswith(DOCUMENTS_DIR + "/")
+
+
 @router.get("", response_model=ListingOut)
-async def list_folder(path: str = Query("", max_length=1000)) -> ListingOut:
+async def list_folder(db: Db, path: str = Query("", max_length=1000)) -> ListingOut:
     entries = await asyncio.to_thread(files.list_dir, path or ".")
+    if not path.strip("/. ") and not await _show_documents(db):
+        entries = [e for e in entries if e.path != DOCUMENTS_DIR]
     return ListingOut(path=path.strip("/"), entries=[_out(e) for e in entries])
 
 
 @router.get("/search", response_model=list[EntryOut])
-async def search(q: str = Query(min_length=1, max_length=200)) -> list[EntryOut]:
-    return [_out(e) for e in await asyncio.to_thread(files.search, q)]
+async def search(db: Db, q: str = Query(min_length=1, max_length=200)) -> list[EntryOut]:
+    entries = await asyncio.to_thread(files.search, q)
+    if not await _show_documents(db):
+        entries = [e for e in entries if not _in_documents(e.path)]
+    return [_out(e) for e in entries]
 
 
 @router.get("/content", response_model=ContentOut)
@@ -160,10 +181,14 @@ async def make_folder(body: PathIn) -> EntryOut:
 
 
 @router.post("/move", response_model=EntryOut)
-async def move(body: MoveIn) -> EntryOut:
+async def move(body: MoveIn, db: Db) -> EntryOut:
     """Rename or move (cut and paste). A document moved within documents/ keeps its
-    history: the documents index recognises it by its content."""
-    _, target = await asyncio.to_thread(files.move, body.source, body.destination, body.keep_both)
+    history: the documents index recognises it by its content. Task attachments and
+    links to the file (or into the folder) in tasks and documents follow it."""
+    source, target = await asyncio.to_thread(
+        files.move, body.source, body.destination, body.keep_both
+    )
+    await links.on_moved(db, files.rel(source), files.rel(target), author="user")
     return _out(files.entry(target))
 
 

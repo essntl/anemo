@@ -99,3 +99,13 @@ describe('document Markdown helpers', () => {
     expect(needsSourceMode('A claim.[^1]\n\n[^1]: Source')).toBe(true)
   })
 })
+
+describe('images from Files', () => {
+  it('keep their app address (so moving the file can update the link)', async () => {
+    const { imagesToEditor, imagesToFile } = await import('./markdown')
+    const editor = '![Photo](/api/files/download?path=files%2Fphoto.jpg) and ![Pasted](/api/files/download?path=documents%2F_assets%2Fp.png)'
+    const file = imagesToFile(editor, 'documents/notes/a.md')
+    expect(file).toBe('![Photo](/api/files/download?path=files%2Fphoto.jpg) and ![Pasted](../_assets/p.png)')
+    expect(imagesToEditor(file, 'documents/notes/a.md')).toBe(editor)
+  })
+})

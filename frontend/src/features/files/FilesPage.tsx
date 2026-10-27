@@ -3,7 +3,7 @@
  * The URL holds the state (?path=folder&file=path) so views can be linked and reloaded.
  */
 import { useEffect, useState, type DragEvent } from 'react'
-import { useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import {
   ChevronRight,
   ClipboardPaste,
@@ -30,6 +30,9 @@ import { chooseDialog, confirmDialog, promptDialog } from '@/components/ui/dialo
 import { EmptyState } from '@/components/ui/EmptyState'
 import { toast } from '@/components/ui/toast'
 import { useProjects } from '@/features/tasks/api'
+import { BacklinkList } from '@/features/links/BacklinkList'
+import { fileBacklinks, linkedFromText, useFileBacklinks } from '@/features/links/api'
+import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import {
   downloadUrl,
@@ -134,8 +137,11 @@ function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
   const cut = () => clipboard.put(entry, 'cut')
   const copy = () => clipboard.put(entry, 'copy')
   const remove = async () => {
+    // Say where it is used first: tasks and documents that link to it.
+    const used = await fileBacklinks(entry.path).then(linkedFromText, () => null)
     const ok = await confirmDialog({
-      title: `Move "${entry.name}" to the trash?`, message: 'You can restore it from Trash later.',
+      title: `Move "${entry.name}" to the trash?`,
+      message: used ? `${used} Those links stop working until you restore it from Trash.` : 'You can restore it from Trash later.',
       confirmLabel: 'Move to trash', danger: true,
     })
     if (ok) trash.mutate(entry.path)
@@ -226,7 +232,19 @@ function PasteBar({ folder }: { folder: string }) {
   )
 }
 
+/** Where a file is used, under its preview. */
+function UsedIn({ path }: { path: string }) {
+  const links = useFileBacklinks(path)
+  if (!links.data || (!links.data.tasks.length && !links.data.documents.length)) return null
+  return (
+    <div className="max-h-48 shrink-0 overflow-y-auto border-t border-border px-4 py-3">
+      <BacklinkList title="Used in" links={links.data} />
+    </div>
+  )
+}
+
 export function FilesPage() {
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   // With a project chosen in the sidebar, the file manager starts in its folder.
   // '.' in the address means the workspace root (so you can still go up from there).
@@ -287,12 +305,30 @@ export function FilesPage() {
     if (e.dataTransfer.files.length) upload.mutate({ folder: path, files: Array.from(e.dataTransfer.files) })
   }
 
+  // A link to a file (/files?path=<file>, from a document or task) opens its folder with
+  // the file shown.
+  const notAFolder = folder.isError && !!requested && requested !== '.'
+  useEffect(() => {
+    if (!notAFolder || !requested) return
+    void api.GET('/api/files', { params: { query: { path: parentOf(requested) } } }).then(({ data }) => {
+      const hit = data?.entries.find((e) => e.path === requested && !e.is_dir)
+      if (hit) setParams(new URLSearchParams({ path: parentOf(requested) || '.', file: requested }), { replace: true })
+    })
+  }, [notAFolder, requested, setParams])
+  // Pages of the Documents library open in the Documents editor, never as plain text.
+  useEffect(() => {
+    if (!openFile?.startsWith('documents/') || !openFile.endsWith('.md')) return
+    void api.GET('/api/documents/by-path', { params: { query: { path: openFile } } }).then(({ data }) => {
+      if (data) void navigate(`/documents/${data.id}`, { replace: true })
+    })
+  }, [openFile, navigate])
+
   const searching = query.trim().length > 0
   const entries = searching ? (search.data ?? []) : (folder.data?.entries ?? [])
   const selectedEntry = openFile ? entries.find((e) => e.path === openFile) ?? {
     name: openFile.split('/').pop() ?? openFile, path: openFile, is_dir: false, size: 0, modified: '', mime: null,
   } : null
-  const error = folder.error ?? makeFolder.error ?? saveFile.error ?? upload.error
+  const error = (notAFolder ? null : folder.error) ?? makeFolder.error ?? saveFile.error ?? upload.error
 
   return (
     <div className="island-reserve flex h-full">
@@ -338,7 +374,8 @@ export function FilesPage() {
       </div>
       {selectedEntry && (
         <div className="flex min-w-0 flex-1 flex-col border-l border-border lg:max-w-[55%]">
-          <FilePreview entry={selectedEntry} onClose={() => go({ file: null })} />
+          <div className="min-h-0 flex-1"><FilePreview entry={selectedEntry} onClose={() => go({ file: null })} /></div>
+          <UsedIn path={selectedEntry.path} />
         </div>
       )}
       <TrashDialog open={trashOpen} onOpenChange={setTrashOpen} />

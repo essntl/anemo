@@ -254,10 +254,9 @@ async def _events(db: AsyncSession, q: Query) -> list[SearchHit]:
 async def _files(db: AsyncSession, q: Query) -> list[SearchHit]:
     """Workspace files and folders by name (not by content)."""
     entries = await asyncio.to_thread(files.search, q.text.strip())
-    # Documents are Markdown files too; they are listed as documents, not twice.
-    entries = [
-        e for e in entries if not (e.path.startswith("documents/") and e.name.endswith(".md"))
-    ]
+    # documents/ is the Documents library: its pages are found as documents (and open
+    # in the Documents editor), and its pasted images are not files of their own.
+    entries = [e for e in entries if e.path != "documents" and not e.path.startswith("documents/")]
     hits = []
     for entry in entries[: q.limit]:
         folder = entry.path.rpartition("/")[0]

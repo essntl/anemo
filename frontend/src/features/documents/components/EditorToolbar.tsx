@@ -105,7 +105,7 @@ export function EditorToolbar({ editor, onPickLink, onPickImage }: {
       <ToolButton label="Strikethrough" active={state.strike} onClick={() => chain().toggleStrike().run()}><Strikethrough /></ToolButton>
       <ToolButton label="Inline code" active={state.code} onClick={() => chain().toggleCode().run()}><Code /></ToolButton>
       <ToolButton label="Link" active={state.link} onClick={() => void editLink()}><Link2 /></ToolButton>
-      <ToolButton label="Link to a document or task" onClick={onPickLink}><FileSymlink /></ToolButton>
+      <ToolButton label="Link to a document, task or file" onClick={onPickLink}><FileSymlink /></ToolButton>
       <Divider />
       <ToolButton label="Bullet list" active={state.bullet} onClick={() => chain().toggleBulletList().run()}><List /></ToolButton>
       <ToolButton label="Numbered list" active={state.ordered} onClick={() => chain().toggleOrderedList().run()}><ListOrdered /></ToolButton>

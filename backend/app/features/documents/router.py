@@ -98,6 +98,17 @@ async def recent_documents(
     return out
 
 
+@router.get("/by-path", response_model=DocumentOut)
+async def document_by_path(db: Db, path: str) -> DocumentOut:
+    """The document stored in a .md file under documents/ (Files and search open
+    documents in the Documents editor, never as plain text)."""
+    await service.reconcile(db)
+    doc = await service.by_path(db, path.strip("/"))
+    if doc is None:
+        raise NotFound("Not a document")
+    return _out(doc)
+
+
 @router.get("", response_model=DocumentList)
 async def list_documents(db: Db) -> DocumentList:
     folders = await service.reconcile(db)
