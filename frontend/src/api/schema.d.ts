@@ -299,6 +299,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/focus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Focus Settings */
+        put: operations["put_focus_settings_api_settings_focus_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/music": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Music Settings */
+        put: operations["put_music_settings_api_settings_music_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Home Settings */
+        put: operations["put_home_settings_api_settings_home_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Files Settings */
+        put: operations["put_files_settings_api_settings_files_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -2413,6 +2481,10 @@ export interface components {
             workspace: components["schemas"]["WorkspaceSettings"];
             web: components["schemas"]["WebSettings"];
             memory: components["schemas"]["MemorySettings"];
+            focus: components["schemas"]["FocusSettings"];
+            music: components["schemas"]["MusicSettings"];
+            home: components["schemas"]["HomeSettings"];
+            files: components["schemas"]["FilesSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -3240,6 +3312,79 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * FilesSettings
+         * @description The Files page.
+         */
+        FilesSettings: {
+            /**
+             * Show Documents Folder
+             * @default false
+             */
+            show_documents_folder: boolean;
+        };
+        /**
+         * FocusSettings
+         * @description The focus timer (Focus page, Home widget, Dynamic Island).
+         */
+        FocusSettings: {
+            /**
+             * Focus Minutes
+             * @default 25
+             */
+            focus_minutes: number;
+            /**
+             * Short Break Minutes
+             * @default 5
+             */
+            short_break_minutes: number;
+            /**
+             * Long Break Minutes
+             * @default 15
+             */
+            long_break_minutes: number;
+            /**
+             * Rounds Before Long Break
+             * @default 4
+             */
+            rounds_before_long_break: number;
+            /**
+             * Auto Start Breaks
+             * @default true
+             */
+            auto_start_breaks: boolean;
+            /**
+             * Auto Start Focus
+             * @default false
+             */
+            auto_start_focus: boolean;
+            /**
+             * Chime
+             * @default bell
+             * @enum {string}
+             */
+            chime: "bell" | "soft" | "none";
+            /**
+             * Chime Volume
+             * @default 0.6
+             */
+            chime_volume: number;
+            /**
+             * Title Countdown
+             * @default true
+             */
+            title_countdown: boolean;
+            /**
+             * Save To Notifications
+             * @default false
+             */
+            save_to_notifications: boolean;
+            /**
+             * Daily Goal Minutes
+             * @default 120
+             */
+            daily_goal_minutes: number;
+        };
         /** GeneralSettings */
         GeneralSettings: {
             /**
@@ -3258,11 +3403,25 @@ export interface components {
              * @default true
              */
             confirm_destructive_actions: boolean;
+            /**
+             * Start Page
+             * @default home
+             * @enum {string}
+             */
+            start_page: "home" | "new_chat";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HomeSettings
+         * @description The Home page layout, shared by every device (phones show one column).
+         */
+        HomeSettings: {
+            /** Layout */
+            layout?: components["schemas"]["WidgetLayout"][];
         };
         /** ImportIn */
         ImportIn: {
@@ -3789,6 +3948,22 @@ export interface components {
             } | null;
             /** Enabled */
             enabled?: boolean | null;
+        };
+        /**
+         * MusicSettings
+         * @description How the music player looks and talks.
+         */
+        MusicSettings: {
+            /**
+             * Blur Backdrop
+             * @default true
+             */
+            blur_backdrop: boolean;
+            /**
+             * Track Alerts
+             * @default true
+             */
+            track_alerts: boolean;
         };
         /** NotificationOut */
         NotificationOut: {
@@ -5447,6 +5622,38 @@ export interface components {
             env_searxng_url: string | null;
         };
         /**
+         * WidgetLayout
+         * @description One widget on the Home page. `w` columns and `h` rows (1-3 each).
+         */
+        WidgetLayout: {
+            /** Id */
+            id: string;
+            /**
+             * W
+             * @default 1
+             */
+            w: number;
+            /**
+             * H
+             * @default 1
+             */
+            h: number;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Options */
+            options?: {
+                [key: string]: string | null;
+            };
+        };
+        /**
          * WorkspaceSettings
          * @description Stored in app_settings["workspace"].
          */
@@ -6035,6 +6242,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemorySettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_focus_settings_api_settings_focus_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FocusSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_music_settings_api_settings_music_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MusicSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_home_settings_api_settings_home_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HomeSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_files_settings_api_settings_files_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilesSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilesSettings"];
                 };
             };
             /** @description Validation Error */

@@ -45,6 +45,23 @@
   --color-tool-waiting: var(--tool-waiting);
   --color-tool-denied: var(--tool-denied);
 
+  --color-phase-focus: var(--phase-focus);
+  --color-phase-short: var(--phase-short);
+  --color-phase-long: var(--phase-long);
+
+  --color-island: var(--island-bg);
+  --color-island-fg: var(--island-fg);
+  --color-island-muted: var(--island-muted);
+  --color-island-ring: var(--island-ring);
+  --color-island-control: var(--island-control);
+  --color-island-control-hover: var(--island-control-hover);
+  --color-island-track: var(--island-track);
+
+  --color-live: var(--live);
+  --color-artwork: var(--artwork-bg);
+  --color-artwork-scrim: var(--artwork-scrim);
+  --color-on-artwork: var(--on-artwork);
+
   --shadow-soft: var(--shadow-soft);
   --shadow-float: var(--shadow-float);
 
@@ -281,6 +298,10 @@
 .wave > span:nth-child(2) { animation-delay: 0.15s; }
 .wave > span:nth-child(3) { animation-delay: 0.3s; }
 
+/* Music: the "now playing" bars bounce while a track plays (Equalizer.tsx). */
+@keyframes eq-bar { 0%, 100% { transform: scaleY(0.3); } 25% { transform: scaleY(1); } 50% { transform: scaleY(0.55); } 75% { transform: scaleY(0.85); } }
+.eq-bar { transform-origin: bottom; }
+
 /* Something on its way out no longer takes clicks. */
 .fade[data-state='closed'], .pop[data-state='closed'], .sheet[data-state='closed'],
 .drawer[data-state='closed'], .toast[data-leaving] { pointer-events: none; }
@@ -294,7 +315,7 @@
 ::view-transition-new(page) { animation: page-in 180ms var(--ease-out) 60ms both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span { animation: none !important; }
+  .drawer, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span, .eq-bar { animation: none !important; }
   .shimmer { color: var(--text-muted); background: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

@@ -34,6 +34,17 @@ function GeneralForm({ initial }: { initial: General }) {
             ]}
           />
         </Field>
+        <Field label="Start page" hint="What opening Anemo shows. The New chat button always starts a chat.">
+          <Select
+            aria-label="Start page"
+            value={form.start_page}
+            onValueChange={(v) => setForm({ ...form, start_page: v as General['start_page'] })}
+            options={[
+              { value: 'home', label: 'Home' },
+              { value: 'new_chat', label: 'New chat' },
+            ]}
+          />
+        </Field>
         <label className="flex items-center gap-2 text-[13px]">
           <input
             type="checkbox"

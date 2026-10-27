@@ -10,6 +10,7 @@ import { CommandPalette } from '@/features/search/CommandPalette'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
 import { ShareDialog } from '@/features/shares/ShareDialog'
 import { MobileTopBar } from './mobileNav'
+import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
 import { Sidebar, SidebarRail } from './Sidebar'
 import { useSidebar } from './sidebarStore'
@@ -71,6 +72,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <PersistentLayer />
       <ReauthDialog />
       <DialogHost />
       <MoveChatsDialog />

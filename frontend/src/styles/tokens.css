@@ -38,6 +38,28 @@
   --tool-waiting: var(--warning);
   --tool-denied: var(--error);
 
+  /* Focus timer phases (the timer dial, the Island's ring, stats). */
+  --phase-focus: var(--accent);
+  --phase-short: var(--success);
+  --phase-long: var(--info);
+
+  /* Dynamic Island: a near-black pill in both themes. */
+  --island-bg: #0b0c0f;
+  --island-fg: #f5f6f8;
+  --island-muted: rgb(245 246 248 / 0.58);
+  --island-ring: rgb(255 255 255 / 0.1);
+  --island-control: rgb(255 255 255 / 0.1);
+  --island-control-hover: rgb(255 255 255 / 0.18);
+  --island-track: rgb(255 255 255 / 0.18);
+
+  /* A live radio stream (no seeking). */
+  --live: var(--error);
+
+  /* Music artwork placeholder and the dimmed overlay on a cover. */
+  --artwork-bg: var(--surface-2);
+  --artwork-scrim: rgb(0 0 0 / 0.45);
+  --on-artwork: #ffffff;
+
   --shadow-soft: 0 1px 2px rgb(15 20 30 / 0.04), 0 4px 16px rgb(15 20 30 / 0.05);
   --shadow-float: 0 2px 6px rgb(15 20 30 / 0.06), 0 16px 40px rgb(15 20 30 / 0.12);
 
@@ -68,6 +90,9 @@
   --warning: #f2a93b;
   --error: #f06464;
   --info: #5b9bff;
+
+  --island-bg: #000000;
+  --island-ring: rgb(255 255 255 / 0.12);
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
   --shadow-float: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.45);
