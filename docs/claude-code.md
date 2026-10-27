@@ -25,7 +25,7 @@ as before.
    `.env`, then run `docker compose --profile claude pull claude-runner` before the
    command above. The prebuilt image runs as user id 1000; if your `PUID` is
    different, build it yourself so the worker can read the runner's token. It is
-   published by `.github/workflows/claude-runner-image.yml`; each image is also
+   published by `.github/workflows/images.yml`; each runner image is also
    tagged with the Claude Code version it contains (`claude-code-2.1.308`).
 
    To have it start with everything else, add `claude` to `COMPOSE_PROFILES` in

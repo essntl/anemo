@@ -1,11 +1,12 @@
-# Anemo on ZimaOS (or CasaOS), using the images from Docker Hub:
-#   essntl/anemo:latest    the app and its background worker
-#   essntl/anemo:sandbox   the isolated shell that agents run commands in
-#   essntl/anemo:browser   a browser that agents can drive (about 1.3 GB)
-#   essntl/anemo:mcp-host  runs local MCP servers (`npx ...`, `uvx ...`)
-#   ghcr.io/essntl/anemo-claude-runner:latest
-#                          lets Anemo use your Claude subscription (Pro/Max) through
-#                          Claude Code, instead of API credits (docs/claude-code.md)
+# Anemo on ZimaOS (or CasaOS), using the prebuilt x86-64 images from GitHub's
+# registry (built from the main branch by .github/workflows/images.yml):
+#   ghcr.io/essntl/anemo                the app and its background worker
+#   ghcr.io/essntl/anemo-sandbox        the isolated shell that agents run commands in
+#   ghcr.io/essntl/anemo-browser        a browser that agents can drive (about 1.3 GB)
+#   ghcr.io/essntl/anemo-mcp-host       runs local MCP servers (`npx ...`, `uvx ...`)
+#   ghcr.io/essntl/anemo-claude-runner  lets Anemo use your Claude subscription
+#                                       (Pro/Max) through Claude Code, instead of API
+#                                       credits (docs/claude-code.md)
 # The last three are optional: delete the `browser`, `mcp-host` or `claude-runner`
 # service below if you do not want it; the app then shows that feature as "not running".
 #
@@ -129,7 +130,7 @@ services:
 
   # Prepares or updates the database, then exits.
   migrate:
-    image: essntl/anemo:latest
+    image: ghcr.io/essntl/anemo:latest
     restart: "no"
     command: ["alembic", "upgrade", "head"]
     environment: *settings
@@ -139,7 +140,7 @@ services:
     networks: [core]
 
   app:
-    image: essntl/anemo:latest
+    image: ghcr.io/essntl/anemo:latest
     restart: unless-stopped
     environment: *settings
     ports:
@@ -167,7 +168,7 @@ services:
 
   # Runs chats, agents, automations and reminders in the background.
   worker:
-    image: essntl/anemo:latest
+    image: ghcr.io/essntl/anemo:latest
     restart: unless-stopped
     command: ["python", "-m", "app.main_worker"]
     environment: *settings
@@ -198,7 +199,7 @@ services:
 
   # Where agents run shell commands: no root, no network, only the workspace.
   sandbox:
-    image: essntl/anemo:sandbox
+    image: ghcr.io/essntl/anemo-sandbox:latest
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
@@ -224,7 +225,7 @@ services:
 
   # The same, with internet access (only used when you allow "Shell with network").
   sandbox-net:
-    image: essntl/anemo:sandbox
+    image: ghcr.io/essntl/anemo-sandbox:latest
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
@@ -257,7 +258,7 @@ services:
   # in Settings > MCP. MCP servers reached by a URL do not need it. It has internet
   # access, but no route to the database, no workspace and none of the app's secrets.
   mcp-host:
-    image: essntl/anemo:mcp-host
+    image: ghcr.io/essntl/anemo-mcp-host:latest
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
@@ -286,7 +287,7 @@ services:
   # your own network unless you allow them in Settings > Web & Search.
   # No workspace, no database, no secrets.
   browser:
-    image: essntl/anemo:browser
+    image: ghcr.io/essntl/anemo-browser:latest
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]

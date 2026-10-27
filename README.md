@@ -462,9 +462,11 @@ you will be asked to confirm your password.
 
 ### ZimaOS / CasaOS (prebuilt images)
 
-Images are on Docker Hub for 64-bit Intel/AMD machines: `essntl/anemo:latest` (app
-and worker), `:sandbox` (the shell sandbox), `:browser` (the agents' browser) and
-`:mcp-host` (local MCP servers).
+Images for 64-bit Intel/AMD machines are built from `main` on every change and
+published to GitHub's registry: `ghcr.io/essntl/anemo:latest` (app and worker),
+`ghcr.io/essntl/anemo-sandbox` (the shell sandbox), `-browser` (the agents' browser),
+`-mcp-host` (local MCP servers) and `-claude-runner` (the Claude subscription
+provider). Older builds are also on Docker Hub (`essntl/anemo`).
 [`deploy/zimaos/docker-compose.yml`](deploy/zimaos/docker-compose.yml) uses them
 and needs no `.env` file:
 
