@@ -2654,6 +2654,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stats
+         * @description Focus, tasks, projects and agent activity from `from` to `to` (local days,
+         *     both included), grouped by day in the time zone of Settings → General.
+         */
+        get: operations["get_stats_api_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/status": {
         parameters: {
             query?: never;
@@ -2675,6 +2696,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentStats */
+        AgentStats: {
+            /** Runs By Day */
+            runs_by_day: components["schemas"]["DayValue"][];
+            /** Runs */
+            runs: number;
+            /** Documents By Agents */
+            documents_by_agents: number;
+            /** Documents By You */
+            documents_by_you: number;
+        };
         /** AllSettings */
         AllSettings: {
             general: components["schemas"]["GeneralSettings"];
@@ -3222,6 +3254,16 @@ export interface components {
             /** Content */
             content?: string | null;
         };
+        /** DayValue */
+        DayValue: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Value */
+            value: number;
+        };
         /** DecisionIn */
         DecisionIn: {
             /**
@@ -3657,6 +3699,29 @@ export interface components {
              * @default 120
              */
             daily_goal_minutes: number;
+        };
+        /** FocusStats */
+        FocusStats: {
+            /** Total Minutes */
+            total_minutes: number;
+            /** Sessions */
+            sessions: number;
+            /** Completed */
+            completed: number;
+            /** Cut Short */
+            cut_short: number;
+            /** Daily Average Minutes */
+            daily_average_minutes: number;
+            /** Current Streak */
+            current_streak: number;
+            /** Longest Streak */
+            longest_streak: number;
+            /** By Day */
+            by_day: components["schemas"]["DayValue"][];
+            /** Heatmap */
+            heatmap: components["schemas"]["DayValue"][];
+            /** By Hour */
+            by_hour: number[];
         };
         /** GeneralSettings */
         GeneralSettings: {
@@ -4677,6 +4742,19 @@ export interface components {
              */
             documents: number;
         };
+        /** ProjectStats */
+        ProjectStats: {
+            /** Project Id */
+            project_id: string | null;
+            /** Name */
+            name: string;
+            /** Color */
+            color: string | null;
+            /** Focus Minutes */
+            focus_minutes: number;
+            /** Tasks Completed */
+            tasks_completed: number;
+        };
         /** ProviderIn */
         ProviderIn: {
             /** Name */
@@ -5552,6 +5630,26 @@ export interface components {
             /** Fingerprint */
             fingerprint?: string | null;
         };
+        /** StatsOut */
+        StatsOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Timezone */
+            timezone: string;
+            focus: components["schemas"]["FocusStats"];
+            tasks: components["schemas"]["TaskStats"];
+            /** Projects */
+            projects: components["schemas"]["ProjectStats"][];
+            agents: components["schemas"]["AgentStats"];
+        };
         /** SummaryItem */
         SummaryItem: {
             /** Capability */
@@ -5689,6 +5787,31 @@ export interface components {
             tags?: string[] | null;
             /** Project Id */
             project_id?: string | null;
+        };
+        /** TaskRef */
+        TaskRef: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Title */
+            title: string;
+            /** Minutes */
+            minutes: number;
+        };
+        /** TaskStats */
+        TaskStats: {
+            /** Completed By Day */
+            completed_by_day: components["schemas"]["DayValue"][];
+            /** Created */
+            created: number;
+            /** Completed */
+            completed: number;
+            /** Overdue Now */
+            overdue_now: number;
+            /** Top By Focus */
+            top_by_focus: components["schemas"]["TaskRef"][];
         };
         /** TestOut */
         TestOut: {
@@ -12437,6 +12560,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageRecordOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stats_api_stats_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsOut"];
                 };
             };
             /** @description Validation Error */

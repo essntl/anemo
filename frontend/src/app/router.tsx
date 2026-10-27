@@ -51,6 +51,7 @@ export const router = createBrowserRouter([
           { path: 'calendar', ...page(() => import('@/features/calendar/CalendarPage'), 'CalendarPage') },
           { path: 'focus', ...page(() => import('@/features/focus/FocusPage'), 'FocusPage') },
           { path: 'music', ...page(() => import('@/features/music/MusicPage'), 'MusicPage') },
+          { path: 'stats', ...page(() => import('@/features/stats/StatsPage'), 'StatsPage') },
           { path: 'runs', ...page(() => import('@/features/runs/pages/RunsPage'), 'RunsPage') },
           { path: 'runs/:runId', ...page(() => import('@/features/runs/pages/RunDetailPage'), 'RunDetailPage') },
           { path: 'automations', ...page(() => import('@/features/automations/AutomationsPage'), 'AutomationsPage') },

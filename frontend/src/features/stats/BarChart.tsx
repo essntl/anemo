@@ -26,7 +26,7 @@ export function BarChart({ data, height = 180, goal, format = formatMinutes, cla
   const [hover, setHover] = useState<number | null>(null)
   const minutes = format === formatMinutes
   const raw = Math.max(minutes ? 30 : 4, goal ?? 0, ...data.map((d) => d.value))
-  const step = minutes ? 30 : raw > 20 ? 10 : raw > 8 ? 2 : 1
+  const step = minutes ? (raw > 120 ? 60 : 30) : raw > 20 ? 10 : raw > 8 ? 2 : 1
   const top = Math.ceil(raw / step) * step
   const ticks = height < 110 ? [0, top] : [0, top / 2, top]
   const tick = (t: number) => (minutes ? (t >= 60 ? `${Math.round((t / 60) * 10) / 10}h` : `${t}m`) : String(Math.round(t)))

@@ -11720,6 +11720,93 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Get Stats",
+        "description": "Focus, tasks, projects and agent activity from `from` to `to` (local days,\nboth included), grouped by day in the time zone of Settings \u2192 General.",
+        "operationId": "get_stats_api_stats_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "To"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/status": {
       "get": {
         "tags": [
@@ -11772,6 +11859,37 @@
   },
   "components": {
     "schemas": {
+      "AgentStats": {
+        "properties": {
+          "runs_by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "Runs By Day"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "documents_by_agents": {
+            "type": "integer",
+            "title": "Documents By Agents"
+          },
+          "documents_by_you": {
+            "type": "integer",
+            "title": "Documents By You"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs_by_day",
+          "runs",
+          "documents_by_agents",
+          "documents_by_you"
+        ],
+        "title": "AgentStats"
+      },
       "AllSettings": {
         "properties": {
           "general": {
@@ -13422,6 +13540,25 @@
         ],
         "title": "CreateIn"
       },
+      "DayValue": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "value": {
+            "type": "integer",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "value"
+        ],
+        "title": "DayValue"
+      },
       "DecisionIn": {
         "properties": {
           "decision": {
@@ -14536,6 +14673,73 @@
         "type": "object",
         "title": "FocusSettings",
         "description": "The focus timer (Focus page, Home widget, Dynamic Island)."
+      },
+      "FocusStats": {
+        "properties": {
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "cut_short": {
+            "type": "integer",
+            "title": "Cut Short"
+          },
+          "daily_average_minutes": {
+            "type": "number",
+            "title": "Daily Average Minutes"
+          },
+          "current_streak": {
+            "type": "integer",
+            "title": "Current Streak"
+          },
+          "longest_streak": {
+            "type": "integer",
+            "title": "Longest Streak"
+          },
+          "by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "By Day"
+          },
+          "heatmap": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "Heatmap"
+          },
+          "by_hour": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "By Hour"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_minutes",
+          "sessions",
+          "completed",
+          "cut_short",
+          "daily_average_minutes",
+          "current_streak",
+          "longest_streak",
+          "by_day",
+          "heatmap",
+          "by_hour"
+        ],
+        "title": "FocusStats"
       },
       "GeneralSettings": {
         "properties": {
@@ -17274,6 +17478,54 @@
         ],
         "title": "ProjectOut"
       },
+      "ProjectStats": {
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "focus_minutes": {
+            "type": "integer",
+            "title": "Focus Minutes"
+          },
+          "tasks_completed": {
+            "type": "integer",
+            "title": "Tasks Completed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "name",
+          "color",
+          "focus_minutes",
+          "tasks_completed"
+        ],
+        "title": "ProjectStats"
+      },
       "ProviderIn": {
         "properties": {
           "name": {
@@ -19644,6 +19896,51 @@
         ],
         "title": "SshKeyOut"
       },
+      "StatsOut": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "focus": {
+            "$ref": "#/components/schemas/FocusStats"
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/TaskStats"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectStats"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "agents": {
+            "$ref": "#/components/schemas/AgentStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "timezone",
+          "focus",
+          "tasks",
+          "projects",
+          "agents"
+        ],
+        "title": "StatsOut"
+      },
       "SummaryItem": {
         "properties": {
           "capability": {
@@ -20113,6 +20410,69 @@
         },
         "type": "object",
         "title": "TaskPatch"
+      },
+      "TaskRef": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "title",
+          "minutes"
+        ],
+        "title": "TaskRef"
+      },
+      "TaskStats": {
+        "properties": {
+          "completed_by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayValue"
+            },
+            "type": "array",
+            "title": "Completed By Day"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "overdue_now": {
+            "type": "integer",
+            "title": "Overdue Now"
+          },
+          "top_by_focus": {
+            "items": {
+              "$ref": "#/components/schemas/TaskRef"
+            },
+            "type": "array",
+            "title": "Top By Focus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "completed_by_day",
+          "created",
+          "completed",
+          "overdue_now",
+          "top_by_focus"
+        ],
+        "title": "TaskStats"
       },
       "TestOut": {
         "properties": {

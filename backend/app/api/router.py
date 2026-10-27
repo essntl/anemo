@@ -35,6 +35,7 @@ from app.features.shares.public_router import router as shares_public_router
 from app.features.shares.router import router as shares_router
 from app.features.shell.router import router as shell_router
 from app.features.skills.router import router as skills_router
+from app.features.stats.router import router as stats_router
 from app.features.system_router import router as system_router
 from app.features.tasks.router import router as tasks_router
 from app.features.usage.router import router as usage_router
@@ -73,5 +74,6 @@ protected.include_router(mcp_router)
 protected.include_router(browser_router)
 protected.include_router(search_router)
 protected.include_router(usage_router)
+protected.include_router(stats_router)
 protected.include_router(system_router)
 api_router.include_router(protected)
