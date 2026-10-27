@@ -42,6 +42,8 @@
   --phase-focus: var(--accent);
   --phase-short: var(--success);
   --phase-long: var(--info);
+  /* The unfilled part of a progress ring. */
+  --ring-track: #e8eaef;
 
   /* Dynamic Island: a near-black pill in both themes. */
   --island-bg: #0b0c0f;
@@ -92,6 +94,7 @@
   --info: #5b9bff;
 
   --island-bg: #000000;
+  --ring-track: #272c35;
   --island-ring: rgb(255 255 255 / 0.12);
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);

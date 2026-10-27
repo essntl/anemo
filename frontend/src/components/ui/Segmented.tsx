@@ -90,7 +90,7 @@ export function Segmented<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cn(
-              'relative flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] font-medium transition-colors [&_svg]:h-4 [&_svg]:w-4',
+              'relative flex min-w-0 flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] font-medium transition-colors [&_svg]:h-4 [&_svg]:w-4',
               size === 'sm' ? 'h-7 px-2.5 text-[12px] pointer-coarse:h-9' : 'h-8 px-3.5 text-[13px] pointer-coarse:h-10',
               active ? 'text-text' : 'text-muted hover:text-text',
             )}

@@ -2014,6 +2014,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/focus/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions */
+        get: operations["list_sessions_api_focus_sessions_get"];
+        put?: never;
+        /**
+         * Record Session
+         * @description Store a finished (or cut short) timer phase. Sending the same `client_id` again
+         *     returns the stored session instead of adding another.
+         */
+        post: operations["record_session_api_focus_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/focus/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Session */
+        delete: operations["delete_session_api_focus_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/focus/phase-ended": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Phase Ended
+         * @description Add "phase finished" to the Notifications list, if the user asked for that
+         *     (Focus settings). Otherwise the timer's notices stay in the browser.
+         */
+        post: operations["phase_ended_api_focus_phase_ended_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notifications": {
         parameters: {
             query?: never;
@@ -3056,7 +3116,7 @@ export interface components {
              */
             enabled: boolean;
             /** Kinds */
-            kinds?: ("reminder" | "automation" | "approval" | "agent")[];
+            kinds?: ("reminder" | "automation" | "approval" | "agent" | "focus")[];
         };
         /** DestinationOut */
         DestinationOut: {
@@ -3089,7 +3149,7 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
             /** Kinds */
-            kinds?: ("reminder" | "automation" | "approval" | "agent")[] | null;
+            kinds?: ("reminder" | "automation" | "approval" | "agent" | "focus")[] | null;
         };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
@@ -3322,6 +3382,76 @@ export interface components {
              * @default false
              */
             show_documents_folder: boolean;
+        };
+        /** FocusSessionIn */
+        FocusSessionIn: {
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Minutes */
+            minutes: number;
+            /**
+             * Phase
+             * @default focus
+             * @enum {string}
+             */
+            phase: "focus" | "short_break" | "long_break";
+            /** Task Id */
+            task_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Completed
+             * @default true
+             */
+            completed: boolean;
+            /** Client Id */
+            client_id?: string | null;
+        };
+        /** FocusSessionOut */
+        FocusSessionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Minutes */
+            minutes: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "focus" | "short_break" | "long_break";
+            /** Task Id */
+            task_id: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Completed */
+            completed: boolean;
+            /** Client Id */
+            client_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * FocusSettings
@@ -3985,7 +4115,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "reminder" | "automation" | "approval" | "agent";
+            kind: "reminder" | "automation" | "approval" | "agent" | "focus";
             /** Link */
             link: string | null;
             /** Read At */
@@ -4173,6 +4303,19 @@ export interface components {
              * @default off
              */
             plan_review: string;
+        };
+        /**
+         * PhaseEndedIn
+         * @description The timer finished a phase in a browser (for the Notifications list).
+         */
+        PhaseEndedIn: {
+            /** Title */
+            title: string;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
         };
         /** PlanIn */
         PlanIn: {
@@ -10367,6 +10510,143 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["OccurrenceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_focus_sessions_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                project_id?: string | null;
+                task_id?: string | null;
+                phase?: ("focus" | "short_break" | "long_break") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_session_api_focus_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FocusSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_session_api_focus_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phase_ended_api_focus_phase_ended_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhaseEndedIn"];
             };
         };
         responses: {

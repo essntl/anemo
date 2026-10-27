@@ -15,6 +15,7 @@ export const KIND_LABELS: Record<NotificationKind, string> = {
   automation: 'Results of automations',
   approval: 'An automation needs my approval',
   agent: 'Messages agents send me',
+  focus: 'The focus timer finished a phase',
 }
 
 const PAGE = 30

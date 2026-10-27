@@ -48,6 +48,7 @@ export const router = createBrowserRouter([
           { path: 'documents/:documentId', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage') },
           { path: 'tasks', ...page(() => import('@/features/tasks/TasksPage'), 'TasksPage') },
           { path: 'calendar', ...page(() => import('@/features/calendar/CalendarPage'), 'CalendarPage') },
+          { path: 'focus', ...page(() => import('@/features/focus/FocusPage'), 'FocusPage') },
           { path: 'runs', ...page(() => import('@/features/runs/pages/RunsPage'), 'RunsPage') },
           { path: 'runs/:runId', ...page(() => import('@/features/runs/pages/RunDetailPage'), 'RunDetailPage') },
           { path: 'automations', ...page(() => import('@/features/automations/AutomationsPage'), 'AutomationsPage') },

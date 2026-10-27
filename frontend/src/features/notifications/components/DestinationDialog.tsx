@@ -14,7 +14,8 @@ export function DestinationDialog({ destination, onClose }: { destination: Desti
     name: destination?.name ?? '',
     url: '',
     enabled: destination?.enabled ?? true,
-    kinds: (destination?.kinds as NotificationKind[] | undefined) ?? KINDS,
+    // Focus timer notices are opt-in: they are mostly useful while you are at the screen.
+    kinds: (destination?.kinds as NotificationKind[] | undefined) ?? KINDS.filter((k) => k !== 'focus'),
   })
   const valid = form.name.trim() !== '' && (destination !== null || form.url.trim() !== '')
   const toggle = (kind: NotificationKind, on: boolean) =>

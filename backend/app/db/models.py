@@ -11,6 +11,7 @@ from app.features.automations import models as automations_models
 from app.features.calendar import models as calendar_models
 from app.features.conversations import models as conversations_models
 from app.features.documents import models as documents_models
+from app.features.focus import models as focus_models
 from app.features.mcp import models as mcp_models
 from app.features.memory import models as memory_models
 from app.features.notifications import models as notifications_models
@@ -35,6 +36,7 @@ __all__ = [
     "calendar_models",
     "conversations_models",
     "documents_models",
+    "focus_models",
     "jobs_models",
     "knowledge_models",
     "mcp_models",

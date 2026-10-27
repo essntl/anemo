@@ -19,6 +19,7 @@ import {
   Plus,
   Search,
   Settings,
+  Timer,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -182,6 +183,7 @@ export function SidebarRail({ className }: { className?: string }) {
       <RailLink to="/documents" label="Documents" icon={<FileText />} />
       <RailLink to="/tasks" label="Tasks" icon={<CheckSquare />} />
       <RailLink to="/calendar" label="Calendar" icon={<CalendarDays />} />
+      <RailLink to="/focus" label="Focus" icon={<Timer />} />
       <RailLink to="/runs" label="Runs" icon={<History />} badge={<RunsBadge />} />
       <RailLink to="/automations" label="Automations" icon={<Clock />} />
       <RailLink to="/agents" label="Profiles & Skills" icon={<Bot />} />
@@ -268,6 +270,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <Page to="/documents" icon={<FileText />}>Documents</Page>
         <Page to="/tasks" icon={<CheckSquare />}>Tasks</Page>
         <Page to="/calendar" icon={<CalendarDays />}>Calendar</Page>
+        <Page to="/focus" icon={<Timer />}>Focus</Page>
         <Page to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</Page>
         <Page to="/automations" icon={<Clock />}>Automations</Page>
         <Page to="/agents" icon={<Bot />} title="Profiles & Skills">Agents</Page>

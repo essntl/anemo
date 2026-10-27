@@ -6,7 +6,8 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, Field, field_validator
 
 Level = Literal["info", "success", "warning", "error"]
-Kind = Literal["reminder", "automation", "approval", "agent"]
+Kind = Literal["reminder", "automation", "approval", "agent", "focus"]
+# What a new destination receives. Focus timer notices are opt-in per destination.
 KINDS: tuple[Kind, ...] = ("reminder", "automation", "approval", "agent")
 
 

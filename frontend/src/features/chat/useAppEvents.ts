@@ -64,6 +64,11 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: ['tasks'] })
       void qc.invalidateQueries({ queryKey: ['projects'] })
     })
+    // Focus sessions were recorded (this or another device).
+    source.addEventListener('focus.changed', () => {
+      void qc.invalidateQueries({ queryKey: ['focus'] })
+      void qc.invalidateQueries({ queryKey: ['stats'] })
+    })
     source.addEventListener('calendar.changed', () => void qc.invalidateQueries({ queryKey: ['calendar'] }))
     // An MCP server was checked, or its tools changed.
     source.addEventListener('mcp.changed', () => void qc.invalidateQueries({ queryKey: mcpKey }))
@@ -71,8 +76,10 @@ export function useAppEvents() {
     // A new notification (a reminder, an automation's result, ...): show it as a
     // desktop notification when the tab is in the background, else as a notice here.
     source.addEventListener('notification', ((e: MessageEvent<string>) => {
-      const note = JSON.parse(e.data) as { id: string; title: string; body: string; link: string | null }
+      const note = JSON.parse(e.data) as { id: string; title: string; body: string; link: string | null; kind?: string }
       void qc.invalidateQueries({ queryKey: notificationsKey })
+      // The focus timer already chimed and told the user in this browser.
+      if (note.kind === 'focus') return
       const open = () => void navigate(note.link ?? '/notifications')
       if (showDesktopNotification(note, open)) return
       // About what is on screen already (e.g. the agent's question in the open chat).

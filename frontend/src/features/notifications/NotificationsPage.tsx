@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { AlarmClock, Bell, Bot, CheckCheck, Clock, ShieldQuestion, Trash2, X } from 'lucide-react'
+import { AlarmClock, Bell, Bot, CheckCheck, Clock, ShieldQuestion, Timer, Trash2, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
@@ -28,6 +28,7 @@ const ICONS: Record<NotificationKind, typeof Bell> = {
   automation: Clock,
   approval: ShieldQuestion,
   agent: Bot,
+  focus: Timer,
 }
 const LEVEL_COLORS: Record<Notification['level'], string> = {
   info: 'bg-accent-soft text-accent',

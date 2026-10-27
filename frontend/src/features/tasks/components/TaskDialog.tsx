@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Trash2 } from 'lucide-react'
+import { Timer, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
@@ -9,6 +9,7 @@ import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
+import { focusOnTask } from '@/features/focus/focusOnTask'
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -147,6 +148,11 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
           <Field label="Tags" hint="Comma-separated">
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="errands, phone" />
           </Field>
+          {task && status !== 'done' && status !== 'cancelled' && (
+            <Button variant="secondary" icon={<Timer className="h-4 w-4" />} onClick={() => focusOnTask(task)}>
+              Focus on this
+            </Button>
+          )}
           {error && <p className="text-[12.5px] text-error">{errorMessage(error)}</p>}
 
           {/* Phone: a bar that stays at the bottom of the sheet (which has no padding of its
