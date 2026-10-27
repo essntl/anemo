@@ -16,8 +16,11 @@ export async function login(page: Page) {
   await page.getByRole('button', { name: 'Sign in' }).click()
   await page.waitForURL((url) => !url.pathname.startsWith('/login'))
   // The first page of a session is the start page (Home, or a new chat: Settings → General).
+  // Wait until it is showing, not just on the way there (/ may still redirect to Home).
   await expect(page.locator('#main-column')).toBeVisible()
-  await page.waitForURL((url) => url.pathname === '/home' || url.pathname === '/')
+  await expect(
+    page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ }).or(page.getByPlaceholder('Message the assistant…')).first(),
+  ).toBeVisible()
 }
 
 /**
@@ -54,6 +57,9 @@ export async function newChat(page: Page, mode: 'Chat' | 'Agent', modelId: strin
 export async function pickModel(page: Page, modelId: string) {
   await page.getByRole('combobox', { name: 'Model' }).click()
   await page.locator(`[role="option"][data-value="${modelId}"]`).click()
+  // The list hands focus back to its button when its closing animation ends; typing
+  // before that would have Enter open the list again instead of sending.
+  await expect(page.getByRole('listbox')).toHaveCount(0)
 }
 
 /** Types an answer into the app's name dialog (e.g. "New folder") and submits it. */

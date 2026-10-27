@@ -41,11 +41,20 @@ test('rearrange and resize widgets; the layout is saved', async ({ page }) => {
     await page.keyboard.press('Shift+ArrowRight')
     await expect(today).toHaveAttribute('aria-label', /Today, 2 by 2/)
 
-    // Mouse: drag Music onto Focus (once the grid has settled after the resize).
-    await page.waitForTimeout(600)
+    // Mouse: drag Music onto Focus, once the grid has stopped moving after the resize.
     const music = page.locator('[data-widget="music"]')
+    const focus = page.locator('[data-widget="focus"]')
+    let last = ''
+    await expect
+      .poll(async () => {
+        const now = JSON.stringify([await music.boundingBox(), await focus.boundingBox()])
+        const still = now === last
+        last = now
+        return still
+      }, { intervals: [250] })
+      .toBe(true)
     const box = (await music.boundingBox())!
-    const target = (await page.locator('[data-widget="focus"]').boundingBox())!
+    const target = (await focus.boundingBox())!
     await page.mouse.move(box.x + 40, box.y + 60)
     await page.mouse.down()
     await page.mouse.move(target.x + target.width / 2, target.y + 50, { steps: 12 })
