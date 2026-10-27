@@ -1,0 +1,96 @@
+# Builds Anemo's images and publishes them to GitHub's container registry, so an
+# install can pull them instead of building:
+#   ghcr.io/essntl/anemo                  the app and its background worker
+#   ghcr.io/essntl/anemo-sandbox          the shell sandbox (sandbox and sandbox-net)
+#   ghcr.io/essntl/anemo-browser          the browser agents can drive
+#   ghcr.io/essntl/anemo-mcp-host         runs local MCP servers
+#   ghcr.io/essntl/anemo-claude-runner    Claude Code sessions (Claude subscription)
+# x86-64 only. Tags: latest (main), sha-<short> (every build), <version> (v* tags);
+# the runner is also tagged claude-code-<CLI version>.
+# Runs on every push to main, on version tags, and by hand (Actions > Images >
+# Run workflow). Unchanged images rebuild from the layer cache in seconds.
+name: Images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    name: ${{ matrix.image }} (linux/amd64)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: anemo
+            context: .
+            dockerfile: backend/Dockerfile
+          - image: anemo-sandbox
+            context: sandbox
+            dockerfile: sandbox/Dockerfile
+          - image: anemo-browser
+            context: browser
+            dockerfile: browser/Dockerfile
+          - image: anemo-mcp-host
+            context: mcp-host
+            dockerfile: mcp-host/Dockerfile
+          - image: anemo-claude-runner
+            context: claude-runner
+            dockerfile: claude-runner/Dockerfile
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # The runner pins a Claude Code version (checked again inside its build).
+      - name: Read the pinned Claude Code version
+        id: cli
+        if: matrix.image == 'anemo-claude-runner'
+        run: echo "version=$(sed -n 's/^ARG CLAUDE_CODE_VERSION=//p' claude-runner/Dockerfile)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=claude-code-${{ steps.cli.outputs.version }},enable=${{ steps.cli.outputs.version != '' && github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      # The runner's tests (real Claude Code CLI, fake API) against the pushed image.
+      - name: Test the published runner image
+        if: matrix.image == 'anemo-claude-runner'
+        run: >
+          docker run --rm -u root -v "$PWD/claude-runner:/src" -w /src
+          --entrypoint sh "${{ env.IMAGE }}:sha-${GITHUB_SHA::7}" /src/tests/run.sh
