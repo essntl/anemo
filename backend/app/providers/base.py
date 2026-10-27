@@ -115,6 +115,15 @@ class ChatRequest(BaseModel):
     reasoning_effort: ReasoningEffort | None = None
     # Per-model provider settings stored on the model row (e.g. {"thinking": "adaptive"}).
     provider_options: dict[str, Any] = {}
+    # Set by the runtime for conversation and agent runs: which long-lived model
+    # session this request continues ("<conversation id>:<mode>", or a run id for
+    # sub-agents and automations). None = a one-shot request (titles, summaries,
+    # memory extraction). Only session-holding adapters (claude_code) use it.
+    session_key: str | None = None
+    # The volatile per-turn context (date and time, memories) of the newest user
+    # message. The runtime has already put it at the end of that message, so most
+    # adapters ignore this field; it lets session-holding adapters recognise it.
+    turn_context: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -156,9 +165,34 @@ class Usage:
     input_tokens: int | None = None
     output_tokens: int | None = None
     reasoning_tokens: int | None = None
-    cached_tokens: int | None = None
+    cached_tokens: int | None = None  # read from the prompt cache (part of input_tokens)
+    cache_creation_tokens: int | None = None  # written to the prompt cache (part of input_tokens)
     cost_usd: float | None = None  # only when the provider reports it
+    # claude_code: what the CLI says the request would have cost on the API. For
+    # information only (subscription usage has no per-token price).
+    equivalent_cost_usd: float | None = None
+    # Provider details for the per-request cache log line (claude_code: the Claude
+    # session id, whether a cache miss was expected and why).
+    meta: dict[str, Any] | None = None
     kind: Literal["usage"] = "usage"
+
+
+def sum_usage(parts: "list[Usage]") -> "Usage":
+    """Totals of several requests (None stays None only when no part reported it)."""
+
+    def total(name: str) -> Any:
+        values = [getattr(p, name) for p in parts if getattr(p, name) is not None]
+        return sum(values) if values else None
+
+    return Usage(
+        input_tokens=total("input_tokens"),
+        output_tokens=total("output_tokens"),
+        reasoning_tokens=total("reasoning_tokens"),
+        cached_tokens=total("cached_tokens"),
+        cache_creation_tokens=total("cache_creation_tokens"),
+        cost_usd=total("cost_usd"),
+        equivalent_cost_usd=total("equivalent_cost_usd"),
+    )
 
 
 StopReason = Literal["end", "tool_use", "max_tokens", "refusal", "error"]

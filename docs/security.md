@@ -116,6 +116,19 @@ sub-agent depth. When one is reached the run stops and says which.
 | Web pages and API calls | Addresses on your own network, the Docker host and cloud metadata addresses are refused unless you list them in Settings → Web & Search. Redirects are checked again. |
 | Browser | Its own container without workspace, database or secrets; the same address rules apply to everything it loads. |
 | MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
+| Claude Code | Runs in its own container without workspace, database or app secrets, and with no tools of its own: every tool call it makes is a normal Anemo tool call, checked here. |
+
+## Claude subscription (Claude Code)
+
+The optional `claude-runner` container lets Anemo use your Claude subscription by
+driving the Claude Code CLI ([details](claude-code.md)). Claude Code acts only as the
+model: it has no built-in tool, no MCP server except Anemo's own bridge, no settings,
+skills, plugins or claude.ai connectors, and every tool call it makes comes back to the
+worker and goes through the permission engine like any other model's. Only the worker
+can reach the runner (internal network plus a token). The Claude Code login stays in the
+`claude-config` volume, mounted in that container only: Anemo never reads, stores, logs
+or forwards it, and the CLI's environment is built from an allowlist (no Anthropic API
+key, token or base URL, none of Anemo's secrets).
 
 ## Secrets
 

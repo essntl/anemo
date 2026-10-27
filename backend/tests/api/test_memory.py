@@ -121,11 +121,16 @@ async def test_relevant_and_pinned_memories_reach_the_model(authed):
 
     script("Which language for my typescript project?", [TextDelta("TS."), Done("end")])
     run_id = await chat_turn(authed, cid, "Which language for my typescript project?")
-    system = FakeAdapter.requests[-1].system or ""
-    assert "What you know about the user" in system
-    assert "Prefers TypeScript" in system  # relevant by keywords
-    assert "Lives in Rotterdam" in system and "British English" in system  # always included
-    assert "Bruno" not in system  # unrelated
+    # Memories are in the turn context at the end of the user's message, never in the
+    # system prompt (which must stay the same for the prompt cache).
+    request = FakeAdapter.requests[-1]
+    assert "What you know about the user" not in (request.system or "")
+    context = request.messages[-1].content[-1].text
+    assert context.startswith("<turn_context>") and context == request.turn_context
+    assert "What you know about the user" in context
+    assert "Prefers TypeScript" in context  # relevant by keywords
+    assert "Lives in Rotterdam" in context and "British English" in context  # always included
+    assert "Bruno" not in context  # unrelated
     used = (await authed.get(f"/api/runs/{run_id}")).json()["memories_used"]
     assert len(used) == 3
     by_content = {m["content"]: m for m in await active(authed)}
@@ -134,7 +139,11 @@ async def test_relevant_and_pinned_memories_reach_the_model(authed):
 
     await authed.put("/api/settings/memory", json={"enabled": False})
     await chat_turn(authed, cid, "and again about typescript?")
-    assert "What you know about the user" not in (FakeAdapter.requests[-1].system or "")
+    latest = FakeAdapter.requests[-1].messages[-1].content[-1].text
+    assert latest.startswith("<turn_context>") and "What you know about the user" not in latest
+    # The earlier message still carries its own context, byte for byte.
+    earlier = [m for m in FakeAdapter.requests[-1].messages if m.role == "user"][0]
+    assert earlier.content[-1].text == context
 
 
 async def test_embeddings_index_and_reindex(authed):

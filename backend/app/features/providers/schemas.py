@@ -4,7 +4,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-ProviderType = Literal["openai", "anthropic", "openrouter", "openai_compatible", "fake"]
+ProviderType = Literal[
+    "openai", "anthropic", "openrouter", "openai_compatible", "claude_code", "fake"
+]
 
 
 def _check_url(v: str | None) -> str | None:
@@ -55,6 +57,16 @@ class ProviderTypeOut(BaseModel):
     label: str
     default_base_url: str | None
     needs_key: bool
+
+
+class ClaudeRunnerStatus(BaseModel):
+    """The claude-runner as the worker last saw it (the app cannot reach it)."""
+
+    state: Literal["signed_in", "not_signed_in", "not_running"]
+    auth_method: str | None = None
+    cli_version: str | None = None
+    login_command: str
+    start_command: str
 
 
 class TestResult(BaseModel):

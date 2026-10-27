@@ -55,6 +55,8 @@ class UsageRecordOut(BaseModel):
     conversation_id: uuid.UUID | None
     input_tokens: int | None
     output_tokens: int | None
+    cached_tokens: int | None = None  # read from the prompt cache
+    cache_creation_tokens: int | None = None  # written to the prompt cache
     cost_usd: float | None
     cost_source: str
 

@@ -65,6 +65,19 @@ jobs:
           docker compose --profile browser run --rm --no-deps -T
           -v "$PWD/browser:/src:ro" --entrypoint sh browser /src/tests/run.sh
 
+  claude-runner:
+    name: Claude runner (pinned Claude Code CLI, fake API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Settings so compose can read the file
+        run: printf 'APP_SECRET_KEY=%s\nPOSTGRES_PASSWORD=x\n' "$(openssl rand -hex 32)" > .env
+      - run: docker compose --profile claude build claude-runner
+      - name: Tests inside the claude-runner image
+        run: >
+          docker run --rm -u root -v "$PWD/claude-runner:/src" -w /src
+          --entrypoint sh ai-workspace-claude-runner:latest /src/tests/run.sh
+
   e2e:
     name: End-to-end (throwaway stack, scripted model)
     runs-on: ubuntu-latest

@@ -37,6 +37,7 @@ os.environ.update(
         "WORKSPACE_PATH": tempfile.mkdtemp(prefix="aiw-test-ws-") + "/workspace",
         # Tests never use the optional containers, even when they happen to be running.
         "BROWSER_TOKEN_FILE": "/nonexistent/browser-token",
+        "CLAUDE_RUNNER_TOKEN_FILE": "/nonexistent/claude-runner-token",
         "MCP_HOST_TOKEN_FILE": "/nonexistent/mcp-host-token",
     }
 )

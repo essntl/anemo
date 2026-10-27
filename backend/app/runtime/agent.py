@@ -26,7 +26,6 @@ import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import ValidationError
 from sqlalchemy import select, update
@@ -42,6 +41,7 @@ from app.features.automations.models import Automation
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.memory import extraction
 from app.features.memory import service as memory
+from app.features.memory.schemas import MemorySettings
 from app.features.notifications import service as notifications
 from app.features.profiles import service as profiles
 from app.features.profiles.models import AgentProfile
@@ -71,7 +71,7 @@ from app.providers.base import (
 )
 from app.providers.catalog import rejects_tools
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
-from app.runtime import citations, compaction, outputs, subagents
+from app.runtime import citations, compaction, outputs, subagents, turn_context
 from app.runtime.chat import (
     SYSTEM_PROMPT as CHAT_SYSTEM_PROMPT,
 )
@@ -109,7 +109,8 @@ KEEP_RECENT_FORCED = 0.2
 
 AGENT_SYSTEM_PROMPT = """\
 You are an autonomous assistant working inside the user's personal, self-hosted AI \
-workspace. You can use tools to act. It is {date} in the user's time zone ({tz}).
+workspace. You can use tools to act. The current date and time, and memories that fit \
+the user's message, are in the turn context at the end of the user's latest message.
 
 How to work:
 - For tasks with several steps, first call update_plan with a short plan, and keep it \
@@ -195,13 +196,11 @@ def build_system_prompt(
     profile: AgentProfile | None,
     skills: list[dict[str, str]],
     plan_review: str,
-    tz: str = "UTC",
 ) -> str:
-    try:
-        now = datetime.now(ZoneInfo(tz))
-    except (ZoneInfoNotFoundError, ValueError):
-        now, tz = datetime.now(UTC), "UTC"
-    system = AGENT_SYSTEM_PROMPT.format(date=f"{now:%A, %Y-%m-%d %H:%M}", tz=tz)
+    """The stable part of the prompt: nothing in it changes from one run to the next
+    (no date, time or retrieved memories - those go into the turn context), so the
+    prompt cache keeps hitting across the turns of a conversation."""
+    system = AGENT_SYSTEM_PROMPT
     if profile is not None and profile.instructions.strip():
         system += PROFILE_SECTION.format(
             name=profile.name, instructions=profile.instructions.strip()
@@ -254,7 +253,13 @@ class AgentRun:
         browser_session: uuid.UUID | None = None,
         ancestors: list[Policy] | None = None,
         project_id: uuid.UUID | None = None,
+        session_key: str | None = None,
+        turn_context: str | None = None,
     ) -> None:
+        # Which model session this run continues (claude_code), and the turn context
+        # of its user message (see runtime/turn_context.py).
+        self.session_key = session_key
+        self.turn_context = turn_context
         # For a sub-agent: the policies of the agents above it (it may do no more).
         self.ancestors = ancestors or []
         self.run_id = run_id
@@ -342,18 +347,38 @@ class AgentRun:
         return None
 
     def _add_usage(
-        self, db: AsyncSession, run: Run, model: ResolvedModel, used: Usage, kind: str
+        self,
+        db: AsyncSession,
+        run: Run,
+        model: ResolvedModel,
+        used: Usage | list[Usage],
+        kind: str,
     ) -> None:
-        rec = usage.record(
-            db, model, used, kind, run_id=run.id, conversation_id=run.conversation_id
-        )
+        """One usage record per model request; the run totals add them up."""
         totals = dict(run.totals)
-        totals["input_tokens"] = totals.get("input_tokens", 0) + (used.input_tokens or 0)
-        totals["output_tokens"] = totals.get("output_tokens", 0) + (used.output_tokens or 0)
-        if rec.cost_usd is not None:
-            totals["cost_usd"] = round(totals.get("cost_usd", 0.0) + float(rec.cost_usd), 6)
-        else:
-            totals["cost_unknown"] = True
+        for part in used if isinstance(used, list) else [used]:
+            rec = usage.record(
+                db, model, part, kind, run_id=run.id, conversation_id=run.conversation_id
+            )
+            totals["input_tokens"] = totals.get("input_tokens", 0) + (part.input_tokens or 0)
+            totals["output_tokens"] = totals.get("output_tokens", 0) + (part.output_tokens or 0)
+            if part.cached_tokens:
+                totals["cache_read_tokens"] = (
+                    totals.get("cache_read_tokens", 0) + part.cached_tokens
+                )
+            if part.cache_creation_tokens:
+                totals["cache_creation_tokens"] = (
+                    totals.get("cache_creation_tokens", 0) + part.cache_creation_tokens
+                )
+            if rec.cost_usd is not None:
+                totals["cost_usd"] = round(totals.get("cost_usd", 0.0) + float(rec.cost_usd), 6)
+            else:
+                totals["cost_unknown"] = True
+            if part.equivalent_cost_usd is not None:
+                # Claude subscription: what this would have cost on the API (information).
+                totals["api_equivalent_cost_usd"] = round(
+                    totals.get("api_equivalent_cost_usd", 0.0) + part.equivalent_cost_usd, 6
+                )
         run.totals = totals
 
     async def _pause_requested(self, db: AsyncSession) -> bool:
@@ -420,7 +445,11 @@ class AgentRun:
                         status=exc.status,
                     ) from exc
                 # The context was too long after all: compact harder and retry once.
-                if forced_compaction or not compaction.is_context_error(exc):
+                if (
+                    forced_compaction
+                    or not compaction.is_context_error(exc)
+                    or self.candidates[0].provider_type == "claude_code"
+                ):
                     raise
                 forced_compaction = True
                 async with get_sessionmaker()() as db:
@@ -460,17 +489,29 @@ class AgentRun:
         return is_chat
 
     def _builder(self, rendered: dict[bool, list[Message]]) -> RequestBuilder:
-        specs = [] if self.tools_off else [t.spec() for t in self.tools.values()]
+        # Sorted by name, so the tool list (the start of every prompt) is the same
+        # bytes on every request of a run and across runs: a prompt-cache prefix.
+        specs = (
+            []
+            if self.tools_off
+            else [t.spec() for t in sorted(self.tools.values(), key=lambda t: t.name)]
+        )
 
         def build(model: ResolvedModel) -> ChatRequest:
             history = rendered[bool(model.capabilities.get("vision"))]
             return ChatRequest(
                 model=model.model_key,
                 system=self.system,
-                messages=trim_to_budget(history, _budget(model)),
+                # Claude Code keeps (and compacts) the conversation itself; trimming
+                # here would make every request look like an edited history.
+                messages=history
+                if model.provider_type == "claude_code"
+                else trim_to_budget(history, _budget(model)),
                 tools=specs,
                 reasoning=bool(model.capabilities.get("reasoning")),
                 provider_options=model.provider_options,
+                session_key=self.session_key,
+                turn_context=self.turn_context,
             )
 
         return build
@@ -496,7 +537,9 @@ class AgentRun:
         run.model_id = result.model.model_id
         label = f"{result.model.display_name} · {result.model.provider_name}"
         run.totals = {**run.totals, "model_label": label}
-        self._add_usage(db, run, result.model, result.usage, self.usage_kind)
+        self._add_usage(
+            db, run, result.model, result.usage_parts or [result.usage], self.usage_kind
+        )
         self._checkpoint_time(run)
 
     @staticmethod
@@ -540,6 +583,8 @@ class AgentRun:
         *,
         force: bool = False,
     ) -> list[Message]:
+        if self.candidates[0].provider_type == "claude_code":
+            return transcript  # Claude Code compacts its own context
         budget = _budget(self.candidates[0])
         used = estimate_tokens(transcript) + len(self.system) // 4
         if not force and used <= budget * COMPACT_AT:
@@ -597,7 +642,7 @@ class AgentRun:
                     Message(role="assistant", content=[TextBlock(text=result.text)]).model_dump(),
                 ]
             self._append_text(run, result)
-            self._add_usage(db, run, result.model, result.usage, "agent")
+            self._add_usage(db, run, result.model, result.usage_parts or [result.usage], "agent")
             self._checkpoint_time(run)
             await _save_progress(db, run)
             await db.commit()
@@ -1153,7 +1198,11 @@ CHAT_LIMITS = Limits(max_steps=8, max_tool_calls=16, max_runtime_s=900)
 def _last_user_text(transcript: list[Message]) -> str:
     for message in reversed(transcript):
         if message.role == "user":
-            return " ".join(b.text for b in message.content if isinstance(b, TextBlock))
+            return " ".join(
+                b.text
+                for b in message.content
+                if isinstance(b, TextBlock) and not turn_context.is_context_block(b)
+            )
     return ""
 
 
@@ -1184,15 +1233,12 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
     if not chat and level_for(settings, "mcp.*") != "deny":
         mcp_refs, mcp_rules = await mcp_tool.snapshot(db)
         snap_policy.rules = [*mcp_rules, *snap_policy.rules]
-    if chat:
-        system = CHAT_SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat())
-    else:
-        general = await settings_service.get_section(db, GeneralSettings, "general")
-        system = build_system_prompt(profile, skills, settings.plan_review, general.timezone)
-    # Memories relevant to this message, and the instructions for the memory tools.
+    # The system prompt is the stable part only (see build_system_prompt); the date,
+    # time and the memories that fit this message go into the turn context below.
+    system = (
+        CHAT_SYSTEM_PROMPT if chat else build_system_prompt(profile, skills, settings.plan_review)
+    )
     memory_settings = await memory.get_settings(db)
-    section, used = await memory.build_context(db, _last_user_text(transcript), memory_settings)
-    system += section
     if memory_settings.enabled:
         system += memory.MEMORY_TOOLS_HINT
     # The chat's project: where its files are, and the user's instructions for it.
@@ -1212,6 +1258,8 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
         system += subagents.SUBAGENT_SECTION
         if inherited:
             system += AUTOMATION_ON_ASK[inherited["on_ask"]] + "\n"
+    general = await settings_service.get_section(db, GeneralSettings, "general")
+    used = await _add_turn_context(db, run, transcript, general.timezone, memory_settings)
     run.options = {**run.options, "memory_context": used}
     run.policy = {
         "policy": snap_policy.model_dump(by_alias=True),
@@ -1240,6 +1288,44 @@ async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> No
         if profile and profile.default_model_id
         else None,
     }
+
+
+def session_key_for(run: Run) -> str:
+    """Which long-lived model session a run continues (used by claude_code): one per
+    conversation and mode; sub-agents and automation runs get their own."""
+    if run.parent_run_id is not None or run.automation_id is not None or not run.conversation_id:
+        return f"run:{run.id}"
+    mode = "agent" if run.kind == "agent" else "chat"
+    return f"conv:{run.conversation_id}:{mode}"
+
+
+async def _add_turn_context(
+    db: AsyncSession,
+    run: Run,
+    transcript: list[Message],
+    tz: str,
+    memory_settings: MemorySettings,
+) -> list[dict[str, str]]:
+    """Render the turn context for the run's user message, save it with that message
+    (so later runs replay the same bytes) and put it at the end of the message in the
+    transcript. Returns the memories that went in."""
+    message = await db.get(ChatMessage, run.user_message_id) if run.user_message_id else None
+    last = transcript[-1] if transcript and transcript[-1].role == "user" else None
+    known = (message.turn_context if message else None) or turn_context.existing(last)
+    if known:
+        # Already rendered (and already in the history loaded from the database), e.g.
+        # when an answer is regenerated: the same bytes are sent again.
+        run.options = {**run.options, "turn_context": known}
+        return list(run.options.get("memory_context", []))
+    section, used = await memory.build_context(db, _last_user_text(transcript), memory_settings)
+    text = turn_context.render(tz, section)
+    if message is not None:
+        message.turn_context = text
+    if transcript and transcript[-1].role == "user":
+        transcript[-1] = turn_context.attach(transcript[-1], text)
+        run.transcript = [m.model_dump() for m in transcript]
+    run.options = {**run.options, "turn_context": text}
+    return used
 
 
 async def _resolve_models(db: AsyncSession, run: Run, needs: set[str]) -> list[ResolvedModel]:
@@ -1387,6 +1473,8 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         browser_session=browser_session,
         ancestors=ancestors,
         project_id=project_id,
+        session_key=session_key_for(run),
+        turn_context=run.options.get("turn_context"),
     )
     task = asyncio.create_task(agent.drive())
     flag = CancelFlag()

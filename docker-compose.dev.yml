@@ -50,6 +50,7 @@ services:
       - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
       - mcp-host-token:/run/mcp-host-token:ro
       - browser-token:/run/browser-token:ro
+      - claude-runner-token:/run/claude-runner-token:ro
 
   postgres:
     ports:

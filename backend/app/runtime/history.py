@@ -33,8 +33,10 @@ def estimate_tokens(messages: list[Message]) -> int:
 
 
 async def load_history(
-    db: AsyncSession, conversation_id: uuid.UUID, before_seq: int
+    db: AsyncSession, conversation_id: uuid.UUID, before_seq: int, *, with_context: bool = True
 ) -> list[Message]:
+    """The conversation as model input. `with_context`: each user message carries the
+    turn context it was first sent with (runtime/turn_context.py), byte for byte."""
     rows = await db.scalars(
         select(ChatMessage)
         .where(ChatMessage.conversation_id == conversation_id, ChatMessage.seq < before_seq)
@@ -49,6 +51,8 @@ async def load_history(
         except ValidationError:
             msg = Message(role=row.role, content=[TextBlock(text=row.text_plain)])  # type: ignore[arg-type]
         msg.content = [b for b in msg.content if not (isinstance(b, TextBlock) and not b.text)]
+        if with_context and row.role == "user" and row.turn_context:
+            msg.content.append(TextBlock(text=row.turn_context))
         if not msg.content:
             continue
         # Providers expect alternating roles: merge consecutive same-role messages.

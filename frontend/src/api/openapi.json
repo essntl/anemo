@@ -972,6 +972,56 @@
         }
       }
     },
+    "/api/providers/claude-code/status": {
+      "get": {
+        "tags": [
+          "providers"
+        ],
+        "summary": "Claude Code Status",
+        "description": "Whether the claude-runner is running and signed in with a Claude subscription.",
+        "operationId": "claude_code_status_api_providers_claude_code_status_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeRunnerStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/providers": {
       "get": {
         "tags": [
@@ -11650,6 +11700,57 @@
         ],
         "title": "Check"
       },
+      "ClaudeRunnerStatus": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "signed_in",
+              "not_signed_in",
+              "not_running"
+            ],
+            "title": "State"
+          },
+          "auth_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Method"
+          },
+          "cli_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cli Version"
+          },
+          "login_command": {
+            "type": "string",
+            "title": "Login Command"
+          },
+          "start_command": {
+            "type": "string",
+            "title": "Start Command"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "login_command",
+          "start_command"
+        ],
+        "title": "ClaudeRunnerStatus",
+        "description": "The claude-runner as the worker last saw it (the app cannot reach it)."
+      },
       "ContentOut": {
         "properties": {
           "path": {
@@ -15445,6 +15546,7 @@
               "anthropic",
               "openrouter",
               "openai_compatible",
+              "claude_code",
               "fake"
             ],
             "title": "Type"
@@ -15513,6 +15615,7 @@
               "anthropic",
               "openrouter",
               "openai_compatible",
+              "claude_code",
               "fake"
             ],
             "title": "Type"
@@ -15663,6 +15766,7 @@
               "anthropic",
               "openrouter",
               "openai_compatible",
+              "claude_code",
               "fake"
             ],
             "title": "Type"
@@ -18755,6 +18859,28 @@
               }
             ],
             "title": "Output Tokens"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
+          "cache_creation_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Creation Tokens"
           },
           "cost_usd": {
             "anyOf": [

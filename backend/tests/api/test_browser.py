@@ -139,12 +139,12 @@ async def test_agent_browses_after_one_approval(authed, browser):
         [TextDelta("Found them."), Done("end")],
     )
     run_id = await agent_turn(authed, cid, "find the otters")
-    assert offered() == [
+    assert offered() == [  # sorted by name (a stable prompt-cache prefix)
+        "browser_click",
         "browser_open",
         "browser_read",
-        "browser_click",
-        "browser_type",
         "browser_screenshot",
+        "browser_type",
     ]
     assert await run_status(authed, run_id) == "waiting_approval" and browser.calls == []
     approval = (await authed.get("/api/approvals")).json()[0]

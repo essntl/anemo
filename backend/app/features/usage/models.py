@@ -35,6 +35,7 @@ class UsageRecord(Base, IdMixin):
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     reasoning_tokens: Mapped[int | None] = mapped_column(Integer)
-    cached_tokens: Mapped[int | None] = mapped_column(Integer)
+    cached_tokens: Mapped[int | None] = mapped_column(Integer)  # read from the prompt cache
+    cache_creation_tokens: Mapped[int | None] = mapped_column(Integer)  # written to it
     cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
     cost_source: Mapped[str] = mapped_column(String(12))  # provider | estimated | unknown
