@@ -10,6 +10,8 @@ export interface MenuAction {
   onSelect?: () => void
   /** Renders a download link instead of a button. */
   download?: string
+  /** Renders a link that opens in a new tab (e.g. a track on YouTube). */
+  href?: string
   danger?: boolean
 }
 
@@ -37,6 +39,10 @@ export function ActionMenu({ actions, label = 'More actions', className }: { act
           {actions.map((a) =>
             a.download ? (
               <a key={a.label} href={a.download} download className={item(a.danger)} onClick={() => setOpen(false)}>
+                {a.icon} {a.label}
+              </a>
+            ) : a.href ? (
+              <a key={a.label} href={a.href} target="_blank" rel="noreferrer noopener" className={item(a.danger)} onClick={() => setOpen(false)}>
                 {a.icon} {a.label}
               </a>
             ) : (

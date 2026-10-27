@@ -21,6 +21,7 @@ from app.features.files.router import router as files_router
 from app.features.focus.router import router as focus_router
 from app.features.mcp.router import router as mcp_router
 from app.features.memory.router import router as memory_router
+from app.features.music.router import router as music_router
 from app.features.notifications.router import router as notifications_router
 from app.features.permissions_router import router as permissions_router
 from app.features.profiles.router import router as profiles_router
@@ -65,6 +66,7 @@ protected.include_router(projects_router)
 protected.include_router(shares_router)
 protected.include_router(calendar_router)
 protected.include_router(focus_router)
+protected.include_router(music_router)
 protected.include_router(notifications_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)

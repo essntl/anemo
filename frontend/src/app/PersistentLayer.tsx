@@ -1,4 +1,5 @@
 import { TimerEngine } from '@/features/focus/TimerEngine'
+import { PlayerEngine } from '@/features/music/PlayerEngine'
 
 /**
  * What keeps running while you move between pages: the focus timer's clock, the
@@ -10,6 +11,7 @@ export function PersistentLayer() {
   return (
     <>
       <TimerEngine />
+      <PlayerEngine />
     </>
   )
 }

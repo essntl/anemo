@@ -69,6 +69,8 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: ['focus'] })
       void qc.invalidateQueries({ queryKey: ['stats'] })
     })
+    // Playlists or the music library changed (this or another device).
+    source.addEventListener('music.changed', () => void qc.invalidateQueries({ queryKey: ['music'] }))
     source.addEventListener('calendar.changed', () => void qc.invalidateQueries({ queryKey: ['calendar'] }))
     // An MCP server was checked, or its tools changed.
     source.addEventListener('mcp.changed', () => void qc.invalidateQueries({ queryKey: mcpKey }))

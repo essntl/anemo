@@ -8,6 +8,7 @@ export interface SectionLink {
 export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'general', label: 'General' },
   { to: 'appearance', label: 'Appearance' },
+  { to: 'focus', label: 'Focus & music' },
   { to: 'providers', label: 'Providers & Models', sensitive: true },
   { to: 'permissions', label: 'Agent Permissions', sensitive: true },
   { to: 'workspace', label: 'Workspace', sensitive: true },
