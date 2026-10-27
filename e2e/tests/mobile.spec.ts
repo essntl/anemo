@@ -239,6 +239,7 @@ test('calendar on a phone: month with dots and the chosen day listed, + adds to 
 test('chat on a phone: send with the button, Enter adds a new line', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)
+  await page.goto('/') // the start page may be Home
   await page.getByRole('radio', { name: 'Chat' }).click()
   await pickModel(page, models.echo)
   const box = page.getByPlaceholder('Message the assistant…')
