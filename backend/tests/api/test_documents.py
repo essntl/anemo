@@ -300,3 +300,25 @@ async def test_image_assets(authed, docs):
     assert bad.status_code == 400 and bad.json()["error"]["code"] == "not_an_image"
     # Assets are not documents.
     assert (await authed.get("/api/documents")).json()["documents"] == []
+
+
+async def test_recent_documents_with_their_first_line(authed):
+    for title, folder, content in [
+        ("Ideas", "", "# Ideas\n\nA garden by the shed.\n\nMore later."),
+        ("Plan", "thesis", "---\ntags: [x]\n---\n# Plan\n- [ ] Write the intro\n"),
+        ("Empty", "", "# Empty\n"),
+    ]:
+        r = await authed.post(
+            "/api/documents", json={"title": title, "folder": folder, "content": content}
+        )
+        assert r.status_code == 201, r.text
+    recent = (await authed.get("/api/documents/recent")).json()
+    assert [d["title"] for d in recent] == ["Empty", "Plan", "Ideas"]
+    assert {d["title"]: d["excerpt"] for d in recent} == {
+        "Empty": "",
+        "Plan": "Write the intro",
+        "Ideas": "A garden by the shed.",
+    }
+    thesis = (await authed.get("/api/documents/recent", params={"folder": "thesis"})).json()
+    assert [d["title"] for d in thesis] == ["Plan"]
+    assert len((await authed.get("/api/documents/recent", params={"limit": 1})).json()) == 1

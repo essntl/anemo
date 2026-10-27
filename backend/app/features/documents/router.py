@@ -58,6 +58,46 @@ def _content(d: Document, content: str) -> DocumentContent:
     return DocumentContent(**_out(d).model_dump(), content=content, hash=d.content_hash)
 
 
+class RecentDocument(DocumentOut):
+    # The first line of text after the title (for the Home page).
+    excerpt: str
+
+
+def excerpt_of(content: str, title: str) -> str:
+    """The first line of real text: not the title, a heading mark, or front matter."""
+    lines = content.splitlines()
+    if lines and lines[0].strip() == "---":  # front matter
+        end = next((i for i, line in enumerate(lines[1:], 1) if line.strip() == "---"), 0)
+        lines = lines[end + 1 :]
+    for line in lines:
+        text = line.strip().lstrip("#>*-+ ").strip()
+        text = text.removeprefix("[ ] ").removeprefix("[x] ")
+        if text and text != title:
+            return text[:160]
+    return ""
+
+
+@router.get("/recent", response_model=list[RecentDocument])
+async def recent_documents(
+    db: Db, limit: int = 8, folder: str | None = None
+) -> list[RecentDocument]:
+    """The last edited documents, with their first line. `folder` narrows to a folder
+    inside documents/ (a project's documents)."""
+    await service.reconcile(db)
+    stmt = select(Document).order_by(Document.updated_at.desc())
+    if folder:
+        stmt = stmt.where(Document.path.startswith(f"{service.DOCS_DIR}/{folder.strip('/')}/"))
+    docs = list(await db.scalars(stmt.limit(max(1, min(limit, 30)))))
+    out: list[RecentDocument] = []
+    for d in docs:
+        try:
+            text = await service.read(db, d)
+        except (NotFound, OSError):
+            continue
+        out.append(RecentDocument(**_out(d).model_dump(), excerpt=excerpt_of(text, d.title)))
+    return out
+
+
 @router.get("", response_model=DocumentList)
 async def list_documents(db: Db) -> DocumentList:
     folders = await service.reconcile(db)

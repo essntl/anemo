@@ -15,7 +15,9 @@ export async function login(page: Page) {
   await page.getByLabel('Password').fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await page.waitForURL((url) => !url.pathname.startsWith('/login'))
-  await expect(page.getByRole('radiogroup', { name: 'Mode' })).toBeVisible()
+  // The first page of a session is the start page (Home, or a new chat: Settings → General).
+  await expect(page.locator('#main-column')).toBeVisible()
+  await page.waitForURL((url) => url.pathname === '/home' || url.pathname === '/')
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   FolderKanban,
   FolderOpen,
   History,
+  House,
   LogOut,
   MessagesSquare,
   Music,
@@ -179,6 +180,7 @@ export function SidebarRail({ className }: { className?: string }) {
       </button>
       <RailLink to="/chats" label="All chats" icon={<MessagesSquare />} />
       <Divider className="my-2 w-8" />
+      <RailLink to="/home" label="Home" icon={<House />} />
       <RailLink to="/projects" label="Projects" icon={<FolderKanban />} />
       <RailLink to="/files" label="Files" icon={<FolderOpen />} />
       <RailLink to="/documents" label="Documents" icon={<FileText />} />
@@ -267,6 +269,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
       <Divider className="mx-1 my-2" />
       {/* On a phone: three columns of small tiles, three rows instead of five. */}
       <nav aria-label="Pages" className={cn('grid shrink-0 gap-0.5', onClose ? 'grid-cols-3' : 'grid-cols-2')}>
+        <Page to="/home" icon={<House />}>Home</Page>
         <Page to="/projects" icon={<FolderKanban />}>Projects</Page>
         <Page to="/files" icon={<FolderOpen />}>Files</Page>
         <Page to="/documents" icon={<FileText />}>Documents</Page>

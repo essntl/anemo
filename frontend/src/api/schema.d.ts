@@ -1654,6 +1654,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent Documents
+         * @description The last edited documents, with their first line. `folder` narrows to a folder
+         *     inside documents/ (a project's documents).
+         */
+        get: operations["recent_documents_api_documents_recent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents": {
         parameters: {
             query?: never;
@@ -4745,6 +4766,31 @@ export interface components {
             default_base_url: string | null;
             /** Needs Key */
             needs_key: boolean;
+        };
+        /** RecentDocument */
+        RecentDocument: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Path */
+            path: string;
+            /** Folder */
+            folder: string;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number;
+            /** Last Editor */
+            last_editor: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Excerpt */
+            excerpt: string;
         };
         /**
          * ReferenceSummary
@@ -9711,6 +9757,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recent_documents_api_documents_recent_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                folder?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentDocument"][];
                 };
             };
             /** @description Validation Error */

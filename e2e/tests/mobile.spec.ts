@@ -10,6 +10,7 @@ signOutAfterEach()
 
 const SCREENS = [
   '/',
+  '/home',
   '/files',
   '/documents',
   '/tasks',
@@ -280,7 +281,7 @@ test('installable: manifest, icons and a service worker that never caches /api',
     await navigator.serviceWorker.ready
   })
   await page.reload() // now controlled by the service worker
-  await expect(page.getByRole('radiogroup', { name: 'Mode' })).toBeVisible()
+  await expect(page.locator('#main-column')).toBeVisible()
   await page.goto('/settings/general')
   await page.waitForLoadState('networkidle')
   const cached = await page.evaluate(async () => {
@@ -328,5 +329,32 @@ test('the Island takes the middle of the top bar and plays and pauses', async ({
     expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
   } finally {
     await removeTrack(page, baseURL!)
+  }
+})
+
+test('Home on a phone: the saved layout in one column, same order', async ({ page }) => {
+  await login(page)
+  const before = (await (await page.request.get('/api/settings')).json()).home
+  const layout = [
+    { id: 'music', w: 2, h: 1, hidden: false, pinned: false, options: {} },
+    { id: 'tasks', w: 3, h: 2, hidden: false, pinned: false, options: {} },
+    { id: 'focus', w: 1, h: 2, hidden: false, pinned: false, options: {} },
+    { id: 'today', w: 1, h: 1, hidden: true, pinned: false, options: {} },
+  ]
+  try {
+    await page.request.put('/api/settings/home', { data: { layout } })
+    await page.goto('/home')
+    await expect(page.locator('[data-widget="music"]')).toBeVisible()
+    const widgets = page.locator('[data-widget]')
+    const ids = await widgets.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.widget))
+    expect(ids.slice(0, 3)).toEqual(['music', 'tasks', 'focus'])
+    expect(ids).not.toContain('today')
+    // One column: every widget starts at the same x and spans the width.
+    const boxes = await widgets.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.x), Math.round(r.width)]))
+    expect(new Set(boxes.map(([x]) => x)).size).toBe(1)
+    expect(new Set(boxes.map(([, w]) => w)).size).toBe(1)
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+  } finally {
+    await page.request.put('/api/settings/home', { data: before })
   }
 })

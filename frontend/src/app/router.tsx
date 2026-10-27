@@ -3,11 +3,11 @@ import { createBrowserRouter, type To } from 'react-router'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { ConversationPage } from '@/features/chat/pages/ConversationPage'
-import { NewChatPage } from '@/features/chat/pages/NewChatPage'
 import { SettingsIndex, SettingsLayout } from '@/features/settings/pages/SettingsLayout'
 import { AppLayout } from './AppLayout'
 import type { RouteHandle } from './mobileNavStore'
 import { RouteError } from './RouteError'
+import { StartPage } from './StartPage'
 
 /**
  * Loads a page's code only when it is first opened. Chat is in the main bundle;
@@ -34,7 +34,8 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { index: true, element: <NewChatPage /> },
+          { index: true, element: <StartPage /> },
+          { path: 'home', ...page(() => import('@/features/home/HomePage'), 'HomePage') },
           {
             path: 'c/:conversationId',
             element: <ConversationPage />,
