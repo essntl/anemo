@@ -25,6 +25,7 @@ import {
   useUpdateTask,
 } from '../api'
 import { REMINDER_OPTIONS } from '../dates'
+import { repeatOptions } from '../repeat'
 
 const NEW_PROJECT = '__new__'
 
@@ -56,6 +57,7 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
   const [dueDate, setDueDate] = useState(task?.due_date ?? defaults?.due_date ?? '')
   const [dueTime, setDueTime] = useState(task?.due_time?.slice(0, 5) ?? '')
   const [remind, setRemind] = useState(task?.remind_minutes != null ? String(task.remind_minutes) : '')
+  const [repeat, setRepeat] = useState(task?.rrule ?? '')
   const [projectId, setProjectId] = useState(task?.project_id ?? defaults?.project_id ?? '')
   const [tags, setTags] = useState((task?.tags ?? []).join(', '))
   const backlinks = useTaskBacklinks(task?.id ?? null)
@@ -80,6 +82,7 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
       due_date: dueDate || null,
       due_time: dueDate && dueTime ? `${dueTime}:00` : null,
       remind_minutes: dueDate && remind !== '' ? Number(remind) : null,
+      rrule: dueDate && repeat ? repeat : null,
       project_id: projectId || null,
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
     }
@@ -136,6 +139,9 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
           </Field>
           <Field label="Reminder" hint={dueDate && !dueTime ? 'Counted from 09:00 on the due day' : undefined}>
             <Select value={remind} onValueChange={setRemind} disabled={!dueDate} options={reminderOptions(remind)} />
+          </Field>
+          <Field label="Repeat" hint={repeat && dueDate ? 'Finishing it adds the next one' : undefined}>
+            <Select value={dueDate ? repeat : ''} onValueChange={setRepeat} disabled={!dueDate} options={repeatOptions(repeat)} />
           </Field>
           <Field label="Project">
             <Select value={projectId} onValueChange={(v) => void chooseProject(v)}

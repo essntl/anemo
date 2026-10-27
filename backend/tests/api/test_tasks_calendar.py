@@ -394,3 +394,70 @@ async def test_agent_updates_and_deletes_with_the_right_risk(authed):
         ("Weekly sync", "2026-10-19T10:00:00Z", "Room 1"),  # the 12th was cancelled
     ]
     assert found[0]["end_at"] == "2026-10-05T11:00:00Z"  # length kept when only the start moved
+
+
+async def test_finishing_a_repeating_task_adds_the_next_one(authed):
+    await authed.put("/api/settings/general", json={"timezone": "UTC"})
+    today = datetime.now(UTC).date()
+    monday = today - timedelta(days=today.weekday()) + timedelta(days=7)  # next Monday
+
+    bad = await authed.post("/api/tasks", json={"title": "x", "rrule": "FREQ=WEEKLY"})
+    assert bad.status_code == 400 and bad.json()["error"]["code"] == "invalid_repeat"
+    bad = await authed.post(
+        "/api/tasks", json={"title": "x", "due_date": str(today), "rrule": "FREQ=HOURLY"}
+    )
+    assert bad.status_code == 422
+
+    weekly = (
+        await authed.post(
+            "/api/tasks",
+            json={
+                "title": "Water the plants",
+                "due_date": str(monday),
+                "rrule": "freq=weekly;byday=mo,th",
+                "tags": ["home"],
+            },
+        )
+    ).json()
+    assert weekly["rrule"] == "FREQ=WEEKLY;BYDAY=MO,TH"
+    r = await authed.patch(f"/api/tasks/{weekly['id']}", json={"status": "done"})
+    assert r.json()["rrule"] is None  # the rule moved on
+    open_tasks = (await authed.get("/api/tasks")).json()
+    [nxt] = [t for t in open_tasks if t["title"] == "Water the plants"]
+    assert nxt["due_date"] == str(monday + timedelta(days=3))
+    assert (nxt["rrule"], nxt["tags"], nxt["status"]) == (
+        "FREQ=WEEKLY;BYDAY=MO,TH",
+        ["home"],
+        "todo",
+    )
+
+    # Reopening and finishing the old one again does not add another.
+    await authed.patch(f"/api/tasks/{weekly['id']}", json={"status": "todo"})
+    await authed.patch(f"/api/tasks/{weekly['id']}", json={"status": "done"})
+    plants = [
+        t for t in (await authed.get("/api/tasks")).json() if t["title"] == "Water the plants"
+    ]
+    assert len(plants) == 1
+
+    # Weeks late: the next one is due from today on, not in the past. Finishing by
+    # dragging to the Done column counts too.
+    late = (
+        await authed.post(
+            "/api/tasks",
+            json={
+                "title": "Pay rent",
+                "due_date": str(today - timedelta(days=60)),
+                "rrule": "FREQ=DAILY",
+            },
+        )
+    ).json()
+    await authed.post("/api/tasks/reorder", json={"status": "done", "ordered_ids": [late["id"]]})
+    [rent] = [t for t in (await authed.get("/api/tasks")).json() if t["title"] == "Pay rent"]
+    assert rent["due_date"] == str(today)
+
+
+async def test_waiting_is_an_open_status(authed):
+    task = (await authed.post("/api/tasks", json={"title": "Hear back from Sam"})).json()
+    r = await authed.patch(f"/api/tasks/{task['id']}", json={"status": "waiting"})
+    assert r.status_code == 200 and r.json()["status"] == "waiting"
+    assert [t["title"] for t in (await authed.get("/api/tasks")).json()] == ["Hear back from Sam"]

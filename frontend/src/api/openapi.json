@@ -7963,6 +7963,7 @@
                   "enum": [
                     "todo",
                     "in_progress",
+                    "waiting",
                     "blocked",
                     "done",
                     "cancelled"
@@ -18652,6 +18653,7 @@
             "enum": [
               "todo",
               "in_progress",
+              "waiting",
               "blocked",
               "done",
               "cancelled"
@@ -20892,6 +20894,7 @@
             "enum": [
               "todo",
               "in_progress",
+              "waiting",
               "blocked",
               "done",
               "cancelled"
@@ -20943,6 +20946,19 @@
             ],
             "title": "Remind Minutes"
           },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule",
+            "description": "Repeat, e.g. FREQ=WEEKLY;BYDAY=MO"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -20990,6 +21006,7 @@
             "enum": [
               "todo",
               "in_progress",
+              "waiting",
               "blocked",
               "done",
               "cancelled"
@@ -21034,6 +21051,17 @@
               }
             ],
             "title": "Remind Minutes"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
           },
           "completed_at": {
             "anyOf": [
@@ -21095,6 +21123,7 @@
           "due_date",
           "due_time",
           "remind_minutes",
+          "rrule",
           "completed_at",
           "tags",
           "project_id",
@@ -21139,6 +21168,7 @@
                 "enum": [
                   "todo",
                   "in_progress",
+                  "waiting",
                   "blocked",
                   "done",
                   "cancelled"
@@ -21199,6 +21229,18 @@
               }
             ],
             "title": "Remind Minutes"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
           },
           "tags": {
             "anyOf": [

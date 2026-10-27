@@ -5107,7 +5107,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+            status: "todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled";
             /** Ordered Ids */
             ordered_ids: string[];
         };
@@ -5933,7 +5933,7 @@ export interface components {
              * @default todo
              * @enum {string}
              */
-            status: "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+            status: "todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled";
             /**
              * Priority
              * @default 0
@@ -5945,6 +5945,11 @@ export interface components {
             due_time?: string | null;
             /** Remind Minutes */
             remind_minutes?: number | null;
+            /**
+             * Rrule
+             * @description Repeat, e.g. FREQ=WEEKLY;BYDAY=MO
+             */
+            rrule?: string | null;
             /** Tags */
             tags?: string[];
             /** Project Id */
@@ -5965,7 +5970,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+            status: "todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled";
             /** Priority */
             priority: number;
             /** Due Date */
@@ -5974,6 +5979,8 @@ export interface components {
             due_time: string | null;
             /** Remind Minutes */
             remind_minutes: number | null;
+            /** Rrule */
+            rrule: string | null;
             /** Completed At */
             completed_at: string | null;
             /** Tags */
@@ -6002,7 +6009,7 @@ export interface components {
             /** Description */
             description?: string | null;
             /** Status */
-            status?: ("todo" | "in_progress" | "blocked" | "done" | "cancelled") | null;
+            status?: ("todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled") | null;
             /** Priority */
             priority?: number | null;
             /** Due Date */
@@ -6011,6 +6018,8 @@ export interface components {
             due_time?: string | null;
             /** Remind Minutes */
             remind_minutes?: number | null;
+            /** Rrule */
+            rrule?: string | null;
             /** Tags */
             tags?: string[] | null;
             /** Project Id */
@@ -10838,7 +10847,7 @@ export interface operations {
     list_tasks_api_tasks_get: {
         parameters: {
             query?: {
-                status?: ("todo" | "in_progress" | "blocked" | "done" | "cancelled") | ("open" | "all");
+                status?: ("todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled") | ("open" | "all");
                 project_id?: string | null;
                 tag?: string | null;
                 q?: string | null;

@@ -8,7 +8,7 @@ import uuid
 from datetime import date, time
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
@@ -17,7 +17,7 @@ from app.features.links import service as links
 from app.features.projects import service as projects
 from app.features.tasks import service
 from app.features.tasks.models import Project, Task
-from app.features.tasks.schemas import TaskStatus, clean_tags
+from app.features.tasks.schemas import TaskStatus, clean_rrule, clean_tags
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.workspace import path_action
@@ -38,6 +38,8 @@ def task_line(task: Task, projects: dict[uuid.UUID, str]) -> str:
         facts.append(f"due {when}")
     if task.project_id in projects:
         facts.append(f"project {projects[task.project_id]}")
+    if task.rrule:
+        facts.append(f"repeats {task.rrule}")
     if task.tags:
         facts.append("tags " + ", ".join(task.tags))
     return f"[{task.id}] {task.title} ({'; '.join(facts)})"
@@ -103,6 +105,12 @@ class ListTasks(Tool):
         return ToolResult(content="\n".join(task_line(t, projects) for t in tasks))
 
 
+REPEAT = (
+    "Repeat rule (RFC 5545), e.g. FREQ=DAILY, FREQ=WEEKLY;BYDAY=MO,TH or "
+    "FREQ=MONTHLY;BYMONTHDAY=1. Needs a due date; finishing the task adds the next one."
+)
+
+
 class CreateTaskInput(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     description: str = Field("", max_length=20_000, description=NOTES)
@@ -114,6 +122,12 @@ class CreateTaskInput(BaseModel):
     remind_minutes: int | None = Field(
         None, ge=0, le=40_320, description="Remind this long before it is due"
     )
+    rrule: str | None = Field(None, max_length=500, description=REPEAT)
+
+    @field_validator("rrule")
+    @classmethod
+    def _rrule(cls, v: str | None) -> str | None:
+        return clean_rrule(v)
 
 
 class CreateTask(Tool):
@@ -154,6 +168,12 @@ class UpdateTaskInput(BaseModel):
     project: str | None = None
     tags: list[str] | None = Field(None, max_length=20)
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    rrule: str | None = Field(None, max_length=500, description=REPEAT + " Empty: stop repeating.")
+
+    @field_validator("rrule")
+    @classmethod
+    def _rrule(cls, v: str | None) -> str | None:
+        return "" if v is not None and not v.strip() else clean_rrule(v)
 
 
 class UpdateTask(Tool):
@@ -177,17 +197,22 @@ class UpdateTask(Tool):
                 exclude_unset=True, exclude={"id", "project", "clear_due", "tags"}
             )
             changes = {k: v for k, v in changes.items() if v is not None}
+            if changes.get("rrule") == "":
+                changes["rrule"] = None
             if args.tags is not None:
                 changes["tags"] = clean_tags(args.tags)
             if args.project is not None:
                 changes["project_id"] = await _project_id(db, args.project)
             if args.clear_due:
                 changes["due_date"] = None
+            repeats = task.rrule is not None and task.status != "done"
             try:
                 task = await service.update_task(db, task, changes)
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)
             line = task_line(task, await _projects(db))
+            if repeats and task.status == "done":
+                line += " It repeats, so the next one was added."
         return ToolResult(
             content=f"Updated: {line}", data={"task": {"id": str(task.id), "title": task.title}}
         )

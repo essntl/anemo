@@ -99,10 +99,28 @@ async def create(db: AsyncSession, data: ProjectIn) -> Project:
     return project
 
 
+async def find(db: AsyncSession, name: str) -> Project | None:
+    """The project an agent means by `name`: the same name, or the same folder name.
+
+    Matching the folder too keeps an agent from making a second project (and a
+    `projects/<slug>-2/` folder) for one that was renamed ("Thesis" became
+    "Dissertation" but still lives in `projects/thesis/`) or that it spells a little
+    differently ("Q4 plan" vs "Q4-plan").
+    """
+    name = name.strip()[:100]
+    by_name = await db.scalar(select(Project).where(func.lower(Project.name) == name.lower()))
+    if by_name is not None:
+        return by_name
+    by_folder: Project | None = await db.scalar(
+        select(Project).where(Project.slug == slugify(name))
+    )
+    return by_folder
+
+
 async def get_or_create_by_name(db: AsyncSession, name: str) -> Project:
     """Used by the agent tools: "put this task in project X" creates X when it is new."""
     name = name.strip()[:100]
-    project = await db.scalar(select(Project).where(func.lower(Project.name) == name.lower()))
+    project = await find(db, name)
     if project is None:
         project = await create(db, ProjectIn(name=name))
     return project
@@ -163,6 +181,11 @@ async def list_out(db: AsyncSession) -> list[ProjectOut]:
             )
         )
     return out
+
+
+async def one_out(db: AsyncSession, project: Project) -> ProjectOut:
+    """One project with its counts, as in the list."""
+    return next(p for p in await list_out(db) if p.id == project.id)
 
 
 def to_out(project: Project, **counts: int) -> ProjectOut:

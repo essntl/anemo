@@ -13,6 +13,7 @@ export const projectsKey = ['projects'] as const
 export const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: 'To do',
   in_progress: 'In progress',
+  waiting: 'Waiting',
   blocked: 'Blocked',
   done: 'Done',
   cancelled: 'Cancelled',

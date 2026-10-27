@@ -8,7 +8,7 @@ saving changes. Only totals and series leave the server, never raw sessions.
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Date, Integer, and_, cast, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,6 @@ from app.features.documents.models import DocumentRevision
 from app.features.focus.models import FocusSession
 from app.features.runs.models import Run
 from app.features.settings import service as settings
-from app.features.settings.sections import GeneralSettings
 from app.features.stats.schemas import (
     AgentStats,
     DayValue,
@@ -33,13 +32,7 @@ from app.features.tasks.schemas import OPEN_STATUSES
 HEATMAP_WEEKS = 26
 
 
-async def user_timezone(db: AsyncSession) -> str:
-    general = await settings.get_section(db, GeneralSettings, "general")
-    try:
-        ZoneInfo(general.timezone)
-        return general.timezone
-    except (ZoneInfoNotFoundError, ValueError):
-        return "UTC"
+user_timezone = settings.user_timezone
 
 
 def _bounds(start: date, end: date, tz: str) -> tuple[datetime, datetime]:
