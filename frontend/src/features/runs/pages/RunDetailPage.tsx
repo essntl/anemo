@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Markdown } from '@/components/ui/Markdown'
-import { timelineKey } from '@/features/agents/api'
+import { refreshTimeline } from '@/features/agents/api'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { RunControls } from '@/features/agents/components/RunControls'
 import { useShellOutput } from '@/features/agents/shellOutput'
@@ -42,7 +42,7 @@ export function RunDetailPage() {
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: runKey(runId) })
-    void qc.invalidateQueries({ queryKey: timelineKey(runId) })
+    void refreshTimeline(qc, runId)
   }
   const onEvent = (event: RunEvent) => {
     if (event.type === 'tool.progress') {

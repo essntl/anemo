@@ -7,7 +7,7 @@ import { MenuButton, NewChatButton } from '@/app/mobileNav'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { promptDialog } from '@/components/ui/dialogs'
-import { timelineKey, useDecide, useTimeline } from '@/features/agents/api'
+import { refreshTimeline, useDecide, useTimeline } from '@/features/agents/api'
 import { pendingQuestion } from '@/features/agents/question'
 import { useShellOutput } from '@/features/agents/shellOutput'
 import { useBrowserStatus } from '@/features/browser/api'
@@ -135,7 +135,7 @@ export function ConversationPage() {
       return
     }
     if (activeRunId && /^(tool|approval|plan)\.|^run\.(status|pause)/.test(event.type)) {
-      void qc.invalidateQueries({ queryKey: timelineKey(activeRunId) })
+      void refreshTimeline(qc, activeRunId)
     }
   }
   const live = useRunStream(activeRunId, onFinished, onEvent)
