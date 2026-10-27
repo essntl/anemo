@@ -22,6 +22,7 @@ from app.providers.base import (
     TextDelta,
     ToolCall,
     Usage,
+    sum_usage,
 )
 from app.providers.registry import make_adapter
 from app.providers.router import ResolvedModel
@@ -40,7 +41,10 @@ class StreamResult:
     reasoning_text: str = ""
     reasoning_blocks: list[ReasoningBlock] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)
-    usage: Usage = field(default_factory=Usage)
+    usage: Usage = field(default_factory=Usage)  # all requests of this call together
+    # One entry per model request (a session-holding provider can make several in
+    # one call); each becomes its own usage record.
+    usage_parts: list[Usage] = field(default_factory=list)
     stop_reason: StopReason = "end"
 
 
@@ -96,7 +100,9 @@ async def _stream_once(
             elif isinstance(event, ToolCall):
                 result.tool_calls.append(event)
             elif isinstance(event, Usage):
-                result.usage = event
+                result.usage_parts.append(event)
+                result.usage = sum_usage(result.usage_parts)
+                log_request_usage(run_id, model, req, event)
             elif isinstance(event, Done):
                 result.stop_reason = event.stop_reason
     finally:
@@ -164,6 +170,41 @@ async def stream_with_fallback(
             )
     assert last_error is not None
     raise last_error
+
+
+def log_request_usage(
+    run_id: uuid.UUID, model: ResolvedModel, req: ChatRequest, used: Usage
+) -> None:
+    """One structured line per model request, to see whether prompt caching works.
+
+    For claude_code (subscription limits are what is scarce) a request that read
+    nothing from the cache is a WARNING, unless the miss was expected: the session's
+    first request, or the first after a logged reason (tool list or model change,
+    edited history, CLI upgrade, Claude Code compaction, a break longer than the
+    cache lifetime)."""
+    meta = used.meta or {}
+    uncached = (
+        (used.input_tokens or 0) - (used.cached_tokens or 0) - (used.cache_creation_tokens or 0)
+    )
+    ctx = {
+        "run_id": str(run_id),
+        "session_key": req.session_key,
+        "claude_session_id": meta.get("claude_session_id"),
+        "model": meta.get("model") or model.model_key,
+        "input_tokens": max(uncached, 0) if used.input_tokens is not None else None,
+        "cache_read_input_tokens": used.cached_tokens,
+        "cache_creation_input_tokens": used.cache_creation_tokens,
+        "output_tokens": used.output_tokens,
+        "expected_miss": meta.get("expected_miss"),
+    }
+    if (
+        model.provider_type == "claude_code"
+        and not used.cached_tokens
+        and not meta.get("expected_miss")
+    ):
+        log.warning("model request read nothing from the prompt cache", extra={"ctx": ctx})
+    else:
+        log.info("model request", extra={"ctx": ctx})
 
 
 def _label(model: ResolvedModel) -> str:

@@ -13,6 +13,7 @@ from app.api.deps import Db, RecentAuth, client_ip
 from app.features.audit import service as audit
 from app.features.providers import service
 from app.features.providers.schemas import (
+    ClaudeRunnerStatus,
     DiscoveredModelOut,
     ImportModelsIn,
     ModelIn,
@@ -44,6 +45,14 @@ async def provider_types() -> list[ProviderTypeOut]:
         )
         for t in available_types()
     ]
+
+
+@router.get("/providers/claude-code/status", response_model=ClaudeRunnerStatus)
+async def claude_code_status() -> ClaudeRunnerStatus:
+    """Whether the claude-runner is running and signed in with a Claude subscription."""
+    from app import claude_runner_client
+
+    return ClaudeRunnerStatus.model_validate(await claude_runner_client.read_status())
 
 
 @router.get("/providers", response_model=list[ProviderOut])

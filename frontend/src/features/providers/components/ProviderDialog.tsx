@@ -5,6 +5,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { type Provider, type ProviderIn, useCreateProvider, useProviderTypes, useUpdateProvider } from '../api'
+import { ClaudeCodeStatus } from './ClaudeCodeStatus'
 
 type ProviderType = ProviderIn['type']
 
@@ -46,6 +47,8 @@ export function ProviderDialog({
 
   const typeInfo = types.data?.find((t) => t.type === type)
   const pending = create.isPending || update.isPending
+  // A Claude subscription signs in inside the claude-runner container: no URL, no key.
+  const subscription = type === 'claude_code'
 
   const submit = async () => {
     setError(null)
@@ -83,7 +86,11 @@ export function ProviderDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={editing ? `Edit ${provider?.name}` : 'Add provider'}
-      description="API keys are encrypted on the server and never shown again."
+      description={
+        subscription
+          ? 'Uses your Claude subscription through Claude Code. Every tool call still goes through Agent Permissions.'
+          : 'API keys are encrypted on the server and never shown again.'
+      }
       className="md:w-[min(92vw,520px)]"
       footer={
         <>
@@ -104,50 +111,63 @@ export function ProviderDialog({
         <Field label="Name">
           <Input value={name} placeholder={typeInfo?.label} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field
-          label="Base URL"
-          hint={typeInfo?.default_base_url ? `Leave empty to use ${typeInfo.default_base_url}` : undefined}
-        >
-          <Input
-            value={baseUrl}
-            placeholder={typeInfo?.default_base_url ?? ''}
-            onChange={(e) => setBaseUrl(e.target.value)}
-          />
-        </Field>
-        <Field
-          label="API key"
-          hint={
-            editing
-              ? provider?.api_key_masked
-                ? `Stored key ${provider.api_key_masked}. Leave empty to keep it.`
-                : 'No key stored.'
-              : typeInfo && !typeInfo.needs_key
-                ? 'Optional for most local servers.'
-                : undefined
-          }
-        >
-          <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-        </Field>
-        <details className="text-[13px]">
-          <summary className="cursor-pointer text-muted">Advanced: extra HTTP headers</summary>
-          <div className="mt-2">
+        {subscription ? (
+          <div className="flex flex-col gap-2 rounded-control border border-border p-3">
+            <ClaudeCodeStatus />
+            <p className="text-[12px] text-muted">
+              No key is needed or stored: Claude Code keeps its own login in the claude-runner
+              container. Chat and agent runs on these models (automations too) count against your
+              subscription&apos;s usage limits. See docs/claude-code.md.
+            </p>
+          </div>
+        ) : (
+          <>
             <Field
-              label="Headers (JSON)"
-              hint={
-                editing && provider?.header_names.length
-                  ? `Currently set: ${provider.header_names.join(', ')}. Entering a value replaces them.`
-                  : 'Stored encrypted.'
-              }
+              label="Base URL"
+              hint={typeInfo?.default_base_url ? `Leave empty to use ${typeInfo.default_base_url}` : undefined}
             >
-              <textarea
-                className="min-h-20 w-full rounded-control border border-border bg-surface p-3 font-mono text-[12px] focus:border-accent focus:outline-none"
-                value={headersText}
-                placeholder='{"X-Custom-Header": "value"}'
-                onChange={(e) => setHeadersText(e.target.value)}
+              <Input
+                value={baseUrl}
+                placeholder={typeInfo?.default_base_url ?? ''}
+                onChange={(e) => setBaseUrl(e.target.value)}
               />
             </Field>
-          </div>
-        </details>
+            <Field
+              label="API key"
+              hint={
+                editing
+                  ? provider?.api_key_masked
+                    ? `Stored key ${provider.api_key_masked}. Leave empty to keep it.`
+                    : 'No key stored.'
+                  : typeInfo && !typeInfo.needs_key
+                    ? 'Optional for most local servers.'
+                    : undefined
+              }
+            >
+              <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+            </Field>
+            <details className="text-[13px]">
+              <summary className="cursor-pointer text-muted">Advanced: extra HTTP headers</summary>
+              <div className="mt-2">
+                <Field
+                  label="Headers (JSON)"
+                  hint={
+                    editing && provider?.header_names.length
+                      ? `Currently set: ${provider.header_names.join(', ')}. Entering a value replaces them.`
+                      : 'Stored encrypted.'
+                  }
+                >
+                  <textarea
+                    className="min-h-20 w-full rounded-control border border-border bg-surface p-3 font-mono text-[12px] focus:border-accent focus:outline-none"
+                    value={headersText}
+                    placeholder='{"X-Custom-Header": "value"}'
+                    onChange={(e) => setHeadersText(e.target.value)}
+                  />
+                </Field>
+              </div>
+            </details>
+          </>
+        )}
         {error && <p className="rounded-control bg-error/10 px-3 py-2 text-[13px] text-error">{error}</p>}
       </div>
     </Dialog>

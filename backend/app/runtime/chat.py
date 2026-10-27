@@ -27,6 +27,8 @@ from app.features.memory import service as memory
 from app.features.projects import service as projects
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Run
+from app.features.settings import service as settings_service
+from app.features.settings.sections import GeneralSettings
 from app.features.usage import service as usage
 from app.jobs import queue
 from app.providers.base import (
@@ -40,7 +42,7 @@ from app.providers.base import (
 )
 from app.providers.registry import make_adapter
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
-from app.runtime import citations
+from app.runtime import citations, turn_context
 from app.runtime.history import (
     latest_user_attachment_kinds,
     load_history,
@@ -55,22 +57,36 @@ MAX_ATTEMPTS = 2  # a run interrupted twice by worker crashes is failed, not ret
 DEFAULT_CONTEXT_TOKENS = 32_000
 CANCEL_POLL_S = 3.0
 
+# Stable for every turn (prompt caching): the date and the memories for a message
+# are in its turn context (runtime/turn_context.py), not here.
 SYSTEM_PROMPT = (
     "You are a helpful assistant inside the user's personal, self-hosted AI workspace. "
     "Answer clearly and concisely. Use Markdown for structure and fenced code blocks for code. "
-    "Today's date is {date}."
+    "The current date and time are in the turn context at the end of the user's latest message."
 )
 
 
-def build_request(model: ResolvedModel, history: list[Message], system: str) -> ChatRequest:
+def build_request(
+    model: ResolvedModel,
+    history: list[Message],
+    system: str,
+    *,
+    session_key: str | None = None,
+    turn_context: str | None = None,
+) -> ChatRequest:
     context = model.context_window or DEFAULT_CONTEXT_TOKENS
     reserve = min(model.max_output or 8_000, context // 4)
     return ChatRequest(
         model=model.model_key,
         system=system,
-        messages=trim_to_budget(history, max_tokens=int((context - reserve) * 0.9)),
+        # Claude Code keeps (and compacts) the conversation itself.
+        messages=history
+        if model.provider_type == "claude_code"
+        else trim_to_budget(history, max_tokens=int((context - reserve) * 0.9)),
         reasoning=bool(model.capabilities.get("reasoning")),
         provider_options=model.provider_options,
+        session_key=session_key,
+        turn_context=turn_context,
     )
 
 
@@ -156,9 +172,12 @@ async def _finish(
         run.model_id = result.model.model_id
         u = result.usage
         run.totals = {"input_tokens": u.input_tokens, "output_tokens": u.output_tokens}
-        usage.record(
-            db, result.model, u, "chat", run_id=run.id, conversation_id=run.conversation_id
-        )
+        if u.equivalent_cost_usd is not None:
+            run.totals["api_equivalent_cost_usd"] = u.equivalent_cost_usd
+        for part in result.usage_parts or [u]:  # one record per model request
+            usage.record(
+                db, result.model, part, "chat", run_id=run.id, conversation_id=run.conversation_id
+            )
     await db.execute(
         update(Conversation)
         .where(Conversation.id == run.conversation_id)
@@ -219,33 +238,57 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         except NoModelAvailable as exc:
             await _finish(db, run, message, None, status="failed", error=exc.message)
             return
+        # Relevant memories go into the turn context (this model has no memory tools).
+        user_message = (
+            await db.get(ChatMessage, run.user_message_id) if run.user_message_id else None
+        )
+        context_text = (user_message.turn_context if user_message else None) or (
+            turn_context.existing(history[-1]) if history and history[-1].role == "user" else None
+        )
+        if not context_text:
+            query = next(
+                (
+                    " ".join(
+                        b.text
+                        for b in m.content
+                        if isinstance(b, TextBlock) and not turn_context.is_context_block(b)
+                    )
+                    for m in reversed(history)
+                    if m.role == "user"
+                ),
+                "",
+            )
+            section, used = await memory.build_context(db, query, await memory.get_settings(db))
+            general = await settings_service.get_section(db, GeneralSettings, "general")
+            context_text = turn_context.render(general.timezone, section)
+            run.options = {**run.options, "memory_context": used}
+            if user_message is not None:
+                user_message.turn_context = context_text
+            if history and history[-1].role == "user":
+                history[-1] = turn_context.attach(history[-1], context_text)
         # Attachments are rendered per capability set (a fallback model may differ).
         rendered = {
             vision: await resolve_attachments(db, history, {"vision": vision})
             for vision in {bool(m.capabilities.get("vision")) for m in candidates}
         }
-        # Relevant memories go into the system prompt (this model has no memory tools).
-        query = next(
-            (
-                " ".join(b.text for b in m.content if isinstance(b, TextBlock))
-                for m in reversed(history)
-                if m.role == "user"
-            ),
-            "",
-        )
-        section, used = await memory.build_context(db, query, await memory.get_settings(db))
-        run.options = {**run.options, "memory_context": used}
         # The chat's project: where its files are, and the user's instructions for it.
-        section += projects.prompt_section(await projects.for_conversation(db, run.conversation_id))
+        system = SYSTEM_PROMPT + projects.prompt_section(
+            await projects.for_conversation(db, run.conversation_id)
+        )
+        session_key = f"conv:{run.conversation_id}:chat"
         await db.commit()
-
-    system = SYSTEM_PROMPT.format(date=datetime.now(UTC).date().isoformat()) + section
     progress = StreamProgress()
     stream_task = asyncio.create_task(
         stream_with_fallback(
             run_id,
             candidates,
-            lambda m: build_request(m, rendered[bool(m.capabilities.get("vision"))], system),
+            lambda m: build_request(
+                m,
+                rendered[bool(m.capabilities.get("vision"))],
+                system,
+                session_key=session_key,
+                turn_context=context_text,
+            ),
             progress,
         )
     )

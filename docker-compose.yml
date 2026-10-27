@@ -135,7 +135,9 @@ services:
       - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
       - mcp-host-token:/run/mcp-host-token:ro
       - browser-token:/run/browser-token:ro
-    networks: [core, sandbox_int, sandbox_net_int, mcp_int, browser_int]
+      # The optional claude-runner's access token (Claude subscription provider).
+      - claude-runner-token:/run/claude-runner-token:ro
+    networks: [core, sandbox_int, sandbox_net_int, mcp_int, browser_int, claude_int]
     stop_grace_period: 30s
     depends_on:
       migrate:
@@ -237,6 +239,52 @@ services:
       retries: 3
     networks: [browser_int, egress]
 
+  # Optional: lets Anemo use your Claude subscription (Claude Max/Pro) through the
+  # official Claude Code CLI. Start it with `docker compose --profile claude up -d`,
+  # then sign in once: `docker compose exec -it claude-runner claude auth login`.
+  # Claude Code acts only as the model: every tool call comes back to the worker and
+  # goes through Agent Permissions. Only the worker can reach it (internal network
+  # plus a token). The login lives in the claude-config volume, which is mounted in
+  # this service only; no workspace, no database, none of the app's secrets.
+  # See docs/claude-code.md.
+  claude-runner:
+    profiles: ["claude"]
+    image: ai-workspace-claude-runner:${APP_VERSION:-latest}
+    build:
+      context: ./claude-runner
+      args:
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: ${CLAUDE_RUNNER_MEMORY:-2g}
+    cpus: ${CLAUDE_RUNNER_CPUS:-2}
+    # Lets running sessions finish writing their transcripts on `docker compose stop`.
+    stop_grace_period: 30s
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Seconds a session's process stays warm after its turn (RAM and start-up time
+      # only; the prompt cache lives at Anthropic). After that the next turn resumes.
+      RUNNER_IDLE_S: ${CLAUDE_RUNNER_IDLE_S:-900}
+      RUNNER_MAX_PROCESSES: ${CLAUDE_RUNNER_MAX_PROCESSES:-6}
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      # The Claude Code login and session transcripts. Mounted here and nowhere else.
+      # It holds a credential: keep it out of backups or protect it like one.
+      - claude-config:/home/claude/.claude-config
+      - claude-runner-token:/run/claude-runner
+    healthcheck:
+      test: ["CMD", "/opt/runnerd/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7100/health', timeout=25)"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 20s
+    networks: [claude_int, egress]
+
 volumes:
   pgdata:
   appdata:
@@ -248,6 +296,8 @@ volumes:
   mcp-host-home:
   mcp-host-token:
   browser-token:
+  claude-config:
+  claude-runner-token:
 
 networks:
   core:
@@ -259,5 +309,7 @@ networks:
   mcp_int:
     internal: true
   browser_int:
+    internal: true
+  claude_int:
     internal: true
   egress:

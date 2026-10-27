@@ -93,7 +93,7 @@ async def render_reference(db: AsyncSession, conversation_id: str, title: str) -
         conv = None
     if conv is None:
         return f'[The chat "{title}" was referenced here, but it no longer exists.]'
-    history = await load_history(db, conv.id, before_seq=EVERYTHING)
+    history = await load_history(db, conv.id, before_seq=EVERYTHING, with_context=False)
     chat = compaction.render(history, max_chars=EVERYTHING)
     if not chat.strip():
         return f'[The chat "{conv.title}" was referenced here, but it has no messages.]'

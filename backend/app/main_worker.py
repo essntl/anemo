@@ -10,6 +10,7 @@ import os
 import signal
 import socket
 
+from app import claude_runner_client
 from app.core.config import get_settings
 from app.core.db import dispose_engine
 from app.core.logging import configure_logging
@@ -41,6 +42,23 @@ async def heartbeat_loop(wid: str, stop: asyncio.Event) -> None:
             pass
 
 
+RUNNER_STATUS_INTERVAL_S = 30
+
+
+async def runner_status_loop(stop: asyncio.Event) -> None:
+    """The app cannot reach the claude-runner (only workers can), so a worker puts
+    its status into Redis for Settings > Providers & Models."""
+    while not stop.is_set():
+        try:
+            await claude_runner_client.publish_status()
+        except Exception:  # noqa: BLE001 - try again next time
+            log.debug("claude-runner status not published", exc_info=True)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=RUNNER_STATUS_INTERVAL_S)
+        except TimeoutError:
+            pass
+
+
 async def main() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -52,13 +70,15 @@ async def main() -> None:
 
     log.info("worker starting", extra={"ctx": {"worker_id": wid}})
     beat = asyncio.create_task(heartbeat_loop(wid, stop))
+    runner_status = asyncio.create_task(runner_status_loop(stop))
     periodic = asyncio.create_task(scheduler.run(stop))  # reminders, automations
     # Returns after `stop` is set and in-flight jobs have finished or been handed back.
     await JobRunner(wid, settings.worker_concurrency).run(stop)
     log.info("worker stopped")
     beat.cancel()
     periodic.cancel()
-    await asyncio.gather(beat, periodic, return_exceptions=True)
+    runner_status.cancel()
+    await asyncio.gather(beat, periodic, runner_status, return_exceptions=True)
     await dispose_engine()
     await close_redis()
 

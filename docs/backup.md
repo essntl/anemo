@@ -9,6 +9,14 @@ A backup has three parts, and the scripts take all of them while the app keeps r
 | `workspace.tar.gz` | Your workspace: files and documents. |
 | `VERSION` | The Anemo version the backup was made with. |
 
+**Not included: the `claude-config` volume** (only there if you use the Claude
+subscription provider, see [claude-code.md](claude-code.md)). It holds the Claude Code
+login, which is a credential for your Claude account. Leave it out of your backups, or
+protect any copy of it like a password. Nothing is lost without it: after a restore,
+sign in again with `docker compose exec -it claude-runner claude auth login`. Claude
+Code's session transcripts live there too; without them, conversations simply start a
+new Claude Code session (one cache write each).
+
 **Not included: your `.env` file.** Keep a copy of it somewhere safe, most of all
 `APP_SECRET_KEY`. Saved API keys, webhooks and MCP secrets are encrypted with that
 key. A restore onto an install with a different key works, but those secrets

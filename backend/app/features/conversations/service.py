@@ -495,6 +495,7 @@ async def edit_last(
     kept = [b for b in user.content if isinstance(b, dict) and b.get("type") != "text"]
     user.content = [*kept, {"type": "text", "text": text}]
     user.text_plain = text
+    user.turn_context = None  # rendered again (current time, memories) for the new text
     assistant.content, assistant.text_plain = [], ""
     assistant.status, assistant.error = "streaming", None
     run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, conv.default_mode)
@@ -543,6 +544,7 @@ async def branch(db: AsyncSession, conversation_id: uuid.UUID, upto_seq: int) ->
             status="complete" if m.role == "user" else m.status,
             model_id=m.model_id,
             model_label=m.model_label,
+            turn_context=m.turn_context,  # same bytes: the copy starts with the same prefix
             created_at=m.created_at,
         )
         db.add(message)

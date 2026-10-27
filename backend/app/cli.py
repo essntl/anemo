@@ -3,6 +3,9 @@
 hash-password     prompt for a password and print an argon2 hash for ADMIN_PASSWORD_HASH
 worker-health     exit 0 if this container's worker heartbeat is fresh (Docker healthcheck)
 export-openapi    print the OpenAPI schema (used to generate frontend API types)
+claude-code-check run a short agent conversation on the Claude subscription provider
+                  and print the prompt-cache use of every model request (uses some
+                  subscription quota; `claude-code-check --help` for options)
 """
 
 import asyncio
@@ -43,6 +46,10 @@ def main(argv: list[str]) -> int:
         return _hash_password()
     if cmd == "worker-health":
         return asyncio.run(_worker_health())
+    if cmd == "claude-code-check":
+        from app.claude_code_check import main as check
+
+        return check(argv[2:])
     if cmd == "export-openapi":
         import json
 

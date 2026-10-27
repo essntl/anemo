@@ -20,7 +20,8 @@ the OpenAI *Responses* API (OpenAI works through the chat completions adapter), 
 searching inside workspace files that are not documents.
 
 Guides: [deployment](docs/deployment.md) · [backup and restore](docs/backup.md) ·
-[security and permissions](docs/security.md) · [architecture](docs/architecture.md)
+[security and permissions](docs/security.md) · [architecture](docs/architecture.md) ·
+[Claude subscription](docs/claude-code.md)
 
 ### Chat vs. Agent mode
 
@@ -362,6 +363,19 @@ not running" otherwise). To have it start with everything else, add
 What a page shows is untrusted: it can try to steer the agent, which is why
 actions with consequences stay behind your permissions.
 
+### Your Claude subscription as a model
+
+Anemo can use your own Claude subscription (Pro or Max) instead of API credits, by
+driving the official Claude Code CLI in an optional container. Claude Code acts only
+as the model: every tool call goes through Agent Permissions as usual, and it has no
+tools, connectors or memory of its own. Start it with
+`docker compose --profile claude up -d`, sign in once with
+`docker compose exec -it claude-runner claude auth login`, then add a provider of type
+*Claude subscription (Claude Code)* in Settings → Providers & Models (no key needed).
+Chats, agent runs and automations on these models count against your subscription's
+usage limits; prompt caching is set up so each request after the first reads the
+conversation from the cache. Details: [docs/claude-code.md](docs/claude-code.md).
+
 ### Shell commands
 
 Agents run commands in a separate **sandbox** container (Debian with git, Python,
@@ -511,6 +525,7 @@ is down is listed in [docs/deployment.md](docs/deployment.md).
 | `sandbox-net` | Runs agent shell commands that need the internet   |
 | `browser`  | Optional (`--profile browser`): a browser agents can drive |
 | `mcp-host` | Optional (`--profile mcp`): runs local MCP servers    |
+| `claude-runner` | Optional (`--profile claude`): Claude Code sessions for the Claude subscription provider |
 
 ## Development
 

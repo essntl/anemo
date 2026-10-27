@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.features.providers.models import Provider
 from app.features.secrets import service as secrets
 from app.providers.adapters.anthropic import AnthropicAdapter
+from app.providers.adapters.claude_code import ClaudeCodeAdapter
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.adapters.openai_chat import OpenAIChatAdapter
 from app.providers.base import ProviderAdapter, ProviderConfig
@@ -36,6 +37,15 @@ PROVIDER_TYPES: dict[str, dict[str, Any]] = {
         "label": "OpenAI-compatible (Ollama, vLLM, LM Studio, ...)",
         "adapter": OpenAIChatAdapter,
         "base_url": "http://host.docker.internal:11434/v1",
+        "needs_key": False,
+    },
+    # Your own Claude subscription, through the Claude Code CLI in the optional
+    # claude-runner container (docs/claude-code.md). No key: the CLI signs itself in;
+    # the runner's address comes from the worker's configuration.
+    "claude_code": {
+        "label": "Claude subscription (Claude Code)",
+        "adapter": ClaudeCodeAdapter,
+        "base_url": None,
         "needs_key": False,
     },
     "fake": {

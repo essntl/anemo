@@ -104,44 +104,47 @@ async def test_agent_uses_tools_and_plan(authed):
     assert "write tests" in tool_results_sent_to_model()[-1]
     msg = await reply(authed, cid)
     assert msg["text"] == "You have 2 todos." and msg["mode"] == "agent"
-    assert [tool.name for tool in FakeAdapter.requests[-1].tools] == [
-        "update_plan",
-        "ask_user",
-        "list_files",
-        "read_file",
-        "find_files",
-        "write_file",
-        "edit_file",
-        "create_folder",
-        "move_path",
-        "delete_path",
-        "list_documents",
-        "read_document",
-        "search_documents",
-        "write_document",
-        "edit_document",
-        "run_shell",
-        "read_web_page",  # web_search only appears once SearXNG is set up
-        "http_request",
-        "list_tasks",
-        "create_task",
-        "update_task",
-        "delete_task",
-        "list_projects",
-        "create_project",
-        "update_project",
-        "list_events",
-        "create_event",
-        "update_event",
-        "delete_event",
-        "send_notification",
-        "remember",
-        "update_memory",
-        "forget_memory",
-        "search_memory",
-        "get_current_time",
-        "read_tool_output",
-    ]
+    # Sorted by name, so the tool list is a stable prompt-cache prefix.
+    assert [tool.name for tool in FakeAdapter.requests[-1].tools] == sorted(
+        [
+            "update_plan",
+            "ask_user",
+            "list_files",
+            "read_file",
+            "find_files",
+            "write_file",
+            "edit_file",
+            "create_folder",
+            "move_path",
+            "delete_path",
+            "list_documents",
+            "read_document",
+            "search_documents",
+            "write_document",
+            "edit_document",
+            "run_shell",
+            "read_web_page",  # web_search only appears once SearXNG is set up
+            "http_request",
+            "list_tasks",
+            "create_task",
+            "update_task",
+            "delete_task",
+            "list_projects",
+            "create_project",
+            "update_project",
+            "list_events",
+            "create_event",
+            "update_event",
+            "delete_event",
+            "send_notification",
+            "remember",
+            "update_memory",
+            "forget_memory",
+            "search_memory",
+            "get_current_time",
+            "read_tool_output",
+        ]
+    )
 
 
 async def test_chat_mode_only_offers_memory_tools(authed):
@@ -150,10 +153,10 @@ async def test_chat_mode_only_offers_memory_tools(authed):
     r = await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})
     await execute_run(uuid.UUID(r.json()["run_id"]))
     assert [t.name for t in FakeAdapter.requests[-1].tools] == [
-        "remember",
-        "update_memory",
         "forget_memory",
+        "remember",
         "search_memory",
+        "update_memory",
     ]
     # With memory switched off, chat is a plain model call again.
     await authed.put("/api/settings/memory", json={"enabled": False})

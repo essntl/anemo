@@ -92,6 +92,10 @@ class ChatMessage(Base, IdMixin):
         UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
     )
     model_label: Mapped[str | None] = mapped_column(String(300))
+    # User messages: the per-turn context the model got with this message (date and
+    # time, memories). Not shown in the UI; replayed byte for byte in later requests
+    # so the conversation prefix stays cacheable (runtime/turn_context.py).
+    turn_context: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed("to_tsvector('english', coalesce(text_plain, ''))", persisted=True)

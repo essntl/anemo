@@ -301,12 +301,12 @@ async def test_agent_manages_tasks_and_events(authed):
         ("Yoga", "2026-10-05T16:00:00Z"),
         ("Team lunch", "2026-10-07T10:30:00Z"),  # 12:30 local time
     ]
-    system = (
-        __import__("app.providers.adapters.fake", fromlist=["FakeAdapter"])
-        .FakeAdapter.requests[-1]
-        .system
-    )
-    assert "in the user's time zone (Europe/Amsterdam)" in system
+    request = __import__(
+        "app.providers.adapters.fake", fromlist=["FakeAdapter"]
+    ).FakeAdapter.requests[-1]
+    # The time and its zone are in the turn context, not the (stable) system prompt.
+    assert "Europe/Amsterdam" not in (request.system or "")
+    assert "(Europe/Amsterdam)" in (request.turn_context or "")
 
 
 def project_call(tool: str, **args) -> ToolCall:

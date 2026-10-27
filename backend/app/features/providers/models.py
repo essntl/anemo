@@ -53,3 +53,17 @@ class Model(Base, IdMixin, TimestampMixin):
     last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     provider: Mapped[Provider] = relationship(back_populates="models")
+
+
+class ClaudeCodeSession(Base, TimestampMixin):
+    """What one Claude Code session (in the claude-runner container) has already seen,
+    so each request sends only what is new. See providers/adapters/claude_code.py.
+
+    Holds no credentials: the Claude Code login lives only in the runner's own volume."""
+
+    __tablename__ = "claude_code_sessions"
+
+    session_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    claude_session_id: Mapped[str | None] = mapped_column(String(64))
+    model: Mapped[str] = mapped_column(String(200))  # full model id the session is pinned to
+    state: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)

@@ -19,6 +19,7 @@ import { CapabilityChips } from './CapabilityChips'
 import { CapabilityDialog } from './CapabilityDialog'
 import { DiscoverDialog } from './DiscoverDialog'
 import { ProviderDialog } from './ProviderDialog'
+import { ClaudeCodeStatus } from './ClaudeCodeStatus'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Lingering } from '@/components/ui/Lingering'
 
@@ -101,9 +102,13 @@ export function ProviderCard({ provider, models }: { provider: Provider; models:
             <Badge>{provider.type.replace('_', '-')}</Badge>
             {!provider.enabled && <Badge tone="warning">Disabled</Badge>}
           </div>
-          <div className="mt-0.5 truncate text-[12px] text-muted">
-            {provider.effective_base_url ?? 'built-in'} · key {provider.api_key_masked ?? 'not set'}
-          </div>
+          {provider.type === 'claude_code' ? (
+            <div className="mt-1"><ClaudeCodeStatus /></div>
+          ) : (
+            <div className="mt-0.5 truncate text-[12px] text-muted">
+              {provider.effective_base_url ?? 'built-in'} · key {provider.api_key_masked ?? 'not set'}
+            </div>
+          )}
           <div className="mt-2 min-h-4">
             {test.data && <TestOutcome ok={test.data.ok} message={test.data.message} />}
             {update.isError && <TestOutcome ok={false} message={errorMessage(update.error)} />}

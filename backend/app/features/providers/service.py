@@ -85,8 +85,20 @@ async def list_providers(db: AsyncSession) -> list[ProviderOut]:
     return [await to_out(db, p, counts.get(p.id, 0)) for p in providers]
 
 
+def _no_credentials(type_: str, base_url: str | None, api_key: str | None, headers: object) -> None:
+    """A Claude subscription signs in inside the claude-runner container: Anemo takes
+    no key, token or address for it (and must never hold one)."""
+    if type_ == "claude_code" and (base_url or api_key or headers):
+        raise AppError(
+            "The Claude subscription provider takes no URL, key or headers: Claude Code "
+            "signs in inside the claude-runner container (docs/claude-code.md).",
+            code="no_credentials_here",
+        )
+
+
 async def create_provider(db: AsyncSession, data: ProviderIn) -> Provider:
     _check_type(data.type)
+    _no_credentials(data.type, data.base_url, data.api_key, data.headers)
     provider = Provider(
         name=data.name,
         type=data.type,
@@ -106,6 +118,7 @@ async def create_provider(db: AsyncSession, data: ProviderIn) -> Provider:
 
 async def update_provider(db: AsyncSession, provider: Provider, data: ProviderPatch) -> Provider:
     fields = data.model_fields_set
+    _no_credentials(provider.type, data.base_url, data.api_key, data.headers)
     if "name" in fields and data.name:
         provider.name = data.name
     if "base_url" in fields:
@@ -160,6 +173,8 @@ async def discover(db: AsyncSession, provider: Provider) -> list[DiscoveredModel
 
 async def test_provider(db: AsyncSession, provider: Provider) -> TestResult:
     """Checks connectivity and credentials by listing models."""
+    if provider.type == "claude_code":
+        return await _test_claude_code()
     started = time.monotonic()
     try:
         models = await discover(db, provider)
@@ -312,4 +327,26 @@ async def test_model(db: AsyncSession, model: Model) -> tuple[TestResult, Usage 
             detail=reply[:200] or "(empty reply)",
         ),
         usage,
+    )
+
+
+async def _test_claude_code() -> TestResult:
+    """The subscription has no models endpoint to try: report the runner's status
+    (signed in with a Claude subscription, not signed in, or not running)."""
+    from app import claude_runner_client
+
+    status = await claude_runner_client.read_status()
+    if status["state"] == "signed_in":
+        version = f" (Claude Code {status['cli_version']})" if status["cli_version"] else ""
+        return TestResult(ok=True, message=f"Signed in with a Claude subscription{version}.")
+    if status["state"] == "not_signed_in":
+        return TestResult(
+            ok=False,
+            message="Claude Code is not signed in with a Claude subscription.",
+            detail=f"Run: {status['login_command']}",
+        )
+    return TestResult(
+        ok=False,
+        message="The claude-runner container is not running.",
+        detail=f"Start it with: {status['start_command']}",
     )

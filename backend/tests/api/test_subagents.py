@@ -80,7 +80,9 @@ async def test_parent_waits_for_its_sub_agent_and_gets_the_answer(authed):
     await execute_run(uuid.UUID(child["id"]))
     # The sub-agent only got the task, and knows it reports to an agent.
     request = FakeAdapter.requests[-1]
-    assert [b.text for m in request.messages for b in m.content] == ["count the otters"]
+    texts = [b.text for m in request.messages for b in m.content]
+    assert texts[0] == "count the otters" and texts[1].startswith("<turn_context>")
+    assert len(texts) == 2
     assert "You are a sub-agent" in request.system
     assert "run_subagent" not in tools_offered()  # depth 1 is the default limit
     assert "ask_user" not in tools_offered()  # nobody answers a sub-agent's questions

@@ -40,13 +40,23 @@ from app.providers.base import (
     Usage,
 )
 
+TURN_CONTEXT_OPEN = "<turn_context>"  # see runtime/turn_context.py
 _STOPWORDS = {"the", "a", "an", "is", "are", "to", "of", "and", "i", "my", "in", "do", "what"}
+
+
+def _texts(content: list[Any]) -> list[str]:
+    """Text blocks, without the runtime's turn context (date, memories) block."""
+    return [
+        b.text
+        for b in content
+        if isinstance(b, TextBlock) and not b.text.startswith(TURN_CONTEXT_OPEN)
+    ]
 
 
 def _last_user_text(req: ChatRequest) -> str:
     for msg in reversed(req.messages):
         if msg.role == "user":
-            texts = [b.text for b in msg.content if isinstance(b, TextBlock)]
+            texts = _texts(msg.content)
             if texts:
                 return " ".join(texts)
     return ""
@@ -55,7 +65,7 @@ def _last_user_text(req: ChatRequest) -> str:
 def _first_user_text(req: ChatRequest) -> str:
     for msg in req.messages:
         if msg.role == "user":
-            texts = [b.text for b in msg.content if isinstance(b, TextBlock)]
+            texts = _texts(msg.content)
             if texts:
                 return " ".join(texts)
     return ""

@@ -155,3 +155,15 @@ export function useSaveModelDefaults() {
     },
   })
 }
+
+export type ClaudeRunnerStatus = Schemas['ClaudeRunnerStatus']
+
+/** The claude-runner (Claude subscription provider) as a worker last saw it. */
+export function useClaudeCodeStatus(enabled = true) {
+  return useQuery({
+    queryKey: ['claude-code-status'],
+    enabled,
+    refetchInterval: 15_000,
+    queryFn: async () => unwrap(await api.GET('/api/providers/claude-code/status')),
+  })
+}

@@ -1,5 +1,11 @@
 """Adapter for the Anthropic Messages API (Claude models), via the official SDK.
 
+Prompt caching: three cache breakpoints per request (the API allows four). One on
+the last tool definition and one on the system prompt (tools and system are the
+stable start of every request; see runtime/turn_context.py), and a rolling one on
+the last block of the final message, so each request reads everything the previous
+request of the conversation wrote.
+
 Thinking: current Claude models (4.6+) use adaptive thinking; thinking blocks
 carry a signature and must be sent back unchanged within a tool loop, so they are
 surfaced as ReasoningComplete events for the runtime to store. Which mode a model
@@ -38,6 +44,10 @@ from app.providers.base import (
 from app.providers.catalog import anthropic_uses_adaptive_thinking, guess_capabilities
 
 log = logging.getLogger(__name__)
+
+CACHE = {"type": "ephemeral"}
+# Blocks the API lets carry a cache_control marker (thinking blocks cannot).
+_CACHEABLE = ("text", "image", "tool_use", "tool_result")
 
 DEFAULT_MAX_TOKENS = 64_000  # streaming, so large output limits do not risk HTTP timeouts
 BUDGET_THINKING_TOKENS = 8_000
@@ -89,6 +99,16 @@ def to_anthropic_messages(messages: list[Message]) -> list[dict[str, Any]]:
     return out
 
 
+def mark_last_block(messages: list[dict[str, Any]]) -> None:
+    """The rolling cache breakpoint: on the last cacheable block of the final message."""
+    if not messages:
+        return
+    for block in reversed(messages[-1]["content"]):
+        if block.get("type") in _CACHEABLE:
+            block["cache_control"] = CACHE
+            return
+
+
 def _map_error(exc: Exception) -> ProviderError:
     if isinstance(exc, anthropic.APIStatusError):
         retryable = exc.status_code in (408, 409, 429, 529) or exc.status_code >= 500
@@ -118,12 +138,14 @@ class AnthropicAdapter:
             "messages": to_anthropic_messages(req.messages),
         }
         if req.system:
-            params["system"] = req.system
+            params["system"] = [{"type": "text", "text": req.system, "cache_control": CACHE}]
         if req.tools:
             params["tools"] = [
                 {"name": t.name, "description": t.description, "input_schema": t.input_schema}
                 for t in req.tools
             ]
+            params["tools"][-1]["cache_control"] = CACHE
+        mark_last_block(params["messages"])
         mode = req.provider_options.get("thinking") or (
             "adaptive" if anthropic_uses_adaptive_thinking(req.model) else "none"
         )
@@ -171,6 +193,7 @@ class AnthropicAdapter:
             input_tokens=(u.input_tokens or 0) + cached,
             output_tokens=u.output_tokens,
             cached_tokens=u.cache_read_input_tokens,
+            cache_creation_tokens=u.cache_creation_input_tokens,
         )
         yield Done(_STOP.get(final.stop_reason or "end_turn", "end"))
 

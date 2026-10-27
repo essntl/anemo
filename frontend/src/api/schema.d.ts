@@ -333,6 +333,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/providers/claude-code/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Claude Code Status
+         * @description Whether the claude-runner is running and signed in with a Claude subscription.
+         */
+        get: operations["claude_code_status_api_providers_claude_code_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/providers": {
         parameters: {
             query?: never;
@@ -2797,6 +2817,25 @@ export interface components {
              */
             optional: boolean;
         };
+        /**
+         * ClaudeRunnerStatus
+         * @description The claude-runner as the worker last saw it (the app cannot reach it).
+         */
+        ClaudeRunnerStatus: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "signed_in" | "not_signed_in" | "not_running";
+            /** Auth Method */
+            auth_method?: string | null;
+            /** Cli Version */
+            cli_version?: string | null;
+            /** Login Command */
+            login_command: string;
+            /** Start Command */
+            start_command: string;
+        };
         /** ContentOut */
         ContentOut: {
             /** Path */
@@ -4142,7 +4181,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
             /** Base Url */
             base_url?: string | null;
             /**
@@ -4176,7 +4215,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
             /** Base Url */
             base_url: string | null;
             /** Effective Base Url */
@@ -4216,7 +4255,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
             /** Label */
             label: string;
             /** Default Base Url */
@@ -5318,6 +5357,10 @@ export interface components {
             input_tokens: number | null;
             /** Output Tokens */
             output_tokens: number | null;
+            /** Cached Tokens */
+            cached_tokens?: number | null;
+            /** Cache Creation Tokens */
+            cache_creation_tokens?: number | null;
             /** Cost Usd */
             cost_usd: number | null;
             /** Cost Source */
@@ -6056,6 +6099,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProviderTypeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claude_code_status_api_providers_claude_code_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaudeRunnerStatus"];
                 };
             };
             /** @description Validation Error */

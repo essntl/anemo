@@ -30,7 +30,11 @@ def record(
     automation_id: uuid.UUID | None = None,
 ) -> UsageRecord:
     cost: float | None
-    if usage.cost_usd is not None:
+    if model.provider_type == "claude_code":
+        # A Claude subscription has no per-token price: the cost is unknown (NULL),
+        # never 0. The CLI's API-equivalent figure is kept in the run totals only.
+        cost, source = None, "unknown"
+    elif usage.cost_usd is not None:
         cost, source = usage.cost_usd, "provider"
     else:
         cost = estimate_cost(usage, model.pricing)
@@ -48,6 +52,7 @@ def record(
         output_tokens=usage.output_tokens,
         reasoning_tokens=usage.reasoning_tokens,
         cached_tokens=usage.cached_tokens,
+        cache_creation_tokens=usage.cache_creation_tokens,
         cost_usd=cost,
         cost_source=source,
     )
