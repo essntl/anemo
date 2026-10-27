@@ -73,3 +73,32 @@ test('the timer keeps going across pages and a reload', async ({ page }) => {
   await expect.poll(async () => (await ours()).length).toBe(1)
   for (const s of await ours()) await page.request.delete(`/api/focus/sessions/${s.id}`)
 })
+
+test('start and pause focus from the search box, edit Home from it', async ({ page }) => {
+  await login(page)
+  await page.goto('/stats')
+  await expect(page.getByRole('heading', { name: 'Stats' })).toBeVisible()
+  const run = async (typed: string, option: string) => {
+    await page.keyboard.press('Control+k')
+    await page.getByRole('combobox', { name: 'Search' }).fill(typed)
+    await page.getByRole('option', { name: option, exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  }
+  const status = () => page.evaluate(() => JSON.parse(localStorage.getItem('anemo-timer') ?? '{}').state?.timer?.status as string)
+  await run('start focus', 'Start focus')
+  // Running, shown in the Island; the page stays where it was.
+  await expect.poll(status).toBe('running')
+  await expect(page.getByRole('button', { name: /Show controls/ })).toBeVisible()
+  await expect(page).toHaveURL(/\/stats/)
+  await run('pause timer', 'Pause or resume the timer')
+  await expect.poll(status).toBe('paused')
+
+  await run('focus', 'Focus')
+  await expect(page).toHaveURL(/\/focus$/)
+  await page.getByRole('button', { name: 'Reset timer' }).click()
+
+  await run('home layout', 'Edit home layout')
+  await expect(page).toHaveURL(/\/home$/)
+  await expect(page.getByRole('button', { name: 'Done' })).toBeVisible()
+  await page.getByRole('button', { name: 'Done' }).click()
+})

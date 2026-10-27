@@ -13,14 +13,20 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
+from app.features.links import service as links
 from app.features.projects import service as projects
 from app.features.tasks import service
 from app.features.tasks.models import Project, Task
 from app.features.tasks.schemas import TaskStatus, clean_tags
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin.workspace import path_action
 
 PRIORITY = {0: "", 1: "low", 2: "medium", 3: "high"}
+NOTES = (
+    "Notes (Markdown). Link a workspace file with [name](/files?path=<path>), a document "
+    "with [title](/documents/<id>), another task with [title](/tasks?task=<id>)"
+)
 
 
 def task_line(task: Task, projects: dict[uuid.UUID, str]) -> str:
@@ -99,7 +105,7 @@ class ListTasks(Tool):
 
 class CreateTaskInput(BaseModel):
     title: str = Field(min_length=1, max_length=300)
-    description: str = Field("", max_length=20_000, description="Notes (Markdown)")
+    description: str = Field("", max_length=20_000, description=NOTES)
     due_date: date | None = None
     due_time: time | None = Field(None, description="Local time of day, e.g. 14:30")
     priority: int = Field(0, ge=0, le=3, description="0 none, 1 low, 2 medium, 3 high")
@@ -139,7 +145,7 @@ class CreateTask(Tool):
 class UpdateTaskInput(BaseModel):
     id: str = Field(description="The task's id (from list_tasks)")
     title: str | None = Field(None, min_length=1, max_length=300)
-    description: str | None = Field(None, max_length=20_000)
+    description: str | None = Field(None, max_length=20_000, description=NOTES)
     status: TaskStatus | None = Field(None, description="Use 'done' to complete a task")
     priority: int | None = Field(None, ge=0, le=3)
     due_date: date | None = None
@@ -212,4 +218,72 @@ class DeleteTask(Tool):
         return ToolResult(content=f"Deleted the task “{title}”.")
 
 
-TASK_TOOLS: list[Tool] = [ListTasks(), CreateTask(), UpdateTask(), DeleteTask()]
+class TaskFilesInput(BaseModel):
+    task_id: str = Field(description="The task's id (from list_tasks)")
+
+
+class ListTaskFiles(Tool):
+    name = "list_task_files"
+    description = "The files attached to a task (workspace paths)."
+    capability = "tasks.read"
+    Input = TaskFilesInput
+
+    async def run(self, args: TaskFilesInput, ctx: ToolContext) -> ToolResult:
+        task_id = _id(args.task_id)
+        async with get_sessionmaker()() as db:
+            task = await db.get(Task, task_id) if task_id else None
+            if task is None:
+                return ToolResult(content=f"No task with id {args.task_id}.", is_error=True)
+            attached = await links.list_files(db, task.id)
+        if not attached:
+            return ToolResult(content=f"“{task.title}” has no attachments.")
+        return ToolResult(
+            content="\n".join(
+                f"{f.path}{'' if f.exists else ' (missing: moved to the trash?)'}" for f in attached
+            )
+        )
+
+
+class AttachFileInput(BaseModel):
+    task_id: str = Field(description="The task's id (from list_tasks)")
+    path: str = Field(description="A workspace file, e.g. projects/thesis/draft.pdf")
+
+
+class AttachFileToTask(Tool):
+    name = "attach_file_to_task"
+    description = (
+        "Attach a workspace file to a task. The file stays where it is; the task links to it "
+        "(and keeps doing so when the file is moved or renamed)."
+    )
+    capability = "tasks.write"
+    extra_capabilities = ("fs.read",)
+    Input = AttachFileInput
+    idempotent = True
+
+    def actions(self, args: AttachFileInput, ctx: ToolContext) -> list[Action]:
+        return [
+            Action(capability=self.capability, summary="Attach a file to a task"),
+            path_action(ctx, "fs.read", args.path, "Attach", "read"),
+        ]
+
+    async def run(self, args: AttachFileInput, ctx: ToolContext) -> ToolResult:
+        task_id = _id(args.task_id)
+        async with get_sessionmaker()() as db:
+            task = await db.get(Task, task_id) if task_id else None
+            if task is None:
+                return ToolResult(content=f"No task with id {args.task_id}.", is_error=True)
+            try:
+                await links.attach(db, task, args.path)
+            except AppError as exc:
+                return ToolResult(content=exc.message, is_error=True)
+        return ToolResult(content=f"Attached {args.path} to “{task.title}”.")
+
+
+TASK_TOOLS: list[Tool] = [
+    ListTasks(),
+    CreateTask(),
+    UpdateTask(),
+    DeleteTask(),
+    ListTaskFiles(),
+    AttachFileToTask(),
+]

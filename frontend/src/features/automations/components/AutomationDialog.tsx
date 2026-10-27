@@ -16,6 +16,7 @@ import { useProfiles } from '@/features/profiles/api'
 import { useModels } from '@/features/providers/api'
 import { type Automation, type NotifyWhen, type OnAsk, useSaveAutomation, useSchedulePreview } from '../api'
 import { defaultForm, fromSchedule, toSchedule } from '../scheduleForm'
+import type { AutomationTemplate } from '../templates'
 import { ScheduleFields } from './ScheduleFields'
 
 const ON_ASK_OPTIONS: { value: OnAsk; label: string }[] = [
@@ -39,15 +40,15 @@ function Section({ title, hint, children }: { title: string; hint?: ReactNode; c
   )
 }
 
-export function AutomationDialog({ automation, onClose }: { automation: Automation | null; onClose: () => void }) {
+export function AutomationDialog({ automation, template, onClose }: { automation: Automation | null; template?: AutomationTemplate; onClose: () => void }) {
   const save = useSaveAutomation()
   const profiles = useProfiles()
   const models = useModels()
   const destinations = useDestinations()
 
-  const [name, setName] = useState(automation?.name ?? '')
-  const [prompt, setPrompt] = useState(automation?.prompt ?? '')
-  const [schedule, setSchedule] = useState(() => (automation ? fromSchedule(automation.schedule) : defaultForm()))
+  const [name, setName] = useState(automation?.name ?? template?.name ?? '')
+  const [prompt, setPrompt] = useState(automation?.prompt ?? template?.prompt ?? '')
+  const [schedule, setSchedule] = useState(() => (automation ? fromSchedule(automation.schedule) : (template?.schedule ?? defaultForm())))
   const [profileId, setProfileId] = useState(automation?.profile_id ?? '')
   const [modelId, setModelId] = useState(automation?.model_id ?? '')
   const [onAsk, setOnAsk] = useState<OnAsk>(automation?.on_ask ?? 'pause')

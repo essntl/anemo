@@ -8,6 +8,8 @@ import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
 import { showDesktopNotification } from '@/features/notifications/desktop'
 import { alertApproval, alertRunStatus, type RunStatusEvent } from './agentAlerts'
+import { type FocusControl, type MusicControl, onFocusControl, onMusicControl } from './agentControl'
+import { tabId, watchUse } from './tab'
 import { conversationKey, conversationsKey, messagesKey } from './api'
 import { TERMINAL } from './runStream'
 
@@ -19,7 +21,11 @@ export function useAppEvents() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   useEffect(() => {
-    const source = new EventSource('/api/events')
+    const source = new EventSource(`/api/events?tab=${tabId()}`)
+    const stopWatching = watchUse()
+    // An agent asked this tab to start the timer or queue music.
+    source.addEventListener('focus.control', ((e: MessageEvent<string>) => void onFocusControl(JSON.parse(e.data) as FocusControl)) as EventListener)
+    source.addEventListener('music.control', ((e: MessageEvent<string>) => void onMusicControl(JSON.parse(e.data) as MusicControl)) as EventListener)
     const refreshConversation = (e: MessageEvent<string>) => {
       const data = JSON.parse(e.data) as { conversation_id?: string | null; status?: string }
       void qc.invalidateQueries({ queryKey: conversationsKey })
@@ -94,6 +100,9 @@ export function useAppEvents() {
       toast({ message: note.title, duration: 10_000, action: { label: 'Open', onClick: open } })
     }) as EventListener)
     source.addEventListener('notifications.changed', () => void qc.invalidateQueries({ queryKey: notificationsKey }))
-    return () => source.close()
+    return () => {
+      stopWatching()
+      source.close()
+    }
   }, [qc, navigate])
 }

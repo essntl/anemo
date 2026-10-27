@@ -974,10 +974,31 @@ export interface paths {
         /**
          * Global Events
          * @description App-wide notices (run status changes, new titles, ...) for every open tab.
+         *     `tab` identifies the tab, so agent tools can act in the one used last.
          */
         get: operations["global_events_api_events_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tab In Use
+         * @description This tab is being used (sent now and then while someone works in it).
+         */
+        post: operations["tab_in_use_api_presence_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4768,6 +4789,11 @@ export interface components {
             /** Track Ids */
             track_ids: string[];
         };
+        /** PresenceIn */
+        PresenceIn: {
+            /** Tab */
+            tab: string;
+        };
         /** ProfileIn */
         ProfileIn: {
             /** Name */
@@ -8493,7 +8519,9 @@ export interface operations {
     };
     global_events_api_events_get: {
         parameters: {
-            query?: never;
+            query?: {
+                tab?: string | null;
+            };
             header?: {
                 "last-event-id"?: string | null;
             };
@@ -8506,6 +8534,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tab_in_use_api_presence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresenceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -16,6 +16,7 @@ import { cn } from '@/lib/cn'
 import { useSearch } from './api'
 import { Highlighted } from './Highlighted'
 import { kindInfo } from './kinds'
+import { matchingActions } from './actions'
 import { matchingPages } from './pages'
 import { usePalette } from './paletteStore'
 
@@ -26,7 +27,9 @@ interface Item {
   icon: LucideIcon
   title: string
   detail?: string
-  to: string
+  to?: string
+  /** An action instead of a page (start focus, next track, …). */
+  run?: (navigate: (to: string) => void) => void
 }
 
 /** Suggested pages shown at once, and how long before the next ones take their place. */
@@ -108,6 +111,7 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
   const shownPages = cycling ? pages.slice(round * SUGGESTIONS, (round + 1) * SUGGESTIONS) : pages.slice(0, typed ? 4 : 30)
 
   const items: Item[] = [
+    ...matchingActions(typed).map((a) => ({ key: `action:${a.label}`, section: 'Actions', icon: a.icon, title: a.label, run: a.run })),
     ...shownPages.map((p) => ({ key: `page:${p.to}`, section: typed ? 'Go to' : 'Suggestions', icon: p.icon, title: p.label, to: p.to })),
     ...(typed ? (results.data?.groups ?? []) : []).flatMap((group) =>
       group.hits.map((hit) => ({
@@ -127,7 +131,8 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
 
   const go = (item: Item) => {
     onDone()
-    void navigate(item.to)
+    if (item.run) item.run((to) => void navigate(to))
+    else if (item.to) void navigate(item.to)
   }
 
   const onKeyDown = (e: KeyboardEvent) => {

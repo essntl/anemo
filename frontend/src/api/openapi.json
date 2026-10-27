@@ -3758,9 +3758,27 @@
           "runs"
         ],
         "summary": "Global Events",
-        "description": "App-wide notices (run status changes, new titles, ...) for every open tab.",
+        "description": "App-wide notices (run status changes, new titles, ...) for every open tab.\n`tab` identifies the tab, so agent tools can act in the one used last.",
         "operationId": "global_events_api_events_get",
         "parameters": [
+          {
+            "name": "tab",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tab"
+            }
+          },
           {
             "name": "last-event-id",
             "in": "header",
@@ -3796,6 +3814,59 @@
         ],
         "responses": {
           "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presence": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Tab In Use",
+        "description": "This tab is being used (sent now and then while someone works in it).",
+        "operationId": "tab_in_use_api_presence_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresenceIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
             "description": "Successful Response"
           },
           "422": {
@@ -17781,6 +17852,22 @@
           "track_ids"
         ],
         "title": "PlaylistTracksIn"
+      },
+      "PresenceIn": {
+        "properties": {
+          "tab": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Tab"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tab"
+        ],
+        "title": "PresenceIn"
       },
       "ProfileIn": {
         "properties": {

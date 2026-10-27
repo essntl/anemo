@@ -7,7 +7,8 @@ import { useNow } from '@/hooks/useNow'
 import { Check, LayoutGrid, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useHotkey } from '@/hooks/useHotkey'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { moveWidget, patchWidget, resetLayout, resizeWidget, type WidgetLayout } from './layout'
 import { useHomeLayout } from './useHomeLayout'
 import { useNeedsYou } from './useNeedsYou'
@@ -33,6 +34,13 @@ export function HomePage() {
   const { layout, update, ready } = useHomeLayout()
   const needs = useNeedsYou()
   const [editing, setEditing] = useState(false)
+  // "Edit home layout" from the search box opens /home?edit=1.
+  const [params, setParams] = useSearchParams()
+  const editParam = params.get('edit') === '1'
+  if (editParam && !editing) setEditing(true)
+  useEffect(() => {
+    if (editParam) setParams({}, { replace: true })
+  }, [editParam, setParams])
   useHotkey((e) => e.key.toLowerCase() === 'e', () => setEditing((x) => !x))
   useHotkey((e) => e.key === 'Escape', () => setEditing(false), editing)
   const now = new Date(useNow())

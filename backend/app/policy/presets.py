@@ -59,6 +59,18 @@ CATEGORIES: list[Category] = [
     Category(
         "notify.send", "Send notifications", "Notify you in the app or on Discord.", "ask_dangerous"
     ),
+    Category(
+        "focus.read",
+        "Focus & music",
+        "Look at your focus sessions and focus stats.",
+        "autonomous",
+    ),
+    Category(
+        "focus.control",
+        "Control the timer and music",
+        "Start a focus session or queue music in the Anemo tab you use.",
+        "ask",
+    ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
 ]
