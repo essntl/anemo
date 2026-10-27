@@ -28,7 +28,7 @@ export function ProfilesPage() {
   const [editing, setEditing] = useState<Editing>(null)
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8">
+    <div className="mx-auto max-w-4xl p-4 md:p-8 md:pt-14">
       <div className="mb-5 flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <Bot className="h-5 w-5" />

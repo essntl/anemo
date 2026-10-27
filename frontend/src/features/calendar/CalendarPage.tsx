@@ -198,7 +198,7 @@ export function CalendarPage() {
   )
 
   return (
-    <div className={cn('flex h-full flex-col px-3 pb-3 pt-2 md:p-6', phoneMonth && 'overflow-y-auto pb-24')}>
+    <div className={cn('flex h-full flex-col px-3 pb-3 pt-2 md:p-6 md:pt-14', phoneMonth && 'overflow-y-auto pb-24')}>
       <div className="mb-3 flex flex-wrap items-center gap-2 md:flex-nowrap">
         <div className="flex min-w-0 flex-1 items-center gap-0.5">
           <Button size="icon" variant="ghost" aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>

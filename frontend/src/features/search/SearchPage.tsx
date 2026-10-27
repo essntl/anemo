@@ -71,7 +71,7 @@ export function SearchPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8">
+    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
       <form onSubmit={submit} className="relative mb-3">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
         <input autoFocus={!q} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Search"

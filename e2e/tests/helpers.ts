@@ -92,3 +92,18 @@ export async function recordAnimations(page: Page): Promise<() => Promise<string
   })
   return () => page.evaluate(() => (window as unknown as { animationsSeen: string[] }).animationsSeen)
 }
+
+/** Adds the app's own sound file to the queue on the Music page (it starts playing). */
+export async function startMusic(page: Page, baseURL: string) {
+  await page.goto('/music')
+  await page.getByRole('textbox', { name: 'Music link' }).fill(`${baseURL}/sounds/timer.mp3`)
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(page.getByTestId('island')).toBeVisible()
+}
+
+/** Removes that track from the music library again. */
+export async function removeTrack(page: Page, baseURL: string) {
+  const tracks = (await (await page.request.get('/api/music/tracks')).json()) as { id: string; url: string }[]
+  for (const t of tracks.filter((x) => x.url === `${baseURL}/sounds/timer.mp3`)) await page.request.delete(`/api/music/tracks/${t.id}`)
+}
+

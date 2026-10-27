@@ -113,7 +113,7 @@ export function TasksPage() {
   }
 
   return (
-    <div className={cn('mx-auto p-4 md:p-8', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
+    <div className={cn('mx-auto p-4 md:p-8 md:pt-14', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
       <div className="mb-4 flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <CheckSquare className="h-5 w-5" />

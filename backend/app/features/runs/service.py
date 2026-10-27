@@ -90,6 +90,11 @@ async def set_status(
             "run_id": str(run.id),
             "status": status,
             "conversation_id": str(run.conversation_id) if run.conversation_id else None,
+            # For the Dynamic Island: only agent runs started by the user are worth
+            # an alert (not chat answers, sub-agents or automations).
+            "kind": run.kind,
+            "subagent": run.parent_run_id is not None,
+            "automation": run.automation_id is not None,
         },
     )
 

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { answerPrompt, confirmWith, fakeModels, login, pickModel, recordAnimations, signOutAfterEach } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic } from './helpers'
 
 /*
  * Phone layout and installable-app checks. Runs in the "mobile" project
@@ -15,6 +15,9 @@ const SCREENS = [
   '/tasks',
   '/tasks?view=board',
   '/calendar',
+  '/focus',
+  '/music',
+  '/settings/focus',
   '/runs',
   '/runs?kind=all',
   '/agents',
@@ -297,5 +300,33 @@ test('installable: manifest, icons and a service worker that never caches /api',
     await expect(page.getByRole('heading', { name: "Can't reach Anemo" })).toBeVisible()
   } finally {
     await context.setOffline(false)
+  }
+})
+
+test('the Island takes the middle of the top bar and plays and pauses', async ({ page, baseURL }) => {
+  await login(page)
+  try {
+    await startMusic(page, baseURL!)
+    const island = page.getByTestId('island')
+    // It replaces the Anemo name in the top bar, between the menu and new-chat buttons.
+    const bar = page.locator('header').filter({ has: page.getByRole('button', { name: 'Open menu' }) }).first()
+    await expect(bar.getByText('Anemo')).toBeHidden()
+    await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
+    // (once its change of shape has settled)
+    await expect.poll(async () => Math.round((await island.boundingBox())!.height)).toBeLessThanOrEqual(36)
+    const pill = (await island.boundingBox())!
+    const menu = (await page.getByRole('button', { name: 'Open menu' }).first().boundingBox())!
+    expect(pill.x).toBeGreaterThanOrEqual(menu.x + menu.width)
+    expect(pill.y + pill.height).toBeLessThanOrEqual(48)
+    // Go to another page through the menu: still playing.
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    await page.getByRole('link', { name: 'Tasks', exact: true }).click()
+    await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
+    await island.getByRole('button', { name: /Show controls/ }).tap()
+    await island.getByRole('button', { name: 'Pause music' }).tap()
+    await expect(island.getByRole('button', { name: 'Play music' })).toBeVisible()
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+  } finally {
+    await removeTrack(page, baseURL!)
   }
 })

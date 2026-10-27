@@ -73,7 +73,7 @@ export function RunDetailPage() {
   const limits = data.limits as { max_steps?: number; max_runtime_s?: number } | null
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8">
+    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
       <Link to="/runs" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-text">
         <ArrowLeft className="h-4 w-4" /> Runs
       </Link>

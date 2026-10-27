@@ -37,7 +37,7 @@ export function SettingsIndex() {
 export function SettingsLayout() {
   const isIndex = useMatch('/settings') !== null
   return (
-    <div className="mx-auto flex max-w-5xl gap-8 p-4 md:p-8">
+    <div className="mx-auto flex max-w-5xl gap-8 p-4 md:p-8 md:pt-14">
       <div className={cn('w-full shrink-0 md:block md:w-52', !isIndex && 'hidden')}>
         <h1 className="mb-4 px-3 text-xl font-semibold">Settings</h1>
         <nav className="flex flex-col gap-0.5">

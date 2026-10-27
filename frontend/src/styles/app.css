@@ -298,6 +298,19 @@
 .wave > span:nth-child(2) { animation-delay: 0.15s; }
 .wave > span:nth-child(3) { animation-delay: 0.3s; }
 
+/*
+ * The Dynamic Island floats at the top centre of the page column (#main-column), which
+ * carries its width as --island-w (0px while hidden) and data-island="on|off".
+ *  .island-clear-left  a header's left part stops short of the Island; set
+ *                      --island-gap to the space between the column edge and it.
+ *  .island-reserve     pages whose toolbar starts at the very top (Files, Documents)
+ *                      move down by the header height while the Island shows (desktop).
+ */
+.island-clear-left { max-width: calc(50% - var(--island-w, 0px) / 2 - var(--island-gap, 1rem)); }
+@media (min-width: 768px) {
+  #main-column[data-island='on'] .island-reserve { padding-top: 3.5rem; transition: padding-top 180ms var(--ease-out); }
+}
+
 /* Music: the "now playing" bars bounce while a track plays (Equalizer.tsx). */
 @keyframes eq-bar { 0%, 100% { transform: scaleY(0.3); } 25% { transform: scaleY(1); } 50% { transform: scaleY(0.55); } 75% { transform: scaleY(0.85); } }
 .eq-bar { transform-origin: bottom; }

@@ -21,6 +21,7 @@ import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
 import { useProjects } from '@/features/tasks/api'
 import { cn } from '@/lib/cn'
+import { useIslandVisible } from '@/features/island/islandStore'
 import {
   type ChatMessage,
   type Conversation,
@@ -80,6 +81,7 @@ export function ConversationPage() {
   const { conversationId = '' } = useParams()
   const navigate = useNavigate()
   const browser = useBrowserStatus()
+  const island = useIslandVisible((s) => s.visible)
   const wide = useMediaQuery(WIDE)
   const [browserOpen, setBrowserOpen] = useState(false)
   const qc = useQueryClient()
@@ -173,7 +175,8 @@ export function ConversationPage() {
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:h-14 md:px-6">
         <MenuButton />
-        <h1 className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold">
+        {/* The title stops short of the Dynamic Island in the middle of this header. */}
+        <h1 className="island-clear-left flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold [--island-gap:3rem] md:[--island-gap:2rem]">
           {/* The title is a button: press it to rename the chat. */}
           {conversation.data ? (
             <button type="button" title="Rename" aria-label={`Rename “${conversation.data.title}”`} onClick={() => void rename()}
@@ -199,6 +202,8 @@ export function ConversationPage() {
           <Button
             size="icon"
             variant="ghost"
+            // On a phone it makes room for the Dynamic Island (it is in the ⋯ menu too).
+            className={cn(island && 'max-md:hidden')}
             aria-label={conversation.data.pinned ? 'Remove from favorites' : 'Add to favorites'}
             aria-pressed={conversation.data.pinned}
             onClick={() => update.mutate({ id: conversationId, body: { pinned: !conversation.data?.pinned } })}

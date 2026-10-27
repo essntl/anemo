@@ -7,6 +7,7 @@ import { automationsKey } from '@/features/automations/api'
 import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
 import { showDesktopNotification } from '@/features/notifications/desktop'
+import { alertApproval, alertRunStatus, type RunStatusEvent } from './agentAlerts'
 import { conversationKey, conversationsKey, messagesKey } from './api'
 import { TERMINAL } from './runStream'
 
@@ -31,11 +32,15 @@ export function useAppEvents() {
         void qc.invalidateQueries({ queryKey: messagesKey(data.conversation_id) })
       }
     }
-    source.addEventListener('run.status', refreshConversation as EventListener)
+    source.addEventListener('run.status', ((e: MessageEvent<string>) => {
+      refreshConversation(e)
+      alertRunStatus(qc, JSON.parse(e.data) as RunStatusEvent)
+    }) as EventListener)
     source.addEventListener('conversation.updated', refreshConversation as EventListener)
     source.addEventListener('approval.requested', ((e: MessageEvent<string>) => {
       void qc.invalidateQueries({ queryKey: approvalsKey })
       refreshConversation(e)
+      alertApproval(qc, JSON.parse(e.data) as { conversation_id?: string | null })
     }) as EventListener)
     // Chats were deleted elsewhere (temporary chats whose time ran out). Leave one that
     // is open here, and say why.
