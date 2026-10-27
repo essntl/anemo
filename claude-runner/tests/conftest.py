@@ -10,6 +10,7 @@ fake API with a dummy key. No account and no network are needed.
 import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -106,6 +107,9 @@ class Runner:
              "--host", "127.0.0.1", "--port", str(self.port), "--no-access-log"],
             env=self.env(**extra),
             cwd=str(ROOT),
+            # Its own process group, so kill() can end it and its CLI processes at
+            # once, like a container restart.
+            start_new_session=True,
         )
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
@@ -128,10 +132,9 @@ class Runner:
     def kill(self) -> None:
         """Like a container restart with no time to clean up."""
         if self.proc is not None:
-            self.proc.kill()
+            os.killpg(self.proc.pid, signal.SIGKILL)  # the runner and every CLI it started
             self.proc.wait()
             self.proc = None
-            subprocess.run(["pkill", "-9", "-f", str(self.fake_cli)], check=False)  # noqa: S603, S607
 
     @property
     def url(self) -> str:
