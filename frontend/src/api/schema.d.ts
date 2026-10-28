@@ -3936,11 +3936,13 @@ export interface components {
         };
         /**
          * HomeSettings
-         * @description The Home page layout, shared by every device (phones show one column).
+         * @description The Home page layouts: one for wider screens, one for phones (one column).
          */
         HomeSettings: {
             /** Layout */
             layout?: components["schemas"]["WidgetLayout"][];
+            /** Mobile Layout */
+            mobile_layout?: components["schemas"]["WidgetLayout"][];
         };
         /** ImportIn */
         ImportIn: {

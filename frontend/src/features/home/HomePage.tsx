@@ -1,7 +1,8 @@
 /**
  * Home: a greeting and a grid of widgets (focus, music, today, tasks, …). The layout
- * is the same on every device (stored on the server); "Edit layout" (or E) lets you
- * move, resize, hide and add widgets. Every widget follows the project switcher.
+ * is stored on the server, one for phones and one for wider screens; "Edit layout"
+ * (or E) lets you move, resize, hide and add widgets. Every widget follows the
+ * project switcher.
  */
 import { useNow } from '@/hooks/useNow'
 import { Check, LayoutGrid, RotateCcw } from 'lucide-react'
@@ -31,7 +32,7 @@ function greeting(hour: number): string {
 }
 
 export function HomePage() {
-  const { layout, update, ready } = useHomeLayout()
+  const { layout, update, ready, phone } = useHomeLayout()
   const needs = useNeedsYou()
   const [editing, setEditing] = useState(false)
   // "Edit home layout" from the search box opens /home?edit=1.
@@ -90,7 +91,9 @@ export function HomePage() {
 
       {editing && (
         <p className="mb-3 text-[13px] text-muted">
-          Drag a widget to move it and its corner to resize it. With the keyboard, focus a widget and use the arrow keys to move it, Shift and the arrows to resize it.
+          {phone
+            ? 'Drag a widget by its grip to move it. This is the phone layout: wider screens keep their own.'
+            : 'Drag a widget to move it and its corner to resize it. With the keyboard, focus a widget and use the arrow keys to move it, Shift and the arrows to resize it. This is the layout for wider screens: phones keep their own.'}
         </p>
       )}
 
