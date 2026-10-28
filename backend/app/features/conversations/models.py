@@ -96,6 +96,12 @@ class ChatMessage(Base, IdMixin):
     # time, memories). Not shown in the UI; replayed byte for byte in later requests
     # so the conversation prefix stays cacheable (runtime/turn_context.py).
     turn_context: Mapped[str | None] = mapped_column(Text)
+    # Assistant messages: earlier answers to the same message (Regenerate keeps them).
+    # The stored fields of each one (content, text_plain, status, error, run_id,
+    # model_id, model_label, created_at); the one shown is the columns themselves,
+    # at position `version` among all of them.
+    versions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+    version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed("to_tsvector('english', coalesce(text_plain, ''))", persisted=True)

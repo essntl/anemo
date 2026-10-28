@@ -709,6 +709,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversation_id}/messages/{message_id}/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Select Version
+         * @description Switch the last answer to another of its versions; the chat goes on from it.
+         */
+        post: operations["select_version_api_conversations__conversation_id__messages__message_id__version_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}/edit-last": {
         parameters: {
             query?: never;
@@ -4377,6 +4397,46 @@ export interface components {
             references: components["schemas"]["ReferenceSummary"][];
             /** Mode */
             mode?: string | null;
+            /**
+             * Questions
+             * @default []
+             */
+            questions: components["schemas"]["QuestionMark"][];
+            /**
+             * Versions
+             * @default []
+             */
+            versions: components["schemas"]["MessageVersion"][];
+            /**
+             * Version
+             * @default 0
+             */
+            version: number;
+        };
+        /**
+         * MessageVersion
+         * @description One answer to the same message; Regenerate adds one.
+         */
+        MessageVersion: {
+            /** Text */
+            text: string;
+            /** Reasoning */
+            reasoning: string | null;
+            /** Status */
+            status: string;
+            /** Error */
+            error: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Model Label */
+            model_label: string | null;
+            /** Mode */
+            mode?: string | null;
+            /**
+             * Questions
+             * @default []
+             */
+            questions: components["schemas"]["QuestionMark"][];
         };
         /**
          * ModelDefaults
@@ -5056,6 +5116,19 @@ export interface components {
             default_base_url: string | null;
             /** Needs Key */
             needs_key: boolean;
+        };
+        /**
+         * QuestionMark
+         * @description The agent stopped to ask something: `at` is where in the answer's text (a
+         *     character offset, before the text that came after the answer).
+         */
+        QuestionMark: {
+            /** At */
+            at: number;
+            /** Question */
+            question: string;
+            /** Answer */
+            answer: string | null;
         };
         /** RecentDocument */
         RecentDocument: {
@@ -6384,6 +6457,11 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VersionIn */
+        VersionIn: {
+            /** Version */
+            version: number;
         };
         /** WebSettings */
         WebSettings: {
@@ -8063,6 +8141,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    select_version_api_conversations__conversation_id__messages__message_id__version_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
                 };
             };
             /** @description Validation Error */

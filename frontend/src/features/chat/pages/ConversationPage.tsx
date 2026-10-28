@@ -34,6 +34,7 @@ import {
   useEditLast,
   useMessages,
   useRegenerate,
+  useSelectVersion,
   useSendTurn,
   useUpdateConversation,
 } from '../api'
@@ -92,6 +93,17 @@ export function ConversationPage() {
   const send = useSendTurn()
   const cancel = useCancelRun()
   const regenerate = useRegenerate()
+  const selectVersion = useSelectVersion()
+  // Earlier answers being looked at (message id -> version). The last answer's version
+  // is switched on the server instead, since the chat goes on from it.
+  const [viewing, setViewing] = useState<Record<string, number>>({})
+  const view = (messageId: string, version: number | null) =>
+    setViewing((old) => {
+      const next = { ...old }
+      if (version === null) delete next[messageId]
+      else next[messageId] = version
+      return next
+    })
   const editLast = useEditLast()
   const branch = useBranch()
   const projects = useProjects()
@@ -167,7 +179,7 @@ export function ConversationPage() {
   // The last message can be edited when it is the one the last answer replied to.
   const canEditLast = !activeRunId && lastUser && lastAssistant && lastAssistant.seq === lastUser.seq + 1
   const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
-  const actionError = send.error ?? regenerate.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
+  const actionError = send.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
 
@@ -270,25 +282,43 @@ export function ConversationPage() {
                     modelLabel={live.modelLabel}
                     notice={live.notice}
                     activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live /> : undefined}
+                    questions={live.questions}
                   />
-                ) : (
-                  <AssistantMessage
-                    text={m.text}
-                    reasoning={m.reasoning}
-                    status={m.status}
-                    error={m.error}
-                    modelLabel={m.model_label}
-                    activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live={false} /> : undefined}
-                    onRegenerate={
-                      m.id === lastAssistant?.id && !activeRunId
-                        ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
-                        : undefined
-                    }
-                    onBranch={() =>
-                      branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
-                    }
-                  />
-                )}
+                ) : (() => {
+                  const versions = m.versions ?? []
+                  const isLast = m.id === lastAssistant?.id
+                  const index = Math.min(viewing[m.id] ?? m.version, Math.max(versions.length - 1, 0))
+                  // Another answer than the one the chat goes on from (only looked at).
+                  const other = versions.length > 1 && index !== m.version ? versions[index] : null
+                  const shown = other ?? m
+                  const select = (version: number) => {
+                    if (!isLast || activeRunId) return view(m.id, version === m.version ? null : version)
+                    view(m.id, version) // shown at once, then kept by the server
+                    selectVersion.mutate({ conversationId, messageId: m.id, version },
+                      { onSettled: () => view(m.id, null) })
+                  }
+                  return (
+                    <AssistantMessage
+                      key={index}
+                      text={shown.text}
+                      reasoning={shown.reasoning}
+                      status={shown.status}
+                      error={shown.error}
+                      modelLabel={shown.model_label}
+                      questions={shown.questions}
+                      activity={shown.mode === 'agent' && shown.run_id ? <RunActivity runId={shown.run_id} live={false} /> : undefined}
+                      versions={versions.length > 1 ? { index, count: versions.length, onSelect: select } : undefined}
+                      onRegenerate={
+                        isLast && !activeRunId && !other
+                          ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
+                          : undefined
+                      }
+                      onBranch={other ? undefined : () =>
+                        branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
+                      }
+                    />
+                  )
+                })()}
               </div>
             )
           })}

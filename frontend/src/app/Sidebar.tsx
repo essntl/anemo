@@ -212,8 +212,12 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
     // whole does, rather than squeezing the chats away.
     <aside className={cn('h-full shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-3 py-4', onClose ? 'flex' : '', className)}>
       <div className={cn('flex items-center gap-2 px-2', onClose ? 'mb-3 gap-1' : 'mb-4')}>
-        <Logo className="h-8 w-8 text-accent pointer-coarse:h-9 pointer-coarse:w-9" />
-        <span className="ml-1 flex-1 text-[19px] font-semibold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
+        {/* The logo leads home. */}
+        <NavLink to="/home" title="Home" aria-label="Anemo, go to Home"
+          className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded-control p-1">
+          <Logo className="h-8 w-8 shrink-0 text-accent pointer-coarse:h-9 pointer-coarse:w-9" />
+          <span className="ml-1 text-[19px] font-semibold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
+        </NavLink>
         {onClose ? (
           // On a phone Notifications and Settings sit up here, so the chats get the room.
           <>

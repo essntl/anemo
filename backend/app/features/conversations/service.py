@@ -3,6 +3,7 @@
 import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy import text as sql
@@ -19,6 +20,8 @@ from app.features.conversations.schemas import (
     AttachmentSummary,
     ConversationOut,
     MessageOut,
+    MessageVersion,
+    QuestionMark,
     ReferenceSummary,
 )
 from app.features.documents import service as documents
@@ -30,19 +33,85 @@ from app.features.tasks.schemas import clean_tags
 from app.jobs import queue
 from app.runtime import outputs
 
+# What a message shows of its run: the run's kind ("chat" or "agent") and the
+# questions the agent asked on the way (see runtime/agent.py, _note_question).
+RunInfo = tuple[str, list[dict[str, Any]]]
+
+
+def _reasoning(content: list[dict[str, Any]]) -> str | None:
+    text = "".join(
+        b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "reasoning"
+    )
+    return text or None
+
+
+def _questions(info: RunInfo | None) -> list[QuestionMark]:
+    if info is None:
+        return []
+    return [
+        QuestionMark(
+            at=int(q.get("at", 0)), question=str(q.get("question", "")), answer=q.get("answer")
+        )
+        for q in info[1]
+        if isinstance(q, dict)
+    ]
+
+
+def _snapshot(m: ChatMessage) -> dict[str, Any]:
+    """The answer a message shows now, as one of its versions."""
+    return {
+        "content": list(m.content),
+        "text_plain": m.text_plain,
+        "status": m.status,
+        "error": m.error,
+        "run_id": str(m.run_id) if m.run_id else None,
+        "model_id": str(m.model_id) if m.model_id else None,
+        "model_label": m.model_label,
+    }
+
+
+def _all_versions(m: ChatMessage) -> list[dict[str, Any]]:
+    """Every answer to this message, oldest first, the shown one among them."""
+    others = list(m.versions or [])
+    at = min(m.version, len(others))
+    return [*others[:at], _snapshot(m), *others[at:]]
+
+
+def _version_run_id(v: dict[str, Any]) -> uuid.UUID | None:
+    return uuid.UUID(v["run_id"]) if v.get("run_id") else None
+
 
 def message_out(
-    m: ChatMessage, files: list[Attachment] | None = None, mode: str | None = None
+    m: ChatMessage,
+    files: list[Attachment] | None = None,
+    mode: str | None = None,
+    runs: dict[uuid.UUID, RunInfo] | None = None,
 ) -> MessageOut:
-    reasoning = "".join(
-        b.get("text", "") for b in m.content if isinstance(b, dict) and b.get("type") == "reasoning"
-    )
+    runs = runs or {}
+    info = runs.get(m.run_id) if m.run_id else None
+    versions: list[MessageVersion] = []
+    if m.versions:
+        for v in _all_versions(m):
+            run_id = _version_run_id(v)
+            v_info = runs.get(run_id) if run_id else None
+            versions.append(
+                MessageVersion(
+                    text=v.get("text_plain", ""),
+                    reasoning=_reasoning(v.get("content") or []),
+                    status=v.get("status", "complete"),
+                    error=v.get("error"),
+                    run_id=run_id,
+                    model_label=v.get("model_label"),
+                    mode=v_info[0] if v_info else None,
+                    questions=_questions(v_info),
+                )
+            )
     return MessageOut(
         id=m.id,
         seq=m.seq,
         role=m.role,
         text=m.text_plain,
-        reasoning=reasoning or None,
+        reasoning=_reasoning(m.content),
         status=m.status,
         error=m.error,
         run_id=m.run_id,
@@ -57,8 +126,26 @@ def message_out(
             for b in m.content
             if isinstance(b, dict) and b.get("type") == "conversation"
         ],
-        mode=mode,
+        mode=mode if mode is not None else (info[0] if info else None),
+        questions=_questions(info),
+        versions=versions,
+        version=min(m.version, len(m.versions or [])) if m.versions else 0,
     )
+
+
+async def _run_info(db: AsyncSession, rows: list[ChatMessage]) -> dict[uuid.UUID, RunInfo]:
+    """What the messages (and their earlier versions) show of their runs."""
+    ids = {m.run_id for m in rows if m.run_id}
+    ids |= {r for m in rows for v in m.versions or [] if (r := _version_run_id(v))}
+    if not ids:
+        return {}
+    result = await db.execute(
+        select(Run.id, Run.kind, Run.totals["questions"]).where(Run.id.in_(ids))
+    )
+    return {
+        run_id: (kind, questions if isinstance(questions, list) else [])
+        for run_id, kind, questions in result.all()
+    }
 
 
 async def get_conversation(db: AsyncSession, conversation_id: uuid.UUID) -> Conversation:
@@ -307,13 +394,8 @@ async def list_messages(db: AsyncSession, conversation_id: uuid.UUID) -> list[Me
     ):
         if att.message_id:
             files.setdefault(att.message_id, []).append(att)
-    run_ids = [m.run_id for m in rows if m.run_id]
-    kinds: dict[uuid.UUID, str] = {}
-    if run_ids:
-        kinds = dict((await db.execute(select(Run.id, Run.kind).where(Run.id.in_(run_ids)))).all())
-    return [
-        message_out(m, files.get(m.id), kinds.get(m.run_id) if m.run_id else None) for m in rows
-    ]
+    runs = await _run_info(db, rows)
+    return [message_out(m, files.get(m.id), runs=runs) for m in rows]
 
 
 async def _next_seq(db: AsyncSession, conversation_id: uuid.UUID) -> int:
@@ -456,11 +538,48 @@ async def regenerate(
     )
     if last is None or last.role != "assistant":
         raise Conflict("Nothing to regenerate", code="nothing_to_regenerate")
+    if last.status in ("complete", "cancelled") or last.text_plain:
+        # Kept as a version of its own: the new answer comes after all of them.
+        # (A failed attempt with nothing in it is simply tried again.)
+        everything = _all_versions(last)
+        last.versions, last.version = everything, len(everything)
     last.content, last.text_plain, last.status, last.error = [], "", "streaming", None
     run = await _start_run(db, conv, last, "(regenerate)", conv.model_id, None, conv.default_mode)
     await db.commit()
     await db.refresh(last)
     return run, last
+
+
+async def select_version(
+    db: AsyncSession, conversation_id: uuid.UUID, message_id: uuid.UUID, version: int
+) -> MessageOut:
+    """Show an earlier (or later) answer to the last message; the chat goes on from it."""
+    conv = await _lock_idle_conversation(db, conversation_id)
+    last = await db.scalar(
+        select(ChatMessage)
+        .where(ChatMessage.conversation_id == conv.id)
+        .order_by(ChatMessage.seq.desc())
+        .limit(1)
+    )
+    if last is None or last.id != message_id:
+        raise Conflict(
+            "Only the last answer can be switched to another version", code="not_last_answer"
+        )
+    everything = _all_versions(last)
+    if version >= len(everything):
+        raise NotFound("This answer has no such version")
+    chosen = everything.pop(version)
+    last.content = list(chosen.get("content") or [])
+    last.text_plain = chosen.get("text_plain", "")
+    last.status = chosen.get("status", "complete")
+    last.error = chosen.get("error")
+    last.run_id = _version_run_id(chosen)
+    last.model_id = uuid.UUID(chosen["model_id"]) if chosen.get("model_id") else None
+    last.model_label = chosen.get("model_label")
+    last.versions, last.version = everything, version
+    await db.commit()
+    await db.refresh(last)
+    return message_out(last, runs=await _run_info(db, [last]))
 
 
 async def _last_exchange(
@@ -498,6 +617,8 @@ async def edit_last(
     user.turn_context = None  # rendered again (current time, memories) for the new text
     assistant.content, assistant.text_plain = [], ""
     assistant.status, assistant.error = "streaming", None
+    # The earlier answers were to the text as it was before.
+    assistant.versions, assistant.version = [], 0
     run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, conv.default_mode)
     conv.last_message_at = func.now()
     files = list(await db.scalars(select(Attachment).where(Attachment.message_id == user.id)))

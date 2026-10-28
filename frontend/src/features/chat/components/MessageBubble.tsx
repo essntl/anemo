@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { AlertCircle, Brain, Check, ChevronRight, Copy, GitBranch, Pencil, RotateCcw } from 'lucide-react'
+import { AlertCircle, Brain, Check, ChevronLeft, ChevronRight, Copy, GitBranch, MessageCircleReply, Pencil, RotateCcw } from 'lucide-react'
 import type { Schemas } from '@/api/client'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
 import { AttachmentChip } from './AttachmentChip'
 import { ReferenceChip } from './ChatReference'
+import type { QuestionMark } from '../api'
+import { splitAtQuestions } from '../questionMarks'
 
 type AttachmentSummary = Schemas['AttachmentSummary']
 type ReferenceSummary = Schemas['ReferenceSummary']
@@ -112,6 +114,49 @@ const ANSWER_INSET = 'px-1'
 const FOOTER_BUTTON =
   'relative flex shrink-0 items-center justify-center gap-1 rounded-md px-1.5 py-1 hover:bg-surface-hover hover:text-text max-md:h-9 max-md:w-9 max-md:px-0'
 
+/** Where the agent stopped to ask you something: a quiet line between the text it
+ *  wrote before and after your answer. */
+function QuestionDivider({ mark }: { mark: QuestionMark }) {
+  const answer = mark.answer ?? 'You left it to the agent'
+  return (
+    <div className="my-3 flex items-center gap-2 text-[12px] text-subtle" title={`${mark.question}\n→ ${answer}`}>
+      <span className="h-px w-4 shrink-0 bg-border" />
+      <MessageCircleReply className="h-3.5 w-3.5 shrink-0" />
+      <span className="min-w-0 truncate">
+        {mark.answer !== null ? (
+          <>You answered <span className="text-muted">“{mark.answer}”</span></>
+        ) : answer}
+        {mark.question && <span className="max-sm:hidden"> to “{mark.question}”</span>}
+      </span>
+      <span className="h-px min-w-4 flex-1 bg-border" />
+    </div>
+  )
+}
+
+/** Answers to the same message (Regenerate adds one): which one is shown, and the
+ *  arrows to go through them. */
+export interface VersionNav {
+  index: number
+  count: number
+  onSelect: (index: number) => void
+}
+
+function VersionArrows({ index, count, onSelect }: VersionNav) {
+  return (
+    <span className="mr-1 flex shrink-0 items-center" aria-label={`Version ${index + 1} of ${count}`}>
+      <button type="button" disabled={index === 0} onClick={() => onSelect(index - 1)} title="Previous version"
+        aria-label="Previous version" className={cn(FOOTER_BUTTON, 'disabled:opacity-40 disabled:hover:bg-transparent')}>
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+      <span className="min-w-[2.25rem] text-center tabular-nums">{index + 1}/{count}</span>
+      <button type="button" disabled={index === count - 1} onClick={() => onSelect(index + 1)} title="Next version"
+        aria-label="Next version" className={cn(FOOTER_BUTTON, 'disabled:opacity-40 disabled:hover:bg-transparent')}>
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </span>
+  )
+}
+
 interface AssistantProps {
   text: string
   reasoning?: string | null
@@ -124,6 +169,10 @@ interface AssistantProps {
   onBranch?: () => void
   /** Agent runs: plan and tool calls, shown above the answer. */
   activity?: ReactNode
+  /** Agent runs: where the agent asked you something, shown in the text. */
+  questions?: QuestionMark[]
+  /** Set when the message was answered more than once. */
+  versions?: VersionNav
 }
 
 export function AssistantMessage({
@@ -136,6 +185,8 @@ export function AssistantMessage({
   onRegenerate,
   onBranch,
   activity,
+  questions,
+  versions,
 }: AssistantProps) {
   const [copied, setCopied] = useState(false)
   const live = ['streaming', 'queued', 'running', 'waiting_approval', 'waiting_subagent', 'paused'].includes(status)
@@ -164,9 +215,13 @@ export function AssistantMessage({
           <span className="shimmer font-medium">Thinking</span>
         </div>
       )}
-      {text && (
+      {(text || Boolean(questions?.length)) && (
         <div className={ANSWER_INSET}>
-          <Markdown text={text} />
+          {splitAtQuestions(text, questions).map((part, i) =>
+            part.kind === 'question'
+              ? <QuestionDivider key={i} mark={part.mark} />
+              : part.text && <Markdown key={i} text={part.text} />,
+          )}
           {live && !suspended && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
         </div>
       )}
@@ -181,6 +236,7 @@ export function AssistantMessage({
       {/* 1px less in than the text above: the smaller, fainter letters otherwise look indented. */}
       {!live && (
         <div className="mt-2 flex items-center gap-1 pl-[3px] text-[12px] text-subtle opacity-70 transition-opacity group-hover:opacity-100">
+          {versions && versions.count > 1 && <VersionArrows {...versions} />}
           {status === 'cancelled' && <span className="mr-2 shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-muted">Stopped</span>}
           {/* On a phone the buttons are just icons, so the model's name has the room. */}
           {modelLabel && <span className="mr-2 min-w-0 flex-1 break-words leading-snug md:flex-none" title={modelLabel}>{modelLabel}</span>}

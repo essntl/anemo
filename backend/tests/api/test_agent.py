@@ -10,6 +10,8 @@ from sqlalchemy import update
 
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
+from app.core.redis import get_redis
+from app.events import bus
 from app.features.auth.models import AuthSession
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta, ToolCall
@@ -225,6 +227,32 @@ async def test_agent_asks_the_user_and_goes_on_with_the_answer(authed):
     assert tool_results_sent_to_model() == ["The user answered: Short, please"]
     [row] = (await timeline(authed, run_id))["tool_calls"]
     assert row["status"] == "succeeded" and row["args"]["answer"] == "Short, please"
+
+
+async def test_the_answer_shows_where_the_agent_stopped_to_ask(authed):
+    cid = await setup(authed)
+    script(
+        "plan lunch",
+        [TextDelta("Let me look."), call("ask_user", question="Where?"), Done("tool_use")],
+        [TextDelta("Booked it."), Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "plan lunch")
+    approval = (await authed.get("/api/approvals")).json()[0]
+    await authed.post(
+        f"/api/approvals/{approval['id']}", json={"decision": "approve", "answer": "Downtown"}
+    )
+    await execute_run(uuid.UUID(run_id))
+    # Running the step again (a worker restart) does not note the question twice.
+    await execute_run(uuid.UUID(run_id))
+    msg = await reply(authed, cid)
+    assert msg["text"] == "Let me look.\n\nBooked it."
+    assert msg["questions"] == [
+        {"at": len("Let me look."), "question": "Where?", "answer": "Downtown"}
+    ]
+    # The live view gets the same mark.
+    entries = await get_redis().xrange(bus.run_stream_key(run_id))
+    marks = [d for t, d in (bus.decode(f) for _, f in entries) if t == "message.question"]
+    assert [m["answer"] for m in marks] == ["Downtown"] and marks[0]["at"] == len("Let me look.")
 
 
 async def test_the_user_can_leave_the_question_to_the_agent(authed):

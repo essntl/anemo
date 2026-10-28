@@ -190,6 +190,58 @@ async def test_provider_error_fails_run_with_message(authed):
     assert r.status_code == 202
 
 
+async def test_regenerate_keeps_the_earlier_answers_as_versions(authed):
+    ids = await _setup_models(authed, ("echo", "reasoning"))
+    cid = await _new_conversation(authed)
+    turn = (await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})).json()
+    await execute_chat_run(uuid.UUID(turn["run_id"]))
+    first = (await authed.get(f"/api/conversations/{cid}/messages")).json()[1]
+    assert first["versions"] == [] and first["version"] == 0
+
+    # Answered again by another model: both answers are kept, the new one shown.
+    r = await authed.post(
+        f"/api/conversations/{cid}/regenerate", params={"model_id": ids["reasoning"]}
+    )
+    await execute_chat_run(uuid.UUID(r.json()["run_id"]))
+    msg = (await authed.get(f"/api/conversations/{cid}/messages")).json()[1]
+    assert msg["id"] == first["id"] and msg["version"] == 1
+    assert [v["model_label"][:4] for v in msg["versions"]] == ["echo", "reas"]
+    assert msg["versions"][0]["text"] == first["text"] and msg["versions"][0]["reasoning"] is None
+    assert msg["versions"][1]["reasoning"] and msg["text"] == msg["versions"][1]["text"]
+
+    # Back to the first: the chat goes on from it.
+    r = await authed.post(
+        f"/api/conversations/{cid}/messages/{msg['id']}/version", json={"version": 0}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["version"] == 0 and r.json()["reasoning"] is None
+    msg = (await authed.get(f"/api/conversations/{cid}/messages")).json()[1]
+    assert msg["text"] == first["text"] and msg["model_label"].startswith("echo")
+    assert [v["model_label"][:4] for v in msg["versions"]] == ["echo", "reas"]
+    missing = f"/api/conversations/{cid}/messages/{msg['id']}/version"
+    assert (await authed.post(missing, json={"version": 2})).status_code == 404
+
+    # A third answer comes after all of them.
+    r = await authed.post(f"/api/conversations/{cid}/regenerate")
+    await execute_chat_run(uuid.UUID(r.json()["run_id"]))
+    msg = (await authed.get(f"/api/conversations/{cid}/messages")).json()[1]
+    assert msg["version"] == 2 and len(msg["versions"]) == 3
+
+    # Only the last answer switches; an edited message starts over.
+    turn = (await authed.post(f"/api/conversations/{cid}/turns", json={"text": "next"})).json()
+    await execute_chat_run(uuid.UUID(turn["run_id"]))
+    r = await authed.post(
+        f"/api/conversations/{cid}/messages/{msg['id']}/version", json={"version": 0}
+    )
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_last_answer"
+    r = await authed.post(f"/api/conversations/{cid}/regenerate")
+    await execute_chat_run(uuid.UUID(r.json()["run_id"]))
+    r = await authed.post(f"/api/conversations/{cid}/edit-last", json={"text": "other"})
+    await execute_chat_run(uuid.UUID(r.json()["run_id"]))
+    last = (await authed.get(f"/api/conversations/{cid}/messages")).json()[-1]
+    assert last["versions"] == [] and last["text"].endswith("other")
+
+
 async def test_restart_after_worker_crash(authed):
     await _setup_models(authed)
     cid = await _new_conversation(authed)

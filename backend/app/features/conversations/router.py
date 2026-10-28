@@ -20,6 +20,7 @@ from app.features.conversations.schemas import (
     TagCount,
     TurnIn,
     TurnOut,
+    VersionIn,
 )
 from app.features.documents import service as documents
 from app.features.profiles import service as profiles
@@ -163,6 +164,14 @@ async def regenerate(
         user_message=None,
         assistant_message=service.message_out(assistant, mode=run.kind),
     )
+
+
+@router.post("/{conversation_id}/messages/{message_id}/version", response_model=MessageOut)
+async def select_version(
+    conversation_id: uuid.UUID, message_id: uuid.UUID, body: VersionIn, db: Db
+) -> MessageOut:
+    """Switch the last answer to another of its versions; the chat goes on from it."""
+    return await service.select_version(db, conversation_id, message_id, body.version)
 
 
 @router.post("/{conversation_id}/edit-last", response_model=TurnOut, status_code=202)

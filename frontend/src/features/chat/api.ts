@@ -4,6 +4,7 @@ import { api, type Schemas, unwrap } from '@/api/client'
 export type Conversation = Schemas['ConversationOut']
 export type ChatMessage = Schemas['MessageOut']
 export type Turn = Schemas['TurnOut']
+export type QuestionMark = Schemas['QuestionMark']
 
 export const conversationsKey = ['conversations'] as const
 export const conversationKey = (id: string) => ['conversation', id] as const
@@ -137,6 +138,25 @@ export function useRegenerate() {
         }),
       ),
     onSuccess: (turn, v) => apply(v.conversationId, turn),
+  })
+}
+
+/** Show another answer to the last message; the chat goes on from the one shown. */
+export function useSelectVersion() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { conversationId: string; messageId: string; version: number }) =>
+      unwrap(
+        await api.POST('/api/conversations/{conversation_id}/messages/{message_id}/version', {
+          params: { path: { conversation_id: v.conversationId, message_id: v.messageId } },
+          body: { version: v.version },
+        }),
+      ),
+    onSuccess: (message, v) => {
+      qc.setQueryData<ChatMessage[]>(messagesKey(v.conversationId), (old) =>
+        old?.map((m) => (m.id === message.id ? { ...m, ...message, attachments: m.attachments } : m)),
+      )
+    },
   })
 }
 

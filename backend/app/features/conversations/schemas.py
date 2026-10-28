@@ -67,6 +67,28 @@ class ReferenceSummary(BaseModel):
     title: str
 
 
+class QuestionMark(BaseModel):
+    """The agent stopped to ask something: `at` is where in the answer's text (a
+    character offset, before the text that came after the answer)."""
+
+    at: int
+    question: str
+    answer: str | None  # None: left to the agent
+
+
+class MessageVersion(BaseModel):
+    """One answer to the same message; Regenerate adds one."""
+
+    text: str
+    reasoning: str | None
+    status: str
+    error: str | None
+    run_id: uuid.UUID | None
+    model_label: str | None
+    mode: str | None = None
+    questions: list[QuestionMark] = []
+
+
 class MessageOut(BaseModel):
     id: uuid.UUID
     seq: int
@@ -81,6 +103,15 @@ class MessageOut(BaseModel):
     attachments: list[AttachmentSummary] = []
     references: list[ReferenceSummary] = []
     mode: str | None = None  # "chat" or "agent" for assistant messages
+    questions: list[QuestionMark] = []
+    # Assistant messages answered more than once: every answer, oldest first (the
+    # one above among them, at `version`). Empty when there is only the one.
+    versions: list[MessageVersion] = []
+    version: int = 0
+
+
+class VersionIn(BaseModel):
+    version: int = Field(ge=0)
 
 
 class TurnIn(BaseModel):
