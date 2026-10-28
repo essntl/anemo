@@ -161,17 +161,18 @@ export function ChatsPage() {
         <h1 className="min-w-0 flex-1 text-xl font-semibold">All chats</h1>
       </div>
 
-      {/* The search and the sort share a row; the filters sit below it, in one row that
-          scrolls sideways on a phone instead of wrapping onto a second. */}
+      {/* The search and the project share a row (the search gives way to a long project
+          name); the other filters sit below it, in one row that scrolls sideways on a
+          phone instead of wrapping onto a second. */}
       <div className="mb-2 flex items-center gap-1.5">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search in titles and messages" aria-label="Search chats"
-          className="h-10 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
-        <Select variant="pill" aria-label="Sort by" value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={SORTS}
-          className="h-10 shrink-0 pointer-coarse:h-10" />
+          className="h-10 min-w-[7rem] flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
+        <Select variant="pill" aria-label="Project" value={projectId} onValueChange={(v) => setParam('project', v)}
+          options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))]}
+          className="h-10 pointer-coarse:h-10" />
       </div>
       <div className="no-scrollbar -mx-4 mb-3 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
-        <Select variant="pill" aria-label="Project" value={projectId} onValueChange={(v) => setParam('project', v)}
-          options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
+        <Select variant="pill" aria-label="Sort by" value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={SORTS} />
         {(tags.data?.length ?? 0) > 0 && (
           <Select variant="pill" aria-label="Tag" value={tag} onValueChange={(v) => setParam('tag', v)}
             options={[{ value: '', label: 'All tags' }, ...(tags.data ?? []).map((t) => ({ value: t.tag, label: `#${t.tag} (${t.count})` }))]} />
@@ -188,7 +189,7 @@ export function ChatsPage() {
         <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] text-muted">
           <Checkbox checked={allSelected} disabled={shown.length === 0} aria-label="Select all shown"
             onChange={() => setSelected(allSelected ? new Set() : new Set(shown.map((c) => c.id)))} />
-          {ids.length === 0 && <span className="truncate">{shown.length}{hasMore ? '+' : ''} chat{shown.length === 1 ? '' : 's'}</span>}
+          {ids.length === 0 && <span className="text-trim truncate py-[0.3em]">{shown.length}{hasMore ? '+' : ''} chat{shown.length === 1 ? '' : 's'}</span>}
         </label>
         {ids.length > 0 && (
           // The count doubles as the way to let go of the selection.

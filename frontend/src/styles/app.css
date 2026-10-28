@@ -315,6 +315,11 @@
   #main-column[data-island='on'] .island-reserve { padding-top: 3.5rem; transition: padding-top 180ms var(--ease-out); }
 }
 
+/* Centres a line of text on its letters rather than on the font's line box, whose
+   space above and below differs between fonts (e.g. MiSans sits high in a pill).
+   Give it equal padding above and below (~0.3em) so clipping never cuts descenders. */
+@utility text-trim { text-box: trim-both cap alphabetic; }
+
 /* A row that scrolls sideways without showing a scrollbar (e.g. filter pills on a phone). */
 @utility no-scrollbar {
   scrollbar-width: none;

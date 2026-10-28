@@ -64,7 +64,7 @@ export function Select({
           className,
         )}
       >
-        <span className="min-w-0 truncate">
+        <span className="text-trim min-w-0 truncate py-[0.3em]">
           <RadixSelect.Value placeholder={placeholder} />
         </span>
         <RadixSelect.Icon>
