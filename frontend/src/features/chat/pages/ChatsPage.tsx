@@ -161,9 +161,15 @@ export function ChatsPage() {
         <h1 className="min-w-0 flex-1 text-xl font-semibold">All chats</h1>
       </div>
 
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search in titles and messages" aria-label="Search chats"
-        className="mb-2 h-10 w-full rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      {/* The search and the sort share a row; the filters sit below it, in one row that
+          scrolls sideways on a phone instead of wrapping onto a second. */}
+      <div className="mb-2 flex items-center gap-1.5">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search in titles and messages" aria-label="Search chats"
+          className="h-10 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
+        <Select variant="pill" aria-label="Sort by" value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={SORTS}
+          className="h-10 shrink-0 pointer-coarse:h-10" />
+      </div>
+      <div className="no-scrollbar -mx-4 mb-3 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
         <Select variant="pill" aria-label="Project" value={projectId} onValueChange={(v) => setParam('project', v)}
           options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
         {(tags.data?.length ?? 0) > 0 && (
@@ -172,7 +178,6 @@ export function ChatsPage() {
         )}
         <Select variant="pill" aria-label="Show" value={show} onValueChange={(v) => setParam('show', v)} options={SHOW} />
         <Select variant="pill" aria-label="Last active" value={age} onValueChange={(v) => setParam('age', v)} options={AGES} />
-        <Select variant="pill" aria-label="Sort by" value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={SORTS} />
       </div>
 
       {(chats.error ?? bulk.error) && <p className="mb-2 text-[13px] text-error">{errorMessage(chats.error ?? bulk.error)}</p>}

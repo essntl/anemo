@@ -121,7 +121,10 @@ export function Island() {
   ].filter(Boolean).join(', ')
 
   return (
-    <div ref={wrap} className="pointer-events-none absolute inset-x-0 top-1.5 z-30 flex justify-center px-12 md:top-2 md:px-3">
+    // Compact, the Island keeps clear of a phone's top-bar buttons (px-12); opened or
+    // alerting it may use the whole width, as its content is sized to the screen.
+    <div ref={wrap} className={cn('pointer-events-none absolute inset-x-0 top-1.5 z-30 flex justify-center px-3 md:top-2',
+      mode === 'compact' && 'max-md:px-12')}>
       {/* Alerts are read out; the timer's phase changes are announced by the timer itself. */}
       <div className="sr-only" role="status" aria-live="polite">{alert ? `${alert.title}. ${alert.body ?? ''}` : ''}</div>
       <AnimatePresence>
