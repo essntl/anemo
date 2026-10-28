@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LAYOUT, moveWidget, normalizeLayout, patchWidget, resizeWidget, WIDGET_IDS } from './layout'
+import { DEFAULT_LAYOUT, layoutFor, moveWidget, normalizeLayout, patchWidget, resizeWidget, WIDGET_IDS } from './layout'
 
 describe('home layout', () => {
   it('fills an empty or broken layout with the defaults', () => {
@@ -44,5 +44,15 @@ describe('home layout', () => {
     expect(resizeWidget(base, 'music', 1, 1)).toBe(base)
 
     expect(patchWidget(base, 'needs', { pinned: true }).find((w) => w.id === 'needs')?.pinned).toBe(true)
+  })
+
+  it('gives phones their own layout, which follows the wider one until it is set', () => {
+    const wide = [{ id: 'music', w: 2, h: 1 }]
+    const phone = [{ id: 'today', w: 1, h: 1 }]
+    expect(layoutFor({ layout: wide }, true)[0].id).toBe('music')
+    expect(layoutFor({ layout: wide, mobile_layout: [] }, true)[0].id).toBe('music')
+    expect(layoutFor({ layout: wide, mobile_layout: phone }, true)[0].id).toBe('today')
+    expect(layoutFor({ layout: wide, mobile_layout: phone }, false)[0].id).toBe('music')
+    expect(layoutFor(undefined, true).map((w) => w.id)).toEqual(DEFAULT_LAYOUT.map((w) => w.id))
   })
 })

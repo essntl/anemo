@@ -1,7 +1,7 @@
 /**
  * The Home page layout: which widgets, in what order, how big. Stored on the server
- * (Settings section `home`), so the phone and the desktop share it; phones always
- * show one column.
+ * (Settings section `home`): `layout` for wider screens and `mobile_layout` for
+ * phones, which show one column (see useHomeLayout).
  *
  * `normalizeLayout` keeps a saved layout usable as widgets are added to or removed
  * from the app: unknown widgets are dropped, missing ones are added (with their
@@ -75,6 +75,12 @@ export function normalizeLayout(saved: unknown): WidgetLayout[] {
     if (!seen.has(w.id)) out.push({ ...w, hidden: !!w.hidden, pinned: false, options: {} })
   }
   return out
+}
+
+/** The layout a screen shows: phones have their own, which follows the wider screens'
+ *  one until Home is first edited on a phone. */
+export function layoutFor(home: { layout?: unknown[]; mobile_layout?: unknown[] } | undefined, phone: boolean): WidgetLayout[] {
+  return normalizeLayout(phone && home?.mobile_layout?.length ? home.mobile_layout : home?.layout)
 }
 
 /** Move a widget to another position in the list. */

@@ -15502,11 +15502,19 @@
             "type": "array",
             "maxItems": 40,
             "title": "Layout"
+          },
+          "mobile_layout": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetLayout"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "title": "Mobile Layout"
           }
         },
         "type": "object",
         "title": "HomeSettings",
-        "description": "The Home page layout, shared by every device (phones show one column)."
+        "description": "The Home page layouts: one for wider screens, one for phones (one column)."
       },
       "ImportIn": {
         "properties": {

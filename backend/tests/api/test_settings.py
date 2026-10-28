@@ -32,7 +32,7 @@ async def test_focus_home_and_files_sections(authed):
     assert body["general"]["start_page"] == "home"
     assert body["focus"]["focus_minutes"] == 25
     assert body["focus"]["save_to_notifications"] is False
-    assert body["home"] == {"layout": []}
+    assert body["home"] == {"layout": [], "mobile_layout": []}
     assert body["files"] == {"show_documents_folder": False}
 
     layout = [
@@ -48,7 +48,15 @@ async def test_focus_home_and_files_sections(authed):
     ]
     r = await authed.put("/api/settings/home", json={"layout": layout})
     assert r.status_code == 200
-    assert (await authed.get("/api/settings")).json()["home"]["layout"] == layout
+    home = (await authed.get("/api/settings")).json()["home"]
+    assert home == {"layout": layout, "mobile_layout": []}
+
+    # Phones keep a layout of their own.
+    mobile = [{"id": "music", "w": 1, "h": 1, "hidden": False, "pinned": False, "options": {}}]
+    r = await authed.put("/api/settings/home", json={"layout": layout, "mobile_layout": mobile})
+    assert r.status_code == 200
+    home = (await authed.get("/api/settings")).json()["home"]
+    assert home == {"layout": layout, "mobile_layout": mobile}
 
     # Spans are 1-3 columns and rows.
     r = await authed.put("/api/settings/home", json={"layout": [{"id": "focus", "w": 4, "h": 1}]})

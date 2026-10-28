@@ -69,10 +69,12 @@ class WidgetLayout(BaseModel):
 
 
 class HomeSettings(BaseModel):
-    """The Home page layout, shared by every device (phones show one column)."""
+    """The Home page layouts: one for wider screens, one for phones (one column)."""
 
     # Empty means "the default layout" (the browser fills in the defaults).
     layout: list[WidgetLayout] = Field(default_factory=list, max_length=40)
+    # Phones: empty means "the same as `layout`" until Home is first edited on a phone.
+    mobile_layout: list[WidgetLayout] = Field(default_factory=list, max_length=40)
 
 
 class FilesSettings(BaseModel):

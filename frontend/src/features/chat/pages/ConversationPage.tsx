@@ -12,7 +12,7 @@ import { pendingQuestion } from '@/features/agents/question'
 import { useShellOutput } from '@/features/agents/shellOutput'
 import { useBrowserStatus } from '@/features/browser/api'
 import { BrowserView } from '@/features/browser/BrowserView'
-import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
 import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
@@ -66,8 +66,6 @@ function useStickToBottom(dep: unknown) {
 
 /** From this width up there is room for the browser next to the chat. */
 const WIDE = '(min-width: 1024px)'
-/** Where the sidebar shows and the phone layout ends (Tailwind's `md`). */
-const DESKTOP = '(min-width: 768px)'
 
 /** Opens the agent's browser for this chat in a window of its own. */
 function popOutBrowser(conversationId: string) {
