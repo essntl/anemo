@@ -691,7 +691,10 @@ class AgentRun:
                     await db.commit()
                     return "paused"
                 if approval.kind == "question":
+                    asked = _note_question(run, row, approval)
                     await self._finish_row(db, row, "succeeded", _answer(approval, row))
+                    if asked is not None:
+                        await self._emit("message.question", asked)
                     continue
                 if approval.status != "approved" or tool is None:
                     await self._finish_row(db, row, "denied", _denial(approval))
@@ -1056,6 +1059,23 @@ def _answer(approval: Approval, row: ToolCall) -> ToolResult:
     if approval.status == "expired":
         return ToolResult(content="Nobody answered within a day. " + DECIDE_YOURSELF)
     return ToolResult(content="The user left this to you. " + DECIDE_YOURSELF)
+
+
+def _note_question(run: Run, row: ToolCall, approval: Approval) -> dict[str, Any] | None:
+    """Remember where in the answer the agent stopped to ask, so the chat can show the
+    question and its answer between the text before and after it."""
+    questions = list(run.totals.get("questions", []))
+    if any(q.get("tool_call_id") == str(row.id) for q in questions):
+        return None  # already noted (the step is being processed again)
+    answer = str(row.args.get("answer") or "").strip()
+    asked = {
+        "tool_call_id": str(row.id),
+        "at": len(run.totals.get("text", "")),
+        "question": str(row.args.get("question") or approval.summary or ""),
+        "answer": answer if approval.status == "approved" and answer else None,
+    }
+    run.totals = {**run.totals, "questions": [*questions, asked]}
+    return asked
 
 
 def _denial(approval: Approval) -> ToolResult:

@@ -7,6 +7,7 @@
  * sends Last-Event-ID, so nothing is received twice.
  */
 import { useEffect, useReducer, useRef } from 'react'
+import type { QuestionMark } from './api'
 
 export const TERMINAL = ['completed', 'failed', 'cancelled']
 
@@ -19,6 +20,8 @@ export interface RunView {
   error: string | null
   /** Agent runs: the user asked to pause; it takes effect at the next safe point. */
   pauseRequested: boolean
+  /** Agent runs: where the agent stopped to ask the user something, and the answer. */
+  questions: QuestionMark[]
 }
 
 export const initialRunView: RunView = {
@@ -29,6 +32,7 @@ export const initialRunView: RunView = {
   notice: null,
   error: null,
   pauseRequested: false,
+  questions: [],
 }
 
 export interface RunEvent {
@@ -60,6 +64,14 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
       return { ...state, notice: 'Older steps were summarized to keep the context small' }
     case 'message.delta':
       return { ...state, text: state.text + str(data.text) }
+    case 'message.question':
+      return {
+        ...state,
+        questions: [
+          ...state.questions,
+          { at: Number(data.at) || 0, question: str(data.question), answer: str(data.answer) || null },
+        ],
+      }
     case 'reasoning.delta':
       return { ...state, reasoning: state.reasoning + str(data.text) }
     case 'run.model':
@@ -77,6 +89,7 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
 const EVENT_TYPES = [
   'run.status',
   'message.delta',
+  'message.question', // the agent's question was answered: shown between the texts
   'reasoning.delta',
   'run.model',
   'run.fallback',

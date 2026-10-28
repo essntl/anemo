@@ -2796,6 +2796,86 @@
         }
       }
     },
+    "/api/conversations/{conversation_id}/messages/{message_id}/version": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Select Version",
+        "description": "Switch the last answer to another of its versions; the chat goes on from it.",
+        "operationId": "select_version_api_conversations__conversation_id__messages__message_id__version_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{conversation_id}/edit-last": {
       "post": {
         "tags": [
@@ -16687,6 +16767,27 @@
               }
             ],
             "title": "Mode"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionMark"
+            },
+            "type": "array",
+            "title": "Questions",
+            "default": []
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/MessageVersion"
+            },
+            "type": "array",
+            "title": "Versions",
+            "default": []
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 0
           }
         },
         "type": "object",
@@ -16703,6 +16804,93 @@
           "created_at"
         ],
         "title": "MessageOut"
+      },
+      "MessageVersion": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "model_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Label"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionMark"
+            },
+            "type": "array",
+            "title": "Questions",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "reasoning",
+          "status",
+          "error",
+          "run_id",
+          "model_label"
+        ],
+        "title": "MessageVersion",
+        "description": "One answer to the same message; Regenerate adds one."
       },
       "ModelDefaults": {
         "properties": {
@@ -18570,6 +18758,37 @@
           "needs_key"
         ],
         "title": "ProviderTypeOut"
+      },
+      "QuestionMark": {
+        "properties": {
+          "at": {
+            "type": "integer",
+            "title": "At"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "question",
+          "answer"
+        ],
+        "title": "QuestionMark",
+        "description": "The agent stopped to ask something: `at` is where in the answer's text (a\ncharacter offset, before the text that came after the answer)."
       },
       "RecentDocument": {
         "properties": {
@@ -22247,6 +22466,20 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VersionIn": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "VersionIn"
       },
       "WebSettings": {
         "properties": {
