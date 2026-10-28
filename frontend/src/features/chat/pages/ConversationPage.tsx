@@ -66,6 +66,8 @@ function useStickToBottom(dep: unknown) {
 
 /** From this width up there is room for the browser next to the chat. */
 const WIDE = '(min-width: 1024px)'
+/** Where the sidebar shows and the phone layout ends (Tailwind's `md`). */
+const DESKTOP = '(min-width: 768px)'
 
 /** Opens the agent's browser for this chat in a window of its own. */
 function popOutBrowser(conversationId: string) {
@@ -83,6 +85,7 @@ export function ConversationPage() {
   const browser = useBrowserStatus()
   const island = useIslandVisible((s) => s.visible)
   const wide = useMediaQuery(WIDE)
+  const desktop = useMediaQuery(DESKTOP)
   const [browserOpen, setBrowserOpen] = useState(false)
   const qc = useQueryClient()
   const conversation = useConversation(conversationId)
@@ -170,49 +173,72 @@ export function ConversationPage() {
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
 
+  // Phones while the Dynamic Island shows: the header takes two rows (see below).
+  const stacked = island && !desktop
+  const title = (
+    // Beside the Island (desktop) the title stops short of it, in the middle of the header.
+    <h1 className={cn('flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold',
+      !stacked && 'island-clear-left [--island-gap:3rem] md:[--island-gap:2rem]', stacked && 'text-[14px]')}>
+      {/* The title is a button: press it to rename the chat. */}
+      {conversation.data ? (
+        <button type="button" title="Rename" aria-label={`Rename “${conversation.data.title}”`} onClick={() => void rename()}
+          className="-mx-1.5 min-w-0 truncate rounded-md px-1.5 py-1 font-semibold hover:bg-surface-hover">
+          {conversation.data.title}
+        </button>
+      ) : ' '}
+      {conversation.data?.temporary && <TemporaryLabel conversation={conversation.data} />}
+      {project && (
+        <span className="hidden shrink-0 items-center gap-1 text-[12px] font-normal text-muted sm:inline-flex">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} /> {project.name}
+        </span>
+      )}
+    </h1>
+  )
+  const tools = (
+    <>
+      {browser.data?.available && (
+        // The agent's browser: beside the chat when there is room, else on its own page.
+        <Button size="icon" variant={browserOpen && wide ? 'secondary' : 'ghost'} aria-label="Browser" aria-pressed={browserOpen && wide}
+          title="The agent’s browser" onClick={() => (wide ? setBrowserOpen(!browserOpen) : void navigate(`/browser/${conversationId}`))}>
+          <AppWindow className="h-4 w-4" />
+        </Button>
+      )}
+      {conversation.data && (
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label={conversation.data.pinned ? 'Remove from favorites' : 'Add to favorites'}
+          aria-pressed={conversation.data.pinned}
+          onClick={() => update.mutate({ id: conversationId, body: { pinned: !conversation.data?.pinned } })}
+        >
+          <Star className={cn('h-4 w-4', conversation.data.pinned && 'fill-current text-warning')} />
+        </Button>
+      )}
+    </>
+  )
+
   return (
     <div className="flex h-full">
     <div className="flex h-full min-w-0 flex-1 flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-1.5 md:h-14 md:px-6">
-        <MenuButton />
-        {/* The title stops short of the Dynamic Island in the middle of this header. */}
-        <h1 className="island-clear-left flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold [--island-gap:3rem] md:[--island-gap:2rem]">
-          {/* The title is a button: press it to rename the chat. */}
-          {conversation.data ? (
-            <button type="button" title="Rename" aria-label={`Rename “${conversation.data.title}”`} onClick={() => void rename()}
-              className="-mx-1.5 min-w-0 truncate rounded-md px-1.5 py-1 font-semibold hover:bg-surface-hover">
-              {conversation.data.title}
-            </button>
-          ) : ' '}
-          {conversation.data?.temporary && <TemporaryLabel conversation={conversation.data} />}
-          {project && (
-            <span className="hidden shrink-0 items-center gap-1 text-[12px] font-normal text-muted sm:inline-flex">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} /> {project.name}
-            </span>
-          )}
-        </h1>
-        {browser.data?.available && (
-          // The agent's browser: beside the chat when there is room, else on its own page.
-          <Button size="icon" variant={browserOpen && wide ? 'secondary' : 'ghost'} aria-label="Browser" aria-pressed={browserOpen && wide}
-            title="The agent’s browser" onClick={() => (wide ? setBrowserOpen(!browserOpen) : void navigate(`/browser/${conversationId}`))}>
-            <AppWindow className="h-4 w-4" />
-          </Button>
+      <header className="shrink-0 border-b border-border">
+        <div className="flex h-12 items-center gap-1 px-1.5 md:h-14 md:px-6">
+          <MenuButton />
+          {!stacked && title}
+          {/* The chat's buttons keep to the right edge, whatever the title's width. */}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {!stacked && tools}
+            {conversation.data && <ChatMenu conversation={conversation.data} />}
+            <NewChatButton />
+          </div>
+        </div>
+        {/* On a phone the Dynamic Island takes the middle of the bar, so the title and its
+            buttons move to a slim row underneath instead of being squeezed beside it. */}
+        {stacked && (
+          <div className="-mt-1 flex h-10 items-center gap-1 pl-3 pr-1.5">
+            {title}
+            {tools}
+          </div>
         )}
-        {conversation.data && (
-          <Button
-            size="icon"
-            variant="ghost"
-            // On a phone it makes room for the Dynamic Island (it is in the ⋯ menu too).
-            className={cn(island && 'max-md:hidden')}
-            aria-label={conversation.data.pinned ? 'Remove from favorites' : 'Add to favorites'}
-            aria-pressed={conversation.data.pinned}
-            onClick={() => update.mutate({ id: conversationId, body: { pinned: !conversation.data?.pinned } })}
-          >
-            <Star className={cn('h-4 w-4', conversation.data.pinned && 'fill-current text-warning')} />
-          </Button>
-        )}
-        {conversation.data && <ChatMenu conversation={conversation.data} />}
-        <NewChatButton />
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
