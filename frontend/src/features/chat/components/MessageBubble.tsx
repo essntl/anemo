@@ -5,6 +5,7 @@ import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
+import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { AttachmentChip } from './AttachmentChip'
 import { ReferenceChip } from './ChatReference'
 import type { QuestionMark } from '../api'
@@ -53,13 +54,8 @@ export function UserBubble({ text, attachments = [], references = [], onEdit }: 
         <div className="flex max-w-[80%] flex-wrap justify-end gap-2">
           {attachments.map((a) =>
             a.kind === 'image' ? (
-              <a key={a.id} href={`/api/attachments/${a.id}/content`} target="_blank" rel="noreferrer">
-                <img
-                  src={`/api/attachments/${a.id}/content`}
-                  alt={a.filename}
-                  className="max-h-48 max-w-64 rounded-xl border border-border object-cover"
-                />
-              </a>
+              <ZoomableImage key={a.id} src={`/api/attachments/${a.id}/content`} alt={a.filename}
+                className="max-h-48 max-w-64 rounded-xl border border-border object-cover" />
             ) : (
               <a key={a.id} href={`/api/attachments/${a.id}/content`} download={a.filename}>
                 <AttachmentChip name={a.filename} size={a.size} />
