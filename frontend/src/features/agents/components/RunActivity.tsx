@@ -29,6 +29,7 @@ import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Input } from '@/components/ui/Input'
+import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { toolOutputUrl, useEditPlan } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
 import { type FileChangeView, type Timeline, type ToolCallView, useDecide, useRevertChange, useTimeline } from '../api'
@@ -200,11 +201,11 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
         </div>
       )}
       {image && (
-        <a href={`/api/attachments/${image.attachment_id}/content`} target="_blank" rel="noreferrer"
-          className="ml-7 mt-1 inline-block" title={`What the agent saw (${image.width}×${image.height})`}>
-          <img src={`/api/attachments/${image.attachment_id}/content`} alt="Image the agent viewed"
+        <div className="ml-7 mt-1">
+          <ZoomableImage src={`/api/attachments/${image.attachment_id}/content`} alt="Image the agent viewed"
+            title={`What the agent saw (${image.width}×${image.height})`}
             className="max-h-32 max-w-56 rounded-lg border border-border object-contain" />
-        </a>
+        </div>
       )}
       {needsApproval &&
         (call.approval?.kind === 'plan' ? <PlanReviewCard runId={runId} call={call} />
