@@ -63,6 +63,10 @@ the sidebar with the time it has left, and is deleted 5 minutes after its last m
 (never while an answer is still being written). Nothing is remembered from it.
 **Keep chat** turns it into an ordinary chat.
 
+To clear out several chats quickly, hold **Shift** with the mouse over the chat list
+in the sidebar: every chat gets a delete button that deletes it at once, without
+asking.
+
 In a chat you can:
 
 - **reference another chat** (the button next to the paperclip): the assistant gets that
@@ -119,7 +123,7 @@ Anemo comes with these skills:
 
 | Command | What it does |
 | --- | --- |
-| `/study` | Explains a concept with examples, then gives practice tasks, checks your answers and corrects mistakes, one step harder each time |
+| `/study` | Teaches a concept in small steps: a short explanation and example, then one practice task at a time, checked and corrected, each a little harder |
 | `/plan` | Turns a project, task or idea into a plan: goal, scope, steps, risks, timeline, first next action |
 | `/review` | Honest, balanced feedback on an idea, plan or draft: strengths, weaknesses, nuances, blind spots |
 | `/fact-check` | Checks claims and numbers and rates each one, with sources (switches to Agent mode to use web search) |
