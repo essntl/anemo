@@ -36,7 +36,7 @@ export function ProfilesPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold">Profiles & Skills</h1>
           <p className="text-[13px] text-muted">
-            Profiles are agent setups you pick in the chat. Skills are instructions agents load when a task needs them.
+            Profiles are agent setups you pick in the chat. Skills are instructions you start a message with (type / in the chat), or that agents load when a task needs them.
           </p>
         </div>
       </div>

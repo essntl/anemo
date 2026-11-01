@@ -29,6 +29,7 @@ from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Run
 from app.features.settings import service as settings_service
 from app.features.settings.sections import GeneralSettings
+from app.features.skills import service as skills
 from app.features.usage import service as usage
 from app.jobs import queue
 from app.providers.base import (
@@ -260,7 +261,9 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
             )
             section, used = await memory.build_context(db, query, await memory.get_settings(db))
             general = await settings_service.get_section(db, GeneralSettings, "general")
-            context_text = turn_context.render(general.timezone, section)
+            # A message started with a /skill carries the skill's instructions too.
+            skill = skills.prompt_section(user_message.skill if user_message else None)
+            context_text = turn_context.render(general.timezone, section, skill)
             run.options = {**run.options, "memory_context": used}
             if user_message is not None:
                 user_message.turn_context = context_text

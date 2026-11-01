@@ -1,24 +1,85 @@
 import { useRef } from 'react'
-import { AlertTriangle, BookOpen, Download, Pencil, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, BookOpen, Bot, Download, Pencil, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
-import { ActionMenu } from '@/components/ui/ActionMenu'
+import { ActionMenu, type MenuAction } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { Switch } from '@/components/ui/Switch'
 import { usePermissionCatalog } from '@/features/agents/api'
-import { type Skill, skillExportUrl, useDeleteSkill, useImportSkill, useSaveSkill, useSkills } from '../api'
+import { SkillIcon } from '@/features/skills/icons'
+import {
+  type Skill, skillBody, skillExportUrl, useDeleteSkill, useImportSkill, useResetSkill, useSaveSkill, useSkills,
+} from '../api'
+
+function SkillRow({ skill: s, onEdit }: { skill: Skill; onEdit: () => void }) {
+  const save = useSaveSkill()
+  const remove = useDeleteSkill()
+  const reset = useResetSkill()
+  const catalog = usePermissionCatalog()
+  const capLabel = (cap: string) => catalog.data?.categories.find((c) => c.capability === cap)?.label ?? cap
+  const error = save.error ?? remove.error ?? reset.error
+
+  const confirmDelete = async () => {
+    if (await confirmDialog({ title: `Delete “${s.name}”?`, message: 'It is no longer offered as a command, and profiles that use it no longer have it.', confirmLabel: 'Delete', danger: true })) {
+      remove.mutate(s.id)
+    }
+  }
+  const confirmReset = async () => {
+    if (await confirmDialog({ title: `Reset “${s.name}”?`, message: 'Your changes to its name, description and instructions are replaced by the original. Its switches stay as they are.', confirmLabel: 'Reset' })) {
+      reset.mutate(s.id)
+    }
+  }
+
+  const actions: MenuAction[] = [
+    { label: 'Edit', icon: <Pencil />, onSelect: onEdit },
+    { label: 'Export .md', icon: <Download />, download: skillExportUrl(s.id) },
+    ...(s.builtin
+      ? s.customized ? [{ label: 'Reset to original', icon: <RotateCcw />, onSelect: () => void confirmReset() }] : []
+      : [{ label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() }]),
+  ]
+
+  return (
+    <div className="flex items-start gap-3 rounded-card border border-border bg-card px-4 py-3 shadow-soft">
+      <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${s.enabled ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-subtle'}`}>
+        <SkillIcon name={s.icon} />
+      </div>
+      <button type="button" className="min-w-0 flex-1 text-left" onClick={onEdit}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[14px] font-medium">{s.name}</span>
+          {s.user_invocable
+            ? <code className="font-mono text-[12px] text-accent">/{s.slug}</code>
+            : <code className="font-mono text-[11.5px] text-subtle">{s.slug}</code>}
+          {s.model_invocable && (
+            <span className="inline-flex items-center gap-1 text-[11.5px] text-subtle" title="Agents may load it by themselves">
+              <Bot className="h-3 w-3" /> agents
+            </span>
+          )}
+          {s.mode === 'agent' && <Badge tone="accent">Agent mode</Badge>}
+          {s.customized && <Badge>Edited</Badge>}
+          {s.tags.map((t) => <Badge key={t}>{t}</Badge>)}
+        </div>
+        <div className="text-[12.5px] text-muted">{s.description}</div>
+        {s.blocked_capabilities.length > 0 && (
+          <div className="mt-1 flex items-center gap-1 text-[12px] text-warning">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Needs {s.blocked_capabilities.map(capLabel).join(', ')}, which your permissions set to Never.
+          </div>
+        )}
+        {error && <p className="mt-1 text-[12px] text-error">{errorMessage(error)}</p>}
+      </button>
+      <Switch label={`${s.name} enabled`} checked={s.enabled} onChange={(enabled) => save.mutate({ id: s.id, body: { ...skillBody(s), enabled } })} />
+      <ActionMenu actions={actions} />
+    </div>
+  )
+}
 
 export function SkillList({ onEdit }: { onEdit: (skill: Skill) => void }) {
   const skills = useSkills()
-  const save = useSaveSkill()
-  const remove = useDeleteSkill()
   const importSkill = useImportSkill()
-  const catalog = usePermissionCatalog()
   const fileRef = useRef<HTMLInputElement>(null)
-  const capLabel = (cap: string) => catalog.data?.categories.find((c) => c.capability === cap)?.label ?? cap
-  const error = save.error ?? remove.error ?? importSkill.error
+  const own = skills.data?.filter((s) => !s.builtin) ?? []
+  const builtin = skills.data?.filter((s) => s.builtin) ?? []
 
   // Import SKILL.md-style files; asks before replacing a skill with the same short name.
   const onFiles = async (files: FileList | null) => {
@@ -35,16 +96,6 @@ export function SkillList({ onEdit }: { onEdit: (skill: Skill) => void }) {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const toggle = (s: Skill, enabled: boolean) =>
-    save.mutate({ id: s.id, body: { slug: s.slug, name: s.name, description: s.description, instructions: s.instructions,
-      required_capabilities: s.required_capabilities, tags: s.tags, enabled } })
-
-  const confirmDelete = async (s: Skill) => {
-    if (await confirmDialog({ title: `Delete “${s.name}”?`, message: 'Profiles that use it will no longer offer it.', confirmLabel: 'Delete', danger: true })) {
-      remove.mutate(s.id)
-    }
-  }
-
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -55,39 +106,30 @@ export function SkillList({ onEdit }: { onEdit: (skill: Skill) => void }) {
         </Button>
         <span className="text-[12px] text-muted">SKILL.md files with a name and description at the top work as they are.</span>
       </div>
-      {error && !(error instanceof ApiError && error.code === 'skill_exists') && (
-        <p className="mb-2 text-[13px] text-error">{errorMessage(error)}</p>
+      {importSkill.error && !(importSkill.error instanceof ApiError && importSkill.error.code === 'skill_exists') && (
+        <p className="mb-2 text-[13px] text-error">{errorMessage(importSkill.error)}</p>
       )}
-      {skills.isSuccess && skills.data.length === 0 && (
-        <EmptyState icon={<BookOpen className="h-5 w-5" />} title="No skills yet"
-          description="A skill is a set of instructions for one kind of task, such as writing release notes. Agents see its description and load it when it fits." />
+      {skills.isError && <p className="mb-2 text-[13px] text-error">{errorMessage(skills.error)}</p>}
+
+      <h2 className="mb-2 mt-4 text-[13px] font-semibold text-muted">Your skills</h2>
+      {skills.isSuccess && own.length === 0 && (
+        <p className="flex items-start gap-2 rounded-card border border-dashed border-border px-4 py-3 text-[12.5px] text-muted">
+          <BookOpen className="mt-0.5 h-4 w-4 shrink-0" />
+          None yet. Write instructions for something you ask for often (release notes, a weekly review, a code review checklist) and start a message with its /command.
+        </p>
       )}
       <div className="flex flex-col gap-2">
-        {skills.data?.map((s) => (
-          <div key={s.id} className="flex items-start gap-3 rounded-card border border-border bg-card px-4 py-3 shadow-soft">
-            <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onEdit(s)}>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[14px] font-medium">{s.name}</span>
-                <code className="font-mono text-[11.5px] text-subtle">{s.slug}</code>
-                {s.tags.map((t) => <Badge key={t}>{t}</Badge>)}
-              </div>
-              <div className="text-[12.5px] text-muted">{s.description}</div>
-              {s.blocked_capabilities.length > 0 && (
-                <div className="mt-1 flex items-center gap-1 text-[12px] text-warning">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Needs {s.blocked_capabilities.map(capLabel).join(', ')}, which your permissions set to Never.
-                </div>
-              )}
-            </button>
-            <Switch label={`${s.name} enabled`} checked={s.enabled} onChange={(on) => toggle(s, on)} />
-            <ActionMenu actions={[
-              { label: 'Edit', icon: <Pencil />, onSelect: () => onEdit(s) },
-              { label: 'Export .md', icon: <Download />, download: skillExportUrl(s.id) },
-              { label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete(s) },
-            ]} />
-          </div>
-        ))}
+        {own.map((s) => <SkillRow key={s.id} skill={s} onEdit={() => onEdit(s)} />)}
       </div>
+
+      {builtin.length > 0 && (
+        <>
+          <h2 className="mb-2 mt-6 text-[13px] font-semibold text-muted">Built in</h2>
+          <div className="flex flex-col gap-2">
+            {builtin.map((s) => <SkillRow key={s.id} skill={s} onEdit={() => onEdit(s)} />)}
+          </div>
+        </>
+      )}
     </div>
   )
 }

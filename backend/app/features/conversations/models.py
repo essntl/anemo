@@ -96,6 +96,9 @@ class ChatMessage(Base, IdMixin):
     # time, memories). Not shown in the UI; replayed byte for byte in later requests
     # so the conversation prefix stays cacheable (runtime/turn_context.py).
     turn_context: Mapped[str | None] = mapped_column(Text)
+    # User messages started with a skill (/study ...): the skill as it was then
+    # (Skill.invocation()). Its instructions go into the turn context.
+    skill: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     # Assistant messages: earlier answers to the same message (Regenerate keeps them).
     # The stored fields of each one (content, text_plain, status, error, run_id,
     # model_id, model_label, created_at); the one shown is the columns themselves,

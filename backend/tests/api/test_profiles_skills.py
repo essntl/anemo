@@ -93,7 +93,8 @@ async def test_skills_crud_import_export(authed):
     )
     assert bad_slug.status_code == 422
     assert (await authed.delete(f"/api/skills/{created.json()['id']}")).status_code == 204
-    assert [s["slug"] for s in (await authed.get("/api/skills")).json()] == ["release-notes"]
+    listed = [s for s in (await authed.get("/api/skills")).json() if not s["builtin"]]
+    assert [s["slug"] for s in listed] == ["release-notes"]
 
 
 async def test_profile_permissions_need_recent_auth(authed):

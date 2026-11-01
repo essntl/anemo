@@ -146,6 +146,7 @@ async def send_turn(conversation_id: uuid.UUID, body: TurnIn, db: Db) -> TurnOut
         body.mode,
         profile_id=body.profile_id,
         reference_ids=body.reference_ids,
+        skill_id=body.skill_id,
     )
     return TurnOut(
         run_id=run.id,

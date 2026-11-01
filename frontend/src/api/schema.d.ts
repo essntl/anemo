@@ -1586,7 +1586,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Skills */
+        /**
+         * List Skills
+         * @description Every skill, the built-in ones included (added here the first time).
+         */
         get: operations["list_skills_api_skills_get"];
         put?: never;
         /** Create Skill */
@@ -1628,6 +1631,26 @@ export interface paths {
         post?: never;
         /** Delete Skill */
         delete: operations["delete_skill_api_skills__skill_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Skill
+         * @description A built-in skill back to its original text (switches stay as they are).
+         */
+        post: operations["reset_skill_api_skills__skill_id__reset_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4395,6 +4418,7 @@ export interface components {
              * @default []
              */
             references: components["schemas"]["ReferenceSummary"][];
+            skill?: components["schemas"]["SkillSummary"] | null;
             /** Mode */
             mode?: string | null;
             /**
@@ -5864,6 +5888,32 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+            /**
+             * Icon
+             * @default sparkles
+             */
+            icon: string;
+            /**
+             * Hint
+             * @default
+             */
+            hint: string;
+            /**
+             * User Invocable
+             * @default true
+             */
+            user_invocable: boolean;
+            /**
+             * Model Invocable
+             * @default true
+             */
+            model_invocable: boolean;
+            /**
+             * Mode
+             * @default any
+             * @enum {string}
+             */
+            mode: "any" | "agent";
         };
         /** SkillOut */
         SkillOut: {
@@ -5890,6 +5940,29 @@ export interface components {
             source: string;
             /** Version */
             version: number;
+            /** Icon */
+            icon: string;
+            /** Hint */
+            hint: string;
+            /** User Invocable */
+            user_invocable: boolean;
+            /** Model Invocable */
+            model_invocable: boolean;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "any" | "agent";
+            /**
+             * Builtin
+             * @default false
+             */
+            builtin: boolean;
+            /**
+             * Customized
+             * @default false
+             */
+            customized: boolean;
             /**
              * Created At
              * Format: date-time
@@ -5905,6 +5978,23 @@ export interface components {
              * @default []
              */
             blocked_capabilities: string[];
+        };
+        /**
+         * SkillSummary
+         * @description The skill a user message was started with (shown as a chip before its text).
+         */
+        SkillSummary: {
+            /** Id */
+            id?: string | null;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Icon
+             * @default sparkles
+             */
+            icon: string;
         };
         /** SshKeyOut */
         SshKeyOut: {
@@ -6333,6 +6423,8 @@ export interface components {
             mode: "chat" | "agent";
             /** Profile Id */
             profile_id?: string | null;
+            /** Skill Id */
+            skill_id?: string | null;
         };
         /** TurnOut */
         TurnOut: {
@@ -10140,6 +10232,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_skill_api_skills__skill_id__reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOut"];
+                };
             };
             /** @description Validation Error */
             422: {

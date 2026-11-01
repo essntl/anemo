@@ -263,7 +263,7 @@ export function ConversationPage() {
             if (m.role === 'user') {
               return (
                 <div key={m.id} className={enter(m.id)}>
-                  <UserBubble text={m.text} attachments={m.attachments} references={m.references}
+                  <UserBubble text={m.text} attachments={m.attachments} references={m.references} skill={m.skill}
                     onEdit={canEditLast && m.id === lastUser?.id
                       ? (text) => editLast.mutate({ conversationId, text, modelId: modelOverride })
                       : undefined} />
@@ -331,12 +331,15 @@ export function ConversationPage() {
           running={Boolean(activeRunId) && !paused && !question}
           placeholder={question ? 'Answer the agent’s question…' : paused ? 'Paused. Send a message to resume with it…' : undefined}
           conversationId={conversationId}
-          onSend={(text, attachmentIds, referenceIds) =>
+          // Not when the message answers the agent's question or resumes a paused run.
+          skills={!question && !paused}
+          onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
+          onSend={(text, attachmentIds, referenceIds, skillId) =>
             question
               ? answer.mutate({ approvalId: question.approval!.id, decision: 'approve', answer: text })
               : paused && activeRunId
                 ? resume.mutate({ runId: activeRunId, message: text })
-                : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId })
+                : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
           }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           toolbar={
