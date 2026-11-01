@@ -110,6 +110,8 @@ export function useSendTurn() {
       referenceIds?: string[]
       mode?: 'chat' | 'agent'
       profileId?: string | null
+      /** The skill chosen with / to answer this message with. */
+      skillId?: string | null
     }) =>
       unwrap(
         await api.POST('/api/conversations/{conversation_id}/turns', {
@@ -121,6 +123,7 @@ export function useSendTurn() {
             reference_ids: v.referenceIds ?? [],
             mode: v.mode ?? 'chat',
             profile_id: v.profileId ?? null,
+            skill_id: v.skillId ?? null,
           },
         }),
       ),

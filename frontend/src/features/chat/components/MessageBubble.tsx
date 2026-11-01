@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
+import { SkillIcon } from '@/features/skills/icons'
 import { AttachmentChip } from './AttachmentChip'
 import { ReferenceChip } from './ChatReference'
 import type { QuestionMark } from '../api'
@@ -13,17 +14,20 @@ import { splitAtQuestions } from '../questionMarks'
 
 type AttachmentSummary = Schemas['AttachmentSummary']
 type ReferenceSummary = Schemas['ReferenceSummary']
+type SkillSummary = Schemas['SkillSummary']
 
 interface UserProps {
   text: string
   attachments?: AttachmentSummary[]
   /** Other chats that were attached to this message as context. */
   references?: ReferenceSummary[]
+  /** The skill the message was started with (/study ...). */
+  skill?: SkillSummary | null
   /** Set on the last message you sent (when nothing is running): change it and have it answered again. */
   onEdit?: (text: string) => void
 }
 
-export function UserBubble({ text, attachments = [], references = [], onEdit }: UserProps) {
+export function UserBubble({ text, attachments = [], references = [], skill, onEdit }: UserProps) {
   const [draft, setDraft] = useState<string | null>(null)
   if (draft !== null) {
     const save = () => {
@@ -65,6 +69,12 @@ export function UserBubble({ text, attachments = [], references = [], onEdit }: 
         </div>
       )}
       <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
+        {skill && (
+          <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-medium text-accent" title={`Answered with the /${skill.slug} skill`}>
+            <SkillIcon name={skill.icon} className="h-[15px] w-[15px]" />
+            {skill.name}
+          </span>
+        )}
         {text}
       </div>
       {onEdit && (

@@ -34,7 +34,7 @@ export function NewChatPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const start = async (text: string, attachmentIds: string[], referenceIds: string[]) => {
+  const start = async (text: string, attachmentIds: string[], referenceIds: string[], skillId: string | null) => {
     setBusy(true)
     setError(null)
     try {
@@ -42,7 +42,9 @@ export function NewChatPage() {
       const turn = unwrap(
         await api.POST('/api/conversations/{conversation_id}/turns', {
           params: { path: { conversation_id: conv.id } },
-          body: { text, model_id: modelId, attachment_ids: attachmentIds, reference_ids: referenceIds, mode, profile_id: profileId },
+          body: {
+            text, model_id: modelId, attachment_ids: attachmentIds, reference_ids: referenceIds, mode, profile_id: profileId, skill_id: skillId,
+          },
         }),
       )
       // Seed the cache so the conversation page renders instantly and starts streaming.
@@ -97,6 +99,8 @@ export function NewChatPage() {
           disabled={busy || Boolean(needsSetup)}
           initialText={aboutDoc ? `About my document “${params.get('title') ?? aboutDoc}” (${aboutDoc}): ` : undefined}
           onSend={start}
+          // Skills that need tools (e.g. web search for /fact-check) switch to Agent mode.
+          onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
           toolbar={
             <>
               <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />

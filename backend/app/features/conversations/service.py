@@ -23,12 +23,14 @@ from app.features.conversations.schemas import (
     MessageVersion,
     QuestionMark,
     ReferenceSummary,
+    SkillSummary,
 )
 from app.features.documents import service as documents
 from app.features.documents.models import Document
 from app.features.profiles.models import AgentProfile
 from app.features.projects import service as projects
 from app.features.runs.models import ACTIVE_STATUSES, Run
+from app.features.skills import service as skills
 from app.features.tasks.schemas import clean_tags
 from app.jobs import queue
 from app.runtime import outputs
@@ -126,6 +128,7 @@ def message_out(
             for b in m.content
             if isinstance(b, dict) and b.get("type") == "conversation"
         ],
+        skill=SkillSummary.model_validate(m.skill) if m.skill else None,
         mode=mode if mode is not None else (info[0] if info else None),
         questions=_questions(info),
         versions=versions,
@@ -480,9 +483,11 @@ async def send_turn(
     mode: str = "chat",
     profile_id: uuid.UUID | None = None,
     reference_ids: list[uuid.UUID] | None = None,
+    skill_id: uuid.UUID | None = None,
 ) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     conv = await _lock_idle_conversation(db, conversation_id)
     references = await _reference_blocks(db, conv.id, reference_ids or [])
+    skill = await skills.get_invocable(db, skill_id) if skill_id else None
     if model_id is not None:
         conv.model_id = model_id  # remember the last explicit choice for this conversation
     if mode == "agent":
@@ -496,6 +501,7 @@ async def send_turn(
         role="user",
         content=[{"type": "text", "text": text}],
         text_plain=text,
+        skill=skill.invocation() if skill else None,
     )
     assistant = ChatMessage(
         conversation_id=conv.id,
@@ -666,6 +672,7 @@ async def branch(db: AsyncSession, conversation_id: uuid.UUID, upto_seq: int) ->
             model_id=m.model_id,
             model_label=m.model_label,
             turn_context=m.turn_context,  # same bytes: the copy starts with the same prefix
+            skill=m.skill,
             created_at=m.created_at,
         )
         db.add(message)
@@ -699,6 +706,8 @@ async def export_markdown(db: AsyncSession, conv: Conversation) -> str:
         if m.role == "assistant" and m.model_label:
             who += f" ({m.model_label})"
         lines = [f"## {who}"]
+        if m.skill:
+            lines.append(f"_Skill: /{m.skill.get('slug', '')} ({m.skill.get('name', '')})_")
         for block in m.content:
             if not isinstance(block, dict):
                 continue

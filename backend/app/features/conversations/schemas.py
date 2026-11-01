@@ -89,6 +89,15 @@ class MessageVersion(BaseModel):
     questions: list[QuestionMark] = []
 
 
+class SkillSummary(BaseModel):
+    """The skill a user message was started with (shown as a chip before its text)."""
+
+    id: uuid.UUID | None = None
+    slug: str
+    name: str
+    icon: str = "sparkles"
+
+
 class MessageOut(BaseModel):
     id: uuid.UUID
     seq: int
@@ -102,6 +111,7 @@ class MessageOut(BaseModel):
     created_at: datetime
     attachments: list[AttachmentSummary] = []
     references: list[ReferenceSummary] = []
+    skill: SkillSummary | None = None  # user messages started with a /skill
     mode: str | None = None  # "chat" or "agent" for assistant messages
     questions: list[QuestionMark] = []
     # Assistant messages answered more than once: every answer, oldest first (the
@@ -124,6 +134,8 @@ class TurnIn(BaseModel):
     # Agent mode: the agent profile to use (None: the default agent). Remembered
     # by the conversation. Ignored in chat mode.
     profile_id: uuid.UUID | None = None
+    # A skill to answer this message with (chosen with /name in the message box).
+    skill_id: uuid.UUID | None = None
 
 
 class TurnOut(BaseModel):

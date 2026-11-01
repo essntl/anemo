@@ -3,12 +3,14 @@ one is still decided by the permission engine, so editing skills needs no re-aut
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import Db
+from app.core.errors import Conflict
 from app.features.settings import service as settings_service
 from app.features.skills import service
 from app.features.skills.models import Skill
@@ -26,6 +28,11 @@ class SkillIn(BaseModel):
     required_capabilities: list[str] = Field(default_factory=list, max_length=30)
     tags: list[str] = Field(default_factory=list, max_length=30)
     enabled: bool = True
+    icon: str = Field("sparkles", pattern=service.ICON_RE.pattern)
+    hint: str = Field("", max_length=120)
+    user_invocable: bool = True  # offered as a /command in the chat
+    model_invocable: bool = True  # agents may load it by themselves
+    mode: Literal["any", "agent"] = "any"
 
 
 class SkillOut(BaseModel):
@@ -39,6 +46,13 @@ class SkillOut(BaseModel):
     enabled: bool
     source: str
     version: int
+    icon: str
+    hint: str
+    user_invocable: bool
+    model_invocable: bool
+    mode: Literal["any", "agent"]
+    builtin: bool = False
+    customized: bool = False
     created_at: datetime
     updated_at: datetime
     # Required capabilities that the global permission settings set to "Never".
@@ -62,14 +76,27 @@ async def _out(db: Db, skills: list[Skill]) -> list[SkillOut]:
     settings = await settings_service.get_section(db, PermissionSettings, "permissions")
     return [
         SkillOut.model_validate(s, from_attributes=True).model_copy(
-            update={"blocked_capabilities": _blocked(s, settings)}
+            update={
+                "blocked_capabilities": _blocked(s, settings),
+                "builtin": s.builtin_key is not None,
+            }
         )
         for s in skills
     ]
 
 
+def _not_builtin(skill: Skill) -> None:
+    if skill.builtin_key is not None:
+        raise Conflict(
+            "Built-in skills can't be deleted. Switch it off, or reset it to the original.",
+            code="builtin_skill",
+        )
+
+
 @router.get("", response_model=list[SkillOut])
 async def list_skills(db: Db) -> list[SkillOut]:
+    """Every skill, the built-in ones included (added here the first time)."""
+    await service.ensure_builtins(db)
     return await _out(db, list(await db.scalars(select(Skill).order_by(Skill.name))))
 
 
@@ -94,6 +121,7 @@ async def import_skill(body: ImportIn, db: Db) -> SkillOut:
         for key, value in fields.items():
             setattr(existing, key, value)
         existing.version += 1
+        existing.customized = existing.builtin_key is not None
         skill = existing
     else:
         skill = Skill(**fields, source="imported")
@@ -114,6 +142,12 @@ async def update_skill(skill_id: uuid.UUID, body: SkillIn, db: Db) -> SkillOut:
     slug = body.slug or skill.slug
     await service.ensure_unique_slug(db, slug, own_id=skill.id)
     changed = body.instructions != skill.instructions or body.description != skill.description
+    # What makes a built-in skill the user's own version (it is then no longer updated).
+    content = ("name", "description", "instructions", "icon", "hint", "mode", "tags")
+    if skill.builtin_key is not None and any(
+        getattr(body, k) != getattr(skill, k) for k in content
+    ):
+        skill.customized = True
     for key, value in body.model_dump(exclude={"slug"}).items():
         setattr(skill, key, value)
     skill.slug = slug
@@ -126,8 +160,21 @@ async def update_skill(skill_id: uuid.UUID, body: SkillIn, db: Db) -> SkillOut:
 
 @router.delete("/{skill_id}", status_code=204)
 async def delete_skill(skill_id: uuid.UUID, db: Db) -> None:
-    await db.delete(await service.get_skill(db, skill_id))
+    skill = await service.get_skill(db, skill_id)
+    _not_builtin(skill)
+    await db.delete(skill)
     await db.commit()
+
+
+@router.post("/{skill_id}/reset", response_model=SkillOut)
+async def reset_skill(skill_id: uuid.UUID, db: Db) -> SkillOut:
+    """A built-in skill back to its original text (switches stay as they are)."""
+    skill = await service.get_skill(db, skill_id)
+    service.reset_builtin(skill)
+    await service.ensure_unique_slug(db, skill.slug, own_id=skill.id)
+    await db.commit()
+    await db.refresh(skill)
+    return (await _out(db, [skill]))[0]
 
 
 @router.get("/{skill_id}/export")

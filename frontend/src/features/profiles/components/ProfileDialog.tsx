@@ -132,7 +132,8 @@ export function ProfileDialog({ profile, onClose }: { profile: Profile | null; o
           ]} />
         {form.skill_mode === 'selected' && (
           <div className="mt-2 flex flex-col gap-1">
-            {(skills.data ?? []).map((s) => (
+            {/* Only skills agents may load by themselves (the others are /commands only). */}
+            {(skills.data ?? []).filter((s) => s.model_invocable).map((s) => (
               <label key={s.id} className="flex items-start gap-2 rounded-control px-2 py-1.5 text-[13px] hover:bg-surface-hover">
                 <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={form.skill_ids.includes(s.id)}
                   onChange={(e) => set({ skill_ids: e.target.checked ? [...form.skill_ids, s.id] : form.skill_ids.filter((id) => id !== s.id) })} />
@@ -143,7 +144,9 @@ export function ProfileDialog({ profile, onClose }: { profile: Profile | null; o
                 </span>
               </label>
             ))}
-            {skills.data?.length === 0 && <p className="text-[12.5px] text-muted">No skills yet. Add some on the Skills tab.</p>}
+            {skills.data?.every((s) => !s.model_invocable) && (
+              <p className="text-[12.5px] text-muted">No skills agents may load yet. Add some under Settings → Skills.</p>
+            )}
           </div>
         )}
       </Section>

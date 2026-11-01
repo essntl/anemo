@@ -196,6 +196,8 @@ IDs are UUIDv7 (time-sortable). All timestamps are `timestamptz`. Rows have `cre
 - `agent_profiles` (id, name, description, instructions, default_model_id?, toolset jsonb {categories, tools, mcp}, policy_id FK, workspace_roots uuid[], memory_mode enum off|read|read_write, auto_retrieval bool, limits jsonb, icon/color)
 - `skills` (id, slug UNIQUE, name, description, instructions md, required_capabilities text[], tags text[], version, source enum user|imported)
 - `profile_skills` (profile_id, skill_id) PK both.
+- Skills also have `icon`, `hint`, `user_invocable` (offered as a /command), `model_invocable` (in agents' skill index), `mode` (`any | agent`: choosing it switches the chat to Agent mode), and for the built-in ones (`features/skills/builtin.py`) `builtin_key` and `customized`. Built-in skills are added when skills are listed; one the user has not edited is brought up to date with the shipped text.
+- `messages.skill` (jsonb, user messages): the skill the message was started with (/study ...), with its instructions as they were then. They go into that message's turn context (inside `<skill>`), so the system prompt stays the same and the instructions are replayed with the message in later turns.
 
 **Memory & knowledge**
 - `memories` (id, kind enum preference|fact|profile|project|instruction, content, category, importance 0–1, confidence, status enum active|pending|archived, pinned bool, source_type enum user_explicit|extracted|agent|manual, source_conversation_id?, source_message_id?, superseded_by?, last_used_at, use_count). Index (status, kind); tsvector on content.

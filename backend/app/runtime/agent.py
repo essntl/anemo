@@ -51,6 +51,7 @@ from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Approval, FileChange, Run, ToolCall
 from app.features.settings import service as settings_service
 from app.features.settings.sections import GeneralSettings, ModelDefaults, TaskType
+from app.features.skills.service import prompt_section as skill_prompt_section
 from app.features.skills.service import skills_for_profile
 from app.features.usage import service as usage
 from app.jobs import queue
@@ -1338,7 +1339,9 @@ async def _add_turn_context(
         run.options = {**run.options, "turn_context": known}
         return list(run.options.get("memory_context", []))
     section, used = await memory.build_context(db, _last_user_text(transcript), memory_settings)
-    text = turn_context.render(tz, section)
+    # A message started with a /skill carries the skill's instructions too.
+    skill = skill_prompt_section(message.skill if message else None)
+    text = turn_context.render(tz, section, skill)
     if message is not None:
         message.turn_context = text
     if transcript and transcript[-1].role == "user":

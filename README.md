@@ -107,6 +107,33 @@ Details in [docs/security.md](docs/security.md#share-links).
   `SKILL.md`-style files (front matter with `name` and `description`, then Markdown)
   or write your own; export turns them back into such files.
 
+### Skills as slash commands
+
+Type **/** at the start of a message (or use the **/** button) and pick a skill: the
+message is answered with that skill's instructions, in Chat and in Agent mode. The
+skill is shown on your message and keeps applying to your replies that continue it,
+for example your answers to a practice task. A complete command typed or pasted, such
+as `/study what are objects in javascript`, works too.
+
+Anemo comes with these skills:
+
+| Command | What it does |
+| --- | --- |
+| `/study` | Explains a concept with examples, then gives practice tasks, checks your answers and corrects mistakes, one step harder each time |
+| `/plan` | Turns a project, task or idea into a plan: goal, scope, steps, risks, timeline, first next action |
+| `/review` | Honest, balanced feedback on an idea, plan or draft: strengths, weaknesses, nuances, blind spots |
+| `/fact-check` | Checks claims and numbers and rates each one, with sources (switches to Agent mode to use web search) |
+| `/brainstorm` | Lots of varied ideas, grouped, with the most promising ones picked out |
+| `/decide` | Compares options against what matters to you and recommends one |
+| `/rewrite` | Makes a text clearer and tighter, keeps your meaning and voice, and explains the changes |
+
+**Settings → Skills** is where you create, edit, import and switch skills on and off.
+For each skill you choose its command, icon, the hint shown in the message box,
+whether it is offered as a /command, whether agents may load it on their own, and
+whether choosing it switches to Agent mode (for skills that need tools). Built-in
+skills can be edited or switched off; once you edit one, updates of Anemo no longer
+change it, and **Reset to original** brings the shipped text back.
+
 **Plan review** (Settings → Agent Permissions, or per profile): the agent proposes
 a plan and waits before taking any action. You can approve it, edit the steps first,
 or send it back with feedback. If the agent later changes the steps, it asks again.

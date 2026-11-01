@@ -50,6 +50,40 @@ export function useSkills() {
   })
 }
 
+/** The skills offered as /commands in the message box: switched on and meant for it. */
+export function useSlashSkills(): Skill[] {
+  const skills = useSkills()
+  return (skills.data ?? []).filter((s) => s.enabled && s.user_invocable)
+}
+
+/** Everything a skill is saved with, from what the API returned (for small changes). */
+export function skillBody(s: Skill): Required<SkillInput> {
+  return {
+    slug: s.slug,
+    name: s.name,
+    description: s.description,
+    instructions: s.instructions,
+    required_capabilities: s.required_capabilities,
+    tags: s.tags,
+    enabled: s.enabled,
+    icon: s.icon,
+    hint: s.hint,
+    user_invocable: s.user_invocable,
+    model_invocable: s.model_invocable,
+    mode: s.mode,
+  }
+}
+
+/** A built-in skill back to the text Anemo ships with. */
+export function useResetSkill() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.POST('/api/skills/{skill_id}/reset', { params: { path: { skill_id: id } } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: skillsKey }),
+  })
+}
+
 export function useSaveSkill() {
   const qc = useQueryClient()
   return useMutation({

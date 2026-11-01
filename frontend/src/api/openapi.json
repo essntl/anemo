@@ -6188,6 +6188,7 @@
           "skills"
         ],
         "summary": "List Skills",
+        "description": "Every skill, the built-in ones included (added here the first time).",
         "operationId": "list_skills_api_skills_get",
         "parameters": [
           {
@@ -6513,6 +6514,66 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/skills/{skill_id}/reset": {
+      "post": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Reset Skill",
+        "description": "A built-in skill back to its original text (switches stay as they are).",
+        "operationId": "reset_skill_api_skills__skill_id__reset_post",
+        "parameters": [
+          {
+            "name": "skill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Skill Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -16757,6 +16818,16 @@
             "title": "References",
             "default": []
           },
+          "skill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "mode": {
             "anyOf": [
               {
@@ -20763,6 +20834,37 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
+          },
+          "icon": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,39}$",
+            "title": "Icon",
+            "default": "sparkles"
+          },
+          "hint": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Hint",
+            "default": ""
+          },
+          "user_invocable": {
+            "type": "boolean",
+            "title": "User Invocable",
+            "default": true
+          },
+          "model_invocable": {
+            "type": "boolean",
+            "title": "Model Invocable",
+            "default": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "agent"
+            ],
+            "title": "Mode",
+            "default": "any"
           }
         },
         "type": "object",
@@ -20821,6 +20923,40 @@
             "type": "integer",
             "title": "Version"
           },
+          "icon": {
+            "type": "string",
+            "title": "Icon"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "user_invocable": {
+            "type": "boolean",
+            "title": "User Invocable"
+          },
+          "model_invocable": {
+            "type": "boolean",
+            "title": "Model Invocable"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "agent"
+            ],
+            "title": "Mode"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin",
+            "default": false
+          },
+          "customized": {
+            "type": "boolean",
+            "title": "Customized",
+            "default": false
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -20852,10 +20988,51 @@
           "enabled",
           "source",
           "version",
+          "icon",
+          "hint",
+          "user_invocable",
+          "model_invocable",
+          "mode",
           "created_at",
           "updated_at"
         ],
         "title": "SkillOut"
+      },
+      "SkillSummary": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "default": "sparkles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "SkillSummary",
+        "description": "The skill a user message was started with (shown as a chip before its text)."
       },
       "SshKeyOut": {
         "properties": {
@@ -22172,6 +22349,18 @@
               }
             ],
             "title": "Profile Id"
+          },
+          "skill_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Id"
           }
         },
         "type": "object",
