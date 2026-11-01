@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { NavLink, useMatch } from 'react-router'
-import { Loader2, Star, Timer } from 'lucide-react'
+import { NavLink, useMatch, useNavigate } from 'react-router'
+import { Loader2, Star, Timer, Trash2 } from 'lucide-react'
+import { errorMessage } from '@/api/client'
 import { useCurrentProject } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
+import { toast } from '@/components/ui/toast'
+import { useShiftHeld } from '@/hooks/useShiftHeld'
 import { cn } from '@/lib/cn'
 import { dayLabel } from '@/lib/format'
-import { type Conversation, useConversations } from '../api'
+import { type Conversation, useConversations, useDeleteConversation } from '../api'
 import { useChatActions } from '../chatActions'
 import { formatRemaining, useNow } from '../remaining'
 
@@ -19,7 +22,29 @@ function TimeLeft({ expiresAt }: { expiresAt: string }) {
   )
 }
 
-function Item({ conv }: { conv: Conversation }) {
+/** With Shift held: delete at once, without asking (for clearing out several chats). */
+function QuickDelete({ conv }: { conv: Conversation }) {
+  const remove = useDeleteConversation()
+  const navigate = useNavigate()
+  const open = useMatch(`/c/${conv.id}`) !== null
+  return (
+    <button type="button" aria-label={`Delete ${conv.title} now`} title="Delete now (Shift is held)"
+      disabled={remove.isPending}
+      onClick={() =>
+        void remove.mutateAsync(conv.id).then(
+          () => {
+            if (open) void navigate('/')
+          },
+          (err: unknown) => toast({ message: errorMessage(err) }),
+        )
+      }
+      className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-control text-error opacity-0 hover:bg-error/12 focus:opacity-100 group-hover/list:opacity-100 disabled:opacity-40 pointer-coarse:h-11 pointer-coarse:w-11">
+      <Trash2 className="h-4 w-4" />
+    </button>
+  )
+}
+
+function Item({ conv, quickDelete }: { conv: Conversation; quickDelete: boolean }) {
   const actions = useChatActions(conv)
   // The open chat stays in sight, also when it is further down than the list shows.
   const open = useMatch(`/c/${conv.id}`) !== null
@@ -42,9 +67,13 @@ function Item({ conv }: { conv: Conversation }) {
         <span className="min-w-0 flex-1 truncate" title={conv.snippet ?? conv.title}>{conv.title}</span>
         {conv.temporary && conv.expires_at && !conv.active_run_id && <TimeLeft expiresAt={conv.expires_at} />}
       </NavLink>
-      {/* Hover (or keyboard focus) reveals the menu; touch screens always show it. */}
-      <ActionMenu actions={actions} label={`Actions for ${conv.title}`}
-        className="absolute right-0 top-0 h-9 w-9 opacity-0 focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:opacity-100" />
+      {quickDelete ? (
+        <QuickDelete conv={conv} />
+      ) : (
+        // Hover (or keyboard focus) reveals the menu; touch screens always show it.
+        <ActionMenu actions={actions} label={`Actions for ${conv.title}`}
+          className="absolute right-0 top-0 h-9 w-9 opacity-0 focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:opacity-100" />
+      )}
     </div>
   )
 }
@@ -79,17 +108,19 @@ export function ConversationList() {
   const conversations = useConversations('', { projectId: project?.id })
   const all = conversations.data ?? []
   const groups = groupChats(all)
+  // Holding Shift over the list puts a delete button on every chat (no confirmation).
+  const shift = useShiftHeld()
 
   return (
     <div className="mt-3 flex min-h-0 flex-1 flex-col">
-      <div aria-label="Chats" className="min-h-0 flex-1 overflow-y-auto">
+      <div aria-label="Chats" className="group/list min-h-0 flex-1 overflow-y-auto">
         {groups.map((group) => (
           <section key={group.label}>
             <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
               {group.kind === 'favorites' && <Star className="h-3 w-3" />}
               {group.kind === 'temporary' && <Timer className="h-3 w-3 text-accent" />} {group.label}
             </div>
-            {group.chats.map((c) => <Item key={c.id} conv={c} />)}
+            {group.chats.map((c) => <Item key={c.id} conv={c} quickDelete={shift} />)}
           </section>
         ))}
         {conversations.data && all.length === 0 && (

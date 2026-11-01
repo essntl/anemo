@@ -149,7 +149,8 @@ async def test_a_message_started_with_a_skill(authed):
         row = await db.scalar(
             select(ChatMessage).where(ChatMessage.conversation_id == uuid.UUID(cid))
         )
-        assert row is not None and row.skill and "practice task" in row.skill["instructions"]
+        assert row is not None and row.skill
+        assert "check your understanding" in row.skill["instructions"]
 
 
 async def test_skill_in_plain_chat_and_agent_mode(authed):
