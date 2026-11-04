@@ -87,6 +87,8 @@ class MessageVersion(BaseModel):
     model_label: str | None
     mode: str | None = None
     questions: list[QuestionMark] = []
+    # Files the agent attached to this answer (attach_file).
+    attachments: list[AttachmentSummary] = []
 
 
 class SkillSummary(BaseModel):

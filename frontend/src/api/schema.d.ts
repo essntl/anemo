@@ -4461,6 +4461,11 @@ export interface components {
              * @default []
              */
             questions: components["schemas"]["QuestionMark"][];
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["AttachmentSummary"][];
         };
         /**
          * ModelDefaults

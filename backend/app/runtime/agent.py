@@ -119,6 +119,12 @@ updated as you go. Skip the plan for simple questions.
 - Use tools when they help; answer directly when they don't.
 - The user's documents are Markdown files under documents/. Use the document tools \
 for them (they keep a revision history); other files use the file tools.
+- Files the user attaches in the chat are shown to you as text where possible. To work \
+on the file itself (change a spreadsheet, unpack a zip, run a script), copy it into the \
+workspace with save_attachment first.
+- When the user wants a file (a spreadsheet, PDF, Word document, zip bundle, script, \
+...), create it in the workspace and give it to them with attach_file: it appears as a \
+download under your answer. Do not paste a whole file into your answer instead.
 - Some actions need the user's approval; the system handles that. If an action is \
 denied, do not retry it: continue without it or explain what you need.
 - If you have the ask_user tool and the user's intent is unclear in a way that \
@@ -256,6 +262,8 @@ class AgentRun:
         project_id: uuid.UUID | None = None,
         session_key: str | None = None,
         turn_context: str | None = None,
+        conversation_id: uuid.UUID | None = None,
+        answer: tuple[uuid.UUID, uuid.UUID] | None = None,
     ) -> None:
         # Which model session this run continues (claude_code), and the turn context
         # of its user message (see runtime/turn_context.py).
@@ -294,11 +302,19 @@ class AgentRun:
             has_browser=has_browser,
             browser_session=browser_session,
             project_id=project_id,
+            conversation_id=conversation_id,
+            message_id=answer[0] if answer else None,
+            answer_run_id=answer[1] if answer else None,
         )
         self.current_call: uuid.UUID | None = None
         # Active time is counted per worker segment and added up in run.totals, so
         # time spent paused or waiting for approval does not count against the limit.
         self.segment_start = time.monotonic()
+
+    def _render_caps(self, vision: bool) -> dict[str, bool]:
+        """What attachments are rendered for: the model's vision, and whether the run
+        can copy them to the workspace (then the model is told their ids)."""
+        return {"vision": vision, "save_attachment": "save_attachment" in self.tools}
 
     async def _emit(self, event_type: str, data: dict[str, Any]) -> None:
         await bus.publish_run_event(self.run_id, event_type, data)
@@ -421,7 +437,7 @@ class AgentRun:
                 transcript = await self._inject_notes(db, run, transcript)
                 transcript = await self._maybe_compact(db, run, transcript, KEEP_RECENT)
                 rendered = {
-                    vision: await resolve_attachments(db, transcript, {"vision": vision})
+                    vision: await resolve_attachments(db, transcript, self._render_caps(vision))
                     for vision in {bool(m.capabilities.get("vision")) for m in self.candidates}
                 }
                 had_text = bool(run.totals.get("text"))
@@ -620,7 +636,7 @@ class AgentRun:
             notice = TextBlock(text=LIMIT_NOTICE.format(reason=reason))
             transcript[-1] = Message(role="user", content=[*transcript[-1].content, notice])
             rendered = {
-                vision: await resolve_attachments(db, transcript, {"vision": vision})
+                vision: await resolve_attachments(db, transcript, self._render_caps(vision))
                 for vision in {bool(m.capabilities.get("vision")) for m in self.candidates}
             }
             had_text = bool(run.totals.get("text"))
@@ -1123,6 +1139,19 @@ def _budget(model: ResolvedModel) -> int:
     return int((context - reserve) * 0.9)
 
 
+async def _answer_message(db: AsyncSession, run: Run) -> tuple[uuid.UUID, uuid.UUID] | None:
+    """(message, run) of the chat answer a run works for: its own, or for a sub-agent
+    the answer of the agent at the top."""
+    current: Run | None = run
+    for _ in range(subagents.ABSOLUTE_MAX_DEPTH + 1):
+        if current is None:
+            return None
+        if current.assistant_message_id is not None:
+            return current.assistant_message_id, current.id
+        current = await db.get(Run, current.parent_run_id) if current.parent_run_id else None
+    return None
+
+
 async def _get_run(db: AsyncSession, run_id: uuid.UUID) -> Run:
     run = await db.get(Run, run_id)
     assert run is not None
@@ -1441,6 +1470,10 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         skills = [s["slug"] for s in run.policy.get("skills") or []]
         ancestors = [Policy.model_validate(p) for p in run.policy.get("ancestors") or []]
 
+        # The answer that files given to the user are attached to (a sub-agent's go to
+        # the answer of the agent at the top).
+        answer_message = await _answer_message(db, run)
+
         needs = {"tools"}
         if "image" in latest_user_attachment_kinds(transcript):
             needs.add("vision")
@@ -1461,6 +1494,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             can_spawn=run.kind == "agent"
             and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),
             can_ask=run.kind == "agent" and run.automation_id is None and run.depth == 0,
+            has_chat=answer_message is not None,
             ancestors=ancestors,
         )
         uses_browser = bool(run.policy.get("browser"))
@@ -1498,6 +1532,8 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         project_id=project_id,
         session_key=session_key_for(run),
         turn_context=run.options.get("turn_context"),
+        conversation_id=run.conversation_id,
+        answer=answer_message,
     )
     task = asyncio.create_task(agent.drive())
     flag = CancelFlag()

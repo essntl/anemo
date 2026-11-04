@@ -30,8 +30,10 @@ import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Input } from '@/components/ui/Input'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
+import { FileIcon } from '@/components/ui/FileIcon'
 import { toolOutputUrl, useEditPlan } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
+import { formatSize } from '@/lib/format'
 import { type FileChangeView, type Timeline, type ToolCallView, useDecide, useRevertChange, useTimeline } from '../api'
 import { type EditableStep, planIsValid, toEditable } from '../plan'
 import { PlanEditor } from './PlanEditor'
@@ -121,6 +123,26 @@ function shownImage(call: ToolCallView): { attachment_id: string; width: number;
   return image?.attachment_id ? { ...image, attachment_id: image.attachment_id } : null
 }
 
+type GivenFile = { attachment_id: string; filename: string; size: number; kind: string }
+
+/** Files the agent gave you (attach_file), as downloads. */
+function GivenFiles({ files }: { files: GivenFile[] }) {
+  return (
+    <div className="ml-7 mt-1 flex flex-wrap gap-1.5">
+      {files.map((f) => (
+          <a key={f.attachment_id} href={`/api/attachments/${f.attachment_id}/content`} download={f.filename}
+            title={`Download ${f.filename}`}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1 text-[12px] hover:border-accent/60 hover:text-accent">
+            <FileIcon name={f.filename} kind={f.kind} className="h-3.5 w-3.5 shrink-0 text-muted" />
+            <span className="truncate">{f.filename}</span>
+            <span className="shrink-0 text-subtle">{formatSize(f.size)}</span>
+            <Download className="h-3 w-3 shrink-0 text-subtle" />
+          </a>
+      ))}
+    </div>
+  )
+}
+
 type WebData = { results?: { title: string; url: string }[]; url?: string; title?: string }
 
 /** Search results and pages the agent read, as links the user can open. */
@@ -158,6 +180,7 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
   const needsApproval = call.status === 'waiting_approval' && call.approval?.status === 'pending'
   const output = call.result_data?.output as { chars: number } | undefined
   const web = (call.result_data?.search ?? call.result_data?.web) as WebData | undefined
+  const given = call.tool_name === 'attach_file' ? (call.result_data?.files as GivenFile[] | undefined) : undefined
   return (
     <div className="py-1">
       <button type="button" onClick={() => setOpen(!open)}
@@ -207,6 +230,7 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
             className="max-h-32 max-w-56 rounded-lg border border-border object-contain" />
         </div>
       )}
+      {given && given.length > 0 && <GivenFiles files={given} />}
       {needsApproval &&
         (call.approval?.kind === 'plan' ? <PlanReviewCard runId={runId} call={call} />
           : call.approval?.kind === 'question' ? <QuestionCard runId={runId} call={call} />

@@ -14,6 +14,7 @@ from app.tools.builtin.automation import AUTOMATION_TOOLS
 from app.tools.builtin.browser import BROWSER_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
+from app.tools.builtin.file_exchange import FILE_EXCHANGE_TOOLS
 from app.tools.builtin.focus import FOCUS_TOOLS
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.notify import SendNotification
@@ -46,6 +47,7 @@ BUILTIN_TOOLS: list[Tool] = [
     CreateFolder(),
     MovePath(),
     DeletePath(),
+    *FILE_EXCHANGE_TOOLS,
     *DOCUMENT_TOOLS,
     RunShell(),
     WebSearch(),
@@ -65,6 +67,8 @@ BUILTIN_TOOLS: list[Tool] = [
     ReadToolOutput(),
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
+# Tools that only work in a run that answers in a chat.
+CHAT_FILE_TOOLS = {"save_attachment", "attach_file"}
 
 
 def get(name: str) -> Tool | None:
@@ -91,11 +95,14 @@ def toolset_for(
     has_browser: bool = False,
     can_spawn: bool = False,
     can_ask: bool = False,
+    has_chat: bool = False,
     ancestors: Iterable[Policy] = (),
 ) -> list[Tool]:
     """`ancestors`: for a sub-agent, the policies of the agents above it (a tool one of
     them may not use is not offered). `can_spawn`: the run may start sub-agents.
-    `can_ask`: someone is there to answer questions (not an automation or a sub-agent)."""
+    `can_ask`: someone is there to answer questions (not an automation or a sub-agent).
+    `has_chat`: the run answers in a chat, so it can use the chat's attachments and
+    attach files to the answer."""
     offered = []
     for tool in BUILTIN_TOOLS:
         is_memory = tool in MEMORY_TOOLS
@@ -108,6 +115,7 @@ def toolset_for(
             or (tool in BROWSER_TOOLS and not has_browser)
             or (tool.name == "run_subagent" and not can_spawn)
             or (tool.name == "ask_user" and not can_ask)
+            or (tool.name in CHAT_FILE_TOOLS and not has_chat)
             or (mode != "agent" and not is_memory)
         ):
             continue

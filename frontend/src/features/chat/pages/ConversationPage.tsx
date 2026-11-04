@@ -306,6 +306,7 @@ export function ConversationPage() {
                       error={shown.error}
                       modelLabel={shown.model_label}
                       questions={shown.questions}
+                      files={shown.attachments}
                       activity={shown.mode === 'agent' && shown.run_id ? <RunActivity runId={shown.run_id} live={false} /> : undefined}
                       versions={versions.length > 1 ? { index, count: versions.length, onSelect: select } : undefined}
                       onRegenerate={

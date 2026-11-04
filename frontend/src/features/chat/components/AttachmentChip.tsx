@@ -1,36 +1,37 @@
-import { AlertCircle, FileText, Loader2, X } from 'lucide-react'
+import { AlertCircle, Download, Loader2, X } from 'lucide-react'
+import { FileIcon } from '@/components/ui/FileIcon'
 import { cn } from '@/lib/cn'
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
+import { formatSize } from '@/lib/format'
 
 interface ChipProps {
   name: string
   size: number
+  /** image | pdf | document | spreadsheet | presentation | archive | text | file */
+  kind?: string | null
   imageUrl?: string | null
   status?: 'uploading' | 'ready' | 'error'
   error?: string
   onRemove?: () => void
+  /** Shown as a download (a file the agent made for you). */
+  download?: boolean
 }
 
-/** A file shown in the composer (while uploading) or on a sent message. */
-export function AttachmentChip({ name, size, imageUrl, status = 'ready', error, onRemove }: ChipProps) {
+/** A file shown in the composer (while uploading), on a sent message, or under an answer. */
+export function AttachmentChip({ name, size, kind, imageUrl, status = 'ready', error, onRemove, download }: ChipProps) {
   return (
     <div
-      title={error ?? name}
+      title={error ?? (download ? `Download ${name}` : name)}
       className={cn(
         'group relative flex h-14 max-w-56 items-center gap-2.5 rounded-xl border bg-surface-2 pr-3',
         imageUrl ? 'pl-1' : 'pl-3',
         status === 'error' ? 'border-error/50' : 'border-border',
+        download && 'transition-colors hover:border-accent/60 hover:bg-surface-hover',
       )}
     >
       {imageUrl ? (
         <img src={imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
       ) : (
-        <FileText className="h-5 w-5 shrink-0 text-muted" />
+        <FileIcon name={name} kind={kind} className="h-5 w-5 shrink-0 text-muted" />
       )}
       <div className="min-w-0">
         <div className="truncate text-[12.5px] font-medium">{name}</div>
@@ -40,6 +41,7 @@ export function AttachmentChip({ name, size, imageUrl, status = 'ready', error, 
           {status === 'uploading' ? 'Uploading…' : status === 'error' ? (error ?? 'Failed') : formatSize(size)}
         </div>
       </div>
+      {download && <Download className="ml-1 h-4 w-4 shrink-0 text-subtle group-hover:text-accent" />}
       {onRemove && (
         <button
           type="button"

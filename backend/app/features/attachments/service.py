@@ -1,9 +1,21 @@
 """Chat attachments: validation, storage, text extraction and model-input rendering.
 
-Supported on purpose, nothing more (extend when a real need appears):
-  image  png / jpeg / gif / webp  -> sent natively to vision-capable models
-  pdf                             -> text extracted with pypdf (no OCR)
-  text   plain text, Markdown, code, CSV, JSON, ...  -> inlined as text
+Any file can be attached. What the model gets depends on its kind:
+  image         png / jpeg / gif / webp  -> sent natively to vision-capable models
+  pdf           text extracted with pypdf (no OCR)
+  document      .docx  -> paragraphs and tables as Markdown        (see extract.py)
+  spreadsheet   .xlsx  -> every sheet as CSV
+  presentation  .pptx  -> the text and notes of each slide
+  archive       .zip   -> the list of files and the text of small text files
+  text          plain text, Markdown, code, CSV, JSON, ...  -> inlined as text
+  file          anything else -> only its name, type and size
+
+In Agent mode the model is also told each attachment's id: save_attachment copies
+the file itself into the workspace, so the agent can work on it with its tools
+(e.g. change a spreadsheet with Python in the shell sandbox).
+
+The agent can hand files back too: attach_file stores a snapshot of a workspace
+file as an attachment of its answer (`store_output`), shown there as a download.
 
 How an attachment reaches a model depends on that model's capabilities, and is
 decided per model at request time (see `render_blocks`), because a run may
@@ -13,7 +25,7 @@ fall back to a different model than the one first chosen.
 import asyncio
 import base64
 import hashlib
-import io
+import mimetypes
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,59 +35,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFound
+from app.features.attachments import extract
 from app.features.attachments.images import PreparedImage
 from app.features.attachments.models import Attachment
 from app.providers.base import ImageBlock, TextBlock
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_OUTPUT_BYTES = 100 * 1024 * 1024  # a file the agent hands over (e.g. a zip bundle)
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
-MAX_EXTRACTED_CHARS = 120_000
-MAX_PDF_PAGES = 300
+MAX_EXTRACTED_CHARS = extract.MAX_CHARS
 MAX_PER_MESSAGE = 10
 
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
-TEXT_EXTENSIONS = {
-    ".txt",
-    ".md",
-    ".markdown",
-    ".csv",
-    ".tsv",
-    ".json",
-    ".jsonl",
-    ".yaml",
-    ".yml",
-    ".toml",
-    ".xml",
-    ".html",
-    ".css",
-    ".log",
-    ".ini",
-    ".cfg",
-    ".env.example",
-    ".sql",
-    ".sh",
-    ".py",
-    ".js",
-    ".jsx",
-    ".ts",
-    ".tsx",
-    ".go",
-    ".rs",
-    ".java",
-    ".kt",
-    ".c",
-    ".h",
-    ".cpp",
-    ".hpp",
-    ".cs",
-    ".rb",
-    ".php",
-    ".swift",
-    ".lua",
-    ".r",
-    ".vue",
-    ".svelte",
-    ".dockerfile",
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+# Kinds whose text is extracted and shown to the model.
+TEXT_KINDS = {"pdf", "document", "spreadsheet", "presentation", "archive", "text"}
+KIND_LABELS = {
+    "pdf": "PDF",
+    "document": "Word document",
+    "spreadsheet": "spreadsheet",
+    "presentation": "presentation",
+    "archive": "zip archive",
+    "text": "text file",
+    "file": "file",
+    "image": "image",
+}
+MIME_BY_KIND = {
+    "pdf": "application/pdf",
+    "archive": "application/zip",
 }
 
 
@@ -88,29 +75,50 @@ def _uploads_dir() -> Path:
     return Path(get_settings().data_path) / "uploads"
 
 
-def classify(filename: str, mime: str, head: bytes) -> str:
-    """Decide the kind from magic bytes first, then declared type/extension."""
-    if head.startswith(b"%PDF-"):
-        return "pdf"
-    if (
+def _is_image(head: bytes) -> bool:
+    return (
         head.startswith(b"\x89PNG")
         or head.startswith(b"\xff\xd8\xff")
         or head[:6] in (b"GIF87a", b"GIF89a")
         or (head[:4] == b"RIFF" and head[8:12] == b"WEBP")
-    ):
+    )
+
+
+def _is_utf8_text(head: bytes) -> bool:
+    if b"\x00" in head:
+        return False
+    try:
+        # A multi-byte character may be cut at the end of the sample.
+        head[:4096].decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return exc.start >= len(head[:4096]) - 3
+    return True
+
+
+def classify(filename: str, mime: str, data: bytes) -> str:
+    """Decide the kind from the content first, then the declared type/extension."""
+    head = data[:16]
+    if head.startswith(b"%PDF-"):
+        return "pdf"
+    if _is_image(head):
         return "image"
     suffix = Path(filename.lower()).suffix
+    if mime in IMAGE_TYPES or suffix in IMAGE_SUFFIXES:
+        # Says it is an image but is not one: refuse rather than guess what it is.
+        raise UnsupportedFile(f"'{filename}' is not a valid PNG, JPEG, GIF or WebP image.")
+    if kind := extract.office_kind(filename, data):
+        return kind
+    if suffix == ".zip" and extract.is_zip(data):
+        return "archive"
+    sample = data[:8192]
     if (
         mime.startswith("text/")
-        or suffix in TEXT_EXTENSIONS
+        or extract.looks_like_text(filename, sample)
         or mime in ("application/json", "application/xml", "application/x-yaml")
-    ):
-        if b"\x00" not in head:
-            return "text"
-    raise UnsupportedFile(
-        f"'{filename}' is not supported. Attach images (PNG, JPEG, GIF, WebP), PDFs, "
-        "or text/code files."
-    )
+        or _is_utf8_text(sample)
+    ) and b"\x00" not in sample:
+        return "text"
+    return "file"
 
 
 def _image_mime(head: bytes) -> str:
@@ -123,27 +131,34 @@ def _image_mime(head: bytes) -> str:
     return "image/gif"
 
 
+def _mime_for(kind: str, filename: str, declared: str, data: bytes) -> str:
+    if kind == "image":
+        return _image_mime(data[:16])
+    if kind in MIME_BY_KIND:
+        return MIME_BY_KIND[kind]
+    guessed = mimetypes.guess_type(filename)[0]
+    if kind == "text":
+        return declared if declared.startswith("text/") else (guessed or "text/plain")
+    return guessed or declared or "application/octet-stream"
+
+
 def extract_pdf_text(data: bytes) -> tuple[str, str | None]:
-    from pypdf import PdfReader
-
-    reader = PdfReader(io.BytesIO(data))
-    parts: list[str] = []
-    note = None
-    for i, page in enumerate(reader.pages):
-        if i >= MAX_PDF_PAGES:
-            note = f"Only the first {MAX_PDF_PAGES} pages were read."
-            break
-        parts.append(page.extract_text() or "")
-    text = "\n\n".join(p.strip() for p in parts if p.strip())
-    if not text:
-        note = "No text found (the PDF may be scanned images; OCR is not supported yet)."
-    return text, note
+    return extract.extract("pdf", data)
 
 
-def _truncate(text: str) -> tuple[str, str | None]:
-    if len(text) <= MAX_EXTRACTED_CHARS:
-        return text, None
-    return text[:MAX_EXTRACTED_CHARS], f"Truncated to the first {MAX_EXTRACTED_CHARS:,} characters."
+async def _read_text(kind: str, data: bytes) -> tuple[str | None, str | None]:
+    """(text for the model, note). A file that cannot be read is kept, with a note."""
+    if kind not in TEXT_KINDS:
+        return None, None
+    try:
+        return await asyncio.to_thread(extract.extract, kind, data)
+    except extract.ExtractionError as exc:
+        return None, str(exc)[:300]
+
+
+def _new_path(att_id: uuid.UUID) -> Path:
+    now = datetime.now(UTC)
+    return Path("uploads") / f"{now:%Y}" / f"{now:%m}" / str(att_id)
 
 
 async def store_upload(db: AsyncSession, filename: str, mime: str, data: bytes) -> Attachment:
@@ -152,35 +167,53 @@ async def store_upload(db: AsyncSession, filename: str, mime: str, data: bytes) 
     if len(data) > MAX_UPLOAD_BYTES:
         raise AppError("Files can be at most 25 MB", code="file_too_large")
     filename = Path(filename or "file").name[:255]
-    kind = classify(filename, mime or "", data[:16])
-    text: str | None = None
-    note: str | None = None
-    if kind == "image":
-        if len(data) > MAX_IMAGE_BYTES:
-            raise AppError("Images can be at most 10 MB", code="file_too_large")
-        mime = _image_mime(data[:16])
-    elif kind == "pdf":
-        mime = "application/pdf"
-        try:
-            raw, note = await asyncio.to_thread(extract_pdf_text, data)
-        except Exception as exc:  # noqa: BLE001 - corrupt or encrypted PDFs
-            raise UnsupportedFile(f"Could not read the PDF: {exc}") from exc
-        text, cut = _truncate(raw)
-        note = note or cut
-    else:
-        text, cut = _truncate(data.decode("utf-8", errors="replace"))
-        note = cut
-        mime = mime or "text/plain"
+    kind = classify(filename, mime or "", data)
+    if kind == "image" and len(data) > MAX_IMAGE_BYTES:
+        raise AppError("Images can be at most 10 MB", code="file_too_large")
+    text, note = await _read_text(kind, data)
+    return await _store(
+        db, filename, _mime_for(kind, filename, mime or "", data), kind, data, text, note
+    )
 
+
+async def store_output(
+    db: AsyncSession,
+    filename: str,
+    data: bytes,
+    *,
+    conversation_id: uuid.UUID | None,
+    message_id: uuid.UUID | None,
+    run_id: uuid.UUID | None,
+) -> Attachment:
+    """A file the agent hands to the user (attach_file): a snapshot of a workspace file,
+    shown as a download under its answer. Its text is not extracted (the agent made it)."""
+    filename = Path(filename).name[:255] or "file"
+    try:
+        kind = classify(filename, "", data)
+    except UnsupportedFile:
+        kind = "file"  # e.g. a damaged image: still downloadable
+    att = await _store(db, filename, _mime_for(kind, filename, "", data), kind, data, None, None)
+    att.conversation_id, att.message_id, att.run_id = conversation_id, message_id, run_id
+    await db.flush()
+    return att
+
+
+async def _store(
+    db: AsyncSession,
+    filename: str,
+    mime: str,
+    kind: str,
+    data: bytes,
+    text: str | None,
+    note: str | None,
+) -> Attachment:
     att_id = uuid.uuid4()
-    now = datetime.now(UTC)
-    rel = Path("uploads") / f"{now:%Y}" / f"{now:%m}" / str(att_id)
-    path = Path(get_settings().data_path) / rel
-    await asyncio.to_thread(_write, path, data)
+    rel = _new_path(att_id)
+    await asyncio.to_thread(_write, Path(get_settings().data_path) / rel, data)
     att = Attachment(
         id=att_id,
         filename=filename,
-        mime=mime,
+        mime=mime[:120],
         size=len(data),
         sha256=hashlib.sha256(data).hexdigest(),
         kind=kind,
@@ -203,8 +236,7 @@ async def store_image(
     it can be sent to the model like a chat attachment. It's a snapshot: later edits
     to the original file don't change what the conversation saw."""
     att_id = uuid.uuid4()
-    now = datetime.now(UTC)
-    rel = Path("uploads") / f"{now:%Y}" / f"{now:%m}" / str(att_id)
+    rel = _new_path(att_id)
     await asyncio.to_thread(_write, Path(get_settings().data_path) / rel, image.data)
     att = Attachment(
         id=att_id,
@@ -264,8 +296,7 @@ async def duplicate(
     owns its files: they are deleted with it, so a branch cannot share them."""
     data = await asyncio.to_thread(file_path(att).read_bytes)
     copy_id = uuid.uuid4()
-    now = datetime.now(UTC)
-    rel = Path("uploads") / f"{now:%Y}" / f"{now:%m}" / str(copy_id)
+    rel = _new_path(copy_id)
     await asyncio.to_thread(_write, Path(get_settings().data_path) / rel, data)
     copy = Attachment(
         id=copy_id,
@@ -280,7 +311,7 @@ async def duplicate(
         extracted_text=att.extracted_text,
         extraction_note=att.extraction_note,
     )
-    db.add(copy)
+    db.add(copy)  # run_id stays empty: the copy belongs to no run of the new chat
     await db.flush()
     return copy
 
@@ -295,23 +326,83 @@ def ref_block(att: Attachment) -> dict[str, object]:
     }
 
 
+def _human_size(n: int) -> str:
+    if n < 1024:
+        return f"{n} bytes"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.0f} KB"
+    return f"{n / 1024 / 1024:.1f} MB"
+
+
+def _quote(value: str) -> str:
+    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+
+
 async def render_blocks(
     db: AsyncSession, attachment_id: str, capabilities: dict[str, bool]
 ) -> list[TextBlock | ImageBlock]:
-    """Model input for one attachment, given the model's capabilities."""
+    """Model input for one attachment, given the model's capabilities.
+
+    `capabilities["save_attachment"]`: the run has the save_attachment tool, so the
+    model is told the attachment's id and that it can copy the file to the workspace.
+    """
     att = await db.get(Attachment, uuid.UUID(attachment_id))
     if att is None:
         return [TextBlock(text="[An attached file is no longer available.]")]
+    # Images a tool showed the model (read_file) belong to no message; they are
+    # already in the workspace, so there is nothing to save.
+    can_save = bool(capabilities.get("save_attachment")) and att.message_id is not None
+    save_hint = (
+        f"[To work on the file itself, copy it into the workspace with save_attachment "
+        f'(attachment_id "{att.id}").]'
+    )
     if att.kind == "image":
         if not capabilities.get("vision"):
-            return [
-                TextBlock(text=f"[Image '{att.filename}' attached; this model cannot view images.]")
-            ]
+            text = f"[Image '{att.filename}' attached; this model cannot view images.]"
+            return [TextBlock(text=f"{text}\n{save_hint}" if can_save else text)]
         data = await asyncio.to_thread(file_path(att).read_bytes)
-        return [ImageBlock(media_type=att.mime, data=base64.b64encode(data).decode())]
-    header = f'<attachment name="{att.filename}" type="{att.kind}">'
-    note = f"\n[{att.extraction_note}]" if att.extraction_note else ""
-    return [TextBlock(text=f"{header}\n{att.extracted_text or ''}{note}\n</attachment>")]
+        image = ImageBlock(media_type=att.mime, data=base64.b64encode(data).decode())
+        if not can_save:
+            return [image]
+        return [TextBlock(text=f"[Attached image '{att.filename}'] {save_hint}"), image]
+    attrs = f'name="{_quote(att.filename)}" type="{att.kind}"'
+    if att.kind == "file":
+        attrs += f' mime="{_quote(att.mime)}" size="{_human_size(att.size)}"'
+    if can_save:
+        attrs += f' id="{att.id}"'
+    lines = [f"<attachment {attrs}>"]
+    if att.kind == "file":
+        lines.append(
+            f"[A {_human_size(att.size)} file whose contents cannot be shown as text here.]"
+        )
+    elif att.extracted_text:
+        lines.append(att.extracted_text)
+    if att.extraction_note:
+        lines.append(f"[{att.extraction_note}]")
+    if can_save:
+        lines.append(save_hint)
+    lines.append("</attachment>")
+    return [TextBlock(text="\n".join(lines))]
+
+
+async def delete_for_message(
+    db: AsyncSession, message_id: uuid.UUID, *, except_run: uuid.UUID | None = None
+) -> None:
+    """Delete the files the agent attached to an answer (rows and bytes), e.g. when the
+    question is edited and the earlier answers are dropped."""
+    rows = await db.scalars(
+        select(Attachment).where(
+            Attachment.message_id == message_id, Attachment.run_id.is_not(None)
+        )
+    )
+    for att in rows:
+        if except_run is not None and att.run_id == except_run:
+            continue
+        try:
+            await asyncio.to_thread(file_path(att).unlink, True)
+        except OSError:
+            pass
+        await db.delete(att)
 
 
 async def delete_files_for_conversation(db: AsyncSession, conversation_id: uuid.UUID) -> None:

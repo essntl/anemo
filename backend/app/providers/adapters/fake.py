@@ -71,6 +71,16 @@ def _first_user_text(req: ChatRequest) -> str:
     return ""
 
 
+def _first_user_typed(req: ChatRequest) -> str:
+    """The last text of the first user message: what was typed after any attachments."""
+    for msg in req.messages:
+        if msg.role == "user":
+            texts = _texts(msg.content)
+            if texts:
+                return texts[-1]
+    return ""
+
+
 class FakeAdapter:
     # Tests put scripts here keyed by the first user message text.
     scripts: ClassVar[dict[str, Any]] = {}
@@ -101,7 +111,10 @@ class FakeAdapter:
             yield Done("end")
             return
         if req.model == "scripted":
-            script = self.scripts.get(_first_user_text(req), [Done("end")])
+            # Attachments come before the typed text, so match that text on its own too.
+            script = self.scripts.get(_first_user_text(req)) or self.scripts.get(
+                _first_user_typed(req), [Done("end")]
+            )
             if script and isinstance(script[0], list):
                 turn = sum(1 for m in req.messages if m.role == "assistant")
                 script = script[min(turn, len(script) - 1)]

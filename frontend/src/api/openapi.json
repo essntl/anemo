@@ -16949,6 +16949,14 @@
             "type": "array",
             "title": "Questions",
             "default": []
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentSummary"
+            },
+            "type": "array",
+            "title": "Attachments",
+            "default": []
           }
         },
         "type": "object",
