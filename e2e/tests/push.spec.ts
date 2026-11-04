@@ -40,7 +40,7 @@ test('push: the settings card, a device in the list, and removing it', async ({ 
   expect(device).toMatchObject({ type: 'webpush', push_service: 'push.invalid', kinds: [] })
   try {
     await page.goto('/settings/notifications')
-    await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible()
     await expect(page.getByText('Push notifications', { exact: true })).toBeVisible()
     await expect(page.getByRole('switch', { name: 'Push notifications on this device' })).toBeVisible()
     // The Discord card keeps its own Add button; devices are not listed there.

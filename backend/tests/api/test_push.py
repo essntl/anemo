@@ -311,6 +311,7 @@ async def test_allow_once_from_the_notification(authed, push_service, workspace)
         for token in buttons.values():
             r = await worker.post("/api/public/push/actions", json={"token": token})
             assert r.status_code == 404 and r.json()["error"]["code"] == "push_action_gone"
+            assert r.headers["cache-control"] == "no-store"
 
     from app.features.runs.models import Approval
 

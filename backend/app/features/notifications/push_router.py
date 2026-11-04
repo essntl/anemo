@@ -83,7 +83,7 @@ async def use_action(
     )
     if row is None or row.expires_at <= datetime.now(UTC):
         await shares.register_miss(ip)
-        raise NotFound(GONE, code="push_action_gone")
+        raise NotFound(GONE, code="push_action_gone", headers={"Cache-Control": "no-store"})
     approval_id, action = row.approval_id, row.action
     # One answer per approval: every button for it (on every device) stops working.
     await db.execute(delete(PushActionToken).where(PushActionToken.approval_id == approval_id))
