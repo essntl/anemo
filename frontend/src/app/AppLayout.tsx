@@ -6,6 +6,7 @@ import { ToastHost } from '@/components/ui/ToastHost'
 import { ReauthDialog } from '@/features/auth/ReauthDialog'
 import { MoveChatsDialog } from '@/features/chat/components/MoveChatsDialog'
 import { useAppEvents } from '@/features/chat/useAppEvents'
+import { useServiceWorkerLinks } from '@/features/notifications/useServiceWorkerLinks'
 import { Island } from '@/features/island/Island'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
@@ -40,6 +41,7 @@ function SidebarDrawer() {
 export function AppLayout() {
   useAppearanceSync()
   useAppEvents()
+  useServiceWorkerLinks()
   useSidebarSwipe()
   const location = useLocation()
   // Desktop: the sidebar can be folded to a strip of icons (its button, or Ctrl+\).

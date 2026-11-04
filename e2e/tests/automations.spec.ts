@@ -125,7 +125,7 @@ test('a reminder arrives as a notification and opens what it is about', async ({
 test('notification settings: desktop notifications and the Discord dialog', async ({ page }) => {
   await login(page)
   await page.goto('/settings/notifications')
-  await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible()
   await expect(page.getByRole('switch', { name: 'Desktop notifications' })).toBeVisible()
   await page.getByRole('button', { name: 'Add' }).click()
   const dialog = page.getByRole('dialog')

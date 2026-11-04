@@ -103,6 +103,8 @@ permission; shared projects show them in the copy; search finds checklist items.
 
 ## 4. Real push notifications
 
+**Status: built.**
+
 Notifications on your phone or computer **even when Anemo is closed**, without
 Discord. Uses the browser's standard Web Push, which works in Chrome, Edge and
 Firefox, and on iPhone/iPad (iOS 16.4+) once Anemo is added to the Home Screen.

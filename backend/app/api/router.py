@@ -1,8 +1,10 @@
 """Aggregates every feature router under /api.
 
 Routers in `protected` require a logged-in session for every endpoint.
-Only health checks, the login flow and viewing a share link (a frozen copy the owner
-chose to share, see features/shares/public_router.py) are reachable without one.
+Only health checks, the login flow, viewing a share link (a frozen copy the owner
+chose to share, see features/shares/public_router.py) and the one-time approval buttons
+on push notifications (see features/notifications/push_router.py) are reachable
+without one.
 """
 
 from fastapi import APIRouter, Depends
@@ -23,6 +25,8 @@ from app.features.links.router import router as links_router
 from app.features.mcp.router import router as mcp_router
 from app.features.memory.router import router as memory_router
 from app.features.music.router import router as music_router
+from app.features.notifications.push_router import public_router as push_public_router
+from app.features.notifications.push_router import router as push_router
 from app.features.notifications.router import router as notifications_router
 from app.features.permissions_router import router as permissions_router
 from app.features.profiles.router import router as profiles_router
@@ -46,6 +50,7 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
 api_router.include_router(auth_router)  # endpoints declare their own session requirement
 api_router.include_router(shares_public_router)  # read-only, by secret link
+api_router.include_router(push_public_router)  # one-time approval buttons, by secret token
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
@@ -71,6 +76,7 @@ protected.include_router(calendar_router)
 protected.include_router(focus_router)
 protected.include_router(music_router)
 protected.include_router(notifications_router)
+protected.include_router(push_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)

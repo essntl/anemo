@@ -1,8 +1,9 @@
 /**
- * Settings > Notifications: desktop notifications on this device, and the
- * Discord channels that get a copy. Notifications always appear in the app.
+ * Settings > Notifications: desktop notifications on this device, push
+ * notifications (this device and the others that have it on), and the Discord
+ * channels that get a copy. Notifications always appear in the app.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { Bell, CheckCircle2, Pencil, Plus, Send, Trash2, XCircle } from 'lucide-react'
 import { errorMessage } from '@/api/client'
@@ -13,13 +14,24 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Switch } from '@/components/ui/Switch'
 import { formatWhen } from '@/lib/format'
-import { type Destination, KIND_LABELS, type NotificationKind, useDeleteDestination, useDestinations, useSaveDestination, useTestDestination } from './api'
+import {
+  type Destination,
+  KIND_LABELS,
+  type NotificationKind,
+  useDeleteDestination,
+  useDestinations,
+  useDisablePush,
+  useEnablePush,
+  useSaveDestination,
+  useTestDestination,
+} from './api'
 import { DestinationDialog } from './components/DestinationDialog'
 import { desktopEnabled, desktopSupport, setDesktopEnabled } from './desktop'
+import { currentSubscription, endpointHash, PushPermissionError, type PushSupport, pushOnHere, pushSupport } from './push'
 import { Lingering } from '@/components/ui/Lingering'
 
 const UNAVAILABLE = {
-  unsupported: 'This browser does not support desktop notifications. On an iPhone or iPad, use a Discord channel instead.',
+  unsupported: 'This browser does not support desktop notifications. On an iPhone or iPad, use push notifications instead.',
   insecure: 'Browsers only allow desktop notifications over HTTPS. Open the app through its https:// address.',
   blocked: 'Notifications are blocked for this site. Allow them in the browser’s site settings (the icon next to the address), then reload.',
 }
@@ -44,7 +56,8 @@ function DesktopCard() {
             <div className="font-medium">Desktop notifications</div>
             <div className="text-[12px] text-muted">
               Shown by your browser while Anemo is open in a tab you are not looking at. Set per browser.
-              With the app closed nothing can be shown; a Discord channel reaches you then.
+              With the app closed nothing can be shown; push notifications reach you then.
+              {pushOnHere() && ' Push is on in this browser, so it shows them instead.'}
             </div>
           </div>
           <Switch label="Desktop notifications" checked={on} disabled={support !== 'ok'} onChange={(next) => void change(next)} />
@@ -56,20 +69,32 @@ function DesktopCard() {
   )
 }
 
-function DestinationRow({ destination, onEdit }: { destination: Destination; onEdit: () => void }) {
+function DestinationRow({ destination, onEdit, thisDevice = false, onRemoveThisDevice }: {
+  destination: Destination
+  onEdit: () => void
+  /** Push: the device this page is open on. */
+  thisDevice?: boolean
+  /** Removing this device also turns push off in this browser. */
+  onRemoveThisDevice?: () => void
+}) {
   const save = useSaveDestination()
   const remove = useDeleteDestination()
   const test = useTestDestination()
+  const push = destination.type === 'webpush'
   const form = { name: destination.name, url: '', kinds: destination.kinds as NotificationKind[] }
 
   const confirmDelete = async () => {
     const ok = await confirmDialog({
       title: `Remove “${destination.name}”?`,
-      message: 'Notifications are no longer sent there. The saved webhook URL is deleted.',
+      message: push
+        ? 'This device no longer gets push notifications. To get them again, turn push on there.'
+        : 'Notifications are no longer sent there. The saved webhook URL is deleted.',
       confirmLabel: 'Remove',
       danger: true,
     })
-    if (ok) remove.mutate(destination.id)
+    if (!ok) return
+    if (thisDevice && onRemoveThisDevice) onRemoveThisDevice()
+    else remove.mutate(destination.id)
   }
   const error = save.error ?? remove.error ?? test.error
 
@@ -79,7 +104,8 @@ function DestinationRow({ destination, onEdit }: { destination: Destination; onE
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
             <span className="truncate">{destination.name}</span>
-            <Badge>Discord</Badge>
+            <Badge>{push ? 'Push' : 'Discord'}</Badge>
+            {thisDevice && <Badge tone="accent">This device</Badge>}
             {!destination.enabled && <Badge tone="warning">Off</Badge>}
           </div>
           <div className="mt-0.5 text-[12px] text-muted">
@@ -112,11 +138,91 @@ function DestinationRow({ destination, onEdit }: { destination: Destination; onE
   )
 }
 
+const PUSH_UNAVAILABLE: Record<Exclude<PushSupport, 'ok'>, string> = {
+  unsupported: 'This browser does not support push notifications.',
+  insecure: 'Push notifications need HTTPS. Open the app through its https:// address.',
+  blocked: 'Notifications are blocked for this site. Allow them in the browser’s site settings (the icon next to the address), then reload.',
+  'ios-install': 'On an iPhone or iPad, push notifications work once Anemo is on your Home Screen: Share › Add to Home Screen, then open it from there and come back here.',
+  dev: 'Push notifications need the built app (its service worker is not used by the development server).',
+}
+
+/** The SHA-256 of this browser's subscription address, once known (null: none). */
+function useThisDeviceHash(devices: Destination[]): string | null | undefined {
+  const [hash, setHash] = useState<string | null | undefined>(undefined)
+  // Look again whenever the list changes (after turning push on or off).
+  const key = devices.map((d) => d.endpoint_hash).join()
+  useEffect(() => {
+    let cancelled = false
+    void currentSubscription().then(async (sub) => {
+      const value = sub ? await endpointHash(sub.endpoint) : null
+      if (!cancelled) setHash(value)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [key])
+  return hash
+}
+
+function PushCard({ devices, onEdit }: { devices: Destination[]; onEdit: (d: Destination) => void }) {
+  const support = pushSupport()
+  const enable = useEnablePush()
+  const disable = useDisablePush()
+  const hash = useThisDeviceHash(devices)
+  const on = !!hash && devices.some((d) => d.endpoint_hash === hash)
+  const busy = enable.isPending || disable.isPending || hash === undefined
+  const error = enable.error ?? disable.error
+
+  const change = (next: boolean) => {
+    if (next) enable.mutate()
+    else disable.mutate(devices)
+  }
+
+  return (
+    <Card>
+      <CardHeader title="Push notifications"
+        description="Notifications on your phone or computer even while Anemo is closed. Turn it on in each browser or phone you want them on; changes ask for your password." />
+      <CardBody className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4 text-[13px]">
+          <div>
+            <div className="font-medium">On this device</div>
+            <div className="text-[12px] text-muted">
+              When an automation needs your approval, the notification has <em>Allow once</em> and <em>Deny</em> buttons.
+              On an iPhone or iPad there are no buttons: tap the notification to answer in the app.
+            </div>
+          </div>
+          <Switch label="Push notifications on this device" checked={on} disabled={support !== 'ok' || busy}
+            onChange={change} />
+        </div>
+        {support !== 'ok' && <p className="text-[12.5px] text-warning">{PUSH_UNAVAILABLE[support]}</p>}
+        {error && (
+          <p className="text-[12.5px] text-error">
+            {error instanceof PushPermissionError ? error.message : errorMessage(error)}
+          </p>
+        )}
+        {devices.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {devices.map((d) => (
+              <DestinationRow key={d.id} destination={d} onEdit={() => onEdit(d)}
+                thisDevice={!!hash && d.endpoint_hash === hash} onRemoveThisDevice={() => disable.mutate(devices)} />
+            ))}
+          </div>
+        )}
+        {devices.length === 0 && support === 'ok' && (
+          <p className="text-[12.5px] text-muted">No device has push on yet.</p>
+        )}
+      </CardBody>
+    </Card>
+  )
+}
+
 export function NotificationSettingsPage() {
   const destinations = useDestinations()
   // null: closed. { destination: null }: adding one.
   const [editing, setEditing] = useState<{ destination: Destination | null } | null>(null)
-  const items = destinations.data ?? []
+  const all = destinations.data ?? []
+  const items = all.filter((d) => d.type !== 'webpush')
+  const devices = all.filter((d) => d.type === 'webpush')
 
   return (
     <div className="flex flex-col gap-5">
@@ -133,11 +239,13 @@ export function NotificationSettingsPage() {
         </div>
       </div>
 
+      <PushCard devices={devices} onEdit={(d) => setEditing({ destination: d })} />
+
       <DesktopCard />
 
       <Card>
         <CardHeader title="Discord"
-          description="Get notifications in a Discord channel, so they reach your phone when the app is closed. Changes ask for your password."
+          description="Get notifications in a Discord channel as well. Changes ask for your password."
           actions={
             <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ destination: null })}>
               Add

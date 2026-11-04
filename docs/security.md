@@ -21,7 +21,7 @@ what is not.
 Anemo has one user, but you can let someone **read** a single chat, document or
 project by giving them a link (**Share** in the menu of a chat, a document or
 a project). This is the only thing reachable without logging in, apart from the login
-page itself.
+page itself and the one-time [buttons on push notifications](#push-notifications).
 
 - **A link shows a frozen copy.** The copy is made when you create the link and is
   stored with it. Opening a link reads that copy and nothing else: no live chat, no
@@ -48,6 +48,38 @@ page itself.
 
 A link only works for people who can reach your server. If Anemo is only on your home
 network, so are its links.
+
+## Push notifications
+
+Push notifications (Settings → Notifications → Push) reach a browser or phone through
+its push service (Google's for Chrome, Mozilla's for Firefox, Apple's, Microsoft's).
+
+- **The push service can't read them.** Every notification is encrypted for that one
+  browser (RFC 8291) and signed with this server's own key (VAPID, RFC 8292). The
+  server's key is made on first use and stored encrypted with `APP_SECRET_KEY`, like
+  the browsers' subscriptions (address and keys), which the API never returns.
+- **Short.** A push carries the title, a line or two of text (at most 200
+  characters) and the page to open; never a whole message, file contents or a secret.
+- **Only real push services.** A subscription address must be `https://` on the
+  standard port and not a private or local host, and every connection is checked again
+  when it is made, like the addresses agents visit (so DNS tricks can't send it into
+  your network). Redirects are not followed. Turning push on asks for your password
+  like the other notification settings, and a device the push service reports as gone
+  is removed by itself.
+- **The approval buttons.** When an automation waits for a plain yes or no, its push
+  notification has *Allow once* and *Deny*. Each button carries a random 256-bit token,
+  sent only inside the encrypted notification; the server keeps only its SHA-256. The
+  button needs no login (the phone may have none open), and this is what it can do:
+  - answer that one approval, only *once* (never "for this run"), and only while it is
+    still waiting, at most for the approval's own 24 hours;
+  - work one time: using any button removes every button for that approval, on every
+    device. A used, expired or unknown token gets the same answer, and wrong tokens are
+    limited to 30 a minute per IP;
+  - nothing else: no data is returned, and plans, questions and several waiting
+    requests at once get no buttons (the notification opens the app).
+  Answers given this way are in the security log, marked as coming from a push
+  notification. Anyone who can see your unlocked phone's notifications can press the
+  buttons, as they could open the app there.
 
 ## Permission levels
 
@@ -132,7 +164,8 @@ key, token or base URL, none of Anemo's secrets).
 
 ## Secrets
 
-API keys, webhook addresses and MCP credentials are encrypted in the database with
+API keys, webhook addresses, push subscriptions and keys, and MCP credentials are
+encrypted in the database with
 `APP_SECRET_KEY`. The API never returns them (you see the last four characters),
 they are not written to logs or run records, and they are never given to a model
 or a tool. The test suite checks this by saving a key, running an agent and then

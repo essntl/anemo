@@ -457,18 +457,22 @@ async def on_needs_approval(
         return
     pending = list(
         await db.scalars(
-            select(Approval.summary).where(Approval.run_id == run.id, Approval.status == "pending")
+            select(Approval).where(Approval.run_id == run.id, Approval.status == "pending")
         )
     )
+    # Push notifications can answer it right there, but only a single plain yes/no:
+    # a plan to review, a question or several requests at once open the app.
+    single = pending[0] if len(pending) == 1 and pending[0].kind == "action" else None
     automation.last_status = "waiting"
     await db.commit()
     await notifications.create(
         db,
         title=f"{automation.name} needs your approval",
-        body="\n".join(pending) or "An action is waiting for your approval.",
+        body="\n".join(a.summary for a in pending) or "An action is waiting for your approval.",
         kind="approval",
         level="warning",
         link=f"/c/{run.conversation_id}" if run.conversation_id else None,
         destination_ids=_destinations(automation),
+        approval_id=single.id if single else None,
     )
     await notify_changed()

@@ -155,7 +155,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
             <label className="flex items-center gap-2 rounded-control px-2 py-1.5 text-[13px] hover:bg-surface-hover">
               <input type="radio" name="destinations" className="accent-[var(--accent)]" checked={destinationIds === null}
                 onChange={() => setDestinationIds(null)} />
-              The channels set to receive automation results
+              The channels and devices set to receive automation results
             </label>
             <label className="flex items-center gap-2 rounded-control px-2 py-1.5 text-[13px] hover:bg-surface-hover">
               <input type="radio" name="destinations" className="accent-[var(--accent)]" checked={destinationIds !== null}
@@ -169,6 +169,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
                     <input type="checkbox" className="accent-[var(--accent)]" checked={destinationIds.includes(c.id)}
                       onChange={(e) => setDestinationIds(e.target.checked ? [...destinationIds, c.id] : destinationIds.filter((id) => id !== c.id))} />
                     {c.name}
+                    {c.type === 'webpush' && <span className="text-subtle">· push</span>}
                     {!c.enabled && <span className="text-subtle">(off)</span>}
                   </label>
                 ))}
@@ -178,7 +179,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
         )}
         {notify !== 'never' && destinations.isSuccess && channels.length === 0 && (
           <p className="mt-3 text-[12.5px] text-muted">
-            Notifications appear in the app. To also get them on your phone, add a Discord channel in{' '}
+            Notifications appear in the app. To also get them on your phone, turn on push notifications or add a Discord channel in{' '}
             <Link to="/settings/notifications" className="text-accent underline">Settings</Link>.
           </p>
         )}

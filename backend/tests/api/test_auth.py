@@ -10,6 +10,9 @@ PUBLIC_PATHS = {
     "/api/auth/login",
     # Viewing a share link: a frozen copy, found by a secret token (tests/api/test_shares.py).
     "/api/public/shares/{token}",
+    # The one-time approval buttons on push notifications: authenticated by their own
+    # single-use token (tests/api/test_push.py).
+    "/api/public/push/actions",
 }
 
 

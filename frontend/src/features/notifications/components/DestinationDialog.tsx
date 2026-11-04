@@ -1,4 +1,5 @@
-/** Add or edit a place notifications are sent to (a Discord channel's webhook). */
+/** Add or edit a place notifications are sent to: a Discord channel's webhook, or (edit
+ *  only) a device with push notifications on. */
 import { useState } from 'react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
@@ -17,6 +18,7 @@ export function DestinationDialog({ destination, onClose }: { destination: Desti
     // Focus timer notices are opt-in: they are mostly useful while you are at the screen.
     kinds: (destination?.kinds as NotificationKind[] | undefined) ?? KINDS.filter((k) => k !== 'focus'),
   })
+  const push = destination?.type === 'webpush'
   const valid = form.name.trim() !== '' && (destination !== null || form.url.trim() !== '')
   const toggle = (kind: NotificationKind, on: boolean) =>
     setForm({ ...form, kinds: on ? [...form.kinds, kind] : form.kinds.filter((k) => k !== kind) })
@@ -24,7 +26,9 @@ export function DestinationDialog({ destination, onClose }: { destination: Desti
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(94vw,520px)]"
       title={destination ? `Edit “${destination.name}”` : 'Add a Discord channel'}
-      description="In Discord: channel settings › Integrations › Webhooks › New Webhook › Copy Webhook URL."
+      description={push
+        ? 'A browser or phone with push notifications on.'
+        : 'In Discord: channel settings › Integrations › Webhooks › New Webhook › Copy Webhook URL.'}
       footer={
         <>
           {save.isError && <span className="mr-auto self-center text-[12.5px] text-error">{errorMessage(save.error)}</span>}
@@ -40,14 +44,14 @@ export function DestinationDialog({ destination, onClose }: { destination: Desti
           <Input value={form.name} maxLength={100} placeholder="e.g. My Discord" autoFocus={!destination}
             onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
-        <Field label="Webhook URL"
+        {!push && <Field label="Webhook URL"
           hint={destination
             ? `Saved (ends in ${destination.url_hint?.replace(/•/g, '') ?? '…'}). Leave empty to keep it.`
             : 'Stored encrypted and never shown again. Anyone with this URL can post to the channel.'}>
           <Input type="password" autoComplete="off" value={form.url}
             placeholder={destination ? 'Paste a new URL to replace it' : 'https://discord.com/api/webhooks/…'}
             onChange={(e) => setForm({ ...form, url: e.target.value })} />
-        </Field>
+        </Field>}
         <fieldset>
           <legend className="mb-1.5 text-[13px] font-medium">Send here</legend>
           <div className="flex flex-col gap-0.5">
@@ -59,7 +63,7 @@ export function DestinationDialog({ destination, onClose }: { destination: Desti
               </label>
             ))}
           </div>
-          <p className="mt-1 text-[12px] text-muted">An automation can also be set to send its results to specific channels.</p>
+          <p className="mt-1 text-[12px] text-muted">An automation can also be set to send its results to specific channels and devices.</p>
         </fieldset>
       </div>
     </Dialog>

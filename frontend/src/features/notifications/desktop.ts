@@ -2,8 +2,9 @@
  * Desktop notifications from the browser, shown while this tab is in the
  * background. They are a per-device choice (kept in this browser, not on the
  * server) and need the browser's permission. They only work while a tab with
- * the app is open; for anything else, use a Discord destination.
+ * the app is open; for anything else, use push notifications or a Discord channel.
  */
+import { pushOnHere } from './push'
 
 const STORAGE_KEY = 'anemo.desktopNotifications'
 
@@ -48,6 +49,7 @@ export function showDesktopNotification(
   onClick: () => void,
 ): boolean {
   if (!desktopEnabled() || !document.hidden) return false
+  if (pushOnHere()) return false // this browser shows it as a push notification already
   try {
     // `tag` makes several open tabs show it once instead of once per tab.
     const popup = new Notification(note.title, { body: note.body, tag: note.id })
