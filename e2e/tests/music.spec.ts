@@ -12,7 +12,9 @@ signOutAfterEach()
 test('add a track, play it, and save the queue as a playlist', async ({ page, baseURL }) => {
   await login(page)
   await page.goto('/music')
-  const link = `${baseURL}/sounds/timer.mp3`
+  // Its own link (the query makes it a separate library track), so the Island test,
+  // which adds and removes the plain timer.mp3 at the same time, can't remove this one.
+  const link = `${baseURL}/sounds/timer.mp3?e2e=music`
   const name = `E2E playlist ${Date.now()}`
   let playlistId: string | undefined
   try {

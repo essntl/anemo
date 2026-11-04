@@ -54,11 +54,13 @@ test('the timer keeps going across pages and a reload', async ({ page }) => {
   await login(page)
   await page.goto('/focus')
   await page.getByRole('button', { name: 'Start timer' }).click()
-  await page.clock.fastForward(60_000)
+  // 90 s, not 60: the time left is rounded up to the second, so a fast run would
+  // still show the full minute (24:00) after exactly 60 s.
+  await page.clock.fastForward(90_000)
   await page.goto('/tasks')
   await page.reload()
   await page.goto('/focus')
-  // Still running, about a minute in (the clock is worked out, not counted).
+  // Still running, a minute and a half in (the clock is worked out, not counted).
   await expect(page.getByRole('button', { name: 'Pause timer' })).toBeVisible()
   const focus = (await (await page.request.get('/api/settings')).json()).focus as { focus_minutes: number }
   const shown = await page.locator('.sr-only', { hasText: /^\d+:\d\d$/ }).first().textContent()
