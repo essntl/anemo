@@ -84,3 +84,16 @@ def test_classify():
     assert classify("song.mp3", "audio/mpeg", b"ID3\x04\x00\x00\x00\x00\x00\xff\xfe") == "file"
     with pytest.raises(UnsupportedFile):
         classify("fake.png", "image/png", b"PK\x03\x04" + b"\x00" * 20)
+
+
+def test_office_mime_types_do_not_depend_on_the_system(monkeypatch):
+    import mimetypes
+
+    from app.features.attachments.service import _mime_for
+
+    # As in a slim image without /etc/mime.types.
+    monkeypatch.setattr(mimetypes, "guess_type", lambda *_a, **_k: (None, None))
+    data = xlsx({"S": [[1]]})
+    assert _mime_for("spreadsheet", "q.xlsx", "", data).endswith("spreadsheetml.sheet")
+    assert _mime_for("document", "d.docx", "", b"").endswith("wordprocessingml.document")
+    assert _mime_for("presentation", "p.pptx", "", b"").endswith("presentationml.presentation")

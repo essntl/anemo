@@ -64,6 +64,16 @@ MIME_BY_KIND = {
     "pdf": "application/pdf",
     "archive": "application/zip",
 }
+# Office types by extension. Python's own table has none of them, and slim images
+# have no /etc/mime.types to fill the gap.
+OFFICE_MIME = {
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".docm": "application/vnd.ms-word.document.macroEnabled.12",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".pptm": "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+}
 
 
 class UnsupportedFile(AppError):
@@ -136,7 +146,8 @@ def _mime_for(kind: str, filename: str, declared: str, data: bytes) -> str:
         return _image_mime(data[:16])
     if kind in MIME_BY_KIND:
         return MIME_BY_KIND[kind]
-    guessed = mimetypes.guess_type(filename)[0]
+    suffix = Path(filename.lower()).suffix
+    guessed = OFFICE_MIME.get(suffix) or mimetypes.guess_type(filename)[0]
     if kind == "text":
         return declared if declared.startswith("text/") else (guessed or "text/plain")
     return guessed or declared or "application/octet-stream"
