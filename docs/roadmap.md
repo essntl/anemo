@@ -1,15 +1,33 @@
 # Roadmap
 
-Features agreed on but not built yet, in the order they are planned. Each one says
-what it does for you and roughly how it fits into what Anemo already has.
+Features agreed on but not built yet. Each one says what it does for you and roughly
+how it fits into what Anemo already has; [Build order](#build-order) says in which
+order they are built.
 
-| # | Feature | Size |
+| # | Feature | Size | Wave |
+| --- | --- | --- | --- |
+| 1 | [Shortcut sheet](#1-shortcut-sheet) | small | 2 |
+| 2 | [Daily note widget](#2-daily-note-widget) | small–medium | 2 |
+| 3 | [Subtasks, checklists and *blocked by* links](#3-subtasks-checklists-and-blocked-by-links) | medium | 1 |
+| 4 | [Real push notifications](#4-real-push-notifications) | medium | 1 |
+| 5 | [First-run setup and update notice](#5-first-run-setup-and-update-notice) | medium | 3 |
+| 6 | [Diagrams, charts and math](#6-diagrams-charts-and-math) | medium | 2 |
+
+## Build order
+
+One feature per branch and pull request, each started from the latest `main`. The
+features in a wave don't depend on each other and can be built at the same time; a
+wave starts once everything before it is merged.
+
+| Wave | Features | Why this order |
 | --- | --- | --- |
-| 1 | [Shortcut sheet](#1-shortcut-sheet) | small |
-| 2 | [Daily note widget](#2-daily-note-widget) | small–medium |
-| 3 | [Subtasks, checklists and *blocked by* links](#3-subtasks-checklists-and-blocked-by-links) | medium |
-| 4 | [Real push notifications](#4-real-push-notifications) | medium |
-| 5 | [First-run setup and update notice](#5-first-run-setup-and-update-notice) | medium |
+| 1 | **3** Subtasks, checklists and *blocked by* · **4** Push notifications | The two largest backend changes, in separate parts of the code. Each adds a migration: whichever merges second rebases onto the first and points its migration at it. |
+| 2 | **1** Shortcut sheet · **2** Daily note widget · **6** Diagrams, charts and math | Mostly frontend and small. The shortcut sheet changes the shared hotkey code, so nothing else in this wave adds shortcuts; the daily note doesn't touch the document editor that diagrams change. |
+| 3 | **5** First-run setup and update notice | Last, because it uses the others: its notifications step turns on push (4), and it can point to the shortcut sheet (1) and the Home widgets (2). |
+
+Every pull request: backend and frontend tests, an end-to-end test with the fake
+provider, `make test`, `make lint` and `make gen-api` passing, the README section for
+the feature written or updated, and the feature marked done here.
 
 ---
 
@@ -134,3 +152,50 @@ have updated.
 - Anemo never updates itself. The check is the only call it makes for this, sends
   nothing about you, and can be switched off in Settings → Advanced (or with an `.env`
   setting).
+
+## 6. Diagrams, charts and math
+
+Answers, documents and automation results can show **diagrams, charts and formulas**
+instead of their source code. Today a diagram the model writes appears as a plain code
+block.
+
+They are ordinary fenced code blocks in Markdown, so files stay plain Markdown, other
+Markdown tools still read them, and agents need no new tool to make them:
+
+- **```` ```mermaid ````**: flowcharts, mind maps, sequence diagrams, timelines, Gantt
+  charts, state diagrams and pie charts ([Mermaid](https://mermaid.js.org/)).
+- **```` ```chart ````**: line, bar, area and pie charts from a small JSON description
+  (`type`, the x values, one or more named series). Drawn by Anemo itself, so charts
+  use the app's colors, work in light and dark mode, and show values on hover.
+- **Math**: `$…$` inline and `$$…$$` as a block (KaTeX).
+
+**How it behaves**
+
+- The same rendering everywhere: chat, documents, share links, automation results and
+  run pages.
+- While an answer is still being written the block shows its code; it is drawn once
+  the block is complete, so nothing flickers or errors halfway.
+- Each diagram or chart has: *Source / Diagram* toggle, copy, download as SVG or PNG,
+  and full screen with zoom and pan (for big mind maps).
+- If the code can't be drawn, the source is shown with the error and a **Fix diagram**
+  button that asks the model to correct it.
+- In the document editor a diagram is shown drawn, with an edit button that opens its
+  source; the Markdown source view shows the code as usual.
+- Mermaid is only downloaded when a page actually contains a diagram, so pages
+  without one stay as fast as now.
+
+**Getting the model to use it**
+
+- The system prompt (Chat and Agent mode) says these blocks are available and when they
+  help, briefly.
+- A built-in **`/diagram`** skill: "show this as a mind map / flowchart / timeline /
+  chart". Like the other built-in skills it can be edited or switched off in
+  **Settings → Skills**.
+- Agents can turn data into charts directly, for example read a CSV with a shell
+  command and answer with a `chart` block.
+
+**Safety**
+
+Diagrams can be written from untrusted content (a web page the agent read), so Mermaid
+runs in its strict mode: no HTML or scripts in labels, no links that run code, and
+nothing loaded from other sites. Charts are drawn from data only.
