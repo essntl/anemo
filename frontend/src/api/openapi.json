@@ -8209,6 +8209,23 @@
             }
           },
           {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
             "name": "aiw_session",
             "in": "cookie",
             "required": false,
@@ -13968,6 +13985,33 @@
         ],
         "title": "Check"
       },
+      "ChecklistItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Id",
+            "default": ""
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ChecklistItem",
+        "description": "One step inside a task. A new item may leave out its id; it is given one."
+      },
       "ClaudeRunnerStatus": {
         "properties": {
           "state": {
@@ -18974,6 +19018,21 @@
             "type": "array",
             "maxItems": 500,
             "title": "Ordered Ids"
+          },
+          "subtasks": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "finish",
+                  "keep"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtasks"
           }
         },
         "type": "object",
@@ -20511,6 +20570,24 @@
         ],
         "title": "ShareOut"
       },
+      "SharedChecklistItem": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "SharedChecklistItem"
+      },
       "SharedDocument": {
         "properties": {
           "title": {
@@ -20781,6 +20858,31 @@
               }
             ],
             "title": "Due Date"
+          },
+          "checklist": {
+            "items": {
+              "$ref": "#/components/schemas/SharedChecklistItem"
+            },
+            "type": "array",
+            "title": "Checklist"
+          },
+          "subtask_of": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtask Of"
+          },
+          "blocked_by": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Blocked By"
           }
         },
         "type": "object",
@@ -21390,6 +21492,37 @@
               }
             ],
             "title": "Project Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Makes it a subtask of this task"
+          },
+          "checklist": {
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItem"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Checklist"
+          },
+          "blocked_by": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Blocked By",
+            "description": "Tasks this one waits on"
           }
         },
         "type": "object",
@@ -21506,6 +21639,34 @@
             ],
             "title": "Project Id"
           },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "checklist": {
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItem"
+            },
+            "type": "array",
+            "title": "Checklist"
+          },
+          "blocked_by": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Blocked By",
+            "description": "The tasks this one waits on (open or not)"
+          },
           "sort_order": {
             "type": "integer",
             "title": "Sort Order"
@@ -21539,6 +21700,9 @@
           "completed_at",
           "tags",
           "project_id",
+          "parent_id",
+          "checklist",
+          "blocked_by",
           "sort_order",
           "created_by",
           "created_at",
@@ -21680,6 +21844,65 @@
               }
             ],
             "title": "Project Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "checklist": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChecklistItem"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checklist"
+          },
+          "blocked_by": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked By"
+          },
+          "subtasks": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "finish",
+                  "keep"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtasks",
+            "description": "Finishing a task with open subtasks: also finish them, or keep them open. Without it, finishing such a task is refused (409 open_subtasks)."
           }
         },
         "type": "object",

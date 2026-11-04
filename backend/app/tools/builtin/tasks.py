@@ -2,6 +2,8 @@
 
 Looking is always allowed; changes need the "Manage tasks" permission
 (tasks.write). Deleting counts as dangerous, so the default level asks first.
+Tasks can have a checklist, subtasks (one level deep) and tasks they wait on
+("blocked by").
 """
 
 import uuid
@@ -17,7 +19,16 @@ from app.features.links import service as links
 from app.features.projects import service as projects
 from app.features.tasks import service
 from app.features.tasks.models import Project, Task
-from app.features.tasks.schemas import TaskStatus, clean_rrule, clean_tags
+from app.features.tasks.schemas import (
+    MAX_BLOCKERS,
+    MAX_CHECKLIST,
+    OPEN_STATUSES,
+    ChecklistItem,
+    SubtasksChoice,
+    TaskStatus,
+    clean_rrule,
+    clean_tags,
+)
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.workspace import path_action
@@ -29,7 +40,8 @@ NOTES = (
 )
 
 
-def task_line(task: Task, projects: dict[uuid.UUID, str]) -> str:
+def task_line(task: Task, projects: dict[uuid.UUID, str], waits_on: int = 0) -> str:
+    """One line per task. `waits_on`: how many open tasks it is blocked by."""
     facts = [task.status.replace("_", " ")]
     if task.priority:
         facts.append(f"{PRIORITY[task.priority]} priority")
@@ -42,7 +54,41 @@ def task_line(task: Task, projects: dict[uuid.UUID, str]) -> str:
         facts.append(f"repeats {task.rrule}")
     if task.tags:
         facts.append("tags " + ", ".join(task.tags))
+    if task.parent_id:
+        facts.append(f"subtask of [{task.parent_id}]")
+    if task.checklist:
+        ticked = sum(1 for i in task.checklist if i.get("done"))
+        facts.append(f"checklist {ticked}/{len(task.checklist)}")
+    if waits_on:
+        facts.append(f"waits on {waits_on} open task{'s' if waits_on != 1 else ''}")
     return f"[{task.id}] {task.title} ({'; '.join(facts)})"
+
+
+async def _waits_on(db: Any, tasks: list[Task]) -> dict[uuid.UUID, int]:
+    """For each task, how many of the tasks it waits on are still open."""
+    blocked_by = await service.blocked_by_map(db, [t.id for t in tasks])
+    blocker_ids = {b for ids in blocked_by.values() for b in ids}
+    open_ids = (
+        set(
+            await db.scalars(
+                select(Task.id).where(Task.id.in_(blocker_ids), Task.status.in_(OPEN_STATUSES))
+            )
+        )
+        if blocker_ids
+        else set()
+    )
+    return {tid: sum(1 for b in ids if b in open_ids) for tid, ids in blocked_by.items()}
+
+
+def _ids(values: list[str]) -> list[uuid.UUID] | str:
+    """Task ids as given by the model, or the first one that isn't an id."""
+    found: list[uuid.UUID] = []
+    for value in values:
+        task_id = _id(value)
+        if task_id is None:
+            return value
+        found.append(task_id)
+    return found
 
 
 async def _projects(db: Any) -> dict[uuid.UUID, str]:
@@ -69,11 +115,15 @@ class ListTasksInput(BaseModel):
     project: str | None = Field(None, description="Project name")
     query: str | None = Field(None, max_length=200, description="Words in the title or notes")
     due_before: date | None = Field(None, description="Only tasks due on or before this day")
+    parent_id: str | None = Field(None, description="Only the subtasks of this task")
 
 
 class ListTasks(Tool):
     name = "list_tasks"
-    description = "List the user's tasks with their ids, status, due dates and projects."
+    description = (
+        "List the user's tasks with their ids, status, due dates and projects, and whether "
+        "they are subtasks, have a checklist or wait on other tasks. get_task shows one in full."
+    )
     capability = "tasks.read"
     Input = ListTasksInput
 
@@ -91,18 +141,74 @@ class ListTasks(Tool):
             if args.project and project_id is None:
                 names = ", ".join(sorted(projects.values())) or "none"
                 return ToolResult(content=f"No project '{args.project}'. Projects: {names}.")
+            parent_id = _id(args.parent_id) if args.parent_id else None
+            if args.parent_id and parent_id is None:
+                return ToolResult(content=f"No task with id {args.parent_id}.", is_error=True)
             tasks = await service.list_tasks(
                 db,
                 status=args.status or "open",
                 project_id=project_id,
                 q=args.query,
                 due_to=args.due_before,
+                parent_id=parent_id,
                 limit=200,
             )
+            waits = await _waits_on(db, tasks)
         if not tasks:
             return ToolResult(content="No tasks match.")
         tasks.sort(key=lambda t: (t.due_date is None, t.due_date or date.max, -t.priority))
-        return ToolResult(content="\n".join(task_line(t, projects) for t in tasks))
+        return ToolResult(
+            content="\n".join(task_line(t, projects, waits.get(t.id, 0)) for t in tasks)
+        )
+
+
+class GetTaskInput(BaseModel):
+    id: str = Field(description="The task's id (from list_tasks)")
+
+
+class GetTask(Tool):
+    name = "get_task"
+    description = (
+        "One task in full: its notes, checklist (with item ids), subtasks, the tasks it "
+        "waits on (blocked by) and the tasks that wait on it."
+    )
+    capability = "tasks.read"
+    Input = GetTaskInput
+
+    async def run(self, args: GetTaskInput, ctx: ToolContext) -> ToolResult:
+        task_id = _id(args.id)
+        async with get_sessionmaker()() as db:
+            task = await db.get(Task, task_id) if task_id else None
+            if task is None:
+                return ToolResult(content=f"No task with id {args.id}.", is_error=True)
+            projects = await _projects(db)
+            blockers = await service.blockers(db, task.id)
+            waiting = await service.dependents(db, task.id)
+            subtasks = await service.subtasks(db, task.id)
+            parent = await db.get(Task, task.parent_id) if task.parent_id else None
+            waits = sum(1 for b in blockers if b.status in OPEN_STATUSES)
+            lines = [task_line(task, projects, waits)]
+            if parent is not None:
+                lines.append(f"Subtask of: {task_line(parent, projects)}")
+            lines.append("Notes:\n" + (task.description.strip() or "(none)"))
+            if task.checklist:
+                lines.append(
+                    "Checklist:\n"
+                    + "\n".join(
+                        f"- [{'x' if i.get('done') else ' '}] {i.get('text')} (id {i.get('id')})"
+                        for i in task.checklist
+                    )
+                )
+            for title, group in (
+                ("Subtasks", subtasks),
+                ("Waits on (blocked by)", blockers),
+                ("Blocks (waiting on this one)", waiting),
+            ):
+                if group:
+                    lines.append(
+                        f"{title}:\n" + "\n".join("- " + task_line(t, projects) for t in group)
+                    )
+        return ToolResult(content="\n\n".join(lines))
 
 
 REPEAT = (
@@ -123,6 +229,19 @@ class CreateTaskInput(BaseModel):
         None, ge=0, le=40_320, description="Remind this long before it is due"
     )
     rrule: str | None = Field(None, max_length=500, description=REPEAT)
+    parent_id: str | None = Field(
+        None,
+        description="Make it a subtask of this task (one level deep: not of a subtask). "
+        "Without a project it gets the parent's project.",
+    )
+    checklist: list[str] = Field(
+        default_factory=list, max_length=MAX_CHECKLIST, description="Checklist items (steps)"
+    )
+    blocked_by: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_BLOCKERS,
+        description="Ids of tasks this one waits on; while any is open it is blocked",
+    )
 
     @field_validator("rrule")
     @classmethod
@@ -143,14 +262,37 @@ class CreateTask(Tool):
     async def run(self, args: CreateTaskInput, ctx: ToolContext) -> ToolResult:
         async with get_sessionmaker()() as db:
             try:
-                fields = args.model_dump(exclude={"project", "tags"})
+                fields = args.model_dump(
+                    exclude={"project", "tags", "parent_id", "checklist", "blocked_by"}
+                )
                 fields["tags"] = clean_tags(args.tags)
-                # Without a named project: the project of the chat this run belongs to.
-                fields["project_id"] = await _project_id(db, args.project) or ctx.project_id
+                parent = None
+                if args.parent_id:
+                    parent_id = _id(args.parent_id)
+                    parent = await db.get(Task, parent_id) if parent_id else None
+                    if parent is None:
+                        return ToolResult(
+                            content=f"No task with id {args.parent_id}.", is_error=True
+                        )
+                    fields["parent_id"] = parent.id
+                # Without a named project: the parent's, or the project of the chat this
+                # run belongs to.
+                fields["project_id"] = (
+                    await _project_id(db, args.project)
+                    or (parent.project_id if parent else None)
+                    or ctx.project_id
+                )
+                fields["checklist"] = [{"text": t} for t in args.checklist if t.strip()]
+                blocked_by = _ids(args.blocked_by)
+                if isinstance(blocked_by, str):
+                    return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
+                fields["blocked_by"] = blocked_by
                 task = await service.create_task(db, fields, created_by="agent", run_id=ctx.run_id)
-            except AppError as exc:
-                return ToolResult(content=exc.message, is_error=True)
-            line = task_line(task, await _projects(db))
+            except (AppError, ValueError) as exc:
+                return ToolResult(content=getattr(exc, "message", str(exc)), is_error=True)
+            line = task_line(
+                task, await _projects(db), (await _waits_on(db, [task])).get(task.id, 0)
+            )
         return ToolResult(
             content=f"Added: {line}", data={"task": {"id": str(task.id), "title": task.title}}
         )
@@ -169,6 +311,24 @@ class UpdateTaskInput(BaseModel):
     tags: list[str] | None = Field(None, max_length=20)
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
     rrule: str | None = Field(None, max_length=500, description=REPEAT + " Empty: stop repeating.")
+    parent_id: str | None = Field(None, description="Make it a subtask of this task")
+    clear_parent: bool = Field(False, description="Make a subtask an ordinary task again")
+    checklist: list[ChecklistItem] | None = Field(
+        None,
+        max_length=MAX_CHECKLIST,
+        description="The whole checklist, replacing the old one. Keep the ids of items that "
+        "stay (from get_task); new items need no id. [] removes it.",
+    )
+    blocked_by: list[str] | None = Field(
+        None,
+        max_length=MAX_BLOCKERS,
+        description="Ids of the tasks it waits on, replacing the old list. [] removes them.",
+    )
+    subtasks: SubtasksChoice | None = Field(
+        None,
+        description="Completing a task that has open subtasks: 'finish' them too or 'keep' "
+        "them open. Ask the user if unsure.",
+    )
 
     @field_validator("rrule")
     @classmethod
@@ -194,7 +354,16 @@ class UpdateTask(Tool):
             if task is None:
                 return ToolResult(content=f"No task with id {args.id}.", is_error=True)
             changes = args.model_dump(
-                exclude_unset=True, exclude={"id", "project", "clear_due", "tags"}
+                exclude_unset=True,
+                exclude={
+                    "id",
+                    "project",
+                    "clear_due",
+                    "tags",
+                    "parent_id",
+                    "clear_parent",
+                    "blocked_by",
+                },
             )
             changes = {k: v for k, v in changes.items() if v is not None}
             if changes.get("rrule") == "":
@@ -205,12 +374,31 @@ class UpdateTask(Tool):
                 changes["project_id"] = await _project_id(db, args.project)
             if args.clear_due:
                 changes["due_date"] = None
+            if args.clear_parent:
+                changes["parent_id"] = None
+            elif args.parent_id:
+                parent_id = _id(args.parent_id)
+                if parent_id is None:
+                    return ToolResult(content=f"No task with id {args.parent_id}.", is_error=True)
+                changes["parent_id"] = parent_id
+            if args.blocked_by is not None:
+                blocked_by = _ids(args.blocked_by)
+                if isinstance(blocked_by, str):
+                    return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
+                changes["blocked_by"] = blocked_by
             repeats = task.rrule is not None and task.status != "done"
             try:
                 task = await service.update_task(db, task, changes)
             except AppError as exc:
-                return ToolResult(content=exc.message, is_error=True)
-            line = task_line(task, await _projects(db))
+                hint = (
+                    " Call update_task again with subtasks='finish' or 'keep'."
+                    if exc.code == "open_subtasks"
+                    else ""
+                )
+                return ToolResult(content=exc.message + hint, is_error=True)
+            line = task_line(
+                task, await _projects(db), (await _waits_on(db, [task])).get(task.id, 0)
+            )
             if repeats and task.status == "done":
                 line += " It repeats, so the next one was added."
         return ToolResult(
@@ -224,7 +412,10 @@ class DeleteTaskInput(BaseModel):
 
 class DeleteTask(Tool):
     name = "delete_task"
-    description = "Delete a task for good. To finish a task use update_task with status 'done'."
+    description = (
+        "Delete a task for good. To finish a task use update_task with status 'done'. "
+        "Its subtasks stay, as ordinary tasks."
+    )
     capability = "tasks.write"
     Input = DeleteTaskInput
     idempotent = False
@@ -306,6 +497,7 @@ class AttachFileToTask(Tool):
 
 TASK_TOOLS: list[Tool] = [
     ListTasks(),
+    GetTask(),
     CreateTask(),
     UpdateTask(),
     DeleteTask(),

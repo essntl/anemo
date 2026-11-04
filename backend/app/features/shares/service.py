@@ -28,6 +28,7 @@ from app.features.projects import service as projects
 from app.features.shares.models import ShareLink
 from app.features.shares.schemas import (
     Section,
+    SharedChecklistItem,
     SharedDocument,
     SharedEvent,
     SharedMessage,
@@ -38,6 +39,7 @@ from app.features.shares.schemas import (
     ShareOut,
     Snapshot,
 )
+from app.features.tasks import service as task_service
 from app.features.tasks.models import Task
 from app.features.tasks.schemas import OPEN_STATUSES
 
@@ -165,12 +167,19 @@ async def _project(
     document_at = {document_id: n for n, document_id in enumerate(document_ids)}
 
     if "tasks" in sections:
+        waits_on = await task_service.blocked_by_map(db, [t.id for t in tasks])
         shared.tasks = [
             SharedTask(
                 title=t.title,
                 description=relink(t.description, document_at, task_at),
                 status=t.status,
                 due_date=t.due_date,
+                checklist=[
+                    SharedChecklistItem(text=str(i.get("text", "")), done=bool(i.get("done")))
+                    for i in t.checklist
+                ],
+                subtask_of=task_at.get(t.parent_id) if t.parent_id else None,
+                blocked_by=[task_at[b] for b in waits_on.get(t.id, []) if b in task_at],
             )
             for t in tasks
         ]

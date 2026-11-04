@@ -26,6 +26,7 @@ from app.features.calendar.models import CalendarEvent
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.documents.models import Document
 from app.features.memory.models import Memory
+from app.features.tasks import service as tasks
 from app.features.tasks.models import Task
 from app.knowledge import index
 from app.workspace import files
@@ -206,10 +207,27 @@ async def _memories(db: AsyncSession, q: Query) -> list[SearchHit]:
     return hits[: q.limit]
 
 
+def _task_snippet(task: Task, words: list[str]) -> str:
+    """The notes around the words, or the checklist items when only they have them."""
+    items = "; ".join(str(i.get("text", "")) for i in task.checklist)
+    in_notes = any(w in plain(task.description).lower() for w in words)
+    if items and not in_notes and any(w in items.lower() for w in words):
+        return snippet(items, words)
+    return snippet(task.description, words) or task.status.replace("_", " ").capitalize()
+
+
 async def _tasks(db: AsyncSession, q: Query) -> list[SearchHit]:
     stmt = (
         select(Task)
-        .where(contains_all(q.words, Task.title, Task.description, cast(Task.tags, Text)))
+        .where(
+            contains_all(
+                q.words,
+                Task.title,
+                Task.description,
+                cast(Task.tags, Text),
+                tasks.checklist_text(),
+            )
+        )
         # Open tasks first, then the most recently changed.
         .order_by(Task.completed_at.is_not(None), Task.updated_at.desc())
         .limit(q.limit)
@@ -219,7 +237,7 @@ async def _tasks(db: AsyncSession, q: Query) -> list[SearchHit]:
             kind="task",
             id=str(t.id),
             title=t.title,
-            snippet=snippet(t.description, q.words) or t.status.replace("_", " ").capitalize(),
+            snippet=_task_snippet(t, q.words),
             url=f"/tasks?task={t.id}",
             when=t.updated_at,
         )

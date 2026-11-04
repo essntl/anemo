@@ -7,7 +7,9 @@
  */
 import { type ReactNode, useEffect, useRef } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, CalendarDays, CheckCircle2, ChevronRight, Circle, FileText, Link2Off, MessageSquare, Paperclip } from 'lucide-react'
+import {
+  ArrowLeft, CalendarDays, CheckCircle2, CheckSquare, ChevronRight, Circle, FileText, Link2Off, MessageSquare, Paperclip, Square,
+} from 'lucide-react'
 import { ApiError } from '@/api/client'
 import { Logo } from '@/components/ui/Logo'
 import { Markdown } from '@/components/ui/Markdown'
@@ -86,7 +88,7 @@ function Section({ title, empty, children }: { title: string; empty: string; chi
 const ROW = 'flex items-center gap-3 px-3.5 py-2.5 text-[14px] [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-muted'
 
 /** One line of a list. With `to` it is a link that opens that entry on this page. */
-function Row({ icon, children, aside, to }: { icon: ReactNode; children: ReactNode; aside?: ReactNode; to?: string }) {
+function Row({ icon, children, aside, to, className }: { icon: ReactNode; children: ReactNode; aside?: ReactNode; to?: string; className?: string }) {
   const body = (
     <>
       {icon}
@@ -94,10 +96,10 @@ function Row({ icon, children, aside, to }: { icon: ReactNode; children: ReactNo
       {aside && <span className="shrink-0 text-[12.5px] text-muted">{aside}</span>}
     </>
   )
-  if (!to) return <li className={ROW}>{body}</li>
+  if (!to) return <li className={cn(ROW, className)}>{body}</li>
   return (
     <li>
-      <Link to={to} className={cn(ROW, 'hover:bg-surface-hover pointer-coarse:py-3')}>
+      <Link to={to} className={cn(ROW, 'hover:bg-surface-hover pointer-coarse:py-3', className)}>
         {body}
         <ChevronRight className="text-subtle" />
       </Link>
@@ -105,16 +107,63 @@ function Row({ icon, children, aside, to }: { icon: ReactNode; children: ReactNo
   )
 }
 
-const taskState = (task: SharedTask) =>
-  [STATUS[task.status] ?? task.status, task.due_date ? `due ${day(task.due_date)}` : ''].filter(Boolean).join(' · ')
+const taskState = (task: SharedTask) => {
+  const checklist = task.checklist ?? []
+  return [
+    STATUS[task.status] ?? task.status,
+    task.due_date ? `due ${day(task.due_date)}` : '',
+    checklist.length ? `${checklist.filter((i) => i.done).length}/${checklist.length} checked` : '',
+  ].filter(Boolean).join(' · ')
+}
 
-/** A task in the list. One with notes opens on its own page, however long they are. */
-function TaskItem({ task, index }: { task: SharedTask; index: number }) {
+/** Whether a task has more than its title to show: notes, a checklist, subtasks or tasks it waits on. */
+const hasDetails = (tasks: SharedTask[], index: number) => {
+  const task = tasks[index]
+  return Boolean(task.description?.trim() || task.checklist?.length || task.blocked_by?.length
+    || tasks.some((t) => t.subtask_of === index))
+}
+
+/** A task in the list. One with more than a title opens on its own page, however long its notes are. */
+function TaskItem({ tasks, index, nested = false }: { tasks: SharedTask[]; index: number; nested?: boolean }) {
+  const task = tasks[index]
   const done = task.status === 'done'
   return (
-    <Row icon={done ? <CheckCircle2 /> : <Circle />} aside={taskState(task)} to={task.description?.trim() ? `?task=${index}` : undefined}>
+    <Row icon={done ? <CheckCircle2 /> : <Circle />} aside={taskState(task)} to={hasDetails(tasks, index) ? `?task=${index}` : undefined}
+      className={nested ? 'pl-9' : undefined}>
       <span className={done ? 'text-muted line-through' : undefined}>{task.title}</span>
     </Row>
+  )
+}
+
+/** A task on its own page: its notes, checklist, subtasks and what it waits on. */
+function TaskDetails({ tasks, index }: { tasks: SharedTask[]; index: number }) {
+  const task = tasks[index]
+  const subtasks = tasks.map((t, i) => [t, i] as const).filter(([t]) => t.subtask_of === index)
+  const waitsOn = (task.blocked_by ?? []).filter((i) => tasks[i])
+  return (
+    <div className="flex flex-col gap-7">
+      {task.description?.trim() && <Markdown text={task.description} />}
+      {(task.checklist ?? []).length > 0 && (
+        <ul aria-label="Checklist" className="flex flex-col gap-1.5 text-[14px]">
+          {(task.checklist ?? []).map((item, i) => (
+            <li key={i} className="flex items-start gap-2.5">
+              {item.done ? <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <Square className="mt-0.5 h-4 w-4 shrink-0 text-muted" />}
+              <span className={item.done ? 'text-muted line-through' : undefined}>{item.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {subtasks.length > 0 && (
+        <Section title="Subtasks" empty="">
+          {subtasks.map(([, i]) => <TaskItem key={i} tasks={tasks} index={i} />)}
+        </Section>
+      )}
+      {waitsOn.length > 0 && (
+        <Section title="Waits on" empty="">
+          {waitsOn.map((i) => <TaskItem key={i} tasks={tasks} index={i} />)}
+        </Section>
+      )}
+    </div>
   )
 }
 
@@ -128,7 +177,11 @@ function ProjectOverview({ project }: { project: SharedProject }) {
     <div className="flex flex-col gap-7">
       {project.tasks && (
         <Section title="Tasks" empty="No tasks.">
-          {project.tasks.map((t, i) => <TaskItem key={i} task={t} index={i} />)}
+          {/* Subtasks right under their task (those whose task is not in the copy, on their own). */}
+          {project.tasks.flatMap((t, i) => t.subtask_of != null ? [] : [
+            <TaskItem key={i} tasks={project.tasks!} index={i} />,
+            ...project.tasks!.flatMap((sub, j) => sub.subtask_of === i ? [<TaskItem key={j} tasks={project.tasks!} index={j} nested />] : []),
+          ])}
         </Section>
       )}
       {project.events && (
@@ -217,7 +270,7 @@ export function SharedPage() {
         {data.kind === 'document' && <Markdown text={documentBody(data.markdown ?? '', data.title)} />}
         {data.kind === 'project' && data.project && (
           document_ ? <Markdown text={documentBody(document_.markdown, document_.title)} />
-            : task ? <Markdown text={task.description ?? ''} />
+            : task ? <TaskDetails tasks={data.project.tasks ?? []} index={at('task')} />
             : <ProjectOverview project={data.project} />
         )}
       </div>

@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from datetime import date, datetime, time
 from typing import Literal
@@ -28,6 +29,41 @@ def clean_rrule(rule: str | None) -> str | None:
     return rule
 
 
+MAX_CHECKLIST = 100
+MAX_BLOCKERS = 50
+# What happens to a parent's open subtasks when it is finished.
+SubtasksChoice = Literal["finish", "keep"]
+
+
+class ChecklistItem(BaseModel):
+    """One step inside a task. A new item may leave out its id; it is given one."""
+
+    id: str = Field("", max_length=40)
+    text: str = Field(min_length=1, max_length=500)
+    done: bool = False
+
+    @field_validator("text")
+    @classmethod
+    def _text(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if not v:
+            raise ValueError("a checklist item needs text")
+        return v
+
+
+def clean_checklist(items: list[ChecklistItem]) -> list[dict[str, object]]:
+    """As stored: every item with its own id (new ones and duplicates get a fresh one)."""
+    seen: set[str] = set()
+    out: list[dict[str, object]] = []
+    for item in items:
+        item_id = item.id.strip()
+        if not item_id or item_id in seen:
+            item_id = secrets.token_hex(4)
+        seen.add(item_id)
+        out.append({"id": item_id, "text": item.text, "done": item.done})
+    return out
+
+
 class TaskIn(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     description: str = Field("", max_length=20_000)
@@ -39,6 +75,11 @@ class TaskIn(BaseModel):
     rrule: str | None = Field(None, max_length=500, description="Repeat, e.g. FREQ=WEEKLY;BYDAY=MO")
     tags: list[str] = Field(default_factory=list, max_length=20)
     project_id: uuid.UUID | None = None
+    parent_id: uuid.UUID | None = Field(None, description="Makes it a subtask of this task")
+    checklist: list[ChecklistItem] = Field(default_factory=list, max_length=MAX_CHECKLIST)
+    blocked_by: list[uuid.UUID] = Field(
+        default_factory=list, max_length=MAX_BLOCKERS, description="Tasks this one waits on"
+    )
 
     @field_validator("tags")
     @classmethod
@@ -62,6 +103,14 @@ class TaskPatch(BaseModel):
     rrule: str | None = Field(None, max_length=500)
     tags: list[str] | None = Field(None, max_length=20)
     project_id: uuid.UUID | None = None
+    parent_id: uuid.UUID | None = None
+    checklist: list[ChecklistItem] | None = Field(None, max_length=MAX_CHECKLIST)
+    blocked_by: list[uuid.UUID] | None = Field(None, max_length=MAX_BLOCKERS)
+    subtasks: SubtasksChoice | None = Field(
+        None,
+        description="Finishing a task with open subtasks: also finish them, or keep them open. "
+        "Without it, finishing such a task is refused (409 open_subtasks).",
+    )
 
     @field_validator("tags")
     @classmethod
@@ -87,6 +136,9 @@ class TaskOut(BaseModel):
     completed_at: datetime | None
     tags: list[str]
     project_id: uuid.UUID | None
+    parent_id: uuid.UUID | None
+    checklist: list[ChecklistItem]
+    blocked_by: list[uuid.UUID] = Field(description="The tasks this one waits on (open or not)")
     sort_order: int
     created_by: str
     created_at: datetime
@@ -98,3 +150,4 @@ class ReorderIn(BaseModel):
 
     status: TaskStatus
     ordered_ids: list[uuid.UUID] = Field(max_length=500)
+    subtasks: SubtasksChoice | None = None  # see TaskPatch

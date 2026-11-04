@@ -23,11 +23,21 @@ class SharedMessage(BaseModel):
     references: list[str] = Field(default_factory=list)  # titles of referenced chats
 
 
+class SharedChecklistItem(BaseModel):
+    text: str
+    done: bool = False
+
+
 class SharedTask(BaseModel):
     title: str
     description: str = ""  # the task's notes (Markdown)
     status: str
     due_date: date | None = None
+    checklist: list[SharedChecklistItem] = Field(default_factory=list)
+    # Places in the copy's task list: the parent of a subtask, and the tasks it waits on
+    # (only those that are part of the copy).
+    subtask_of: int | None = None
+    blocked_by: list[int] = Field(default_factory=list)
 
 
 class SharedEvent(BaseModel):
