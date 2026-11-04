@@ -1,20 +1,51 @@
-import { useEffect, useRef } from 'react'
-import { Bell, CalendarDays, Check, ChevronRight, Flag, PanelRightOpen, Repeat, Timer, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Bell, CalendarDays, Check, ChevronRight, CornerDownRight, Flag, ListChecks, ListTree, Lock, PanelRightOpen, Repeat,
+  Timer, Trash2,
+} from 'lucide-react'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
 import { focusOnTask } from '@/features/focus/focusOnTask'
 import { cn } from '@/lib/cn'
-import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask, useUpdateTask } from '../api'
+import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask } from '../api'
 import { bucketOf, formatDue } from '../dates'
+import { checklistProgress, isOpen, openBlockers, subtasksOf } from '../relations'
 import { describeRepeat } from '../repeat'
+import { useToggleDone } from '../useToggleDone'
 
 const PRIORITY_TONE = ['', 'text-muted', 'text-warning', 'text-error']
 
-/** The small facts under a task's title: due date, priority, project, tags. */
-export function TaskMeta({ task, project }: { task: Task; project?: Project }) {
-  const open = task.status !== 'done' && task.status !== 'cancelled'
+/** Every task, to show how a task relates to others (its subtasks, what it waits on). */
+export interface TaskInfo {
+  all: Task[]
+  byId: Map<string, Task>
+}
+
+/** "Waits on: Paint the walls, Buy tiles" (only those still open), or null. */
+export function BlockedBadge({ task, info }: { task: Task; info: TaskInfo }) {
+  const blockers = openBlockers(task, info.byId)
+  if (!isOpen(task) || blockers.length === 0) return null
+  const names = blockers.map((t) => t.title).join(', ')
+  return (
+    <span title={`Waits on: ${names}`} aria-label={`Waits on ${blockers.length === 1 ? names : `${blockers.length} tasks`}`}
+      className="flex shrink-0 items-center gap-1 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">
+      <Lock className="h-3 w-3" /> {blockers.length === 1 ? 'Waits on 1' : `Waits on ${blockers.length}`}
+    </span>
+  )
+}
+
+/**
+ * The small facts under a task's title: due date, priority, project, tags, and with
+ * `info` its checklist and subtask progress, and the task it is a subtask of (unless
+ * `nested`: then it is shown right under that task).
+ */
+export function TaskMeta({ task, project, info, nested = false }: { task: Task; project?: Project; info?: TaskInfo; nested?: boolean }) {
+  const open = isOpen(task)
   const overdue = open && bucketOf(task) === 'overdue'
+  const checklist = checklistProgress(task.checklist)
+  const subtasks = info ? subtasksOf(info.all, task.id) : []
+  const parent = info && task.parent_id && !nested ? info.byId.get(task.parent_id) : undefined
   return (
     <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-muted">
       {task.due_date && (
@@ -35,33 +66,60 @@ export function TaskMeta({ task, project }: { task: Task; project?: Project }) {
         </span>
       )}
       {task.tags.map((tag) => <span key={tag}>#{tag}</span>)}
+      {checklist && (
+        <span className="flex items-center gap-1" aria-label={`Checklist: ${checklist.done} of ${checklist.total} done`}>
+          <ListChecks className="h-3 w-3" /> {checklist.done}/{checklist.total}
+        </span>
+      )}
+      {subtasks.length > 0 && (
+        <span className="flex items-center gap-1"
+          aria-label={`Subtasks: ${subtasks.filter((t) => t.status === 'done').length} of ${subtasks.length} done`}>
+          <ListTree className="h-3 w-3" /> {subtasks.filter((t) => t.status === 'done').length}/{subtasks.length}
+        </span>
+      )}
+      {parent && (
+        <span className="flex min-w-0 items-center gap-1" title={`Subtask of “${parent.title}”`}>
+          <CornerDownRight className="h-3 w-3 shrink-0" /> <span className="truncate">{parent.title}</span>
+        </span>
+      )}
     </span>
   )
 }
 
 interface TaskRowProps {
   task: Task
-  project?: Project
-  /** Open the task in the editor. */
+  projects: Map<string, Project>
+  info: TaskInfo
+  /** Open a task in the editor. */
   onOpen: (task: Task) => void
-  /** Whether the start of its notes is shown under it. */
-  expanded: boolean
-  onToggleNotes: () => void
+  /** Whether the start of a task's notes is shown under it. */
+  notesShown: (id: string) => boolean
+  onToggleNotes: (id: string) => void
   /** A link led to this task: it is scrolled into view and marked for a moment. */
-  linked?: boolean
+  linkedId?: string | null
+  /** A subtask shown under its parent. */
+  nested?: boolean
 }
 
 /**
  * One line in the task list: a checkbox to complete it, and the task itself (opens it).
- * A task with notes has an arrow that shows the start of them under the line.
+ * A task with notes has an arrow that shows the start of them under the line; a task
+ * with subtasks has one that shows them, folded in under it.
  */
-export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked = false }: TaskRowProps) {
-  const update = useUpdateTask()
+export function TaskRow({ task, projects, info, onOpen, notesShown, onToggleNotes, linkedId = null, nested = false }: TaskRowProps) {
+  const { toggle } = useToggleDone()
   const remove = useDeleteTask()
   const create = useCreateTask()
   const done = task.status === 'done'
   const finished = done || task.status === 'cancelled'
   const hasNotes = task.description.trim() !== ''
+  const expanded = notesShown(task.id)
+  const linked = linkedId === task.id
+  const project = task.project_id ? projects.get(task.project_id) : undefined
+  const subtasks = nested ? [] : subtasksOf(info.all, task.id)
+  const [showSubtasks, setShowSubtasks] = useState(() => subtasks.some((t) => t.id === linkedId))
+  // A link to one of its subtasks unfolds them.
+  if (linkedId && !showSubtasks && subtasks.some((t) => t.id === linkedId)) setShowSubtasks(true)
 
   const row = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -83,7 +141,10 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
               create.mutate({
                 title: task.title, description: task.description, status: task.status, priority: task.priority,
                 due_date: task.due_date, due_time: task.due_time, remind_minutes: task.remind_minutes,
-                tags: task.tags, project_id: task.project_id,
+                tags: task.tags, project_id: task.project_id, checklist: task.checklist,
+                // The parent may be gone too; then it comes back as an ordinary task.
+                parent_id: task.parent_id && info.byId.has(task.parent_id) ? task.parent_id : null,
+                blocked_by: task.blocked_by.filter((id) => info.byId.has(id)),
               }),
           },
         }),
@@ -95,7 +156,7 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
     <div ref={row} aria-current={linked || undefined} className={cn('rounded-control', linked && 'flash')}>
       <div className="group flex items-start gap-3 rounded-control px-2 py-2 hover:bg-surface-hover">
         <button type="button" role="checkbox" aria-checked={done} aria-label={done ? `Reopen “${task.title}”` : `Complete “${task.title}”`}
-          onClick={() => update.mutate({ id: task.id, body: { status: done ? 'todo' : 'done' } })}
+          onClick={() => void toggle(task)}
           className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors pointer-coarse:h-6 pointer-coarse:w-6',
             done ? 'border-success bg-success text-white' : 'border-border-strong hover:border-accent')}>
           {done && <Check className="h-3 w-3" strokeWidth={3} />}
@@ -104,14 +165,23 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
           <span className={cn('block break-words text-[14px]', finished && 'text-muted line-through')}>
             {task.title}
           </span>
-          <TaskMeta task={task} project={project} />
+          <TaskMeta task={task} project={project} info={info} nested={nested} />
         </button>
         {task.status === 'in_progress' && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">In progress</span>}
         {task.status === 'waiting' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted">Waiting</span>}
-        {task.status === 'blocked' && <span className="shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">Blocked</span>}
+        {openBlockers(task, info.byId).length > 0 && !finished
+          ? <BlockedBadge task={task} info={info} />
+          : task.status === 'blocked' && <span className="shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">Blocked</span>}
+        {subtasks.length > 0 && (
+          <button type="button" aria-expanded={showSubtasks} aria-label={`Subtasks of “${task.title}”`}
+            title={showSubtasks ? 'Hide subtasks' : 'Show subtasks'} onClick={() => setShowSubtasks(!showSubtasks)}
+            className={cn(side, 'hover:text-text')}>
+            <ListTree className={cn('h-4 w-4', showSubtasks && 'text-accent')} />
+          </button>
+        )}
         {hasNotes && (
           <button type="button" aria-expanded={expanded} aria-label={`Notes of “${task.title}”`} title={expanded ? 'Hide notes' : 'Show notes'}
-            onClick={onToggleNotes} className={cn(side, 'hover:text-text')}>
+            onClick={() => onToggleNotes(task.id)} className={cn(side, 'hover:text-text')}>
             <ChevronRight className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')} />
           </button>
         )}
@@ -139,6 +209,15 @@ export function TaskRow({ task, project, onOpen, expanded, onToggleNotes, linked
           <button type="button" onClick={() => onOpen(task)} className="mt-1 text-[12.5px] font-medium text-accent hover:underline">
             Open task
           </button>
+        </div>
+      )}
+      {showSubtasks && subtasks.length > 0 && (
+        // Folded in under the parent, with a line down the side like the notes.
+        <div role="group" aria-label={`Subtasks of “${task.title}”`} className="mb-1 ml-5 border-l-2 border-border pl-2 pointer-coarse:ml-6">
+          {subtasks.map((sub) => (
+            <TaskRow key={sub.id} task={sub} projects={projects} info={info} onOpen={onOpen} notesShown={notesShown}
+              onToggleNotes={onToggleNotes} linkedId={linkedId} nested />
+          ))}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Timer, Trash2 } from 'lucide-react'
+import { CornerDownRight, Timer, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
@@ -22,10 +22,13 @@ import {
   useDeleteTask,
   useProjects,
   useSaveProject,
+  useTasks,
   useUpdateTask,
 } from '../api'
 import { REMINDER_OPTIONS } from '../dates'
+import { askAboutSubtasks, openSubtasksLeft, parentCandidates } from '../relations'
 import { repeatOptions } from '../repeat'
+import { BlockedByEditor, ChecklistEditor, SubtaskList } from './TaskStructure'
 
 const NEW_PROJECT = '__new__'
 
@@ -41,10 +44,15 @@ interface TaskDialogProps {
   /** Starting values for a new task (e.g. the day clicked in the calendar). */
   defaults?: { due_date?: string; project_id?: string | null; status?: TaskStatus }
   onClose: () => void
+  /** Open another task in the editor instead (a subtask, its parent, one it waits on). */
+  onOpenTask?: (task: Task) => void
 }
 
-export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
+const tagList = (text: string) => text.split(',').map((t) => t.trim()).filter(Boolean)
+
+export function TaskDialog({ task, defaults, onClose, onOpenTask }: TaskDialogProps) {
   const projects = useProjects()
+  const all = useTasks().data ?? []
   const create = useCreateTask()
   const update = useUpdateTask()
   const remove = useDeleteTask()
@@ -60,6 +68,12 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
   const [repeat, setRepeat] = useState(task?.rrule ?? '')
   const [projectId, setProjectId] = useState(task?.project_id ?? defaults?.project_id ?? '')
   const [tags, setTags] = useState((task?.tags ?? []).join(', '))
+  const [checklist, setChecklist] = useState(task?.checklist ?? [])
+  const [parentId, setParentId] = useState(task?.parent_id ?? '')
+  const [blockedBy, setBlockedBy] = useState(task?.blocked_by ?? [])
+  const parents = parentCandidates(all, task)
+  const parent = all.find((t) => t.id === parentId)
+  const hasSubtasks = task !== null && all.some((t) => t.parent_id === task.id)
   const backlinks = useTaskBacklinks(task?.id ?? null)
   const pending = create.isPending || update.isPending
   const error = create.error ?? update.error ?? remove.error ?? saveProject.error
@@ -73,7 +87,11 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
   }
 
   /** Saves the task, then closes the dialog (or does `after` instead). */
-  const save = (after: () => void = onClose) => {
+  const save = async (after: () => void = onClose) => {
+    // Finished here with open subtasks: finish them too, or keep them open?
+    const finishing = task !== null && status === 'done' && task.status !== 'done'
+    const choice = await askAboutSubtasks(finishing ? openSubtasksLeft(all, [task.id]) : 0)
+    if (choice === null) return
     const body = {
       title: title.trim(),
       description,
@@ -84,18 +102,28 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
       remind_minutes: dueDate && remind !== '' ? Number(remind) : null,
       rrule: dueDate && repeat ? repeat : null,
       project_id: projectId || null,
-      tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+      tags: tagList(tags),
+      checklist: checklist.filter((i) => i.text.trim()),
+      parent_id: parentId || null,
+      blocked_by: blockedBy,
     }
-    if (task) update.mutate({ id: task.id, body }, { onSuccess: after })
+    if (task) update.mutate({ id: task.id, body: { ...body, ...(choice ? { subtasks: choice } : {}) } }, { onSuccess: after })
     else create.mutate(body, { onSuccess: after })
   }
+  // Another task opens in the editor: keep what was typed here first, like Save would.
+  const openTask = onOpenTask
+    ? (other: Task) => {
+        if (title.trim()) void save(() => onOpenTask(other))
+        else onOpenTask(other)
+      }
+    : undefined
   // A link in the notes leads away from the editor: keep what was typed, like Save would.
   const openLink = (path: string) => {
     const leave = () => {
       onClose()
       void navigate(path)
     }
-    if (title.trim()) save(leave)
+    if (title.trim()) void save(leave)
     else leave()
   }
   const confirmDelete = async () => {
@@ -115,15 +143,22 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
         <div className="relative min-w-0">
         <div className="flex flex-col gap-3 md:absolute md:inset-0">
           <input aria-label="Title" autoFocus={!task} value={title} maxLength={300} placeholder="What needs doing?"
-            onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && save()}
+            onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && void save()}
             className="w-full bg-transparent text-xl font-semibold placeholder:font-medium placeholder:text-subtle focus:outline-none md:text-2xl" />
           {/* The status and the notes box are moved out by their own padding, so their text
               starts on the same line as the heading and the title above them. */}
           <div className="flex flex-wrap items-center gap-2 md:-ml-3">
             <Select variant="pill" aria-label="Status" value={status} onValueChange={(v) => setStatus(v as TaskStatus)}
               options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))} />
+            {parent && (
+              <button type="button" disabled={!openTask} onClick={() => openTask?.(parent)} title={`Subtask of “${parent.title}”`}
+                className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted enabled:hover:text-accent">
+                <CornerDownRight className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Subtask of {parent.title}</span>
+              </button>
+            )}
             {task?.created_by === 'agent' && <span className="text-[12px] text-muted">Added by an agent.</span>}
           </div>
+          <div className="md:-ml-1"><ChecklistEditor items={checklist} onChange={setChecklist} /></div>
           {/* Stored as Markdown, like documents. An empty editor gives an empty text. */}
           <RichEditor variant="notes" className="md:-ml-3 md:flex-1" label="Notes" initial={task?.description ?? ''} onOpenAppLink={openLink}
             onChange={(markdown) => setDescription(markdown.trim() ? tidyMarkdown(markdown) : '')} />
@@ -158,6 +193,18 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
           <Field label="Tags" hint="Comma-separated">
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="errands, phone" />
           </Field>
+          <Field label="Subtask of" hint={hasSubtasks ? 'It has subtasks of its own, so it can’t be one.' : undefined}>
+            <Select value={parentId} onValueChange={setParentId} disabled={hasSubtasks} aria-label="Subtask of"
+              options={[
+                { value: '', label: 'Not a subtask' },
+                // The current parent stays listed even when it is finished.
+                ...[...(parent && !parents.includes(parent) ? [parent] : []), ...parents].map((p) => ({ value: p.id, label: p.title })),
+              ]} />
+          </Field>
+          {!parentId && (
+            <SubtaskList task={task} all={all} projectId={projectId || null} tags={tagList(tags)} onOpen={openTask} />
+          )}
+          <BlockedByEditor task={task} all={all} blockedBy={blockedBy} onChange={setBlockedBy} onOpen={openTask} />
           <TaskAttachments taskId={task?.id ?? null} projectId={projectId || null} />
           <BacklinkList title="Linked from" links={backlinks.data} />
           {task && status !== 'done' && status !== 'cancelled' && (
@@ -177,7 +224,7 @@ export function TaskDialog({ task, defaults, onClose }: TaskDialogProps) {
               </Button>
             )}
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" loading={pending} disabled={!title.trim()} onClick={() => save()}>
+            <Button variant="primary" loading={pending} disabled={!title.trim()} onClick={() => void save()}>
               {task ? 'Save' : 'Add task'}
             </Button>
           </div>

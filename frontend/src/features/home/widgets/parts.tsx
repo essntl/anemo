@@ -2,8 +2,9 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowUpRight, Check, Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { type Task, useUpdateTask } from '@/features/tasks/api'
+import type { Task } from '@/features/tasks/api'
 import { bucketOf, formatDue } from '@/features/tasks/dates'
+import { useToggleDone } from '@/features/tasks/useToggleDone'
 
 /** A widget's title row: icon, name, extra bits, and ↗ to its full page. */
 export function WidgetHeader({ title, icon, to, children }: { title: string; icon: ReactNode; to?: string; children?: ReactNode }) {
@@ -24,13 +25,13 @@ export function WidgetHeader({ title, icon, to, children }: { title: string; ico
 
 /** A task with a check box that completes it; the title opens it in Tasks. */
 export function TaskLine({ task, showDue = true }: { task: Task; showDue?: boolean }) {
-  const update = useUpdateTask()
+  const { toggle } = useToggleDone()
   const done = task.status === 'done'
   const overdue = !done && bucketOf(task) === 'overdue'
   return (
     <li className="flex items-center gap-2.5 rounded-control px-2 py-1.5 hover:bg-surface-hover">
       <button type="button" role="checkbox" aria-checked={done} aria-label={done ? `Reopen “${task.title}”` : `Complete “${task.title}”`}
-        onClick={() => update.mutate({ id: task.id, body: { status: done ? 'todo' : 'done' } })}
+        onClick={() => void toggle(task)}
         className={cn('flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors pointer-coarse:h-6 pointer-coarse:w-6',
           done ? 'border-success bg-success text-white' : overdue ? 'border-error hover:border-error' : 'border-border-strong hover:border-accent')}>
         {done && <Check className="h-3 w-3" strokeWidth={3} />}

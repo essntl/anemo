@@ -115,8 +115,8 @@ project: **Share** in its menu creates a link that works without logging in.
 - The link shows a **copy made at that moment**. It does not follow later changes
   unless you press **Update copy**, and it never includes attached files, the model's
   reasoning or agent activity.
-- A shared **project** shows what you tick: its tasks with their notes, its upcoming
-  events, and its documents, which the visitor can open and read in full. Links
+- A shared **project** shows what you tick: its tasks with their notes, checklists and
+  subtasks, its upcoming events, and its documents, which the visitor can open and read in full. Links
   between its tasks and documents work inside the copy; links to anything that is
   not part of it are shown as plain text. Its chats, files and instructions are
   never part of a link.
@@ -254,7 +254,27 @@ task. In the list, a task with notes has an arrow that shows the start of them. 
 link to a task (from a document, other notes or search) shows it in the list, marked
 and with its notes open, rather than opening the editor.
 
-**Attachments:** a task can have files attached. Upload them in the task (they go to
+**Checklists, subtasks and *waits on*.** Three ways to break up and order work:
+
+- A **checklist** holds quick steps inside one task: add, tick, edit and remove them in
+  the editor (Enter adds the next one). The list and the board show how far it is
+  ("3/5"). A repeating task's next one gets the same checklist, unticked.
+- **Subtasks** are tasks of their own (status, due date, notes, attachments) that belong
+  to another task, one level deep. Add them in the task's side panel, where they get the
+  task's project and tags, or make an existing task one with *Subtask of*. In the list
+  they are folded in under their task (the arrow shows them); on the board they are
+  cards of their own that name their task. Finishing a task with open subtasks asks
+  whether to finish them too or keep them open. Deleting a task keeps its subtasks, as
+  ordinary tasks.
+- **Waits on** (*blocked by*): pick the tasks that have to be done first. While any of
+  them is open the task shows *Waits on* and moves from *to do* to *blocked*; when the
+  last one is done it moves back to *to do* and you get a notification. The other task
+  lists it under *Blocks*. Loops (A waits on B, B waits on A) are refused, and deleting a
+  task removes it from what it blocked.
+
+Search finds checklist items too.
+
+ Upload them in the task (they go to
 the project's folder, or `files/` without a project) or pick existing ones from Files.
 The file stays in Files; the task links to it, and the link keeps working when you
 rename or move the file there. Removing an attachment leaves the file alone. Notes
@@ -276,7 +296,8 @@ without a zone, use the time zone from **Settings → General**.
 
 **Reminders** (on events and tasks) arrive as notifications; see below.
 
-**Agents** can list, add, change and delete tasks and events. Changes follow the
+**Agents** can list, add, change and delete tasks and events, including checklists,
+subtasks and what a task waits on. Changes follow the
 *Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
 action, so the default level asks you first.
 

@@ -19,8 +19,9 @@ import { cn } from '@/lib/cn'
 import { type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
 import { TaskBoard } from './components/TaskBoard'
 import { TaskDialog } from './components/TaskDialog'
-import { TaskRow } from './components/TaskRow'
+import { type TaskInfo, TaskRow } from './components/TaskRow'
 import { type Bucket, BUCKET_LABELS, bucketOf } from './dates'
+import { byId } from './relations'
 import { Lingering } from '@/components/ui/Lingering'
 
 const BUCKETS: Bucket[] = ['overdue', 'today', 'upcoming', 'later', 'none']
@@ -67,6 +68,7 @@ export function TasksPage() {
 
   const projectMap = useMemo(() => new Map<string, Project>((projects.data ?? []).map((p) => [p.id, p])), [projects.data])
   const all = useMemo(() => tasks.data ?? [], [tasks.data])
+  const info = useMemo<TaskInfo>(() => ({ all, byId: byId(all) }), [all])
   // The task a link points to. It is made visible whatever the list was showing:
   // its notes opened, "Finished" unfolded, the search emptied (here, once per link),
   // and filters or the board view that would hide it dropped (the effect below).
@@ -76,7 +78,10 @@ export function TasksPage() {
     setRevealed(linked.id)
     setExpanded((old) => new Set(old).add(linked.id))
     setSearch('')
-    if (linked.status === 'done' || linked.status === 'cancelled') setShowDone(true)
+    // A finished task is under "Finished", unless it is a subtask of an open task.
+    const parent = linked.parent_id ? all.find((t) => t.id === linked.parent_id) : undefined
+    const underOpenParent = parent !== undefined && parent.status !== 'done' && parent.status !== 'cancelled'
+    if ((linked.status === 'done' || linked.status === 'cancelled') && !underOpenParent) setShowDone(true)
   }
   useEffect(() => {
     if (!linked) return
@@ -101,9 +106,13 @@ export function TasksPage() {
         (!q || t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)),
     )
   }, [all, projectFilter, tagFilter, search])
-  const open = shown.filter((t) => t.status !== 'done' && t.status !== 'cancelled').sort(byUrgency)
+  const openShown = shown.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
+  // A subtask whose parent is in the list is shown folded in under it, not on its own.
+  const listedParents = new Set(openShown.map((t) => t.id))
+  const onItsOwn = (t: Task) => t.parent_id === null || !listedParents.has(t.parent_id)
+  const open = openShown.filter(onItsOwn).sort(byUrgency)
   const finished = shown
-    .filter((t) => t.status === 'done' || t.status === 'cancelled')
+    .filter((t) => (t.status === 'done' || t.status === 'cancelled') && onItsOwn(t))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 
   const quickAdd = () => {
@@ -151,7 +160,7 @@ export function TasksPage() {
       {(tasks.error ?? create.error) && <p className="mb-2 text-[13px] text-error">{errorMessage(tasks.error ?? create.error)}</p>}
 
       {view === 'board' ? (
-        <TaskBoard tasks={shown} projects={projectMap} onOpen={(task) => setEditing({ task })}
+        <TaskBoard tasks={shown} info={info} projects={projectMap} onOpen={(task) => setEditing({ task })}
           onAdd={(status) => setEditing({ task: null, status })} />
       ) : (
         <>
@@ -176,9 +185,8 @@ export function TasksPage() {
                   {BUCKET_LABELS[bucket]} <span className="font-normal">{items.length}</span>
                 </h2>
                 {items.map((t) => (
-                  <TaskRow key={t.id} task={t} project={t.project_id ? projectMap.get(t.project_id) : undefined}
-                    onOpen={(task) => setEditing({ task })}
-                    expanded={expanded.has(t.id)} onToggleNotes={() => toggleNotes(t.id)} linked={t.id === linked?.id} />
+                  <TaskRow key={t.id} task={t} projects={projectMap} info={info} onOpen={(task) => setEditing({ task })}
+                    notesShown={(id) => expanded.has(id)} onToggleNotes={toggleNotes} linkedId={linked?.id} />
                 ))}
               </section>
             )
@@ -191,9 +199,8 @@ export function TasksPage() {
                 Finished <span className="font-normal">{finished.length}</span>
               </button>
               {showDone && finished.slice(0, 100).map((t) => (
-                <TaskRow key={t.id} task={t} project={t.project_id ? projectMap.get(t.project_id) : undefined}
-                  onOpen={(task) => setEditing({ task })}
-                  expanded={expanded.has(t.id)} onToggleNotes={() => toggleNotes(t.id)} linked={t.id === linked?.id} />
+                <TaskRow key={t.id} task={t} projects={projectMap} info={info} onOpen={(task) => setEditing({ task })}
+                  notesShown={(id) => expanded.has(id)} onToggleNotes={toggleNotes} linkedId={linked?.id} />
               ))}
             </section>
           )}
@@ -202,7 +209,8 @@ export function TasksPage() {
 
       <Lingering value={editing}>
         {(shown) => (
-          <TaskDialog task={shown.task} onClose={() => setEditing(null)}
+          <TaskDialog key={shown.task?.id ?? 'new'} task={shown.task} onClose={() => setEditing(null)}
+            onOpenTask={(task) => setEditing({ task })}
             defaults={{ status: shown.status, project_id: projectFilter || null }} />
         )}
       </Lingering>

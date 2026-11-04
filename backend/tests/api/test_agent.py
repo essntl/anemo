@@ -132,6 +132,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "read_web_page",  # web_search only appears once SearXNG is set up
             "http_request",
             "list_tasks",
+            "get_task",
             "create_task",
             "update_task",
             "delete_task",

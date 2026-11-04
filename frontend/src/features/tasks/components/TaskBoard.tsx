@@ -6,20 +6,24 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { errorMessage } from '@/api/client'
 import { type Project, STATUS_LABELS, type Task, type TaskStatus, useReorderTasks } from '../api'
-import { TaskMeta } from './TaskRow'
+import { askAboutSubtasks, openSubtasksLeft } from '../relations'
+import { BlockedBadge, type TaskInfo, TaskMeta } from './TaskRow'
 
 const COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'waiting', 'blocked', 'done']
 const MAX_DONE = 30 // the Done column only shows the latest ones
 
 interface TaskBoardProps {
   tasks: Task[]
+  /** Every task (also those the filters hide), for subtasks and what tasks wait on. */
+  info: TaskInfo
   projects: Map<string, Project>
   onOpen: (task: Task) => void
   onAdd: (status: TaskStatus) => void
 }
 
-export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
+export function TaskBoard({ tasks, info, projects, onOpen, onAdd }: TaskBoardProps) {
   const reorder = useReorderTasks()
   const [dragged, setDragged] = useState<string | null>(null)
   // Where the card would land: a column, and the card it would go in front of (null: the end).
@@ -31,18 +35,25 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
     return own.sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')).slice(0, MAX_DONE)
   }
 
-  const drop = () => {
-    if (dragged && target) {
-      const ids = column(target.status).map((t) => t.id).filter((id) => id !== dragged)
-      const at = target.before ? ids.indexOf(target.before) : -1
-      ids.splice(at < 0 ? ids.length : at, 0, dragged)
-      reorder.mutate({ status: target.status, orderedIds: ids })
-    }
+  const drop = async () => {
+    const [card, place] = [dragged, target]
     setDragged(null)
     setTarget(null)
+    if (!card || !place) return
+    const ids = column(place.status).map((t) => t.id).filter((id) => id !== card)
+    const at = place.before ? ids.indexOf(place.before) : -1
+    ids.splice(at < 0 ? ids.length : at, 0, card)
+    // Into "Done" with open subtasks: finish them too, or keep them open?
+    const moving = info.byId.get(card)
+    const left = place.status === 'done' && moving?.status !== 'done' ? openSubtasksLeft(info.all, [card]) : 0
+    const choice = await askAboutSubtasks(left)
+    if (choice === null) return
+    reorder.mutate({ status: place.status, orderedIds: ids, subtasks: choice })
   }
 
   return (
+    <>
+    {reorder.error && <p className="mb-2 text-[13px] text-error">{errorMessage(reorder.error)}</p>}
     <div className="flex flex-col gap-3 md:flex-row md:overflow-x-auto md:pb-2">
       {COLUMNS.map((status) => {
         const items = column(status)
@@ -53,7 +64,7 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
               e.preventDefault()
               if (target?.status !== status) setTarget({ status, before: null })
             }}
-            onDrop={drop}
+            onDrop={() => void drop()}
             className={cn('flex flex-col rounded-card md:w-72 md:shrink-0 border border-border bg-surface-2/50 p-2 transition-colors',
               isTarget && dragged && 'border-accent bg-accent-soft/40')}>
             <header className="flex items-center justify-between px-1.5 pb-2 pt-1 text-[12.5px] font-semibold text-muted">
@@ -83,7 +94,8 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
                     dragged === task.id && 'opacity-40',
                     dragged && target?.before === task.id && 'border-t-2 border-t-accent')}>
                   <div className={cn('break-words text-[13.5px]', status === 'done' && 'text-muted line-through')}>{task.title}</div>
-                  <TaskMeta task={task} project={task.project_id ? projects.get(task.project_id) : undefined} />
+                  <TaskMeta task={task} project={task.project_id ? projects.get(task.project_id) : undefined} info={info} />
+                  <div className="mt-1 flex empty:hidden"><BlockedBadge task={task} info={info} /></div>
                 </div>
               ))}
             </div>
@@ -91,5 +103,6 @@ export function TaskBoard({ tasks, projects, onOpen, onAdd }: TaskBoardProps) {
         )
       })}
     </div>
+    </>
   )
 }

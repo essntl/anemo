@@ -59,7 +59,7 @@ export function useCreateTask() {
     mutationFn: async (body: Partial<TaskInput> & { title: string }) =>
       unwrap(
         await api.POST('/api/tasks', {
-          body: { description: '', status: 'todo', priority: 0, tags: [], ...body },
+          body: { description: '', status: 'todo', priority: 0, tags: [], checklist: [], blocked_by: [], ...body },
         }),
       ),
     onSuccess: refresh,
@@ -95,8 +95,10 @@ export function useDeleteTask() {
 export function useReorderTasks() {
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: async (v: { status: TaskStatus; orderedIds: string[] }) =>
-      unwrap(await api.POST('/api/tasks/reorder', { body: { status: v.status, ordered_ids: v.orderedIds } })),
+    mutationFn: async (v: { status: TaskStatus; orderedIds: string[]; subtasks?: 'finish' | 'keep' }) =>
+      unwrap(await api.POST('/api/tasks/reorder', {
+        body: { status: v.status, ordered_ids: v.orderedIds, subtasks: v.subtasks ?? null },
+      })),
     onSettled: refresh,
   })
 }

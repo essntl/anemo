@@ -70,6 +70,8 @@ call back, a thought to pick up later, three things that must not slip today.
 
 ## 3. Subtasks, checklists and *blocked by* links
 
+**Status: built.**
+
 Three ways to break up and order work inside **Tasks**.
 
 **Checklist.** Quick items inside one task (text and a tick), for steps that don't

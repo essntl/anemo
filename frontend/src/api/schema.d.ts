@@ -3349,6 +3349,24 @@ export interface components {
             optional: boolean;
         };
         /**
+         * ChecklistItem
+         * @description One step inside a task. A new item may leave out its id; it is given one.
+         */
+        ChecklistItem: {
+            /**
+             * Id
+             * @default
+             */
+            id: string;
+            /** Text */
+            text: string;
+            /**
+             * Done
+             * @default false
+             */
+            done: boolean;
+        };
+        /**
          * ClaudeRunnerStatus
          * @description The claude-runner as the worker last saw it (the app cannot reach it).
          */
@@ -5214,6 +5232,8 @@ export interface components {
             status: "todo" | "in_progress" | "waiting" | "blocked" | "done" | "cancelled";
             /** Ordered Ids */
             ordered_ids: string[];
+            /** Subtasks */
+            subtasks?: ("finish" | "keep") | null;
         };
         /** ReorderPlaylistsIn */
         ReorderPlaylistsIn: {
@@ -5776,6 +5796,16 @@ export interface components {
             /** Last Viewed At */
             last_viewed_at: string | null;
         };
+        /** SharedChecklistItem */
+        SharedChecklistItem: {
+            /** Text */
+            text: string;
+            /**
+             * Done
+             * @default false
+             */
+            done: boolean;
+        };
         /** SharedDocument */
         SharedDocument: {
             /** Title */
@@ -5870,6 +5900,12 @@ export interface components {
             status: string;
             /** Due Date */
             due_date?: string | null;
+            /** Checklist */
+            checklist?: components["schemas"]["SharedChecklistItem"][];
+            /** Subtask Of */
+            subtask_of?: number | null;
+            /** Blocked By */
+            blocked_by?: number[];
         };
         /** SkillIn */
         SkillIn: {
@@ -6124,6 +6160,18 @@ export interface components {
             tags?: string[];
             /** Project Id */
             project_id?: string | null;
+            /**
+             * Parent Id
+             * @description Makes it a subtask of this task
+             */
+            parent_id?: string | null;
+            /** Checklist */
+            checklist?: components["schemas"]["ChecklistItem"][];
+            /**
+             * Blocked By
+             * @description Tasks this one waits on
+             */
+            blocked_by?: string[];
         };
         /** TaskOut */
         TaskOut: {
@@ -6157,6 +6205,15 @@ export interface components {
             tags: string[];
             /** Project Id */
             project_id: string | null;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Checklist */
+            checklist: components["schemas"]["ChecklistItem"][];
+            /**
+             * Blocked By
+             * @description The tasks this one waits on (open or not)
+             */
+            blocked_by: string[];
             /** Sort Order */
             sort_order: number;
             /** Created By */
@@ -6194,6 +6251,17 @@ export interface components {
             tags?: string[] | null;
             /** Project Id */
             project_id?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Checklist */
+            checklist?: components["schemas"]["ChecklistItem"][] | null;
+            /** Blocked By */
+            blocked_by?: string[] | null;
+            /**
+             * Subtasks
+             * @description Finishing a task with open subtasks: also finish them, or keep them open. Without it, finishing such a task is refused (409 open_subtasks).
+             */
+            subtasks?: ("finish" | "keep") | null;
         };
         /** TaskRef */
         TaskRef: {
@@ -11101,6 +11169,7 @@ export interface operations {
                 q?: string | null;
                 due_from?: string | null;
                 due_to?: string | null;
+                parent_id?: string | null;
             };
             header?: never;
             path?: never;

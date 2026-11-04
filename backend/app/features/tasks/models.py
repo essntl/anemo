@@ -3,6 +3,7 @@ from datetime import date, datetime, time
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -15,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
 
 from app.db.base import Base, IdMixin, TimestampMixin
 
@@ -46,6 +48,7 @@ class Task(Base, IdMixin, TimestampMixin):
     __table_args__ = (
         Index("ix_tasks_status_due", "status", "due_date"),
         Index("ix_tasks_project", "project_id"),
+        Index("ix_tasks_parent", "parent_id"),
     )
 
     title: Mapped[str] = mapped_column(String(300))
@@ -68,3 +71,30 @@ class Task(Base, IdMixin, TimestampMixin):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)  # position within its status
     created_by: Mapped[str] = mapped_column(String(10), default="user")  # user | agent
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # A subtask belongs to this task (one level deep: a parent is never a subtask itself).
+    # Deleting the parent keeps its subtasks, as ordinary tasks.
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL")
+    )
+    # Quick steps inside the task: [{"id": "a1b2c3d4", "text": "…", "done": false}, …]
+    checklist: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, default=list, server_default="[]"
+    )
+
+
+class TaskDependency(Base):
+    """`task_id` waits on (is blocked by) `blocker_id`. Deleting either removes it."""
+
+    __tablename__ = "task_dependencies"
+    __table_args__ = (
+        CheckConstraint("task_id <> blocker_id", name="not_self"),
+        Index("ix_task_dependencies_blocker", "blocker_id"),
+    )
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True
+    )
+    blocker_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
