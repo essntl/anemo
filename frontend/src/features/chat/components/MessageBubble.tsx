@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { AlertCircle, Brain, Check, ChevronLeft, ChevronRight, Copy, GitBranch, MessageCircleReply, Pencil, RotateCcw } from 'lucide-react'
+import { AlertCircle, Brain, Check, ChevronLeft, ChevronRight, Copy, Download, GitBranch, MessageCircleReply, Pencil, RotateCcw } from 'lucide-react'
 import type { Schemas } from '@/api/client'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
@@ -62,7 +62,7 @@ export function UserBubble({ text, attachments = [], references = [], skill, onE
                 className="max-h-48 max-w-64 rounded-xl border border-border object-cover" />
             ) : (
               <a key={a.id} href={`/api/attachments/${a.id}/content`} download={a.filename}>
-                <AttachmentChip name={a.filename} size={a.size} />
+                <AttachmentChip name={a.filename} size={a.size} kind={a.kind} />
               </a>
             ),
           )}
@@ -179,6 +179,33 @@ interface AssistantProps {
   questions?: QuestionMark[]
   /** Set when the message was answered more than once. */
   versions?: VersionNav
+  /** Files the agent attached to this answer, to download. */
+  files?: AttachmentSummary[]
+}
+
+/** Files the agent made for you, under its answer. */
+function AnswerFiles({ files }: { files: AttachmentSummary[] }) {
+  return (
+    <div className={cn('mt-3 flex flex-wrap gap-2', ANSWER_INSET)} aria-label="Files from the agent">
+      {files.map((a) =>
+        a.kind === 'image' ? (
+          <div key={a.id} className="relative">
+            <ZoomableImage src={`/api/attachments/${a.id}/content`} alt={a.filename}
+              className="max-h-48 max-w-64 rounded-xl border border-border object-cover" />
+            <a href={`/api/attachments/${a.id}/content`} download={a.filename} title={`Download ${a.filename}`}
+              aria-label={`Download ${a.filename}`}
+              className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-surface/90 text-muted shadow-sm hover:text-text">
+              <Download className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        ) : (
+          <a key={a.id} href={`/api/attachments/${a.id}/content`} download={a.filename}>
+            <AttachmentChip name={a.filename} size={a.size} kind={a.kind} download />
+          </a>
+        ),
+      )}
+    </div>
+  )
 }
 
 export function AssistantMessage({
@@ -193,6 +220,7 @@ export function AssistantMessage({
   activity,
   questions,
   versions,
+  files,
 }: AssistantProps) {
   const [copied, setCopied] = useState(false)
   const live = ['streaming', 'queued', 'running', 'waiting_approval', 'waiting_subagent', 'paused'].includes(status)
@@ -231,6 +259,8 @@ export function AssistantMessage({
           {live && !suspended && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
         </div>
       )}
+
+      {files && files.length > 0 && <AnswerFiles files={files} />}
 
       {status === 'failed' && (
         <div className="mt-2 flex items-start gap-2 rounded-xl bg-error/10 px-3 py-2 text-[13px] text-error">

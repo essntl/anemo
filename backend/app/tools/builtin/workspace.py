@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
-from app.features.attachments import images
+from app.features.attachments import extract, images
 from app.features.links import service as links
 from app.policy.models import Action, Risk
 from app.tools.base import Tool, ToolContext, ToolResult
@@ -111,13 +111,35 @@ class ReadInput(BaseModel):
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 MAX_IMAGE_BYTES = images.MAX_INPUT_BYTES
+# Files read_file shows as extracted text (see features/attachments/extract.py).
+EXTRACTED_SUFFIXES = {".pdf", ".zip", *extract.OFFICE_SUFFIXES}
+MAX_EXTRACT_BYTES = 50 * 1024 * 1024
+EXTRACTED_LABELS = {
+    "pdf": "PDF",
+    "document": "Word document",
+    "spreadsheet": "spreadsheet",
+    "presentation": "presentation",
+    "archive": "zip archive",
+}
+
+
+def _extracted_kind(name: str, data: bytes) -> str | None:
+    if data.startswith(b"%PDF-"):
+        return "pdf"
+    if kind := extract.office_kind(name, data):
+        return kind
+    if extract.is_zip(data):
+        return "archive"
+    return None
 
 
 class ReadFile(Tool):
     name = "read_file"
     description = (
         "Read a file from the workspace. Text files return their content. Images (PNG, "
-        "JPEG, GIF, WebP, BMP, TIFF) are shown to you as an image if you can view images."
+        "JPEG, GIF, WebP, BMP, TIFF) are shown to you as an image if you can view images. "
+        "PDFs, Word (.docx), Excel (.xlsx) and PowerPoint (.pptx) files return their text "
+        "(spreadsheets as CSV per sheet), and zip files the list of files in them."
     )
     capability = "fs.read"
     Input = ReadInput
@@ -126,13 +148,21 @@ class ReadFile(Tool):
         return [path_action(ctx, self.capability, args.path, "Read", "read")]
 
     async def run(self, args: ReadInput, ctx: ToolContext) -> ToolResult:
-        if Path(args.path).suffix.lower() in IMAGE_SUFFIXES:
+        suffix = Path(args.path).suffix.lower()
+        if suffix in IMAGE_SUFFIXES:
             return await self._read_image(args.path, ctx)
+        if suffix in EXTRACTED_SUFFIXES:
+            result = await self._read_extracted(args)
+            assert result is not None  # only None when guessing
+            return result
         try:
             text, _ = await asyncio.to_thread(files.read_text, args.path, MAX_READ_BYTES)
         except files.NotText as exc:
             if "binary" in exc.message:
-                # Maybe an image without a usual extension.
+                # A PDF or Office file with an unusual name, or an image.
+                extracted = await self._read_extracted(args, guessed=True)
+                if extracted is not None:
+                    return extracted
                 return await self._read_image(args.path, ctx, guessed=True)
             return ToolResult(content=f"Cannot read {args.path}: {exc.message}", is_error=True)
         except AppError as exc:
@@ -142,6 +172,41 @@ class ReadFile(Tool):
         note = f"\n\n[Truncated: showing {args.max_chars} of {len(text)} characters]" if cut else ""
         return ToolResult(
             content=f"{rel}:\n{text[: args.max_chars]}{note}",
+            data={"path": rel, "chars": len(text)},
+        )
+
+    async def _read_extracted(self, args: ReadInput, guessed: bool = False) -> ToolResult | None:
+        """The text of a PDF, Office file or zip. With `guessed`, None when the file is
+        none of these."""
+        try:
+            data = await asyncio.to_thread(files.read_bytes, args.path, MAX_EXTRACT_BYTES)
+        except AppError as exc:
+            return ToolResult(content=f"Cannot read {args.path}: {exc.message}", is_error=True)
+        rel = fs_guard.relative(fs_guard.resolve(args.path))
+        kind = _extracted_kind(Path(rel).name, data)
+        if kind is None:
+            if guessed:
+                return None
+            return ToolResult(
+                content=f"Cannot read {rel}: it is not a valid {Path(rel).suffix} file.",
+                is_error=True,
+            )
+        try:
+            text, note = await asyncio.to_thread(extract.extract, kind, data)
+        except extract.ExtractionError as exc:
+            return ToolResult(content=f"Cannot read {rel}: {exc}", is_error=True)
+        cut = len(text) > args.max_chars
+        notes = [n for n in (note,) if n]
+        if cut:
+            notes.append(f"Truncated: showing {args.max_chars} of {len(text)} characters")
+        if kind != "pdf":
+            notes.append(
+                "This is the text only; to change the file itself, use Python in run_shell"
+                + (" or extract_zip" if kind == "archive" else "")
+            )
+        tail = "".join(f"\n[{n}]" for n in notes)
+        return ToolResult(
+            content=f"{rel} ({EXTRACTED_LABELS[kind]}):\n{text[: args.max_chars]}\n{tail}",
             data={"path": rel, "chars": len(text)},
         )
 

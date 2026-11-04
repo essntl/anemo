@@ -10,6 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         nodejs npm openssh-client procps ripgrep rsync sqlite3 tree unzip wget xz-utils zip tini \
     && rm -rf /var/lib/apt/lists/*
 
+# Libraries for reading and making files people ask for: spreadsheets, Word and
+# PowerPoint files, PDFs and charts. Installed system-wide (not in the execd venv), so
+# `python3` in the sandbox has them even without network access.
+RUN pip install --no-cache-dir \
+        "pandas>=2.2" "openpyxl>=3.1" "xlsxwriter>=3.2" "python-docx>=1.1" "python-pptx>=1.0" \
+        "reportlab>=4.2" "pypdf>=5.1" "matplotlib>=3.9" "markdown>=3.7"
+
 # execd lives in its own virtualenv, out of the way of anything agents install.
 RUN python -m venv /opt/execd && /opt/execd/bin/pip install --no-cache-dir \
         "fastapi>=0.115" "uvicorn>=0.32"

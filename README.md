@@ -77,6 +77,36 @@ In a chat you can:
 - **download** the chat as Markdown or **save it as a document** in the workspace;
 - **share** it by link (below).
 
+### Files in chats
+
+**Attach any file** with the paperclip, by dropping it on the composer or by pasting it
+(up to 10 per message, 25 MB each). What the assistant gets depends on the file:
+
+| File | What the model gets |
+|---|---|
+| Images (PNG, JPEG, GIF, WebP) | the image itself, for models that can see images |
+| PDF | its text (no OCR for scanned pages) |
+| Word (`.docx`) | paragraphs, headings and tables |
+| Excel (`.xlsx`, `.xlsm`) | every sheet as CSV (the last calculated values; first 2,000 rows) |
+| PowerPoint (`.pptx`) | the text and speaker notes of each slide |
+| Zip | the list of files, and the text of small text files in it |
+| Text, Markdown, code, CSV, JSON, ... | the text |
+| Anything else (`.xls`, `.sqlite`, audio, ...) | its name, type and size only |
+
+In **Agent mode** the agent can work on the file itself, not just read it:
+`save_attachment` copies an attachment into the workspace (it needs *Create and edit
+files*), where it can change it with Python in the shell, unpack a zip with
+`extract_zip`, and so on.
+
+**The agent can give you files**, of any kind: spreadsheets, PDFs, Word and PowerPoint
+files, zip bundles, standalone scripts, charts. It creates them in the workspace (the
+shell sandbox has pandas, openpyxl, XlsxWriter, python-docx, python-pptx, reportlab,
+pypdf and matplotlib, and `zip`), packs several into one with `create_zip`, and hands
+them over with `attach_file`: they appear as downloads under its answer (up to 100 MB
+each, 20 per answer). An attached file is a copy of the workspace file as it was then.
+Each version of a regenerated answer keeps its own files, and a branched chat gets a
+copy of them.
+
 ### Share links
 
 Anemo is for one person, but you can let someone read a single chat, document or

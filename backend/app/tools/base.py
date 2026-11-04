@@ -58,6 +58,11 @@ class ToolContext:
     browser_session: uuid.UUID | None = None
     # The project of the run's chat: new tasks and events are filed under it.
     project_id: uuid.UUID | None = None
+    # The run's chat, and the answer files given to the user are attached to
+    # (attach_file). For a sub-agent: the answer of the agent that started it.
+    conversation_id: uuid.UUID | None = None
+    message_id: uuid.UUID | None = None
+    answer_run_id: uuid.UUID | None = None  # the run of that answer
 
 
 class ToolResult(BaseModel):

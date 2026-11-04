@@ -33,9 +33,6 @@ interface ComposerProps {
   onSkillChange?: (skill: Skill | null) => void
 }
 
-const ACCEPT =
-  'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/*,.md,.csv,.json,.yaml,.yml,.toml,.py,.js,.ts,.tsx,.jsx,.go,.rs,.java,.c,.cpp,.h,.cs,.rb,.php,.sh,.sql,.html,.css,.xml,.log'
-
 /** The box grows with the text up to this height (px), then scrolls. */
 const MAX_HEIGHT = 240
 
@@ -196,6 +193,7 @@ export function Composer({
               key={f.key}
               name={f.file.name}
               size={f.file.size}
+              kind={f.uploaded?.kind}
               imageUrl={f.previewUrl}
               status={f.status}
               error={f.error}
@@ -318,7 +316,6 @@ export function Composer({
             ref={fileRef}
             type="file"
             multiple
-            accept={ACCEPT}
             className="hidden"
             onChange={(e) => {
               if (e.target.files) files.add(e.target.files)

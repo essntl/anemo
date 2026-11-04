@@ -83,6 +83,10 @@ def _version_run_id(v: dict[str, Any]) -> uuid.UUID | None:
     return uuid.UUID(v["run_id"]) if v.get("run_id") else None
 
 
+def _attachment_summary(a: Attachment) -> AttachmentSummary:
+    return AttachmentSummary(id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size)
+
+
 def message_out(
     m: ChatMessage,
     files: list[Attachment] | None = None,
@@ -91,6 +95,13 @@ def message_out(
 ) -> MessageOut:
     runs = runs or {}
     info = runs.get(m.run_id) if m.run_id else None
+    files = files or []
+    if m.role == "assistant":
+        # Files the agent attached belong to the answer (version) of the run that did;
+        # copies in a branched chat belong to no run and to the answer as it is.
+        current = [a for a in files if a.run_id is None or a.run_id == m.run_id]
+    else:
+        current = files
     versions: list[MessageVersion] = []
     if m.versions:
         for v in _all_versions(m):
@@ -106,6 +117,12 @@ def message_out(
                     model_label=v.get("model_label"),
                     mode=v_info[0] if v_info else None,
                     questions=_questions(v_info),
+                    attachments=[
+                        _attachment_summary(a)
+                        for a in files
+                        if (a.run_id is not None and a.run_id == run_id)
+                        or (a.run_id is None and run_id == m.run_id)
+                    ],
                 )
             )
     return MessageOut(
@@ -119,10 +136,7 @@ def message_out(
         run_id=m.run_id,
         model_label=m.model_label,
         created_at=m.created_at,
-        attachments=[
-            AttachmentSummary(id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size)
-            for a in files or []
-        ],
+        attachments=[_attachment_summary(a) for a in current],
         references=[
             ReferenceSummary(conversation_id=b["conversation_id"], title=b.get("title", ""))
             for b in m.content
@@ -623,8 +637,9 @@ async def edit_last(
     user.turn_context = None  # rendered again (current time, memories) for the new text
     assistant.content, assistant.text_plain = [], ""
     assistant.status, assistant.error = "streaming", None
-    # The earlier answers were to the text as it was before.
+    # The earlier answers were to the text as it was before, and so were their files.
     assistant.versions, assistant.version = [], 0
+    await attachments.delete_for_message(db, assistant.id)
     run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, conv.default_mode)
     conv.last_message_at = func.now()
     files = list(await db.scalars(select(Attachment).where(Attachment.message_id == user.id)))
@@ -688,6 +703,18 @@ async def branch(db: AsyncSession, conversation_id: uuid.UUID, upto_seq: int) ->
                 )
             content.append(block)
         message.content = content
+        if m.role == "assistant":
+            # Files the agent attached to the answer as it is shown now.
+            for original in await db.scalars(
+                select(Attachment)
+                .where(
+                    Attachment.message_id == m.id,
+                    Attachment.run_id.is_not(None),
+                    Attachment.run_id == m.run_id,
+                )
+                .order_by(Attachment.created_at)
+            ):
+                await attachments.duplicate(db, original, copy.id, message.id)
     await db.commit()
     await db.refresh(copy)
     return copy

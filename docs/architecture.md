@@ -180,7 +180,7 @@ IDs are UUIDv7 (time-sortable). All timestamps are `timestamptz`. Rows have `cre
 **Conversations**
 - `conversations` (id, title, default_mode, profile_id?, model_id?, pinned, archived, summary, summary_upto_message_id, last_message_at). Index (archived, pinned, last_message_at DESC); tsvector on title.
 - `messages` (id, conversation_id FK, seq, role enum user|assistant|system|tool_note, content jsonb (canonical blocks), text_plain (for FTS), run_id?, model_id?, created_at). UNIQUE(conversation_id, seq); GIN(tsv generated from text_plain).
-- `attachments` (id, conversation_id?, message_id?, filename, mime, size, sha256, storage_path, kind enum image|pdf|text|structured|other, extracted_text?, meta jsonb). Index (sha256) for dedupe.
+- `attachments` (id, conversation_id?, message_id?, run_id? SET NULL, filename, mime, size, sha256, storage_path, kind image|pdf|document|spreadsheet|presentation|archive|text|file, extracted_text?, extraction_note?). Index (sha256) for dedupe. A row with `run_id` is a file the agent attached to its answer (`attach_file`); the others were uploaded by the user.
 
 **Runs (unified execution record: chat turn, agent run, automation run, sub-agent)**
 - `runs` (id, kind enum chat|agent|automation|subagent, status enum queued|running|paused|waiting_approval|completed|failed|cancelled|interrupted, conversation_id?, automation_id?, profile_id?, parent_run_id?, root_run_id, depth, model_id, request text, effective_policy jsonb (snapshot), toolset jsonb, limits jsonb, plan jsonb, plan_version, checkpoint jsonb (step idx, pending tool calls), context_manifest jsonb, result_summary, error jsonb, attempt, started_at, ended_at, totals jsonb {tokens, cost}).

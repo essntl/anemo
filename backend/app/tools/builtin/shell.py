@@ -59,8 +59,11 @@ class RunShell(Tool):
     name = "run_shell"
     description = (
         "Run a bash command in an isolated Linux sandbox (Debian with git, python3, pip, "
-        "node/npm, curl, jq, ripgrep, sqlite3, make). The workspace is at /workspace and `cwd` "
-        "is relative to it. Stdin is closed, so commands must not prompt (use flags like -y). "
+        "node/npm, curl, jq, ripgrep, sqlite3, make, zip/unzip). Python has pandas, openpyxl "
+        "(Excel), python-docx (Word), python-pptx (PowerPoint), reportlab and pypdf (PDF) and "
+        "matplotlib (charts) for reading and making files. The workspace is at /workspace "
+        "and `cwd` is relative to it. Stdin is closed, so commands must not prompt (use "
+        "flags like -y). "
         "There is no internet unless network=true. SSH works with network=true: `ssh "
         "user@host 'command'` uses the agent's own key (no passwords; the user adds that key "
         "to their server) and host.docker.internal is the Docker host; also scp and rsync. "
