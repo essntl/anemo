@@ -22,7 +22,7 @@ searching inside workspace files that are not documents.
 
 Guides: [deployment](docs/deployment.md) · [backup and restore](docs/backup.md) ·
 [security and permissions](docs/security.md) · [architecture](docs/architecture.md) ·
-[Claude subscription](docs/claude-code.md)
+[Claude subscription](docs/claude-code.md) · [roadmap](docs/roadmap.md)
 
 ### Chat vs. Agent mode
 
