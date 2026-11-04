@@ -371,12 +371,28 @@ app is open they also pop up as a notice.
 
 In **Settings → Notifications** you choose where else they go:
 
+- **Push notifications**: arrive on your phone or computer even while Anemo is closed.
+  Turn them on in each browser or phone you want them on (*Push notifications on this
+  device*); every device is listed with when it last received something, and for each
+  you pick which kinds it gets, or remove it. Tapping a notification opens what it is
+  about. Works in Chrome, Edge and Firefox, and on an iPhone or iPad (iOS 16.4 or
+  later) once Anemo is on the Home Screen: open it from there to turn push on. Needs
+  HTTPS.
+- **Approve from the notification**: when an automation is waiting for a plain yes or
+  no, its push notification has **Allow once** and **Deny** buttons. Each works one
+  time, only for that request, and only while it is still waiting; anything else (for
+  example *Allow for this run*) is answered in the app. iPhones and iPads don't show
+  buttons on web notifications: tap it to answer in the app.
 - **Desktop notifications**: shown by your browser while Anemo is open in a tab
-  you are not looking at. This is a per-browser choice and needs HTTPS.
+  you are not looking at. This is a per-browser choice and needs HTTPS. A browser with
+  push on shows push notifications instead.
 - **Discord**: add a channel's webhook URL (channel settings → Integrations →
-  Webhooks) to get notifications on your phone when the app is closed. The URL is
-  stored encrypted and never shown again; for each channel you pick which kinds
-  of notification it receives. Sending is retried when Discord is unreachable.
+  Webhooks) to get notifications there. The URL is stored encrypted and never shown
+  again; for each channel you pick which kinds of notification it receives. Sending is
+  retried when Discord is unreachable.
+
+A notification sent to a device says only a line or two, encrypted so the browser's
+push service can't read it. Details in [docs/security.md](docs/security.md#push-notifications).
 
 Agents can send you a notification themselves (the *Send notifications*
 permission); they cannot choose or change where notifications go.

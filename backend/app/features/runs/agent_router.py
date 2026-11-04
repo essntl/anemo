@@ -13,6 +13,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Db, client_ip
 from app.core.errors import AppError, Conflict, NotFound
@@ -167,6 +168,17 @@ def grant_for(call: ToolCall) -> Grant:
 
 @router.post("/approvals/{approval_id}", response_model=ApprovalOut)
 async def decide(approval_id: uuid.UUID, body: DecisionIn, request: Request, db: Db) -> ApprovalOut:
+    approval = await decide_approval(db, approval_id, body, ip=client_ip(request))
+    return ApprovalOut.model_validate(approval, from_attributes=True)
+
+
+async def decide_approval(
+    db: AsyncSession, approval_id: uuid.UUID, body: DecisionIn, *, ip: str, via: str = "app"
+) -> Approval:
+    """Answer an approval request and let its run continue. Commits.
+
+    The one place an approval is decided: the app's approval cards and the buttons on
+    push notifications (`via="push"`) both come through here."""
     approval = await db.scalar(select(Approval).where(Approval.id == approval_id).with_for_update())
     if approval is None:
         raise NotFound("Approval not found")
@@ -200,15 +212,20 @@ async def decide(approval_id: uuid.UUID, body: DecisionIn, request: Request, db:
         f"approval.{approval.status}",
         target_type="tool_call",
         target_id=call.id,
-        ip=client_ip(request),
-        details={"run_id": str(run.id), "summary": approval.summary, "scope": body.scope},
+        ip=ip,
+        details={
+            "run_id": str(run.id),
+            "summary": approval.summary,
+            "scope": body.scope,
+            **({"via": via} if via != "app" else {}),
+        },
     )
     await queue.enqueue(db, "run.execute", {"run_id": str(run.id)}, lane="interactive")
     await bus.publish_run_event(
         run.id, "approval.resolved", {"approval_id": str(approval.id), "status": approval.status}
     )
     await service.set_status(db, run, "queued")  # commits
-    return ApprovalOut.model_validate(approval, from_attributes=True)
+    return approval
 
 
 class RevertOut(BaseModel):

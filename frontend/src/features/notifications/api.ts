@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
 import { withReauth } from '@/features/auth/reauthStore'
+import { deviceName, endpointHash, subscribeThisDevice, unsubscribeThisDevice } from './push'
 
 export type Notification = Schemas['NotificationOut']
 export type NotificationKind = Notification['kind']
@@ -13,7 +14,7 @@ export const destinationsKey = ['notification-destinations'] as const
 export const KIND_LABELS: Record<NotificationKind, string> = {
   reminder: 'Reminders for tasks and events',
   automation: 'Results of automations',
-  approval: 'An automation needs my approval',
+  approval: 'An automation needs my approval, or an agent asks me something',
   agent: 'Messages agents send me',
   focus: 'The focus timer finished a phase',
 }
@@ -100,6 +101,8 @@ export function useSaveDestination() {
       withReauth(async () => {
         const { name, url, enabled, kinds } = v.form
         if (!v.id) {
+          // New destinations made here are always Discord channels (devices subscribe
+          // through useEnablePush).
           return unwrap(
             await api.POST('/api/notification-destinations', { body: { name, url, enabled, kinds, type: 'discord' } }),
           )
@@ -140,6 +143,55 @@ export function useTestDestination() {
           params: { path: { destination_id: id } },
         }),
       ),
+    onSettled: () => void qc.invalidateQueries({ queryKey: destinationsKey }),
+  })
+}
+
+// -- push on this device ------------------------------------------------------------------
+
+/** Turn push on for this browser (asks the browser, then the password if needed). */
+export function useEnablePush() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      subscribeThisDevice((sub) =>
+        withReauth(async () =>
+          unwrap(
+            await api.POST('/api/push/subscriptions', {
+              body: {
+                endpoint: sub.endpoint ?? '',
+                keys: { p256dh: sub.keys?.p256dh ?? '', auth: sub.keys?.auth ?? '' },
+                name: deviceName(navigator.userAgent, navigator.maxTouchPoints),
+              },
+            }),
+          ),
+        ),
+      ),
+    onSettled: () => void qc.invalidateQueries({ queryKey: destinationsKey }),
+  })
+}
+
+/** Turn push off for this browser, and remove it from the list of devices. */
+export function useDisablePush() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (devices: Destination[]) => {
+      const endpoint = await unsubscribeThisDevice()
+      if (!endpoint) return
+      const hash = await endpointHash(endpoint)
+      const own = devices.find((d) => d.endpoint_hash === hash)
+      // If this is not confirmed, the server finds out on its own: the push service
+      // answers "gone" to the next notification and the device is removed then.
+      if (own) {
+        await withReauth(async () =>
+          unwrap(
+            await api.DELETE('/api/notification-destinations/{destination_id}', {
+              params: { path: { destination_id: own.id } },
+            }),
+          ),
+        )
+      }
+    },
     onSettled: () => void qc.invalidateQueries({ queryKey: destinationsKey }),
   })
 }
