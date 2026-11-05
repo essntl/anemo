@@ -41,6 +41,8 @@ const SCREENS = [
   '/notifications',
   '/memory',
   '/memory?tab=pending',
+  '/setup',
+  '/settings/advanced',
 ]
 
 async function horizontalOverflow(page: Page): Promise<number> {

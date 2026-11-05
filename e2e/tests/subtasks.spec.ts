@@ -65,7 +65,7 @@ test('a checklist, a subtask and a task it waits on', async ({ page }) => {
     await expect(dialog.getByText('1/2')).toBeVisible()
     await dialog.getByRole('button', { name: 'Save' }).click()
     await expect(dialog).toHaveCount(0)
-    await expect(page.getByLabel('Checklist: 1 of 2 done')).toBeVisible()
+    await expect(page.getByRole('button', { name: new RegExp(parent) }).getByLabel('Checklist: 1 of 2 done')).toBeVisible()
     expect((await byTitle(page, parent)).checklist).toEqual([
       expect.objectContaining({ text: 'Pack the books', done: true }),
       expect.objectContaining({ text: 'Label the boxes', done: false }),
@@ -144,7 +144,16 @@ test.describe('on the board', () => {
       const subCard = todo.locator('[draggable="true"]').filter({ hasText: sub })
       await expect(parentCard).toBeVisible()
       await expect(subCard).toContainText(parent) // "↳ its task"
-      await parentCard.dragTo(done)
+      // Drag by events on the card itself, not by mouse position: other tests add tasks
+      // to "To do" meanwhile, and a card moving under the mouse would drag another one.
+      // (The card is held as an element: once the dialog opens, the board is hidden
+      // from role queries.)
+      const transfer = await page.evaluateHandle(() => new DataTransfer())
+      const card = await parentCard.elementHandle()
+      await card!.dispatchEvent('dragstart', { dataTransfer: transfer })
+      await done.dispatchEvent('dragover', { dataTransfer: transfer })
+      await done.dispatchEvent('drop', { dataTransfer: transfer })
+      await card!.dispatchEvent('dragend', { dataTransfer: transfer })
       const ask = page.getByRole('dialog', { name: 'It has an open subtask' })
       await expect(ask).toBeVisible()
       // Keep it open: the task moves, its subtask stays.

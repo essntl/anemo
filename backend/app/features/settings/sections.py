@@ -29,6 +29,24 @@ class GeneralSettings(BaseModel):
     carry_over_daily_notes: bool = False
 
 
+SetupStep = Literal["provider", "models", "you", "parts", "notifications"]
+
+
+class SetupSettings(BaseModel):
+    """The first-run setup: whether it is still to do, and where it was left."""
+
+    # new: offered when the app is opened and nothing is set up yet; later: "Not now"
+    # (only reopened from Settings > Advanced); done: finished.
+    status: Literal["new", "later", "done"] = "new"
+    step: SetupStep | None = None
+
+
+class UpdateSettings(BaseModel):
+    """The update notice (Settings > Advanced). UPDATE_CHECK=false in .env wins."""
+
+    check: bool = True
+
+
 class FocusSettings(BaseModel):
     """The focus timer (Focus page, Home widget, Dynamic Island)."""
 
@@ -131,4 +149,6 @@ SECTIONS: dict[str, SectionSpec] = {
     "music": SectionSpec(MusicSettings),
     "home": SectionSpec(HomeSettings),
     "files": SectionSpec(FilesSettings),
+    "setup": SectionSpec(SetupSettings),
+    "updates": SectionSpec(UpdateSettings),
 }

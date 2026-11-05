@@ -81,6 +81,15 @@ its push service (Google's for Chrome, Mozilla's for Firefox, Apple's, Microsoft
   notification. Anyone who can see your unlocked phone's notifications can press the
   buttons, as they could open the app there.
 
+## Update check
+
+About once a day the worker asks GitHub's API how many commits `main` has that the
+running build doesn't. It is the only outside request Anemo makes on its own: a plain
+HTTPS GET to `api.github.com` with a fixed User-Agent (`Anemo-update-check`), no
+cookies, no token and nothing about you or your data; the answer only fills Settings
+→ Advanced. Anemo never downloads or installs anything itself. Switch it off in
+Settings → Advanced or for good with `UPDATE_CHECK=false`.
+
 ## Diagrams, charts and math
 
 Diagrams can be written from untrusted content (a web page an agent read, a shared

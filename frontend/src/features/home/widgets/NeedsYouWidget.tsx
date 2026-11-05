@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { AlarmClock, Brain, Clock, Inbox, Pin, PinOff, ShieldQuestion } from 'lucide-react'
+import { AlarmClock, Brain, Clock, Inbox, Pin, PinOff, ShieldQuestion, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import type { WidgetLayout } from '../layout'
@@ -12,6 +12,7 @@ const ICON: Record<NeedsRow['kind'], ReactNode> = {
   memory: <Brain />,
   automation: <Clock />,
   overdue: <AlarmClock />,
+  update: <Sparkles />,
 }
 
 /** Needs you: approvals, memory suggestions, failed automations, overdue tasks. */
@@ -35,7 +36,7 @@ export function NeedsYouWidget({ item, onPin }: { item: WidgetLayout; onPin: (pi
           {rows.slice(0, n).map((r) => (
             <li key={r.key}>
               <Link to={r.to} className="flex items-center gap-2.5 rounded-control px-2 py-1.5 hover:bg-surface-hover">
-                <span className={cn('shrink-0 [&>svg]:h-4 [&>svg]:w-4', r.kind === 'overdue' || r.kind === 'automation' ? 'text-error' : 'text-warning')}>{ICON[r.kind]}</span>
+                <span className={cn('shrink-0 [&>svg]:h-4 [&>svg]:w-4', r.kind === 'overdue' || r.kind === 'automation' ? 'text-error' : r.kind === 'update' ? 'text-accent' : 'text-warning')}>{ICON[r.kind]}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] font-medium">{r.title}</span>
                   {r.detail && <span className="block truncate text-[12px] text-muted">{r.detail}</span>}

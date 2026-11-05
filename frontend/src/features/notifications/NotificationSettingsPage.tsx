@@ -164,7 +164,7 @@ function useThisDeviceHash(devices: Destination[]): string | null | undefined {
   return hash
 }
 
-function PushCard({ devices, onEdit }: { devices: Destination[]; onEdit: (d: Destination) => void }) {
+export function PushCard({ devices, onEdit }: { devices: Destination[]; onEdit: (d: Destination) => void }) {
   const support = pushSupport()
   const enable = useEnablePush()
   const disable = useDisablePush()

@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     data_path: str = "/data"
     static_dir: str = "/app/static"
 
+    # The commit this build was made from (set by the image build; empty for a build
+    # that didn't pass it) and how it was installed: "image" for the prebuilt images,
+    # "source" for a build from a checkout. Settings > Advanced and the update notice.
+    app_commit: str = ""
+    app_install: Literal["image", "source"] = "source"
+    # The update notice: once a day, ask GitHub how many changes this repository's main
+    # branch has that this build doesn't. UPDATE_CHECK=false switches it off for good.
+    update_check: bool = True
+    update_repo: str = "essntl/anemo"
+
     worker_concurrency: int = 4
     enable_fake_provider: bool = False
     searxng_url: str | None = None
