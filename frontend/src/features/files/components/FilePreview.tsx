@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Download, FileQuestion, Save, X } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { contentKey, downloadUrl, type Entry, useFileContent, useSaveFile } from '../api'
+import { useShortcut } from '@/hooks/useShortcut'
 import { CodeEditor } from './CodeEditor'
 
 const IMAGE = /\.(png|jpe?g|gif|webp)$/i
@@ -42,15 +43,8 @@ function TextEditor({ path, onClose }: { path: string; onClose: () => void }) {
   }
 
   // Ctrl/Cmd+S saves.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        if (dirty) void doSave()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+  useShortcut('files.save', () => {
+    if (dirty) void doSave()
   })
 
   if (content.isError) {

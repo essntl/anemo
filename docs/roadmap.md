@@ -33,6 +33,8 @@ the feature written or updated, and the feature marked done here.
 
 ## 1. Shortcut sheet
 
+**Status: built.**
+
 Press **?** anywhere (outside a text field) to see every keyboard shortcut in one
 place. Today they are spread over the README and individual pages (Ctrl+K, Ctrl+\\,
 E on Home, Space/R/S/+ for the timer, Shift over the chat list, …) and nothing in

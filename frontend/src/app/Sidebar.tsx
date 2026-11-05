@@ -34,6 +34,7 @@ import { useNotificationSummary } from '@/features/notifications/api'
 import { useRunsSummary } from '@/features/runs/api'
 import { useProjects } from '@/features/tasks/api'
 import { usePalette } from '@/features/search/paletteStore'
+import { shortcutText } from '@/features/shortcuts/registry'
 import { cn } from '@/lib/cn'
 import { useCurrentProject, useProjectStore } from './projectStore'
 import { useSidebar } from './sidebarStore'
@@ -169,13 +170,13 @@ export function SidebarRail({ className }: { className?: string }) {
   const button = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
   return (
     <nav aria-label="Menu" className={cn('h-full w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-border bg-surface py-4', className)}>
-      <button type="button" aria-label="Show the sidebar" title="Show the sidebar (Ctrl+\)" onClick={() => setCollapsed(false)} className={button}>
+      <button type="button" aria-label="Show the sidebar" title={`Show the sidebar (${shortcutText('app.sidebar')})`} onClick={() => setCollapsed(false)} className={button}>
         <PanelLeftOpen className="h-4 w-4" />
       </button>
       <Button variant="primary" size="icon" className="mt-2 shrink-0" aria-label="New chat" title="New chat" onClick={() => navigate('/')}>
         <Plus className="h-4 w-4" />
       </Button>
-      <button type="button" aria-label="Search everything" title="Search everything (Ctrl+K)" onClick={() => openSearch(true)} className={button}>
+      <button type="button" aria-label="Search everything" title={`Search everything (${shortcutText('app.search')})`} onClick={() => openSearch(true)} className={button}>
         <Search className="h-4 w-4" />
       </button>
       <RailLink to="/chats" label="All chats" icon={<MessagesSquare />} />
@@ -229,7 +230,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
             </button>
           </>
         ) : (
-          <button type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+\)" onClick={() => setCollapsed(true)}
+          <button type="button" aria-label="Hide the sidebar" title={`Hide the sidebar (${shortcutText('app.sidebar')})`} onClick={() => setCollapsed(true)}
             className="flex h-8 w-8 items-center justify-center rounded-control text-subtle hover:bg-surface-hover hover:text-text">
             <PanelLeftClose className="h-4 w-4" />
           </button>
@@ -247,7 +248,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </Button>
         {/* Search everything (also Ctrl+K): chats by title and text, documents, files, tasks, … */}
         <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" aria-label="Search everything"
-          title="Search everything (Ctrl+K)"
+          title={`Search everything (${shortcutText('app.search')})`}
           // On a phone the search takes the screen, so the menu makes way for it.
           onClick={() => { onClose?.(); openSearch(true) }}>
           <Search className="h-4 w-4" />

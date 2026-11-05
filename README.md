@@ -445,13 +445,21 @@ Press **Ctrl+K** (⌘K on a Mac) anywhere, or the search button next to *New cha
 to search everything: chats, documents, memories, tasks, calendar events, files
 (by name) and automations. Typing a page name ("calendar", "settings mcp") jumps
 there. Arrow keys move, Enter opens. It also does things: *Start focus*, *Pause or
-resume the timer*, *Play or pause music*, *Next track*, *Paste a music link…* and
-*Edit home layout*.
+resume the timer*, *Play or pause music*, *Next track*, *Paste a music link…*,
+*Edit home layout* and *Keyboard shortcuts*.
 
 *All results* opens the search page, where you can filter by kind. Every word you
 type has to match. On that page documents and memories are also found by meaning
 when an embedding model is set (Settings → Providers & Models); the quick box
 matches words only, so typing never calls a model.
+
+### Keyboard shortcuts
+
+Press **?** anywhere (outside a text field) to see every keyboard shortcut: the ones
+for the page you are on first, then those that work everywhere, then the rest. Esc
+closes it. *Keyboard shortcuts* in the search box and **Settings → General** open the
+same list. On a Mac it shows ⌘ and ⌥ instead of Ctrl and Alt. Phones and tablets
+without a mouse or trackpad don't get it.
 
 ### Usage
 

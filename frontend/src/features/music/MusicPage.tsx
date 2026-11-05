@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/Card'
 import { promptDialog } from '@/components/ui/dialogs'
 import { Lingering } from '@/components/ui/Lingering'
 import { Segmented } from '@/components/ui/Segmented'
-import { useHotkey } from '@/hooks/useHotkey'
+import { useShortcut } from '@/hooks/useShortcut'
 import { useCreatePlaylist, usePlaylists } from './api'
 import { AmbientCard } from './components/AmbientCard'
 import { NowPlayingCard } from './components/NowPlayingCard'
@@ -27,7 +27,7 @@ export function MusicPage() {
   const create = useCreatePlaylist()
   const [tab, setTab] = useState<Tab>('queue')
   const [check, setCheck] = useState(false)
-  useHotkey((e) => e.key === ' ', () => player.toggle())
+  useShortcut('music.toggle', () => player.toggle())
 
   const saveQueue = async () => {
     const name = await promptDialog({ title: 'Save the queue as a playlist', label: 'Name', placeholder: 'e.g. Deep focus', confirmLabel: 'Save' })

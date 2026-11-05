@@ -359,3 +359,13 @@ test('Home on a phone: the saved layout in one column, same order', async ({ pag
     await page.request.put('/api/settings/home', { data: before })
   }
 })
+
+test('a touch screen gets no keyboard shortcut sheet', async ({ page }) => {
+  await login(page)
+  await page.goto('/settings/general')
+  await expect(page.getByRole('button', { name: 'Sign out' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Show keyboard shortcuts' })).toHaveCount(0)
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.press('?')
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveCount(0)
+})

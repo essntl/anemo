@@ -33,6 +33,7 @@ import { useProjects } from '@/features/tasks/api'
 import { BacklinkList } from '@/features/links/BacklinkList'
 import { fileBacklinks, linkedFromText, useFileBacklinks } from '@/features/links/api'
 import { api } from '@/api/client'
+import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
 import {
   downloadUrl,
@@ -204,15 +205,8 @@ function PasteBar({ folder }: { folder: string }) {
     else copy.mutate(body)
   }
   // Ctrl+V / Cmd+V pastes too, Escape cancels (not while typing somewhere).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, [contenteditable=true]')) return
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') paste()
-      else if (e.key === 'Escape') clear()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
+  useShortcut('files.paste', paste, { enabled: Boolean(item), whileTyping: false, keepDefault: true })
+  useShortcut('files.cancelPaste', clear, { enabled: Boolean(item), keepDefault: true })
   if (!item) return null
   const error = move.error ?? copy.error
   return (

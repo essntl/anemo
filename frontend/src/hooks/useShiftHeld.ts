@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isTyping } from './useHotkey'
+import { isTyping } from './useShortcut'
 
 /**
  * True while Shift is held down (and not while typing in a field, where Shift only
