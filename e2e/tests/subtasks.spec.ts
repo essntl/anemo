@@ -104,8 +104,14 @@ test('a checklist, a subtask and a task it waits on', async ({ page }) => {
     await page.getByRole('checkbox', { name: `Complete “${blocker}”` }).click()
     await expect(page.getByLabel(`Waits on ${blocker}`)).toHaveCount(0)
     await expect.poll(async () => (await byTitle(page, parent)).status).toBe('todo')
-    const notes = (await (await page.request.get('/api/notifications')).json()) as { title: string }[]
-    expect(notes.some((n) => n.title === `Ready to start: ${parent}`)).toBe(true)
+    // The list holds only the newest notifications, and other tests add theirs at the
+    // same time: ask for the most it gives and wait for ours rather than reading it once.
+    await expect
+      .poll(async () => {
+        const notes = (await (await page.request.get('/api/notifications?limit=200')).json()) as { title: string }[]
+        return notes.some((n) => n.title === `Ready to start: ${parent}`)
+      })
+      .toBe(true)
 
     // Finishing the task asks about its open subtask; finish it too.
     await page.getByRole('checkbox', { name: `Complete “${parent}”` }).click()
