@@ -193,6 +193,21 @@ async def test_a_file_moving_during_the_listing_is_not_forgotten(authed, docs, m
     assert alpha["id"] in ids
 
 
+async def test_a_document_created_during_the_listing_is_kept(authed, docs, monkeypatch):
+    # Another request lists the folder just before a document is created, and reads the
+    # index just after: the new document's row is there, its file not in the listing.
+    before = service._scan()
+    created = await authed.post("/api/documents", json={"title": "Fresh", "content": "# Fresh"})
+    assert created.status_code == 201, created.text
+    fresh = created.json()
+    monkeypatch.setattr(service, "_scan", lambda: before)
+    assert (await authed.get("/api/documents")).status_code == 200
+    monkeypatch.undo()
+    # Still the same document (same id, its history), not dropped and found again.
+    assert (await authed.get(f"/api/documents/{fresh['id']}")).status_code == 200
+    assert [d["id"] for d in (await listing(authed))["documents"]] == [fresh["id"]]
+
+
 async def test_agent_document_tools(authed, docs):
     cid = await setup(authed, **{"docs.write": "autonomous"})
     (docs / "recipes.md").write_text("# Recipes\n\nPancakes need flour, eggs and milk.\n")

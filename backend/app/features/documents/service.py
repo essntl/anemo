@@ -151,6 +151,13 @@ def _scan() -> tuple[list[FileInfo], list[str], bool]:
     return found, folders, complete
 
 
+def _exists(path: str) -> bool:
+    try:
+        return files.resolve(path).is_file()
+    except AppError:
+        return False
+
+
 def _read(path: str) -> str:
     return files.read_text(path, MAX_DOC_BYTES)[0]
 
@@ -193,6 +200,11 @@ async def reconcile(db: AsyncSession) -> list[str]:
     # A file that vanished mid-scan may just be moving: forget nothing this time (the
     # next look sees where it went, and keeps its history).
     for doc in gone.values() if complete else []:
+        # Created (by another request) after the folder was listed, so not in the list
+        # but in the index: it is there, keep it rather than dropping it and finding it
+        # again on the next look as a new document with a new id.
+        if await asyncio.to_thread(_exists, doc.path):
+            continue
         await index.delete_source(db, SOURCE_TYPE, [doc.id])
         await db.delete(doc)
         changed = True
