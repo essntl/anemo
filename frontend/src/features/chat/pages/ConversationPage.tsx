@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { AppWindow, ExternalLink, GitBranch, Star, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { MenuButton, NewChatButton } from '@/app/mobileNav'
+import { fixRequest } from '@/components/diagrams/context'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { promptDialog } from '@/components/ui/dialogs'
@@ -316,6 +317,9 @@ export function ConversationPage() {
                       }
                       onBranch={other ? undefined : () =>
                         branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
+                      }
+                      onFixDiagram={activeRunId || question ? undefined : (problem) =>
+                        send.mutate({ conversationId, text: fixRequest(problem), modelId: modelOverride, mode, profileId })
                       }
                     />
                   )

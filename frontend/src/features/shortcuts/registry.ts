@@ -30,7 +30,7 @@ export interface Shortcut {
   prefix?: string
 }
 
-export type AreaId = 'everywhere' | 'search' | 'chat' | 'home' | 'focus' | 'music' | 'files'
+export type AreaId = 'everywhere' | 'search' | 'chat' | 'home' | 'focus' | 'music' | 'files' | 'diagram'
 
 export interface Area {
   id: AreaId
@@ -47,6 +47,7 @@ export const AREAS: Area[] = [
   { id: 'focus', title: 'Focus', pages: (p) => p === '/focus' },
   { id: 'music', title: 'Music', pages: (p) => p === '/music' },
   { id: 'files', title: 'Files', pages: (p) => p === '/files' },
+  { id: 'diagram', title: 'Diagram or chart in full screen' },
 ]
 
 const ARROWS: KeyCombo[] = [{ key: 'ArrowUp' }, { key: 'ArrowDown' }, { key: 'ArrowLeft' }, { key: 'ArrowRight' }]
@@ -81,6 +82,9 @@ export const SHORTCUTS = {
   'files.save': { area: 'files', keys: [{ key: 's', mod: true }], description: 'Save the file you are editing' },
   'files.paste': { area: 'files', keys: [{ key: 'v', mod: true }], description: 'Paste what you cut or copied into the open folder' },
   'files.cancelPaste': { area: 'files', keys: [{ key: 'Escape' }], description: 'Forget what you cut or copied' },
+  'diagram.zoomIn': { area: 'diagram', keys: [{ key: '+' }, { key: '=', quiet: true }], description: 'Zoom in' },
+  'diagram.zoomOut': { area: 'diagram', keys: [{ key: '-' }], description: 'Zoom out' },
+  'diagram.fit': { area: 'diagram', keys: [{ key: '0' }], description: 'Fit to the window' },
 } satisfies Record<string, Shortcut>
 
 export type ShortcutId = keyof typeof SHORTCUTS

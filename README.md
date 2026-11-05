@@ -160,6 +160,7 @@ Anemo comes with these skills:
 | `/brainstorm` | Lots of varied ideas, grouped, with the most promising ones picked out |
 | `/decide` | Compares options against what matters to you and recommends one |
 | `/rewrite` | Makes a text clearer and tighter, keeps your meaning and voice, and explains the changes |
+| `/diagram` | Shows an explanation, process, plan or numbers as a picture: a flowchart, mind map, timeline, sequence diagram or chart |
 
 **Settings → Skills** is where you create, edit, import and switch skills on and off.
 For each skill you choose its command, icon, the hint shown in the message box,
@@ -187,6 +188,33 @@ page through it, and you can download it from the run.
 
 **Runs** lists every agent run with its status, profile, time, tokens and cost, and
 opens each one with its plan, tool calls, approvals, file changes and answer.
+
+### Diagrams, charts and math
+
+Answers, documents, shared pages and automation results show **diagrams, charts and
+formulas** drawn instead of as code. They are ordinary Markdown, so the text stays
+readable in any other tool:
+
+- **Diagrams**: a ```` ```mermaid ```` block ([Mermaid](https://mermaid.js.org/)):
+  flowcharts, mind maps, sequence diagrams, timelines, Gantt charts, state diagrams,
+  pie charts.
+- **Charts**: a ```` ```chart ```` block with a little JSON: `type` (line, bar, area or
+  pie), `title`, the `x` labels and one or more `series` with a `name` and a value per
+  label, optionally a `unit`. Charts use the app's colors and show values on hover.
+- **Math**: `$…$` in a sentence, `$$…$$` on its own line (LaTeX, drawn with KaTeX).
+  Prices like "\$5 and \$10" stay text.
+
+Each diagram and chart has a bar to see its **source**, **copy** it, **download** it
+as SVG or PNG, and open it **full screen** (zoom with the wheel or + and −, drag to
+move). While an answer is being written, a block shows as code until it is complete.
+One that can't be drawn shows its source and the error; in a chat, **Fix diagram**
+asks the model to send a corrected one.
+
+The models are told these blocks exist, and the built-in **/diagram** skill asks for
+one directly ("show this as a mind map"). In a document, a diagram shows drawn with
+an **Edit** button that opens its source. Mermaid is only downloaded by a page that
+shows a diagram. Diagrams can't run scripts or load anything from other sites (see
+[security](docs/security.md#diagrams-charts-and-math)).
 
 ### Sub-agents
 
@@ -217,7 +245,9 @@ on the same files. Sub-folders are groups; images you drop in go to
 - **Editor:** rich text (headings, lists, checklists, tables, code blocks, links,
   images) that reads and writes Markdown, or the Markdown source itself. Documents
   using raw HTML or footnotes open as source, because the rich editor would lose
-  those.
+  those; so do documents with formulas the rich editor would change (LaTeX such as
+  `\,` or `\{`). Diagram and chart blocks are shown drawn, with an *Edit* button for
+  their source (see below).
 - **Autosave** about a second after you stop typing. If the file was changed
   somewhere else in the meantime (an agent, another tab), nothing is overwritten:
   you choose which version to keep. With no unsaved changes, outside changes just

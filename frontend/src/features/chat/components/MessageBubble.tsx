@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { AlertCircle, Brain, Check, ChevronLeft, ChevronRight, Copy, Download, GitBranch, MessageCircleReply, Pencil, RotateCcw } from 'lucide-react'
 import type { Schemas } from '@/api/client'
+import { DiagramFixContext, type DiagramProblem } from '@/components/diagrams/context'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
@@ -181,6 +182,8 @@ interface AssistantProps {
   versions?: VersionNav
   /** Files the agent attached to this answer, to download. */
   files?: AttachmentSummary[]
+  /** Asks the model to correct a diagram in this answer that can't be drawn. */
+  onFixDiagram?: (problem: DiagramProblem) => void
 }
 
 /** Files the agent made for you, under its answer. */
@@ -221,6 +224,7 @@ export function AssistantMessage({
   questions,
   versions,
   files,
+  onFixDiagram,
 }: AssistantProps) {
   const [copied, setCopied] = useState(false)
   const live = ['streaming', 'queued', 'running', 'waiting_approval', 'waiting_subagent', 'paused'].includes(status)
@@ -250,14 +254,16 @@ export function AssistantMessage({
         </div>
       )}
       {(text || Boolean(questions?.length)) && (
-        <div className={ANSWER_INSET}>
-          {splitAtQuestions(text, questions).map((part, i) =>
-            part.kind === 'question'
-              ? <QuestionDivider key={i} mark={part.mark} />
-              : part.text && <Markdown key={i} text={part.text} />,
-          )}
-          {live && !suspended && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
-        </div>
+        <DiagramFixContext.Provider value={live ? null : (onFixDiagram ?? null)}>
+          <div className={ANSWER_INSET}>
+            {splitAtQuestions(text, questions).map((part, i) =>
+              part.kind === 'question'
+                ? <QuestionDivider key={i} mark={part.mark} />
+                : part.text && <Markdown key={i} text={part.text} streaming={live} />,
+            )}
+            {live && !suspended && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
+          </div>
+        </DiagramFixContext.Provider>
       )}
 
       {files && files.length > 0 && <AnswerFiles files={files} />}

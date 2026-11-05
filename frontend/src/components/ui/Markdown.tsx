@@ -1,19 +1,44 @@
-import { memo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { createContext, memo, useContext, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
+import ReactMarkdown, { type ExtraProps, type Options } from 'react-markdown'
 import { Link } from 'react-router'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { Check, Copy } from 'lucide-react'
+import { DiagramBlock } from '@/components/diagrams/DiagramBlock'
+import { protectDollars } from '@/components/diagrams/dollars'
+import { isFenceClosed } from '@/components/diagrams/fence'
+import { isDiagramLanguage } from '@/components/diagrams/languages'
+import { useMath } from '@/components/diagrams/useMath'
 import { isAppLink } from '@/lib/appLinks'
 import { stripCitationMarkup } from '@/lib/citations'
 
-function CodeBlock({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) {
+/** The Markdown being shown, for code blocks that need their own source. */
+const SourceContext = createContext<{ text: string; streaming: boolean }>({ text: '', streaming: false })
+
+/** The text of a code element's children (react-markdown passes it as a string). */
+function textOf(children: unknown): string {
+  if (typeof children === 'string') return children
+  if (Array.isArray(children)) return children.map(textOf).join('')
+  return ''
+}
+
+function CodeBlock({ children, node, ...rest }: ComponentPropsWithoutRef<'pre'> & ExtraProps) {
   const ref = useRef<HTMLPreElement>(null)
   const [copied, setCopied] = useState(false)
+  const { text, streaming } = useContext(SourceContext)
   // The language comes from the `language-xyz` class on the inner <code>.
   const child = Array.isArray(children) ? children[0] : children
-  const className = (child as { props?: { className?: string } })?.props?.className ?? ''
+  const childProps = (child as { props?: { className?: string; children?: unknown } })?.props
+  const className = childProps?.className ?? ''
   const language = /language-([\w-]+)/.exec(className)?.[1] ?? 'text'
+
+  if (isDiagramLanguage(language)) {
+    // While an answer is being written, a block is drawn once its closing fence is there.
+    const start = node?.position?.start.offset
+    const end = node?.position?.end.offset
+    const complete = !streaming || (start !== undefined && end !== undefined && isFenceClosed(text.slice(start, end)))
+    if (complete) return <DiagramBlock lang={language} source={textOf(childProps?.children).replace(/\n$/, '')} />
+  }
 
   const copy = async () => {
     await navigator.clipboard.writeText(ref.current?.innerText ?? '')
@@ -48,21 +73,29 @@ function Table({ children }: ComponentPropsWithoutRef<'table'>) {
   return <div className="table-scroll"><table>{children}</table></div>
 }
 
-/** Renders Markdown (GFM tables, task lists, highlighted code). */
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
+// Kept the same between renders, so a drawn diagram isn't mounted again on every update.
+const COMPONENTS = { pre: CodeBlock, a: Anchor, table: Table }
+const HIGHLIGHT: NonNullable<Options['rehypePlugins']>[number] = [rehypeHighlight, { detect: false, ignoreMissing: true }]
+
+/**
+ * Renders Markdown: GFM tables and task lists, highlighted code, ```mermaid diagrams,
+ * ```chart charts and math ($…$, $$…$$). `streaming` is set while an answer is still
+ * being written, so diagrams are only drawn once their block is complete.
+ */
+export const Markdown = memo(function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  const cleaned = stripCitationMarkup(text)
+  const math = useMath(cleaned.includes('$'))
+  const source = useMemo(() => (math ? protectDollars(cleaned) : cleaned), [math, cleaned])
+  const context = useMemo(() => ({ text: source, streaming }), [source, streaming])
+  const remarkPlugins = useMemo(() => [remarkGfm, ...(math?.remarkPlugins ?? [])], [math])
+  const rehypePlugins = useMemo(() => [...(math?.rehypePlugins ?? []), HIGHLIGHT], [math])
   return (
     <div className="markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeHighlight, { detect: false, ignoreMissing: true }]]}
-        components={{
-          pre: CodeBlock,
-          a: Anchor,
-          table: Table,
-        }}
-      >
-        {stripCitationMarkup(text)}
-      </ReactMarkdown>
+      <SourceContext.Provider value={context}>
+        <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={COMPONENTS}>
+          {source}
+        </ReactMarkdown>
+      </SourceContext.Provider>
     </div>
   )
 })

@@ -89,10 +89,22 @@ export function tidyMarkdown(markdown: string): string {
 export const assetUrl =(workspacePath: string) => `${DOWNLOAD}${encodeURIComponent(workspacePath)}`
 
 /**
+ * A formula ($…$ or $$…$$) with a backslash before punctuation, as LaTeX often has
+ * (`\,`, `\{`, `\\`): the rich editor would read those as Markdown escapes and drop
+ * the backslash, changing the formula.
+ */
+const FRAGILE_MATH = /\$\$[\s\S]*?\\[!-/:-@[-`{-~][\s\S]*?\$\$|\$[^\s$][^$\n]*?\\[!-/:-@[-`{-~][^$\n]*?\$/
+
+/**
  * True when the body uses Markdown the rich editor cannot keep (raw HTML,
- * footnotes): such documents open in the Markdown source editor instead.
+ * footnotes, formulas it would change): such documents open in the Markdown source
+ * editor instead.
  */
 export function needsSourceMode(body: string): boolean {
   const withoutCode = body.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g, '')
-  return /<\/?[a-zA-Z][^>\n]*>/.test(withoutCode) || /\[\^[^\]\s]+\]/.test(withoutCode)
+  return (
+    /<\/?[a-zA-Z][^>\n]*>/.test(withoutCode) ||
+    /\[\^[^\]\s]+\]/.test(withoutCode) ||
+    FRAGILE_MATH.test(withoutCode)
+  )
 }

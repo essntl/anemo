@@ -59,6 +59,24 @@ describe('rich editor Markdown round trip', () => {
     expect(roundTrip(SAMPLE)).toBe(SAMPLE)
   })
 
+  it('keeps diagram and chart blocks byte for byte', () => {
+    const text = [
+      '# Diagrams',
+      '',
+      '```mermaid',
+      'flowchart TD',
+      '  A["Start: here"] --> B{Ok?}',
+      '  B -->|yes| C[Done]',
+      '```',
+      '',
+      '```chart',
+      '{"type": "pie", "x": ["a", "b"], "series": [{"name": "Share", "values": [1, 2]}]}',
+      '```',
+      '',
+    ].join('\n')
+    expect(roundTrip(text)).toBe(text)
+  })
+
   it('is stable: a second pass changes nothing', () => {
     const once = roundTrip('* star bullets\n* become dashes\n\n| a | b |\n|---|---|\n| 1 | 2 |\n')
     expect(once).toContain('- star bullets')
@@ -97,6 +115,17 @@ describe('document Markdown helpers', () => {
     expect(needsSourceMode('a < b and c > d')).toBe(false)
     expect(needsSourceMode('<details><summary>More</summary>text</details>')).toBe(true)
     expect(needsSourceMode('A claim.[^1]\n\n[^1]: Source')).toBe(true)
+  })
+
+  it('sends documents with formulas it would change to the source editor', () => {
+    // A backslash before punctuation is a Markdown escape: the rich editor would drop it.
+    expect(needsSourceMode('Area $\\pi r^2$ and $$\\int_0^1 x\\,dx$$')).toBe(true)
+    expect(needsSourceMode('A set $\\{1, 2\\}$')).toBe(true)
+    expect(needsSourceMode('Lines:\n\n$$\na \\\\\nb\n$$')).toBe(true)
+    // Formulas without such escapes, prices and code stay in the rich editor.
+    expect(needsSourceMode('Area $\\pi r^2$ and $E=mc^2$')).toBe(false)
+    expect(needsSourceMode('It costs $5 and $10, not \\$20.')).toBe(false)
+    expect(needsSourceMode('```latex\n$\\{x\\}$\n```')).toBe(false)
   })
 })
 

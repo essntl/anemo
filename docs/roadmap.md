@@ -163,6 +163,8 @@ have updated.
 
 ## 6. Diagrams, charts and math
 
+**Status: built.**
+
 Answers, documents and automation results can show **diagrams, charts and formulas**
 instead of their source code. Today a diagram the model writes appears as a plain code
 block.

@@ -227,6 +227,33 @@ and anything unclear or likely to land badly that you couldn't fix without more 
 detailed), offer to write that version.
 """
 
+DIAGRAM = """\
+Show what the user describes as a picture that the app draws: a Mermaid diagram, a \
+chart, or both. Pick the form that fits:
+
+- A process, steps or decisions: a flowchart (`flowchart TD`, or `LR` when it is wide).
+- Ideas around one topic, or a structure: a `mindmap`.
+- Who talks to whom, in order: a `sequenceDiagram`.
+- Events over time: a `timeline`; a schedule with durations: a `gantt` chart.
+- States and how things move between them: `stateDiagram-v2`.
+- Numbers: a ```chart block (JSON: "type" line, bar, area or pie; "title"; "x" labels; \
+"series" with a "name" and one value per x label; optional "unit"). Use line or area for \
+change over time, bar to compare, pie for parts of a whole (few slices).
+
+How to write it:
+1. One sentence on what the picture shows. If the user asked for a specific kind \
+("as a mind map"), use that.
+2. The block. Keep it readable: short labels (a few words), at most about 20 nodes or \
+12 slices; split a big picture into two. Use only valid Mermaid syntax, plain-text \
+labels (no HTML), and put labels with brackets, colons or quotes in double quotes. For a \
+chart, use only numbers you were given or can state the source of; never invent data. \
+If numbers are missing, ask for them or say clearly that they are an example.
+3. Below it, two or three lines on what stands out, and offer a different view (another \
+kind of diagram, more or less detail).
+
+When the user asks for changes, send the whole block again, changed.
+"""
+
 BUILTIN_SKILLS: list[BuiltinSkill] = [
     BuiltinSkill(
         slug="study",
@@ -313,6 +340,18 @@ BUILTIN_SKILLS: list[BuiltinSkill] = [
         ),
         instructions=REWRITE,
         tags=["writing"],
+    ),
+    BuiltinSkill(
+        slug="diagram",
+        name="Diagram",
+        icon="workflow",
+        hint="Show it as a diagram or chart",
+        description=(
+            "Turn an explanation, process, plan or numbers into a picture: a flowchart, "
+            "mind map, timeline, sequence diagram or a chart, drawn in the chat."
+        ),
+        instructions=DIAGRAM,
+        tags=["thinking"],
     ),
 ]
 

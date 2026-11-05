@@ -5,7 +5,7 @@
 import {
   BadgeCheck, BookOpen, Briefcase, Bug, Calculator, ChefHat, Code, Compass, Dumbbell, FileText, GraduationCap,
   Languages, Lightbulb, ListChecks, Mail, Map, MessageSquare, Microscope, Palette, PenLine, Presentation, Puzzle,
-  Rocket, Scale, Search, Sparkles, Split, Target, Terminal, WandSparkles, Zap, type LucideIcon,
+  Rocket, Scale, Search, Sparkles, Split, Target, Terminal, WandSparkles, Workflow, Zap, type LucideIcon,
 } from 'lucide-react'
 
 export const SKILL_ICONS: Record<string, LucideIcon> = {
@@ -20,6 +20,7 @@ export const SKILL_ICONS: Record<string, LucideIcon> = {
   microscope: Microscope,
   lightbulb: Lightbulb,
   split: Split,
+  workflow: Workflow,
   'pen-line': PenLine,
   'file-text': FileText,
   mail: Mail,
