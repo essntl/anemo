@@ -81,6 +81,24 @@ its push service (Google's for Chrome, Mozilla's for Firefox, Apple's, Microsoft
   notification. Anyone who can see your unlocked phone's notifications can press the
   buttons, as they could open the app there.
 
+## Diagrams, charts and math
+
+Diagrams can be written from untrusted content (a web page an agent read, a shared
+document), so drawing one can't do more than show a picture:
+
+- Mermaid runs in its **strict** mode with plain-text labels (no HTML) and no click
+  handlers. A diagram's own `%%{init}%%` settings can't change that, the theme or the
+  CSS.
+- The drawing is cleaned again before it goes into the page: only SVG is kept (no
+  scripts, event handlers, embedded HTML or images), links keep only targets inside
+  the drawing (`#…`), and CSS loses `url(…)` and `@import`. So nothing is loaded from
+  another site and nothing runs.
+- Charts are drawn by the app itself from validated numbers and labels (rendered as
+  text).
+- Formulas use KaTeX with `trust` off, so commands such as `\href`, `\url` or
+  `\includegraphics` don't work. KaTeX, its fonts and Mermaid are part of the app;
+  nothing comes from a CDN.
+
 ## Permission levels
 
 **Settings → Agent Permissions** has one level per kind of action:

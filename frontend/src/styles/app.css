@@ -202,6 +202,8 @@
 
   /* The rich document editor (TipTap) uses .markdown too; these are its extras. */
   .tiptap pre { @apply my-3 overflow-x-auto rounded-xl border border-border bg-surface-2 p-3 font-mono text-[12.5px] leading-relaxed; }
+  /* A drawn diagram's own source view keeps the look of its frame. */
+  .tiptap .code-block-preview pre { @apply my-0 rounded-none border-0; }
   .tiptap table { @apply my-3 w-full max-w-full; }
   .tiptap td > p, .tiptap th > p { @apply my-0; }
   .tiptap .selectedCell { background: var(--selection); }

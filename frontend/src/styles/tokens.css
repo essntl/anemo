@@ -54,6 +54,14 @@
   --island-control-hover: rgb(255 255 255 / 0.18);
   --island-track: rgb(255 255 255 / 0.18);
 
+  /* Charts and diagrams: categorical colors for series and slices, in this order. */
+  --chart-1: #3478f6;
+  --chart-2: #e07a2e;
+  --chart-3: #2a9d68;
+  --chart-4: #8b5cf6;
+  --chart-5: #d6457a;
+  --chart-6: #1597a8;
+
   /* A live radio stream (no seeking). */
   --live: var(--error);
 
@@ -92,6 +100,13 @@
   --warning: #f2a93b;
   --error: #f06464;
   --info: #5b9bff;
+
+  --chart-1: #5b9bff;
+  --chart-2: #f2994a;
+  --chart-3: #3fc283;
+  --chart-4: #a78bfa;
+  --chart-5: #ef6f9c;
+  --chart-6: #33bfcf;
 
   --island-bg: #000000;
   --ring-track: #272c35;

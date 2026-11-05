@@ -60,10 +60,25 @@ CANCEL_POLL_S = 3.0
 
 # Stable for every turn (prompt caching): the date and the memories for a message
 # are in its turn context (runtime/turn_context.py), not here.
+# What the app draws from Markdown (Chat and Agent mode). Brief, and stable like the rest.
+VISUALS_HINT = """
+## Diagrams, charts and math
+The app draws these Markdown blocks. Use them when a picture explains better than \
+text (a process, a structure, a timeline, numbers to compare), not for simple answers:
+- ```mermaid: Mermaid diagrams (flowchart, mindmap, sequenceDiagram, timeline, gantt, \
+stateDiagram-v2, pie). Plain-text labels, no HTML; quote labels with special characters.
+- ```chart: numbers as a chart, JSON: {"type": "line" | "bar" | "area" | "pie", \
+"title": "...", "unit": "%", "x": ["label", ...], "series": [{"name": "...", \
+"values": [number, ...]}]}, one value per x label (a pie uses the first series).
+- Math in LaTeX: $...$ inline, $$...$$ for a formula on its own line. Write amounts of \
+money with the currency as text or as \\$ (e.g. 5 USD) so they aren't read as math.
+"""
+
 SYSTEM_PROMPT = (
     "You are a helpful assistant inside the user's personal, self-hosted AI workspace. "
     "Answer clearly and concisely. Use Markdown for structure and fenced code blocks for code. "
     "The current date and time are in the turn context at the end of the user's latest message."
+    "\n" + VISUALS_HINT
 )
 
 
