@@ -26,7 +26,7 @@ from app.features.providers.schemas import (
     TestResult,
 )
 from app.features.settings import service as settings_service
-from app.features.settings.sections import ModelDefaults
+from app.features.settings.sections import ModelDefaults, SetupSettings
 from app.features.usage import service as usage_service
 from app.providers.registry import PROVIDER_TYPES, available_types
 from app.providers.router import to_resolved
@@ -178,15 +178,21 @@ class SetupStatus(BaseModel):
     has_provider: bool
     has_model: bool
     has_chat_default: bool
+    # Open the first-run setup when the app is opened: nothing is set up yet (no
+    # provider) and the setup was neither finished nor put off ("Not now").
+    offer_setup: bool
 
 
 @router.get("/setup/status", response_model=SetupStatus)
 async def setup_status(db: Db) -> SetupStatus:
-    """Drives the first-run checklist in the UI."""
+    """Drives the first-run setup and checklist in the UI."""
     defaults = await settings_service.get_section(db, ModelDefaults, "models")
+    setup = await settings_service.get_section(db, SetupSettings, "setup")
     models = await service.list_models(db)
+    has_provider = bool(await service.list_providers(db))
     return SetupStatus(
-        has_provider=bool(await service.list_providers(db)),
+        has_provider=has_provider,
         has_model=bool(models),
         has_chat_default=defaults.chat is not None and any(m.id == defaults.chat for m in models),
+        offer_setup=setup.status == "new" and not has_provider,
     )

@@ -26,7 +26,7 @@ export async function saveAppearance(body: Schemas['AppearanceSettings']) {
 }
 
 /** The sections that anyone signed in may change without confirming the password again. */
-type PlainSection = 'focus' | 'music' | 'home' | 'files'
+type PlainSection = 'focus' | 'music' | 'home' | 'files' | 'setup' | 'updates'
 
 /**
  * Save one settings section. The cached settings update at once (optimistically), so

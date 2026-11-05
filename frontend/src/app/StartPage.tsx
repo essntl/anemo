@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Navigate } from 'react-router'
 import { NewChatPage } from '@/features/chat/pages/NewChatPage'
+import { useSetupStatus } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
 
 const KEY = 'anemo.opened'
@@ -21,23 +22,26 @@ const justOpened = (() => {
 })()
 
 /**
- * `/`: the new-chat page, except when the app has just been opened and Settings →
- * General → Start page is Home. "New chat" leads here later and stays on the new chat.
+ * `/`: the new-chat page, except when the app has just been opened: then the first-run
+ * setup while nothing is set up yet, or Home when Settings → General → Start page says
+ * so. "New chat" leads here later and stays on the new chat.
  */
 const start = { redirected: false }
 
-/** Goes to Home, once: coming back to / later in the session is a new chat. */
-function GoHome() {
+/** Goes elsewhere, once: coming back to / later in the session is a new chat. */
+function GoOnce({ to }: { to: string }) {
   useEffect(() => {
     start.redirected = true
   }, [])
-  return <Navigate to="/home" replace />
+  return <Navigate to={to} replace />
 }
 
 export function StartPage() {
   const settings = useSettings()
+  const setup = useSetupStatus()
   if (!justOpened || start.redirected) return <NewChatPage />
-  if (settings.isPending) return null
-  if ((settings.data?.general.start_page ?? 'home') === 'home') return <GoHome />
+  if (settings.isPending || setup.isPending) return null
+  if (setup.data?.offer_setup) return <GoOnce to="/setup" />
+  if ((settings.data?.general.start_page ?? 'home') === 'home') return <GoOnce to="/home" />
   return <NewChatPage />
 }

@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.db import dispose_engine
 from app.core.logging import configure_logging
 from app.core.redis import close_redis, get_redis
+from app.features import parts
 from app.jobs import scheduler
 from app.jobs.runner import JobRunner
 
@@ -53,6 +54,10 @@ async def runner_status_loop(stop: asyncio.Event) -> None:
             await claude_runner_client.publish_status()
         except Exception:  # noqa: BLE001 - try again next time
             log.debug("claude-runner status not published", exc_info=True)
+        try:
+            await parts.publish()  # which optional containers run (Settings > Advanced)
+        except Exception:  # noqa: BLE001 - try again next time
+            log.debug("parts status not published", exc_info=True)
         try:
             await asyncio.wait_for(stop.wait(), timeout=RUNNER_STATUS_INTERVAL_S)
         except TimeoutError:

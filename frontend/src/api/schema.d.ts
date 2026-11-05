@@ -384,6 +384,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Setup Settings */
+        put: operations["put_setup_settings_api_settings_setup_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Updates Settings */
+        put: operations["put_updates_settings_api_settings_updates_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -587,7 +621,7 @@ export interface paths {
         };
         /**
          * Setup Status
-         * @description Drives the first-run checklist in the UI.
+         * @description Drives the first-run setup and checklist in the UI.
          */
         get: operations["setup_status_api_setup_status_get"];
         put?: never;
@@ -2979,6 +3013,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Updates */
+        get: operations["get_updates_api_updates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/updates/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Now
+         * @description Settings > Advanced → Check now.
+         */
+        post: operations["check_now_api_updates_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/updates/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss
+         * @description Put the update notice away (it comes back for newer changes after a while).
+         */
+        post: operations["dismiss_api_updates_dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/updates/whats-new/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Whats New */
+        post: operations["dismiss_whats_new_api_updates_whats_new_dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3007,6 +3115,8 @@ export interface components {
             music: components["schemas"]["MusicSettings"];
             home: components["schemas"]["HomeSettings"];
             files: components["schemas"]["FilesSettings"];
+            setup: components["schemas"]["SetupSettings"];
+            updates: components["schemas"]["UpdateSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -3392,6 +3502,15 @@ export interface components {
             /** Workspace Scoped */
             workspace_scoped: boolean;
         };
+        /** Change */
+        Change: {
+            /** Sha */
+            sha: string;
+            /** Title */
+            title: string;
+            /** Date */
+            date?: string | null;
+        };
         /**
          * ChatBulkIn
          * @description One change applied to several chats at once.
@@ -3427,6 +3546,12 @@ export interface components {
              * @default false
              */
             optional: boolean;
+            /**
+             * Group
+             * @default core
+             * @enum {string}
+             */
+            group: "core" | "part";
         };
         /**
          * ChecklistItem
@@ -5877,6 +6002,20 @@ export interface components {
             /** Current */
             current: boolean;
         };
+        /**
+         * SetupSettings
+         * @description The first-run setup: whether it is still to do, and where it was left.
+         */
+        SetupSettings: {
+            /**
+             * Status
+             * @default new
+             * @enum {string}
+             */
+            status: "new" | "later" | "done";
+            /** Step */
+            step?: ("provider" | "models" | "you" | "parts" | "notifications") | null;
+        };
         /** SetupStatus */
         SetupStatus: {
             /** Has Provider */
@@ -5885,6 +6024,8 @@ export interface components {
             has_model: boolean;
             /** Has Chat Default */
             has_chat_default: boolean;
+            /** Offer Setup */
+            offer_setup: boolean;
         };
         /** ShareIn */
         ShareIn: {
@@ -6252,6 +6393,13 @@ export interface components {
         SystemStatus: {
             /** Version */
             version: string;
+            /** Commit */
+            commit: string | null;
+            /**
+             * Install
+             * @enum {string}
+             */
+            install: "image" | "source";
             /** Database Version */
             database_version: string | null;
             /** Checks */
@@ -6666,6 +6814,45 @@ export interface components {
             user_message: components["schemas"]["MessageOut"] | null;
             assistant_message: components["schemas"]["MessageOut"];
         };
+        /**
+         * UpdateSettings
+         * @description The update notice (Settings > Advanced). UPDATE_CHECK=false in .env wins.
+         */
+        UpdateSettings: {
+            /**
+             * Check
+             * @default true
+             */
+            check: boolean;
+        };
+        /** UpdatesOut */
+        UpdatesOut: {
+            /** Commit */
+            commit: string | null;
+            /** Install */
+            install: string;
+            /** Repo */
+            repo: string;
+            /** Command */
+            command: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Env Disabled */
+            env_disabled: boolean;
+            /** Checked At */
+            checked_at: string | null;
+            /** Status */
+            status: ("up_to_date" | "available" | "unknown_commit" | "error") | null;
+            /** Error */
+            error: string | null;
+            /** Behind By */
+            behind_by: number;
+            /** Changes */
+            changes: components["schemas"]["Change"][];
+            /** Notice */
+            notice: boolean;
+            whats_new: components["schemas"]["WhatsNew"] | null;
+        };
         /** UsageGroup */
         UsageGroup: {
             /**
@@ -6817,6 +7004,20 @@ export interface components {
             search_configured: boolean;
             /** Env Searxng Url */
             env_searxng_url: string | null;
+        };
+        /**
+         * WhatsNew
+         * @description What changed between the version that ran here before and this one.
+         */
+        WhatsNew: {
+            /** From Commit */
+            from_commit: string;
+            /** To Commit */
+            to_commit: string;
+            /** Total */
+            total: number;
+            /** Changes */
+            changes?: components["schemas"]["Change"][];
         };
         /**
          * WidgetLayout
@@ -7612,6 +7813,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FilesSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_setup_settings_api_settings_setup_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_updates_settings_api_settings_updates_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateSettings"];
                 };
             };
             /** @description Validation Error */
@@ -13850,6 +14121,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_updates_api_updates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_now_api_updates_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_api_updates_dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_whats_new_api_updates_whats_new_dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatesOut"];
                 };
             };
             /** @description Validation Error */

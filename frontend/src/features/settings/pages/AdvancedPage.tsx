@@ -1,25 +1,23 @@
 /**
- * Settings > Advanced: the version, whether each part of the system is working,
- * and the log of security-relevant events (logins, changed settings, approvals).
- * Nothing can be changed here; it is the place to look when something is off.
+ * Settings > Advanced: the version, updates, the first-run setup, whether each part of
+ * the system is working, and the log of security-relevant events (logins, changed
+ * settings, approvals). The place to look when something is off.
  */
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, CircleSlash, RefreshCw, Wrench } from 'lucide-react'
+import { Link } from 'react-router'
+import { RefreshCw, Rocket, Wrench } from 'lucide-react'
 import { api, errorMessage, type Schemas, unwrap } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { shortCommit } from '@/features/updates/api'
+import { UpdatesCard, WhatsNewCard } from '@/features/updates/UpdatesCards'
 import { formatWhen } from '@/lib/format'
+import { useSettings } from '../api'
+import { CheckRow } from '../CheckRow'
+import { useSystemStatus } from '../systemStatus'
 
-type Check = Schemas['Check']
 type AuditEntry = Schemas['AuditOut']
 
-function useSystemStatus() {
-  return useQuery({
-    queryKey: ['system', 'status'],
-    queryFn: async () => unwrap(await api.GET('/api/system/status')),
-    staleTime: 0, // always fresh when the page is opened
-  })
-}
 
 function useAuditLog() {
   return useQuery({
@@ -29,18 +27,26 @@ function useAuditLog() {
   })
 }
 
-function CheckRow({ check }: { check: Check }) {
-  // An optional part that is off is not a problem, just a fact.
-  const Icon = check.ok ? CheckCircle2 : check.optional ? CircleSlash : AlertTriangle
-  const tone = check.ok ? 'text-success' : check.optional ? 'text-subtle' : 'text-error'
+/** The first-run setup can be opened again from here, or picked up where it was left. */
+function SetupCard() {
+  const settings = useSettings()
+  const setup = settings.data?.setup
+  if (!setup) return null
+  const done = setup.status === 'done'
   return (
-    <li className="flex items-start gap-3 border-t border-border py-2.5 first:border-t-0">
-      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone}`} />
-      <div className="min-w-0 flex-1">
-        <div className="text-[13.5px] font-medium">{check.name}</div>
-        <div className={`break-words text-[12.5px] ${check.ok || check.optional ? 'text-muted' : 'text-error'}`}>{check.detail}</div>
-      </div>
-    </li>
+    <Card>
+      <CardHeader title="First-run setup"
+        description={done
+          ? 'Finished. Go through it again to check the providers, models and optional parts.'
+          : 'A few steps: a model provider, helper models, your time zone, optional parts and notifications.'}
+        actions={
+          <Link to="/setup" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10">
+            <Rocket className="h-3.5 w-3.5" aria-hidden />
+            {done ? 'Open setup' : setup.step ? 'Continue setup' : 'Start setup'}
+          </Link>
+        } />
+      <div className="pb-2" />
+    </Card>
   )
 }
 
@@ -66,10 +72,16 @@ export function AdvancedPage() {
           <h2 className="text-lg font-semibold">Advanced</h2>
           <p className="text-[13px] text-muted">
             Anemo {status.data ? `version ${status.data.version}` : ''}
+            {status.data?.commit && <> · commit <code className="font-mono" title={status.data.commit}>{shortCommit(status.data.commit)}</code></>}
+            {status.data && <> · {status.data.install === 'image' ? 'prebuilt image' : 'built from source'}</>}
             {status.data?.database_version && <> · database version {status.data.database_version}</>}
           </p>
         </div>
       </div>
+
+      <WhatsNewCard />
+      <UpdatesCard />
+      <SetupCard />
 
       <Card>
         <CardHeader title="System status"

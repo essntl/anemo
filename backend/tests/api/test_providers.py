@@ -95,7 +95,9 @@ async def test_default_model_routing(authed):
     r = await authed.put("/api/settings/models", json={"chat": by_key["echo"]})
     assert r.status_code == 200
     status = (await authed.get("/api/setup/status")).json()
-    assert status == {"has_provider": True, "has_model": True, "has_chat_default": True}
+    assert status == {
+        "has_provider": True, "has_model": True, "has_chat_default": True, "offer_setup": False,
+    }  # fmt: skip
 
     async with get_sessionmaker()() as db:
         plan = await resolve(db, RouteRequest(task="title"))  # falls back to chat default

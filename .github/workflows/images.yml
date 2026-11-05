@@ -85,6 +85,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # The app records the commit it was built from (the update notice compares it
+          # with main) and that it is a prebuilt image (Settings > Advanced shows the
+          # matching update command). Other images ignore these.
+          build-args: |
+            APP_COMMIT=${{ github.sha }}
+            APP_INSTALL=image
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 

@@ -36,6 +36,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <StartPage /> },
           { path: 'home', ...page(() => import('@/features/home/HomePage'), 'HomePage') },
+          { path: 'setup', ...page(() => import('@/features/setup/SetupPage'), 'SetupPage') },
           {
             path: 'c/:conversationId',
             element: <ConversationPage />,

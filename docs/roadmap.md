@@ -131,6 +131,8 @@ Firefox, and on iPhone/iPad (iOS 16.4+) once Anemo is added to the Home Screen.
 
 ## 5. First-run setup and update notice
 
+**Status: built.**
+
 **First-run setup.** On the first login, a short guided setup instead of an empty app
 and a hint to go to Settings.
 
@@ -150,13 +152,16 @@ opened again from **Settings → Advanced**. Nothing it sets differs from settin
 hand.
 
 **Update notice.** Tells you when a newer Anemo is out, and what changed once you
-have updated.
+have updated. Anemo has no numbered releases (the images are rebuilt from `main` on
+every change), so it compares commits: each build records the commit it was made from.
 
-- About once a day the server compares its version with the latest release on GitHub.
-  When a newer one exists, **Settings → Advanced** shows it with its release notes and
-  the update command for your setup (`docker compose pull && docker compose up -d`),
-  and a small dismissible notice appears once.
-- After an update, a **What's new** card shows that version's notes once.
+- About once a day the server asks GitHub how many changes `main` has that this build
+  doesn't. When there are some, **Settings → Advanced** lists their titles (newest
+  first) with the update command for your kind of install (`docker compose pull &&
+  docker compose up -d` for the prebuilt images, `git pull` and a rebuild for a
+  checkout), and a small dismissible notice appears in Home's *Needs you*.
+- After an update, a **What's new** card lists the changes since the version that ran
+  before, once.
 - Anemo never updates itself. The check is the only call it makes for this, sends
   nothing about you, and can be switched off in Settings → Advanced (or with an `.env`
   setting).

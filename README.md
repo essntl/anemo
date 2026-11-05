@@ -16,9 +16,8 @@ Docker Compose on a homelab.
 > numbers, plus a **Home** page of widgets, a **focus timer**, a **music** player, the
 > **Dynamic Island** and **stats**. Works on phones and can be installed to your home screen.
 
-Not built yet: a first-run setup wizard (you add a provider in Settings instead),
-the OpenAI *Responses* API (OpenAI works through the chat completions adapter), and
-searching inside workspace files that are not documents.
+Not built yet: the OpenAI *Responses* API (OpenAI works through the chat completions
+adapter), and searching inside workspace files that are not documents.
 
 Guides: [deployment](docs/deployment.md) · [backup and restore](docs/backup.md) ·
 [security and permissions](docs/security.md) · [architecture](docs/architecture.md) ·
@@ -674,9 +673,24 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Open `http://<server>:8080`, log in, then go to **Settings → Providers & Models**:
-add a provider (OpenAI, Anthropic, OpenRouter or any OpenAI-compatible server such
-as Ollama), use **Add models** to pick models, and choose a default chat model.
+Open `http://<server>:8080` and log in. The first time, a short **setup** opens:
+
+1. **Model provider**: add one (OpenAI, Anthropic, OpenRouter, any OpenAI-compatible
+   server such as Ollama, or your Claude subscription), use **Add models** to pick its
+   models, and choose the model for chats.
+2. **Helper models** (optional): Summaries, Memory and Embeddings, with suggestions
+   from the models you added (a small model for the first two).
+3. **You**: your time zone, and whether Anemo opens on Home or a new chat.
+4. **Optional parts**: whether the sandboxes, the browser, the MCP host, the Claude
+   runner and SearXNG are running, and for each one that isn't, the command that
+   starts it.
+5. **Notifications** (optional): push on this device, or a Discord channel.
+
+Every step can be skipped, and **Not now** leaves it for later: it then waits in
+**Settings → Advanced** (*Continue setup*), and the step you left off at is kept, also
+for another device. You can go through it again there after finishing. It sets
+nothing you couldn't set in Settings yourself; an install that already has a
+provider never sees it on its own.
 
 Each model shows what it can do (tools, vision, reasoning, …). OpenRouter reports
 this per model. Other providers do not, so Anemo assumes a chat model can use tools
@@ -703,7 +717,8 @@ and needs no `.env` file:
    and run `docker compose up -d` in that folder.
 3. Open `http://<your-zimaos-address>:8484` and log in.
 
-Update with `docker compose pull && docker compose up -d` in the same folder.
+Update with `docker compose pull && docker compose up -d` in the same folder
+(Settings → Advanced tells you when there is something new; see *Updates* below).
 
 Installing through the ZimaOS screen (App Store → **+** → *Install a customized
 app* → *Import*) is possible, but ZimaOS rewrites the file and keeps only one
@@ -737,9 +752,31 @@ Details, nightly backups and moving to another machine: [docs/backup.md](docs/ba
 
 ### Is everything running?
 
-**Settings → Advanced** shows the version, a check of every part (database, live
-events, worker, folders, browser) and the security log. What happens when a part
-is down is listed in [docs/deployment.md](docs/deployment.md).
+**Settings → Advanced** shows the version and the commit it was built from, a check
+of every part (database, live events, worker, folders, the sandboxes, browser, MCP
+host, Claude runner, SearXNG) and the security log. What happens when a part is down
+is listed in [docs/deployment.md](docs/deployment.md).
+
+### Updates
+
+Anemo has no numbered releases: the images are rebuilt from `main` on every change,
+and each build records the commit it was made from. About once a day Anemo asks
+GitHub how many changes `main` has that your version doesn't. When there are some,
+**Settings → Advanced** lists them (newest first) with the command that updates your
+kind of install, and Home's **Needs you** shows *An Anemo update is available* until
+you put it away (*Not now*; it comes back a week later if there are newer changes).
+After you update, a **What's new** card lists what changed since the version you had,
+once.
+
+- Prebuilt images: `docker compose pull && docker compose up -d`.
+- From a checkout: `git pull && APP_COMMIT=$(git rev-parse HEAD) docker compose up -d --build`
+  (or `make up`). A build without `APP_COMMIT` can't be compared, and Advanced says so.
+
+Anemo never updates itself. The check is one request to GitHub's API that carries
+nothing about you (no cookies, no ids, a fixed User-Agent). Switch it off in
+Settings → Advanced, or for good with `UPDATE_CHECK=false` in `.env`;
+`UPDATE_REPO` (default `essntl/anemo`) compares with another repository, such as your
+fork.
 
 ## Services
 

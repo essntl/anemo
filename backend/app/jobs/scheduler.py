@@ -18,6 +18,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.features.conversations import service as conversations
     from app.features.notifications import service as notifications
     from app.features.runs import service as runs
+    from app.features.updates import service as updates
 
     return [
         ("reminders", reminders.fire_due),
@@ -25,6 +26,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
         ("notifications.prune", notifications.prune),
         ("approvals.expire", runs.expire_stale_approvals),
         ("chats.temporary", conversations.delete_expired_temporary),
+        ("updates.check", updates.check_if_due),  # about once a day
     ]
 
 

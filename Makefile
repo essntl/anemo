@@ -4,8 +4,8 @@ RUN = $(DEV) run --rm --no-deps -e ENV=test app
 
 .PHONY: up down dev build logs test test-backend test-frontend e2e lint fmt migrate revision gen-api backup
 
-up:            ## Production stack
-	docker compose up -d --build
+up:            ## Production stack (records the checkout's commit for the update notice)
+	APP_COMMIT=$$(git rev-parse HEAD 2>/dev/null) docker compose up -d --build
 down:
 	docker compose down
 dev:           ## Hot-reload stack; open http://localhost:5173

@@ -79,16 +79,29 @@ HTTPS; an extra access list or VPN in front is a good idea.
 
 - `docker compose ps` — every service should be `healthy` (`migrate` exits after it
   has run).
-- **Settings → Advanced** shows the version and a check of each part: database,
-  live events, background worker, workspace folder, data folder, browser.
+- **Settings → Advanced** shows the version, the commit it was built from, and a
+  check of each part: database, live events, background worker, workspace folder,
+  data folder, the two sandboxes, browser, MCP host, Claude runner and SearXNG.
 - `curl http://<server>:8080/api/health` answers `{"status":"ok"}`.
 
 ## Updating
 
+From a checkout:
+
 ```bash
 git pull
-docker compose up -d --build
+APP_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
 ```
+
+(`make up` does the same.) `APP_COMMIT` lets Anemo know which version runs, for the
+update notice; without it everything works, but Settings → Advanced can't tell
+whether there is something newer. With the prebuilt images (ZimaOS):
+`docker compose pull && docker compose up -d`. The images carry their commit.
+
+About once a day the worker asks GitHub's API how many commits `main` has that this
+build doesn't (`compare/<commit>...main`) and Settings → Advanced shows them. Switch
+it off there, or with `UPDATE_CHECK=false` in `.env`; `UPDATE_REPO` (default
+`essntl/anemo`) points it at another repository. Nothing is ever installed by itself.
 
 Database changes are applied automatically by the `migrate` service before the app
 starts. Make a backup first (see [backup.md](backup.md)); going back to an older

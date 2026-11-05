@@ -1131,6 +1131,124 @@
         }
       }
     },
+    "/api/settings/setup": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Setup Settings",
+        "operationId": "put_setup_settings_api_settings_setup_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/updates": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Updates Settings",
+        "operationId": "put_updates_settings_api_settings_updates_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -2017,7 +2135,7 @@
           "providers"
         ],
         "summary": "Setup Status",
-        "description": "Drives the first-run checklist in the UI.",
+        "description": "Drives the first-run setup and checklist in the UI.",
         "operationId": "setup_status_api_setup_status_get",
         "parameters": [
           {
@@ -12971,6 +13089,204 @@
           }
         }
       }
+    },
+    "/api/updates": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Get Updates",
+        "operationId": "get_updates_api_updates_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/check": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Check Now",
+        "description": "Settings > Advanced \u2192 Check now.",
+        "operationId": "check_now_api_updates_check_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/dismiss": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Dismiss",
+        "description": "Put the update notice away (it comes back for newer changes after a while).",
+        "operationId": "dismiss_api_updates_dismiss_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/whats-new/dismiss": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Dismiss Whats New",
+        "operationId": "dismiss_whats_new_api_updates_whats_new_dismiss_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13040,6 +13356,12 @@
           },
           "files": {
             "$ref": "#/components/schemas/FilesSettings"
+          },
+          "setup": {
+            "$ref": "#/components/schemas/SetupSettings"
+          },
+          "updates": {
+            "$ref": "#/components/schemas/UpdateSettings"
           }
         },
         "type": "object",
@@ -13054,7 +13376,9 @@
           "focus",
           "music",
           "home",
-          "files"
+          "files",
+          "setup",
+          "updates"
         ],
         "title": "AllSettings"
       },
@@ -14195,6 +14519,36 @@
         ],
         "title": "CategoryOut"
       },
+      "Change": {
+        "properties": {
+          "sha": {
+            "type": "string",
+            "title": "Sha"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha",
+          "title"
+        ],
+        "title": "Change"
+      },
       "ChatBulkIn": {
         "properties": {
           "ids": {
@@ -14285,6 +14639,15 @@
             "type": "boolean",
             "title": "Optional",
             "default": false
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "core",
+              "part"
+            ],
+            "title": "Group",
+            "default": "core"
           }
         },
         "type": "object",
@@ -20926,6 +21289,41 @@
         ],
         "title": "SessionOut"
       },
+      "SetupSettings": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "later",
+              "done"
+            ],
+            "title": "Status",
+            "default": "new"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "provider",
+                  "models",
+                  "you",
+                  "parts",
+                  "notifications"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "type": "object",
+        "title": "SetupSettings",
+        "description": "The first-run setup: whether it is still to do, and where it was left."
+      },
       "SetupStatus": {
         "properties": {
           "has_provider": {
@@ -20939,13 +21337,18 @@
           "has_chat_default": {
             "type": "boolean",
             "title": "Has Chat Default"
+          },
+          "offer_setup": {
+            "type": "boolean",
+            "title": "Offer Setup"
           }
         },
         "type": "object",
         "required": [
           "has_provider",
           "has_model",
-          "has_chat_default"
+          "has_chat_default",
+          "offer_setup"
         ],
         "title": "SetupStatus"
       },
@@ -21813,6 +22216,25 @@
             "type": "string",
             "title": "Version"
           },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "install": {
+            "type": "string",
+            "enum": [
+              "image",
+              "source"
+            ],
+            "title": "Install"
+          },
           "database_version": {
             "anyOf": [
               {
@@ -21835,6 +22257,8 @@
         "type": "object",
         "required": [
           "version",
+          "commit",
+          "install",
           "database_version",
           "checks"
         ],
@@ -23151,6 +23575,135 @@
         ],
         "title": "TurnOut"
       },
+      "UpdateSettings": {
+        "properties": {
+          "check": {
+            "type": "boolean",
+            "title": "Check",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "UpdateSettings",
+        "description": "The update notice (Settings > Advanced). UPDATE_CHECK=false in .env wins."
+      },
+      "UpdatesOut": {
+        "properties": {
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "install": {
+            "type": "string",
+            "title": "Install"
+          },
+          "repo": {
+            "type": "string",
+            "title": "Repo"
+          },
+          "command": {
+            "type": "string",
+            "title": "Command"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "env_disabled": {
+            "type": "boolean",
+            "title": "Env Disabled"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "up_to_date",
+                  "available",
+                  "unknown_commit",
+                  "error"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "behind_by": {
+            "type": "integer",
+            "title": "Behind By"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "notice": {
+            "type": "boolean",
+            "title": "Notice"
+          },
+          "whats_new": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WhatsNew"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "commit",
+          "install",
+          "repo",
+          "command",
+          "enabled",
+          "env_disabled",
+          "checked_at",
+          "status",
+          "error",
+          "behind_by",
+          "changes",
+          "notice",
+          "whats_new"
+        ],
+        "title": "UpdatesOut"
+      },
       "UsageGroup": {
         "properties": {
           "requests": {
@@ -23490,6 +24043,37 @@
           "env_searxng_url"
         ],
         "title": "WebStatus"
+      },
+      "WhatsNew": {
+        "properties": {
+          "from_commit": {
+            "type": "string",
+            "title": "From Commit"
+          },
+          "to_commit": {
+            "type": "string",
+            "title": "To Commit"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_commit",
+          "to_commit",
+          "total"
+        ],
+        "title": "WhatsNew",
+        "description": "What changed between the version that ran here before and this one."
       },
       "WidgetLayout": {
         "properties": {

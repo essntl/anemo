@@ -7,6 +7,7 @@ answer?"): each check says what it is, whether it is fine, and what it means if 
 import asyncio
 import shutil
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -16,7 +17,10 @@ from app import __version__, browser_client
 from app.api.deps import Db
 from app.core.config import get_settings
 from app.core.redis import get_redis
+from app.features import parts
+from app.features.settings import service as settings_service
 from app.jobs.models import Job
+from app.web.settings import WebSettings
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -26,10 +30,15 @@ class Check(BaseModel):
     ok: bool
     detail: str
     optional: bool = False  # a part that may be switched off on purpose
+    # "part": a container or service you start (or not) yourself; the first-run setup
+    # lists these. "core": the app's own machinery.
+    group: Literal["core", "part"] = "core"
 
 
 class SystemStatus(BaseModel):
     version: str
+    commit: str | None  # the commit this build was made from, when the build said
+    install: Literal["image", "source"]  # prebuilt images, or built from a checkout
     database_version: str | None  # the latest applied migration
     checks: list[Check]
 
@@ -100,15 +109,86 @@ async def status(db: Db) -> SystemStatus:
     checks.append(await _workers())
     checks.append(await asyncio.to_thread(_folder, "Workspace folder", settings.workspace_path))
     checks.append(await asyncio.to_thread(_folder, "Data folder", settings.data_path))
-    running = browser_client.available()
-    checks.append(
+    checks.extend(await _parts(db))
+    return SystemStatus(
+        version=__version__,
+        commit=settings.app_commit.strip() or None,
+        install=settings.app_install,
+        database_version=migration,
+        checks=checks,
+    )
+
+
+# The containers you start yourself: (key, name, optional, what is missing when it's off,
+# how to start it).
+_PARTS: list[tuple[str, str, bool, str, str]] = [
+    (
+        "sandbox",
+        "Shell sandbox",
+        False,
+        "agents can't run commands",
+        "docker compose up -d sandbox",
+    ),
+    (
+        "sandbox_net",
+        "Shell sandbox with network",
+        False,
+        "agents can't run commands that need the internet",
+        "docker compose up -d sandbox-net",
+    ),
+    (
+        "browser",
+        "Browser for agents",
+        True,
+        "agents can't use web pages that need JavaScript",
+        "docker compose --profile browser up -d",
+    ),
+    (
+        "mcp_host",
+        "MCP host (local MCP servers)",
+        True,
+        "local MCP servers (npx …, uvx …) can't run",
+        "docker compose --profile mcp up -d",
+    ),
+    (
+        "claude_runner",
+        "Claude subscription runner",
+        True,
+        "the Claude subscription can't be used as a model",
+        "docker compose --profile claude up -d",
+    ),
+]
+
+
+async def _parts(db: Db) -> list[Check]:
+    seen = await parts.read()
+    out: list[Check] = []
+    for key, name, optional, missing, start in _PARTS:
+        if key == "browser":
+            running: bool | None = browser_client.available()  # the app sees its token too
+        else:
+            running = seen.get(key) if seen is not None else None
+        if running is None:
+            detail = "Unknown: the background worker hasn't reported yet"
+        elif running:
+            detail = "Running"
+        else:
+            detail = f"Off: {missing} (start it with: {start})"
+        out.append(
+            Check(name=name, ok=bool(running), optional=optional, detail=detail, group="part")
+        )
+    web = await settings_service.get_section(db, WebSettings, "web")
+    url = web.search_url()
+    out.append(
         Check(
-            name="Browser for agents",
-            ok=running,
+            name="Web search (SearXNG)",
+            ok=bool(url),
             optional=True,
-            detail="Running"
-            if running
-            else "Off (start it with: docker compose --profile browser up -d)",
+            group="part",
+            detail=f"Set up: {url}"
+            if url
+            else "Not set up: agents can't search the web (Settings → Web & Search, "
+            "or SEARXNG_URL in .env)",
         )
     )
-    return SystemStatus(version=__version__, database_version=migration, checks=checks)
+    return out

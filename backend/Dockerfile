@@ -32,6 +32,12 @@ COPY --from=deps /opt/venv /opt/venv
 WORKDIR /app
 COPY backend/ ./
 COPY --from=frontend /frontend/dist /app/static
+# The commit this image was built from, and how it is installed ("image": the prebuilt
+# images, "source": built from a checkout). Settings > Advanced and the update notice
+# use them. Last, so a new commit doesn't rebuild the layers above.
+ARG APP_COMMIT=""
+ARG APP_INSTALL=source
+ENV APP_COMMIT=${APP_COMMIT} APP_INSTALL=${APP_INSTALL}
 USER app
 EXPOSE 8080
 ENTRYPOINT ["/usr/bin/tini", "--"]
