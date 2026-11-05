@@ -5,6 +5,7 @@
 import { useRef, useState, type PointerEvent, type ReactNode, type WheelEvent } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { Maximize2, Minus, Plus, X } from 'lucide-react'
+import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 
 const MIN = 0.25
 const MAX = 8
@@ -50,9 +51,9 @@ export function DiagramViewer({ title, onClose, children }: { title: string; onC
         <RadixDialog.Content aria-describedby={undefined}
           className="fixed inset-0 z-50 flex flex-col focus:outline-none"
           onKeyDown={(e) => {
-            if (e.key === '+' || e.key === '=') zoom(1.25)
-            else if (e.key === '-') zoom(1 / 1.25)
-            else if (e.key === '0') reset()
+            if (matchesShortcut(SHORTCUTS['diagram.zoomIn'], e)) zoom(1.25)
+            else if (matchesShortcut(SHORTCUTS['diagram.zoomOut'], e)) zoom(1 / 1.25)
+            else if (matchesShortcut(SHORTCUTS['diagram.fit'], e)) reset()
           }}>
           <div className="flex items-center gap-2 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <RadixDialog.Title className="min-w-0 flex-1 truncate text-[14px] font-medium">{title}</RadixDialog.Title>
