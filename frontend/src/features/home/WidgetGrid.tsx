@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import { motion, useDragControls } from 'motion/react'
 import { EyeOff, GripVertical, Plus } from 'lucide-react'
+import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { cn } from '@/lib/cn'
 import { spring } from '@/lib/motion'
 import { MAX_SPAN, WIDGETS, type WidgetId, type WidgetLayout } from './layout'
@@ -78,21 +79,23 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
     if (!editing || e.target !== e.currentTarget) return
     const cols = gridRef.current ? gridMetrics(gridRef.current).cols : MAX_SPAN
     const w = Math.min(item.w, cols)
-    const keys: Record<string, () => void> = e.shiftKey
+    const keys: Record<string, () => void> = matchesShortcut(SHORTCUTS['home.resize'], e)
       ? {
           ArrowRight: () => actions.resize(item.id, Math.min(cols, w + 1), item.h),
           ArrowLeft: () => actions.resize(item.id, w - 1, item.h),
           ArrowDown: () => actions.resize(item.id, item.w, item.h + 1),
           ArrowUp: () => actions.resize(item.id, item.w, item.h - 1),
         }
-      : {
-          ArrowRight: () => actions.move(item.id, nextIndex),
-          ArrowDown: () => actions.move(item.id, nextIndex),
-          ArrowLeft: () => actions.move(item.id, prevIndex),
-          ArrowUp: () => actions.move(item.id, prevIndex),
-          Delete: () => actions.setHidden(item.id, true),
-          Backspace: () => actions.setHidden(item.id, true),
-        }
+      : matchesShortcut(SHORTCUTS['home.move'], e)
+        ? {
+            ArrowRight: () => actions.move(item.id, nextIndex),
+            ArrowDown: () => actions.move(item.id, nextIndex),
+            ArrowLeft: () => actions.move(item.id, prevIndex),
+            ArrowUp: () => actions.move(item.id, prevIndex),
+          }
+        : matchesShortcut(SHORTCUTS['home.hide'], e)
+          ? { [e.key]: () => actions.setHidden(item.id, true) }
+          : {}
     const run = keys[e.key]
     if (!run) return
     e.preventDefault()

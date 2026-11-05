@@ -11,6 +11,9 @@ import { Island } from '@/features/island/Island'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
 import { ShareDialog } from '@/features/shares/ShareDialog'
+import { ShortcutSheet } from '@/features/shortcuts/ShortcutSheet'
+import { useHasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
+import { useShortcut } from '@/hooks/useShortcut'
 import { MobileTopBar } from './mobileNav'
 import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
@@ -46,17 +49,13 @@ export function AppLayout() {
   const location = useLocation()
   // Desktop: the sidebar can be folded to a strip of icons (its button, or Ctrl+\).
   const collapsed = useSidebar((s) => s.collapsed)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
-        e.preventDefault()
-        const { collapsed: now, setCollapsed } = useSidebar.getState()
-        setCollapsed(!now)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  useShortcut('app.sidebar', () => {
+    const { collapsed: now, setCollapsed } = useSidebar.getState()
+    setCollapsed(!now)
+  })
+  // ? shows every shortcut (not on touch-only devices, which have no keyboard to use).
+  const keyboard = useHasKeyboard()
+  useShortcut('app.shortcuts', () => useShortcutSheet.getState().setOpen(true), keyboard)
   const setOpen = useMobileNav((s) => s.setOpen)
   // Close the phone menu whenever the page changes (e.g. after tapping a link in it).
   useEffect(() => setOpen(false), [location.pathname, location.search, setOpen])
@@ -85,6 +84,7 @@ export function AppLayout() {
       <ShareDialog />
       <ToastHost />
       <CommandPalette />
+      <ShortcutSheet />
     </div>
   )
 }

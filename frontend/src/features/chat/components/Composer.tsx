@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { ArrowUp, MessagesSquare, Paperclip, Settings2, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
+import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { SkillIcon } from '@/features/skills/icons'
 import { matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -146,7 +147,7 @@ export function Composer({
       return
     }
     // Enter sends, Shift+Enter adds a line (not on touch screens). Ignore Enter while an IME is composing.
-    if (e.key === 'Enter' && !e.shiftKey && !touch && !e.nativeEvent.isComposing) {
+    if (matchesShortcut(SHORTCUTS['chat.send'], e) && !touch && !e.nativeEvent.isComposing) {
       e.preventDefault()
       send()
     }

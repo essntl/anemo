@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogOut, Monitor } from 'lucide-react'
+import { Keyboard, LogOut, Monitor } from 'lucide-react'
 import { errorMessage, type Schemas } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -7,6 +7,7 @@ import { Field, Input } from '@/components/ui/Input'
 import { useLogout, useRevokeSession, useSessions } from '@/features/auth/api'
 import { useSaveGeneral, useSettings } from '../api'
 import { Select } from '@/components/ui/Select'
+import { useHasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
 
 type General = Schemas['GeneralSettings']
 
@@ -98,6 +99,21 @@ function SessionsCard() {
   )
 }
 
+/** Where the shortcut sheet can be found without knowing to press ?. Not on touch-only devices. */
+function ShortcutsCard() {
+  const keyboard = useHasKeyboard()
+  const setOpen = useShortcutSheet((s) => s.setOpen)
+  if (!keyboard) return null
+  return (
+    <Card>
+      <CardHeader title="Keyboard shortcuts" description="Press ? anywhere outside a text field to see them all." />
+      <CardBody>
+        <Button icon={<Keyboard className="h-3.5 w-3.5" />} onClick={() => setOpen(true)}>Show keyboard shortcuts</Button>
+      </CardBody>
+    </Card>
+  )
+}
+
 export function GeneralPage() {
   const settings = useSettings()
   return (
@@ -105,6 +121,7 @@ export function GeneralPage() {
       {settings.data && (
         <GeneralForm key={JSON.stringify(settings.data.general)} initial={settings.data.general} />
       )}
+      <ShortcutsCard />
       <SessionsCard />
     </div>
   )

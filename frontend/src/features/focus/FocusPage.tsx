@@ -9,7 +9,8 @@ import { BellRing, ChevronDown, Clock, Flame, Plus, Settings2, Timer } from 'luc
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Segmented } from '@/components/ui/Segmented'
-import { useHotkey } from '@/hooks/useHotkey'
+import { ShortcutKeys } from '@/features/shortcuts/ShortcutKeys'
+import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
 import { desktopEnabled } from '@/features/notifications/desktop'
 import { useTasks } from '@/features/tasks/api'
@@ -20,9 +21,6 @@ import { TimerSettingsForm } from './components/TimerSettingsForm'
 import { PHASE_LABEL, type Phase } from './timer'
 import { timerActions, useTimer } from './timerStore'
 
-function Kbd({ children }: { children: string }) {
-  return <kbd className="rounded border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10.5px] text-muted">{children}</kbd>
-}
 
 function Today() {
   const today = useTodayFocus()
@@ -64,10 +62,10 @@ function Today() {
 export function FocusPage() {
   const t = useTimer()
   const [showSettings, setShowSettings] = useState(false)
-  useHotkey((e) => e.key === ' ', () => timerActions.toggle())
-  useHotkey((e) => e.key.toLowerCase() === 'r', () => timerActions.reset())
-  useHotkey((e) => e.key.toLowerCase() === 's', () => timerActions.skip())
-  useHotkey((e) => e.key === '+' || e.key === '=', () => timerActions.addMinute())
+  useShortcut('focus.toggle', () => timerActions.toggle())
+  useShortcut('focus.reset', () => timerActions.reset())
+  useShortcut('focus.skip', () => timerActions.skip())
+  useShortcut('focus.addMinute', () => timerActions.addMinute())
 
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-8 md:pt-14">
@@ -97,10 +95,10 @@ export function FocusPage() {
             <TaskPicker />
           </div>
           <div className="mt-4 hidden flex-wrap items-center justify-center gap-x-3.5 gap-y-1 text-[11.5px] text-muted md:flex">
-            <span><Kbd>Space</Kbd> start / pause</span>
-            <span><Kbd>R</Kbd> reset</span>
-            <span><Kbd>S</Kbd> skip</span>
-            <span><Kbd>+</Kbd> add a minute</span>
+            <span><ShortcutKeys id="focus.toggle" /> start / pause</span>
+            <span><ShortcutKeys id="focus.reset" /> reset</span>
+            <span><ShortcutKeys id="focus.skip" /> skip</span>
+            <span><ShortcutKeys id="focus.addMinute" /> add a minute</span>
           </div>
         </Card>
 

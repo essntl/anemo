@@ -11,7 +11,9 @@ import { type KeyboardEvent, useEffect, useState } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { useNavigate } from 'react-router'
 import { CornerDownLeft, type LucideIcon, Search, X } from 'lucide-react'
+import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
 import { useSearch } from './api'
 import { Highlighted } from './Highlighted'
@@ -49,16 +51,7 @@ export function CommandPalette() {
   const { open, setOpen } = usePalette()
 
   // Ctrl+K / ⌘K toggles it from anywhere.
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setOpen(!usePalette.getState().open)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [setOpen])
+  useShortcut('app.search', () => setOpen(!usePalette.getState().open))
 
   const [session, setSession] = useState(0)
   const [wasOpen, setWasOpen] = useState(open)
@@ -71,7 +64,7 @@ export function CommandPalette() {
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fade fixed inset-0 z-40 bg-black/45 backdrop-blur-sm" />
-        <RadixDialog.Content aria-describedby={undefined}
+        <RadixDialog.Content aria-describedby={undefined} data-command-palette=""
           className={cn(
             'pop fixed inset-x-3 top-[max(3.5rem,calc(env(safe-area-inset-top)+1rem))] z-50 mx-auto flex max-h-[min(72dvh,560px)] max-w-xl flex-col overflow-hidden focus:outline-none md:top-[14vh]',
             // Raised and slightly see-through, with a hairline of light along the edge.
@@ -136,12 +129,12 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (matchesShortcut(SHORTCUTS['search.move'], e)) {
       e.preventDefault()
       setHeld(true)
       const step = e.key === 'ArrowDown' ? 1 : -1
       setSelected((active + step + items.length) % items.length)
-    } else if (e.key === 'Enter' && items[active]) {
+    } else if (matchesShortcut(SHORTCUTS['search.open'], e) && items[active]) {
       e.preventDefault()
       go(items[active])
     }

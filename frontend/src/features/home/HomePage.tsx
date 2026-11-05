@@ -7,7 +7,7 @@
 import { useNow } from '@/hooks/useNow'
 import { Check, LayoutGrid, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { useHotkey } from '@/hooks/useHotkey'
+import { useShortcut } from '@/hooks/useShortcut'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { moveWidget, patchWidget, resetLayout, resizeWidget, type WidgetLayout } from './layout'
@@ -42,8 +42,8 @@ export function HomePage() {
   useEffect(() => {
     if (editParam) setParams({}, { replace: true })
   }, [editParam, setParams])
-  useHotkey((e) => e.key.toLowerCase() === 'e', () => setEditing((x) => !x))
-  useHotkey((e) => e.key === 'Escape', () => setEditing(false), editing)
+  useShortcut('home.edit', () => setEditing((x) => !x))
+  useShortcut('home.stopEditing', () => setEditing(false), editing)
   const now = new Date(useNow())
 
   const actions: GridActions = {
