@@ -2033,6 +2033,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/daily-notes/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Daily Note
+         * @description A day's note. Today's is started with the unticked notes of the last day
+         *     before it when that is switched on (Settings > General).
+         */
+        get: operations["get_daily_note_api_daily_notes__day__get"];
+        /** Save Daily Note */
+        put: operations["save_daily_note_api_daily_notes__day__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -3554,6 +3576,34 @@ export interface components {
             /** Content */
             content?: string | null;
         };
+        /** DailyNoteIn */
+        DailyNoteIn: {
+            /** Content */
+            content: string;
+            /**
+             * Base Hash
+             * @description Hash of the version being edited
+             */
+            base_hash?: string | null;
+        };
+        /** DailyNoteOut */
+        DailyNoteOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+            /** Heading */
+            heading: string;
+            /** Path */
+            path: string;
+            document: components["schemas"]["DocumentContent"] | null;
+        };
         /** DayValue */
         DayValue: {
             /**
@@ -4051,6 +4101,11 @@ export interface components {
              * @enum {string}
              */
             start_page: "home" | "new_chat";
+            /**
+             * Carry Over Daily Notes
+             * @default false
+             */
+            carry_over_daily_notes: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -11282,6 +11337,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_daily_note_api_daily_notes__day__get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path: {
+                day: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_daily_note_api_daily_notes__day__put: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path: {
+                day: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailyNoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyNoteOut"];
                 };
             };
             /** @description Validation Error */

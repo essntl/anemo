@@ -18,6 +18,7 @@ from app.features.automations.router import router as automations_router
 from app.features.browser_router import router as browser_router
 from app.features.calendar.router import router as calendar_router
 from app.features.conversations.router import router as conversations_router
+from app.features.daily_notes.router import router as daily_notes_router
 from app.features.documents.router import router as documents_router
 from app.features.files.router import router as files_router
 from app.features.focus.router import router as focus_router
@@ -69,6 +70,7 @@ protected.include_router(skills_router)
 protected.include_router(web_router)
 protected.include_router(memory_router)
 protected.include_router(documents_router)
+protected.include_router(daily_notes_router)
 protected.include_router(tasks_router)
 protected.include_router(projects_router)
 protected.include_router(shares_router)

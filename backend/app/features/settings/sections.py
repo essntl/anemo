@@ -25,6 +25,8 @@ class GeneralSettings(BaseModel):
     confirm_destructive_actions: bool = True
     # What opening the app shows: the Home page or a new chat.
     start_page: Literal["home", "new_chat"] = "home"
+    # Home's daily note: unticked notes of the last day with notes start the next one.
+    carry_over_daily_notes: bool = False
 
 
 class FocusSettings(BaseModel):

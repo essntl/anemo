@@ -304,10 +304,21 @@ action, so the default level asks you first.
 ### Home
 
 **Home** is a page of widgets: the focus timer, the music player, today (what is due
-and what you have focused), open tasks, this week, recent documents, a box to ask
+and what you have focused), the daily note, open tasks, this week, recent documents, a box to ask
 Anemo something, **Needs you** (approvals, memory suggestions, failed automations,
 overdue tasks; hidden while empty), the latest result of an automation (**Briefing**) and what is coming up.
 Every widget follows the project switcher.
+
+The **Daily note** is for today's important short notes: a number to call back, a
+thought to pick up later, the three things that must not slip. Type a line and press
+Enter; tick notes off, click one to edit it, drag it by its grip (or focus the grip and
+use the arrow keys) to move it, and delete it with ×. Nothing to open or save. The
+arrows go back to earlier days, *Today* comes back. The day turns over at midnight in
+the time zone from **Settings → General**, where you can also have unticked notes
+carried over to the next day. Each day is an ordinary document,
+`documents/daily/<date>.md` (with a project chosen, that project's own daily note in
+`documents/<project>/daily/`), so it has a history, is found by search, can be
+linked to, and agents can read it. The ↗ button opens it in Documents.
 
 **Edit layout** (or E) lets you drag widgets around, make them wider or taller, hide
 them and add them back; **Reset** goes back to the default. The layout is saved on the

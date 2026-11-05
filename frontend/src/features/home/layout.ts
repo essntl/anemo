@@ -5,10 +5,11 @@
  *
  * `normalizeLayout` keeps a saved layout usable as widgets are added to or removed
  * from the app: unknown widgets are dropped, missing ones are added (with their
- * default size, at the end), sizes are clamped, duplicates removed.
+ * default size, at the end, or next to a related widget for those in ADDED_AFTER),
+ * sizes are clamped, duplicates removed.
  */
 
-export const WIDGET_IDS = ['focus', 'today', 'music', 'needs', 'week', 'tasks', 'ask', 'documents', 'upcoming', 'briefing'] as const
+export const WIDGET_IDS = ['focus', 'today', 'daily', 'music', 'needs', 'week', 'tasks', 'ask', 'documents', 'upcoming', 'briefing'] as const
 export type WidgetId = (typeof WIDGET_IDS)[number]
 
 export interface WidgetLayout {
@@ -28,6 +29,7 @@ export const MAX_SPAN = 3
 export const WIDGETS: Record<WidgetId, { name: string; path: string }> = {
   focus: { name: 'Focus', path: '/focus' },
   today: { name: 'Today', path: '/tasks' },
+  daily: { name: 'Daily note', path: '/documents' },
   music: { name: 'Music', path: '/music' },
   needs: { name: 'Needs you', path: '/notifications' },
   week: { name: 'This week', path: '/stats' },
@@ -41,6 +43,7 @@ export const WIDGETS: Record<WidgetId, { name: string; path: string }> = {
 export const DEFAULT_LAYOUT: WidgetLayout[] = [
   { id: 'focus', w: 1, h: 2 },
   { id: 'today', w: 1, h: 2 },
+  { id: 'daily', w: 1, h: 2 },
   { id: 'music', w: 1, h: 1 },
   { id: 'needs', w: 1, h: 1 },
   { id: 'ask', w: 2, h: 1 },
@@ -50,6 +53,10 @@ export const DEFAULT_LAYOUT: WidgetLayout[] = [
   { id: 'documents', w: 1, h: 1 },
   { id: 'briefing', w: 1, h: 1, hidden: true },
 ]
+
+/** Widgets added in a later version that an existing layout gets next to a related
+ *  one rather than at the end (where a widget meant for every day would be missed). */
+const ADDED_AFTER: Partial<Record<WidgetId, WidgetId>> = { daily: 'today' }
 
 const clampSpan = (n: unknown) => Math.min(MAX_SPAN, Math.max(1, Math.round(Number(n) || 1)))
 const known = new Set<string>(WIDGET_IDS)
@@ -72,7 +79,12 @@ export function normalizeLayout(saved: unknown): WidgetLayout[] {
     })
   }
   for (const w of DEFAULT_LAYOUT) {
-    if (!seen.has(w.id)) out.push({ ...w, hidden: !!w.hidden, pinned: false, options: {} })
+    if (seen.has(w.id)) continue
+    const added = { ...w, hidden: !!w.hidden, pinned: false, options: {} }
+    const after = ADDED_AFTER[w.id]
+    const at = after ? out.findIndex((x) => x.id === after) : -1
+    if (at >= 0) out.splice(at + 1, 0, added)
+    else out.push(added)
   }
   return out
 }
