@@ -50,6 +50,15 @@ function GeneralForm({ initial }: { initial: General }) {
           <input
             type="checkbox"
             className="h-4 w-4 accent-[var(--accent)]"
+            checked={form.carry_over_daily_notes}
+            onChange={(e) => setForm({ ...form, carry_over_daily_notes: e.target.checked })}
+          />
+          Carry unticked notes in the daily note over to the next day
+        </label>
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[var(--accent)]"
             checked={form.confirm_destructive_actions}
             onChange={(e) => setForm({ ...form, confirm_destructive_actions: e.target.checked })}
           />

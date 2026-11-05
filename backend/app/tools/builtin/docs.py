@@ -38,7 +38,11 @@ class NoInput(BaseModel):
 
 class ListDocuments(Tool):
     name = "list_documents"
-    description = "List the user's documents (Markdown files under documents/) with their titles."
+    description = (
+        "List the user's documents (Markdown files under documents/) with their titles. "
+        "The daily note on the user's Home page is documents/daily/<YYYY-MM-DD>.md "
+        "(documents/<project folder>/daily/... for a project): one '- [ ] note' line each."
+    )
     capability = "fs.read"
     Input = NoInput
 

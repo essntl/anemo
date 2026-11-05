@@ -1,5 +1,5 @@
 /**
- * Home: a greeting and a grid of widgets (focus, music, today, tasks, …). The layout
+ * Home: a greeting and a grid of widgets (focus, music, today, daily note, tasks, …). The layout
  * is stored on the server, one for phones and one for wider screens; "Edit layout"
  * (or E) lets you move, resize, hide and add widgets. Every widget follows the
  * project switcher.
@@ -16,6 +16,7 @@ import { useNeedsYou } from './useNeedsYou'
 import { type GridActions, WidgetGrid } from './WidgetGrid'
 import { AskWidget } from './widgets/AskWidget'
 import { BriefingWidget } from './widgets/BriefingWidget'
+import { DailyNoteWidget } from './widgets/DailyNoteWidget'
 import { DocumentsWidget } from './widgets/DocumentsWidget'
 import { FocusWidget } from './widgets/FocusWidget'
 import { MusicWidget } from './widgets/MusicWidget'
@@ -57,6 +58,7 @@ export function HomePage() {
       case 'focus': return <FocusWidget item={item} />
       case 'music': return <MusicWidget item={item} />
       case 'today': return <TodayWidget item={item} />
+      case 'daily': return <DailyNoteWidget item={item} />
       case 'tasks': return <TasksWidget item={item} />
       case 'week': return <WeekWidget item={item} />
       case 'documents': return <DocumentsWidget item={item} />

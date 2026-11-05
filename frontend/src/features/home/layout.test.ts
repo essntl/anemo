@@ -26,6 +26,23 @@ describe('home layout', () => {
     expect(out).toHaveLength(WIDGET_IDS.length)
   })
 
+  it('puts the daily note after Today: in the default layout, and in layouts saved before it existed', () => {
+    const ids = (l: { id: string }[]) => l.map((w) => w.id)
+    expect(ids(normalizeLayout([])).slice(0, 3)).toEqual(['focus', 'today', 'daily'])
+    const saved = [
+      { id: 'music', w: 1, h: 1 },
+      { id: 'today', w: 2, h: 1, hidden: true },
+      { id: 'focus', w: 1, h: 2 },
+    ]
+    expect(ids(normalizeLayout(saved)).slice(0, 4)).toEqual(['music', 'today', 'daily', 'focus'])
+    expect(normalizeLayout(saved).find((w) => w.id === 'daily')).toMatchObject({ w: 1, h: 2, hidden: false })
+    // Without Today it goes at the end, like any widget added later.
+    expect(ids(normalizeLayout([{ id: 'music', w: 1, h: 1 }])).at(-1)).toBe('briefing')
+    expect(ids(normalizeLayout([{ id: 'music', w: 1, h: 1 }]))).toContain('daily')
+    // Once saved, it stays where the user put it.
+    expect(ids(normalizeLayout([{ id: 'daily', w: 1, h: 1 }, { id: 'today', w: 1, h: 1 }])).slice(0, 2)).toEqual(['daily', 'today'])
+  })
+
   it('keeps widget options', () => {
     const out = normalizeLayout([{ id: 'briefing', w: 1, h: 2, options: { automation_id: 'a1' } }])
     expect(out[0].options).toEqual({ automation_id: 'a1' })

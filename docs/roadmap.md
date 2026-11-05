@@ -51,6 +51,8 @@ the app lists them.
 
 ## 2. Daily note widget
 
+**Status: built.**
+
 A **Daily note** widget on Home for today's important short notes: a phone number to
 call back, a thought to pick up later, three things that must not slip today.
 
