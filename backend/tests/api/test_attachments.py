@@ -122,3 +122,20 @@ async def test_non_images_download_instead_of_rendering(authed):
     r = await authed.get(f"/api/attachments/{a['id']}/content")
     assert r.headers["content-type"] == "application/octet-stream"
     assert r.headers["content-disposition"].startswith("attachment")
+
+
+async def test_a_message_can_be_just_files(authed):
+    cid = await _setup(authed, vision=True)
+    # Neither text nor files: nothing to send.
+    r = await authed.post(f"/api/conversations/{cid}/turns", json={"text": "  "})
+    assert r.status_code == 422
+    img = (await _upload(authed, "Pasted image 09.05.03.png", PNG, "image/png")).json()["id"]
+    note = (await _upload(authed, "todo.txt", b"buy milk", "text/plain")).json()["id"]
+    r = await authed.post(f"/api/conversations/{cid}/turns", json={"attachment_ids": [img, note]})
+    assert r.status_code == 202, r.text
+    user = r.json()["user_message"]
+    assert user["text"] == "" and len(user["attachments"]) == 2
+    await execute_chat_run(uuid.UUID(r.json()["run_id"]))
+    assert (await authed.get(f"/api/runs/{r.json()['run_id']}")).json()["status"] == "completed"
+    msgs = (await authed.get(f"/api/conversations/{cid}/messages")).json()
+    assert "buy milk" in msgs[1]["text"]  # the file reached the model, without an empty text

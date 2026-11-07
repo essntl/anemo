@@ -69,6 +69,8 @@ export function UserBubble({ text, attachments = [], references = [], skill, onE
           )}
         </div>
       )}
+      {/* A message can be just files: then no empty bubble under them. */}
+      {(text || skill) && (
       <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
         {skill && (
           <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-medium text-accent" title={`Answered with the /${skill.slug} skill`}>
@@ -78,6 +80,7 @@ export function UserBubble({ text, attachments = [], references = [], skill, onE
         )}
         {text}
       </div>
+      )}
       {onEdit && (
         <button type="button" onClick={() => setDraft(text)}
           className="-mr-1.5 -mt-1 flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-subtle opacity-70 transition-opacity hover:bg-surface-hover hover:text-text group-hover:opacity-100">

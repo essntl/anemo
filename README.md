@@ -79,7 +79,10 @@ In a chat you can:
 ### Files in chats
 
 **Attach any file** with the paperclip, by dropping it on the composer or by pasting it
-(up to 10 per message, 25 MB each). What the assistant gets depends on the file:
+(up to 10 per message, 25 MB each). A paste works anywhere on the chat page, not only in
+the message box; a pasted screenshot is named "Pasted image" with the time. A message
+can be just files: **Send** works without writing anything. What the assistant gets
+depends on the file:
 
 | File | What the model gets |
 |---|---|

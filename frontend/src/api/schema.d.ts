@@ -6785,7 +6785,10 @@ export interface components {
         };
         /** TurnIn */
         TurnIn: {
-            /** Text */
+            /**
+             * Text
+             * @default
+             */
             text: string;
             /** Model Id */
             model_id?: string | null;

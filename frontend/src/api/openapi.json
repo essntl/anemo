@@ -23473,8 +23473,8 @@
           "text": {
             "type": "string",
             "maxLength": 200000,
-            "minLength": 1,
-            "title": "Text"
+            "title": "Text",
+            "default": ""
           },
           "model_id": {
             "anyOf": [
@@ -23541,9 +23541,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "text"
-        ],
         "title": "TurnIn"
       },
       "TurnOut": {
