@@ -79,7 +79,10 @@ In a chat you can:
 ### Files in chats
 
 **Attach any file** with the paperclip, by dropping it on the composer or by pasting it
-(up to 10 per message, 25 MB each). What the assistant gets depends on the file:
+(up to 10 per message, 25 MB each). A paste works anywhere on the chat page, not only in
+the message box; a pasted screenshot is named "Pasted image" with the time. A message
+can be just files: **Send** works without writing anything. What the assistant gets
+depends on the file:
 
 | File | What the model gets |
 |---|---|
@@ -264,6 +267,12 @@ on the same files. Sub-folders are groups; images you drop in go to
   list, a file in Files, another site in a new tab. They are ordinary Markdown links
   (`/documents/<id>`, `/tasks?task=<id>`, `/files?path=<path>`), and links to a file
   are updated when it is renamed or moved in Files. A document lists what links to it.
+- **Links to a part of a document:** add `#text=<a few words from it>` to point at a
+  passage, or `#<heading>` for a section (`/documents/<id>#scams-to-watch-for`).
+  Opening the link scrolls there and highlights it until you click or type in the
+  document. Agents get each document's link from their document tools, so answers can
+  quote a passage and link straight to it; a link written with the document's file
+  (`/documents/<folder>/<name>.md`) opens that document too.
 - **Delete** moves the file to the workspace trash (Files → Trash).
 
 ### Tasks and calendar

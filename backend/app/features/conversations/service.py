@@ -513,7 +513,8 @@ async def send_turn(
         conversation_id=conv.id,
         seq=seq,
         role="user",
-        content=[{"type": "text", "text": text}],
+        # Just files, no text: no empty text block (providers refuse those).
+        content=[{"type": "text", "text": text}] if text.strip() else [],
         text_plain=text,
         skill=skill.invocation() if skill else None,
     )

@@ -338,6 +338,8 @@ export function ConversationPage() {
           conversationId={conversationId}
           // Not when the message answers the agent's question or resumes a paused run.
           skills={!question && !paused}
+          // An answer to the agent, or a message to resume with, is text.
+          filesOnly={!question && !paused}
           onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
           onSend={(text, attachmentIds, referenceIds, skillId) =>
             question

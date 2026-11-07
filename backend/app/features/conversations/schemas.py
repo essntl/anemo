@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 from app.features.tasks.schemas import clean_tags
 
@@ -127,7 +127,8 @@ class VersionIn(BaseModel):
 
 
 class TurnIn(BaseModel):
-    text: str = Field(min_length=1, max_length=200_000)
+    # May be empty when files are attached: a message can be just a screenshot.
+    text: str = Field("", max_length=200_000)
     model_id: uuid.UUID | None = None
     attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=10)
     # Other chats to give the model as context for this message.
@@ -138,6 +139,12 @@ class TurnIn(BaseModel):
     profile_id: uuid.UUID | None = None
     # A skill to answer this message with (chosen with /name in the message box).
     skill_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _says_something(self) -> "TurnIn":
+        if not self.text.strip() and not self.attachment_ids:
+            raise ValueError("Write a message or attach a file")
+        return self
 
 
 class TurnOut(BaseModel):

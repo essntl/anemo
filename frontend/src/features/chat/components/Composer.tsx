@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowUp, MessagesSquare, Paperclip, Settings2, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
@@ -8,6 +8,7 @@ import { SkillIcon } from '@/features/skills/icons'
 import { matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { isTextField, pastedFiles } from '../pastedFiles'
 import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
 import { type ChatRef, ChatPickerDialog, MAX_REFERENCES, ReferenceChip } from './ChatReference'
@@ -21,6 +22,8 @@ interface ComposerProps {
   onStop?: () => void
   running: boolean
   disabled?: boolean
+  /** Whether a message may be just files, with no text (not for an answer to the agent). Default true. */
+  filesOnly?: boolean
   placeholder?: string
   /** Text the box starts with (e.g. a question about a document). */
   initialText?: string
@@ -38,7 +41,7 @@ interface ComposerProps {
 const MAX_HEIGHT = 240
 
 export function Composer({
-  onSend, onStop, running, disabled, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange,
+  onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange,
 }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
@@ -99,7 +102,8 @@ export function Composer({
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
   }, [text])
 
-  const canSend = Boolean(text.trim()) && !running && !disabled && !files.uploading
+  // A message can be just files: a pasted screenshot, a document to look at.
+  const canSend = Boolean(text.trim() || (filesOnly && files.readyIds.length)) && !running && !disabled && !files.uploading
 
   const send = () => {
     if (!canSend) return
@@ -153,13 +157,23 @@ export function Composer({
     }
   }
 
-  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const pasted = Array.from(e.clipboardData.files)
-    if (pasted.length) {
+  // Pasted files are attached: in the message box, and anywhere else on the page that
+  // isn't a text field of its own (a paste in a dialog stays with the dialog).
+  const addFiles = files.add
+  useEffect(() => {
+    if (disabled) return
+    const onPaste = (e: ClipboardEvent) => {
+      const inBox = e.target === textRef.current
+      if (!inBox && (isTextField(e.target) || document.querySelector('[role="dialog"], [role="alertdialog"]'))) return
+      const pasted = pastedFiles(e.clipboardData)
+      if (!pasted.length) return
       e.preventDefault()
-      files.add(pasted)
+      addFiles(pasted)
+      if (!inBox) textRef.current?.focus()
     }
-  }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [disabled, addFiles])
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
@@ -262,7 +276,6 @@ export function Composer({
           }
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
-          onPaste={onPaste}
           role={menuOpen ? 'combobox' : undefined}
           aria-expanded={menuOpen ? true : undefined}
           aria-controls={menuOpen ? menuId : undefined}

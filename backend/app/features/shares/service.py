@@ -58,10 +58,12 @@ def _now() -> datetime:
 # -- making the copy ----------------------------------------------------------------------
 
 _UUID = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
-# A Markdown link to a document or a task of this app: [text](/documents/<id>) or
-# [text](/tasks?task=<id>), as the editors write them.
+# A Markdown link to a document or a task of this app: [text](/documents/<id>) (also
+# with a #part of it), [text](/tasks?task=<id>), as the editors write them; or one to a
+# document by its file (/documents/<folder>/<name>.md), as an answer may write it.
 _APP_LINK = re.compile(
-    rf"\[((?:\\.|[^\]\\\n])*)\]\((?:/documents/({_UUID})|/tasks\?task=({_UUID}))\)"
+    rf"\[((?:\\.|[^\]\\\n])*)\]"
+    rf"\((?:/documents/(?:({_UUID})(?:#[^)\s]*)?|[^)\s]+)|/tasks\?task=({_UUID}))\)"
 )
 
 
@@ -80,6 +82,8 @@ def relink(
 
     def swap(match: re.Match[str]) -> str:
         label, document_id, task_id = match.groups()
+        if not document_id and not task_id:
+            return label  # a document by its file: not resolved in a copy
         if document_id:
             key, place = "doc", (document_at or {}).get(uuid.UUID(document_id))
         else:

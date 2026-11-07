@@ -12,7 +12,8 @@ import uuid
 from urllib.parse import quote, unquote
 
 FILE_LINK = re.compile(r"(\((/files\?path=|/api/files/download\?path=))([^)\s#&]+)")
-DOC_LINK = re.compile(r"\(/documents/([0-9a-fA-F-]{36})\)")
+# Also with a part of the document after it: (/documents/<id>#text=...).
+DOC_LINK = re.compile(r"\(/documents/([0-9a-fA-F-]{36})(?:#[^)\s]*)?\)")
 TASK_LINK = re.compile(r"\(/tasks\?task=([0-9a-fA-F-]{36})\)")
 
 

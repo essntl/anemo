@@ -253,6 +253,13 @@
 }
 /* Marks what a link led to (a task in the list) for a moment. */
 .flash { animation: flash 2.2s ease-out; }
+/* The part of a document a link points at (documents/passage.ts). */
+::highlight(passage) {
+  background-color: var(--accent-soft);
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 3px;
+}
+
 @keyframes flash { from, 35% { background-color: var(--accent-soft); } }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes fade-out { to { opacity: 0; } }
