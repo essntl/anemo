@@ -264,6 +264,12 @@ on the same files. Sub-folders are groups; images you drop in go to
   list, a file in Files, another site in a new tab. They are ordinary Markdown links
   (`/documents/<id>`, `/tasks?task=<id>`, `/files?path=<path>`), and links to a file
   are updated when it is renamed or moved in Files. A document lists what links to it.
+- **Links to a part of a document:** add `#text=<a few words from it>` to point at a
+  passage, or `#<heading>` for a section (`/documents/<id>#scams-to-watch-for`).
+  Opening the link scrolls there and highlights it until you click or type in the
+  document. Agents get each document's link from their document tools, so answers can
+  quote a passage and link straight to it; a link written with the document's file
+  (`/documents/<folder>/<name>.md`) opens that document too.
 - **Delete** moves the file to the workspace trash (Files → Trash).
 
 ### Tasks and calendar

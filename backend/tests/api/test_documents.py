@@ -230,7 +230,7 @@ async def test_agent_document_tools(authed, docs):
     results = tool_results_sent_to_model()
     assert "- Recipes (documents/recipes.md" in results[0]
     assert "Pancakes need flour" in results[1]
-    assert "Edited documents/recipes.md (1 replacement)" in results[2]
+    assert "Edited documents/recipes.md (1 replacement;" in results[2]
     assert "Created documents/notes/plan.md" in results[3]
     assert "already exists" in results[4]
     t = await timeline(authed, run_id)
@@ -243,7 +243,13 @@ async def test_agent_document_tools(authed, docs):
 
     data = await listing(authed)
     recipes = next(d for d in data["documents"] if d["title"] == "Recipes")
+    plan = next(d for d in data["documents"] if d["title"] == "Plan")
     assert recipes["last_editor"] == "agent"
+    # Every result gives the app's link to the document, never just its file, so an
+    # answer can link it (a file path is not a page of the app).
+    link = f"link /documents/{recipes['id']}"
+    assert link in results[0] and link in results[1] and link in results[2]
+    assert f"link /documents/{plan['id']}" in results[3]
     revisions = (await authed.get(f"/api/documents/{recipes['id']}/revisions")).json()
     assert [r["author"] for r in revisions] == ["agent", "external"]
 
@@ -301,7 +307,8 @@ async def test_documents_are_indexed_for_search(authed, docs):
     )
     await agent_turn(authed, cid, "find basil")
     [result] = tool_results_sent_to_model()
-    assert "## Garden (documents/garden.md)" in result and "Basil likes warmth" in result
+    assert f"## Garden (documents/garden.md, link /documents/{doc['id']})" in result
+    assert "Basil likes warmth" in result
 
 
 async def test_image_assets(authed, docs):

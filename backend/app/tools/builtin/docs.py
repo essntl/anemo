@@ -36,12 +36,36 @@ class NoInput(BaseModel):
     pass
 
 
+# Answers link documents with the app's own address, never the file path: the path is
+# not a page of the app. The link is given next to each document in these results.
+LINKING = (
+    " To link a document in your answer, write [its title](/documents/<id>) with the link "
+    "given next to it here; add #text=<a few exact words from it> to point at a passage "
+    "(or #<heading> for a section)."
+)
+
+
+def link(doc: Document) -> str:
+    return f"/documents/{doc.id}"
+
+
+async def _link_for(path: str) -> str | None:
+    """The app link of the document at `path` (indexing it first if it is new)."""
+    async with get_sessionmaker()() as db:
+        doc = await service.by_path(db, path)
+        if doc is None:
+            await service.reconcile(db)
+            doc = await service.by_path(db, path)
+        return link(doc) if doc else None
+
+
 class ListDocuments(Tool):
     name = "list_documents"
     description = (
         "List the user's documents (Markdown files under documents/) with their titles. "
         "The daily note on the user's Home page is documents/daily/<YYYY-MM-DD>.md "
         "(documents/<project folder>/daily/... for a project): one '- [ ] note' line each."
+        + LINKING
     )
     capability = "fs.read"
     Input = NoInput
@@ -56,7 +80,8 @@ class ListDocuments(Tool):
         if not docs:
             return ToolResult(content="There are no documents yet.")
         lines = [
-            f"- {d.title} ({d.path}, {d.word_count} words, changed {d.updated_at:%Y-%m-%d})"
+            f"- {d.title} ({d.path}, link {link(d)}, {d.word_count} words, "
+            f"changed {d.updated_at:%Y-%m-%d})"
             for d in docs[:300]
         ]
         return ToolResult(content="\n".join(lines), data={"count": len(docs)})
@@ -70,7 +95,7 @@ class ReadDocumentInput(BaseModel):
 
 class ReadDocument(Tool):
     name = "read_document"
-    description = "Read one of the user's documents as Markdown."
+    description = "Read one of the user's documents as Markdown." + LINKING
     capability = "fs.read"
     Input = ReadDocumentInput
 
@@ -91,8 +116,10 @@ class ReadDocument(Tool):
             if end < len(content)
             else ""
         )
+        found = await _link_for(path)
+        header = f"{path} (link {found})" if found else path
         return ToolResult(
-            content=f"{path}:\n{text}{note}", data={"path": path, "chars": len(content)}
+            content=f"{header}:\n{text}{note}", data={"path": path, "chars": len(content)}
         )
 
 
@@ -106,6 +133,7 @@ class SearchDocuments(Tool):
     description = (
         "Find documents by what they say (by meaning when an embedding model is set, "
         "otherwise by words). Returns the best-matching passages with their document paths."
+        + LINKING
     )
     capability = "fs.read"
     Input = SearchDocumentsInput
@@ -129,7 +157,7 @@ class SearchDocuments(Tool):
         found = [(docs[h.source_id], h) for h in hits if h.source_id in docs]
         if not found:
             return ToolResult(content="No documents match. (New documents take a moment to index.)")
-        parts = [f"## {d.title} ({d.path})\n{h.content[:800]}" for d, h in found]
+        parts = [f"## {d.title} ({d.path}, link {link(d)})\n{h.content[:800]}" for d, h in found]
         return ToolResult(content="\n\n".join(parts), data={"paths": [d.path for d, _ in found]})
 
 
@@ -188,7 +216,8 @@ class WriteDocument(Tool):
                     )
                     await _record(ctx, path, None, doc.content_hash, None)
                     return ToolResult(
-                        content=f"Created {path}", data={"path": path, "op": "create"}
+                        content=f"Created {path} (link {link(doc)})",
+                        data={"path": path, "op": "create"},
                     )
                 if not args.overwrite:
                     return ToolResult(
@@ -204,7 +233,9 @@ class WriteDocument(Tool):
                 await _record(ctx, path, before, doc.content_hash, backup)
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
-        return ToolResult(content=f"Replaced {path}", data={"path": path, "op": "modify"})
+        return ToolResult(
+            content=f"Replaced {path} (link {link(doc)})", data={"path": path, "op": "modify"}
+        )
 
 
 class EditDocumentInput(BaseModel):
@@ -268,7 +299,8 @@ class EditDocument(Tool):
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
         return ToolResult(
-            content=f"Edited {path} ({count} replacement{'s' if count != 1 else ''}).",
+            content=f"Edited {path} ({count} replacement{'s' if count != 1 else ''}; "
+            f"link {link(doc)}).",
             data={"path": path, "op": "modify"},
         )
 
