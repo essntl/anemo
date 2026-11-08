@@ -22,22 +22,27 @@ export function useHomeLayout() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // The section is saved whole, so both layouts go along (as they are by then).
+  const flush = useCallback(() => {
+    timer.current = null
+    const current = qc.getQueryData<AllSettings>(settingsKey)?.home
+    if (!current) return
+    const body = { layout: current.layout ?? [], mobile_layout: current.mobile_layout ?? [] }
+    void api
+      .PUT('/api/settings/home', { body })
+      .then(unwrap)
+      .catch(() => void qc.invalidateQueries({ queryKey: settingsKey }))
+  }, [qc])
   const save = useCallback(() => {
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      timer.current = null
-      const current = qc.getQueryData<AllSettings>(settingsKey)?.home
-      if (!current) return
-      const body = { layout: current.layout ?? [], mobile_layout: current.mobile_layout ?? [] }
-      void api
-        .PUT('/api/settings/home', { body })
-        .then(unwrap)
-        .catch(() => void qc.invalidateQueries({ queryKey: settingsKey }))
-    }, 500)
-  }, [qc])
+    timer.current = setTimeout(flush, 500)
+  }, [flush])
+  // Leaving Home within the half second: save now rather than never.
   useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current)
-  }, [])
+    if (timer.current) {
+      clearTimeout(timer.current)
+      flush()
+    }
+  }, [flush])
 
   const update = useCallback(
     (change: (layout: WidgetLayout[]) => WidgetLayout[]) => {
