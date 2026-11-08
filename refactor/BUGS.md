@@ -52,6 +52,12 @@ security headers) are in the appendices: backend-core §0 and §12, services-and
 | run-1 | Low-Med | `backend/app/runtime/chat.py:222-236` vs `runtime/agent.py:1442-1455` | Chat and agent runs count restarts differently. Chat increments `attempt` on every pickup (`MAX_ATTEMPTS = 2`), so it gives up after **one** crash; agent increments only when resuming a `running` run (`MAX_CRASH_RESUMES = 2`), so it gives up after **two**. | Decide on one rule and apply it to both. | open (pinned in PR 2) |
 | run-2 | Low-Med | `backend/app/runtime/chat.py:222-236` | A chat run in status `running` that is picked up by a duplicate job is treated as a crash (`run.restarted`, attempt counted) even while another worker still streams it; agent runs check `queue.other_worker_has_run` first. | Do the same check for chat runs. | open (pinned in PR 2) |
 
+## Tests
+
+| ID | Severity | Location | What's wrong | Suggested fix | Status |
+|---|---|---|---|---|---|
+| test-1 | Low | `e2e/tests/motion.spec.ts:11-22` | Flaky: "dialogs, dropdowns and the search palette animate when they close" sometimes sees only `fade-out`/`pop-out` and misses `pop-in`/`fade-in` (1 of 4 repeats failed, on `main` as well as on a branch). When it fails in a full run, the `notifications` project (`automations.spec.ts`) doesn't run, because it depends on the `desktop` project. | Wait for the opening animation to have been recorded before pressing Escape, e.g. `await expect.poll(seen).toContain('pop-in')`. | open |
+
 ## Everything else
 
 | ID | Severity | Location | What's wrong | Suggested fix | Status |

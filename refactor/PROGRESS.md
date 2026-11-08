@@ -51,3 +51,4 @@ runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolat
 
 - 2026-11-08: baseline measured, audit written, plan approved (answers 1a, 2a, 3a, 4a, 6a, 7a).
 - 2026-11-08: S1 (symlink race) fixed with a reproducing test; 795 backend tests pass.
+- 2026-11-08: full e2e locally on S1: 75 passed, 1 skipped (browser), 1 flaky failure that fails on `main` too (BUGS test-1); `automations.spec.ts` passed when run with `--no-deps`.
