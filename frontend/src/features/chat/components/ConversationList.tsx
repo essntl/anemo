@@ -116,7 +116,7 @@ export function ConversationList() {
       <div aria-label="Chats" className="group/list min-h-0 flex-1 overflow-y-auto">
         {groups.map((group) => (
           <section key={group.label}>
-            <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
+            <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-text/75">
               {group.kind === 'favorites' && <Star className="h-3 w-3" />}
               {group.kind === 'temporary' && <Timer className="h-3 w-3 text-accent" />} {group.label}
             </div>
