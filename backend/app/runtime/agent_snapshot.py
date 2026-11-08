@@ -57,7 +57,7 @@ def _last_user_text(transcript: list[Message]) -> str:
     return ""
 
 
-async def _snapshot(db: AsyncSession, run: Run, transcript: list[Message]) -> None:
+async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) -> None:
     """Freeze what the run may do and know (permissions, folder access, profile, skills,
     memories, prompt): changing settings later does not affect a run that has started."""
     chat = run.kind == "chat"
@@ -181,7 +181,7 @@ async def _add_turn_context(
     return used
 
 
-async def _resolve_models(db: AsyncSession, run: Run, needs: set[str]) -> list[ResolvedModel]:
+async def resolve_models(db: AsyncSession, run: Run, needs: set[str]) -> list[ResolvedModel]:
     """The conversation's chosen model, else the profile's default, else Settings."""
     if run.kind == "chat":
         candidates = await resolve(

@@ -26,7 +26,7 @@ from app.runtime.lifecycle import follow_up_answer
 log = logging.getLogger(__name__)
 
 
-async def _notify_question(db: AsyncSession, run: Run) -> None:
+async def notify_question(db: AsyncSession, run: Run) -> None:
     """The agent asked the user something: say so wherever they are (the app shows no
     pop-up for it in the chat that is open)."""
     question = await db.scalar(
@@ -45,7 +45,7 @@ async def _notify_question(db: AsyncSession, run: Run) -> None:
     )
 
 
-async def _save_progress(db: AsyncSession, run: Run) -> None:
+async def save_progress(db: AsyncSession, run: Run) -> None:
     """Keep the chat message's text current, so a reload always shows progress."""
     if run.assistant_message_id is None:
         return
@@ -56,7 +56,7 @@ async def _save_progress(db: AsyncSession, run: Run) -> None:
         )
 
 
-async def _finalize(
+async def finalize(
     db: AsyncSession, run: Run, status: str, *, error: str | None = None, note: str = ""
 ) -> None:
     message = (
@@ -116,7 +116,7 @@ async def _finalize(
 
 async def give_up(db: AsyncSession, run: Run, error: str) -> None:
     """End a run that can't go on as failed (see dispatch.give_up_run)."""
-    await _finalize(db, run, "failed", error=error)
+    await finalize(db, run, "failed", error=error)
 
 
 async def _stop_subagents(db: AsyncSession, run: Run) -> None:
@@ -130,10 +130,10 @@ async def _stop_subagents(db: AsyncSession, run: Run) -> None:
             await db.commit()
             await bus.send_control(child.id, "cancel")  # its worker stops it
         else:
-            await _finalize(db, child, "cancelled")  # no worker holds it: end it here
+            await finalize(db, child, "cancelled")  # no worker holds it: end it here
 
 
-async def _after_answer(db: AsyncSession, run: Run) -> None:
+async def after_answer(db: AsyncSession, run: Run) -> None:
     """Follow-up work once an answer is complete: name a new conversation, and let
     memory extraction look at it later."""
     if run.conversation_id is None or run.assistant_message_id is None:

@@ -58,9 +58,9 @@ from app.providers.base import (
 from app.providers.catalog import rejects_tools
 from app.providers.router import NoModelAvailable, ResolvedModel
 from app.runtime import citations, compaction, outputs, subagents
-from app.runtime.agent_finalize import _after_answer, _finalize, _notify_question, _save_progress
+from app.runtime.agent_finalize import after_answer, finalize, notify_question, save_progress
 from app.runtime.agent_prompt import build_system_prompt
-from app.runtime.agent_snapshot import _resolve_models, _snapshot, session_key_for
+from app.runtime.agent_snapshot import resolve_models, session_key_for, snapshot_run
 from app.runtime.history import (
     estimate_tokens,
     latest_user_attachment_kinds,
@@ -362,7 +362,7 @@ class AgentRun:
                 run = await _get_run(db, self.run_id)
                 self._save_model_output(db, run, result)
                 self.progress.current = None  # saved
-                await _save_progress(db, run)
+                await save_progress(db, run)
                 await db.commit()
             if result.stop_reason == "refusal":
                 return "refused"
@@ -542,7 +542,7 @@ class AgentRun:
             self._append_text(run, result)
             self._add_usage(db, run, result.model, result.usage_parts or [result.usage], "agent")
             self._checkpoint_time(run)
-            await _save_progress(db, run)
+            await save_progress(db, run)
             await db.commit()
 
     # -- tool calls ----------------------------------------------------------------
@@ -1029,7 +1029,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         if run.status in ("paused", "waiting_approval", "waiting_subagent"):
             return  # a stale job: the run continues when it is resumed, approved or woken
         if run.cancel_requested:
-            await _finalize(db, run, "cancelled")
+            await finalize(db, run, "cancelled")
             return
         if run.status == "running":
             if await queue.other_worker_has_run(db, run.id):
@@ -1037,7 +1037,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             # The previous worker died. Resume from the last checkpoint.
             run.attempt += 1
             if run.attempt > MAX_CRASH_RESUMES:
-                await _finalize(
+                await finalize(
                     db,
                     run,
                     "failed",
@@ -1057,7 +1057,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         transcript = [Message.model_validate(m) for m in run.transcript]
 
         if run.policy is None:
-            await _snapshot(db, run, transcript)
+            await snapshot_run(db, run, transcript)
         assert run.policy is not None
         policy = Policy.model_validate(run.policy["policy"])
         ceiling = (
@@ -1076,9 +1076,9 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         if "image" in latest_user_attachment_kinds(transcript):
             needs.add("vision")
         try:
-            candidates = await _resolve_models(db, run, needs)
+            candidates = await resolve_models(db, run, needs)
         except NoModelAvailable as exc:
-            await _finalize(db, run, "failed", error=exc.message)
+            await finalize(db, run, "failed", error=exc.message)
             return
         tools = registry.toolset_for(
             run.kind,
@@ -1150,7 +1150,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         if outcome in ("cancelled", "failed") and partial is not None:
             AgentRun._append_text(run, partial)  # keep what was streamed before it stopped
         if outcome in ("waiting", "paused"):
-            await _save_progress(db, run)
+            await save_progress(db, run)
             if outcome == "paused":
                 run.pause_requested = False
             await runs.set_status(db, run, "waiting_approval" if outcome == "waiting" else "paused")
@@ -1168,15 +1168,15 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
                 await automations.on_needs_approval(
                     db, run, uuid.UUID(unattended) if unattended else None
                 )
-                await _notify_question(db, run)
+                await notify_question(db, run)
         elif outcome == "waiting_child":
-            await _save_progress(db, run)
+            await save_progress(db, run)
             await runs.set_status(db, run, "waiting_subagent")
             # They may all have finished in the meantime: then continue right away.
             await subagents.wake_parent(db, run.id)
         elif outcome == "blocked":
             run.options = {**run.options, "no_retry": True}  # it would stop the same way
-            await _finalize(
+            await finalize(
                 db,
                 run,
                 "failed",
@@ -1185,11 +1185,11 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             )
         elif outcome.startswith("limit:"):
             note = limit_message(outcome.removeprefix("limit:"), policy.limits)
-            await _finalize(db, run, "completed", note=f"\n\n_{note}_")
-            await _after_answer(db, run)
+            await finalize(db, run, "completed", note=f"\n\n_{note}_")
+            await after_answer(db, run)
         elif outcome == "refused":
-            await _finalize(db, run, "failed", error="The model declined to continue.")
+            await finalize(db, run, "failed", error="The model declined to continue.")
         else:
-            await _finalize(db, run, outcome, error=error)
+            await finalize(db, run, outcome, error=error)
             if outcome == "completed":
-                await _after_answer(db, run)
+                await after_answer(db, run)
