@@ -79,7 +79,12 @@ async def logout(session: CurrentSession, response: Response, db: Db) -> None:
 
 
 @router.get("/me", response_model=MeOut)
-async def me(session: CurrentSession) -> MeOut:
+async def me(session: CurrentSession, request: Request, response: Response) -> MeOut:
+    # The session's expiry slides while the app is used; give the cookie the same new
+    # lifetime, or the browser drops it 30 days after login whatever happened since.
+    token = request.cookies.get(auth.COOKIE_NAME)
+    if token:
+        _set_cookie(response, token)
     return MeOut(
         username=get_settings().admin_username,
         session_id=session.id,
