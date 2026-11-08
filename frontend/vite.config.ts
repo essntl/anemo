@@ -24,5 +24,12 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // `npm run coverage`: every source file counts, not only the ones a test imports.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/api/schema.d.ts', 'src/test/**'],
+      reporter: ['text-summary', 'json-summary'],
+    },
   },
 })
