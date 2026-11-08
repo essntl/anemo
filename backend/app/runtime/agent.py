@@ -1090,32 +1090,60 @@ async def _get_run(db: AsyncSession, run_id: uuid.UUID) -> Run:
 
 
 async def execute_agent_run(run_id: uuid.UUID) -> None:
-    sessionmaker = get_sessionmaker()
-    async with sessionmaker() as db:
+    """Set the run up, drive its loop until it ends or has to wait, then record how."""
+    agent = await _prepare(run_id)
+    if agent is None:
+        return
+    # A worker shutdown is not caught: the job is handed back and resumes from the checkpoint.
+    driven = await drive_until_stopped(run_id, agent.drive())
+    outcome, error = "completed", None
+    if driven.cancelled:
+        outcome = "cancelled"
+    elif driven.error is not None:
+        outcome, error = "failed", driven.error
+    elif driven.value is not None:
+        outcome = driven.value
+
+    await _record_outcome(run_id, agent, outcome, error)
+
+
+async def _pick_up(db: AsyncSession, run: Run) -> bool:
+    """Whether this worker should drive the run now. A stale or duplicate job leaves it
+    alone; a run stopped before it started, or interrupted too often, is ended here.
+    After a crash the restart is counted (refactor/BUGS.md run-1)."""
+    if run.status in TERMINAL_STATUSES:
+        return False
+    if run.status in ("paused", "waiting_approval", "waiting_subagent"):
+        return False  # a stale job: the run continues when it is resumed, approved or woken
+    if run.cancel_requested:
+        await finalize(db, run, "cancelled")
+        return False
+    if run.status == "running":
+        if await queue.other_worker_has_run(db, run.id):
+            return False  # a duplicate job: another worker is executing this run
+        # The previous worker died. Resume from the last checkpoint.
+        run.attempt += 1
+        if run.attempt > MAX_CRASH_RESUMES:
+            await finalize(
+                db,
+                run,
+                "failed",
+                error="The worker was interrupted repeatedly while running this.",
+            )
+            return False
+        await runs.emit(db, run, "run.restarted", {"attempt": run.attempt})
+        if run.totals.get("text"):
+            await runs.emit(db, run, "message.delta", {"text": run.totals["text"]})
+    return True
+
+
+async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
+    """Pick the run up and build its loop from the snapshot (taken now for a new run).
+    None when there is nothing to drive."""
+    async with get_sessionmaker()() as db:
         run = await db.get(Run, run_id)
-        if run is None or run.status in TERMINAL_STATUSES:
-            return
-        if run.status in ("paused", "waiting_approval", "waiting_subagent"):
-            return  # a stale job: the run continues when it is resumed, approved or woken
-        if run.cancel_requested:
-            await finalize(db, run, "cancelled")
-            return
-        if run.status == "running":
-            if await queue.other_worker_has_run(db, run.id):
-                return  # a duplicate job: another worker is executing this run
-            # The previous worker died. Resume from the last checkpoint.
-            run.attempt += 1
-            if run.attempt > MAX_CRASH_RESUMES:
-                await finalize(
-                    db,
-                    run,
-                    "failed",
-                    error="The worker was interrupted repeatedly while running this.",
-                )
-                return
-            await runs.emit(db, run, "run.restarted", {"attempt": run.attempt})
-            if run.totals.get("text"):
-                await runs.emit(db, run, "message.delta", {"text": run.totals["text"]})
+        if run is None or not await _pick_up(db, run):
+            return None
 
         if not run.transcript:
             assert run.conversation_id is not None
@@ -1148,7 +1176,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             candidates = await resolve_models(db, run, needs)
         except NoModelAvailable as exc:
             await finalize(db, run, "failed", error=exc.message)
-            return
+            return None
         tools = registry.toolset_for(
             run.kind,
             policy,
@@ -1179,7 +1207,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         await runs.set_status(db, run, "running")  # commits
 
-    agent = AgentRun(
+    return AgentRun(
         run_id,
         candidates,
         policy,
@@ -1202,17 +1230,14 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         conversation_id=run.conversation_id,
         answer=answer_message,
     )
-    # A worker shutdown is not caught: the job is handed back and resumes from the checkpoint.
-    driven = await drive_until_stopped(run_id, agent.drive())
-    outcome, error = "completed", None
-    if driven.cancelled:
-        outcome = "cancelled"
-    elif driven.error is not None:
-        outcome, error = "failed", driven.error
-    elif driven.value is not None:
-        outcome = driven.value
 
-    async with sessionmaker() as db:
+
+async def _record_outcome(
+    run_id: uuid.UUID, agent: AgentRun, outcome: str, error: str | None
+) -> None:
+    """Save how the loop ended: waiting for the user or sub-agents, paused, stopped by a
+    limit, blocked, refused, or finished (with the follow-ups of a completed answer)."""
+    async with get_sessionmaker()() as db:
         run = await _get_run(db, run_id)
         agent._checkpoint_time(run)
         partial = agent.progress.current
@@ -1253,7 +1278,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
                 "(This automation is set to stop when approval is needed.)",
             )
         elif outcome.startswith("limit:"):
-            note = limit_message(outcome.removeprefix("limit:"), policy.limits)
+            note = limit_message(outcome.removeprefix("limit:"), agent.policy.limits)
             await finalize(db, run, "completed", note=f"\n\n_{note}_")
             await after_answer(db, run)
         elif outcome == "refused":
