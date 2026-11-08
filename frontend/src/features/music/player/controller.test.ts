@@ -149,4 +149,26 @@ describe('music controller', () => {
     // Copies get their own ids, so the queue reorders independently of the playlist.
     expect(usePlayerStore.getState().queue[0].id).not.toBe('id-x')
   })
+
+  it('appends to a queue that is playing without changing what plays', () => {
+    player.playIndex(1)
+    usePlayerRuntime.setState({ loaded: true, status: 'playing' })
+    fake.calls = []
+    player.append([track('e'), track('b')], { announce: false })
+    const { queue, index } = usePlayerStore.getState()
+    expect(queue.map((t) => t.ref)).toEqual(['a', 'b', 'c', 'd', 'e', 'b'])
+    expect(index).toBe(1) // still on "b"
+    expect(fake.calls).toEqual([]) // nothing restarted
+    // A track already in the queue is added as a copy with its own id.
+    expect(queue[5].id).not.toBe('id-b')
+    expect(queue[4].id).toBe('id-e')
+  })
+
+  it('appends and plays the first new track when asked to play now', () => {
+    usePlayerRuntime.setState({ loaded: true, status: 'playing' })
+    fake.calls = []
+    player.append([track('e')], { announce: false, playNow: true })
+    expect(usePlayerStore.getState().index).toBe(4)
+    expect(fake.calls).toEqual(['load e play'])
+  })
 })
