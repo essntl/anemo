@@ -203,6 +203,29 @@ async def test_repeating_events_and_single_occurrence_changes(authed):
     assert [t for _, t in await starts()] == ["Standup"] * 4
 
 
+async def test_an_invalid_time_zone_does_not_stop_reminders(authed):
+    """features-B1: the setting accepts any text; reminders then use UTC instead of stopping."""
+    now = datetime(2026, 10, 12, 8, 50, tzinfo=UTC)
+    r = await authed.put("/api/settings/general", json={"timezone": "Not/AZone"})
+    assert r.status_code == 200
+    await authed.post(
+        "/api/tasks",
+        json={
+            "title": "Call the bank",
+            "due_date": "2026-10-12",
+            "due_time": "09:00",
+            "remind_minutes": 15,
+        },
+    )
+    await authed.post(
+        "/api/calendar/events",
+        json={"title": "Standup", "start_at": "2026-10-12T09:00:00+00:00", "remind_minutes": 10},
+    )
+    assert await reminders.fire_due(now) == 2
+    titles = sorted(n["title"] for n in (await authed.get("/api/notifications")).json())
+    assert titles == ["Reminder: Call the bank", "Reminder: Standup"]
+
+
 async def test_reminders_fire_once(authed):
     now = datetime(2026, 10, 12, 6, 50, tzinfo=UTC)  # 08:50 in Amsterdam
     await authed.put("/api/settings/general", json={"timezone": AMS})
