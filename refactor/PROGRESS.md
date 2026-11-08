@@ -21,9 +21,9 @@ Read this file and PLAN.md first at the start of every session. Each PR updates 
 |---|---|---|
 | Phase 0: baseline | — | done (BASELINE.md) |
 | Phase 1: audit and plan | — | done, plan approved 2026-11-08 |
-| 0 notes | `refactor/notes` | in review |
-| S1 symlink race | `fix/workspace-symlink-race` | next |
-| S2 remote images in Markdown | `fix/markdown-remote-images` | to do |
+| 0 notes | `refactor/notes` | in review ([essntl/anemo#21](https://github.com/essntl/anemo/pull/21)) |
+| S1 symlink race | `fix/workspace-symlink-race` | in review (stacked on the notes PR) |
+| S2 remote images in Markdown | `fix/markdown-remote-images` | next (covers chat Markdown and the document editor) |
 | S3 trash restore | `fix/trash-restore-name` | to do |
 | 1 safety net | `refactor/safety-net` | to do |
 | 2 run lifecycle | `refactor/run-lifecycle` | to do |
@@ -39,6 +39,15 @@ Read this file and PLAN.md first at the start of every session. Each PR updates 
 - Dead-code candidates in AUDIT.md §4: owner to decide whether any is removed.
 - Which of the bugs in BUGS.md to fix: owner to decide.
 
+## Local end-to-end runs
+
+This container's Docker builds can't reach the Debian or GitHub container registries, so
+`e2e/run-isolated.sh` can't build its images here. Instead the app, the worker and two execd
+sandboxes run as plain processes (a fresh `aiw_e2e` database, Redis database 2, the built
+`frontend/dist`), the fake provider is seeded with `e2e/scripts/seed-fake.mjs`, and Playwright
+runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolated.sh` on every PR.
+
 ## Log
 
 - 2026-11-08: baseline measured, audit written, plan approved (answers 1a, 2a, 3a, 4a, 6a, 7a).
+- 2026-11-08: S1 (symlink race) fixed with a reproducing test; 795 backend tests pass.
