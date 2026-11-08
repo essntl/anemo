@@ -73,12 +73,15 @@ export function useAttachments() {
   }, [])
 
   const clear = useCallback(() => setItems([]), [])
+  /** Put back attachments taken away by `clear` (a send that failed). */
+  const restore = useCallback((back: PendingAttachment[]) => setItems((prev) => [...back, ...prev]), [])
 
   return {
     items,
     add,
     remove,
     clear,
+    restore,
     uploading: items.some((i) => i.status === 'uploading'),
     readyIds: items.filter((i) => i.status === 'ready').map((i) => i.uploaded!.id),
   }

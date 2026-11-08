@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fromRRule, toRRule } from '@/features/calendar/recurrence'
-import { addDays, bucketOf, formatDay, formatDue } from './dates'
+import { addDays, bucketOf, formatDay, formatDue, localDay } from './dates'
 
 const NOW = '2026-10-05' // a Monday
 
@@ -43,5 +43,22 @@ describe('repeat rules', () => {
     const custom = 'FREQ=MONTHLY;BYDAY=1MO'
     expect(fromRRule(custom).repeat).toBe('custom')
     expect(toRRule('custom', '', custom)).toBe(custom)
+  })
+})
+
+/* frontend-12: "done today" uses the local day of the completion time. */
+describe('localDay', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'Europe/Amsterdam')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('a task done just after midnight counts for the new local day', () => {
+    // 00:30 on 9 November in Amsterdam is still 8 November in UTC.
+    const doneAt = new Date(2026, 10, 9, 0, 30).toISOString()
+    expect(doneAt.slice(0, 10)).toBe('2026-11-08')
+    expect(localDay(doneAt)).toBe('2026-11-09')
   })
 })

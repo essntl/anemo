@@ -278,8 +278,12 @@ export function FilesPage() {
       title: 'New file', label: 'File name', initial: 'untitled.md', selectName: true, confirmLabel: 'Create',
     })
     if (!name) return
-    const saved = await saveFile.mutateAsync({ path: joinPath(path, name), content: '', base_hash: null })
-    go({ file: saved.path })
+    try {
+      const saved = await saveFile.mutateAsync({ path: joinPath(path, name), content: '', base_hash: null })
+      go({ file: saved.path })
+    } catch (err) {
+      toast({ message: errorMessage(err) }) // e.g. a file with that name exists
+    }
   }
   const pickFiles = () => {
     const input = document.createElement('input')

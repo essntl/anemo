@@ -10,5 +10,6 @@ export const fileLink = (path: string) => `/files?path=${encodeURIComponent(path
 
 /** An address inside this app ("/documents/…", "?doc=2") rather than another site. */
 export function isAppLink(href: string): boolean {
-  return (href.startsWith('/') && !href.startsWith('//')) || href.startsWith('?')
+  // "//host" and "/\host" are other sites to a browser, not paths of this app.
+  return (href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/\\')) || href.startsWith('?')
 }

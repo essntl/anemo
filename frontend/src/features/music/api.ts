@@ -70,7 +70,9 @@ export function useDeletePlaylist() {
           onClick: () =>
             void api
               .POST('/api/music/playlists', { body: { name: pl.name, track_ids: pl.tracks.map((t) => t.id), sort_order: pl.sort_order } })
-              .then(refresh),
+              .then(unwrap)
+              .then(refresh)
+              .catch(() => toast({ message: `Couldn’t bring back “${pl.name}”. Try again later.` })),
         },
       })
     },

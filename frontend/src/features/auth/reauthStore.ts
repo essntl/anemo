@@ -12,17 +12,21 @@ import { create } from 'zustand'
 import { ApiError } from '@/api/client'
 
 interface ReauthStore {
-  pending: ((ok: boolean) => void) | null
+  /** Everyone waiting for the password (one dialog answers them all); null when none. */
+  pending: ((ok: boolean) => void)[] | null
   request: () => Promise<boolean>
   resolve: (ok: boolean) => void
 }
 
 export const useReauthStore = create<ReauthStore>((set, get) => ({
   pending: null,
-  request: () => new Promise<boolean>((resolve) => set({ pending: resolve })),
+  // Two changes that need the password at the same time share the one dialog, and both
+  // go on (or both stop) with its answer.
+  request: () => new Promise<boolean>((resolve) => set({ pending: [...(get().pending ?? []), resolve] })),
   resolve: (ok) => {
-    get().pending?.(ok)
+    const waiting = get().pending ?? []
     set({ pending: null })
+    for (const done of waiting) done(ok)
   },
 }))
 
