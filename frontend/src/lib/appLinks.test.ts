@@ -10,6 +10,7 @@ describe('links inside the app', () => {
   it('are told apart from links to other sites', () => {
     expect(isAppLink('/documents/abc')).toBe(true)
     expect(isAppLink('?doc=2')).toBe(true)
+    expect(isAppLink('/\\evil.example/path')).toBe(false) // a browser goes to another site
     expect(isAppLink('https://example.com/documents/abc')).toBe(false)
     expect(isAppLink('//example.com')).toBe(false)
     expect(isAppLink('mailto:someone@example.com')).toBe(false)
