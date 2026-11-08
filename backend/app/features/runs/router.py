@@ -327,7 +327,7 @@ async def cancel_run(run_id: uuid.UUID, db: Db) -> RunOut:
         # No worker holds it: finish it here. A worker that picks it up later skips it.
         # (Ending a run also stops its sub-agents.)
         if run.kind == "agent":
-            from app.runtime.agent import _finalize
+            from app.runtime.agent_finalize import _finalize
 
             await _finalize(db, run, "cancelled")  # commits
             return run_out(run)
