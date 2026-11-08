@@ -1,5 +1,8 @@
-"""The parts of a run's life that chat and agent runs share: watching for the user's
-cancel while the run streams, and asking for a title after the first exchange.
+"""The parts of a run's life that chat and agent runs share: driving the run's work
+until it ends or the user stops it, and the follow-up jobs once an answer is complete.
+
+Picking a run up (early exits, counting restarts after a crash) stays in each
+executor: chat and agent runs do it differently (refactor/BUGS.md run-1, run-2).
 
 Cancellation: the API publishes "cancel" on the run's control channel (and sets
 `cancel_requested` in the DB as a fallback). The watcher cancels the run's task.
@@ -8,6 +11,8 @@ Cancellation: the API publishes "cancel" on the run's control channel (and sets
 import asyncio
 import logging
 import uuid
+from collections.abc import Coroutine
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,8 +21,10 @@ from app.core.db import get_sessionmaker
 from app.core.redis import get_redis
 from app.events import bus
 from app.features.conversations.models import Conversation
+from app.features.memory import extraction
 from app.features.runs.models import Run
 from app.jobs import queue
+from app.providers.base import ProviderError
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +84,7 @@ async def _watch_for_cancel(
             pass
 
 
-async def _maybe_enqueue_title(
+async def maybe_enqueue_title(
     db: AsyncSession, conversation_id: uuid.UUID | None, assistant_seq: int
 ) -> None:
     if conversation_id is None or assistant_seq != 2:
@@ -91,3 +98,42 @@ async def _maybe_enqueue_title(
             dedupe_key=f"title:{conv.id}",
         )
         await db.commit()
+
+
+@dataclass
+class Driven[T]:
+    """How a run's work ended, when it ended at all (see `drive_until_stopped`)."""
+
+    value: T | None = None
+    cancelled: bool = False  # the user stopped the run
+    error: str | None = None  # the provider failed: the message for the user
+
+
+async def drive_until_stopped[T](run_id: uuid.UUID, work: Coroutine[Any, Any, T]) -> Driven[T]:
+    """Run `work` as a task that the user's cancel stops. A worker shutdown is not caught:
+    its CancelledError goes up, so the job is handed back and another worker resumes."""
+    task = asyncio.create_task(work)
+    flag = CancelFlag()
+    watcher = asyncio.create_task(_watch_for_cancel(run_id, task, flag))
+    try:
+        return Driven(value=await task)
+    except asyncio.CancelledError:
+        if not flag.requested:
+            raise  # the worker itself is shutting down
+        return Driven(cancelled=True)
+    except ProviderError as exc:
+        return Driven(error=f"The model provider returned an error: {exc}")
+    finally:
+        watcher.cancel()
+
+
+async def follow_up_answer(
+    db: AsyncSession, conversation_id: uuid.UUID | None, assistant_seq: int
+) -> None:
+    """Once an answer is complete: name a new conversation, and let memory extraction
+    look at it later."""
+    if conversation_id is None:
+        return
+    await maybe_enqueue_title(db, conversation_id, assistant_seq)
+    await extraction.schedule(db, conversation_id, assistant_seq)
+    await db.commit()

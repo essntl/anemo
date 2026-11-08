@@ -9,7 +9,6 @@ Cancellation: the API publishes "cancel" on the run's control channel (and sets
 streaming task, and partial output is saved with status "cancelled".
 """
 
-import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -20,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.events import bus
 from app.features.conversations.models import ChatMessage, Conversation
-from app.features.memory import extraction
 from app.features.memory import service as memory
 from app.features.projects import service as projects
 from app.features.runs import service as runs
@@ -32,7 +30,6 @@ from app.features.usage import service as usage
 from app.providers.base import (
     ChatRequest,
     Message,
-    ProviderError,
     ReasoningBlock,
     TextBlock,
     TextDelta,
@@ -47,7 +44,7 @@ from app.runtime.history import (
     resolve_attachments,
     trim_to_budget,
 )
-from app.runtime.lifecycle import CancelFlag, _maybe_enqueue_title, _watch_for_cancel
+from app.runtime.lifecycle import drive_until_stopped, follow_up_answer
 from app.runtime.streaming import StreamProgress, StreamResult, stream_with_fallback
 
 log = logging.getLogger(__name__)
@@ -240,7 +237,8 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         session_key = f"conv:{run.conversation_id}:chat"
         await db.commit()
     progress = StreamProgress()
-    stream_task = asyncio.create_task(
+    driven = await drive_until_stopped(
+        run_id,
         stream_with_fallback(
             run_id,
             candidates,
@@ -252,24 +250,16 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
                 turn_context=context_text,
             ),
             progress,
-        )
+        ),
     )
-    cancel_flag = CancelFlag()
-    watcher = asyncio.create_task(_watch_for_cancel(run_id, stream_task, cancel_flag))
-    result: StreamResult | None = None
+    result: StreamResult | None = driven.value
     status, error = "completed", None
-    try:
-        result = await stream_task
-        if result.stop_reason == "refusal":
-            status, error = "failed", "The model declined to answer this request."
-    except asyncio.CancelledError:
-        if not cancel_flag.requested:
-            raise  # the worker itself is shutting down; the job is handed to another worker
+    if driven.cancelled:
         status = "cancelled"
-    except ProviderError as exc:
-        status, error = "failed", f"The model provider returned an error: {exc}"
-    finally:
-        watcher.cancel()
+    elif driven.error is not None:
+        status, error = "failed", driven.error
+    elif result is not None and result.stop_reason == "refusal":
+        status, error = "failed", "The model declined to answer this request."
 
     async with sessionmaker() as db:
         run = await db.get(Run, run_id)
@@ -278,10 +268,7 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         # On cancel/error, keep whatever was streamed before it stopped.
         await _finish(db, run, message, result or progress.current, status=status, error=error)
         if status == "completed":
-            await _maybe_enqueue_title(db, run.conversation_id, message.seq)
-            if run.conversation_id is not None:
-                await extraction.schedule(db, run.conversation_id, message.seq)
-                await db.commit()
+            await follow_up_answer(db, run.conversation_id, message.seq)
 
 
 TITLE_PROMPT = (
