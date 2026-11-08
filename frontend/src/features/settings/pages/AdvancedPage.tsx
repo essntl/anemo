@@ -35,17 +35,22 @@ function SetupCard() {
   const done = setup.status === 'done'
   return (
     <Card>
-      <CardHeader title="First-run setup"
-        description={done
-          ? 'Finished. Go through it again to check the providers, models and optional parts.'
-          : 'A few steps: a model provider, helper models, your time zone, optional parts and notifications.'}
-        actions={
-          <Link to="/setup" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10">
-            <Rocket className="h-3.5 w-3.5" aria-hidden />
-            {done ? 'Open setup' : setup.step ? 'Continue setup' : 'Start setup'}
-          </Link>
-        } />
-      <div className="pb-2" />
+      {/* The button sits beside the text, centred; where that would squeeze the text, it
+          goes underneath instead. It never breaks over two lines. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 pb-6 pt-5 md:px-6">
+        <div className="min-w-[14rem] flex-1">
+          <h3 className="text-[15px] font-semibold">First-run setup</h3>
+          <p className="mt-0.5 text-[13px] text-muted">
+            {done
+              ? 'Finished. Go through it again to check the providers, models and optional parts.'
+              : 'A few steps: a model provider, helper models, your time zone, optional parts and notifications.'}
+          </p>
+        </div>
+        <Link to="/setup" className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10">
+          <Rocket className="h-3.5 w-3.5" aria-hidden />
+          {done ? 'Open setup' : setup.step ? 'Continue setup' : 'Start setup'}
+        </Link>
+      </div>
     </Card>
   )
 }
