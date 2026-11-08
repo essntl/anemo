@@ -16,10 +16,10 @@ recorded in the run's history and can be reverted.
 import asyncio
 import os
 import stat
-import tempfile
 import uuid
 import zipfile
 from pathlib import Path, PurePosixPath
+from typing import BinaryIO
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -31,7 +31,7 @@ from app.features.attachments.models import Attachment
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.workspace import _backup, _exists, path_action
-from app.workspace import files, fs_guard
+from app.workspace import files, fs_guard, safe_fs
 from app.workspace.access import access_for
 
 MAX_ATTACH_PER_CALL = 10
@@ -234,7 +234,7 @@ class AttachFile(Tool):
                 await asyncio.to_thread(attachments.file_path(att).unlink, True)
                 await db.delete(att)
             for rel, path in found:
-                data = await asyncio.to_thread(path.read_bytes)
+                data = await asyncio.to_thread(safe_fs.read_bytes, path)
                 att = await attachments.store_output(
                     db,
                     path.name,
@@ -317,17 +317,13 @@ def _collect(ctx: ToolContext, sources: list[Path], skip: Path) -> list[tuple[Pa
 
 
 def _write_zip(target: Path, entries: list[tuple[Path, str]]) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".tmp-", suffix=".zip")
-    os.close(fd)
-    try:
-        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+    def write(out: BinaryIO) -> None:
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
             for path, arcname in entries:
-                zf.write(path, arcname)
-        os.replace(tmp, target)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise
+                with safe_fs.open_read(path) as src:
+                    zf.write(safe_fs.fd_path(src.fileno()), arcname)
+
+    safe_fs.write_atomic(target, write, suffix=".zip")
 
 
 class CreateZip(Tool):
@@ -412,6 +408,11 @@ class UnzipInput(BaseModel):
     )
 
 
+def _is_zip(path: Path) -> bool:
+    with safe_fs.open_read(path) as f:
+        return zipfile.is_zipfile(f)
+
+
 def _member_name(info: zipfile.ZipInfo) -> PurePosixPath | None:
     """The member's path inside the destination, or None when it must be skipped."""
     name = info.filename.replace("\\", "/")
@@ -427,7 +428,7 @@ def _member_name(info: zipfile.ZipInfo) -> PurePosixPath | None:
 
 
 def _extract(zip_path: Path, dest_rel: str) -> int:
-    with zipfile.ZipFile(zip_path) as zf:
+    with safe_fs.open_read(zip_path) as f, zipfile.ZipFile(f) as zf:
         infos = zf.infolist()
         if len(infos) > MAX_ZIP_FILES:
             raise AppError(
@@ -455,11 +456,10 @@ def _extract(zip_path: Path, dest_rel: str) -> int:
         written = 0
         for info, target in plan:
             if info.is_dir():
-                target.mkdir(parents=True, exist_ok=True)
+                safe_fs.make_dirs(target)
                 continue
-            target.parent.mkdir(parents=True, exist_ok=True)
             remaining = info.file_size
-            with zf.open(info) as src, target.open("wb") as out:
+            with zf.open(info) as src, safe_fs.open_write(target) as out:
                 # Never trust the declared size: stop at it.
                 while chunk := src.read(min(1024 * 1024, remaining + 1)):
                     remaining -= len(chunk)
@@ -496,7 +496,7 @@ class ExtractZip(Tool):
             return ToolResult(content=exc.message, is_error=True)
         if not source.is_file():
             return ToolResult(content=f"{args.path} does not exist.", is_error=True)
-        if not zipfile.is_zipfile(source):
+        if not _is_zip(source):
             return ToolResult(content=f"{args.path} is not a zip file.", is_error=True)
         if dest.exists() and (not dest.is_dir() or any(dest.iterdir())):
             return ToolResult(
@@ -518,7 +518,7 @@ class ExtractZip(Tool):
             return ToolResult(content=exc.message, is_error=True)
         except zipfile.BadZipFile as exc:
             return ToolResult(content=f"The zip is damaged: {exc}", is_error=True)
-        dest.mkdir(parents=True, exist_ok=True)
+        safe_fs.make_dirs(dest)
         # One revertible change: reverting moves the whole folder to the trash.
         await ctx.record_change(op="mkdir", path=rel)
         entries = await asyncio.to_thread(files.list_dir, rel)
