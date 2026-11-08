@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { formatSize as linksFormatSize } from '@/features/links/files'
 import { formatSize } from './format'
 
 /*
@@ -34,6 +33,10 @@ describe('file sizes', () => {
   })
 
   it('reads as before for task attachments and the file finder (links/files.ts)', () => {
-    for (const n of [...SIZES, null, undefined]) expect(linksFormatSize(n)).toBe(before.links(n))
+    for (const n of [...SIZES, null, undefined]) expect(formatSize(n)).toBe(before.links(n))
+  })
+
+  it('reads as before in the file manager (FilesPage.tsx), with one decimal for KB', () => {
+    for (const n of SIZES) expect(formatSize(n, { kbDecimals: 1 })).toBe(before.filesPage(n))
   })
 })

@@ -35,6 +35,7 @@ import { fileBacklinks, linkedFromText, useFileBacklinks } from '@/features/link
 import { api } from '@/api/client'
 import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
+import { formatSize } from '@/lib/format'
 import {
   downloadUrl,
   type Entry,
@@ -52,12 +53,6 @@ import {
 import { cannotPaste, useClipboard } from './clipboard'
 import { FilePreview } from './components/FilePreview'
 import { TrashDialog } from './components/TrashDialog'
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 function Breadcrumbs({ path, onOpen }: { path: string; onOpen: (path: string) => void }) {
   const parts = path ? path.split('/') : []
@@ -161,7 +156,7 @@ function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
         {showPath ? entry.path : entry.name}
         {error && <span className="ml-2 text-[12px] text-error">{errorMessage(error)}</span>}
       </button>
-      <span className="hidden w-20 text-right text-[12px] text-muted sm:block">{entry.is_dir ? '' : formatSize(entry.size)}</span>
+      <span className="hidden w-20 text-right text-[12px] text-muted sm:block">{entry.is_dir ? '' : formatSize(entry.size, { kbDecimals: 1 })}</span>
       <span className="hidden w-36 text-right text-[12px] text-muted md:block">{new Date(entry.modified).toLocaleString()}</span>
       {/* Desktop: icons appear on hover (always on touch screens). Phones: a "⋯" menu. */}
       <span className="hidden w-48 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100 md:flex">

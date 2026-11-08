@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronLeft, File, FileImage, Folder, Search } from 'lucide-react'
-import { formatSize, IMAGE } from './files'
+import { formatSize } from '@/lib/format'
+import { IMAGE } from './files'
 import { type Entry, useFileSearch, useFolder } from '@/features/files/api'
 import { cn } from '@/lib/cn'
 

@@ -10,7 +10,8 @@ import { downloadUrl } from '@/features/files/api'
 import { useProjects } from '@/features/tasks/api'
 import { useAttachFile, useDetachFile, useTaskFiles, useUploadToTask } from './api'
 import { FileFinder, FileIcon } from './FileFinder'
-import { formatSize, IMAGE } from './files'
+import { formatSize } from '@/lib/format'
+import { IMAGE } from './files'
 
 const parentOf = (p: string) => p.split('/').slice(0, -1).join('/')
 
