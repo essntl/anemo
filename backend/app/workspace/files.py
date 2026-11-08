@@ -99,6 +99,8 @@ def list_dir(relative: str) -> list[Entry]:
             out.append(entry(child))
         except OSError:
             continue  # vanished or unreadable
+        except ValueError:
+            continue  # a link out of the workspace (it can't be opened either)
     return sorted(out, key=lambda e: (not e.is_dir, e.name.lower()))
 
 
@@ -326,7 +328,7 @@ def search(query: str) -> list[Entry]:
             if q in name.lower():
                 try:
                     results.append(entry(Path(dirpath) / name))
-                except OSError:
+                except (OSError, ValueError):  # gone, unreadable, or a link out of the workspace
                     continue
                 if len(results) >= MAX_SEARCH_RESULTS:
                     return results

@@ -407,6 +407,7 @@ class AgentRun:
                 else trim_to_budget(history, _budget(model)),
                 tools=specs,
                 reasoning=bool(model.capabilities.get("reasoning")),
+                output_limit=model.max_output,
                 provider_options=model.provider_options,
                 session_key=self.session_key,
                 turn_context=self.turn_context,
@@ -733,7 +734,11 @@ class AgentRun:
         args: Any,
         grants: list[Grant],
     ) -> str | None:
-        actions = tool.actions(args, self.ctx)
+        # A tool that describes no actions is still checked: against its own capability,
+        # never waved through (refactor/BUGS.md sec-15).
+        actions = tool.actions(args, self.ctx) or [
+            Action(capability=tool.capability, summary=tool.name)
+        ]
         verdict = combine(
             [
                 evaluate(

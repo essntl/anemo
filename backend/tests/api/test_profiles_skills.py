@@ -198,3 +198,19 @@ async def test_no_skills_means_no_load_skill_tool(authed):
         json={"text": "x", "mode": "agent", "profile_id": str(uuid.uuid4())},
     )
     assert unknown.status_code == 404
+
+
+async def test_turning_plan_review_off_in_a_profile_needs_recent_auth(authed):
+    """sec-8: a profile could switch off "always review plans" without the password."""
+    profile = (await authed.post("/api/profiles", json={"name": "Planner"})).json()
+    await expire_reauth()
+    same = {k: profile[k] for k in ("name", "permission_levels", "skill_mode")}
+
+    stricter = await authed.put(
+        f"/api/profiles/{profile['id']}", json={**same, "plan_review": "always"}
+    )
+    assert stricter.status_code == 200, stricter.text  # stricter: no password needed
+    off = await authed.put(f"/api/profiles/{profile['id']}", json={**same, "plan_review": "off"})
+    assert off.status_code == 403 and off.json()["error"]["code"] == "reauth_required"
+    create = await authed.post("/api/profiles", json={"name": "No review", "plan_review": "off"})
+    assert create.status_code == 403

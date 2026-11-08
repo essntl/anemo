@@ -16,6 +16,7 @@ from app.api.deps import Db
 from app.core.errors import AppError, NotFound
 from app.features.documents import service
 from app.features.documents.models import Document, DocumentRevision
+from app.features.links import service as links
 from app.workspace import files
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -188,7 +189,12 @@ async def move_document(document_id: uuid.UUID, body: MoveIn, db: Db) -> Documen
     if "/" in name or name.startswith("."):
         raise AppError("Not a valid file name", code="invalid_path")
     target = "/".join(p for p in (service.DOCS_DIR, folder, name) if p)
-    return _out(await service.move(db, doc, target))
+    old_path = doc.path
+    moved = await service.move(db, doc, target)
+    if moved.path != old_path:
+        # Task attachments and links to it follow, as when it is moved in Files.
+        await links.on_moved(db, old_path, moved.path, author="user")
+    return _out(moved)
 
 
 @router.delete("/{document_id}", status_code=204)

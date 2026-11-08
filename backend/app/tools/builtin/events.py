@@ -19,13 +19,12 @@ from app.features.calendar import recurrence, service
 from app.features.calendar.models import CalendarEvent
 from app.features.calendar.schemas import EventIn, OccurrenceIn
 from app.features.settings import service as settings_service
-from app.features.settings.sections import GeneralSettings
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 
 
 async def _user_tz(db: Any) -> str:
-    return (await settings_service.get_section(db, GeneralSettings, "general")).timezone
+    return await settings_service.user_timezone(db)  # UTC if the setting isn't a valid zone
 
 
 def _instant(value: datetime, tz: str) -> datetime:

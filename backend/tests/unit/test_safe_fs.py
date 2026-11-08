@@ -177,3 +177,13 @@ def test_a_move_across_file_systems_copies_then_removes(ws, monkeypatch):
     monkeypatch.setattr(os, "rename", real_rename)
     assert (ws / "b" / "f.txt").read_text() == "x"
     assert not (ws / "a").exists()
+
+
+def test_a_link_out_of_the_workspace_is_left_out_of_listings_and_search(ws, outside):
+    """core-B2: such a link (easy to make with the shell) made the whole listing fail."""
+    (ws / "notes").mkdir()
+    (ws / "notes" / "todo.md").write_text("x")
+    (ws / "notes" / "etc-link").symlink_to(outside, target_is_directory=True)
+    assert [e.name for e in files.list_dir("notes")] == ["todo.md"]
+    assert [e.name for e in files.search("link")] == []
+    assert [e.name for e in files.search("todo")] == ["todo.md"]

@@ -89,6 +89,13 @@ def _security_fields(body: ProfileIn) -> dict[str, object]:
     }
 
 
+def _turns_review_off(body: ProfileIn, current: str | None = None) -> bool:
+    """Switching plan review off for a profile overrides the global "always review
+    plans", so it needs the password like other permission changes. Making it stricter
+    doesn't."""
+    return body.plan_review == "off" and current != "off"
+
+
 async def _check_skills(db: Db, ids: list[uuid.UUID]) -> None:
     if ids:
         found = set(await db.scalars(select(Skill.id).where(Skill.id.in_(ids))))
@@ -118,7 +125,7 @@ async def list_profiles(db: Db) -> list[ProfileOut]:
 async def create_profile(
     body: ProfileIn, request: Request, session: CurrentSession, db: Db
 ) -> ProfileOut:
-    if body.permission_levels or body.limits:
+    if body.permission_levels or body.limits or _turns_review_off(body):
         await require_recent_auth(session)
     await service.ensure_unique_name(db, body.name.strip())
     await _check_skills(db, body.skill_ids)
@@ -151,7 +158,9 @@ async def update_profile(
 ) -> ProfileOut:
     profile = await service.get_profile(db, profile_id)
     before = {"permission_levels": profile.permission_levels, "limits": profile.limits}
-    security_changed = before != _security_fields(body)
+    security_changed = before != _security_fields(body) or _turns_review_off(
+        body, profile.plan_review
+    )
     if security_changed:
         await require_recent_auth(session)
     await service.ensure_unique_name(db, body.name.strip(), own_id=profile.id)
@@ -165,7 +174,11 @@ async def update_profile(
             target_type="agent_profile",
             target_id=profile.id,
             ip=client_ip(request),
-            details={"name": profile.name, **_security_fields(body)},
+            details={
+                "name": profile.name,
+                **_security_fields(body),
+                "plan_review": body.plan_review,
+            },
         )
     await db.commit()
     await db.refresh(profile)

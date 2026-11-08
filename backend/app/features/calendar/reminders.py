@@ -21,7 +21,6 @@ from app.features.calendar import recurrence, service
 from app.features.calendar.models import Reminder
 from app.features.notifications import service as notifications
 from app.features.settings import service as settings_service
-from app.features.settings.sections import GeneralSettings
 from app.features.tasks.models import Task
 from app.features.tasks.schemas import OPEN_STATUSES
 
@@ -60,7 +59,8 @@ async def fire_due(now: datetime | None = None) -> int:
     now = now or datetime.now(UTC)
     sent = 0
     async with get_sessionmaker()() as db:
-        general = await settings_service.get_section(db, GeneralSettings, "general")
+        # A time zone that isn't a real one falls back to UTC instead of stopping reminders.
+        tz = await settings_service.user_timezone(db)
         for occ in await service.occurrences(db, now - GRACE, now + LOOKAHEAD):
             minutes = occ.event.remind_minutes
             if minutes is None:
@@ -70,12 +70,12 @@ async def fire_due(now: datetime | None = None) -> int:
                 continue
             if await _claim(db, "event", occ.event.id, occ.original_start):
                 sent += 1
-                when = when_text(occ.start_at, general.timezone, all_day=occ.event.all_day)
+                when = when_text(occ.start_at, tz, all_day=occ.event.all_day)
                 await notifications.create(
                     db, title=f"Reminder: {occ.title}", body=when, kind="reminder", link="/calendar"
                 )
 
-        today = now.astimezone(recurrence.zone(general.timezone)).date()
+        today = now.astimezone(recurrence.zone(tz)).date()
         tasks = await db.scalars(
             select(Task).where(
                 Task.status.in_(OPEN_STATUSES),
@@ -85,7 +85,7 @@ async def fire_due(now: datetime | None = None) -> int:
             )
         )
         for task in list(tasks):
-            due = task_due_instant(task, general.timezone)
+            due = task_due_instant(task, tz)
             if due is None or task.remind_minutes is None:
                 continue
             remind_at = due - timedelta(minutes=task.remind_minutes)
@@ -93,7 +93,7 @@ async def fire_due(now: datetime | None = None) -> int:
                 continue
             if await _claim(db, "task", task.id, due):
                 sent += 1
-                when = when_text(due, general.timezone, all_day=task.due_time is None)
+                when = when_text(due, tz, all_day=task.due_time is None)
                 await notifications.create(
                     db,
                     title=f"Reminder: {task.title}",

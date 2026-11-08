@@ -17,6 +17,7 @@ from pathlib import Path
 
 import yaml
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
@@ -24,7 +25,7 @@ from app.events import bus
 from app.features.documents.models import Document, DocumentRevision
 from app.jobs import queue
 from app.knowledge import index
-from app.workspace import files
+from app.workspace import files, safe_fs
 
 DOCS_DIR = "documents"
 ASSETS_DIR = "_assets"
@@ -188,8 +189,14 @@ async def reconcile(db: AsyncSession) -> list[str]:
                 moved.size, moved.mtime = info.size, info.mtime
             else:
                 doc = Document(path=info.path, title="", content_hash="")
-                db.add(doc)
-                await db.flush()
+                try:
+                    async with db.begin_nested():
+                        db.add(doc)
+                        await db.flush()
+                except IntegrityError:
+                    # Another request found this file at the same moment and added it
+                    # (Home loads several document lists at once): it is indexed.
+                    continue
                 await _apply(db, doc, content, info, author="external")
             changed = True
         elif doc.content_hash != digest:
@@ -396,8 +403,11 @@ async def create(
 def unique_path(folder: str, title: str) -> str:
     """documents/<folder>/<slug>.md, with a number added if that name is taken."""
     folder = folder.strip("/")
-    base = files.root() / DOCS_DIR / folder if folder else files.root() / DOCS_DIR
-    base.mkdir(parents=True, exist_ok=True)
+    # Checked before anything is created: "../x" or "/x" must not make folders elsewhere.
+    base = files.resolve(f"{DOCS_DIR}/{folder}" if folder else DOCS_DIR)
+    if not base.is_relative_to(files.root() / DOCS_DIR):
+        raise AppError("Not a folder inside documents", code="invalid_path")
+    safe_fs.make_dirs(base)
     return files.rel(files.unique_name(base, f"{slugify(title)}.md"))
 
 

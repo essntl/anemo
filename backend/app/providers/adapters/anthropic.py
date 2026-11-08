@@ -134,7 +134,8 @@ class AnthropicAdapter:
     def _params(self, req: ChatRequest) -> dict[str, Any]:
         params: dict[str, Any] = {
             "model": req.model,
-            "max_tokens": req.max_tokens or DEFAULT_MAX_TOKENS,
+            "max_tokens": req.max_tokens
+            or min(DEFAULT_MAX_TOKENS, req.output_limit or DEFAULT_MAX_TOKENS),
             "messages": to_anthropic_messages(req.messages),
         }
         if req.system:

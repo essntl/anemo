@@ -94,3 +94,14 @@ async def test_failed_login_is_audited(authed):
     actions = [e["action"] for e in (await authed.get("/api/audit")).json()]
     assert "auth.login_failed" in actions
     assert "auth.login" in actions
+
+
+async def test_using_the_app_keeps_the_login_cookie_alive(authed):
+    """services-B8: the server extends a session while it is used, but the cookie kept
+    the expiry it got at login, so the browser dropped it 30 days after login anyway.
+    Opening the app (GET /me) now renews it."""
+    r = await authed.get("/api/auth/me")
+    assert r.status_code == 200
+    cookie = r.headers.get("set-cookie", "")
+    assert cookie.startswith("aiw_session=") and "Max-Age=" in cookie and "HttpOnly" in cookie
+    assert (await authed.get("/api/auth/me")).status_code == 200  # still logged in with it

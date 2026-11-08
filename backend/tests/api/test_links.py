@@ -188,3 +188,30 @@ async def test_files_hide_the_documents_folder_unless_asked(authed):
 
     folder = await authed.get("/api/files/upload-folder")
     assert folder.json() == "files"
+
+
+async def test_renaming_a_document_keeps_attachments_and_links_working(authed):
+    """features-B5: renaming or moving a document in Documents must update what points to
+    it, as moving it in Files does."""
+    doc = (
+        await authed.post("/api/documents", json={"title": "Draft", "content": "# Draft\n"})
+    ).json()
+    task = (await authed.post("/api/tasks", json={"title": "Review the draft"})).json()
+    r = await authed.post(f"/api/tasks/{task['id']}/files", json={"path": doc["path"]})
+    assert r.status_code in (200, 201), r.text
+    await authed.patch(
+        f"/api/tasks/{task['id']}",
+        json={"description": f"See [the draft](/files?path={doc['path']})."},
+    )
+
+    r = await authed.post(
+        f"/api/documents/{doc['id']}/move", json={"name": "Final", "folder": "thesis"}
+    )
+    assert r.status_code == 200, r.text
+    new_path = r.json()["path"]
+    assert new_path == "documents/thesis/Final.md"
+    attached = (await authed.get(f"/api/tasks/{task['id']}/files")).json()
+    assert [(f["path"], f["exists"]) for f in attached] == [(new_path, True)]
+    tasks = (await authed.get("/api/tasks", params={"status": "all"})).json()
+    notes = next(t for t in tasks if t["id"] == task["id"])["description"]
+    assert f"(/files?path={new_path})" in notes
