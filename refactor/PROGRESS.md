@@ -21,17 +21,17 @@ Read this file and PLAN.md first at the start of every session. Each PR updates 
 |---|---|---|
 | Phase 0: baseline | — | done (BASELINE.md) |
 | Phase 1: audit and plan | — | done, plan approved 2026-11-08 |
-| 0 notes | `refactor/notes` | in review ([essntl/anemo#21](https://github.com/essntl/anemo/pull/21)) |
-| S1 symlink race | `fix/workspace-symlink-race` | in review (stacked on the notes PR) |
-| S2 remote images in Markdown | `fix/markdown-remote-images` | next (covers chat Markdown and the document editor) |
-| S3 trash restore | `fix/trash-restore-name` | next |
-| 1 safety net | `refactor/safety-net` | in review (stacked on the notes PR) |
-| 2 run lifecycle | `refactor/run-lifecycle` | in review (stacked on the notes PR) |
-| 3 agent modules | `refactor/agent-modules` | in review (stacked on PR 2) |
-| 4 agent loop | `refactor/agent-loop` | in review (stacked on PR 3) |
-| 5 formatSize | `refactor/format-size` | in review (stacked on the notes PR) |
-| 6 dump.rdb | `chore/remove-dump-rdb` | in review (stacked on the notes PR) |
-| 7 conventions | `refactor/conventions` | next (last) |
+| 0 notes | `refactor/notes` | merged ([essntl/anemo#21](https://github.com/essntl/anemo/pull/21)) |
+| S1 symlink race | `fix/workspace-symlink-race` | merged ([essntl/anemo#22](https://github.com/essntl/anemo/pull/22)) |
+| S2 remote images in Markdown | `fix/markdown-remote-images` | merged ([essntl/anemo#23](https://github.com/essntl/anemo/pull/23)) |
+| S3 trash restore | `fix/trash-restore-name` | merged ([essntl/anemo#24](https://github.com/essntl/anemo/pull/24)) |
+| 1 safety net | `refactor/safety-net` | merged ([essntl/anemo#25](https://github.com/essntl/anemo/pull/25)) |
+| 2 run lifecycle | `refactor/run-lifecycle` | merged ([essntl/anemo#26](https://github.com/essntl/anemo/pull/26)) |
+| 3 agent modules | `refactor/agent-modules` | merged ([essntl/anemo#27](https://github.com/essntl/anemo/pull/27)) |
+| 4 agent loop | `refactor/agent-loop` | merged ([essntl/anemo#28](https://github.com/essntl/anemo/pull/28)) |
+| 5 formatSize | `refactor/format-size` | merged ([essntl/anemo#29](https://github.com/essntl/anemo/pull/29)) |
+| 6 dump.rdb | `chore/remove-dump-rdb` | merged ([essntl/anemo#30](https://github.com/essntl/anemo/pull/30)) |
+| 7 conventions | `refactor/conventions` | merged ([essntl/anemo#31](https://github.com/essntl/anemo/pull/31)) |
 
 ## Open questions
 
@@ -62,5 +62,8 @@ runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolat
 - 2026-11-08: formatSize: one function with `kbDecimals`; outputs checked against the three old versions; frontend 200 tests pass; e2e files, attachments, subtasks 5/5.
 - 2026-11-08: dump.rdb removed from the tree and `*.rdb` ignored (no history rewrite).
 - 2026-11-08: conventions: `CLAUDE.md`, `docs/architecture.md` updated, import boundaries (import-linter, dependency-cruiser, no-cycles test) in CI; final report in `REPORT.md`, measured on all branches merged locally (833 backend and 210 frontend tests pass; e2e 74/77 with the known flaky motion spec).
+- 2026-11-08: all 11 PRs merged in order (#21 to #31). Before merging, the branches were rebased into one chain so each PR's CI ran on exactly what `main` became; the trash fix was combined with the symlink fix in `workspace/files.py`, and the conventions PR with the safety net in CI, the Makefile and the dependency files.
+
 ## Done
-All steps of the plan are in review. What is left is the owner's: merging (order in `REPORT.md`), and the decisions listed there.
+
+All steps of the plan are merged into `main` (2026-11-08). What is left is the owner's decisions listed in `REPORT.md` ("What needs your action") and under Open questions above.

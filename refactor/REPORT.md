@@ -116,11 +116,11 @@ After merging, on your install (with a backup taken first):
   build (`make dev` / CI build it anyway).
 - **CI** now also runs `lint-imports`, `npm run lint:imports`, and mounts
   `frontend/src/api/openapi.json` into the backend test container for the contract test.
-- **Merge order**: `refactor/notes` first. Then the others in any order, except
-  run-lifecycle → agent-modules → agent-loop → conventions, which build on each other. Each PR
-  appends to `refactor/PROGRESS.md`, and #22/#24 both touch `workspace/files.py` (restore and
-  trash list), #25 and the conventions PR both touch CI, the Makefile and the dependency files:
-  I rebase whichever comes second, with the combined resolution already tested here.
+- **Merged** on 2026-11-08 in this order: #21, #22, #23, #24, #25, #26, #27, #28, #29, #30, #31.
+  The trash fix (#24) was combined with the symlink fix (#22) in `workspace/files.py` (the trash
+  metadata is read and the item moved through `safe_fs`, and only a plain name inside the slot is
+  accepted), and the conventions PR (#31) with the safety net (#25) in CI, the Makefile and the
+  dependency files.
 - **Decisions waiting for you**: sec-6 (default permissions), the dead-code candidates
   (`AUDIT.md` §4), which of the 105 open bugs to fix, the `katex` advisory (dep-1), whether to
   add a Content-Security-Policy (sec-4 follow-up), and the flaky e2e specs (test-1, test-2).
