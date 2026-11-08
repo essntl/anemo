@@ -56,3 +56,4 @@ runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolat
 - 2026-11-08: S3 (trash restore) fixed with tests that fail on the old code; 795 backend tests pass.
 - 2026-11-08: safety net: coverage tooling, the OpenAPI snapshot test (wired into CI and `make test-backend`), music-queue characterization tests; frontend coverage baseline recorded.
 - 2026-11-08: run lifecycle: 18 characterization tests, the shared helpers moved to `runtime/lifecycle.py`, then the stuck-run fix (core-B1) as a separate behaviour change; 801 backend tests pass.
+- 2026-11-08: e2e locally for the run lifecycle: chat, agents, temporary chats, projects, subtasks 42/42 with `--workers=1` (twice); automations 3/3. With 2 workers two chat tests were flaky (BUGS test-2), so local runs use `--workers=1` from now on.
