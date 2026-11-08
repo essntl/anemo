@@ -157,3 +157,17 @@ async def test_a_question_comes_back_as_the_tool_result(authed):
     assert r.status_code == 200, r.text
     await execute_run(uuid.UUID(run_id))
     assert await run_status(authed, run_id) == "paused"
+
+
+async def test_a_tool_that_describes_no_actions_is_still_checked(authed, monkeypatch):
+    """sec-15: an empty action list was allowed without asking; now the tool's own
+    capability decides (here fs.read is set to ask)."""
+    from app.tools import registry
+
+    tool = registry.get("read_file")
+    assert tool is not None
+    monkeypatch.setattr(type(tool), "actions", lambda self, args, ctx: [])
+    cid = await setup(authed, **{"fs.read": "ask"})
+    script("read todo", [call("read_file", path="notes/todo.md"), Done("tool_use")])
+    run_id = await agent_turn(authed, cid, "read todo")
+    assert await run_status(authed, run_id) == "waiting_approval"

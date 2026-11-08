@@ -734,7 +734,11 @@ class AgentRun:
         args: Any,
         grants: list[Grant],
     ) -> str | None:
-        actions = tool.actions(args, self.ctx)
+        # A tool that describes no actions is still checked: against its own capability,
+        # never waved through (refactor/BUGS.md sec-15).
+        actions = tool.actions(args, self.ctx) or [
+            Action(capability=tool.capability, summary=tool.name)
+        ]
         verdict = combine(
             [
                 evaluate(
