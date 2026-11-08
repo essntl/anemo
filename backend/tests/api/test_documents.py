@@ -360,3 +360,19 @@ async def test_two_requests_finding_a_new_document_at_once_both_succeed(authed, 
     await asyncio.gather(look(), look(), look())
     listed = (await authed.get("/api/documents")).json()["documents"]
     assert [d["title"] for d in listed if d["path"].endswith("found.md")] == ["Found"]
+
+
+async def test_a_new_document_stays_inside_documents(authed, docs, workspace):  # noqa: F811
+    """sec-2: the folder was created before it was checked, so ../ made folders elsewhere."""
+    for folder in ["../../escape-sec2", "../files-sec2", "thesis/../../files-sec2"]:
+        r = await authed.post("/api/documents", json={"title": "X", "folder": folder})
+        assert r.status_code == 400, (folder, r.text)
+        assert r.json()["error"]["code"] == "invalid_path"
+    assert not (workspace.parent.parent / "escape-sec2").exists()
+    assert not (workspace / "files-sec2").exists()
+    ok = await authed.post("/api/documents", json={"title": "Plan", "folder": "thesis/2026"})
+    assert ok.status_code == 201, ok.text
+    assert ok.json()["path"] == "documents/thesis/2026/plan.md"
+    # A leading slash means "from the documents folder", as before.
+    lead = await authed.post("/api/documents", json={"title": "Note", "folder": "/inbox"})
+    assert lead.json()["path"] == "documents/inbox/note.md"
