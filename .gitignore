@@ -10,10 +10,13 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 
 # node
 node_modules/
 dist/
+coverage/
 frontend/src/api/schema.d.ts.bak
 
 # local data
