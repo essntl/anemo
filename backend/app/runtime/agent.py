@@ -76,12 +76,7 @@ from app.runtime import citations, compaction, outputs, subagents, turn_context
 from app.runtime.chat import (
     SYSTEM_PROMPT as CHAT_SYSTEM_PROMPT,
 )
-from app.runtime.chat import (
-    VISUALS_HINT,
-    CancelFlag,
-    _maybe_enqueue_title,
-    _watch_for_cancel,
-)
+from app.runtime.chat import VISUALS_HINT
 from app.runtime.history import (
     estimate_tokens,
     latest_user_attachment_kinds,
@@ -89,6 +84,7 @@ from app.runtime.history import (
     resolve_attachments,
     trim_to_budget,
 )
+from app.runtime.lifecycle import CancelFlag, _maybe_enqueue_title, _watch_for_cancel
 from app.runtime.streaming import (
     RequestBuilder,
     StreamProgress,

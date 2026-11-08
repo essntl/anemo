@@ -5,7 +5,7 @@ the worker (not the API), so it keeps going if the browser disconnects, and the
 browser can reconnect to the live stream at any time.
 
 Cancellation: the API publishes "cancel" on the run's control channel (and sets
-`cancel_requested` in the DB as a fallback). The watcher below cancels the
+`cancel_requested` in the DB as a fallback). The watcher (runtime/lifecycle.py) cancels the
 streaming task, and partial output is saved with status "cancelled".
 """
 
@@ -13,13 +13,11 @@ import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
-from app.core.redis import get_redis
 from app.events import bus
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.memory import extraction
@@ -31,7 +29,6 @@ from app.features.settings import service as settings_service
 from app.features.settings.sections import GeneralSettings
 from app.features.skills import service as skills
 from app.features.usage import service as usage
-from app.jobs import queue
 from app.providers.base import (
     ChatRequest,
     Message,
@@ -50,13 +47,13 @@ from app.runtime.history import (
     resolve_attachments,
     trim_to_budget,
 )
+from app.runtime.lifecycle import CancelFlag, _maybe_enqueue_title, _watch_for_cancel
 from app.runtime.streaming import StreamProgress, StreamResult, stream_with_fallback
 
 log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 2  # a run interrupted twice by worker crashes is failed, not retried again
 DEFAULT_CONTEXT_TOKENS = 32_000
-CANCEL_POLL_S = 3.0
 
 # Stable for every turn (prompt caching): the date and the memories for a message
 # are in its turn context (runtime/turn_context.py), not here.
@@ -104,59 +101,6 @@ def build_request(
         session_key=session_key,
         turn_context=turn_context,
     )
-
-
-class CancelFlag:
-    """Set by the watcher so a user cancel can be told apart from a worker shutdown."""
-
-    requested = False
-
-
-async def _watch_for_cancel(
-    run_id: uuid.UUID, target: "asyncio.Task[Any]", flag: CancelFlag
-) -> None:
-    """Cancels `target` when a cancel signal arrives (Redis), or the DB flag is set.
-
-    The signal makes stopping immediate; the flag is checked every few seconds as
-    well, so stopping still works when Redis is down."""
-    pubsub = get_redis().pubsub()
-    signals = True  # False once Redis fails: from then on only the flag is checked
-    try:
-        await pubsub.subscribe(bus.control_channel(run_id))
-    except Exception:  # noqa: BLE001
-        signals = False
-        log.warning("no cancel signals for this run (redis unavailable); polling the database")
-    try:
-        waited = 0.0
-        while not target.done():
-            if signals:
-                try:
-                    msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-                except Exception:  # noqa: BLE001
-                    signals, msg = False, None
-                    log.warning("cancel signals lost (redis unavailable); polling the database")
-                if msg and msg.get("data") == "cancel":
-                    flag.requested = True
-                    target.cancel()
-                    return
-            else:
-                await asyncio.sleep(1.0)
-            waited += 1.0
-            if waited >= CANCEL_POLL_S:
-                waited = 0.0
-                async with get_sessionmaker()() as db:
-                    run = await db.get(Run, run_id)
-                    if run is not None and run.cancel_requested:
-                        flag.requested = True
-                        target.cancel()
-                        return
-    except Exception:  # noqa: BLE001 - never let the watcher crash the run
-        log.warning("cancel watcher stopped", exc_info=True)
-    finally:
-        try:
-            await pubsub.aclose()
-        except Exception:  # noqa: BLE001, S110 - closing a dead connection may fail too
-            pass
 
 
 async def _finish(
@@ -338,22 +282,6 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
             if run.conversation_id is not None:
                 await extraction.schedule(db, run.conversation_id, message.seq)
                 await db.commit()
-
-
-async def _maybe_enqueue_title(
-    db: AsyncSession, conversation_id: uuid.UUID | None, assistant_seq: int
-) -> None:
-    if conversation_id is None or assistant_seq != 2:
-        return  # only after the first exchange
-    conv = await db.get(Conversation, conversation_id)
-    if conv is not None and conv.title_is_auto:
-        await queue.enqueue(
-            db,
-            "conversation.title",
-            {"conversation_id": str(conv.id)},
-            dedupe_key=f"title:{conv.id}",
-        )
-        await db.commit()
 
 
 TITLE_PROMPT = (
