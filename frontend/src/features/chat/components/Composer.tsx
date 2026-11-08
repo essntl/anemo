@@ -17,8 +17,10 @@ interface ComposerProps {
   /**
    * `referenceIds`: other chats to give the model as context for this message.
    * `skillId`: the skill chosen with / to answer it with.
+   * The box is cleared at once; when the returned promise rejects (the send failed), the
+   * message, its files, chats and skill are put back so nothing is lost.
    */
-  onSend: (text: string, attachmentIds: string[], referenceIds: string[], skillId: string | null) => void
+  onSend: (text: string, attachmentIds: string[], referenceIds: string[], skillId: string | null) => void | Promise<unknown>
   onStop?: () => void
   running: boolean
   disabled?: boolean
@@ -107,7 +109,8 @@ export function Composer({
 
   const send = () => {
     if (!canSend) return
-    onSend(text.trim(), files.readyIds, references.map((r) => r.id), chosen?.id ?? null)
+    const sent = { text, files: files.items, references, skill }
+    const result = onSend(text.trim(), files.readyIds, references.map((r) => r.id), chosen?.id ?? null)
     setText('')
     files.clear()
     setReferences([])
@@ -115,6 +118,17 @@ export function Composer({
       setSkill(null)
       onSkillChange?.(null)
     }
+    // Sending failed (the page shows why): put the message back, unless something new
+    // was typed meanwhile.
+    void result?.catch(() => {
+      setText((now) => now || sent.text)
+      files.restore(sent.files)
+      setReferences((now) => (now.length ? now : sent.references))
+      if (sent.skill) {
+        setSkill((now) => now ?? sent.skill)
+        onSkillChange?.(sent.skill)
+      }
+    })
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {

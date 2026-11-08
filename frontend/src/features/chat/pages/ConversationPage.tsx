@@ -343,10 +343,10 @@ export function ConversationPage() {
           onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
           onSend={(text, attachmentIds, referenceIds, skillId) =>
             question
-              ? answer.mutate({ approvalId: question.approval!.id, decision: 'approve', answer: text })
+              ? answer.mutateAsync({ approvalId: question.approval!.id, decision: 'approve', answer: text })
               : paused && activeRunId
-                ? resume.mutate({ runId: activeRunId, message: text })
-                : send.mutate({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
+                ? resume.mutateAsync({ runId: activeRunId, message: text })
+                : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
           }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           toolbar={

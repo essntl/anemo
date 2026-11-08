@@ -55,6 +55,7 @@ export function NewChatPage() {
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)
+      throw err // the composer puts the message back
     }
   }
 
