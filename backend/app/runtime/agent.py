@@ -552,177 +552,247 @@ class AgentRun:
         return list(approved) if approved is not None else None
 
     async def _process_tools(self, db: AsyncSession, run: Run, uses: list[ToolUseBlock]) -> str:
-        rows = {
+        """Settle the tool calls of the current step in order. Returns why the run has to
+        wait ("waiting", "paused", "blocked", "waiting_child") or "done" once every call
+        is settled and the results are handed to the model."""
+        rows = await self._step_rows(db, run)
+        grants = [Grant.model_validate(g) for g in run.grants]
+        for position, use in enumerate(uses):
+            row = await self._row_for(db, run, rows, position, use)
+            stop = await self._settle_call(db, run, row, use, grants)
+            if stop is not None:
+                return stop
+
+        if any(r.status == "waiting_child" for r in rows.values()):
+            await db.commit()
+            return "waiting_child"  # continue when the sub-agents are done
+        await self._hand_results_to_model(db, run, rows)
+        return "done"
+
+    async def _step_rows(self, db: AsyncSession, run: Run) -> dict[str, ToolCall]:
+        """The calls of this step recorded so far (all of them when it is resumed)."""
+        return {
             r.provider_call_id: r
             for r in await db.scalars(
                 select(ToolCall).where(ToolCall.run_id == run.id, ToolCall.step == run.step)
             )
         }
-        grants = [Grant.model_validate(g) for g in run.grants]
-        for position, use in enumerate(uses):
-            row = rows.get(use.id)
-            if row is None:
-                row = ToolCall(
-                    run_id=run.id,
-                    step=run.step,
-                    position=position,
-                    provider_call_id=use.id,
-                    tool_name=use.name,
-                    args=use.input,
-                )
-                db.add(row)
-                await db.flush()
-                rows[use.id] = row
-            if row.status in DONE_TOOL_STATUSES:
-                continue
-            if row.status == "waiting_child":
-                await self._collect_subagent(db, run, row)  # done if the sub-agent is
-                continue
-            tool = self.tools.get(use.name)
 
-            if row.status == "waiting_approval":
-                approval = await db.scalar(select(Approval).where(Approval.tool_call_id == row.id))
-                if approval is None or approval.status == "pending":
-                    await db.commit()
-                    return "waiting"
-                if await self._pause_requested(db):
-                    await db.commit()
-                    return "paused"
-                if approval.kind == "question":
-                    asked = _note_question(run, row, approval)
-                    await self._finish_row(db, row, "succeeded", _answer(approval, row))
-                    if asked is not None:
-                        await self._emit("message.question", asked)
-                    continue
-                if approval.status != "approved" or tool is None:
-                    await self._finish_row(db, row, "denied", _denial(approval))
-                    continue
-                if approval.kind == "plan":
-                    await self._run_approved_plan(db, run, row, tool, use)
-                    continue
-                await self._execute(db, run, row, tool, tool.Input.model_validate(use.input))
-                continue
-
-            if await self._pause_requested(db):
-                await db.commit()
-                return "paused"
-
-            if row.status == "running":
-                # The worker crashed while this call ran. Only safe calls are repeated.
-                if tool is not None and tool.idempotent:
-                    await self._execute(db, run, row, tool, tool.Input.model_validate(use.input))
-                else:
-                    await self._finish_row(
-                        db,
-                        row,
-                        "interrupted",
-                        ToolResult(
-                            content="The run was interrupted while this action was running; its "
-                            "outcome is unknown. Check the current state before retrying.",
-                            is_error=True,
-                        ),
-                    )
-                continue
-
-            # A new call: validate, then ask the permission engine.
-            args = await self._validate(db, row, use, tool)
-            if args is None or tool is None:
-                continue
-
-            if isinstance(args, AskUserInput):
-                row.capability, row.decision = tool.capability, "ask"
-                row.decision_reason = "a question for the user"
-                row.args = {**row.args, "options": clean_options(args.options)}
-                if self.on_ask != "pause":  # nobody is there (the tool is not offered then)
-                    await self._finish_row(
-                        db,
-                        row,
-                        "succeeded",
-                        ToolResult(content="Nobody is here to answer. " + DECIDE_YOURSELF),
-                    )
-                    continue
-                return await self._ask(db, run, row, tool, "question", args.question)
-
-            approved_plan = self._plan_approved(run)
-            if self.plan_review == "always" and tool.name == "update_plan":
-                titles = [s.title for s in args.steps]
-                if titles != approved_plan:
-                    return await self._ask_plan_review(db, run, row, tool, args)
-            elif self.plan_review == "always" and approved_plan is None:
-                row.capability, row.decision = tool.capability, "deny"
-                row.decision_reason = "the plan has not been approved yet"
-                await self._finish_row(
-                    db,
-                    row,
-                    "denied",
-                    ToolResult(
-                        content="The user reviews your plan before you act. Call update_plan "
-                        "with your plan first; other tools work once it is approved.",
-                        is_error=True,
-                    ),
-                )
-                continue
-
-            actions = tool.actions(args, self.ctx)
-            verdict = combine(
-                [
-                    evaluate(
-                        a,
-                        self.policy,
-                        ceiling=self.ceiling,
-                        ancestors=self.ancestors,
-                        grants=grants,
-                    )
-                    for a in actions
-                ]
+    async def _row_for(
+        self,
+        db: AsyncSession,
+        run: Run,
+        rows: dict[str, ToolCall],
+        position: int,
+        use: ToolUseBlock,
+    ) -> ToolCall:
+        row = rows.get(use.id)
+        if row is None:
+            row = ToolCall(
+                run_id=run.id,
+                step=run.step,
+                position=position,
+                provider_call_id=use.id,
+                tool_name=use.name,
+                args=use.input,
             )
-            row.capability = tool.capability
-            row.actions = [a.model_dump() for a in actions]
-            row.risk = max((a.risk for a in actions), key=lambda r: _RISK_ORDER[r], default="safe")
-            row.decision, row.decision_reason = verdict.decision, verdict.reason
+            db.add(row)
+            await db.flush()
+            rows[use.id] = row
+        return row
 
-            if verdict.decision == "deny":
-                await self._finish_row(
-                    db,
-                    row,
-                    "denied",
-                    ToolResult(
-                        content="Not allowed by the user's permission settings "
-                        f"({verdict.reason}). "
-                        "Do not retry; continue without it or tell the user.",
-                        is_error=True,
-                    ),
-                )
-                await self._emit("tool.denied", {"tool_call_id": str(row.id)})
-                continue
-            if verdict.decision == "ask":
-                summary = "; ".join(a.summary for a in actions if a.summary) or tool.name
-                if self.on_ask == "pause":
-                    return await self._ask(db, run, row, tool, "action", summary)
-                # Unattended and set not to wait: the answer is no, never a silent yes.
-                row.decision_reason = f"{verdict.reason}; nobody is here to approve"[:300]
-                await self._finish_row(
-                    db,
-                    row,
-                    "denied",
-                    ToolResult(
-                        content="This action needs the user's approval and this unattended "
-                        "run does not wait for it. Do not retry; continue without it and "
-                        "say in your answer what you could not do.",
-                        is_error=True,
-                    ),
-                )
-                await self._emit("tool.denied", {"tool_call_id": str(row.id)})
-                if self.on_ask == "fail":
-                    self.blocked_by = summary
-                    return "blocked"
-                continue
-            await self._execute(db, run, row, tool, args)
-
-        if any(r.status == "waiting_child" for r in rows.values()):
+    async def _settle_call(
+        self, db: AsyncSession, run: Run, row: ToolCall, use: ToolUseBlock, grants: list[Grant]
+    ) -> str | None:
+        """Settle one call, by the state it is in. Returns the outcome that ends the step
+        early, or None to go on with the next call. The order of the checks matters: an
+        approval that is still pending comes before a pause, a pause before running
+        anything (tests/api/test_agent_loop.py)."""
+        if row.status in DONE_TOOL_STATUSES:
+            return None
+        if row.status == "waiting_child":
+            await self._collect_subagent(db, run, row)  # done if the sub-agent is
+            return None
+        tool = self.tools.get(use.name)
+        if row.status == "waiting_approval":
+            return await self._resume_decided(db, run, row, use, tool)
+        if await self._pause_requested(db):
             await db.commit()
-            return "waiting_child"  # continue when the sub-agents are done
+            return "paused"
+        if row.status == "running":
+            await self._resume_interrupted(db, run, row, use, tool)
+            return None
+        return await self._decide_new_call(db, run, row, use, tool, grants)
 
+    async def _resume_decided(
+        self, db: AsyncSession, run: Run, row: ToolCall, use: ToolUseBlock, tool: Tool | None
+    ) -> str | None:
+        """A call that waited for the user: an approval, a plan review or a question."""
+        approval = await db.scalar(select(Approval).where(Approval.tool_call_id == row.id))
+        if approval is None or approval.status == "pending":
+            await db.commit()
+            return "waiting"
+        if await self._pause_requested(db):
+            await db.commit()
+            return "paused"
+        if approval.kind == "question":
+            asked = _note_question(run, row, approval)
+            await self._finish_row(db, row, "succeeded", _answer(approval, row))
+            if asked is not None:
+                await self._emit("message.question", asked)
+            return None
+        if approval.status != "approved" or tool is None:
+            await self._finish_row(db, row, "denied", _denial(approval))
+            return None
+        if approval.kind == "plan":
+            await self._run_approved_plan(db, run, row, tool, use)
+            return None
+        await self._execute(db, run, row, tool, tool.Input.model_validate(use.input))
+        return None
+
+    async def _resume_interrupted(
+        self, db: AsyncSession, run: Run, row: ToolCall, use: ToolUseBlock, tool: Tool | None
+    ) -> None:
+        """The worker crashed while this call ran. Only safe calls are repeated."""
+        if tool is not None and tool.idempotent:
+            await self._execute(db, run, row, tool, tool.Input.model_validate(use.input))
+            return
+        await self._finish_row(
+            db,
+            row,
+            "interrupted",
+            ToolResult(
+                content="The run was interrupted while this action was running; its "
+                "outcome is unknown. Check the current state before retrying.",
+                is_error=True,
+            ),
+        )
+
+    async def _decide_new_call(
+        self,
+        db: AsyncSession,
+        run: Run,
+        row: ToolCall,
+        use: ToolUseBlock,
+        tool: Tool | None,
+        grants: list[Grant],
+    ) -> str | None:
+        """A new call: validate it, then a question goes to the user, plan review comes
+        next, and everything else is up to the permission engine."""
+        args = await self._validate(db, row, use, tool)
+        if args is None or tool is None:
+            return None
+
+        if isinstance(args, AskUserInput):
+            return await self._new_question(db, run, row, tool, args)
+
+        approved_plan = self._plan_approved(run)
+        if self.plan_review == "always" and tool.name == "update_plan":
+            titles = [s.title for s in args.steps]
+            if titles != approved_plan:
+                return await self._ask_plan_review(db, run, row, tool, args)
+        elif self.plan_review == "always" and approved_plan is None:
+            row.capability, row.decision = tool.capability, "deny"
+            row.decision_reason = "the plan has not been approved yet"
+            await self._finish_row(
+                db,
+                row,
+                "denied",
+                ToolResult(
+                    content="The user reviews your plan before you act. Call update_plan "
+                    "with your plan first; other tools work once it is approved.",
+                    is_error=True,
+                ),
+            )
+            return None
+
+        return await self._decide_by_policy(db, run, row, tool, args, grants)
+
+    async def _new_question(
+        self, db: AsyncSession, run: Run, row: ToolCall, tool: Tool, args: AskUserInput
+    ) -> str | None:
+        row.capability, row.decision = tool.capability, "ask"
+        row.decision_reason = "a question for the user"
+        row.args = {**row.args, "options": clean_options(args.options)}
+        if self.on_ask != "pause":  # nobody is there (the tool is not offered then)
+            await self._finish_row(
+                db,
+                row,
+                "succeeded",
+                ToolResult(content="Nobody is here to answer. " + DECIDE_YOURSELF),
+            )
+            return None
+        return await self._ask(db, run, row, tool, "question", args.question)
+
+    async def _decide_by_policy(
+        self,
+        db: AsyncSession,
+        run: Run,
+        row: ToolCall,
+        tool: Tool,
+        args: Any,
+        grants: list[Grant],
+    ) -> str | None:
+        actions = tool.actions(args, self.ctx)
+        verdict = combine(
+            [
+                evaluate(
+                    a,
+                    self.policy,
+                    ceiling=self.ceiling,
+                    ancestors=self.ancestors,
+                    grants=grants,
+                )
+                for a in actions
+            ]
+        )
+        row.capability = tool.capability
+        row.actions = [a.model_dump() for a in actions]
+        row.risk = max((a.risk for a in actions), key=lambda r: _RISK_ORDER[r], default="safe")
+        row.decision, row.decision_reason = verdict.decision, verdict.reason
+
+        if verdict.decision == "deny":
+            await self._finish_row(
+                db,
+                row,
+                "denied",
+                ToolResult(
+                    content="Not allowed by the user's permission settings "
+                    f"({verdict.reason}). "
+                    "Do not retry; continue without it or tell the user.",
+                    is_error=True,
+                ),
+            )
+            await self._emit("tool.denied", {"tool_call_id": str(row.id)})
+            return None
+        if verdict.decision == "ask":
+            summary = "; ".join(a.summary for a in actions if a.summary) or tool.name
+            if self.on_ask == "pause":
+                return await self._ask(db, run, row, tool, "action", summary)
+            # Unattended and set not to wait: the answer is no, never a silent yes.
+            row.decision_reason = f"{verdict.reason}; nobody is here to approve"[:300]
+            await self._finish_row(
+                db,
+                row,
+                "denied",
+                ToolResult(
+                    content="This action needs the user's approval and this unattended "
+                    "run does not wait for it. Do not retry; continue without it and "
+                    "say in your answer what you could not do.",
+                    is_error=True,
+                ),
+            )
+            await self._emit("tool.denied", {"tool_call_id": str(row.id)})
+            if self.on_ask == "fail":
+                self.blocked_by = summary
+                return "blocked"
+            return None
+        await self._execute(db, run, row, tool, args)
+        return None
+
+    async def _hand_results_to_model(
+        self, db: AsyncSession, run: Run, rows: dict[str, ToolCall]
+    ) -> None:
         # Every call of this step is settled: hand the results to the model.
         ordered = sorted(rows.values(), key=lambda r: r.position)
         results: list[ContentBlock] = [
@@ -747,7 +817,6 @@ class AgentRun:
         run.totals = {**run.totals, "consecutive_errors": errors}
         run.transcript = [*run.transcript, Message(role="user", content=results).model_dump()]
         await db.commit()
-        return "done"
 
     async def _validate(
         self, db: AsyncSession, row: ToolCall, use: ToolUseBlock, tool: Tool | None
@@ -1021,32 +1090,60 @@ async def _get_run(db: AsyncSession, run_id: uuid.UUID) -> Run:
 
 
 async def execute_agent_run(run_id: uuid.UUID) -> None:
-    sessionmaker = get_sessionmaker()
-    async with sessionmaker() as db:
+    """Set the run up, drive its loop until it ends or has to wait, then record how."""
+    agent = await _prepare(run_id)
+    if agent is None:
+        return
+    # A worker shutdown is not caught: the job is handed back and resumes from the checkpoint.
+    driven = await drive_until_stopped(run_id, agent.drive())
+    outcome, error = "completed", None
+    if driven.cancelled:
+        outcome = "cancelled"
+    elif driven.error is not None:
+        outcome, error = "failed", driven.error
+    elif driven.value is not None:
+        outcome = driven.value
+
+    await _record_outcome(run_id, agent, outcome, error)
+
+
+async def _pick_up(db: AsyncSession, run: Run) -> bool:
+    """Whether this worker should drive the run now. A stale or duplicate job leaves it
+    alone; a run stopped before it started, or interrupted too often, is ended here.
+    After a crash the restart is counted (refactor/BUGS.md run-1)."""
+    if run.status in TERMINAL_STATUSES:
+        return False
+    if run.status in ("paused", "waiting_approval", "waiting_subagent"):
+        return False  # a stale job: the run continues when it is resumed, approved or woken
+    if run.cancel_requested:
+        await finalize(db, run, "cancelled")
+        return False
+    if run.status == "running":
+        if await queue.other_worker_has_run(db, run.id):
+            return False  # a duplicate job: another worker is executing this run
+        # The previous worker died. Resume from the last checkpoint.
+        run.attempt += 1
+        if run.attempt > MAX_CRASH_RESUMES:
+            await finalize(
+                db,
+                run,
+                "failed",
+                error="The worker was interrupted repeatedly while running this.",
+            )
+            return False
+        await runs.emit(db, run, "run.restarted", {"attempt": run.attempt})
+        if run.totals.get("text"):
+            await runs.emit(db, run, "message.delta", {"text": run.totals["text"]})
+    return True
+
+
+async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
+    """Pick the run up and build its loop from the snapshot (taken now for a new run).
+    None when there is nothing to drive."""
+    async with get_sessionmaker()() as db:
         run = await db.get(Run, run_id)
-        if run is None or run.status in TERMINAL_STATUSES:
-            return
-        if run.status in ("paused", "waiting_approval", "waiting_subagent"):
-            return  # a stale job: the run continues when it is resumed, approved or woken
-        if run.cancel_requested:
-            await finalize(db, run, "cancelled")
-            return
-        if run.status == "running":
-            if await queue.other_worker_has_run(db, run.id):
-                return  # a duplicate job: another worker is executing this run
-            # The previous worker died. Resume from the last checkpoint.
-            run.attempt += 1
-            if run.attempt > MAX_CRASH_RESUMES:
-                await finalize(
-                    db,
-                    run,
-                    "failed",
-                    error="The worker was interrupted repeatedly while running this.",
-                )
-                return
-            await runs.emit(db, run, "run.restarted", {"attempt": run.attempt})
-            if run.totals.get("text"):
-                await runs.emit(db, run, "message.delta", {"text": run.totals["text"]})
+        if run is None or not await _pick_up(db, run):
+            return None
 
         if not run.transcript:
             assert run.conversation_id is not None
@@ -1079,7 +1176,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
             candidates = await resolve_models(db, run, needs)
         except NoModelAvailable as exc:
             await finalize(db, run, "failed", error=exc.message)
-            return
+            return None
         tools = registry.toolset_for(
             run.kind,
             policy,
@@ -1110,7 +1207,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         await runs.set_status(db, run, "running")  # commits
 
-    agent = AgentRun(
+    return AgentRun(
         run_id,
         candidates,
         policy,
@@ -1133,17 +1230,14 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         conversation_id=run.conversation_id,
         answer=answer_message,
     )
-    # A worker shutdown is not caught: the job is handed back and resumes from the checkpoint.
-    driven = await drive_until_stopped(run_id, agent.drive())
-    outcome, error = "completed", None
-    if driven.cancelled:
-        outcome = "cancelled"
-    elif driven.error is not None:
-        outcome, error = "failed", driven.error
-    elif driven.value is not None:
-        outcome = driven.value
 
-    async with sessionmaker() as db:
+
+async def _record_outcome(
+    run_id: uuid.UUID, agent: AgentRun, outcome: str, error: str | None
+) -> None:
+    """Save how the loop ended: waiting for the user or sub-agents, paused, stopped by a
+    limit, blocked, refused, or finished (with the follow-ups of a completed answer)."""
+    async with get_sessionmaker()() as db:
         run = await _get_run(db, run_id)
         agent._checkpoint_time(run)
         partial = agent.progress.current
@@ -1184,7 +1278,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
                 "(This automation is set to stop when approval is needed.)",
             )
         elif outcome.startswith("limit:"):
-            note = limit_message(outcome.removeprefix("limit:"), policy.limits)
+            note = limit_message(outcome.removeprefix("limit:"), agent.policy.limits)
             await finalize(db, run, "completed", note=f"\n\n_{note}_")
             await after_answer(db, run)
         elif outcome == "refused":
