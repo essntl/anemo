@@ -29,8 +29,8 @@ Read this file and PLAN.md first at the start of every session. Each PR updates 
 | 2 run lifecycle | `refactor/run-lifecycle` | in review (stacked on the notes PR) |
 | 3 agent modules | `refactor/agent-modules` | in review (stacked on PR 2) |
 | 4 agent loop | `refactor/agent-loop` | in review (stacked on PR 3) |
-| 5 formatSize | `refactor/format-size` | next |
-| 6 dump.rdb | `chore/remove-dump-rdb` | to do |
+| 5 formatSize | `refactor/format-size` | in review (stacked on the notes PR) |
+| 6 dump.rdb | `chore/remove-dump-rdb` | next |
 | 7 conventions | `refactor/conventions` | to do (last) |
 
 ## Open questions
@@ -59,3 +59,4 @@ runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolat
 - 2026-11-08: e2e locally for the run lifecycle: chat, agents, temporary chats, projects, subtasks 42/42 with `--workers=1` (twice); automations 3/3. With 2 workers two chat tests were flaky (BUGS test-2), so local runs use `--workers=1` from now on.
 - 2026-11-08: agent modules: prompt, snapshot and run end moved out of `agent.py` byte for byte (1,612 → 1,195 lines), then renamed to public names; 801 backend tests pass.
 - 2026-11-08: agent loop: 6 ordering tests, then `_process_tools` split by call state and `execute_agent_run` by phase; longest function in `agent.py` now 93 lines (was 197); 807 backend tests pass; e2e chat, agents, subtasks, push 17/17 and automations 3/3.
+- 2026-11-08: formatSize: one function with `kbDecimals`; outputs checked against the three old versions; frontend 200 tests pass; e2e files, attachments, subtasks 5/5.
