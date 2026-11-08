@@ -13,8 +13,8 @@ How it was run, so the final comparison is like for like:
   there, so **none of the 783 tests was skipped**. Without them, 20 tests skip.
 - Backend coverage: `uv run --with pytest-cov pytest --cov=app` (no lockfile change).
 - Frontend: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.
-- Frontend coverage was not measured here: `@vitest/coverage-v8` is added in the safety-net PR,
-  and its first run on unchanged code is recorded below once that PR lands.
+- Frontend coverage: `npm run coverage` (`@vitest/coverage-v8`, added in the safety-net PR), run at
+  that PR's first commit, which changes no source or test file.
 
 ## Results
 
@@ -30,7 +30,7 @@ How it was run, so the final comparison is like for like:
 | `oxlint src` | pass | 0.3 s |
 | `vitest run` | **197 passed** (43 files) | 14 s |
 | `vite build` | pass; warns that 4 chunks are over 500 kB | 13 s |
-| Frontend line coverage | *measured in the safety-net PR* | — |
+| Frontend line coverage | **65.4 %** of the lines in the 79 files that tests load (1,479 of 2,262); **230 of 309** source files are loaded by no test | 15 s |
 | E2E (`e2e/run-isolated.sh`, 30 specs) | not run in this container (its Docker builds can't reach the Debian and GitHub container registries); runs in CI on every PR | — |
 | OpenAPI export vs `frontend/src/api/openapi.json` | identical (165 paths) | — |
 
@@ -127,3 +127,10 @@ Longest functions: `AgentRun` class 826 lines, `AgentRun._process_tools` 197,
   30 imports of app modules sit inside functions, most in `jobs/runner.py` (9) and `jobs/scheduler.py` (6).
 - Frontend import cycles (madge): 2 — `app/router → CalendarPage → TaskDialog → focusOnTask → app/router`
   and `RunActivity ↔ SubagentRun`.
+
+### Note on frontend coverage
+
+Vitest's v8 provider reports a source file that no test imports as having no lines, so such files
+don't lower the percentage. The number above is therefore "how much of the code that tests reach
+is run", and the count of files no test loads is the other half of the picture. The final
+comparison uses the same tool and the same two numbers.

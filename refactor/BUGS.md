@@ -57,6 +57,8 @@ security headers) are in the appendices: backend-core §0 and §12, services-and
 | ID | Severity | Location | What's wrong | Suggested fix | Status |
 |---|---|---|---|---|---|
 | test-1 | Low | `e2e/tests/motion.spec.ts:11-22` | Flaky: "dialogs, dropdowns and the search palette animate when they close" sometimes sees only `fade-out`/`pop-out` and misses `pop-in`/`fade-in` (1 of 4 repeats failed, on `main` as well as on a branch). When it fails in a full run, the `notifications` project (`automations.spec.ts`) doesn't run, because it depends on the `desktop` project. | Wait for the opening animation to have been recorded before pressing Escape, e.g. `await expect.poll(seen).toContain('pop-in')`. | open |
+| dep-1 | Low | `frontend/package-lock.json` | `npm audit`: 6 advisories, all present before the refactor. `katex` 0.16 (runtime, through `rehype-katex` and `remark-math`): prototype pollution can bypass its trust restrictions (GHSA-238p-pmpm-9mq7); math is rendered from model output. `undici` (through `jsdom`, tests only) and `vite` (build/dev only). | Owner's call (dependency upgrades): move to a fixed `katex` once `rehype-katex`/`micromark-extension-math` allow it, or pin it with an npm override. | open |
+## Dependencies
 
 ## Everything else
 
