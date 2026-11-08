@@ -94,6 +94,7 @@ def build_request(
         if model.provider_type == "claude_code"
         else trim_to_budget(history, max_tokens=int((context - reserve) * 0.9)),
         reasoning=bool(model.capabilities.get("reasoning")),
+        output_limit=model.max_output,
         provider_options=model.provider_options,
         session_key=session_key,
         turn_context=turn_context,

@@ -407,6 +407,7 @@ class AgentRun:
                 else trim_to_budget(history, _budget(model)),
                 tools=specs,
                 reasoning=bool(model.capabilities.get("reasoning")),
+                output_limit=model.max_output,
                 provider_options=model.provider_options,
                 session_key=self.session_key,
                 turn_context=self.turn_context,

@@ -119,3 +119,16 @@ async def test_usage_reports_cache_reads_and_writes():
     assert usage.cached_tokens == 900
     assert usage.cache_creation_tokens == 90
     assert usage.input_tokens == 1000  # the whole prompt: uncached + read + written
+
+
+def test_max_tokens_stays_within_what_the_model_can_write():
+    """core-B4: 64k for every request made models with a smaller output limit refuse it."""
+    msg = [Message(role="user", content=[TextBlock(text="hi")])]
+    small = adapter()._params(ChatRequest(model="claude-3-haiku", messages=msg, output_limit=4096))
+    assert small["max_tokens"] == 4096
+    unknown = adapter()._params(ChatRequest(model="claude-x", messages=msg))
+    assert unknown["max_tokens"] == 64_000
+    asked = adapter()._params(
+        ChatRequest(model="claude-x", messages=msg, max_tokens=2000, output_limit=4096)
+    )
+    assert asked["max_tokens"] == 2000

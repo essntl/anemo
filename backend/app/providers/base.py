@@ -111,6 +111,9 @@ class ChatRequest(BaseModel):
     system: str | None = None
     tools: list[ToolSpec] = []
     max_tokens: int | None = None
+    # The most this model can write in one answer, when known (models.max_output). Only
+    # adapters that must always send a limit use it (Anthropic), to stay within it.
+    output_limit: int | None = None
     reasoning: bool = False  # request provider-exposed reasoning when supported
     reasoning_effort: ReasoningEffort | None = None
     # Per-model provider settings stored on the model row (e.g. {"thinking": "adaptive"}).
