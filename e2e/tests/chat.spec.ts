@@ -162,3 +162,22 @@ test('file manager: create, edit, save, trash and restore', async ({ page }) => 
     }
   }
 })
+
+test('opening another chat from the sidebar starts with an empty message box', async ({ page }) => {
+  await login(page)
+  const make = async (title: string) => {
+    const c = await (await page.request.post('/api/conversations', { data: {} })).json()
+    await page.request.patch(`/api/conversations/${c.id}`, { data: { title } })
+    return c.id as string
+  }
+  const first = await make(`Draft A ${Date.now()}`)
+  const second = await make(`Draft B ${Date.now()}`)
+  await page.goto(`/c/${first}`)
+  const box = page.getByPlaceholder(/Message the assistant/)
+  await box.fill('half a thought for chat A')
+  // Within the app (no page load), as when clicking another chat in the sidebar.
+  await page.locator(`aside a[href="/c/${second}"]`).first().click()
+  await expect(page).toHaveURL(new RegExp(second))
+  await expect(page.getByPlaceholder(/Message the assistant/)).toHaveValue('')
+  for (const id of [first, second]) await page.request.delete(`/api/conversations/${id}`)
+})

@@ -79,7 +79,17 @@ function ChatMenu({ conversation }: { conversation: Conversation }) {
   return <ActionMenu actions={useChatActions(conversation)} label="Chat actions" />
 }
 
+/**
+ * One chat. Keyed by the chat's id, so opening another chat starts fresh: a draft, a model
+ * or mode picked for one chat, or an answer version being looked at never carries over to
+ * the next.
+ */
 export function ConversationPage() {
+  const { conversationId = '' } = useParams()
+  return <Conversation key={conversationId} />
+}
+
+function Conversation() {
   const { conversationId = '' } = useParams()
   const navigate = useNavigate()
   const browser = useBrowserStatus()
