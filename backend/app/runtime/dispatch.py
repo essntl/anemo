@@ -15,7 +15,7 @@ from app.core.db import get_sessionmaker
 from app.features.memory import service as memory
 from app.features.runs.models import Run
 from app.providers.router import NoModelAvailable, RouteRequest, resolve
-from app.runtime import agent, chat
+from app.runtime import agent_finalize, chat
 from app.runtime.agent import execute_agent_run
 from app.runtime.chat import execute_chat_run
 
@@ -60,4 +60,4 @@ async def give_up_run(run_id: uuid.UUID) -> None:
         if run.kind == "chat" and run.policy is None:
             await chat.give_up(db, run, GAVE_UP)
         else:
-            await agent.give_up(db, run, GAVE_UP)
+            await agent_finalize.give_up(db, run, GAVE_UP)

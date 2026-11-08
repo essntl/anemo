@@ -3,7 +3,7 @@
 from app.features.skills.builtin import BY_SLUG
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
-from app.runtime.agent import build_system_prompt
+from app.runtime.agent_prompt import build_system_prompt
 from app.runtime.chat import SYSTEM_PROMPT, VISUALS_HINT
 from tests.api.test_agent import agent_turn, script, setup
 from tests.api.test_slash_skills import skills_by_slug, turn
