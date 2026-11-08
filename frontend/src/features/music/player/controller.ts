@@ -602,7 +602,9 @@ export const player = {
     const newIndex = i < index ? index - 1 : Math.min(index, Math.max(0, rest.length - 1))
     usePlayerStore.setState({ queue: rest, index: newIndex })
     if (removingCurrent) {
-      const wasPlaying = usePlayerRuntime.getState().status === 'playing'
+      // Still loading counts as playing: removing a track that is buffering goes on to the next.
+      const status = usePlayerRuntime.getState().status
+      const wasPlaying = status === 'playing' || status === 'buffering'
       if (rest.length && wasPlaying) loadIndex(newIndex, true)
       else {
         wantsPlayback = false

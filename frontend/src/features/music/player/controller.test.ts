@@ -164,6 +164,15 @@ describe('music controller', () => {
     expect(queue[4].id).toBe('id-e')
   })
 
+  it('removing the track that is still loading goes on to the next one', () => {
+    player.playIndex(1)
+    usePlayerRuntime.setState({ status: 'buffering', loaded: true })
+    fake.calls = []
+    player.remove('id-b')
+    expect(usePlayerStore.getState().queue.map((t) => t.ref)).toEqual(['a', 'c', 'd'])
+    expect(fake.calls).toEqual(['load c play'])
+  })
+
   it('appends and plays the first new track when asked to play now', () => {
     usePlayerRuntime.setState({ loaded: true, status: 'playing' })
     fake.calls = []
