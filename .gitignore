@@ -20,6 +20,7 @@ coverage/
 frontend/src/api/schema.d.ts.bak
 
 # local data
+*.rdb
 /data/
 /workspace-dev/
 *.log
