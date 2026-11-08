@@ -248,9 +248,9 @@ def list_trash() -> list[TrashItem]:
         meta_file = slot / ".meta.json"
         if not meta_file.is_file():
             continue
-        meta = json.loads(safe_fs.read_bytes(meta_file))
-        items.append(
-            TrashItem(
+        try:
+            meta = json.loads(safe_fs.read_bytes(meta_file))
+            item = TrashItem(
                 id=slot.name,
                 name=meta["name"],
                 original_path=meta["original_path"],
@@ -258,7 +258,9 @@ def list_trash() -> list[TrashItem]:
                 is_dir=meta["is_dir"],
                 deleted_by=meta.get("deleted_by", "user"),
             )
-        )
+        except (OSError, ValueError, KeyError, TypeError, AppError):
+            continue  # unreadable: the trash is inside the workspace, so the shell can edit it
+        items.append(item)
     return sorted(items, key=lambda i: i.deleted_at, reverse=True)
 
 
@@ -266,19 +268,37 @@ def _trash_slot(item_id: str) -> Path:
     if not item_id.isalnum():
         raise NotFound("Trash item not found")
     slot = _trash_root() / item_id
-    if not (slot / ".meta.json").is_file():
+    if slot.is_symlink() or not (slot / ".meta.json").is_file():
         raise NotFound("Trash item not found")
     return slot
+
+
+def _trashed_entry(slot: Path, name: object) -> Path:
+    """The item kept in `slot`. Its name comes from `.meta.json`, which the agents' shell can
+    edit (the trash is inside the workspace), so only a plain name of an entry right inside
+    the slot is accepted: "../../data/x" must not move a file from elsewhere into the
+    workspace (refactor/BUGS.md sec-5)."""
+    if (
+        not isinstance(name, str)
+        or name in ("", ".", "..", ".meta.json")
+        or any(c in name for c in "/\\\x00")
+    ):
+        raise NotFound("Trash item not found")
+    entry = slot / name
+    if not (entry.exists() or entry.is_symlink()):
+        raise NotFound("Trash item not found")
+    return entry
 
 
 def restore(item_id: str) -> str:
     """Put a trashed item back (with a numbered name if the original is taken)."""
     slot = _trash_slot(item_id)
     meta = json.loads(safe_fs.read_bytes(slot / ".meta.json"))
+    source = _trashed_entry(slot, meta.get("name"))
     target = resolve(meta["original_path"])
     safe_fs.make_dirs(target.parent)
     target = unique_name(target.parent, target.name)
-    safe_fs.move(slot / meta["name"], target)
+    safe_fs.move(source, target)
     safe_fs.remove(slot)
     return rel(target)
 
