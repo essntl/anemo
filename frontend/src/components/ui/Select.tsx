@@ -64,7 +64,10 @@ export function Select({
           className,
         )}
       >
-        <span className="text-trim min-w-0 truncate py-[0.3em]">
+        {/* A field takes the width it is given and shortens its text to fit: its text
+            never makes it (or a grid column it sits in) wider, e.g. a long model name
+            on a phone. Other variants are as wide as their text. */}
+        <span className={cn('text-trim min-w-0 truncate py-[0.3em]', variant === 'field' && 'w-0 flex-1')}>
           <RadixSelect.Value placeholder={placeholder} />
         </span>
         <RadixSelect.Icon>

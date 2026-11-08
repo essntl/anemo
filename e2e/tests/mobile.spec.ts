@@ -147,6 +147,34 @@ test('adding models: capability tags are behind one button per model', async ({ 
   await expect(page.getByText('Reasoning', { exact: true }).filter({ visible: true })).toHaveCount(0)
 })
 
+test('model dropdowns fit the screen, also with a long model name', async ({ page }) => {
+  await login(page)
+  const fake = (await fakeModels(page.request)).echo // skips without the fake provider
+  const all = (await (await page.request.get('/api/models')).json()) as { id: string; provider_id: string }[]
+  const providerId = all.find((m) => m.id === fake)!.provider_id
+  const long = `DeepSeek: DeepSeek Flash Latest With A Long Name ${Math.random().toString(36).slice(2, 6)}`
+  const created = await page.request.post('/api/models', {
+    data: { provider_id: providerId, model_key: `e2e-long-${Date.now()}`, display_name: long },
+  })
+  expect(created.ok()).toBe(true)
+  const model = (await created.json()) as { id: string }
+  try {
+    await page.goto('/settings/providers')
+    // Chosen in the form (not saved): the field shows the long name, shortened to fit.
+    const titles = page.getByRole('combobox', { name: 'Titles' })
+    await titles.click()
+    await page.getByRole('option', { name: new RegExp(long) }).click()
+    await expect(titles).toContainText('DeepSeek')
+    const width = page.viewportSize()!.width
+    for (const box of await page.getByRole('combobox').all()) {
+      const r = (await box.boundingBox())!
+      expect(r.x + r.width, `${await box.getAttribute('aria-label')} reaches past the screen`).toBeLessThanOrEqual(width)
+    }
+  } finally {
+    await page.request.delete(`/api/models/${model.id}`)
+  }
+})
+
 test('on a phone you sign out under Settings > General', async ({ page }) => {
   await login(page)
   await page.goto('/settings/general')
