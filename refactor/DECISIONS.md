@@ -35,3 +35,5 @@ the owner has made them.
 | D11 | Functions imported across modules lose their leading underscore, in a commit after the move. | The move stays byte for byte; the names then say what is meant to be used from outside. |
 | D12 | Each step of the tool loop returns "an outcome that ends the step" or `None` ("go on"). | The original loop's `continue`/`return` choices map one to one, so every branch moved unchanged and the order of checks is visible in `_settle_call`. |
 | D13 | `AgentRun` (895 lines) is not split further. | No method is over 93 lines now; splitting the class would mean passing its state around without making a change easier. |
+| D14 | Import boundaries describe the current dependency direction, with the existing exceptions listed by name (backend `ignore_imports`, frontend known-violations file). | The owner asked not to rewrite working code; the checks still stop new crossings. |
+| D15 | The backend "API side doesn't import the runtime" contract checks direct imports only. | Routers reach two runtime helpers indirectly through the tool registry; forbidding that would mean moving those helpers, outside the plan. |

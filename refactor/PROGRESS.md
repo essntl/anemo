@@ -61,3 +61,6 @@ runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolat
 - 2026-11-08: agent loop: 6 ordering tests, then `_process_tools` split by call state and `execute_agent_run` by phase; longest function in `agent.py` now 93 lines (was 197); 807 backend tests pass; e2e chat, agents, subtasks, push 17/17 and automations 3/3.
 - 2026-11-08: formatSize: one function with `kbDecimals`; outputs checked against the three old versions; frontend 200 tests pass; e2e files, attachments, subtasks 5/5.
 - 2026-11-08: dump.rdb removed from the tree and `*.rdb` ignored (no history rewrite).
+- 2026-11-08: conventions: `CLAUDE.md`, `docs/architecture.md` updated, import boundaries (import-linter, dependency-cruiser, no-cycles test) in CI; final report in `REPORT.md`, measured on all branches merged locally (833 backend and 210 frontend tests pass; e2e 74/77 with the known flaky motion spec).
+## Done
+All steps of the plan are in review. What is left is the owner's: merging (order in `REPORT.md`), and the decisions listed there.
