@@ -21,6 +21,8 @@ from app.jobs.models import Job
 log = logging.getLogger("worker.jobs")
 
 Handler = Callable[[dict[str, Any]], Awaitable[None]]
+# Called once a job has failed for good (no retry left), to clean up after it.
+GiveUp = Callable[[dict[str, Any]], Awaitable[None]]
 
 POLL_INTERVAL_S = 5.0
 HEARTBEAT_S = 10.0
@@ -81,12 +83,27 @@ def default_handlers() -> dict[str, Handler]:
     }
 
 
+def default_give_ups() -> dict[str, GiveUp]:
+    from app.runtime.dispatch import give_up_run
+
+    async def run_execute(payload: dict[str, Any]) -> None:
+        # Otherwise the run would stay "running" forever (refactor/BUGS.md core-B1).
+        await give_up_run(uuid.UUID(payload["run_id"]))
+
+    return {"run.execute": run_execute}
+
+
 class JobRunner:
     def __init__(
-        self, worker_id: str, concurrency: int, handlers: dict[str, Handler] | None = None
+        self,
+        worker_id: str,
+        concurrency: int,
+        handlers: dict[str, Handler] | None = None,
+        give_ups: dict[str, GiveUp] | None = None,
     ) -> None:
         self.worker_id = worker_id
         self.handlers = handlers or default_handlers()
+        self.give_ups = default_give_ups() if give_ups is None else give_ups
         self.limits = {"interactive": max(1, concurrency), "background": max(1, concurrency // 2)}
         self.wakeups = {lane: asyncio.Event() for lane in self.limits}
         self.running: set[asyncio.Task[None]] = set()
@@ -180,6 +197,7 @@ class JobRunner:
             reason = f"no handler for {job.type}" if handler is None else "too many attempts"
             async with get_sessionmaker()() as db:
                 await queue.fail(db, job, reason, retry=False)
+            await self._give_up(job)
             return
         beat = asyncio.create_task(self._heartbeat(job.id))
         log.info("job started", extra={"ctx": ctx})
@@ -193,13 +211,24 @@ class JobRunner:
         except Exception as exc:  # noqa: BLE001
             log.exception("job failed", extra={"ctx": ctx})
             async with get_sessionmaker()() as db:
-                await queue.fail(db, job, f"{type(exc).__name__}: {exc}")
+                will_retry = await queue.fail(db, job, f"{type(exc).__name__}: {exc}")
+            if not will_retry:
+                await self._give_up(job)
         else:
             async with get_sessionmaker()() as db:
                 await queue.complete(db, job.id)
             log.info("job done", extra={"ctx": ctx})
         finally:
             beat.cancel()
+
+    async def _give_up(self, job: Job) -> None:
+        give_up = self.give_ups.get(job.type)
+        if give_up is None:
+            return
+        try:
+            await give_up(job.payload)
+        except Exception:  # noqa: BLE001 - cleaning up must not stop the lane
+            log.exception("giving up on a job failed", extra={"ctx": {"job_id": str(job.id)}})
 
     async def _heartbeat(self, job_id: uuid.UUID) -> None:
         while True:

@@ -39,7 +39,6 @@ from app.features.attachments.images import PreparedImage
 from app.features.automations import service as automations
 from app.features.automations.models import Automation
 from app.features.conversations.models import ChatMessage, Conversation
-from app.features.memory import extraction
 from app.features.memory import service as memory
 from app.features.memory.schemas import MemorySettings
 from app.features.notifications import service as notifications
@@ -76,12 +75,7 @@ from app.runtime import citations, compaction, outputs, subagents, turn_context
 from app.runtime.chat import (
     SYSTEM_PROMPT as CHAT_SYSTEM_PROMPT,
 )
-from app.runtime.chat import (
-    VISUALS_HINT,
-    CancelFlag,
-    _maybe_enqueue_title,
-    _watch_for_cancel,
-)
+from app.runtime.chat import VISUALS_HINT
 from app.runtime.history import (
     estimate_tokens,
     latest_user_attachment_kinds,
@@ -89,6 +83,7 @@ from app.runtime.history import (
     resolve_attachments,
     trim_to_budget,
 )
+from app.runtime.lifecycle import drive_until_stopped, follow_up_answer
 from app.runtime.streaming import (
     RequestBuilder,
     StreamProgress,
@@ -1233,6 +1228,11 @@ async def _finalize(
         await subagents.wake_parent(db, run.parent_run_id)  # it may be waiting for this one
 
 
+async def give_up(db: AsyncSession, run: Run, error: str) -> None:
+    """End a run that can't go on as failed (see dispatch.give_up_run)."""
+    await _finalize(db, run, "failed", error=error)
+
+
 async def _stop_subagents(db: AsyncSession, run: Run) -> None:
     """A run that has ended takes its sub-agents with it (they have no one to report to)."""
     children = await db.scalars(
@@ -1541,20 +1541,15 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
         conversation_id=run.conversation_id,
         answer=answer_message,
     )
-    task = asyncio.create_task(agent.drive())
-    flag = CancelFlag()
-    watcher = asyncio.create_task(_watch_for_cancel(run_id, task, flag))
+    # A worker shutdown is not caught: the job is handed back and resumes from the checkpoint.
+    driven = await drive_until_stopped(run_id, agent.drive())
     outcome, error = "completed", None
-    try:
-        outcome = await task
-    except asyncio.CancelledError:
-        if not flag.requested:
-            raise  # worker shutdown: the job is handed back and resumes from the checkpoint
+    if driven.cancelled:
         outcome = "cancelled"
-    except ProviderError as exc:
-        outcome, error = "failed", f"The model provider returned an error: {exc}"
-    finally:
-        watcher.cancel()
+    elif driven.error is not None:
+        outcome, error = "failed", driven.error
+    elif driven.value is not None:
+        outcome = driven.value
 
     async with sessionmaker() as db:
         run = await _get_run(db, run_id)
@@ -1618,6 +1613,4 @@ async def _after_answer(db: AsyncSession, run: Run) -> None:
     message = await db.get(ChatMessage, run.assistant_message_id)
     if message is None:
         return
-    await _maybe_enqueue_title(db, run.conversation_id, message.seq)
-    await extraction.schedule(db, run.conversation_id, message.seq)
-    await db.commit()
+    await follow_up_answer(db, run.conversation_id, message.seq)

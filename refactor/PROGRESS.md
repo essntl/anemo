@@ -26,8 +26,8 @@ Read this file and PLAN.md first at the start of every session. Each PR updates 
 | S2 remote images in Markdown | `fix/markdown-remote-images` | next (covers chat Markdown and the document editor) |
 | S3 trash restore | `fix/trash-restore-name` | next |
 | 1 safety net | `refactor/safety-net` | in review (stacked on the notes PR) |
-| 2 run lifecycle | `refactor/run-lifecycle` | next |
-| 3 agent modules | `refactor/agent-modules` | to do (after 2) |
+| 2 run lifecycle | `refactor/run-lifecycle` | in review (stacked on the notes PR) |
+| 3 agent modules | `refactor/agent-modules` | next (stacked on PR 2) |
 | 4 agent loop | `refactor/agent-loop` | to do (after 3) |
 | 5 formatSize | `refactor/format-size` | to do |
 | 6 dump.rdb | `chore/remove-dump-rdb` | to do |
@@ -55,3 +55,5 @@ runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolat
 - 2026-11-08: S2 (remote images) fixed with tests that fail on the old code; frontend 201 tests pass; 22 affected e2e tests pass locally.
 - 2026-11-08: S3 (trash restore) fixed with tests that fail on the old code; 795 backend tests pass.
 - 2026-11-08: safety net: coverage tooling, the OpenAPI snapshot test (wired into CI and `make test-backend`), music-queue characterization tests; frontend coverage baseline recorded.
+- 2026-11-08: run lifecycle: 18 characterization tests, the shared helpers moved to `runtime/lifecycle.py`, then the stuck-run fix (core-B1) as a separate behaviour change; 801 backend tests pass.
+- 2026-11-08: e2e locally for the run lifecycle: chat, agents, temporary chats, projects, subtasks 42/42 with `--workers=1` (twice); automations 3/3. With 2 workers two chat tests were flaky (BUGS test-2), so local runs use `--workers=1` from now on.
