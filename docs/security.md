@@ -90,6 +90,15 @@ cookies, no token and nothing about you or your data; the answer only fills Sett
 → Advanced. Anemo never downloads or installs anything itself. Switch it off in
 Settings → Advanced or for good with `UPDATE_CHECK=false`.
 
+## Images in answers and documents
+
+Answers, documents, task notes and notifications can contain Markdown written by a model or an
+agent, which may have read a page with instructions planted in it. An image address can carry
+data (`https://example.org/x.png?q=…`), and the browser sends it as soon as the image loads. So
+only images from Anemo itself (and `data:`/`blob:` images) load by themselves; an image from
+another site shows as a "show image from example.org" button and loads when you click it. The
+document itself is not changed.
+
 ## Diagrams, charts and math
 
 Diagrams can be written from untrusted content (a web page an agent read, a shared
