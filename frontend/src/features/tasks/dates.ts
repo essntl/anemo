@@ -8,6 +8,8 @@ const pad = (n: number) => String(n).padStart(2, '0')
 
 /** A Date as its local calendar day, "YYYY-MM-DD". */
 export const dayOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+/** The local day ("2026-11-08") of a timestamp such as a task's `completed_at`. */
+export const localDay = (iso: string) => dayOf(new Date(iso))
 
 export const today = () => dayOf(new Date())
 

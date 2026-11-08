@@ -3,7 +3,7 @@ import { SquareCheckBig } from 'lucide-react'
 import { useCurrentProject } from '@/app/projectStore'
 import { Select } from '@/components/ui/Select'
 import { useCreateTask, useProjects, useTasks } from '@/features/tasks/api'
-import { addDays, today as todayKey } from '@/features/tasks/dates'
+import { addDays, localDay, today as todayKey } from '@/features/tasks/dates'
 import type { WidgetLayout } from '../layout'
 import { ROWS } from './rows'
 import { MoreLink, QuickAdd, TaskLine, WidgetHeader } from './parts'
@@ -28,7 +28,7 @@ export function TasksWidget({ item }: { item: WidgetLayout }) {
       .filter((t) => t.status !== 'done' && t.status !== 'cancelled')
       .filter((t) => due === 'all' || (due === 'none' ? !t.due_date : !!t.due_date && t.due_date <= (due === 'today' ? today : addDays(today, 7))))
       .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || b.priority - a.priority)
-    const doneToday = mine.filter((t) => t.status === 'done' && t.completed_at && t.completed_at.slice(0, 10) >= today).length
+    const doneToday = mine.filter((t) => t.status === 'done' && t.completed_at && localDay(t.completed_at) >= today).length
     return { open, doneToday }
   }, [tasks.data, projectId, due, today])
 

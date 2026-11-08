@@ -5,7 +5,7 @@ import { CalendarDays } from 'lucide-react'
 import { useCurrentProject } from '@/app/projectStore'
 import { useOccurrences, type Occurrence } from '@/features/calendar/api'
 import { type Task, useCreateTask, useTasks } from '@/features/tasks/api'
-import { dayOf } from '@/features/tasks/dates'
+import { dayOf, localDay } from '@/features/tasks/dates'
 import { dayRange, timeOf } from '../dates'
 import type { WidgetLayout } from '../layout'
 import { ROWS } from './rows'
@@ -31,7 +31,7 @@ export function TodayWidget({ item }: { item: WidgetLayout }) {
       ...open.filter((t) => t.due_date === today).map((t): Entry => ({ kind: 'task', task: t, sort: t.due_time ?? '99' })),
       ...(events.data ?? []).map((e): Entry => ({ kind: 'event', event: e, sort: e.all_day ? '00' : timeOf(e.start_at) })),
     ].sort((a, b) => a.sort.localeCompare(b.sort))
-    const doneToday = mine.filter((t) => t.status === 'done' && t.completed_at && t.completed_at.slice(0, 10) >= today).length
+    const doneToday = mine.filter((t) => t.status === 'done' && t.completed_at && localDay(t.completed_at) >= today).length
     return { overdue, entries, doneToday }
   }, [tasks.data, events.data, project, today])
 

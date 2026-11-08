@@ -60,8 +60,10 @@ export function formatCount(n: number): string {
 export function formatUpcoming(iso: string, now = new Date()): string {
   const d = new Date(iso)
   const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  // Calendar days, not 24-hour blocks: a day with a daylight-saving change is 23 or 25 hours.
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const days = Math.floor((d.getTime() - startOfToday) / 86_400_000)
+  const startOfThatDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const days = Math.round((startOfThatDay - startOfToday) / 86_400_000)
   if (days === 0) return `Today ${time}`
   if (days === 1) return `Tomorrow ${time}`
   const date = d.toLocaleDateString(undefined, {
