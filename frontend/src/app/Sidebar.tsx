@@ -39,16 +39,19 @@ import { cn } from '@/lib/cn'
 import { useCurrentProject, useProjectStore } from './projectStore'
 import { useSidebar } from './sidebarStore'
 
-/** One page in the pinned grid under the chats: an icon and a short name. */
+/** One page in the pinned grid under the chats: an icon and a short name. A count sits
+ * small on the icon's corner, so the name keeps its room. */
 function PageLink({ to, icon, children, title, badge }: { to: string; icon: ReactNode; children: ReactNode; title?: string; badge?: ReactNode }) {
   return (
     <NavLink to={to} title={title}
       className={({ isActive }) =>
         cn('flex h-8 min-w-0 items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium transition-colors pointer-coarse:h-10 pointer-coarse:text-[14px]',
           isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
-      <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+      <span className="relative shrink-0 [&>svg]:h-4 [&>svg]:w-4">
+        {icon}
+        {badge && <span className="pointer-events-none absolute -right-3 -top-2.5 origin-bottom-left scale-[0.7]">{badge}</span>}
+      </span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
-      {badge}
     </NavLink>
   )
 }
