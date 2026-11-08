@@ -28,9 +28,11 @@ jobs:
           PUID=$(id -u)
           EOF
           mkdir -p workspace-dev && chmod 777 workspace-dev
+      # The committed OpenAPI schema is mounted for the API contract test.
       - name: Lint, type-check, test (in the dev container, with Postgres and Valkey)
         run: >
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm -e ENV=test app
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm -e ENV=test
+          -v "$PWD/frontend/src/api/openapi.json:/openapi.json:ro" -e OPENAPI_SNAPSHOT=/openapi.json app
           sh -c "ruff check . && ruff format --check . && mypy app && pytest -q -p no:logging && alembic check"
 
   frontend:
