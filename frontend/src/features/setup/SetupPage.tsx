@@ -12,9 +12,11 @@ import { Bell, Boxes, Clock, Cpu, Plug, Plus, RefreshCw, Rocket } from 'lucide-r
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Field, Input } from '@/components/ui/Input'
 import { Lingering } from '@/components/ui/Lingering'
 import { Select } from '@/components/ui/Select'
+import { toast } from '@/components/ui/toast'
 import { type Destination, useDestinations } from '@/features/notifications/api'
 import { DestinationDialog } from '@/features/notifications/components/DestinationDialog'
 import { PushCard } from '@/features/notifications/NotificationSettingsPage'
@@ -253,6 +255,13 @@ function NotificationsStep({ nav, finishing }: { nav: Nav; finishing: boolean })
 
 export function SetupPage() {
   const settings = useSettings()
+  if (settings.isError && !settings.data) {
+    return (
+      <EmptyState icon={<Rocket className="h-6 w-6" />} title="Couldn’t load the setup"
+        description={errorMessage(settings.error)}
+        action={<Button onClick={() => void settings.refetch()} disabled={settings.isFetching}>Try again</Button>} />
+    )
+  }
   if (!settings.data) return null
   return <Setup settings={settings.data} />
 }
@@ -274,8 +283,12 @@ function Setup({ settings }: { settings: AllSettings }) {
     navigate('/home')
   }
   const finish = async () => {
-    await save.mutateAsync({ status: 'done', step: null })
-    navigate('/home')
+    try {
+      await save.mutateAsync({ status: 'done', step: null })
+      navigate('/home')
+    } catch (err) {
+      toast({ message: `Couldn’t finish the setup: ${errorMessage(err)}` })
+    }
   }
   const back = neighbour(step, -1)
   const forward = neighbour(step, 1)
