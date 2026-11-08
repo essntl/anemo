@@ -17,6 +17,7 @@ from pathlib import Path
 
 import yaml
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
@@ -188,8 +189,14 @@ async def reconcile(db: AsyncSession) -> list[str]:
                 moved.size, moved.mtime = info.size, info.mtime
             else:
                 doc = Document(path=info.path, title="", content_hash="")
-                db.add(doc)
-                await db.flush()
+                try:
+                    async with db.begin_nested():
+                        db.add(doc)
+                        await db.flush()
+                except IntegrityError:
+                    # Another request found this file at the same moment and added it
+                    # (Home loads several document lists at once): it is indexed.
+                    continue
                 await _apply(db, doc, content, info, author="external")
             changed = True
         elif doc.content_hash != digest:

@@ -344,3 +344,19 @@ async def test_recent_documents_with_their_first_line(authed):
     thesis = (await authed.get("/api/documents/recent", params={"folder": "thesis"})).json()
     assert [d["title"] for d in thesis] == ["Plan"]
     assert len((await authed.get("/api/documents/recent", params={"limit": 1})).json()) == 1
+
+
+async def test_two_requests_finding_a_new_document_at_once_both_succeed(authed, docs):
+    """features-B2: Home loads several document lists at once; each one indexes new files.
+    Two of them finding the same new file must not fail with a 500."""
+    import asyncio
+
+    (docs / "found.md").write_text("# Found\n\nWritten outside the app.")
+
+    async def look() -> list[str]:
+        async with get_sessionmaker()() as db:
+            return await service.reconcile(db)
+
+    await asyncio.gather(look(), look(), look())
+    listed = (await authed.get("/api/documents")).json()["documents"]
+    assert [d["title"] for d in listed if d["path"].endswith("found.md")] == ["Found"]
