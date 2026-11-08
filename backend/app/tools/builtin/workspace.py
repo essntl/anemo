@@ -6,7 +6,6 @@ history with a backup of the previous content, so they can be reverted.
 """
 
 import asyncio
-import shutil
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,7 +19,7 @@ from app.features.attachments import extract, images
 from app.features.links import service as links
 from app.policy.models import Action, Risk
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.workspace import files, fs_guard
+from app.workspace import files, fs_guard, safe_fs
 from app.workspace.access import Access, access_for, allows
 
 MAX_ENTRIES = 200
@@ -63,7 +62,7 @@ def _backup(path: Path) -> str:
     backups = Path(get_settings().data_path) / "run-backups"
     backups.mkdir(parents=True, exist_ok=True)
     name = uuid.uuid4().hex
-    shutil.copy2(path, backups / name)
+    safe_fs.copy_file_to(path, backups / name)
     return f"backup:{name}"
 
 

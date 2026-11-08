@@ -515,7 +515,8 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
   - `sandbox` sits on an `internal: true` network (no egress; only the worker can reach it). `sandbox-net` has egress but still no route to Postgres/Redis (separate networks).
   - Host-level execution is **not provided**. If ever added, it would be an explicitly-labelled advanced opt-in with its own documented threat model.
 - **Filesystem**
-  - `WorkspaceFS` resolves paths as `realpath(root / rel)` and requires `commonpath` = root. It rejects NUL bytes, absolute paths, `..` escapes and symlinks pointing outside, and re-checks after open (`O_NOFOLLOW` on final component).
+  - `fs_guard.resolve()` resolves paths as `realpath(root / rel)` and requires the result to be inside root. It rejects NUL bytes, absolute paths, `..` escapes and symlinks pointing outside.
+  - The agents' shell can still swap a folder for a symlink after that check, so `workspace/safe_fs.py` opens the checked path one component at a time, each relative to the folder opened before it, with `O_NOFOLLOW` at every step. Contents are read, written, moved and copied that way; a swapped path fails instead of being followed. (Listing a folder and reading sizes or dates still go by path.)
   - Per-root `agent_access` is enforced in fs tools.
   - Size caps: read 2 MB to the model, upload 200 MB default, write 10 MB via tool.
   - Delete moves to `.trash/` (retained 30 d). Overwrites and deletes by agents are backed up to `/data/run-backups` for revert.

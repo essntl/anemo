@@ -1,24 +1,23 @@
 """Workspace file operations, shared by the file manager API and the agent tools.
 
 All paths are workspace-relative strings and go through fs_guard.resolve(), so
-nothing here can touch files outside the workspace. Writes are atomic (temp file
-+ rename). Deleting never destroys data: items move to `.trash/` and can be
-restored until the trash is emptied.
+nothing here can touch files outside the workspace. Contents are read, written,
+moved and copied through safe_fs, so a symlink swapped in after the check is not
+followed. Writes are atomic (temp file + rename). Deleting never destroys data:
+items move to `.trash/` and can be restored until the trash is emptied.
 """
 
 import hashlib
 import json
 import mimetypes
 import os
-import shutil
-import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from app.core.errors import AppError, Conflict, NotFound
-from app.workspace import fs_guard
+from app.workspace import fs_guard, safe_fs
 
 TRASH_DIR = ".trash"
 MAX_TEXT_BYTES = 2 * 1024 * 1024
@@ -69,7 +68,7 @@ def is_hidden(relative_path: str) -> bool:
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
-    with path.open("rb") as f:
+    with safe_fs.open_read(path) as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -110,7 +109,7 @@ def read_text(relative: str, max_bytes: int = MAX_TEXT_BYTES) -> tuple[str, str]
         raise NotFound("File not found")
     if path.stat().st_size > max_bytes:
         raise NotText(f"File is larger than {max_bytes // (1024 * 1024)} MB")
-    data = path.read_bytes()
+    data = safe_fs.read_bytes(path)
     if b"\x00" in data[:8192]:
         raise NotText("This is a binary file")
     return data.decode("utf-8", errors="replace"), hashlib.sha256(data).hexdigest()
@@ -122,19 +121,11 @@ def read_bytes(relative: str, max_bytes: int) -> bytes:
         raise NotFound("File not found")
     if path.stat().st_size > max_bytes:
         raise NotText(f"File is larger than {max_bytes // (1024 * 1024)} MB")
-    return path.read_bytes()
+    return safe_fs.read_bytes(path)
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=".part")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        os.replace(tmp, path)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise
+    safe_fs.write_atomic(path, lambda f: f.write(data))
 
 
 def write_bytes(
@@ -164,7 +155,7 @@ def make_dir(relative: str) -> Path:
     path = resolve(relative)
     if path.exists():
         raise Conflict("Something with that name already exists", code="exists")
-    path.mkdir(parents=True)
+    safe_fs.make_dir(path)
     return path
 
 
@@ -180,24 +171,21 @@ def _source_and_target(src: str, dst: str, verb: str, keep_both: bool) -> tuple[
         if not keep_both:
             raise Conflict("Something already exists at the destination", code="exists")
         target = unique_name(target.parent, target.name)  # "notes (1).md"
-    target.parent.mkdir(parents=True, exist_ok=True)
+    safe_fs.make_dirs(target.parent)
     return source, target
 
 
 def move(src: str, dst: str, keep_both: bool = False) -> tuple[Path, Path]:
     """`keep_both`: if the name is taken there, add a number instead of failing."""
     source, target = _source_and_target(src, dst, "moved", keep_both)
-    shutil.move(str(source), str(target))
+    safe_fs.move(source, target)
     return source, target
 
 
 def copy(src: str, dst: str, keep_both: bool = False) -> tuple[Path, Path]:
     """A copy of a file or a whole folder (`keep_both` as for move)."""
     source, target = _source_and_target(src, dst, "copied", keep_both)
-    if source.is_dir():
-        shutil.copytree(source, target, symlinks=True)
-    else:
-        shutil.copy2(source, target)
+    safe_fs.copy(source, target)
     return source, target
 
 
@@ -227,7 +215,7 @@ class TrashItem:
 
 def _trash_root() -> Path:
     path = root() / TRASH_DIR
-    path.mkdir(exist_ok=True)
+    safe_fs.make_dirs(path)
     return path
 
 
@@ -240,7 +228,7 @@ def trash(relative: str, deleted_by: str = "user") -> str:
         raise NotFound("Not found")
     item_id = uuid.uuid4().hex
     slot = _trash_root() / item_id
-    slot.mkdir()
+    safe_fs.make_dir(slot)
     meta = {
         "original_path": rel(path),
         "deleted_at": datetime.now(UTC).isoformat(),
@@ -248,8 +236,9 @@ def trash(relative: str, deleted_by: str = "user") -> str:
         "name": path.name,
         "deleted_by": deleted_by,
     }
-    shutil.move(str(path), str(slot / path.name))
-    (slot / ".meta.json").write_text(json.dumps(meta))
+    safe_fs.move(path, slot / path.name)
+    with safe_fs.open_write(slot / ".meta.json") as f:
+        f.write(json.dumps(meta).encode())
     return item_id
 
 
@@ -259,7 +248,7 @@ def list_trash() -> list[TrashItem]:
         meta_file = slot / ".meta.json"
         if not meta_file.is_file():
             continue
-        meta = json.loads(meta_file.read_text())
+        meta = json.loads(safe_fs.read_bytes(meta_file))
         items.append(
             TrashItem(
                 id=slot.name,
@@ -285,17 +274,17 @@ def _trash_slot(item_id: str) -> Path:
 def restore(item_id: str) -> str:
     """Put a trashed item back (with a numbered name if the original is taken)."""
     slot = _trash_slot(item_id)
-    meta = json.loads((slot / ".meta.json").read_text())
+    meta = json.loads(safe_fs.read_bytes(slot / ".meta.json"))
     target = resolve(meta["original_path"])
-    target.parent.mkdir(parents=True, exist_ok=True)
+    safe_fs.make_dirs(target.parent)
     target = unique_name(target.parent, target.name)
-    shutil.move(str(slot / meta["name"]), str(target))
-    shutil.rmtree(slot)
+    safe_fs.move(slot / meta["name"], target)
+    safe_fs.remove(slot)
     return rel(target)
 
 
 def purge(item_id: str) -> None:
-    shutil.rmtree(_trash_slot(item_id))
+    safe_fs.remove(_trash_slot(item_id))
 
 
 # --- search -------------------------------------------------------------------------
