@@ -50,4 +50,8 @@ describe('audioTitle', () => {
     expect(audioTitle('https://cdn.example/music/My%20Song.mp3')).toEqual({ title: 'My Song', artist: 'cdn.example' })
     expect(audioTitle('https://radio.example/stream')).toEqual({ title: 'radio.example', artist: 'radio.example' })
   })
+
+  it('keeps a name with a stray % as it is written', () => {
+    expect(audioTitle('https://cdn.example/music/100%25%20Live%ZZ.mp3')).toEqual({ title: '100%25%20Live%ZZ', artist: 'cdn.example' })
+  })
 })

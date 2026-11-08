@@ -85,7 +85,13 @@ export async function fetchOEmbed(kind: 'youtube' | 'soundcloud', url: string) {
 /** A readable title for a direct audio link: the file name, or the site. */
 export function audioTitle(href: string): { title: string; artist: string } {
   const url = new URL(href)
-  const file = decodeURIComponent(url.pathname.split('/').pop() ?? '')
+  const last = url.pathname.split('/').pop() ?? ''
+  let file = last
+  try {
+    file = decodeURIComponent(last)
+  } catch {
+    // A stray % in the address: show the name as written.
+  }
   const hasExtension = /\.[a-z0-9]{2,4}$/i.test(file)
   return { title: hasExtension ? file.replace(/\.[a-z0-9]{2,4}$/i, '') : url.hostname, artist: url.hostname }
 }
