@@ -73,9 +73,16 @@ export function formatUpcoming(iso: string, now = new Date()): string {
   return `${date} ${time}`
 }
 
-/** A file size: 512 B, 12 KB, 3.4 MB. */
-export function formatSize(bytes: number): string {
+/**
+ * A file size: 512 B, 12 KB, 3.4 MB. `kbDecimals: 1` gives 12.1 KB (the file manager's
+ * size column). An unknown size is an empty string.
+ */
+export function formatSize(bytes: number | null | undefined, opts: { kbDecimals?: 0 | 1 } = {}): string {
+  if (bytes == null) return ''
   if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  if (bytes < 1024 * 1024) {
+    const kb = bytes / 1024
+    return `${opts.kbDecimals ? kb.toFixed(opts.kbDecimals) : Math.round(kb)} KB`
+  }
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
