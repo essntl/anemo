@@ -3,7 +3,8 @@ run up, counting restarts after a crash, a duplicate job, worker shutdown versus
 stopping the run, provider errors, refusals, other exceptions, and the follow-up jobs.
 
 They pin the behaviour as it is, including where chat and agent runs differ
-(refactor/BUGS.md run-1, run-2) and where a run is left unfinished (core-B1).
+(refactor/BUGS.md run-1, run-2). The last section covers the fix for core-B1: a run
+whose job fails for good is ended instead of left running forever.
 """
 
 import asyncio
@@ -262,7 +263,8 @@ async def test_a_refusal_fails_the_run(authed):
     assert (message.status, message.text_plain) == ("failed", "No.")
 
 
-# -- other exceptions (BUGS core-B1: the run is left unfinished) -------------------------
+# -- other exceptions: the executor leaves the run as it is, so the job's retry can resume
+# it; once the job fails for good, the job runner ends the run (see the end of this file).
 
 
 async def test_another_exception_in_a_chat_run_leaves_it_running(authed, monkeypatch):
@@ -334,3 +336,73 @@ async def _latest_run(conversation_id: str) -> Run:
         )
         assert run is not None
         return run
+
+
+# -- a run whose job fails for good is ended (behaviour change: BUGS core-B1) -------------
+
+
+async def _job_for(run_id: uuid.UUID) -> Job:
+    async with get_sessionmaker()() as db:
+        jobs = list(await db.scalars(select(Job).where(Job.type == "run.execute")))
+        (job,) = [j for j in jobs if j.payload["run_id"] == str(run_id)]
+        return job
+
+
+async def _run_job_on_its_last_attempt(run_id: uuid.UUID, broken_runtime) -> None:
+    """Execute the run's job as the worker does, on its last allowed attempt, with the
+    runtime replaced by `broken_runtime`."""
+    from app.jobs.runner import JobRunner
+
+    job = await _job_for(run_id)
+    job.attempts = job.max_attempts
+    runner = JobRunner("test-worker", 1, handlers={"run.execute": broken_runtime})
+    await runner._execute(job)
+
+
+async def _broken(payload):
+    raise RuntimeError("a bug")
+
+
+async def test_a_chat_run_whose_job_fails_for_good_is_failed(authed):
+    await _setup_models(authed)
+    cid = await _new_conversation(authed)
+    run_id = await chat_turn(authed, cid)
+    await set_run(run_id, status="running", attempt=1)
+    await _run_job_on_its_last_attempt(run_id, _broken)
+    run = await get_run(run_id)
+    assert run.status == "failed"
+    assert run.error == {"message": "An internal error stopped this run."}
+    message = await answer_of(run)
+    assert (message.status, message.error) == ("failed", "An internal error stopped this run.")
+    assert "message.completed" in await event_types(run_id)
+    assert (await _job_for(run_id)).status == "failed"
+
+
+async def test_an_agent_run_whose_job_fails_for_good_is_failed(authed):
+    cid = await setup(authed)
+    script("hi", [TextDelta("Hello."), Done("end")])
+    run_id = await agent_turn_queued(authed, cid, "hi")
+    await _run_job_on_its_last_attempt(run_id, _broken)
+    run = await get_run(run_id)
+    assert (run.status, run.error) == ("failed", {"message": "An internal error stopped this run."})
+    assert (await answer_of(run)).status == "failed"
+
+
+async def test_a_run_whose_job_will_be_retried_is_left_for_the_retry(authed):
+    from app.jobs.runner import JobRunner
+
+    cid = await setup(authed)
+    run_id = await agent_turn_queued(authed, cid, "hi")
+    job = await _job_for(run_id)
+    job.attempts = 1
+    await JobRunner("test-worker", 1, handlers={"run.execute": _broken})._execute(job)
+    assert (await get_run(run_id)).status == "queued"
+    assert (await _job_for(run_id)).status == "queued"  # retried later
+
+
+async def test_a_waiting_run_is_not_ended_when_a_stale_job_fails(authed):
+    cid = await setup(authed)
+    run_id = await agent_turn_queued(authed, cid, "hi")
+    await set_run(run_id, status="paused")
+    await _run_job_on_its_last_attempt(run_id, _broken)
+    assert (await get_run(run_id)).status == "paused"

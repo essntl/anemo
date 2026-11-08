@@ -147,6 +147,15 @@ async def _finish(
     await runs.set_status(db, run, status, error=err)  # commits
 
 
+async def give_up(db: AsyncSession, run: Run, error: str) -> None:
+    """End a chat run that can't go on as failed, keeping nothing of a partial answer."""
+    message = await db.get(ChatMessage, run.assistant_message_id)
+    if message is None:
+        await runs.set_status(db, run, "failed", error={"message": error})
+        return
+    await _finish(db, run, message, None, status="failed", error=error)
+
+
 async def execute_chat_run(run_id: uuid.UUID) -> None:
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:

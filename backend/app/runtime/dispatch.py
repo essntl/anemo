@@ -3,6 +3,8 @@
 Agent runs use the tool loop. Chat turns use it too when memory is on and the
 chat model supports tools (so "remember that ..." works in chat); otherwise a
 chat turn is one plain model call.
+
+When a run's job fails for good, give_up_run() ends the run as failed.
 """
 
 import uuid
@@ -13,8 +15,11 @@ from app.core.db import get_sessionmaker
 from app.features.memory import service as memory
 from app.features.runs.models import Run
 from app.providers.router import NoModelAvailable, RouteRequest, resolve
+from app.runtime import agent, chat
 from app.runtime.agent import execute_agent_run
 from app.runtime.chat import execute_chat_run
+
+GAVE_UP = "An internal error stopped this run."
 
 
 async def _chat_uses_tools(db: AsyncSession, run: Run) -> bool:
@@ -42,3 +47,17 @@ async def execute_run(run_id: uuid.UUID) -> None:
         await execute_agent_run(run_id)
     elif kind == "chat":
         await execute_chat_run(run_id)
+
+
+async def give_up_run(run_id: uuid.UUID) -> None:
+    """The run's job failed and won't be retried (an error the runtime didn't handle, or
+    too many attempts): end the run as failed rather than leave it running forever.
+    A run that is waiting (for an approval, a resume or its sub-agents) is left alone."""
+    async with get_sessionmaker()() as db:
+        run = await db.get(Run, run_id)
+        if run is None or run.status not in ("queued", "running"):
+            return
+        if run.kind == "chat" and run.policy is None:
+            await chat.give_up(db, run, GAVE_UP)
+        else:
+            await agent.give_up(db, run, GAVE_UP)

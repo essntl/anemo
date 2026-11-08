@@ -1228,6 +1228,11 @@ async def _finalize(
         await subagents.wake_parent(db, run.parent_run_id)  # it may be waiting for this one
 
 
+async def give_up(db: AsyncSession, run: Run, error: str) -> None:
+    """End a run that can't go on as failed (see dispatch.give_up_run)."""
+    await _finalize(db, run, "failed", error=error)
+
+
 async def _stop_subagents(db: AsyncSession, run: Run) -> None:
     """A run that has ended takes its sub-agents with it (they have no one to report to)."""
     children = await db.scalars(
