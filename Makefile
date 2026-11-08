@@ -19,7 +19,7 @@ test: test-backend test-frontend
 test-backend:  ## needs postgres/valkey; starts them if necessary
 	$(DEV) run --rm -e ENV=test $(SNAPSHOT) app pytest -q
 test-frontend:
-	cd frontend && npm run typecheck && npm run lint && npm test
+	cd frontend && npm run typecheck && npm run lint && npm run lint:imports && npm test
 coverage:      ## line coverage of backend and frontend tests (see refactor/BASELINE.md)
 	$(DEV) run --rm -e ENV=test $(SNAPSHOT) app pytest -q --cov=app --cov-report=term
 	cd frontend && npm run coverage
@@ -27,7 +27,7 @@ e2e:           ## every end-to-end test, against a throwaway stack
 	sh e2e/run-isolated.sh
 
 lint:
-	$(RUN) sh -c "ruff check . && ruff format --check . && mypy app"
+	$(RUN) sh -c "ruff check . && ruff format --check . && mypy app && lint-imports"
 fmt:
 	$(RUN) sh -c "ruff check --fix . && ruff format ."
 

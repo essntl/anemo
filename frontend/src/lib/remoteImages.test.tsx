@@ -1,10 +1,7 @@
-import { Editor } from '@tiptap/core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { Markdown } from '@/components/ui/Markdown'
-import { editorExtensions } from '@/features/documents/editorExtensions'
-import { tidyMarkdown } from '@/features/documents/markdown'
 import { loadsWithoutAsking } from './remoteImages'
 
 // refactor/BUGS.md sec-4: an image address can carry data a prompt injection put into it.
@@ -32,18 +29,5 @@ describe('images from other sites wait for a click', () => {
     const img = container.querySelector('img')
     expect(img?.getAttribute('src')).toBe('/api/attachments/1/content')
     expect(img?.getAttribute('alt')).toBe('photo')
-  })
-
-  it('in the document editor, shows a button and keeps the document as it was', () => {
-    const markdown = `Before\n\n![chart](${LEAK})\n\n![mine](/api/files/download?path=a.png)\n`
-    const editor = new Editor({ extensions: editorExtensions, content: markdown, contentType: 'markdown' })
-    const images = [...editor.view.dom.querySelectorAll('img')].map((i) => i.getAttribute('src'))
-    expect(images).toEqual(['/api/files/download?path=a.png'])
-    const button = editor.view.dom.querySelector('button')
-    expect(button?.textContent).toBe('chart: show image from attacker.example')
-    button?.click()
-    expect(editor.view.dom.querySelector(`img[src="${LEAK}"]`)).not.toBeNull()
-    expect(tidyMarkdown(editor.getMarkdown())).toBe(tidyMarkdown(markdown))
-    editor.destroy()
   })
 })

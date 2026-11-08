@@ -1,21 +1,21 @@
 # Architecture — anemo (AI Workspace & Agent Operating Environment)
 
+> This document started as the design for an empty repository (sections A, P and T record that
+> plan). Sections D, L and O describe the code as it is (checked in November 2026, see
+> `refactor/AUDIT.md`); the conventions for new code are in `CLAUDE.md`.
+
 ## Context
 
 The goal is a single-user, self-hosted AI workspace for a Linux homelab, deployed with Docker Compose behind Nginx Proxy Manager (NPM). It covers chat, autonomous agents, persistent memory, documents, files, tasks, calendar, scheduled automations, MCP, browser automation and multi-provider models. The key design principle: **autonomy is a runtime-enforced, user-controlled capability, never something the model gets by default.** The runtime is the product. The UI is only one consumer of it.
 
 ---
 
-## A. Current Repository Assessment
+## A. Starting point (history)
 
-- `C:\Users\user\Desktop\AI-workspace` is **empty** and **not a git repository**. There is no code, infra, tests or docs to keep, refactor or replace. Everything is planned from scratch.
-- The dev machine is Windows 11 with Docker 29.8, Node 22.23, npm 10.9, Python 3.14 and git 2.55. **pnpm and uv are not installed.**
-- Implications:
-  - The deploy target is Linux, so all runtime work happens in containers. Local Python 3.14 is only for tooling. Containers pin **Python 3.13** for library compatibility.
-  - Use npm for the frontend so no extra tool is needed. Install `uv` for the backend, or run it inside the dev container.
-  - Add `.gitattributes` (LF endings for `*.sh`, Dockerfiles and Python). Windows CRLF breaks container entrypoints.
-  - In the README, recommend a WSL2 checkout for dev. Docker Desktop bind mounts from NTFS are slow and mangle file permissions.
-- Phase 0 step one: `git init`, then the `main` branch.
+The project was planned from an empty folder on a Windows machine, with Linux containers as the
+only runtime (Python 3.13 in the images, npm for the frontend, `uv` for the backend). That is why
+the repository has `.gitattributes` for LF line endings and the README recommends a WSL2 checkout
+for development. The audit of the code as it grew is in `refactor/AUDIT.md`.
 
 ---
 
@@ -110,55 +110,52 @@ Chat turns go through the worker too. That gives one execution path, one event p
 ## D. Repository Structure
 
 ```
-ai-workspace/
-├─ docker-compose.yml            # production
-├─ docker-compose.dev.yml        # hot reload overrides (uvicorn --reload, vite dev)
-├─ docker-compose.override.example.yml  # extra workspace mounts, external NPM/SearXNG networks
-├─ .env.example   .gitattributes   .editorconfig   Makefile   README.md
-├─ docs/  (architecture.md, permissions.md, deployment.md, providers.md, mcp.md, backup.md)
-├─ backend/
-│  ├─ Dockerfile                 # multi-stage: builds frontend → copies dist into app image
-│  ├─ pyproject.toml  uv.lock  alembic.ini
-│  ├─ migrations/versions/
+anemo/
+├─ docker-compose.yml  docker-compose.dev.yml  Makefile  .env.example  CLAUDE.md
+├─ deploy/zimaos/      # a single-file compose for ZimaOS
+├─ docs/               # architecture, security, deployment, backup, claude-code, roadmap
+├─ refactor/           # audit, plan, decisions, bugs and progress of the 2026 refactor
+├─ backend/            # one image for the app (API) and the worker
 │  ├─ app/
-│  │  ├─ main_api.py             # FastAPI app factory, static SPA mount
-│  │  ├─ main_worker.py          # JobRunner + Scheduler + dispatchers
-│  │  ├─ cli.py                  # hash-password, rotate-key, reindex, doctor
-│  │  ├─ core/                   # config, db, redis, logging, crypto, ids(uuid7), errors, time
-│  │  ├─ api/                    # deps.py (auth, db session), router registry, sse.py
-│  │  ├─ jobs/                   # queue.py, runner.py, scheduler.py, handlers registry
-│  │  ├─ events/                 # event schemas, publisher (XADD), stream reader
-│  │  ├─ providers/              # base.py (Protocol + canonical types), adapters/{openai_responses,openai_chat,anthropic,fake}.py, registry.py, router.py, catalog.json, pricing.py
-│  │  ├─ runtime/                # runner.py (state machine), context.py (ContextBuilder), plan.py, signals.py, limits.py, compaction.py, subagents.py
-│  │  ├─ policy/                 # models.py (Policy DSL), engine.py (pure), presets.py, summary.py, risk/shell_classifier.py
-│  │  ├─ tools/                  # base.py, registry.py, executor.py, results.py, builtin/{fs,shell,web,browser,docs,tasks,calendar,memory,notify,plan,agents,skills,automation_state}.py
-│  │  ├─ workspace/              # fs_guard.py (path resolution), roots.py, trash.py, watcher.py
-│  │  ├─ sandbox_client/  browser_client/  mcp/ (manager.py, tool_adapter.py)
-│  │  ├─ search/                 # base.py, searxng.py, fetch.py (SSRF guard)
-│  │  └─ features/               # one folder per domain: models.py, schemas.py, service.py, router.py
-│  │     ├─ auth/ settings/ secrets/ conversations/ attachments/ runs/ approvals/
-│  │     ├─ memory/ knowledge/ documents/ files/ tasks/ calendar/ profiles/ skills/
-│  │     ├─ automations/ notifications/ mcp_servers/ usage/ search/ audit/
-│  └─ tests/  unit/ integration/ api/ runtime/ policy/ security/  conftest.py
-├─ sandbox/          # Dockerfile (debian-slim + git, python, node, common CLI), execd/ (FastAPI, ~200 LOC)
-├─ browser/          # Dockerfile (playwright base), service/ (session API)
-├─ mcp-host/         # Dockerfile (node + python + uv), bridge/ (stdio→streamable HTTP)
-├─ frontend/
-│  ├─ package.json  vite.config.ts  tsconfig.json
-│  └─ src/
-│     ├─ main.tsx  app/ (router.tsx, AppLayout.tsx, Sidebar/, providers.tsx, RequireAuth.tsx)
-│     ├─ api/        # client.ts (openapi-fetch), schema.d.ts (generated), sse.ts (EventSource wrapper)
-│     ├─ styles/     # app.css (@import "tailwindcss"; @theme semantic tokens), tokens.css (light/dark CSS vars)
-│     ├─ components/ui/   # Button, IconButton, Card, Dialog, Popover, Menu, Tabs, Input, Select, Switch, Badge, Toast, EmptyState, Spinner, CodeBlock, Markdown
-│     ├─ features/<feature>/  # chat, runs, approvals, files, documents, tasks, calendar, memory,
-│     │                       # agents(profiles/skills), automations, search, notifications, settings, usage, auth
-│     │   ├─ pages/  components/  hooks/  api.ts  store.ts? (only if needed)
-│     ├─ hooks/  (useDebounce, useHotkey(single), useConfirm)
-│     └─ lib/    (format, dates, tokens)
-└─ e2e/              # Playwright tests against compose stack with fake provider
+│  │  ├─ main_api.py  main_worker.py  cli.py
+│  │  ├─ sandbox_client.py  browser_client.py  claude_runner_client.py   # side-container clients
+│  │  ├─ core/         # config, db, redis, errors, logging, crypto, ids (imports nothing else)
+│  │  ├─ db/           # base, mixins; models.py imports every model for Alembic
+│  │  ├─ api/          # router.py (mounts everything), deps.py, sse.py, security.py, health.py
+│  │  ├─ features/     # one folder per domain: router.py, service.py, models.py, schemas.py
+│  │  │   attachments audit auth automations calendar conversations daily_notes documents files
+│  │  │   focus links mcp memory music notifications profiles projects providers runs search
+│  │  │   secrets settings shares shell skills stats tasks updates usage
+│  │  │   (+ browser_router.py, permissions_router.py, system_router.py, parts.py)
+│  │  ├─ runtime/      # dispatch.py → chat.py (one model call) or agent.py (the tool loop);
+│  │  │                # lifecycle.py (shared), agent_snapshot.py, agent_prompt.py, agent_finalize.py,
+│  │  │                # streaming, history, compaction, subagents, turn_context, citations, outputs
+│  │  ├─ tools/        # base.py, registry.py (built-in list), mcp_tool.py, builtin/*.py
+│  │  ├─ policy/       # engine (pure), models, presets, summary, shell_risk
+│  │  ├─ providers/    # adapters/{openai_responses,openai_chat,anthropic,claude_code,fake}, registry, router, catalog
+│  │  ├─ jobs/         # queue.py (Postgres), runner.py (worker lanes), scheduler.py (30 s loop)
+│  │  ├─ workspace/    # fs_guard (path checks), files, access, revert
+│  │  ├─ web/          # safe_http (SSRF guard), fetch, search (SearXNG), router
+│  │  ├─ knowledge/    # embeddings index;  mcp/  MCP client;  events/  Valkey streams, presence
+│  ├─ migrations/      # Alembic
+│  └─ tests/           # unit/ (no DB), api/ (HTTP and worker code on a test DB), integration/
+├─ frontend/src/
+│  ├─ app/             # router.tsx, AppLayout, Sidebar, shared stores
+│  ├─ features/<x>/    # pages, components, api.ts (TanStack Query), stores, tests
+│  ├─ components/      # ui/ (shared controls, Markdown) and diagrams/
+│  ├─ lib/  hooks/     # shared helpers
+│  └─ api/             # client.ts; openapi.json and schema.d.ts are generated (`make gen-api`)
+├─ e2e/                # Playwright specs; run-isolated.sh starts a throwaway stack
+├─ sandbox/            # execd: runs agent shell commands (sandbox, sandbox-net)
+├─ mcp-host/           # hostd: runs local (stdio) MCP servers
+├─ browser/            # browserd: the agents' Chromium, with a network guard
+└─ claude-runner/      # runnerd: the Claude subscription through the Claude Code CLI
 ```
 
-The backend image serves both `app` and `worker`. `sandbox`, `browser` and `mcp-host` are small separate images.
+Import direction (checked by `lint-imports` and `npm run lint:imports`): `core` and `policy`
+depend on nothing else in the app; the API side never imports `runtime/` or the job loop;
+`runtime/`, `tools/` and `providers/` never import the HTTP layer; providers know nothing of runs
+or tools; shared frontend code (`components/`, `lib/`, `hooks/`, `api/`) never imports a feature.
 
 ---
 
@@ -224,7 +221,7 @@ IDs are UUIDv7 (time-sortable). All timestamps are `timestamptz`. Rows have `cre
 
 **Automations & notifications**
 - `automations` (id, name, description, prompt, schedule jsonb {type: cron|interval|once, expr, tz}, enabled, profile_id, model_id?, toolset_override?, policy_id?, workspace_roots?, timeout_s, max_retries, on_ask enum pause_notify|deny_continue|fail, concurrency enum skip|queue, notify_destination_ids uuid[], output jsonb {type: notification|document|conversation|file, target}, state jsonb (key-value the agent can read/write via tool — enables "notify when changed"), next_run_at, last_run_at, last_status). Partial index (next_run_at) WHERE enabled.
-- `notification_destinations` (id, type enum discord_webhook|ntfy|… , name, secret_id, config jsonb, enabled)
+- `notification_destinations` (id, type `discord` or `webpush`, name, secret_id, config jsonb, enabled)
 - `notifications` (id, title, body md, level, source_type, source_id, read_at?, created_at). Index (read_at NULLS FIRST, created_at DESC).
 - `notification_deliveries` (outbox: notification_id, destination_id, status, attempts, last_error)
 
@@ -466,7 +463,7 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
 - **Dialogs** become bottom sheets or full-screen on phones.
 - **Inputs**: font-size ≥16 px on phones, so iOS doesn't zoom in on focus. `viewport-fit=cover` plus safe-area insets for notched phones.
 - **Installable (PWA)**: a web app manifest (name "anemo", icons, `display: standalone`, theme colour following the appearance setting) and a minimal service worker. The service worker caches only the app shell (built JS/CSS/icons). It **never caches `/api`** responses or event streams, so there is no stale or private data offline, and it shows a simple "offline" page when the server is unreachable. Add-to-home-screen then opens anemo full-screen without browser bars. Installing requires HTTPS, which NPM provides. On plain-HTTP LAN access it stays a normal website.
-- **Push notifications** to the phone remain in Phase 12 (Discord/ntfy first; Web Push is deferred, see S).
+- **Push notifications** to the phone: Discord webhooks and Web Push (the installed app gets notifications and approval buttons while no tab is open).
 
 ---
 
@@ -490,20 +487,21 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
 
 ## L. Background Jobs & Scheduling
 
-- **Queue**: the `jobs` table.
-  - Claim with `UPDATE … WHERE id = (SELECT … FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`.
-  - LISTEN `jobs_new` for instant wakeup, plus a 5 s poll fallback.
-  - Lanes: `interactive` (chat/agent turns, reserved slots) vs `background` (automations, extraction, indexing), so automations never starve chat.
-  - Worker concurrency `WORKER_CONCURRENCY` (default 4) with 2 interactive-reserved.
-- **Leases**: heartbeat extends `lease_expires_at`. A reaper (in the scheduler leader) requeues expired leases and marks their runs `interrupted` → `queued` (once; a second crash sets `failed` with an explanation).
-- **Job types**: `run.execute`, `memory.extract`, `knowledge.index`, `notify.deliver`, `reminder.fire`, `workspace.scan`, `maintenance.*` (prune revisions, trash, backups, redis streams, HNSW index).
-- **Scheduler** (leader via `pg_try_advisory_lock`, 15 s tick):
-  - `SELECT automations WHERE enabled AND next_run_at <= now() FOR UPDATE SKIP LOCKED`.
-  - One transaction: create run + job (`dedupe_key = automation_id:scheduled_ts`) and advance `next_run_at` via croniter in the automation's timezone.
-  - **Misfire policy**: if downtime made several fires due, run **once** if within grace (default 1 h), else skip and log "missed".
-  - Concurrency `skip` means no new run while one is active.
-  - Reminders and maintenance run in the same loop.
-- **Restart survival**: all timing and execution state is in Postgres (`next_run_at`, runs, checkpoints, jobs, approvals). Redis holds only ephemeral streams and signals and can be wiped safely.
+- **Queue** (`jobs/queue.py`): the `jobs` table. A worker claims with `FOR UPDATE SKIP LOCKED`,
+  wakes on `LISTEN jobs_new` and polls every 5 s as a fallback.
+  - Lanes: `interactive` (chat and agent turns) runs up to `WORKER_CONCURRENCY` jobs at once,
+    `background` up to half that, so background work never starves a chat.
+  - Leases: 60 s, extended by a heartbeat every 10 s; a reaper requeues expired leases every 30 s.
+  - A failed job is retried with backoff (default 3 attempts). Once a job fails for good, a
+    give-up hook can clean up after it: a `run.execute` job ends its run as failed.
+- **Job types** (`jobs/runner.py`): `run.execute`, `conversation.title`, `memory.extract`,
+  `memory.reindex`, `document.index`, `notify.deliver`, `automation.retry`, `mcp.refresh`.
+- **Periodic tasks** (`jobs/scheduler.py`): one loop every 30 s in each worker, running in turn
+  `reminders`, `automations` (due runs, grace 1 h), `notifications.prune` (90 days),
+  `approvals.expire` (24 h), `chats.temporary` and `updates.check` (about once a day). Each task
+  claims its rows in the database, so several workers can run the loop at once.
+- **Restart survival**: all timing and execution state is in Postgres (`next_run_at`, runs,
+  checkpoints, jobs, approvals). Valkey holds only ephemeral streams and signals and can be wiped.
 
 ---
 
@@ -563,32 +561,38 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
 
 ## O. API Surface (all under `/api`, JSON, typed via OpenAPI)
 
-- **Auth**: `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/reauth`, `GET/DELETE /auth/sessions`
-- **Settings**: `GET /settings`, `PATCH /settings/{section}`, `GET /setup/status` (first-run)
-- **Providers/Models**: `CRUD /providers`, `POST /providers/{id}/test`, `POST /providers/{id}/discover`, `CRUD /models`, `POST /models/{id}/test`, `GET/PUT /model-defaults`
-- **Conversations**: `CRUD /conversations`, `GET /conversations/{id}/messages?cursor`, `POST /conversations/{id}/turns` → `{run_id, user_message_id}`, `POST /conversations/{id}/regenerate`
-- **Attachments**: `POST /attachments` (multipart) → `{id, kind, supported_by_model}`, `GET /attachments/{id}`
-- **Runs**: `GET /runs?filters`, `POST /runs` (standalone agent run), `GET /runs/{id}` (snapshot), `GET /runs/{id}/events` (SSE), `POST /runs/{id}/pause|resume|cancel`, `PUT /runs/{id}/plan`, `GET /runs/{id}/tool-calls`, `GET /runs/{id}/files`, `POST /runs/{id}/files/{change_id}/revert`, `GET /runs/{id}/outputs/{ref}`
-- **Approvals**: `GET /approvals?status=pending`, `POST /approvals/{id}` `{decision, scope, reason?}`
-- **Global events**: `GET /events` (SSE)
-- **Agents**: `CRUD /profiles`, `CRUD /skills`, `POST /skills/import`, `GET /skills/{id}/export`, `GET /tools` (registry catalog with capabilities), `CRUD /policies`, `POST /policies/preview` (permission summary), `GET /capabilities`
-- **Automations**: `CRUD /automations`, `POST /automations/{id}/run-now`, `GET /automations/{id}/runs`, `POST /automations/schedule-preview`
-- **Workspace/files**: `CRUD /workspace/roots`, `GET /files?root&path`, `GET /files/content`, `PUT /files/content` (base_hash), `POST /files/upload`, `GET /files/download`, `POST /files/move`, `POST /files/mkdir`, `DELETE /files` (→ trash), `GET /files/search`, `GET/POST /files/trash`
-- **Documents**: `GET /documents` (tree), `POST /documents`, `GET/PUT /documents/{id}` (base_hash), `POST /documents/{id}/move`, `DELETE /documents/{id}`, `GET /documents/{id}/revisions`, `POST /documents/{id}/revisions/{rid}/restore`, `POST /documents/assets`
-- **Tasks/Calendar**: `CRUD /projects`, `CRUD /tasks`, `POST /tasks/reorder`, `GET /calendar/events?start&end` (expanded occurrences), `CRUD /calendar/events`, `PUT /calendar/events/{id}/occurrences/{start}`
-- **Memory**: `CRUD /memories`, `GET /memories?q&kind&status`, `POST /memories/{id}/approve`, `GET /memories/export`
-- **Search**: `GET /search?q&types&mode=hybrid|keyword`
-- **Notifications**: `GET /notifications`, `POST /notifications/read`, `CRUD /notification-destinations`, `POST /notification-destinations/{id}/test`
-- **MCP**: `CRUD /mcp/servers`, `POST /mcp/servers/{id}/refresh`, `GET /mcp/servers/{id}/tools`, `PATCH /mcp/tools/{id}`
-- **Usage**: `GET /usage/records`, `GET /usage/summary?group_by=day|model|provider|kind|profile|automation&from&to`
-- **Focus**: `POST/GET /focus/sessions`, `DELETE /focus/sessions/{id}`, `POST /focus/phase-ended`
-- **Music**: `GET/POST /music/tracks`, `PATCH/DELETE /music/tracks/{id}`, `CRUD /music/playlists`, `POST /music/playlists/reorder`, `PUT/POST /music/playlists/{id}/tracks`
-- **Stats**: `GET /stats?from&to&project_id` (grouped in SQL in the user's time zone)
-- **Links**: `GET/POST/DELETE /tasks/{id}/files`, `POST /tasks/{id}/files/upload`, `GET /tasks/{id}/backlinks`, `GET /documents/{id}/backlinks`, `GET /files/links?path`, `GET /files/upload-folder`, `GET /documents/recent`, `GET /documents/by-path`
-- **Presence**: `POST /presence {tab}` (the tab was just used)
-- **Ops**: `GET /health`, `GET /ready`, `GET /audit`, `GET /search-providers/test`
+The complete, current list is the OpenAPI schema committed at `frontend/src/api/openapi.json`
+(212 routes; `tests/unit/test_openapi_snapshot.py` fails when the code and that file differ, and
+`make gen-api` regenerates it). A route table with handlers is in
+`refactor/audit/backend-api.md` §1.1. By area:
 
-**Errors**: a uniform `{error: {code, message, details?}}` with stable codes (`policy_denied`, `conflict_base_hash`, `capability_missing`, …).
+- **Public** (no login): `GET /health`, `GET /ready`, `POST /auth/login`, the share page data
+  (`/public/shares/…`), one-time push action buttons (`/public/push/…`).
+- **Auth**: login, logout, `me`, re-auth, sessions.
+- **Settings**: `GET /settings`, `PUT /settings/{section}` (sensitive sections need re-auth),
+  first-run setup, the update notice.
+- **Providers and models**: providers, provider types, model discovery (`GET`) and import,
+  models, `PUT /settings/models` for the defaults, Claude subscription status.
+- **Conversations**: CRUD, messages, turns (`POST /conversations/{id}/turns` → run id),
+  regenerate and versions, edit last, branch, bulk actions, tags, export and save as document,
+  temporary chats.
+- **Runs**: list and summary, a run, its timeline, its live events (`GET /runs/{id}/events`, SSE),
+  pause, resume, cancel, plan edits, file reverts, saved tool outputs; approvals
+  (`GET /approvals`, `POST /approvals/{id}`); the global event stream (`GET /events`, SSE).
+- **Agents**: profiles, skills (and slash skills), permissions catalog, summary and preview,
+  the tool catalog.
+- **Workspace**: files (list, content, upload, download, move, copy, folder, trash and restore,
+  search), documents (tree, CRUD, move, revisions, assets, recent, by path), links and backlinks,
+  task attachments, daily notes, projects.
+- **Planner**: tasks (with subtasks, checklists, dependencies, repeats), calendar events and
+  occurrences, focus sessions, stats.
+- **Music**: tracks and playlists. **Memory**: memories. **Search** and **usage**.
+- **Notifications**: notifications, destinations (Discord webhook, Web Push), push keys.
+- **Automations**, **MCP** servers and tools, the agents' **browser**, the shell's SSH key, system
+  status, presence, audit log, web search test.
+
+**Errors**: a uniform `{error: {code, message, details?}}` with stable codes (`conflict_base_hash`,
+`reauth_required`, `invalid_path`, …).
 
 ---
 
@@ -692,7 +696,7 @@ Each phase ends with a green test suite, a working `docker compose up`, and a de
 10. **Windows dev vs Linux prod**: file permissions, line endings and bind-mount performance. WSL2 is recommended; PUID/PGID are handled in images.
 11. **Image sizes**: the browser image is ~1.5 GB, which is why it's optional via Compose profile.
 12. **Memory extraction costs tokens.** It's debounced, configurable, and can target a cheap/local model.
-13. **Web Push** (notifications while no tab is open) is deferred. Discord/ntfy cover the offline case initially.
+13. **Web Push** (notifications while no tab is open) was deferred at first and is now built in, next to Discord webhooks. (ntfy was considered and not built.)
 14. The **ceiling + policy + grants** model may feel complex. The UI presents presets first and the raw rules as "Advanced". This may need UX iteration.
 
 ---

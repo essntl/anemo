@@ -40,6 +40,7 @@ dev = [
   "asgi-lifespan>=2.1",
   "hypothesis>=6.120",
   "pytest-cov>=6",
+  "import-linter>=2.1",
 ]
 
 [tool.ruff]
@@ -66,3 +67,67 @@ python_version = "3.13"
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
 check_untyped_defs = true
+
+# Import boundaries (`lint-imports`, run in CI and `make lint`). They describe the
+# dependency direction as it is (see CLAUDE.md); the ignore_imports are the existing
+# exceptions, listed so they don't grow. Function-level imports count too.
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "core imports nothing else from the app"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = [
+  "app.api", "app.db", "app.events", "app.features", "app.jobs", "app.knowledge", "app.mcp",
+  "app.policy", "app.providers", "app.runtime", "app.tools", "app.web", "app.workspace",
+  "app.main_api", "app.main_worker", "app.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "the permission policy is pure (no IO, no other app modules)"
+type = "forbidden"
+source_modules = ["app.policy"]
+forbidden_modules = [
+  "app.api", "app.core", "app.db", "app.events", "app.features", "app.jobs", "app.knowledge",
+  "app.mcp", "app.providers", "app.runtime", "app.tools", "app.web", "app.workspace",
+  "app.main_api", "app.main_worker", "app.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "only the worker drives runs: the API side doesn't import the runtime or the job loop"
+type = "forbidden"
+source_modules = [
+  "app.api", "app.core", "app.db", "app.events", "app.features", "app.knowledge", "app.mcp",
+  "app.policy", "app.providers", "app.web", "app.workspace", "app.main_api",
+]
+forbidden_modules = ["app.runtime", "app.jobs.runner", "app.jobs.scheduler", "app.main_worker"]
+# Direct imports only: routers reach a few runtime helpers through the tool registry.
+allow_indirect_imports = true
+ignore_imports = [
+  "app.features.conversations.service -> app.runtime.outputs",
+  "app.features.runs.router -> app.runtime.outputs",
+  "app.features.runs.router -> app.runtime.agent_finalize",
+]
+
+[[tool.importlinter.contracts]]
+name = "the runtime, tools and providers don't import the HTTP layer"
+type = "forbidden"
+source_modules = ["app.runtime", "app.tools", "app.providers", "app.jobs", "app.knowledge", "app.mcp"]
+forbidden_modules = ["app.api", "app.main_api"]
+
+[[tool.importlinter.contracts]]
+name = "providers know nothing of runs, tools or jobs"
+type = "forbidden"
+source_modules = ["app.providers"]
+forbidden_modules = ["app.runtime", "app.tools", "app.jobs", "app.api"]
+
+[[tool.importlinter.contracts]]
+name = "tools don't import the agent runtime"
+type = "forbidden"
+source_modules = ["app.tools"]
+forbidden_modules = ["app.runtime"]
+ignore_imports = [
+  "app.tools.builtin.agent -> app.runtime.outputs",
+  "app.tools.builtin.web -> app.runtime.citations",
+]
