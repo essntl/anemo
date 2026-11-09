@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { login, signOutAfterEach } from './helpers'
+import { login, signOutAfterEach, useStoppedTimer } from './helpers'
 
 /*
  * The focus timer: linked to a task, started, fast-forwarded to its end (Playwright's
@@ -11,6 +11,7 @@ signOutAfterEach()
 test('start a focus session for a task and finish it', async ({ page }) => {
   await page.clock.install()
   await login(page)
+  await useStoppedTimer(page)
   const focus = (await (await page.request.get('/api/settings')).json()).focus as { focus_minutes: number }
   const task = await (await page.request.post('/api/tasks', { data: { title: `E2E focus ${Date.now()}` } })).json()
   try {
@@ -52,6 +53,7 @@ test('the timer keeps going across pages and a reload', async ({ page }) => {
   const t0 = Date.now()
   await page.clock.install()
   await login(page)
+  await useStoppedTimer(page)
   await page.goto('/focus')
   await page.getByRole('button', { name: 'Start timer' }).click()
   // 90 s, not 60: the time left is rounded up to the second, so a fast run would
@@ -78,6 +80,7 @@ test('the timer keeps going across pages and a reload', async ({ page }) => {
 
 test('start and pause focus from the search box, edit Home from it', async ({ page }) => {
   await login(page)
+  await useStoppedTimer(page)
   await page.goto('/stats')
   await expect(page.getByRole('heading', { name: 'Stats' })).toBeVisible()
   const run = async (typed: string, option: string) => {

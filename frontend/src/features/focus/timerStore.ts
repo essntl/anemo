@@ -3,8 +3,11 @@
  * it (sounds, Island alerts, desktop notifications, recording sessions).
  *
  * The state is kept in this browser's storage, so a reload, a closed tab or a phone
- * that put the page to sleep picks up exactly where it was. Settings (lengths, sounds,
- * …) come from the server (Settings → Focus); <TimerEngine> copies them in.
+ * that put the page to sleep picks up exactly where it was, offline too. It is also
+ * shared through the server with every other Anemo tab and the browser extension
+ * (timerSync.ts): each change made here is sent there, and changes made elsewhere are
+ * taken. Settings (lengths, sounds, …) come from the server (Settings → Focus);
+ * <TimerEngine> copies them in.
  *
  * `timerActions` are plain functions, so the Focus page, the Home widget, the Island,
  * the command palette and agent requests all drive the same timer.
@@ -16,6 +19,7 @@ import { showDesktopNotification } from '@/features/notifications/desktop'
 import { islandAlert } from '@/features/island/alerts'
 import { enqueueSession } from './outbox'
 import { type Chime, playSound } from './sounds'
+import { bindTimer, pushTimer } from './timerSync'
 import * as timer from './timer'
 import { DEFAULT_SETTINGS, type Phase, type TimerSettings, type TimerState, type Transition } from './timer'
 
@@ -60,7 +64,7 @@ const NOTICE: Record<Phase, (p: FocusPrefs) => { title: string; body: string }> 
   long_break: (p) => ({ title: 'Back to focus', body: `${p.focusMinutes} minutes on the clock.` }),
 }
 
-function afterFinished(finished: Phase, next: TimerState, prefs: FocusPrefs) {
+function afterFinished(finished: Phase, next: TimerState, prefs: FocusPrefs): { title: string; body: string } {
   const notice =
     finished === 'focus' && next.phase === 'long_break'
       ? { title: 'Long break', body: `Cycle complete. Enjoy ${prefs.longBreakMinutes} minutes off.` }
@@ -76,9 +80,8 @@ function afterFinished(finished: Phase, next: TimerState, prefs: FocusPrefs) {
   })
   // Only shown while the tab is in the background, and only if turned on (Settings → Notifications).
   showDesktopNotification({ id: `focus-${next.sessionId}`, title: notice.title, body: notice.body }, () => openPage('/focus'))
-  // Kept in the Notifications list too, if the user asked for that (the server checks).
-  void api.POST('/api/focus/phase-ended', { body: notice }).catch(() => undefined)
   useTimerStore.setState({ announcement: `${notice.title}. ${notice.body}` })
+  return notice
 }
 
 /** Apply a step of the timer: save the new state, record a session, react to a finished phase. */
@@ -90,8 +93,23 @@ function apply(step: (t: TimerState, prefs: FocusPrefs, now: number) => Transiti
   if (result.state !== t) useTimerStore.setState({ timer: result.state })
   useClock.setState({ now })
   if (result.session) enqueueSession(result.session)
-  if (result.finished) afterFinished(result.finished, result.state, prefs)
+  const notice = result.finished ? afterFinished(result.finished, result.state, prefs) : null
+  if (result.state !== t) {
+    // Kept in the Notifications list too, if the user asked for that (the server checks);
+    // only by the tab whose change counted, so another device finishing the same phase
+    // doesn't add it twice.
+    pushTimer(notice ? () => void api.POST('/api/focus/phase-ended', { body: notice }).catch(() => undefined) : undefined)
+  }
   return result
+}
+
+/** A change made here outside `apply` (the task, the length): saved and shared. */
+function change(patch: (t: TimerState) => TimerState) {
+  const before = useTimerStore.getState().timer
+  const after = patch(before)
+  if (after === before) return
+  useTimerStore.setState({ timer: after })
+  pushTimer()
 }
 
 function announce(text: string) {
@@ -131,18 +149,14 @@ export const timerActions = {
   },
   /** Link the timer to an Anemo task (null: no task). */
   setTask(taskId: string | null) {
-    useTimerStore.setState((s) => ({ timer: { ...s.timer, taskId } }))
+    change((t) => (t.taskId === taskId ? t : { ...t, taskId }))
   },
   /** Start a focus phase for this task, as the "Focus on this" buttons do. */
   focusOn(taskId: string | null, minutes?: number) {
     const { timer: t } = useTimerStore.getState()
     if (t.phase !== 'focus' || t.status === 'idle') timerActions.choosePhase('focus')
     timerActions.setTask(taskId)
-    if (minutes) {
-      useTimerStore.setState((s) => ({
-        timer: s.timer.status === 'idle' ? { ...s.timer, duration: minutes * 60_000 } : s.timer,
-      }))
-    }
+    if (minutes) change((t) => (t.status === 'idle' ? { ...t, duration: minutes * 60_000 } : t))
     if (useTimerStore.getState().timer.status !== 'running') timerActions.start()
   },
   /** Finish the phase if its time is up (called by the engine's clock). */
@@ -152,9 +166,20 @@ export const timerActions = {
   },
   /** New settings from the server. An idle timer takes the new lengths at once. */
   setPrefs(prefs: FocusPrefs) {
-    useTimerStore.setState((s) => ({ prefs, timer: timer.applySettings(s.timer, prefs) }))
+    useTimerStore.setState({ prefs })
+    change((t) => timer.applySettings(t, prefs))
   },
 }
+
+// The shared state from the server replaces this tab's copy as it is (no sounds: the
+// change happened elsewhere).
+bindTimer(
+  () => useTimerStore.getState().timer,
+  (t) => {
+    useTimerStore.setState({ timer: t })
+    useClock.setState({ now: Date.now() })
+  },
+)
 
 /** Everything a timer display needs, recomputed once a second while it runs. */
 export function useTimer() {

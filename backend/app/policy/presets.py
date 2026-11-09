@@ -44,6 +44,15 @@ CATEGORIES: list[Category] = [
     Category(
         "browser.use", "Browser automation", "Open pages, click and type in a browser.", "ask"
     ),
+    # Anemo Companion's browser control. Clicks (other than following a link) and typing
+    # are always asked about in code, whatever this level says (tools/builtin/browser.py).
+    Category(
+        "browser.mine",
+        "Your own Chrome",
+        "Open and read pages in an “Anemo” tab group in your Chrome (browser control "
+        "in Anemo Companion). Clicks and typing there always ask.",
+        "ask_dangerous",
+    ),
     Category("http.request", "External API calls", "Send HTTP requests to other services.", "ask"),
     Category("docs.write", "Edit documents", "Create and change documents.", "ask"),
     Category(

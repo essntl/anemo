@@ -1,8 +1,18 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, TimestampMixin
@@ -36,3 +46,20 @@ class FocusSession(Base, IdMixin, TimestampMixin):
     # Chosen by the browser, so a session sent again from its offline outbox is
     # stored once.
     client_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+
+
+class FocusTimer(Base):
+    """The focus timer's running state, shared by every Anemo tab and the browser
+    extension. One row (`key` "shared"). `version` goes up on each change, so a client
+    that changed an older state learns it was overtaken (409) instead of overwriting."""
+
+    __tablename__ = "focus_timer"
+
+    key: Mapped[str] = mapped_column(String(20), primary_key=True)
+    state: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    # Who made the last change ("tab", "extension", ...), for the clients' own use.
+    updated_by: Mapped[str] = mapped_column(String(40), default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

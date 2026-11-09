@@ -16,6 +16,45 @@ what is not.
 - Logins, setting changes, approvals and denials are in the security log under
   **Settings → Advanced**.
 
+## API tokens (the browser extension)
+
+**Settings → General → Extension and device tokens** makes long-lived logins for Anemo
+Companion (the browser extension, `extension/`) or another device. A token is sent as
+`Authorization: Bearer …`.
+
+- **Shown once.** Only its SHA-256 is stored; the list shows its name, its first
+  characters, when it was made and when and from where it was last used.
+- **Revocable.** Revoking deletes it and it stops working at once; the extension then goes
+  back to its setup screen. Making one needs your password again (it is a login that lasts
+  until revoked); making and revoking one are in the security log.
+- **Less than a login.** A token never counts as "password entered recently", so it can't
+  change providers, agent permissions, the workspace or web settings, MCP servers or
+  notification destinations, and it can't make tokens. It can't log out, confirm the
+  password or manage browser sessions either.
+- **The Origin check.** Changes from another site are refused (see the cross-site check in
+  `backend/app/api/security.py`). The only exception: requests from Anemo Companion's
+  extension id (`EXTENSION_IDS`, default its fixed id) that carry a token. The browser login's
+  cookie is still refused from there. No CORS headers are sent: an extension with permission
+  for your Anemo address doesn't need them, and web pages get none.
+- **The extension's live connection** (`/api/extension/ws`, a WebSocket) accepts only
+  Anemo Companion's origin, and its token in the first message (never in the address, so
+  not in proxy logs). The token is checked again every minute: revoking it closes the
+  connection.
+- **"Skip Discord while I'm here".** When this option is on in the extension, it reports
+  whether the computer is in use (Chrome's idle detection, 5 minutes). While it is,
+  notifications are shown in the browser and not copied to Discord; the skipped copy is
+  recorded as `skipped`. A closed browser or lost connection counts as away after 90
+  seconds. Destinations an automation names itself, and test messages, are always sent.
+- **Saving web content** (quick capture): the extension sends what it read; the
+  "Inline & formatting" model (Settings → Models) reformats it before it is written into a
+  document. That model sees only the content, fenced and labelled as untrusted, and at most
+  the target document's headings; never the document's text, your memories, other chats or
+  tools. A page could still try to make the formatter write something misleading into the
+  document; review saved clips like any text from the web.
+- **Pages attached to a chat message** are kept apart from the message, wrapped and
+  labelled as untrusted data for the model, and never used for memories (nor are the answers
+  to such messages).
+
 ## Share links
 
 Anemo has one user, but you can let someone **read** a single chat, document or
@@ -166,7 +205,8 @@ The rules are copied onto a run when it starts. Changing settings affects new ru
 
 When a run waits for you, you can approve once, approve for the rest of that run
 (for that kind of action in that place), or deny, with a reason the agent sees.
-An approval for the run never overrides "Never" or the ceiling. Unanswered
+An approval for the run never overrides "Never" or the ceiling, and some actions are
+asked about every time regardless (clicks and typing in your own Chrome). Unanswered
 requests expire after 24 hours and count as denied. Unattended automations follow
 their own setting for this: wait and notify you, skip the action, or stop.
 
@@ -183,6 +223,7 @@ sub-agent depth. When one is reached the run stops and says which.
 | Shell | Runs in a separate container as a non-root user, with a read-only system, no extra privileges and memory/CPU/process limits. The default sandbox has **no network at all**. A second one with internet access is a separate permission. Neither can reach the database. |
 | Web pages and API calls | Addresses on your own network, the Docker host and cloud metadata addresses are refused unless you list them in Settings → Web & Search. Redirects are checked again. |
 | Browser | Its own container without workspace, database or secrets; the same address rules apply to everything it loads. |
+| Your own Chrome (browser control) | Only while you switch it on in Anemo Companion, never for automations, and only in tabs the agent opened in an "Anemo" tab group. Opening, reading and following links are allowed by default ("Your own Chrome" permission); every other click and all typing are asked about every time, whatever the level says ("allow for this run" doesn't apply). The extension never types into password fields and never uses Anemo itself, browser pages, `.gov` sites, banks or its blocklist. Commands reach it only over its authenticated WebSocket. It acts with that browser's logins, so use a separate Chrome profile. |
 | MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
 | Claude Code | Runs in its own container without workspace, database or app secrets, and with no tools of its own: every tool call it makes is a normal Anemo tool call, checked here. |
 

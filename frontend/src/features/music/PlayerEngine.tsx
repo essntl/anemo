@@ -4,6 +4,7 @@ import { useSettings } from '@/features/settings/api'
 import { musicKey } from './api'
 import { onLibraryChanged, setPlayerPrefs, usePlayerStore } from './player/controller'
 import { useAmbient } from './player/ambient'
+import { startExtensionBridge } from './extensionBridge'
 
 /**
  * The music player's link to the rest of the app (mounted once, in PersistentLayer).
@@ -20,6 +21,9 @@ export function PlayerEngine() {
 
   // Tracks saved to the library from here: refresh the lists that show them.
   useEffect(() => onLibraryChanged(() => void qc.invalidateQueries({ queryKey: musicKey })), [qc])
+
+  // The browser extension's remote (play, pause, skip, add a link), if it is installed.
+  useEffect(() => startExtensionBridge(), [])
 
   // Another tab on this device changed the queue or volume.
   useEffect(() => {

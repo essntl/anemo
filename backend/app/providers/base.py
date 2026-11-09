@@ -71,6 +71,34 @@ class ConversationRef(BaseModel):
     title: str = ""
 
 
+PageSource = Literal["page", "selection", "pdf", "youtube"]
+
+
+class PageRef(BaseModel):
+    """Content of a web page the user attached to a message (from the browser extension):
+    the page's main text, a selection, a PDF's text or a video transcript. Untrusted: the
+    runtime wraps and labels it as data before a request is sent (runtime/pages.py), and
+    it is never part of the message's own text (so never used for memories)."""
+
+    type: Literal["page"] = "page"
+    url: str
+    title: str = ""
+    source: PageSource = "page"
+    content: str
+    word_count: int = 0
+    # The extension cut the middle out to stay within the length limit.
+    truncated: bool = False
+
+
+class ResearchRef(BaseModel):
+    """The sources of a research session (browser extension), attached to each message of
+    the session's chat. Rendered as untrusted material before a request is sent
+    (runtime/research.py): in full on the latest message, as a short note on earlier ones."""
+
+    type: Literal["research"] = "research"
+    session_id: str
+
+
 ContentBlock = Annotated[
     TextBlock
     | ImageBlock
@@ -78,7 +106,9 @@ ContentBlock = Annotated[
     | ToolResultBlock
     | ReasoningBlock
     | AttachmentRef
-    | ConversationRef,
+    | ConversationRef
+    | PageRef
+    | ResearchRef,
     Field(discriminator="type"),
 ]
 

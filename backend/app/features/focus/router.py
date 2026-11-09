@@ -6,7 +6,14 @@ from fastapi import APIRouter, Query
 from app.api.deps import Db
 from app.features.focus import service
 from app.features.focus.models import FocusSession
-from app.features.focus.schemas import FocusPhase, FocusSessionIn, FocusSessionOut, PhaseEndedIn
+from app.features.focus.schemas import (
+    FocusPhase,
+    FocusSessionIn,
+    FocusSessionOut,
+    FocusTimerIn,
+    FocusTimerOut,
+    PhaseEndedIn,
+)
 from app.features.notifications import service as notifications
 from app.features.settings import service as settings
 from app.features.settings.sections import FocusSettings
@@ -61,3 +68,16 @@ async def phase_ended(body: PhaseEndedIn, db: Db) -> None:
         await notifications.create(
             db, title=body.title, body=body.body, kind="focus", link="/focus"
         )
+
+
+@router.get("/timer", response_model=FocusTimerOut)
+async def get_timer(db: Db) -> FocusTimerOut:
+    """The timer's shared state (every Anemo tab and the browser extension follow it)."""
+    return await service.get_timer(db)
+
+
+@router.put("/timer", response_model=FocusTimerOut)
+async def put_timer(body: FocusTimerIn, db: Db) -> FocusTimerOut:
+    """Change the timer. Refused with 409 `timer_conflict` (details: the current state)
+    when it changed since `base_version`."""
+    return await service.put_timer(db, body)

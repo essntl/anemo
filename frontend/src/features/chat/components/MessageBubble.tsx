@@ -10,12 +10,14 @@ import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { SkillIcon } from '@/features/skills/icons'
 import { AttachmentChip } from './AttachmentChip'
 import { ReferenceChip } from './ChatReference'
+import { PageChip } from './PageChip'
 import type { QuestionMark } from '../api'
 import { splitAtQuestions } from '../questionMarks'
 
 type AttachmentSummary = Schemas['AttachmentSummary']
 type ReferenceSummary = Schemas['ReferenceSummary']
 type SkillSummary = Schemas['SkillSummary']
+type PageSummary = Schemas['PageSummary']
 
 interface UserProps {
   text: string
@@ -24,11 +26,13 @@ interface UserProps {
   references?: ReferenceSummary[]
   /** The skill the message was started with (/study ...). */
   skill?: SkillSummary | null
+  /** A web page attached by the browser extension, with where to load its text from. */
+  page?: { summary: PageSummary; conversationId: string; messageId: string } | null
   /** Set on the last message you sent (when nothing is running): change it and have it answered again. */
   onEdit?: (text: string) => void
 }
 
-export function UserBubble({ text, attachments = [], references = [], skill, onEdit }: UserProps) {
+export function UserBubble({ text, attachments = [], references = [], skill, page, onEdit }: UserProps) {
   const [draft, setDraft] = useState<string | null>(null)
   if (draft !== null) {
     const save = () => {
@@ -50,6 +54,7 @@ export function UserBubble({ text, attachments = [], references = [], skill, onE
   }
   return (
     <div className="group flex flex-col items-end gap-2">
+      {page && <PageChip page={page.summary} conversationId={page.conversationId} messageId={page.messageId} />}
       {references.length > 0 && (
         <div className="flex max-w-[80%] flex-wrap justify-end gap-2">
           {references.map((r) => <ReferenceChip key={r.conversation_id} chat={{ id: r.conversation_id, title: r.title }} link />)}
@@ -69,7 +74,7 @@ export function UserBubble({ text, attachments = [], references = [], skill, onE
           )}
         </div>
       )}
-      {/* A message can be just files: then no empty bubble under them. */}
+      {/* A message can be just files (or a page): then no empty bubble under them. */}
       {(text || skill) && (
       <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
         {skill && (

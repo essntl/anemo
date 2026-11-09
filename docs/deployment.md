@@ -70,7 +70,13 @@ proxy_read_timeout 1h;
 
 Then in `.env`: `PUBLIC_URL=https://your.domain`, `COOKIE_SECURE=true`, and
 `TRUSTED_PROXIES=<address of the proxy>` so the login rate limit sees the real
-client address. WebSockets are not needed.
+client address.
+
+The web app needs no WebSockets. The browser extension (Anemo Companion, `extension/`)
+does: its live connection is one WebSocket at `/api/extension/ws`. If you use the
+extension, switch on **Websockets Support** for the proxy host in Nginx Proxy Manager.
+Cloudflare passes WebSockets through on every plan; the extension sends a ping every 20 s,
+well inside Cloudflare's 100-second idle limit.
 
 Anemo has one user and one password. Do not expose it to the internet without
 HTTPS; an extra access list or VPN in front is a good idea.

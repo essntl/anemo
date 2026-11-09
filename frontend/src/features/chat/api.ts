@@ -268,3 +268,18 @@ export function useSaveAsDocument() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['documents'] }),
   })
 }
+
+/** The web page attached to a message by the browser extension, with its text. */
+export function usePageContent(conversationId: string, messageId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['message-page', conversationId, messageId],
+    enabled,
+    staleTime: Infinity,
+    queryFn: async () =>
+      unwrap(
+        await api.GET('/api/conversations/{conversation_id}/messages/{message_id}/page', {
+          params: { path: { conversation_id: conversationId, message_id: messageId } },
+        }),
+      ),
+  })
+}

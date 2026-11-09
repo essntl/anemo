@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     admin_password: SecretStr | None = None
 
     public_url: str = "http://localhost:8080"
+    # Browser extensions allowed to call the API with an API token (comma-separated
+    # extension ids). The default is Anemo Companion's id (extension/manifest key).
+    extension_ids: str = "jpmimgldkledmklijfmfnbaaimmfjaaf"
     cookie_secure: bool = True
     session_days: int = 30
     trusted_proxies: str = ""

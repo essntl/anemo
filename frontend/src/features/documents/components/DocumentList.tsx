@@ -82,6 +82,7 @@ export function DocumentList({ currentFolder, projectFolder, projectName }: { cu
                   <span className="block truncate text-[11.5px] text-muted">
                     {formatWhen(doc.updated_at)} · {doc.word_count} words
                     {doc.last_editor === 'agent' && ' · by an agent'}
+                    {doc.last_editor === 'extension' && ' · saved from the browser'}
                   </span>
                 </span>
               </NavLink>

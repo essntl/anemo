@@ -99,6 +99,17 @@ Some sites refuse automated browsers with a bot check or CAPTCHA. Never try to s
 or get around one: use another source, or ask the user to answer it in the Browser panel.
 """
 
+MY_BROWSER_HINT = """
+## The user's own Chrome
+The user has switched on browser control: the browser_* tools can also act in their own \
+Chrome (browser="my_browser"), in tabs you open in an "Anemo" tab group, with their \
+logins. Use it only when the user asks for it or the task needs their logged-in browser; \
+otherwise use the sandbox (the default). Reading and following links there is free; every \
+other click and all typing wait for the user's approval, so say what you are about to do. \
+You never see or touch the user's other tabs. Never type passwords. If a site checks \
+whether you are a person, stop and ask the user to solve it in that tab.
+"""
+
 
 def build_system_prompt(
     profile: AgentProfile | None,

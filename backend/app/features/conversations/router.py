@@ -16,6 +16,7 @@ from app.features.conversations.schemas import (
     ConversationPatch,
     EditLastIn,
     MessageOut,
+    PageContentOut,
     SavedDocument,
     TagCount,
     TurnIn,
@@ -147,12 +148,19 @@ async def send_turn(conversation_id: uuid.UUID, body: TurnIn, db: Db) -> TurnOut
         profile_id=body.profile_id,
         reference_ids=body.reference_ids,
         skill_id=body.skill_id,
+        page=body.page,
     )
     return TurnOut(
         run_id=run.id,
         user_message=service.message_out(user, files),
         assistant_message=service.message_out(assistant, mode=run.kind),
     )
+
+
+@router.get("/{conversation_id}/messages/{message_id}/page", response_model=PageContentOut)
+async def message_page(conversation_id: uuid.UUID, message_id: uuid.UUID, db: Db) -> PageContentOut:
+    """The web page attached to a message (by the browser extension), with its text."""
+    return await service.page_content(db, conversation_id, message_id)
 
 
 @router.post("/{conversation_id}/regenerate", response_model=TurnOut, status_code=202)

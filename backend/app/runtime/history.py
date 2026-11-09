@@ -14,8 +14,11 @@ from app.providers.base import (
     ConversationRef,
     ImageBlock,
     Message,
+    PageRef,
+    ResearchRef,
     TextBlock,
 )
+from app.runtime import pages, research
 
 CHARS_PER_TOKEN = 4  # rough estimate; good enough for trimming decisions
 IMAGE_TOKENS = 1_600  # what a ~1568px image costs on current vision models
@@ -66,19 +69,33 @@ async def load_history(
 async def resolve_attachments(
     db: AsyncSession, history: list[Message], capabilities: dict[str, bool]
 ) -> list[Message]:
-    """Replace references to attachments and to other chats with model input suited
-    to these capabilities."""
+    """Replace references to attachments and to other chats, and attached web pages, with
+    model input suited to these capabilities."""
     # Imported here: references needs load_history from this module.
     from app.runtime.references import render_reference
 
     resolved: list[Message] = []
-    for msg in history:
+    # Research sources go in full only with the latest message that has them.
+    last_research = max(
+        (i for i, m in enumerate(history) if any(isinstance(b, ResearchRef) for b in m.content)),
+        default=-1,
+    )
+    for index, msg in enumerate(history):
         blocks: list[ContentBlock] = []
         for block in msg.content:
             if isinstance(block, AttachmentRef):
                 blocks.extend(await render_blocks(db, block.attachment_id, capabilities))
             elif isinstance(block, ConversationRef):
                 text = await render_reference(db, block.conversation_id, block.title)
+                blocks.append(TextBlock(text=text))
+            elif isinstance(block, PageRef):
+                blocks.append(TextBlock(text=pages.render(block)))
+            elif isinstance(block, ResearchRef):
+                text = (
+                    await research.render(db, block.session_id)
+                    if index == last_research
+                    else research.EARLIER
+                )
                 blocks.append(TextBlock(text=text))
             else:
                 blocks.append(block)

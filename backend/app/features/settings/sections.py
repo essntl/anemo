@@ -111,7 +111,15 @@ class AppearanceSettings(BaseModel):
 
 
 TaskType = Literal[
-    "chat", "agent", "summarization", "memory", "background", "automation", "embeddings", "title"
+    "chat",
+    "agent",
+    "summarization",
+    "memory",
+    "background",
+    "automation",
+    "embeddings",
+    "title",
+    "inline",
 ]
 
 
@@ -127,6 +135,9 @@ class ModelDefaults(BaseModel):
     automation: uuid.UUID | None = None
     embeddings: uuid.UUID | None = None
     title: uuid.UUID | None = None
+    # The browser extension's in-page translate/explain, and formatting what it saves into
+    # documents. No personal context is ever sent with these.
+    inline: uuid.UUID | None = None
     # Ordered backup models per task, tried when the primary fails or lacks a capability.
     fallbacks: dict[TaskType, list[uuid.UUID]] = Field(default_factory=dict)
 

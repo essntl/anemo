@@ -102,11 +102,15 @@ function ApprovalCard({ runId, call }: { runId: string; call: ToolCallView }) {
             onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'once' })}>
             Allow once
           </Button>
-          <Button size="sm" variant="secondary" disabled={decide.isPending}
-            onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'run' })}
-            title="Allow the same kind of action in the same folder for the rest of this run">
-            Allow for this run
-          </Button>
+          {/* Actions that are asked about every time (a click in your own Chrome) can't
+              be allowed for the whole run. */}
+          {!call.actions.some((a) => a.always_ask) && (
+            <Button size="sm" variant="secondary" disabled={decide.isPending}
+              onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'run' })}
+              title="Allow the same kind of action in the same folder for the rest of this run">
+              Allow for this run
+            </Button>
+          )}
           <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => setDenying(true)}>
             Deny
           </Button>

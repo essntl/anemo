@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import browser_client
 from app.features.automations.models import Automation
 from app.features.conversations.models import ChatMessage
+from app.features.extension import browser_relay
 from app.features.memory import service as memory
 from app.features.memory.schemas import MemorySettings
 from app.features.profiles import service as profiles
@@ -33,6 +34,7 @@ from app.runtime.agent_prompt import (
     AUTOMATION_ON_ASK,
     AUTOMATION_SECTION,
     BROWSER_HINT,
+    MY_BROWSER_HINT,
     build_system_prompt,
 )
 from app.runtime.chat import (
@@ -95,16 +97,28 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     # The chat's project: where its files are, and the user's instructions for it.
     project = await projects.for_conversation(db, run.conversation_id)
     system += projects.prompt_section(project)
-    has_browser = (
+    has_sandbox = (
         not chat and browser_client.available() and level_for(settings, "browser.use") != "deny"
     )
-    if has_browser:
+    if has_sandbox:
         system += BROWSER_HINT
     if automation is not None:
         system += AUTOMATION_SECTION.format(name=automation.name)
         system += AUTOMATION_ON_ASK[automation.on_ask] + "\n"
     # A sub-agent of an unattended run is unattended too.
     inherited = (sub or {}).get("automation")
+    # The user's own Chrome (Anemo Companion's browser control): only while it is switched
+    # on, and never for an unattended run (nobody there to approve, or to watch).
+    my_browser = (
+        not chat
+        and automation is None
+        and not inherited
+        and level_for(settings, "browser.mine") != "deny"
+        and await browser_relay.available()
+    )
+    if my_browser:
+        system += MY_BROWSER_HINT
+    has_browser = has_sandbox or my_browser
     if sub is not None:
         system += subagents.SUBAGENT_SECTION
         if inherited:
@@ -126,6 +140,7 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         "mcp_tools": mcp_refs,
         # Browser tools are only offered when the browser container is running.
         "browser": has_browser,
+        "my_browser": my_browser,
         "automation": {
             "id": str(automation.id),
             "name": automation.name,

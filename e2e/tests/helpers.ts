@@ -83,8 +83,39 @@ export async function send(page: Page, text: string) {
 /** Sign out after each test, so test logins don't pile up under Settings > Active sessions. */
 export function signOutAfterEach() {
   test.afterEach(async ({ page }) => {
+    await restoreTimer(page)
     await page.request.post('/api/auth/logout').catch(() => undefined)
   })
+}
+
+type TimerOut = { state: Record<string, unknown> | null; version: number }
+const savedTimers = new WeakMap<Page, TimerOut['state']>()
+
+/**
+ * The focus timer is one state on the server, shared by every tab and device (and the
+ * browser extension). A test that uses it calls this after `login`: it starts from a
+ * stopped timer, and `signOutAfterEach` puts back what was there (the instance may be in
+ * real use, and a phase one test finished would otherwise still run in the next).
+ */
+export async function useStoppedTimer(page: Page): Promise<void> {
+  const before = (await (await page.request.get('/api/focus/timer')).json()) as TimerOut
+  savedTimers.set(page, before.state)
+  const focus = (await (await page.request.get('/api/settings')).json()).focus as { focus_minutes: number }
+  const stopped = {
+    phase: 'focus', status: 'idle', phase_started_at: null, started_at: null, paused_at: null,
+    accumulated: 0, duration: focus.focus_minutes * 60_000, round: 0, task_id: null, session_id: `e2e-${Date.now()}`,
+  }
+  const r = await page.request.put('/api/focus/timer', { data: { state: stopped, base_version: before.version, source: 'e2e' } })
+  expect(r.ok(), await r.text()).toBe(true)
+}
+
+async function restoreTimer(page: Page): Promise<void> {
+  if (!savedTimers.has(page)) return
+  const saved = savedTimers.get(page)
+  savedTimers.delete(page)
+  if (!saved) return // there was none: it stays stopped
+  const now = (await (await page.request.get('/api/focus/timer')).json()) as TimerOut
+  await page.request.put('/api/focus/timer', { data: { state: saved, base_version: now.version, source: 'e2e' } }).catch(() => undefined)
 }
 
 /**

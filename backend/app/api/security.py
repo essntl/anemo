@@ -4,6 +4,13 @@ Session cookies are SameSite=Lax, which already blocks most cross-site POSTs.
 As a second layer, state-changing requests that carry an Origin (or Referer)
 header must come from this app's own origin.
 
+The one exception is the browser extension (Anemo Companion): requests from an allowed
+`chrome-extension://<id>` origin that carry `Authorization: Bearer` pass, because a token
+in a header is never sent by a browser on its own (no cross-site forgery is possible), and
+the token is checked like any other login. A cookie-only request from that origin is
+still blocked. No CORS headers are needed: an extension with permission for this host
+isn't subject to CORS.
+
 Implemented as plain ASGI middleware so it never buffers streaming (SSE) responses.
 """
 
@@ -15,10 +22,23 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.core.config import get_settings
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+EXTENSION_SCHEME = "chrome-extension"
 
 
 def _host_of(url: str) -> str:
     return urlsplit(url).netloc.lower()
+
+
+def allowed_extension_ids() -> set[str]:
+    return {i.strip().lower() for i in get_settings().extension_ids.split(",") if i.strip()}
+
+
+def is_allowed_extension(source: str | None, authorization: str | None) -> bool:
+    """A Bearer request from one of the allowed extensions."""
+    if not source or not authorization or not authorization.lower().startswith("bearer "):
+        return False
+    parts = urlsplit(source)
+    return parts.scheme == EXTENSION_SCHEME and parts.netloc.lower() in allowed_extension_ids()
 
 
 def is_allowed_origin(source: str | None, host_header: str, public_url: str) -> bool:
@@ -39,7 +59,10 @@ class OriginCheckMiddleware:
         ):
             headers = {k.decode().lower(): v.decode() for k, v in scope["headers"]}
             source = headers.get("origin") or headers.get("referer")
-            if not is_allowed_origin(source, headers.get("host", ""), get_settings().public_url):
+            if not (
+                is_allowed_origin(source, headers.get("host", ""), get_settings().public_url)
+                or is_allowed_extension(source, headers.get("authorization"))
+            ):
                 body = json.dumps(
                     {
                         "error": {

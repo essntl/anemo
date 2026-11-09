@@ -146,6 +146,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tokens */
+        get: operations["list_tokens_api_auth_tokens_get"];
+        put?: never;
+        /**
+         * Create Token
+         * @description A new token, for the browser extension or another device. Needs the password
+         *     confirmed recently (a token is a login that lasts until it is revoked).
+         */
+        post: operations["create_token_api_auth_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/tokens/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Current Token
+         * @description Revoke the token this request is made with (the extension's "Disconnect").
+         */
+        delete: operations["revoke_current_token_api_auth_tokens_current_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Token */
+        delete: operations["revoke_token_api_auth_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/shares/{token}": {
         parameters: {
             query?: never;
@@ -737,6 +796,26 @@ export interface paths {
          * @description Queues the answer; follow it live at GET /api/runs/{run_id}/events.
          */
         post: operations["send_turn_api_conversations__conversation_id__turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/messages/{message_id}/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Message Page
+         * @description The web page attached to a message (by the browser extension), with its text.
+         */
+        get: operations["message_page_api_conversations__conversation_id__messages__message_id__page_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2375,6 +2454,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/focus/timer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Timer
+         * @description The timer's shared state (every Anemo tab and the browser extension follow it).
+         */
+        get: operations["get_timer_api_focus_timer_get"];
+        /**
+         * Put Timer
+         * @description Change the timer. Refused with 409 `timer_conflict` (details: the current state)
+         *     when it changed since `base_version`.
+         */
+        put: operations["put_timer_api_focus_timer_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/music/tracks": {
         parameters: {
             query?: never;
@@ -2661,6 +2765,236 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/extension/pdf-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pdf Text
+         * @description The text of a PDF, page by page, for "Include this page" on a PDF the browser shows.
+         *     The extension fetches the PDF itself (with the browser's own login to the site) and
+         *     sends it here; nothing is stored.
+         */
+        post: operations["pdf_text_api_extension_pdf_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Capture
+         * @description Queue a save. Follow it with the `capture.progress` / `capture.finished` events
+         *     or GET /api/capture/{id}.
+         */
+        post: operations["capture_api_capture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/capture/{capture_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Capture Status */
+        get: operations["capture_status_api_capture__capture_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inline/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain
+         * @description The explanation as it is written (SSE: `delta` {text}…, then `done` or `error`).
+         */
+        post: operations["explain_api_inline_explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inline/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate */
+        post: operations["translate_api_inline_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The active session first, then the most recently used.
+         */
+        get: operations["list_sessions_api_research_sessions_get"];
+        put?: never;
+        /** Create Session */
+        post: operations["create_session_api_research_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session */
+        get: operations["get_session_api_research_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Session */
+        patch: operations["update_session_api_research_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Source */
+        post: operations["add_source_api_research_sessions__session_id__sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder */
+        put: operations["reorder_api_research_sessions__session_id__order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Session Conversation
+         * @description The session's chat ("Research: …"), made on first use; its messages carry the sources.
+         */
+        post: operations["session_conversation_api_research_sessions__session_id__conversation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End Session
+         * @description End the session and write it up (a document in documents/Research/, written in the
+         *     background; `research.changed` events report it).
+         */
+        post: operations["end_session_api_research_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source */
+        get: operations["get_source_api_research_sources__source_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Source */
+        delete: operations["delete_source_api_research_sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Source */
+        patch: operations["update_source_api_research_sources__source_id__patch"];
         trace?: never;
     };
     "/api/automations": {
@@ -3138,6 +3472,16 @@ export interface components {
              */
             density: "comfortable" | "compact";
         };
+        /** AppendTo */
+        AppendTo: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "append";
+            /** Document Id */
+            document_id?: string | null;
+        };
         /** ApprovalOut */
         ApprovalOut: {
             /**
@@ -3374,6 +3718,11 @@ export interface components {
             /** Documents */
             documents: components["schemas"]["LinkedDocument"][];
         };
+        /** Body_pdf_text_api_extension_pdf_text_post */
+        Body_pdf_text_api_extension_pdf_text_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
             /** File */
@@ -3478,6 +3827,90 @@ export interface components {
         BulkOut: {
             /** Changed */
             changed: number;
+        };
+        /** CaptureIn */
+        CaptureIn: {
+            page: components["schemas"]["CapturedPage"];
+            /**
+             * Kind
+             * @default page
+             * @enum {string}
+             */
+            kind: "page" | "selection";
+            /**
+             * Format
+             * @default markdown
+             * @enum {string}
+             */
+            format: "markdown" | "summary";
+            /** Target */
+            target: components["schemas"]["NewDocument"] | components["schemas"]["AppendTo"];
+            /** Explanation */
+            explanation?: string | null;
+        };
+        /** CaptureResult */
+        CaptureResult: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Path */
+            path: string;
+            /** Title */
+            title: string;
+            /** Formatted */
+            formatted: boolean;
+            undo: components["schemas"]["Undo"];
+        };
+        /** CaptureStarted */
+        CaptureStarted: {
+            /** Id */
+            id: string;
+        };
+        /** CaptureStatus */
+        CaptureStatus: {
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "formatting" | "saving" | "done" | "failed";
+            /**
+             * Done
+             * @default 0
+             */
+            done: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            result?: components["schemas"]["CaptureResult"] | null;
+            /** Error */
+            error?: string | null;
+        };
+        /**
+         * CapturedPage
+         * @description What the extension read: a page's main content (Markdown), a PDF's text, a selection.
+         */
+        CapturedPage: {
+            /** Url */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Source
+             * @default page
+             * @enum {string}
+             */
+            source: "page" | "selection" | "pdf" | "youtube";
+            /** Content */
+            content: string;
         };
         /** CatalogOut */
         CatalogOut: {
@@ -3688,6 +4121,14 @@ export interface components {
             tags?: string[] | null;
             /** Temporary */
             temporary?: false | null;
+        };
+        /** ConversationRef */
+        ConversationRef: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
         };
         /** CreateIn */
         CreateIn: {
@@ -4013,6 +4454,36 @@ export interface components {
             /** Created By */
             created_by: string;
         };
+        /** ExplainIn */
+        ExplainIn: {
+            /** Text */
+            text: string;
+            /**
+             * Context
+             * @default
+             */
+            context: string;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Target Language
+             * @default en
+             */
+            target_language: string;
+            /**
+             * Breakdown
+             * @default false
+             */
+            breakdown: boolean;
+        };
         /** FileChangeOut */
         FileChangeOut: {
             /**
@@ -4201,6 +4672,65 @@ export interface components {
             heatmap: components["schemas"]["DayValue"][];
             /** By Hour */
             by_hour: number[];
+        };
+        /** FocusTimerIn */
+        FocusTimerIn: {
+            state: components["schemas"]["FocusTimerState"];
+            /** Base Version */
+            base_version: number;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
+        /** FocusTimerOut */
+        FocusTimerOut: {
+            state: components["schemas"]["FocusTimerState"] | null;
+            /** Version */
+            version: number;
+            /** Updated By */
+            updated_by: string;
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /**
+         * FocusTimerState
+         * @description The focus timer's state (frontend `features/focus/timer.ts`), times in epoch ms.
+         */
+        FocusTimerState: {
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "focus" | "short_break" | "long_break";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "idle" | "running" | "paused";
+            /** Phase Started At */
+            phase_started_at?: number | null;
+            /** Started At */
+            started_at?: number | null;
+            /** Paused At */
+            paused_at?: number | null;
+            /**
+             * Accumulated
+             * @default 0
+             */
+            accumulated: number;
+            /** Duration */
+            duration: number;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /** Task Id */
+            task_id?: string | null;
+            /** Session Id */
+            session_id: string;
         };
         /** GeneralSettings */
         GeneralSettings: {
@@ -4512,6 +5042,12 @@ export interface components {
             session_id: string;
             /** Recent Auth */
             recent_auth: boolean;
+            /**
+             * Via
+             * @default session
+             * @enum {string}
+             */
+            via: "session" | "token";
         };
         /** MemoryIn */
         MemoryIn: {
@@ -4678,6 +5214,7 @@ export interface components {
              * @default []
              */
             references: components["schemas"]["ReferenceSummary"][];
+            page?: components["schemas"]["PageSummary"] | null;
             skill?: components["schemas"]["SkillSummary"] | null;
             /** Mode */
             mode?: string | null;
@@ -4749,6 +5286,8 @@ export interface components {
             embeddings?: string | null;
             /** Title */
             title?: string | null;
+            /** Inline */
+            inline?: string | null;
             /** Fallbacks */
             fallbacks?: {
                 [key: string]: string[];
@@ -4858,6 +5397,49 @@ export interface components {
              * @default true
              */
             track_alerts: boolean;
+        };
+        /** NewDocument */
+        NewDocument: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "new";
+            /**
+             * Folder
+             * @default Web clips
+             */
+            folder: string;
+            /** Title */
+            title?: string | null;
+        };
+        /** NewTokenOut */
+        NewTokenOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Last Used Ip */
+            last_used_ip: string | null;
+            /**
+             * Current
+             * @default false
+             */
+            current: boolean;
+            /** Token */
+            token: string;
         };
         /** NotificationOut */
         NotificationOut: {
@@ -4978,6 +5560,65 @@ export interface components {
             /** Changed */
             changed: boolean;
         };
+        /** PageContentOut */
+        PageContentOut: {
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Source */
+            source: string;
+            /** Word Count */
+            word_count: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Content */
+            content: string;
+        };
+        /**
+         * PageIn
+         * @description A web page attached to a message by the browser extension: its main content (or a
+         *     selection, a PDF's text, a video transcript). Untrusted: it is wrapped and labelled as
+         *     data for the model (runtime/pages.py) and never becomes part of the message text.
+         */
+        PageIn: {
+            /** Url */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Source
+             * @default page
+             * @enum {string}
+             */
+            source: "page" | "selection" | "pdf" | "youtube";
+            /** Content */
+            content: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /**
+         * PageSummary
+         * @description The page attached to a message, without its content (GET …/page has it).
+         */
+        PageSummary: {
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Source */
+            source: string;
+            /** Word Count */
+            word_count: number;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** PasswordIn */
         PasswordIn: {
             /** Password */
@@ -4987,6 +5628,24 @@ export interface components {
         PathIn: {
             /** Path */
             path: string;
+        };
+        /** PdfPage */
+        PdfPage: {
+            /** Number */
+            number: number;
+            /** Text */
+            text: string;
+        };
+        /** PdfTextOut */
+        PdfTextOut: {
+            /** Pages */
+            pages: components["schemas"]["PdfPage"][];
+            /** Page Count */
+            page_count: number;
+            /** Pages Read */
+            pages_read: number;
+            /** Has Text */
+            has_text: boolean;
         };
         /** PendingApprovalOut */
         PendingApprovalOut: {
@@ -5521,6 +6180,188 @@ export interface components {
         ReorderPlaylistsIn: {
             /** Ordered Ids */
             ordered_ids: string[];
+        };
+        /** ResearchOrderIn */
+        ResearchOrderIn: {
+            /** Source Ids */
+            source_ids: string[];
+        };
+        /** ResearchSessionDetail */
+        ResearchSessionDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Topic */
+            topic: string;
+            /** Status */
+            status: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Writeup Document Id */
+            writeup_document_id: string | null;
+            /** Source Count */
+            source_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Writeup Status */
+            writeup_status?: string | null;
+            /** Writeup Error */
+            writeup_error?: string | null;
+            /** Sources */
+            sources: components["schemas"]["ResearchSourceOut"][];
+        };
+        /** ResearchSessionIn */
+        ResearchSessionIn: {
+            /** Topic */
+            topic: string;
+        };
+        /** ResearchSessionOut */
+        ResearchSessionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Topic */
+            topic: string;
+            /** Status */
+            status: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Writeup Document Id */
+            writeup_document_id: string | null;
+            /** Source Count */
+            source_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Writeup Status */
+            writeup_status?: string | null;
+            /** Writeup Error */
+            writeup_error?: string | null;
+        };
+        /** ResearchSessionPatch */
+        ResearchSessionPatch: {
+            /** Topic */
+            topic?: string | null;
+            /** Status */
+            status?: ("active" | "paused") | null;
+        };
+        /** ResearchSourceContentOut */
+        ResearchSourceContentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            /** Kind */
+            kind: string;
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number;
+            /** Note */
+            note: string;
+            /** Key */
+            key: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Content */
+            content: string;
+        };
+        /** ResearchSourceIn */
+        ResearchSourceIn: {
+            /**
+             * Kind
+             * @default page
+             * @enum {string}
+             */
+            kind: "page" | "selection" | "pdf" | "youtube";
+            /** Url */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Content */
+            content: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** ResearchSourceOut */
+        ResearchSourceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            /** Kind */
+            kind: string;
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number;
+            /** Note */
+            note: string;
+            /** Key */
+            key: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ResearchSourcePatch */
+        ResearchSourcePatch: {
+            /** Note */
+            note?: string | null;
+            /** Key */
+            key?: boolean | null;
+        };
+        /** ResearchWriteupIn */
+        ResearchWriteupIn: {
+            /**
+             * Format
+             * @default notes
+             * @enum {string}
+             */
+            format: "notes" | "outline" | "table";
         };
         /** ResumeIn */
         ResumeIn: {
@@ -6635,6 +7476,37 @@ export interface components {
             /** File Changes */
             file_changes: components["schemas"]["FileChangeOut"][];
         };
+        /** TokenIn */
+        TokenIn: {
+            /** Name */
+            name: string;
+        };
+        /** TokenOut */
+        TokenOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Last Used Ip */
+            last_used_ip: string | null;
+            /**
+             * Current
+             * @default false
+             */
+            current: boolean;
+        };
         /** ToolCallOut */
         ToolCallOut: {
             /**
@@ -6765,6 +7637,21 @@ export interface components {
             /** Tracks */
             tracks: components["schemas"]["TrackIn"][];
         };
+        /** TranslateIn */
+        TranslateIn: {
+            /** Text */
+            text: string;
+            /**
+             * Target Language
+             * @default en
+             */
+            target_language: string;
+        };
+        /** TranslateOut */
+        TranslateOut: {
+            /** Text */
+            text: string;
+        };
         /** TrashItemOut */
         TrashItemOut: {
             /** Id */
@@ -6806,6 +7693,7 @@ export interface components {
             profile_id?: string | null;
             /** Skill Id */
             skill_id?: string | null;
+            page?: components["schemas"]["PageIn"] | null;
         };
         /** TurnOut */
         TurnOut: {
@@ -6816,6 +7704,21 @@ export interface components {
             run_id: string;
             user_message: components["schemas"]["MessageOut"] | null;
             assistant_message: components["schemas"]["MessageOut"];
+        };
+        /** Undo */
+        Undo: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "restore" | "delete";
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Revision Id */
+            revision_id?: string | null;
         };
         /**
          * UpdateSettings
@@ -7324,6 +8227,132 @@ export interface operations {
             header?: never;
             path: {
                 session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tokens_api_auth_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_token_api_auth_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewTokenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_current_token_api_auth_tokens_current_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_token_api_auth_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
             };
             cookie?: {
                 aiw_session?: string | null;
@@ -8735,6 +9764,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    message_page_api_conversations__conversation_id__messages__message_id__page_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageContentOut"];
                 };
             };
             /** @description Validation Error */
@@ -12549,6 +13612,72 @@ export interface operations {
             };
         };
     };
+    get_timer_api_focus_timer_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusTimerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_timer_api_focus_timer_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FocusTimerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusTimerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tracks_api_music_tracks_get: {
         parameters: {
             query?: never;
@@ -13306,6 +14435,556 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DestinationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pdf_text_api_extension_pdf_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_text_api_extension_pdf_text_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdfTextOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_api_capture_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureStarted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_status_api_capture__capture_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capture_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explain_api_inline_explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_api_inline_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_research_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_session_api_research_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_api_research_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_session_api_research_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSessionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_source_api_research_sessions__session_id__sources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_api_research_sessions__session_id__order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_conversation_api_research_sessions__session_id__conversation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_session_api_research_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchWriteupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_api_research_sources__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSourceContentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_api_research_sources__source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_source_api_research_sources__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSourcePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSourceOut"];
                 };
             };
             /** @description Validation Error */

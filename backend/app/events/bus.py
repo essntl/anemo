@@ -105,3 +105,15 @@ async def send_control(run_id: uuid.UUID, command: str) -> None:
         await get_redis().publish(control_channel(run_id), command)
     except (RedisError, OSError):
         _warn_unavailable("a control signal was not sent")
+
+
+async def oldest_global_id() -> str | None:
+    """The id of the oldest event still in the global stream (older ones were trimmed)."""
+    entries = await get_redis().xrange(GLOBAL_STREAM, count=1)
+    return cast(str, entries[0][0]) if entries else None
+
+
+async def latest_global_id() -> str | None:
+    """The id of the newest event in the global stream."""
+    entries = await get_redis().xrevrange(GLOBAL_STREAM, count=1)
+    return cast(str, entries[0][0]) if entries else None

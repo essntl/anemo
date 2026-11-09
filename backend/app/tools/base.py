@@ -54,6 +54,8 @@ class ToolContext:
     web: WebSettings = field(default_factory=WebSettings)  # search & network allowlist (snapshot)
     automation_id: uuid.UUID | None = None  # set in runs started by an automation
     has_browser: bool = False  # the run was offered the browser tools
+    # Browser control in the user's own Chrome was on when the run started (Anemo Companion).
+    my_browser: bool = False
     # The browser session the run uses: its conversation's (shared with the user).
     browser_session: uuid.UUID | None = None
     # The project of the run's chat: new tasks and events are filed under it.

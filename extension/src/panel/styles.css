@@ -1,0 +1,100 @@
+@import 'tailwindcss';
+/* Anemo's own design tokens: one source of truth for colours, shared with the web app. */
+@import '../../../frontend/src/styles/tokens.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* The same semantic utilities as Anemo (frontend/src/styles/app.css). */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-card: var(--card);
+  --color-overlay: var(--overlay);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-selection: var(--selection);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  --color-tool-running: var(--tool-running);
+  --color-tool-ok: var(--tool-ok);
+  --color-tool-waiting: var(--tool-waiting);
+  --color-tool-denied: var(--tool-denied);
+  --color-phase-focus: var(--phase-focus);
+  --color-phase-short: var(--phase-short);
+  --color-phase-long: var(--phase-long);
+  --shadow-soft: var(--shadow-soft);
+  --shadow-float: var(--shadow-float);
+  --radius-control: 10px;
+  --radius-card: 18px;
+  --radius-panel: 22px;
+  --font-sans: 'Inter', 'MiSans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+    min-width: 280px;
+  }
+  ::selection {
+    background: var(--selection);
+  }
+}
+
+/* Rendered Markdown: Anemo's styles (frontend/src/styles/app.css), a little tighter for
+   a side panel. */
+@layer components {
+  .markdown { @apply text-[13.5px] leading-6 break-words; }
+  .markdown > :first-child { margin-top: 0; }
+  .markdown > :last-child { margin-bottom: 0; }
+  .markdown p { @apply my-2.5; }
+  .markdown h1 { @apply mt-5 mb-2.5 text-lg font-semibold; }
+  .markdown h2 { @apply mt-4 mb-2 text-base font-semibold; }
+  .markdown h3 { @apply mt-3 mb-1.5 text-[14px] font-semibold; }
+  .markdown ul { @apply my-2.5 list-disc pl-5; }
+  .markdown ol { @apply my-2.5 list-decimal pl-5; }
+  .markdown li { @apply my-0.5; }
+  .markdown a { @apply text-accent underline underline-offset-2; }
+  .markdown blockquote { @apply my-2.5 border-l-4 border-border-strong pl-3 text-muted; }
+  .markdown hr { @apply my-5 border-border; }
+  .markdown .table-scroll { @apply my-2.5 overflow-x-auto; }
+  .markdown table { @apply w-max max-w-2xl border-collapse text-[12.5px]; }
+  .markdown th, .markdown td { @apply border border-border px-2.5 py-1 text-left; }
+  .markdown th { @apply bg-surface-2 font-semibold; }
+  .markdown :not(pre) > code { @apply rounded-md bg-surface-2 px-1 py-0.5 font-mono text-[0.88em]; }
+  .markdown input[type='checkbox'] { @apply mr-1.5 align-middle; }
+  .markdown li.task-list-item { @apply -ml-5 list-none; }
+  .markdown img { @apply my-2.5 max-w-full rounded-lg; }
+  .markdown .katex-display { @apply my-3 overflow-x-auto overflow-y-hidden py-1; }
+
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in { color: var(--code-keyword); }
+  .hljs-string, .hljs-attr-value, .hljs-regexp, .hljs-addition { color: var(--code-string); }
+  .hljs-number, .hljs-symbol, .hljs-bullet { color: var(--code-number); }
+  .hljs-comment, .hljs-quote, .hljs-meta { color: var(--code-comment); font-style: italic; }
+  .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--code-function); }
+  .hljs-type, .hljs-class, .hljs-attr, .hljs-variable, .hljs-params { color: var(--code-type); }
+  .hljs-deletion { color: var(--error); }
+}

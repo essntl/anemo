@@ -4,7 +4,8 @@ Routers in `protected` require a logged-in session for every endpoint.
 Only health checks, the login flow, viewing a share link (a frozen copy the owner
 chose to share, see features/shares/public_router.py) and the one-time approval buttons
 on push notifications (see features/notifications/push_router.py) are reachable
-without one.
+without one. The browser extension's WebSocket (features/extension/router.py) checks its
+API token itself, in its first message.
 """
 
 from fastapi import APIRouter, Depends
@@ -17,11 +18,15 @@ from app.features.auth.router import router as auth_router
 from app.features.automations.router import router as automations_router
 from app.features.browser_router import router as browser_router
 from app.features.calendar.router import router as calendar_router
+from app.features.capture.router import router as capture_router
 from app.features.conversations.router import router as conversations_router
 from app.features.daily_notes.router import router as daily_notes_router
 from app.features.documents.router import router as documents_router
+from app.features.extension.http_router import router as extension_http_router
+from app.features.extension.router import router as extension_router
 from app.features.files.router import router as files_router
 from app.features.focus.router import router as focus_router
+from app.features.inline.router import router as inline_router
 from app.features.links.router import router as links_router
 from app.features.mcp.router import router as mcp_router
 from app.features.memory.router import router as memory_router
@@ -33,6 +38,7 @@ from app.features.permissions_router import router as permissions_router
 from app.features.profiles.router import router as profiles_router
 from app.features.projects.router import router as projects_router
 from app.features.providers.router import router as providers_router
+from app.features.research.router import router as research_router
 from app.features.runs.agent_router import router as agent_router
 from app.features.runs.router import router as runs_router
 from app.features.search.router import router as search_router
@@ -53,6 +59,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth_router)  # endpoints declare their own session requirement
 api_router.include_router(shares_public_router)  # read-only, by secret link
 api_router.include_router(push_public_router)  # one-time approval buttons, by secret token
+api_router.include_router(extension_router)  # WebSocket; authenticates with an API token
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
@@ -80,6 +87,10 @@ protected.include_router(focus_router)
 protected.include_router(music_router)
 protected.include_router(notifications_router)
 protected.include_router(push_router)
+protected.include_router(extension_http_router)
+protected.include_router(capture_router)
+protected.include_router(inline_router)
+protected.include_router(research_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)

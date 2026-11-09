@@ -1,14 +1,17 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentSession, Db, client_ip
+from app.api.deps import BrowserSession, CurrentSession, Db, RecentAuth, client_ip
 from app.core.config import get_settings
 from app.core.errors import NotFound, Unauthorized
 from app.features.audit import service as audit
 from app.features.auth import service as auth
+from app.features.auth import tokens
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -24,8 +27,9 @@ class PasswordIn(BaseModel):
 
 class MeOut(BaseModel):
     username: str
-    session_id: uuid.UUID
+    session_id: uuid.UUID  # the API token's id when logged in with a token
     recent_auth: bool
+    via: Literal["session", "token"] = "session"
 
 
 class SessionOut(BaseModel):
@@ -72,7 +76,7 @@ async def login(body: LoginIn, request: Request, response: Response, db: Db) -> 
 
 
 @router.post("/logout", status_code=204)
-async def logout(session: CurrentSession, response: Response, db: Db) -> None:
+async def logout(session: BrowserSession, response: Response, db: Db) -> None:
     await auth.revoke_session(db, session.id)
     await db.commit()
     response.delete_cookie(auth.COOKIE_NAME, path="/")
@@ -89,11 +93,12 @@ async def me(session: CurrentSession, request: Request, response: Response) -> M
         username=get_settings().admin_username,
         session_id=session.id,
         recent_auth=auth.has_recent_auth(session),
+        via="token" if session.token_id else "session",
     )
 
 
 @router.post("/reauth", response_model=MeOut)
-async def reauth(body: PasswordIn, request: Request, session: CurrentSession, db: Db) -> MeOut:
+async def reauth(body: PasswordIn, request: Request, session: BrowserSession, db: Db) -> MeOut:
     ip = client_ip(request)
     await auth.check_rate_limit(ip)
     if not auth.verify_password(body.password):
@@ -105,7 +110,7 @@ async def reauth(body: PasswordIn, request: Request, session: CurrentSession, db
 
 
 @router.get("/sessions", response_model=list[SessionOut])
-async def sessions(session: CurrentSession, db: Db) -> list[SessionOut]:
+async def sessions(session: BrowserSession, db: Db) -> list[SessionOut]:
     rows = await auth.list_sessions(db)
     return [
         SessionOut(
@@ -121,10 +126,86 @@ async def sessions(session: CurrentSession, db: Db) -> list[SessionOut]:
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
-async def revoke(session_id: uuid.UUID, session: CurrentSession, db: Db) -> None:
+async def revoke(session_id: uuid.UUID, session: BrowserSession, db: Db) -> None:
     rows = await auth.list_sessions(db)
     if not any(r.id == session_id for r in rows):
         raise NotFound("Session not found")
     await auth.revoke_session(db, session_id)
     audit.record(db, "auth.session_revoked", target_type="session", target_id=session_id)
+    await db.commit()
+
+
+# -- API tokens (features/auth/tokens.py) ------------------------------------------------
+
+
+class TokenIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class TokenOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    prefix: str  # the first characters, to tell tokens apart
+    created_at: datetime
+    last_used_at: datetime | None
+    last_used_ip: str | None
+    current: bool = False  # the token this request was made with
+
+
+class NewTokenOut(TokenOut):
+    token: str  # shown once; only its hash is kept
+
+
+def _token_out(token: object, current: uuid.UUID | None) -> TokenOut:
+    out = TokenOut.model_validate(token, from_attributes=True)
+    out.current = out.id == current
+    return out
+
+
+@router.get("/tokens", response_model=list[TokenOut])
+async def list_tokens(session: CurrentSession, db: Db) -> list[TokenOut]:
+    return [_token_out(t, session.token_id) for t in await tokens.list_all(db)]
+
+
+@router.post("/tokens", response_model=NewTokenOut, status_code=201)
+async def create_token(body: TokenIn, request: Request, _: RecentAuth, db: Db) -> NewTokenOut:
+    """A new token, for the browser extension or another device. Needs the password
+    confirmed recently (a token is a login that lasts until it is revoked)."""
+    token, raw = await tokens.create(db, body.name)
+    audit.record(
+        db,
+        "auth.token_created",
+        ip=client_ip(request),
+        target_type="api_token",
+        target_id=token.id,
+        details={"name": token.name},
+    )
+    await db.commit()
+    await db.refresh(token)
+    return NewTokenOut(**_token_out(token, None).model_dump(), token=raw)
+
+
+@router.delete("/tokens/current", status_code=204)
+async def revoke_current_token(request: Request, session: CurrentSession, db: Db) -> None:
+    """Revoke the token this request is made with (the extension's "Disconnect")."""
+    if session.token_id is None:
+        raise NotFound("This request was not made with an API token")
+    await _revoke_token(db, session.token_id, client_ip(request))
+
+
+@router.delete("/tokens/{token_id}", status_code=204)
+async def revoke_token(token_id: uuid.UUID, request: Request, _: BrowserSession, db: Db) -> None:
+    await _revoke_token(db, token_id, client_ip(request))
+
+
+async def _revoke_token(db: AsyncSession, token_id: uuid.UUID, ip: str) -> None:
+    token = await tokens.revoke(db, token_id)
+    audit.record(
+        db,
+        "auth.token_revoked",
+        ip=ip,
+        target_type="api_token",
+        target_id=token_id,
+        details={"name": token.name},
+    )
     await db.commit()
