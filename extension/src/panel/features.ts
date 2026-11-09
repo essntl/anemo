@@ -12,13 +12,13 @@ export interface FeatureInfo {
 
 /** The optional features, in the order they are listed. */
 export const FEATURES: FeatureInfo[] = [
-  { key: 'notifications', label: 'Notifications', description: 'Reminders, approvals, finished agent runs and focus as Chrome notifications.', available: false },
+  { key: 'notifications', label: 'Notifications', description: 'Reminders, approvals, finished agent runs and focus as Chrome notifications.', available: true },
   {
     key: 'discordSkip',
     label: 'Skip Discord while I’m here',
     description: 'Anemo doesn’t send to Discord while the extension is connected and you used this computer in the last 5 minutes.',
     asks: 'whether this computer is in use (idle detection)',
-    available: false,
+    available: true,
   },
   {
     key: 'focusBlocking',

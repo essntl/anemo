@@ -148,6 +148,20 @@ function Conversation({
   const [sendError, setSendError] = useState<string | null>(null)
 
   const runId = startedRun ?? conversation.data?.active_run_id ?? null
+
+  // Tell the worker which chat is in view: a finished agent run there needs no notification.
+  useEffect(() => {
+    const report = () =>
+      void storage.set('session', 'panelFocus', { conversationId, visible: document.visibilityState === 'visible', at: Date.now() })
+    const hide = () => void storage.set('session', 'panelFocus', { conversationId, visible: false, at: Date.now() })
+    report()
+    document.addEventListener('visibilitychange', report)
+    window.addEventListener('pagehide', hide)
+    return () => {
+      document.removeEventListener('visibilitychange', report)
+      window.removeEventListener('pagehide', hide)
+    }
+  }, [conversationId])
   const profileId = profileChoice === undefined ? (conversation.data?.profile_id ?? null) : profileChoice
 
   const changeDraft = (text: string) => {

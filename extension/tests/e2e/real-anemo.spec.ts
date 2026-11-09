@@ -68,3 +68,33 @@ test.describe('chat (real Anemo with the fake provider)', () => {
     await expect(panel.getByTestId('assistant-message').last()).toContainText('notes folder', { timeout: 20_000 })
   })
 })
+
+test('a reminder in Anemo becomes a Chrome notification through the event stream', async ({ panel, context }) => {
+  test.setTimeout(120_000)
+  await panel.getByLabel('Anemo address').fill(url!)
+  await panel.getByLabel('API token').fill(token!)
+  await panel.getByRole('button', { name: 'Connect' }).click()
+  await expect(panel.getByText('What can I help with?')).toBeVisible()
+  const worker = context.serviceWorkers()[0]
+  await expect
+    .poll(() => worker.evaluate(async () => ((await chrome.storage.session.get('stream')).stream as { state?: string } | undefined)?.state), { timeout: 15_000 })
+    .toBe('connected')
+
+  // A task due this minute, reminder at the due time (Anemo's time zone is UTC here).
+  const now = new Date()
+  const res = await fetch(`${url}/api/tasks`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Origin: 'chrome-extension://jpmimgldkledmklijfmfnbaaimmfjaaf' },
+    body: JSON.stringify({
+      title: `Read chapter ${now.getTime()}`,
+      due_date: now.toISOString().slice(0, 10),
+      due_time: now.toISOString().slice(11, 16),
+      remind_minutes: 0,
+    }),
+  })
+  expect(res.status).toBe(201)
+  // Anemo's scheduler fires it within ~30 s; the worker turns it into a notification.
+  await expect
+    .poll(() => worker.evaluate(async () => Object.keys(await chrome.notifications.getAll())), { timeout: 90_000, intervals: [2000] })
+    .toEqual(expect.arrayContaining([expect.stringMatching(/^n:/)]))
+})

@@ -14,7 +14,9 @@ export interface Features {
   browserControl: boolean
 }
 
-export type NotificationType = 'reminder' | 'calendar' | 'agent' | 'approval' | 'focus' | 'automation'
+/** reminder: reminders and due tasks; calendar: event reminders; agent: finished agent
+ *  runs and automations; approval: approvals and agent questions; focus: focus ended. */
+export type NotificationType = 'reminder' | 'calendar' | 'agent' | 'approval' | 'focus'
 
 export interface Preferences {
   features: Features
@@ -31,7 +33,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     youtubeNotes: false,
     browserControl: false,
   },
-  notificationTypes: { reminder: true, calendar: true, agent: true, approval: true, focus: true, automation: true },
+  notificationTypes: { reminder: true, calendar: true, agent: true, approval: true, focus: true },
   targetLanguage: 'en',
 }
 

@@ -12,6 +12,7 @@ type Handler = (req: IncomingMessage, body: unknown, res: ServerResponse) => voi
 
 export interface MockAnemo {
   url: string
+  server: import('node:http').Server
   tokens: Set<string>
   /** Requests seen, as "METHOD /path". */
   log: string[]
@@ -73,6 +74,7 @@ export async function startMockAnemo(): Promise<MockAnemo> {
   const { port } = server.address() as AddressInfo
   return {
     url: `http://127.0.0.1:${port}`,
+    server,
     tokens,
     log,
     routes,

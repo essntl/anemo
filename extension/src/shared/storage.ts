@@ -8,6 +8,17 @@
 import type { Connection } from './connection'
 import type { Preferences } from './preferences'
 
+/** A notification held back during focus (see background/notify.ts `Spec`). */
+export interface HeldNotification {
+  id: string
+  type: import('./preferences').NotificationType
+  title: string
+  message: string
+  target: { kind: 'chat'; conversationId: string } | { kind: 'anemo'; path: string } | { kind: 'none' }
+  urgent: boolean
+  at: number
+}
+
 export interface LocalData {
   connection: Connection | null
   preferences: Preferences
@@ -15,6 +26,12 @@ export interface LocalData {
   accent: string | null
   /** The chat open in the panel, and unsent drafts per chat ("new" for a new chat). */
   chat: { conversationId: string | null; drafts: Record<string, string> }
+  /** Where the event stream got to: the last event id, and the time of the last event seen. */
+  events: { lastId: string | null; lastSeenAt: number }
+  /** Notifications held back during a focus session, shown as a summary when it ends. */
+  heldNotifications: HeldNotification[]
+  /** The focus session as last known (feature 10 keeps it current). */
+  focusState: { active: boolean; endsAt: number | null } | null
 }
 
 export interface SessionData {
@@ -22,6 +39,14 @@ export interface SessionData {
   injectedTabs: number[]
   /** The panel's open view and chat, so reopening the panel resumes. */
   panelState: { view: string; conversationId: string | null } | null
+  /** The chat the panel shows right now, if it is open and visible. */
+  panelFocus: { conversationId: string | null; visible: boolean; at: number } | null
+  /** What a click on a notification opens, by notification id. */
+  notificationTargets: Record<string, HeldNotification['target']>
+  /** The event stream's state, for the settings view. */
+  stream: { state: string; at: number; retryInMs?: number } | null
+  /** The badge's inputs (focus minutes > research > pending approvals). */
+  badge: { focusMinutes: number | null; research: boolean; approvals: number }
 }
 
 type Area = 'local' | 'session'

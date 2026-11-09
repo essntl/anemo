@@ -8,14 +8,11 @@
 import { useMemo } from 'react'
 import { createApi, type Api } from '@/shared/api'
 import type { Connection } from '@/shared/connection'
+import { markTokenLost } from '@/shared/connectionStore'
 import { storage } from '@/shared/storage'
 import { useStored } from './useStored'
 
-export async function markTokenLost(): Promise<void> {
-  const current = await storage.get('local', 'connection')
-  if (!current?.token) return
-  await storage.set('local', 'connection', { ...current, token: null, lostReason: 'revoked' })
-}
+export { markTokenLost }
 
 export async function saveConnection(serverUrl: string, token: string, username: string): Promise<void> {
   const connection: Connection = { serverUrl, token, username, lostReason: null, connectedAt: new Date().toISOString() }

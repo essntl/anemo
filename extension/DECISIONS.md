@@ -94,6 +94,14 @@ rule.
 | T7 | `POST /auth/tokens` needs `RecentAuth`; `DELETE /auth/tokens/current` lets a token revoke itself. | Creating a lasting login is security-sensitive; the extension's "Disconnect" revokes its own token. |
 | T8 | `EXTENSION_IDS` env var (default: Anemo Companion's fixed id `jpmimgldkledmklijfmfnbaaimmfjaaf`, pinned by the manifest `key`). | A fixed id makes the default work for everyone loading the unpacked extension; the private key is not kept (not needed for "Load unpacked"). |
 
+### Server: event stream (feature 9)
+
+| # | Choice | Why |
+|---|---|---|
+| T9 | `features/extension/router.py`: WebSocket `/api/extension/ws`, mounted outside the cookie-protected router; it authenticates itself. Origin must be an allowed extension id (else close 4403); the token comes in a `hello` message within 10 s (4408), never in the URL; it is rechecked every 60 s (4401 when revoked; closes the gap `sec-10` describes for this stream). | Browsers can't put headers on a WebSocket; a token in the URL would land in NPM/Cloudflare access logs. |
+| T10 | It relays a fixed list of global events (`FORWARDED`) from the existing Valkey stream, starting at the client's `last_id` (or the newest event); the welcome says `missed` when that id was trimmed, and carries the `cursor` it starts from. | Reuses Anemo's event bus as is; the cursor lets a client resume after a drop even before its first event. |
+| T11 | Presence for "Skip Discord" is one Valkey key (`presence:extension`, 90 s expiry) set from the extension's reports; `notifications.create` checks it once per notification with a Discord copy due (default routing only) and records the skipped copy with status `skipped`. | Fails safe: no key (closed browser, Valkey down) means Discord gets everything as before. |
+
 ### Extension
 
 | # | Choice | Why |
@@ -116,4 +124,10 @@ rule.
 | E16 | Panel Markdown: react-markdown (never inserts raw HTML) + GFM + highlight.js (no auto-detect) + KaTeX (`trust` off, fonts bundled). Links: Anemo paths (`/documents/…`) open in Anemo, http/https/mailto in a new tab, anything else (javascript:, data:, protocol-relative) is dropped. Remote images wait for a click. DOMPurify is used where HTML is produced from Markdown (the in-page box, feature 5); in the panel no HTML string is ever produced, so there is nothing for it to clean. | Same safety as Anemo's own Markdown; the spec's sanitising goal without a step that would do nothing. |
 | E17 | Approval cards use `GET /runs/{id}/timeline` (refetched on each tool/approval/plan event) and `POST /approvals/{id}`. Plans can be approved or sent back with feedback; editing steps links to the chat in Anemo. | Your answer 15; Anemo's own decision path. |
 | E18 | The chat view keeps itself scrolled to the bottom with a ResizeObserver on its content (unless you scrolled up). | Approval cards and tool calls load a moment after their event; a scroll on each event missed them. |
+| E19 | The service worker keeps the event stream (`background/stream.ts`): hello with token and last id, ping every 20 s, presence every 30 s, a 50 s silence watchdog for half-open connections, backoff 1 s doubling to 60 s with jitter; 4401 → back to setup, 4403 → stop. A 1-minute alarm reconnects after the worker was stopped. Socket and timers are injected for tests. | Chrome 116+ keeps the worker alive while a WebSocket is active; the alarm covers the rest. |
+| E20 | Notification rules are pure functions (`background/notify.ts`), tested without Chrome: kind/link → type and target; approval questions and live approval requests share one id per chat (one notification); agent runs notify when user-started, completed/failed, and over 2 min or not in view. Texts are clipped to 200 characters. | Your answers 37–40, in one tested place. |
+| E21 | Catch-up: replayed events in the 1.5 s after a welcome are collected; if the server says `missed` (or there is no last id), unread notifications and pending approvals since the last event seen are fetched by REST. Only the last 24 h; more than 3 → one summary that opens Anemo's Notifications page. The first connection ever shows nothing old. | Your answer 37. |
+| E22 | Clicking a notification opens the panel on the chat (calling `sidePanel.open` before any `await`, while Chrome still counts the click as a user action), with targets kept in memory and in session storage; if Chrome refuses, the chat opens in Anemo in a tab. Tasks and calendar open in Anemo. | `sidePanel.open` only works during a user action. |
+| E23 | Held notifications (focus) are kept in `chrome.storage.local` and released as one summary (or the one itself) when `focusState.active` turns false. Feature 10 keeps `focusState` current. | Survives the worker stopping during a long focus session. |
+| E24 | The badge is computed from three inputs in priority order (focus minutes, research dot, pending approvals); approvals are counted from `GET /api/approvals` on each approval or run event. | Your answer 36. |
 
