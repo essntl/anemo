@@ -5,7 +5,10 @@
  * the browser's own login to the site and Anemo extracts its text page by page.
  */
 import { unwrap, type Api } from './api'
-import { countWords, truncateMiddle } from './truncate'
+import { countWords, PAGE_CHAR_LIMIT, truncateMiddle } from './truncate'
+
+/** Saving keeps more than a chat message: Anemo formats long pages in pieces. */
+export const SAVE_CHAR_LIMIT = 600_000
 import type { Extracted } from '@/inpage/extract'
 
 export type PageSource = 'page' | 'selection' | 'pdf' | 'youtube'
@@ -106,10 +109,10 @@ export async function readPdf(api: Api, url: string): Promise<{ text: string; ti
 }
 
 /** Turns what was read into the page context sent with a message. */
-export function toContext(e: Extracted, preferSelection = false): PageContext {
+export function toContext(e: Extracted, preferSelection = false, limit = PAGE_CHAR_LIMIT): PageContext {
   const useSelection = preferSelection && e.selection
   const body = useSelection ? e.selection : (e.markdown ?? e.text)
-  const cut = truncateMiddle(body)
+  const cut = truncateMiddle(body, limit)
   return {
     url: e.url,
     title: e.title,
@@ -123,18 +126,23 @@ export function toContext(e: Extracted, preferSelection = false): PageContext {
 }
 
 /** Reads a tab's page (or PDF) as page context. Throws PageReadError. */
-export async function readPage(api: Api, tab: { id?: number; url?: string; title?: string }, opts: { preferSelection?: boolean } = {}): Promise<PageContext> {
+export async function readPage(
+  api: Api,
+  tab: { id?: number; url?: string; title?: string },
+  opts: { preferSelection?: boolean; limit?: number } = {},
+): Promise<PageContext> {
   if (tab.id === undefined) throw new PageReadError({ reason: 'failed', message: 'No tab.' })
-  if (tab.url && looksLikePdf(tab.url)) return pdfContext(api, tab.url)
+  const limit = opts.limit ?? PAGE_CHAR_LIMIT
+  if (tab.url && looksLikePdf(tab.url)) return pdfContext(api, tab.url, limit)
   const extracted = await extractFromTab(tab.id, tab.url)
-  if (looksLikePdf(extracted.url, extracted.contentType)) return pdfContext(api, extracted.url)
-  const context = toContext(extracted, opts.preferSelection)
+  if (looksLikePdf(extracted.url, extracted.contentType)) return pdfContext(api, extracted.url, limit)
+  const context = toContext(extracted, opts.preferSelection, limit)
   if (!context.content.trim()) throw new PageReadError({ reason: 'empty' })
   return context
 }
 
-async function pdfContext(api: Api, url: string): Promise<PageContext> {
+async function pdfContext(api: Api, url: string, limit: number): Promise<PageContext> {
   const { text, title } = await readPdf(api, url)
-  const cut = truncateMiddle(text)
+  const cut = truncateMiddle(text, limit)
   return { url, title, source: 'pdf', content: cut.text, truncated: cut.truncated, wordCount: countWords(text), selection: '', selectionContext: '' }
 }

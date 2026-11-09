@@ -130,3 +130,38 @@ test('a page attached in the panel reaches the model wrapped as untrusted data',
     site.close()
   }
 })
+
+test('saving a page goes through Anemo’s worker and lands in a document', async ({ panel, context }) => {
+  test.setTimeout(90_000)
+  const { createServer } = await import('node:http')
+  const { ARTICLE } = await import('./mockAnemo')
+  const site = createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end(ARTICLE)
+  })
+  await new Promise<void>((r) => site.listen(0, '127.0.0.1', r))
+  const port = (site.address() as import('node:net').AddressInfo).port
+  try {
+    await panel.getByLabel('Anemo address').fill(url!)
+    await panel.getByLabel('API token').fill(token!)
+    await panel.getByRole('button', { name: 'Connect' }).click()
+    await expect(panel.getByText('What can I help with?')).toBeVisible()
+    const page = await context.newPage()
+    await page.goto(`http://127.0.0.1:${port}/article`)
+    await page.bringToFront()
+    await panel.getByRole('button', { name: 'Capture' }).click()
+    await panel.getByRole('button', { name: /Save page/ }).click()
+    await panel.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(panel.getByTestId('capture-done')).toContainText('Saved to', { timeout: 60_000 })
+    const href = await panel.getByRole('link', { name: 'View' }).getAttribute('href')
+    const id = href!.split('/').pop()!
+    const doc = await (await fetch(`${url}/api/documents/${id}`, { headers: { Authorization: `Bearer ${token}` } })).json()
+    expect(doc.path).toMatch(/^documents\/Web clips\/photosynthesis-explained(-\d+)?\.md$/)
+    expect(doc.content).toMatch(/^# Photosynthesis explained\n\nSource: \[127\.0\.0\.1:\d+\]\(http:\/\/127\.0\.0\.1:\d+\/article\) · Saved /)
+    // The fake "echo" model "formats" by repeating what it got: the content, fenced as untrusted.
+    expect(doc.content).toContain('untrusted_web_content')
+    expect(doc.content).toContain('plants turn **light**')
+  } finally {
+    site.close()
+  }
+})

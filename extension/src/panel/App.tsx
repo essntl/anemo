@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MessageSquare, Settings } from 'lucide-react'
+import { BookmarkPlus, MessageSquare, Settings } from 'lucide-react'
 import { storage } from '@/shared/storage'
 import { cn } from './lib/cn'
 import { useConnection } from './state/connection'
 import { SessionProvider } from './state/session'
 import { useStored } from './state/useStored'
 import { applyAccent } from './theme'
+import { CaptureView } from './capture/CaptureView'
 import { ChatView } from './chat/ChatView'
 import { ConnectionBanner } from './views/ConnectionBanner'
 import { PanelNotice } from './views/PanelNotice'
 import { SettingsView } from './views/SettingsView'
 import { SetupView } from './views/SetupView'
 
-export type View = 'chat' | 'settings'
+export type View = 'chat' | 'capture' | 'settings'
 
 /** The query cache for one connection. */
 function Connected({ children }: { children: React.ReactNode }) {
@@ -23,23 +24,22 @@ function Connected({ children }: { children: React.ReactNode }) {
 
 const TABS: { view: View; label: string; icon: typeof MessageSquare }[] = [
   { view: 'chat', label: 'Chat', icon: MessageSquare },
+  { view: 'capture', label: 'Capture', icon: BookmarkPlus },
   { view: 'settings', label: 'Settings', icon: Settings },
 ]
 
 export function App() {
   const { connection, loaded, api } = useConnection()
   const accent = useStored('local', 'accent')
-  const [view, setView] = useState<View>('chat')
+  // The view lives in session storage: reopening the panel shows the one it was left on,
+  // and the worker can switch it (a right-click "Save page" opens Capture).
+  const panelState = useStored('session', 'panelState')
+  const view = (panelState.value?.view as View | undefined) ?? 'chat'
 
   useEffect(() => applyAccent(accent.value), [accent.value])
 
-  // Reopening the panel shows the view it was left on.
-  useEffect(() => {
-    void storage.get('session', 'panelState').then((s) => s?.view && setView(s.view as View))
-  }, [])
   const go = (next: View) => {
-    setView(next)
-    void storage.get('session', 'panelState').then((s) => storage.set('session', 'panelState', { conversationId: s?.conversationId ?? null, view: next }))
+    void storage.set('session', 'panelState', { conversationId: panelState.value?.conversationId ?? null, view: next })
   }
 
   if (!loaded) return null
@@ -75,6 +75,7 @@ export function App() {
       <PanelNotice />
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {view === 'chat' && <ChatView />}
+        {view === 'capture' && <CaptureView />}
         {view === 'settings' && <SettingsView api={api} connection={connection} />}
       </main>
     </div>

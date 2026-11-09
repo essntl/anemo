@@ -134,6 +134,15 @@ async function onEvent(e: StreamEvent): Promise<void> {
       if (agentRunWorthNotifying(data, durationMs, showing)) await deliver(fromAgentRun(data, title, at))
       break
     }
+    case 'capture.progress':
+    case 'capture.finished': {
+      // The panel shows these (saving a page or selection).
+      const status = e.data as unknown as import('@/shared/storage').CaptureStatus
+      const all = (await storage.get('session', 'captures')) ?? {}
+      const kept = Object.fromEntries(Object.entries(all).slice(-19))
+      await storage.set('session', 'captures', { ...kept, [status.id]: status })
+      break
+    }
     default:
       break
   }

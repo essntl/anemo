@@ -30,6 +30,8 @@ export interface LocalData {
   events: { lastId: string | null; lastSeenAt: number }
   /** Notifications held back during a focus session, shown as a summary when it ends. */
   heldNotifications: HeldNotification[]
+  /** The project last chosen for a quick task. */
+  lastProjectId: string | null
   /** The focus session as last known (feature 10 keeps it current). */
   focusState: { active: boolean; endsAt: number | null } | null
 }
@@ -51,6 +53,25 @@ export interface SessionData {
   pendingCompose: { page: import('./pageContext').PageContext | null; draft: string; at: number } | null
   /** A message for the panel after a context-menu action failed (e.g. the page can't be read). */
   panelNotice: { title: string; body: string; at: number } | null
+  /** A capture started from the right-click menu or a shortcut, for the panel to finish. */
+  pendingCapture: { kind: 'page' | 'selection' | 'task'; page: import('./pageContext').PageContext; at: number } | null
+  /** Saves in progress or done, by id (from the event stream's capture events). */
+  captures: Record<string, CaptureStatus>
+}
+
+export interface CaptureStatus {
+  id: string
+  status: 'queued' | 'formatting' | 'saving' | 'done' | 'failed'
+  done: number
+  total: number
+  result: {
+    document_id: string
+    path: string
+    title: string
+    formatted: boolean
+    undo: { kind: 'restore' | 'delete'; document_id: string; revision_id: string | null }
+  } | null
+  error: string | null
 }
 
 type Area = 'local' | 'session'

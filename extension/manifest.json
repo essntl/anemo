@@ -52,6 +52,18 @@
         "default": "Alt+Shift+A"
       },
       "description": "Open the Anemo panel"
+    },
+    "save-selection": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Save the selection to Anemo"
+    },
+    "quick-task": {
+      "suggested_key": {
+        "default": "Alt+Shift+T"
+      },
+      "description": "Create a task from this page or selection"
     }
   }
 }

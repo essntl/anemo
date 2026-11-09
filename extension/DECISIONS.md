@@ -111,6 +111,15 @@ rule.
 | T14 | `MessageOut.page` (summary, no content) and `GET /conversations/{id}/messages/{mid}/page`; Anemo's chat shows a `PageChip` that opens the text as plain text in a dialog, linking only to http(s) addresses. | Your answer 9. |
 | T15 | `POST /api/extension/pdf-text` returns a PDF's text page by page (`attachments.extract.pdf_pages`, shared with attachments; 50 MB, nothing stored). | Your answer 11: the extension fetches the PDF with your cookies; page numbers are kept as `[Page n]`. |
 
+### Server: quick capture (feature 6)
+
+| # | Choice | Why |
+|---|---|---|
+| T16 | `features/capture/`: `POST /api/capture` queues a `capture.save` job (interactive lane, one attempt) and returns an id; progress and the result come as `capture.progress`/`capture.finished` global events (forwarded to the extension) and `GET /api/capture/{id}` (Valkey, 24 h). | Formatting a long page on a local model can take longer than Cloudflare's 100 s; a job also finishes when the panel is closed. One attempt: a retry could save twice. |
+| T17 | New model task `inline` (Settings → Models → "Inline & formatting"; falls back to the chat model). Formatting prompt: keep the wording, fix structure, drop boilerplate, headings start at the target's section level, content fenced as `<untrusted_web_content>`, never follow instructions in it. Summary prompt: TL;DR + key points. Pieces of ≤ 40k tokens split at headings, then paragraphs. No model, or it fails: the content is saved as it came and the result says `formatted: false`. Usage recorded as `format`/`summarize`. | Your answers F1–F7 (128k context, output ≈ input). |
+| T18 | New document: `documents/Web clips/<slug>.md` with `# Title`, `Source: [site](url) · Saved <date>` (your time zone). Append: a section at the document's own level (the lowest heading level below its title, default `##`) with `*[site](url) · <date>*`, at the end; re-read and retried up to 3 times if the document changed during formatting. Selections with an explanation: the selection quoted, then the explanation. Inbox: `documents/Inbox.md`, created with `# Inbox` when first needed. | Your answers 25, 26, F3. |
+| T19 | Saves are written as author `extension` (Anemo shows "Anemo Companion" in the history, "saved from the browser" in the list) with a new revision; Undo = restore the revision from before the save, or delete a document the save created. | Your answer F4; `last_editor` holds 10 characters. |
+
 ### Extension
 
 | # | Choice | Why |
@@ -145,4 +154,8 @@ rule.
 | E28 | Learning actions (feature 4): "Summarize this page" and "Quiz me on it" in an empty chat; right-click "Summarize page", "Quiz me on this page" and (on a selection) "Discuss in chat". Summaries and quizzes start a new chat in chat mode with the page attached and a fixed prompt (`shared/learning.ts`); "Discuss" opens a new chat with the page attached and the selection quoted in the box, for you to finish. The worker does the right-click versions (it can read the tab: the click grants access) and the panel follows the chat. | Your answers 13 and 14. |
 | E29 | Chrome puts an extension's right-click entries under one submenu named after the extension: "Anemo Companion ▸ Summarize page" rather than "Anemo: Summarize page". | Chrome's behaviour; not configurable. |
 | E30 | "The active tab" is the active tab of the last focused normal window (the side panel belongs to it). | Also makes the panel testable when opened as a tab. |
+| E31 | Capture view (a "Capture" tab): Save page (formatted page or summary; a new document in Web clips or added to one), Save selection (Inbox by default, or a document), Quick task (title from the selection's first line or the page title, the link and quote in the notes, no due date, the last used project remembered). Saving reads up to 600,000 characters (the server formats long pages in pieces), not the 30k-token chat limit. | Your answers 25–27, F1. |
+| E32 | Progress: the worker stores `capture.*` events in session storage; the panel shows them, checking `GET /api/capture/{id}` every 4 s in case an event was missed. Done: "Saved to …", View (opens the document in Anemo), Undo. | Your answer F4. |
+| E33 | Right-click "Save page to Anemo", "Save selection to Anemo", "Create a task from this", and the shortcuts Alt+Shift+S (save selection) and Alt+Shift+T (quick task) read the tab (the click/shortcut grants access), then open the panel on the Capture view, filled in; one click saves. | The panel shows where it goes before anything is written. |
+| E34 | The panel's view (chat/capture/settings) lives in session storage, so the worker can switch it. | Right-click actions open the right view. |
 
