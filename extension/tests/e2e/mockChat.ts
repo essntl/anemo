@@ -86,6 +86,16 @@ export function addChat(anemo: MockAnemo) {
     const conv = conversations.get(params(req).id)
     return conv ? send(res, 200, conv) : send(res, 404, { error: { code: 'not_found', message: 'Conversation not found' } })
   })
+  const uploads: { id: string; filename: string }[] = []
+  const slow = { uploadMs: 0 }
+  anemo.routes.set('POST /api/attachments', async (req, _b, res) => {
+    if (slow.uploadMs) await sleep(slow.uploadMs)
+    const id = nextId('att')
+    // The file's name is in the multipart body, which the mock doesn't parse: the test names it.
+    const filename = String(req.headers['x-test-filename'] ?? `file-${uploads.length + 1}.txt`)
+    uploads.push({ id, filename })
+    send(res, 201, { id, filename, mime: 'text/plain', size: 12, kind: 'text', extraction_note: null })
+  })
   anemo.routes.set('PATCH /api/conversations/:id', (req, body, res) => {
     const conv = conversations.get(params(req).id)
     if (!conv) return send(res, 404, { error: { code: 'not_found', message: 'Conversation not found' } })
@@ -106,7 +116,8 @@ export function addChat(anemo: MockAnemo) {
     const list = messages.get(id)!
     const base = { reasoning: null, error: null, model_label: 'Echo', created_at: now(), attachments: [], references: [], questions: [], versions: [], version: 0 }
     const pageSummary = page ? { url: page.url, title: page.title, source: page.source, word_count: page.content.split(/\s+/).length, truncated: page.truncated } : null
-    const user = { ...base, id: nextId('msg'), seq: list.length, role: 'user', text, status: 'completed', run_id: null, page: pageSummary }
+    const sent = ((body as { attachment_ids?: string[] }).attachment_ids ?? []).map((aid) => ({ id: aid, filename: uploads.find((u) => u.id === aid)?.filename ?? 'file', kind: 'text', mime: 'text/plain', size: 12 }))
+    const user = { ...base, id: nextId('msg'), seq: list.length, role: 'user', text, status: 'completed', run_id: null, page: pageSummary, attachments: sent }
     const runId = nextId('run')
     const assistant = { ...base, id: nextId('msg'), seq: list.length + 1, role: 'assistant', text: '', status: 'streaming', run_id: runId, mode }
     list.push(user, assistant)
@@ -167,5 +178,5 @@ export function addChat(anemo: MockAnemo) {
     run.resume?.()
     send(res, 200, { ...run.approval, decided_at: now() })
   })
-  return { conversations, messages, runs, turns }
+  return { conversations, messages, runs, turns, uploads, slow }
 }

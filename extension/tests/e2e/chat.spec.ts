@@ -1,8 +1,10 @@
 import { expect, test } from './fixtures'
 import { addChat } from './mockChat'
 
+let chat: ReturnType<typeof addChat>
+
 test.beforeEach(async ({ panel, anemo }) => {
-  addChat(anemo)
+  chat = addChat(anemo)
   await panel.getByLabel('Anemo address').fill(anemo.url)
   await panel.getByLabel('API token').fill('anemo_good-token')
   await panel.getByRole('button', { name: 'Connect' }).click()
@@ -14,6 +16,8 @@ test('sends a message and streams the answer', async ({ panel }) => {
   await panel.getByLabel('Message').press('Enter')
   await expect(panel.getByTestId('assistant-message')).toContainText('You said: hello there')
   await expect(panel.getByTestId('user-message')).toHaveText('hello there')
+  await panel.getByRole('button', { name: 'Copy answer' }).click()
+  await expect(panel.getByRole('button', { name: 'Copy answer' })).toHaveText('Copied')
 })
 
 test('reopening the panel resumes the chat and its draft', async ({ panel }) => {
@@ -97,6 +101,12 @@ test('chats can be renamed, favorited, archived and deleted, from the list and t
   await panel.getByRole('button', { name: 'Actions for first chat' }).click()
   await panel.getByRole('menuitem', { name: 'Archive' }).click()
   await expect(chats).not.toContainText('first chat')
+  // Undo brings it back; then archive it for good.
+  await panel.getByRole('status').filter({ hasText: 'Chat archived' }).getByRole('button', { name: 'Undo' }).click()
+  await expect(chats).toContainText('first chat')
+  await panel.getByRole('button', { name: 'Actions for first chat' }).click()
+  await panel.getByRole('menuitem', { name: 'Archive' }).click()
+  await expect(chats).not.toContainText('first chat')
   await panel.getByRole('tab', { name: 'Archived' }).click()
   await expect(chats).toContainText('first chat')
   // Delete it, after confirming.
@@ -123,4 +133,61 @@ test('a temporary chat says how long it has left and can be kept', async ({ pane
   await badge.click()
   await panel.getByRole('button', { name: 'Keep chat' }).click()
   await expect(badge).toHaveCount(0)
+})
+
+test('files are attached by picking or pasting, sent with the message, and shown on it', async ({ panel, anemo }) => {
+  const chat = anemo as unknown as { routes: Map<string, unknown> }
+  expect(chat.routes.has('POST /api/attachments')).toBe(true)
+  await panel.locator('input[type=file]').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello notes') })
+  await expect(panel.getByTestId('pending-attachment')).toContainText('notes.txt')
+  // A pasted image is attached too (not put into the text).
+  await panel.getByLabel('Message').focus()
+  await panel.evaluate(() => {
+    const data = new DataTransfer()
+    data.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'shot.png', { type: 'image/png' }))
+    document.activeElement!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  })
+  await expect(panel.getByTestId('pending-attachment')).toHaveCount(2)
+  // One can be taken off again.
+  await panel.getByRole('button', { name: 'Remove shot.png' }).click({ force: true })
+  await expect(panel.getByTestId('pending-attachment')).toHaveCount(1)
+  // Too large: refused here, not sent.
+  await panel.locator('input[type=file]').setInputFiles({ name: 'huge.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(26 * 1024 * 1024) })
+  await expect(panel.getByTestId('pending-attachment').filter({ hasText: 'huge.bin' })).toContainText('Larger than 25 MB')
+  await panel.getByRole('button', { name: 'Remove huge.bin' }).click({ force: true })
+  // Files alone can be sent.
+  await panel.getByRole('button', { name: 'Send' }).click()
+  await expect(panel.getByTestId('user-message').getByTestId('attachment')).toHaveCount(1)
+  await expect(panel.getByTestId('pending-attachment')).toHaveCount(0)
+})
+
+test('find in the open chat counts the matches and steps through them', async ({ panel }) => {
+  await panel.getByLabel('Message').fill('apples and more apples')
+  await panel.getByLabel('Message').press('Enter')
+  await expect(panel.getByTestId('assistant-message')).toContainText('You said: apples and more apples')
+  await panel.keyboard.press('Control+f')
+  await panel.getByLabel('Find in this chat').last().fill('APPLES')
+  await expect(panel.getByTestId('find-count')).toHaveText('1 of 4')
+  await panel.getByLabel('Find in this chat').last().press('Enter')
+  await expect(panel.getByTestId('find-count')).toHaveText('2 of 4')
+  await panel.getByRole('button', { name: 'Previous match' }).click()
+  await expect(panel.getByTestId('find-count')).toHaveText('1 of 4')
+  expect(await panel.evaluate(() => CSS.highlights.get('chat-find')?.size)).toBe(4)
+  await panel.getByLabel('Find in this chat').last().fill('pears')
+  await expect(panel.getByTestId('find-count')).toHaveText('None')
+  await panel.keyboard.press('Escape')
+  await expect(panel.getByTestId('find-count')).toHaveCount(0)
+  expect(await panel.evaluate(() => CSS.highlights.has('chat-find'))).toBe(false)
+})
+
+test('Enter during an upload sends once the file is up', async ({ panel }) => {
+  chat.slow.uploadMs = 1500
+  await panel.locator('input[type=file]').setInputFiles({ name: 'slow.txt', mimeType: 'text/plain', buffer: Buffer.from('slow file') })
+  await panel.getByLabel('Message').fill('with the file')
+  await panel.getByLabel('Message').press('Enter')
+  await expect(panel.getByText('Sends when the upload is done…')).toBeVisible()
+  expect(chat.turns).toHaveLength(0)
+  await expect(panel.getByTestId('user-message').getByTestId('attachment')).toHaveCount(1)
+  expect(chat.turns).toHaveLength(1)
+  expect((chat.turns[0] as { attachment_ids: string[] }).attachment_ids).toHaveLength(1)
 })

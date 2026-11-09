@@ -65,3 +65,14 @@ test('events missed while disconnected are replayed; more than three become one 
   await expect.poll(notificationIds, { timeout: 10_000 }).toEqual(expect.arrayContaining([expect.stringMatching(/^summary:missed:/)]))
   expect((await notificationIds()).filter((id) => id.startsWith('n:m'))).toEqual([])
 })
+
+test('the panel shows the live connection’s state and where an approval is waiting', async ({ panel }) => {
+  await expect(panel.getByTestId('status-dot')).toHaveAttribute('data-state', 'connected')
+  events.publish('approval.requested', { run_id: 'run-9', conversation_id: 'c9' })
+  const bar = panel.getByRole('button', { name: /Waiting for your approval/ })
+  await expect(bar).toContainText('Delete old drafts')
+  // Anemo goes away: the dot says so (and the worker opens no socket until it is back).
+  events.closeAll(1012)
+  await expect(panel.getByTestId('status-dot')).not.toHaveAttribute('data-state', 'connected')
+  await expect(panel.getByTestId('status-dot')).toHaveAttribute('data-state', 'connected', { timeout: 15_000 })
+})

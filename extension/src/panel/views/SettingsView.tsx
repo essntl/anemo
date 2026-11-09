@@ -118,7 +118,7 @@ export function SettingsView({ api, connection }: { api: Api; connection: Connec
       <TranslateCard />
       <NotificationsCard />
       <p className="px-1 text-[11.5px] text-subtle">
-        Anemo Companion {chrome.runtime.getManifest().version} · extension id {chrome.runtime.id}
+        {chrome.runtime.getManifest().name} {chrome.runtime.getManifest().version} · extension id {chrome.runtime.id}
       </p>
     </div>
   )

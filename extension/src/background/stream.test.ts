@@ -32,7 +32,7 @@ class FakeSocket implements WebSocketLike {
   }
 }
 
-function setup(over: Partial<StreamOptions> = {}) {
+function setup(over: Partial<StreamOptions> = {}, deps: Partial<import('./stream').StreamDeps> = {}) {
   const sockets: FakeSocket[] = []
   const timers: { fn: () => void; ms: number; id: number; cleared: boolean }[] = []
   let next = 1
@@ -63,6 +63,9 @@ function setup(over: Partial<StreamOptions> = {}) {
       if (t) t.cleared = true
     },
     random: () => 1,
+    reachable: null,
+    onOnline: null,
+    ...deps,
   })
   const run = (ms: number) => {
     for (const t of timers.filter((x) => !x.cleared && x.ms === ms)) {
@@ -154,5 +157,24 @@ describe('EventStream', () => {
 
   it('uses ws:// for a plain-http server on the local network', () => {
     expect(wsUrl('http://192.168.1.5:8080')).toBe('ws://192.168.1.5:8080/api/extension/ws')
+  })
+
+  it('opens no socket while Anemo can’t be reached, and tries at once when back online', async () => {
+    let up = false
+    let online: () => void = () => undefined
+    const { stream, sockets, timers, opts } = setup({}, { reachable: async () => up, onOnline: (fn) => (online = fn) })
+    stream.start()
+    await Promise.resolve()
+    await Promise.resolve()
+    // No WebSocket (Chrome would log its failure as an extension error): a quiet retry.
+    expect(sockets).toHaveLength(0)
+    expect(opts.onState).toHaveBeenLastCalledWith('waiting', { retryInMs: 1000 })
+    up = true
+    online()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(sockets).toHaveLength(1)
+    // The pending retry was dropped: no second socket later.
+    expect(timers.filter((t) => t.ms === 1000 && !t.cleared)).toHaveLength(0)
   })
 })

@@ -73,7 +73,7 @@ the same card in Anemo; the extension then goes back to its setup screen at once
 | | Feature | Where |
 |---|---|---|
 | 1 | **Setup & connection**: address + token, a clear message for each way the connection can fail (offline, wrong address, Cloudflare challenge, revoked token…) | first start, Settings tab |
-| 2 | **Chat**: Anemo's chats in the panel, streaming, with chat/agent mode, model picker, approvals, plan and question cards; the chat list is Anemo's own | Chat tab |
+| 2 | **Chat**: Anemo's chats in the panel, streaming, with chat/agent mode, model picker, approvals, plan and question cards; attach files and images (paperclip, paste or drop); find in the open chat (Ctrl+F); manage chats (rename, favorite, archive, delete, temporary) | Chat tab |
 | 3 | **Page context**: the globe button attaches the page you're on (readable text, a PDF's text, a YouTube transcript), marked as untrusted, to your next message; it shows as a chip in Anemo too | Chat tab |
 | 4 | **Learning actions**: Summarize, Quiz me (5 questions, one at a time), Discuss a selection | Chat tab, right-click menu |
 | 5 | **Translate & explain on the page**: select text, right-click, Explain or Translate; Translate page; Restore all. Uses Anemo's "inline" model, with no memories, documents or tools | right-click menu |
@@ -160,6 +160,16 @@ the stricter of the two wins.
   anything personal (memories, documents, other chats, the token), since the page's own
   scripts can read it.
 - No tokens or page contents in logs. No remote code, `eval` or inline scripts.
+
+## Updating
+
+Build again (or unzip the new build over the old folder) and press the reload arrow on the
+extension's card in `chrome://extensions`. Settings shows the build's name and version at
+the bottom. Pages that were open during the reload need a reload themselves before
+Explain/Translate work on them again (the extension says so).
+
+If `chrome://extensions` shows old entries under **Errors**, press **Clear all**: they are
+kept from earlier builds until cleared.
 
 ## Known limitations
 

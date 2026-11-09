@@ -79,7 +79,7 @@ export async function startMockAnemo(): Promise<MockAnemo> {
       const found = match(routes, req.method ?? 'GET', path)
       if (!found) return error(res, 404, 'not_found', `No route ${key}`)
       ;(req as IncomingMessage & { params: Record<string, string> }).params = found.params
-      await found.handler(req, raw ? JSON.parse(raw) : undefined, res)
+      await found.handler(req, raw && !String(req.headers['content-type']).startsWith('multipart/') ? JSON.parse(raw) : undefined, res)
     })
   })
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
