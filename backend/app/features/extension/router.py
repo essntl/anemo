@@ -58,6 +58,7 @@ FORWARDED = frozenset(
         "music.changed",
         "capture.progress",
         "capture.finished",
+        "research.changed",
     }
 )
 

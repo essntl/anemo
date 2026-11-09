@@ -19,6 +19,7 @@ from app.features.music import models as music_models
 from app.features.notifications import models as notifications_models
 from app.features.profiles import models as profiles_models
 from app.features.providers import models as providers_models
+from app.features.research import models as research_models
 from app.features.runs import models as runs_models
 from app.features.secrets import models as secrets_models
 from app.features.settings import models as settings_models
@@ -48,6 +49,7 @@ __all__ = [
     "notifications_models",
     "profiles_models",
     "providers_models",
+    "research_models",
     "runs_models",
     "secrets_models",
     "settings_models",

@@ -32,6 +32,7 @@ from app.features.documents import service as documents
 from app.features.documents.models import Document
 from app.features.profiles.models import AgentProfile
 from app.features.projects import service as projects
+from app.features.research.models import ResearchSession
 from app.features.runs.models import ACTIVE_STATUSES, Run
 from app.features.skills import service as skills
 from app.features.tasks.schemas import clean_tags
@@ -588,6 +589,12 @@ async def send_turn(
         # Before the text, like a file: the page, then what to do with it. Its content is
         # never part of text_plain, so memory extraction and search don't see it.
         user.content = [page_block(page), *user.content]
+    # The chat of a research session: every message carries the session's sources.
+    research_id = await db.scalar(
+        select(ResearchSession.id).where(ResearchSession.conversation_id == conv.id)
+    )
+    if research_id is not None:
+        user.content = [{"type": "research", "session_id": str(research_id)}, *user.content]
     conv.default_mode = mode
     request = text if text.strip() or page is None else f"About the page: {page.title or page.url}"
     run = await _start_run(db, conv, assistant, request, conv.model_id, user.id, mode)

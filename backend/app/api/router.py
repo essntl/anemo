@@ -38,6 +38,7 @@ from app.features.permissions_router import router as permissions_router
 from app.features.profiles.router import router as profiles_router
 from app.features.projects.router import router as projects_router
 from app.features.providers.router import router as providers_router
+from app.features.research.router import router as research_router
 from app.features.runs.agent_router import router as agent_router
 from app.features.runs.router import router as runs_router
 from app.features.search.router import router as search_router
@@ -89,6 +90,7 @@ protected.include_router(push_router)
 protected.include_router(extension_http_router)
 protected.include_router(capture_router)
 protected.include_router(inline_router)
+protected.include_router(research_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)

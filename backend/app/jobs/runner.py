@@ -76,9 +76,15 @@ def default_handlers() -> dict[str, Handler]:
 
         await capture.run(str(payload["capture_id"]), payload["body"])
 
+    async def research_writeup(payload: dict[str, Any]) -> None:
+        from app.runtime import research_writeup
+
+        await research_writeup.run(uuid.UUID(payload["session_id"]), str(payload["format"]))
+
     return {
         "automation.retry": automation_retry,
         "capture.save": capture_save,
+        "research.writeup": research_writeup,
         "mcp.refresh": mcp_refresh,
         "notify.deliver": notify_deliver,
         "document.index": document_index,

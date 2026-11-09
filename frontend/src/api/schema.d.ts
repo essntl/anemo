@@ -2839,6 +2839,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The active session first, then the most recently used.
+         */
+        get: operations["list_sessions_api_research_sessions_get"];
+        put?: never;
+        /** Create Session */
+        post: operations["create_session_api_research_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session */
+        get: operations["get_session_api_research_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Session */
+        patch: operations["update_session_api_research_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Source */
+        post: operations["add_source_api_research_sessions__session_id__sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder */
+        put: operations["reorder_api_research_sessions__session_id__order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Session Conversation
+         * @description The session's chat ("Research: …"), made on first use; its messages carry the sources.
+         */
+        post: operations["session_conversation_api_research_sessions__session_id__conversation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End Session
+         * @description End the session and write it up (a document in documents/Research/, written in the
+         *     background; `research.changed` events report it).
+         */
+        post: operations["end_session_api_research_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source */
+        get: operations["get_source_api_research_sources__source_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Source */
+        delete: operations["delete_source_api_research_sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Source */
+        patch: operations["update_source_api_research_sources__source_id__patch"];
+        trace?: never;
+    };
     "/api/automations": {
         parameters: {
             query?: never;
@@ -3963,6 +4096,14 @@ export interface components {
             tags?: string[] | null;
             /** Temporary */
             temporary?: false | null;
+        };
+        /** ConversationRef */
+        ConversationRef: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
         };
         /** CreateIn */
         CreateIn: {
@@ -5955,6 +6096,188 @@ export interface components {
         ReorderPlaylistsIn: {
             /** Ordered Ids */
             ordered_ids: string[];
+        };
+        /** ResearchOrderIn */
+        ResearchOrderIn: {
+            /** Source Ids */
+            source_ids: string[];
+        };
+        /** ResearchSessionDetail */
+        ResearchSessionDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Topic */
+            topic: string;
+            /** Status */
+            status: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Writeup Document Id */
+            writeup_document_id: string | null;
+            /** Source Count */
+            source_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Writeup Status */
+            writeup_status?: string | null;
+            /** Writeup Error */
+            writeup_error?: string | null;
+            /** Sources */
+            sources: components["schemas"]["ResearchSourceOut"][];
+        };
+        /** ResearchSessionIn */
+        ResearchSessionIn: {
+            /** Topic */
+            topic: string;
+        };
+        /** ResearchSessionOut */
+        ResearchSessionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Topic */
+            topic: string;
+            /** Status */
+            status: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Writeup Document Id */
+            writeup_document_id: string | null;
+            /** Source Count */
+            source_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Writeup Status */
+            writeup_status?: string | null;
+            /** Writeup Error */
+            writeup_error?: string | null;
+        };
+        /** ResearchSessionPatch */
+        ResearchSessionPatch: {
+            /** Topic */
+            topic?: string | null;
+            /** Status */
+            status?: ("active" | "paused") | null;
+        };
+        /** ResearchSourceContentOut */
+        ResearchSourceContentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            /** Kind */
+            kind: string;
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number;
+            /** Note */
+            note: string;
+            /** Key */
+            key: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Content */
+            content: string;
+        };
+        /** ResearchSourceIn */
+        ResearchSourceIn: {
+            /**
+             * Kind
+             * @default page
+             * @enum {string}
+             */
+            kind: "page" | "selection" | "pdf" | "youtube";
+            /** Url */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Content */
+            content: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** ResearchSourceOut */
+        ResearchSourceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            /** Kind */
+            kind: string;
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number;
+            /** Note */
+            note: string;
+            /** Key */
+            key: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ResearchSourcePatch */
+        ResearchSourcePatch: {
+            /** Note */
+            note?: string | null;
+            /** Key */
+            key?: boolean | null;
+        };
+        /** ResearchWriteupIn */
+        ResearchWriteupIn: {
+            /**
+             * Format
+             * @default notes
+             * @enum {string}
+             */
+            format: "notes" | "outline" | "table";
         };
         /** ResumeIn */
         ResumeIn: {
@@ -14133,6 +14456,385 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranslateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_research_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_session_api_research_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_api_research_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_session_api_research_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSessionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_source_api_research_sessions__session_id__sources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_api_research_sessions__session_id__order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_conversation_api_research_sessions__session_id__conversation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_session_api_research_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchWriteupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_api_research_sources__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSourceContentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_api_research_sources__source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_source_api_research_sources__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSourcePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSourceOut"];
                 };
             };
             /** @description Validation Error */

@@ -90,6 +90,15 @@ class PageRef(BaseModel):
     truncated: bool = False
 
 
+class ResearchRef(BaseModel):
+    """The sources of a research session (browser extension), attached to each message of
+    the session's chat. Rendered as untrusted material before a request is sent
+    (runtime/research.py): in full on the latest message, as a short note on earlier ones."""
+
+    type: Literal["research"] = "research"
+    session_id: str
+
+
 ContentBlock = Annotated[
     TextBlock
     | ImageBlock
@@ -98,7 +107,8 @@ ContentBlock = Annotated[
     | ReasoningBlock
     | AttachmentRef
     | ConversationRef
-    | PageRef,
+    | PageRef
+    | ResearchRef,
     Field(discriminator="type"),
 ]
 
