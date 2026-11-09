@@ -2,6 +2,7 @@ import { FileText, Globe, PlaySquare, RefreshCw, TextSelect, X } from 'lucide-re
 import { failureMessage } from '@/shared/pageFailure'
 import type { PageContext, ReadFailure } from '@/shared/pageContext'
 import { Notice } from '../ui/Notice'
+import { AlwaysAllow } from '../sites/AlwaysAllow'
 
 export type PageState =
   | { status: 'off' }
@@ -47,6 +48,7 @@ export function PagePreview({ state, onRefresh, onRemove }: { state: PageState; 
           {page.source === 'selection' ? ' · selection' : page.source === 'pdf' ? ' · PDF' : ''}
           {page.truncated ? ' · shortened (middle left out)' : ''}
         </div>
+        <AlwaysAllow url={page.url} />
       </div>
       <button type="button" aria-label="Read the page again" title="Read the page again" onClick={onRefresh} className="rounded p-1 text-muted hover:bg-surface-hover hover:text-text">
         <RefreshCw className="h-3.5 w-3.5" />

@@ -12,6 +12,7 @@ import { FEATURES } from '../features'
 import { NotificationsCard } from './NotificationsCard'
 import { TranslateCard } from './TranslateCard'
 import { usePreferences } from '../state/preferences'
+import { SitesCard } from '../sites/SitesCard'
 
 function ConnectionCard({ api, connection }: { api: Api; connection: Connection }) {
   const [busy, setBusy] = useState(false)
@@ -111,6 +112,7 @@ export function SettingsView({ api, connection }: { api: Api; connection: Connec
     <div className="flex flex-col gap-4 p-3">
       <ConnectionCard api={api} connection={connection} />
       <FeaturesCard />
+      <SitesCard />
       <TranslateCard />
       <NotificationsCard />
       <p className="px-1 text-[11.5px] text-subtle">

@@ -105,6 +105,7 @@ Asked for when needed (Chrome asks you; switching a feature off gives it back):
 | `idle` | "Skip Discord while I'm here" | Telling Anemo whether this computer is in use. |
 | `declarativeNetRequest` | "Block distractions during focus" | The blocking rules. |
 | Each site you add to the distraction list | Adding it | Chrome only lets an extension redirect a site it has access to. |
+| A site, with "Always allow on <site>" | Clicking it | Reading that site's tabs from the panel without clicking the toolbar icon first. |
 | `https://www.youtube.com/*` | "YouTube notes" | Reading the video's time, pausing, frames, transcripts. |
 | `debugger`, `tabs`, `tabGroups`, all sites | Browser control (not built yet) | |
 
@@ -125,11 +126,12 @@ a feature that needs it. Nothing runs on web pages by itself.
 
 ## Known limitations
 
-- **The panel can't read a tab you haven't clicked on.** Chrome gives an extension access
-  to a tab only after you click its icon, use a right-click entry or a shortcut on that tab.
-  Buttons in the panel ("Include this page", "Add this page", "Save page") on a tab you
-  just switched to say so. Clicking the toolbar icon on that tab makes them work.
-  (How this should work is still being decided.)
+- **The panel can't read a tab on a new site before you click.** Chrome gives an
+  extension access to a tab only after you click its icon, use a right-click entry or a
+  shortcut on that tab. Until then it doesn't even tell the extension which site the tab is
+  on. Buttons in the panel ("Include this page", "Add this page", "Save page") on such a tab
+  say so. After one click, the panel offers **Always allow on <site>**, and that site works
+  from the panel from then on. Settings lists those sites, to remove them.
 - **Chrome's PDF viewer** can't show the translate/explain box: on a PDF, the result
   shows in the side panel instead. Saving and chatting about PDFs works.
 - **Chrome's own pages** (`chrome://…`, the Web Store, the new-tab page) can't be read or
@@ -137,9 +139,9 @@ a feature that needs it. Nothing runs on web pages by itself.
 - **YouTube transcripts** use YouTube's own internal transcript request. YouTube can change
   it at any time. When that happens, notes still work, but "Explain this moment" and
   transcripts as page context don't. Shorts aren't supported.
-- **Focus blocking** applies when a page loads. A tab already open on a blocked site
-  stays as it is, including moving within a site that doesn't load new pages (YouTube,
-  Reddit). Reloading it or opening the site shows the focus page.
+- **Focus blocking** redirects new page loads, and when focus starts, tabs already open
+  on a listed site switch to the focus page (anything typed there but not sent is lost;
+  the focus page links back afterwards).
 - **Music** controls the player in an Anemo tab in this Chrome: no tab, no music (the
   panel offers to open one). If the browser blocks autoplay in a tab you haven't used,
   press play in that tab once.

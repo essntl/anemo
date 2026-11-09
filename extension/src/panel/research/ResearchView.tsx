@@ -36,6 +36,7 @@ import { Notice } from '../ui/Notice'
 import { cn } from '../lib/cn'
 import { useSession } from '../state/useSession'
 import { useStored } from '../state/useStored'
+import { AlwaysAllow } from '../sites/AlwaysAllow'
 import { useFollowResearchChanges, useResearchMutations, useSessionDetail, useSessions, type Session, type SessionDetail, type Source } from './api'
 
 type Shape = 'notes' | 'outline' | 'table'
@@ -261,7 +262,12 @@ function AddSource({ sessionId }: { sessionId: string }) {
           </Button>
         </div>
         {m.add.error && <p className="text-[12px] text-error">{problem(m.add.error)}</p>}
-        {m.add.isSuccess && !m.add.isPending && <p className="text-[12px] text-muted">Added “{m.add.data.title}”.</p>}
+        {m.add.isSuccess && !m.add.isPending && (
+          <>
+            <p className="text-[12px] text-muted">Added “{m.add.data.title}”.</p>
+            <AlwaysAllow url={m.add.data.url} />
+          </>
+        )}
       </CardBody>
     </Card>
   )

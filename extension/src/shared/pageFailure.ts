@@ -8,7 +8,7 @@ export function failureMessage(f: ReadFailure): { title: string; body: string } 
     case 'no_access':
       return {
         title: 'Anemo can’t read this tab from the panel yet',
-        body: 'Use the right-click menu on the page (Anemo Companion ▸ …), or click the Anemo toolbar icon while on that tab, then try again.',
+        body: 'Click the Anemo toolbar icon while on that tab (or use the right-click menu on the page), then try again. After that you can let Anemo always read this site.',
       }
     case 'pdf':
       return { title: 'The PDF couldn’t be read', body: f.message }

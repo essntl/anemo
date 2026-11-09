@@ -60,6 +60,17 @@ or WAF challenges).
 | 46 | Auto-off | 10 min |
 | 47 | Blocklist | Banking/payment, government/tax, webmail, password managers, accounts.google.com, Chrome Web Store, `chrome://` (editable) |
 
+### Later answers (2026-11-09)
+
+| # | Topic | Decision |
+|---|---|---|
+| 48 | Panel access to a tab | a1: after a click on a tab (toolbar icon, right-click, shortcut), the panel offers "Always allow on <site>" (that one site); Settings lists them. Asking before any click isn't possible: without access Chrome doesn't tell the extension which site a tab is on |
+| 49 | Open tabs when focus starts | Tabs on a blocked site switch to the focus page (which links back afterwards) |
+| 50 | Browser control basics | `chrome.debugger`, auto-off after 10 min, the default blocklist (answers 45–47 stand) |
+| 51 | Sandbox or your Chrome | The agent picks per call, sandbox by default; your Chrome only while browser control is on and connected, else the sandbox |
+| 52 | Approvals in your Chrome | Free: open, read, scroll, screenshot, follow links. Every other click and all typing ask. Anemo's own permission settings also apply; the stricter wins |
+| 53 | Which tabs | Only tabs the agent opened itself (in its "Anemo" group) |
+
 ### Follow-up (2026-11-09): formatting saved content with the inline model
 
 When page or selection content is saved into Anemo, the inline model (your Qwen 27B, 128k
@@ -200,3 +211,5 @@ rule.
 | E60 | The panel's Focus tab: the timer (time left, phase, task), Start focus with an optional task from your open tasks, Pause/Resume, Skip, Stop (= Anemo's reset, which keeps the minutes focused). A button press made on a timer that changed elsewhere meanwhile is applied once more to the newer state. | The spec's "start/stop focus from the panel". |
 | E61 | Music: a script of ours runs in Anemo's tabs only (registered for the Anemo address when you connect, and put into Anemo tabs already open), relaying the panel's commands to Anemo's page and what is playing back. Reports are accepted only from the top frame of a tab on the Anemo address. The panel controls the tab that is playing, else the one heard from last. With no Anemo tab open, "Open Anemo's player" opens Anemo's Music page in a background tab. No cover art is shown (no remote images in the panel). | Your answer 44. |
 | E62 | "Add this tab to the queue" appears when the tab in front is a YouTube or SoundCloud page whose address the extension may read: YouTube while notes are on, or a tab you opened the panel on with the toolbar icon. A typed or pasted link works anywhere. Additions always go to the end of the queue; if nothing was playing, Anemo starts playing (its own behaviour). | Your answer 44; question 48 decides how other tabs become readable. |
+| E63 | "Always allow on <site>" is offered under a page the panel just read (chat's page chip, Capture, Research) when the site isn't allowed yet; it asks Chrome for `scheme://host/*` of that site only. Settings → "Sites Anemo can read from the panel" lists them with Remove. The Anemo address, YouTube (while notes are on) and focus sites aren't listed there; their features own them. | Your answer 48 (a1). |
+| E64 | When focus starts (and on every check while it runs), tabs open on a listed site are sent to the focus page with their address after `#`. | Your answer 49. |

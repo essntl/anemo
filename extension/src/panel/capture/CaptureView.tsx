@@ -17,6 +17,7 @@ import { useSession } from '../state/useSession'
 import { useStored } from '../state/useStored'
 import { activeTab } from '../chat/currentTab'
 import { RestoreTranslations } from './RestoreTranslations'
+import { AlwaysAllow } from '../sites/AlwaysAllow'
 import { useCaptureStatus, useCreateTask, useDocuments, useProjects, useStartCapture, useUndoCapture, type Target } from './api'
 
 type Mode = 'page' | 'selection' | 'task'
@@ -241,7 +242,8 @@ export function CaptureView() {
       {current ? (
         <Card>
           <CardHeader title={TITLES[current.mode]} actions={<Button size="sm" variant="ghost" onClick={reset}>Back</Button>} />
-          <CardBody>
+          <CardBody className="flex flex-col gap-2">
+            {chosen && <AlwaysAllow url={chosen.page.url} />}
             {current.mode === 'task' ? (
               <TaskForm page={current.page} onDone={reset} />
             ) : (

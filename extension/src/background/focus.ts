@@ -134,12 +134,28 @@ async function blockableSites(sites: string[]): Promise<string[]> {
   return out
 }
 
+/**
+ * Tabs already open on a blocked site switch to the focus page too (question 49, a): a
+ * rule only stops pages from loading, and sites like YouTube move between pages without
+ * loading one. The focus page links back to where the tab was once focus is over.
+ */
+async function moveOpenTabs(sites: string[], focusPage: string): Promise<void> {
+  if (!sites.length) return
+  const tabs = await chrome.tabs.query({ url: sites.flatMap(sitePatterns) }).catch(() => [])
+  for (const tab of tabs) {
+    if (tab.id === undefined || !tab.url) continue
+    await chrome.tabs.update(tab.id, { url: `${focusPage}#${tab.url}` }).catch(() => undefined)
+  }
+}
+
 async function syncRules(active: boolean): Promise<void> {
   const dnr = chrome.declarativeNetRequest
   if (!dnr) return // switched off: the permission (and with it every rule) is gone
   const prefs = withDefaults(await storage.get('local', 'preferences'))
   const sites = active && prefs.features.focusBlocking ? await blockableSites(prefs.focusSites) : []
-  const wanted = blockRules(sites, chrome.runtime.getURL('pages/blocked.html'))
+  const focusPage = chrome.runtime.getURL('pages/blocked.html')
+  await moveOpenTabs(sites, focusPage)
+  const wanted = blockRules(sites, focusPage)
   const existing = (await dnr.getDynamicRules()).filter((r) => r.id >= RULE_BASE)
   const same = existing.length === wanted.length && wanted.every((w) => existing.some((e) => e.id === w.id && JSON.stringify(e.condition.requestDomains) === JSON.stringify(w.condition.requestDomains)))
   if (same) return

@@ -111,3 +111,17 @@ test('a site needs blocking switched on, and nothing is blocked outside focus', 
   await panel.getByRole('button', { name: 'Add site' }).click()
   await expect(panel.getByText('That isn’t a site address (try “youtube.com”).')).toBeVisible()
 })
+
+test('tabs already open on a blocked site switch to the focus page when focus starts, and can go back after', async ({ panel, context }) => {
+  await blockDistraction(panel)
+  const open = await context.newPage()
+  await open.goto('https://distraction.test/feed?page=2')
+  await expect(open.getByRole('heading')).toHaveText('Very distracting')
+  await panel.getByRole('button', { name: 'Start focus' }).click()
+  await expect(open).toHaveURL(/pages\/blocked\.html#https:\/\/distraction\.test\/feed\?page=2$/)
+  await expect(open.getByRole('heading')).toHaveText('distraction.test is blocked while you focus')
+  await panel.getByRole('button', { name: 'Stop' }).click()
+  await expect(open.getByRole('heading')).toHaveText('Focus is over')
+  await open.getByRole('link', { name: 'Go to distraction.test' }).click()
+  await expect(open).toHaveURL('https://distraction.test/feed?page=2')
+})
