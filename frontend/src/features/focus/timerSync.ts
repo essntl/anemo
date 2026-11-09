@@ -76,8 +76,18 @@ function adopt(out: TimerOut): void {
   useTimerSync.setState({ version: out.version, dirty: false })
 }
 
+/** The newest state that arrived while a change of ours was on its way. */
+let held: TimerOut | null = null
+
 /** A state from the server (fetched, or a `focus.timer` event): taken if it is newer. */
 export function receive(out: TimerOut): void {
+  if (pushing) {
+    // A change of ours is on its way. The server announces each change before it answers,
+    // so this may be the echo of our own first change while a newer one waits here: taking
+    // it would undo that. The answer settles it; anything newer is looked at afterwards.
+    if (!held || out.version > held.version) held = out
+    return
+  }
   const { version, dirty } = useTimerSync.getState()
   if (!out.state) {
     // Nothing on the server yet: this tab's timer becomes the shared one, if it is in use.
@@ -128,7 +138,11 @@ export function pushTimer(onAccepted?: () => void): void {
     if (again) {
       again = false
       pushTimer()
+      return
     }
+    const later = held
+    held = null
+    if (later) receive(later)
   })
 }
 

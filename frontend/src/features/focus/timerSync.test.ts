@@ -7,6 +7,8 @@ const server = vi.hoisted(() => ({
   offline: false,
   puts: [] as { base_version: number; status: string }[],
   posts: [] as string[],
+  /** Called after a change is stored and before the answer (the server announces first). */
+  onStored: null as null | ((out: Record<string, unknown>) => void),
 }))
 
 vi.mock('@/api/client', () => {
@@ -32,12 +34,15 @@ vi.mock('@/api/client', () => {
         return {}
       },
       PUT: async (_path: string, { body }: { body: { state: Record<string, unknown>; base_version: number } }) => {
+        await new Promise((r) => setTimeout(r, 0)) // a request takes a moment
         if (server.offline) throw new TypeError('Failed to fetch')
         server.puts.push({ base_version: body.base_version, status: String(body.state.status) })
         if (body.base_version !== server.version) throw new ApiError(409, 'timer_conflict', 'changed elsewhere', { current: out() })
         server.state = body.state
         server.version += 1
-        return out()
+        const stored = out()
+        server.onStored?.(stored)
+        return stored
       },
     },
   }
@@ -49,7 +54,7 @@ const { initialState, start, DEFAULT_SETTINGS } = await import('./timer')
 
 beforeEach(async () => {
   await sync.settled()
-  Object.assign(server, { state: null, version: 0, offline: false, puts: [], posts: [] })
+  Object.assign(server, { state: null, version: 0, offline: false, puts: [], posts: [], onStored: null })
   useTimerStore.setState({ timer: initialState(DEFAULT_SETTINGS) })
   sync.useTimerSync.setState({ version: 0, dirty: false })
 })
@@ -65,6 +70,33 @@ describe('the shared focus timer', () => {
       { base_version: 1, status: 'paused' },
     ])
     expect(sync.useTimerSync.getState()).toEqual({ version: 2, dirty: false })
+  })
+
+  it('the echo of its own change, arriving before the answer, doesn’t undo a newer change', async () => {
+    // Pick focus (sent), then start at once (waits): the event for the first arrives first.
+    server.onStored = (stored) => sync.receive(stored as unknown as Parameters<typeof sync.receive>[0])
+    timerActions.choosePhase('long_break')
+    timerActions.start()
+    await sync.settled()
+    expect(useTimerStore.getState().timer.status).toBe('running')
+    expect(server.state?.status).toBe('running')
+    expect(sync.useTimerSync.getState()).toEqual({ version: 2, dirty: false })
+  })
+
+  it('a change made elsewhere during our own push is taken once the push is answered', async () => {
+    server.onStored = (stored) => {
+      server.onStored = null
+      // Another device changes it right after ours, and its event arrives before our answer.
+      const elsewhere = { ...(stored.state as Record<string, unknown>), status: 'paused', started_at: null, paused_at: Date.now() }
+      server.state = elsewhere as typeof server.state
+      server.version += 1
+      sync.receive({ state: elsewhere, version: server.version, updated_by: 'tab', updated_at: null } as unknown as Parameters<typeof sync.receive>[0])
+    }
+    timerActions.start()
+    await sync.settled()
+    await Promise.resolve()
+    expect(useTimerStore.getState().timer.status).toBe('paused')
+    expect(sync.useTimerSync.getState().version).toBe(2)
   })
 
   it('takes a newer state from elsewhere, without sounds or a session', async () => {

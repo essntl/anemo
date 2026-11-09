@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { login, signOutAfterEach } from './helpers'
+import { login, signOutAfterEach, useStoppedTimer } from './helpers'
 
 /*
  * The keyboard shortcut sheet: ? opens it (not while typing), the page you are on is
@@ -15,6 +15,7 @@ const blur = (page: Page) => page.evaluate(() => (document.activeElement as HTML
 
 test('? shows the shortcuts with this page first, Esc closes them', async ({ page }) => {
   await login(page)
+  await useStoppedTimer(page)
   await page.goto('/focus')
   await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible()
   await blur(page) // nothing focused that takes text

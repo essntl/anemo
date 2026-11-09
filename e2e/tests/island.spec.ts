@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { login, removeTrack, signOutAfterEach, startMusic } from './helpers'
+import { login, removeTrack, signOutAfterEach, startMusic, useStoppedTimer } from './helpers'
 
 /*
  * The Dynamic Island: appears when music plays, keeps going across pages, and its
@@ -34,6 +34,7 @@ test('play and pause music from the Island on another page', async ({ page, base
 
 test('the Island shows the running timer and its controls', async ({ page }) => {
   await login(page)
+  await useStoppedTimer(page)
   await page.goto('/focus')
   await expect(page.getByTestId('island')).toHaveCount(0)
   await page.getByRole('button', { name: 'Start timer' }).click()
