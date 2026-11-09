@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
   publicDir: resolve(here, 'public'),
   plugins: [react(), tailwindcss()],
   resolve: { alias },
-  define: { __DEV__: JSON.stringify(mode !== 'production'), __E2E__: 'false' },
+  define: { __DEV__: JSON.stringify(mode !== 'production'), __E2E__: 'false', __BROWSER_CONTROL__: 'false' },
   build: {
     outDir: resolve(here, 'dist'),
     emptyOutDir: true,

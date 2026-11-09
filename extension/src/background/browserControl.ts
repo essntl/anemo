@@ -16,7 +16,7 @@
  * sent (reading and following links are free; other clicks and typing always ask).
  */
 import { blockedReason, elementLine, ELEMENT_LIMIT, IDLE_OFF_MS, INTERACTIVE_ROLES, isFollowableLink, looksLikePersonCheck, TEXT_LIMIT, type ElementInfo } from '@/shared/browserControl'
-import { log } from '@/shared/env'
+import { BROWSER_CONTROL, log } from '@/shared/env'
 import { withDefaults } from '@/shared/preferences'
 import { storage } from '@/shared/storage'
 
@@ -394,6 +394,10 @@ async function run(cmd: Command): Promise<Record<string, unknown>> {
 
 /** One command from Anemo: run it and answer. Only called for messages from the socket. */
 export async function handleCommand(cmd: Command, reply: Reply): Promise<void> {
+  if (!BROWSER_CONTROL) {
+    reply({ type: 'browser.result', id: cmd.id, ok: false, error: 'This build of Anemo Companion has no browser control (it is in the separate “browser control” build).' })
+    return
+  }
   const active = await storage.get('session', 'browserActive')
   if (!active?.on) {
     reply({ type: 'browser.result', id: cmd.id, ok: false, error: 'Browser control is switched off in the extension.' })

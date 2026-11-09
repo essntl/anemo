@@ -36,9 +36,8 @@
     "notifications"
   ],
   "optional_permissions": [
-    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
     "idle",
-    "debugger",
     "tabs",
     "tabGroups"
   ],

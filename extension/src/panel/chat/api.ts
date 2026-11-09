@@ -17,11 +17,43 @@ export const conversationKey = (id: string) => ['conversation', id] as const
 export const messagesKey = (id: string) => ['messages', id] as const
 export const timelineKey = (runId: string) => ['timeline', runId] as const
 
-export function useConversations(q: string) {
+export function useConversations(q: string, archived = false) {
   const { api } = useSession()
   return useQuery({
-    queryKey: [...conversationsKey, q],
-    queryFn: async () => unwrap(await api.GET('/api/conversations', { params: { query: { limit: 50, q: q || undefined } } })),
+    queryKey: [...conversationsKey, q, archived],
+    queryFn: async () => unwrap(await api.GET('/api/conversations', { params: { query: { limit: 80, q: q || undefined, archived } } })),
+  })
+}
+
+export type ConversationPatch = Schemas['ConversationPatch']
+
+/** Rename, favorite, archive or keep (a temporary chat) a chat. */
+export function useUpdateConversation() {
+  const { api } = useSession()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: ConversationPatch }) =>
+      unwrap(await api.PATCH('/api/conversations/{conversation_id}', { params: { path: { conversation_id: id } }, body })),
+    onSuccess: (conv) => {
+      qc.setQueryData(conversationKey(conv.id), conv)
+      void qc.invalidateQueries({ queryKey: conversationsKey })
+    },
+  })
+}
+
+export function useDeleteConversation() {
+  const { api } = useSession()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      unwrap(await api.DELETE('/api/conversations/{conversation_id}', { params: { path: { conversation_id: id } } }))
+      return id
+    },
+    onSuccess: (id) => {
+      qc.removeQueries({ queryKey: conversationKey(id) })
+      qc.removeQueries({ queryKey: messagesKey(id) })
+      void qc.invalidateQueries({ queryKey: conversationsKey })
+    },
   })
 }
 
@@ -79,6 +111,8 @@ export interface SendInput {
   modelId: string | null
   profileId: string | null
   page?: PageContext | null
+  /** A new chat that is deleted 5 minutes after its last message unless kept. */
+  temporary?: boolean
 }
 
 /** Sends a message; a new chat is created first. Resolves with the chat and the run. */
@@ -89,7 +123,7 @@ export function useSendTurn() {
     mutationFn: async (input: SendInput) => {
       let conversationId = input.conversationId
       if (!conversationId) {
-        const conv = unwrap(await api.POST('/api/conversations', { body: { model_id: input.modelId, temporary: false } }))
+        const conv = unwrap(await api.POST('/api/conversations', { body: { model_id: input.modelId, temporary: input.temporary ?? false } }))
         conversationId = conv.id
       }
       const turn = unwrap(

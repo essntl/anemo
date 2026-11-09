@@ -1,3 +1,4 @@
+import { BROWSER_CONTROL } from '@/shared/env'
 import type { FeatureKey } from '@/shared/permissions'
 
 export interface FeatureInfo {
@@ -10,8 +11,8 @@ export interface FeatureInfo {
   available: boolean
 }
 
-/** The optional features, in the order they are listed. */
-export const FEATURES: FeatureInfo[] = [
+/** The optional features, in the order they are listed (browser control only in its own build). */
+const ALL_FEATURES: FeatureInfo[] = [
   { key: 'notifications', label: 'Notifications', description: 'Reminders, approvals, finished agent runs and focus as Chrome notifications.', available: true },
   {
     key: 'discordSkip',
@@ -32,7 +33,9 @@ export const FEATURES: FeatureInfo[] = [
     key: 'browserControl',
     label: 'Browser control',
     description: 'Let Anemo’s agent use tabs it opens in an “Anemo” tab group of this Chrome, with your logins. Once allowed, you still switch it on each time (“Browser control” below); it goes off after 10 minutes without use.',
-    asks: 'debugger, tabs and tab groups, all sites',
+    asks: 'tabs and tab groups, all sites (the debugger came with this build)',
     available: true,
   },
 ]
+
+export const FEATURES: FeatureInfo[] = ALL_FEATURES.filter((f) => f.key !== 'browserControl' || BROWSER_CONTROL)

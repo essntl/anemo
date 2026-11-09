@@ -70,10 +70,14 @@ export function addChat(anemo: MockAnemo) {
     send(res, 200, [{ id: 'm-echo', display_name: 'Echo', enabled: true, provider_enabled: true, capabilities: { chat: true } }]),
   )
   anemo.routes.set('GET /api/profiles', (_r, _b, res) => send(res, 200, []))
-  anemo.routes.set('GET /api/conversations', (_r, _b, res) => send(res, 200, [...conversations.values()].reverse()))
-  anemo.routes.set('POST /api/conversations', (_r, _b, res) => {
+  anemo.routes.set('GET /api/conversations', (req, _b, res) => {
+    const archived = new URL(req.url ?? '/', 'http://x').searchParams.get('archived') === 'true'
+    send(res, 200, [...conversations.values()].filter((c) => Boolean(c.archived) === archived).reverse())
+  })
+  anemo.routes.set('POST /api/conversations', (_r, body, res) => {
     const id = nextId('conv')
-    const conv = { id, title: 'New chat', pinned: false, archived: false, model_id: null, last_message_at: now(), created_at: now(), active_run_id: null, default_mode: 'chat', profile_id: null, tags: [], temporary: false }
+    const temporary = Boolean((body as { temporary?: boolean } | undefined)?.temporary)
+    const conv = { id, title: 'New chat', pinned: false, archived: false, model_id: null, last_message_at: now(), created_at: now(), active_run_id: null, default_mode: 'chat', profile_id: null, tags: [], temporary, expires_at: temporary ? new Date(Date.now() + 5 * 60_000).toISOString() : null }
     conversations.set(id, conv)
     messages.set(id, [])
     send(res, 201, conv)
@@ -81,6 +85,17 @@ export function addChat(anemo: MockAnemo) {
   anemo.routes.set('GET /api/conversations/:id', (req, _b, res) => {
     const conv = conversations.get(params(req).id)
     return conv ? send(res, 200, conv) : send(res, 404, { error: { code: 'not_found', message: 'Conversation not found' } })
+  })
+  anemo.routes.set('PATCH /api/conversations/:id', (req, body, res) => {
+    const conv = conversations.get(params(req).id)
+    if (!conv) return send(res, 404, { error: { code: 'not_found', message: 'Conversation not found' } })
+    for (const [k, v] of Object.entries(body as Record<string, unknown>)) if (v !== null && v !== undefined) conv[k] = v
+    if (conv.temporary === false) conv.expires_at = null
+    send(res, 200, conv)
+  })
+  anemo.routes.set('DELETE /api/conversations/:id', (req, _b, res) => {
+    conversations.delete(params(req).id)
+    res.writeHead(204).end()
   })
   anemo.routes.set('GET /api/conversations/:id/messages', (req, _b, res) => send(res, 200, messages.get(params(req).id) ?? []))
   anemo.routes.set('POST /api/conversations/:id/turns', (req, body, res) => {

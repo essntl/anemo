@@ -6,6 +6,7 @@
   "description": "Anemo in the browser: chat, page context, translate and explain, capture, notes, research, focus and notifications.",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:browser": "node scripts/build.mjs --browser-control",
     "dev": "node scripts/build.mjs --watch",
     "typecheck": "tsc -b",
     "lint": "oxlint src scripts tests",
@@ -15,6 +16,9 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-popover": "^1.3.1",
+    "@radix-ui/react-select": "^2.4.1",
     "@tanstack/react-query": "^5.107.1",
     "clsx": "^2.1.1",
     "dompurify": "^3.4.17",

@@ -2,6 +2,7 @@
  *  detaches from every tab at once), and what the agent stopped at, if anything. */
 import { useState } from 'react'
 import { MonitorSmartphone, Square } from 'lucide-react'
+import { BROWSER_CONTROL } from '@/shared/env'
 import { storage } from '@/shared/storage'
 import { Button } from '../ui/Button'
 import { Notice } from '../ui/Notice'
@@ -13,7 +14,7 @@ export function BrowserBar() {
   const notice = useStored('session', 'browserNotice').value
   const [openedAt] = useState(() => Date.now())
   const showNotice = notice && notice.at > openedAt - 10 * 60_000
-  if (!active?.on && !showNotice) return null
+  if (!BROWSER_CONTROL || (!active?.on && !showNotice)) return null
   const showTab = async () => {
     if (!notice) return
     const tab = await chrome.tabs.update(notice.tabId, { active: true }).catch(() => null)

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { ArrowUp, Globe, Square } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { Select, type SelectOption } from '../ui/Select'
 import { cn } from '../lib/cn'
 import { useModels, useProfiles, type Mode } from './api'
 
@@ -27,8 +28,12 @@ export interface ComposerProps {
   canSendEmpty?: boolean
 }
 
-const selectClass =
-  'h-7 max-w-[9.5rem] truncate rounded-md border border-transparent bg-transparent px-1 text-[12px] text-muted hover:bg-surface-hover hover:text-text focus:border-accent focus:outline-none'
+/** A model's name without its provider in front ("OpenAI: GPT-6" → "GPT-6"), since the
+ *  list groups models by provider. */
+function shortName(display: string, provider: string | null | undefined): string {
+  const prefix = `${provider ?? ''}: `
+  return provider && display.startsWith(prefix) ? display.slice(prefix.length) : display
+}
 
 export function Composer(p: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -80,20 +85,30 @@ export function Composer(p: ComposerProps) {
               </button>
             ))}
           </div>
-          <select aria-label="Model" className={selectClass} value={current} onChange={(e) => p.onModel(e.target.value || null)}>
-            {!current && <option value="">No model configured</option>}
-            {models.data?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.display_name}
-                {m.id === p.defaultModelId ? ' (default)' : ''}
-              </option>
-            ))}
-          </select>
+          <Select
+            aria-label="Model"
+            variant="ghost"
+            side="top"
+            value={current}
+            onValueChange={(v) => p.onModel(v || null)}
+            placeholder="No model configured"
+            options={(models.data ?? []).map(
+              (m): SelectOption => ({
+                value: m.id,
+                group: m.provider_name ?? undefined,
+                label: `${shortName(m.display_name, m.provider_name)}${m.id === p.defaultModelId ? ' (default)' : ''}`,
+              }),
+            )}
+          />
           {p.mode === 'agent' && (profiles.data?.length ?? 0) > 0 && (
-            <select aria-label="Agent profile" className={selectClass} value={p.profileId ?? ''} onChange={(e) => p.onProfile(e.target.value || null)}>
-              <option value="">Default agent</option>
-              {profiles.data?.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
-            </select>
+            <Select
+              aria-label="Agent profile"
+              variant="ghost"
+              side="top"
+              value={p.profileId ?? ''}
+              onValueChange={(v) => p.onProfile(v || null)}
+              options={[{ value: '', label: 'Default agent' }, ...(profiles.data ?? []).map((pr) => ({ value: pr.id, label: pr.name }))]}
+            />
           )}
           <button
             type="button"

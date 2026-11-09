@@ -185,6 +185,18 @@ export const steps = {
   resume: (): Step => (t, _s, now) => timer.start(t, now),
   skip: (): Step => (t, s, now) => timer.skip(t, s, now),
   stop: (): Step => (t, s, now) => timer.reset(t, s, now),
+  /** Start or pause, whichever phase it is. */
+  toggle: (): Step => (t, _s, now) => timer.toggle(t, now),
+  /** Switch to a phase (as Anemo's Focus / Short break / Long break switch). */
+  choose:
+    (phase: Phase): Step =>
+    (t, s, now) =>
+      timer.choosePhase(t, phase, s, now),
+  /** The task the timer is for (null: none). */
+  setTask:
+    (taskId: string | null): Step =>
+    (t) =>
+      t.taskId === taskId ? t : { ...t, taskId },
   /** The phase's time is up (no-op otherwise). */
   completeIfDue: (): Step => (t, s, now) => timer.complete(t, s, now),
 }

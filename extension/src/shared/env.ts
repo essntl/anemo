@@ -8,10 +8,14 @@ declare global {
   const __DEV__: boolean
   /** True only in the Playwright build (dist-e2e/). */
   const __E2E__: boolean
+  /** True in the build with browser control (dist-browser/, and the Playwright build). */
+  const __BROWSER_CONTROL__: boolean
 }
 
 export const DEV = typeof __DEV__ !== 'undefined' && __DEV__
 export const E2E = typeof __E2E__ !== 'undefined' && __E2E__
+/** Browser control is in this build (it holds the debugger permission). */
+export const BROWSER_CONTROL = typeof __BROWSER_CONTROL__ !== 'undefined' && __BROWSER_CONTROL__
 
 export const log = {
   debug(message: string, ctx?: Record<string, unknown>): void {

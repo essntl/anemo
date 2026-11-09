@@ -3,8 +3,8 @@
  * inline model), or make a task from it. Started here, from the right-click menu, or with
  * a shortcut (Alt+Shift+S saves the selection, Alt+Shift+T makes a task).
  */
-import { useState } from 'react'
-import { BookmarkPlus, Check, ExternalLink, FileText, ListPlus, Loader2, TextSelect, Undo2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BookmarkPlus, Check, ExternalLink, FilePlus, FileText, Globe, Inbox, ListPlus, Loader2, Search, TextSelect, Undo2, X } from 'lucide-react'
 import { PageReadError, readPage, SAVE_CHAR_LIMIT, type PageContext } from '@/shared/pageContext'
 import { failureMessage } from '@/shared/pageFailure'
 import { storage } from '@/shared/storage'
@@ -12,6 +12,7 @@ import { Button } from '../ui/Button'
 import { Card, CardBody, CardHeader } from '../ui/Card'
 import { Field, Input, Textarea } from '../ui/Input'
 import { Notice } from '../ui/Notice'
+import { Select } from '../ui/Select'
 import { cn } from '../lib/cn'
 import { useSession } from '../state/useSession'
 import { useStored } from '../state/useStored'
@@ -30,32 +31,42 @@ function host(url: string): string {
   }
 }
 
-/** Where a saved page or selection goes. "" means the Inbox (append) or Web clips (new). */
+/** Where a saved page or selection goes: the Inbox, a new document, or one you find. */
 function DocumentPicker({ value, onChange, allowNew }: { value: string; onChange: (v: string) => void; allowNew: boolean }) {
   const docs = useDocuments()
   const [filter, setFilter] = useState('')
   const shown = (docs.data ?? [])
     .filter((d) => d.path !== 'documents/Inbox.md')
     .filter((d) => !filter || `${d.title} ${d.folder}`.toLowerCase().includes(filter.toLowerCase()))
-    .slice(0, 200)
+    .slice(0, 100)
+  const fixed = [...(allowNew ? [{ id: 'new', title: 'New document', folder: 'Web clips', icon: FilePlus }] : []), { id: 'inbox', title: 'Inbox', folder: 'Saved to the end', icon: Inbox }]
+  const row = (id: string, title: string, sub: string, Icon: typeof FileText) => (
+    <li key={id} role="option" aria-selected={value === id}>
+      <button
+        type="button"
+        onClick={() => onChange(id)}
+        className={cn('flex w-full items-center gap-2.5 rounded-control px-2.5 py-1.5 text-left', value === id ? 'bg-accent-soft text-accent' : 'hover:bg-surface-hover')}
+      >
+        <Icon className="h-4 w-4 shrink-0 opacity-80" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium">{title}</span>
+          {sub && <span className="block truncate text-[11.5px] text-muted">{sub}</span>}
+        </span>
+        {value === id && <Check className="h-4 w-4 shrink-0" />}
+      </button>
+    </li>
+  )
   return (
     <div className="flex flex-col gap-1.5">
-      <Input placeholder="Find a document" aria-label="Find a document" value={filter} onChange={(e) => setFilter(e.target.value)} />
-      <select
-        aria-label="Save to"
-        className="h-9 w-full rounded-control border border-border bg-surface px-2 text-[13px]"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {allowNew && <option value="new">A new document in Web clips</option>}
-        <option value="inbox">Inbox</option>
-        {shown.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.title}
-            {d.folder ? ` — ${d.folder}` : ''}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-subtle" />
+        <Input placeholder="Find a document" aria-label="Find a document" className="pl-8" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      </div>
+      <ul role="listbox" aria-label="Save to" className="max-h-56 overflow-y-auto rounded-control border border-border bg-surface p-1">
+        {!filter && fixed.map((f) => row(f.id, f.title, f.folder, f.icon))}
+        {shown.map((d) => row(d.id, d.title, d.folder || 'Documents', FileText))}
+        {filter && shown.length === 0 && <li className="px-2.5 py-2 text-[12.5px] text-muted">No document matches.</li>}
+      </ul>
     </div>
   )
 }
@@ -179,10 +190,7 @@ function TaskForm({ page, onDone }: { page: PageContext; onDone: () => void }) {
       <Field label="Due date" hint="Leave empty for no due date.">{(id) => <Input id={id} type="date" value={due} onChange={(e) => setDue(e.target.value)} />}</Field>
       <Field label="Project">
         {(id) => (
-          <select id={id} className="h-9 w-full rounded-control border border-border bg-surface px-2 text-[13px]" value={projectId} onChange={(e) => setProject(e.target.value)}>
-            <option value="">No project</option>
-            {projects.data?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <Select id={id} value={projectId} onValueChange={setProject} options={[{ value: '', label: 'No project' }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
         )}
       </Field>
       <Field label="Notes">{(id) => <Textarea id={id} rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
@@ -195,9 +203,9 @@ function TaskForm({ page, onDone }: { page: PageContext; onDone: () => void }) {
 }
 
 const ACTIONS: { mode: Mode; label: string; hint: string; icon: typeof FileText }[] = [
-  { mode: 'page', label: 'Save page', hint: 'As a new document, or added to one', icon: FileText },
-  { mode: 'selection', label: 'Save selection', hint: 'Added to the Inbox or a document, with its link', icon: TextSelect },
-  { mode: 'task', label: 'Quick task', hint: 'From the page or selection', icon: ListPlus },
+  { mode: 'page', label: 'Save page', hint: 'Save page: as a new document, or added to one', icon: FileText },
+  { mode: 'selection', label: 'Save selection', hint: 'Save selection: added to the Inbox or a document, with its link', icon: TextSelect },
+  { mode: 'task', label: 'Quick task', hint: 'Quick task: from the page or the selection', icon: ListPlus },
 ]
 
 const TITLES: Record<Mode, string> = { page: 'Save page', selection: 'Save selection', task: 'Quick task' }
@@ -252,25 +260,102 @@ export function CaptureView() {
           </CardBody>
         </Card>
       ) : (
-        <div className="flex flex-col gap-2">
-          {ACTIONS.map(({ mode, label, hint, icon: Icon }) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => void begin(mode)}
-              disabled={reading !== null}
-              className="flex items-center gap-3 rounded-card border border-border bg-card px-3.5 py-3 text-left shadow-soft hover:bg-surface-hover disabled:opacity-60"
-            >
-              {reading === mode ? <Loader2 className="h-5 w-5 animate-spin text-accent" /> : <Icon className="h-5 w-5 text-accent" />}
-              <span className="min-w-0">
-                <span className="block text-[13.5px] font-medium">{label}</span>
-                <span className="block text-[12px] text-muted">{hint}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+        <>
+          <ThisTab />
+          <div className="grid grid-cols-3 gap-2">
+            {ACTIONS.map(({ mode, label, hint, icon: Icon }) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => void begin(mode)}
+                disabled={reading !== null}
+                title={hint}
+                className="group flex flex-col items-center gap-2 rounded-card border border-border bg-card px-2 py-3.5 text-center shadow-soft transition-colors hover:border-accent/50 hover:bg-surface-hover disabled:opacity-60"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent transition-transform group-hover:scale-105">
+                  {reading === mode ? <Loader2 className="h-5 w-5 animate-spin" /> : <Icon className="h-5 w-5" />}
+                </span>
+                <span className="text-[12.5px] font-semibold leading-tight">{label}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
       {problem && <Notice tone="warning" title={problem.title}>{problem.body}</Notice>}
+      {!current && <RecentSaves />}
+      {!current && <Shortcuts />}
     </div>
+  )
+}
+
+/** The tab the actions work on: its title and site, when the extension may read them. */
+function ThisTab() {
+  const [tab, setTab] = useState<chrome.tabs.Tab | null>(null)
+  useEffect(() => {
+    let gone = false
+    const update = () => void activeTab().then((t) => !gone && setTab(t ?? null))
+    update()
+    const onUpdated = (_id: number, change: { url?: string; title?: string; status?: string }) => {
+      if (change.url || change.title || change.status === 'complete') update()
+    }
+    chrome.tabs.onActivated.addListener(update)
+    chrome.tabs.onUpdated.addListener(onUpdated)
+    return () => {
+      gone = true
+      chrome.tabs.onActivated.removeListener(update)
+      chrome.tabs.onUpdated.removeListener(onUpdated)
+    }
+  }, [])
+  const known = Boolean(tab?.url && /^https?:/.test(tab.url))
+  return (
+    <div className="flex items-center gap-3 rounded-card border border-border bg-surface px-3.5 py-3" data-testid="capture-tab">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
+        <Globe className="h-4.5 w-4.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium">{known ? tab?.title || host(tab!.url!) : 'The tab in front'}</span>
+        <span className="block truncate text-[12px] text-muted">{known ? host(tab!.url!) : 'Save it, a selection from it, or make a task'}</span>
+      </span>
+    </div>
+  )
+}
+
+/** What was saved lately in this browser session, with a way to open it. */
+function RecentSaves() {
+  const { connection } = useSession()
+  const captures = Object.values(useStored('session', 'captures').value ?? {}).reverse().slice(0, 5)
+  if (captures.length === 0) return null
+  return (
+    <section aria-label="Recent saves" className="flex flex-col gap-1">
+      <h3 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">Recent saves</h3>
+      <ul className="flex flex-col gap-0.5">
+        {captures.map((c) => (
+          <li key={c.id} className="flex items-center gap-2.5 rounded-control px-2 py-1.5 hover:bg-surface-hover">
+            {c.status === 'done' ? <Check className="h-4 w-4 shrink-0 text-success" /> : c.status === 'failed' ? <X className="h-4 w-4 shrink-0 text-error" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent" />}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12.5px] font-medium">{c.result?.title ?? (c.status === 'failed' ? 'Not saved' : 'Saving…')}</span>
+              <span className="block truncate text-[11.5px] text-muted">{c.status === 'failed' ? (c.error ?? 'The save failed.') : c.result ? c.result.path.replace(/^documents\//, '') : `Part ${Math.min(c.done + 1, Math.max(1, c.total))} of ${Math.max(1, c.total)}`}</span>
+            </span>
+            {c.result && (
+              <a className="shrink-0 rounded-md px-2 py-1 text-[12px] text-accent hover:bg-accent-soft" href={`${connection.serverUrl}/documents/${c.result.document_id}`} target="_blank" rel="noopener noreferrer">
+                Open
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function Shortcuts() {
+  const keys = (k: string) => <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] text-text">{k}</kbd>
+  return (
+    <section aria-label="Shortcuts" className="mt-1 flex flex-col gap-1.5 rounded-card border border-dashed border-border px-3.5 py-3 text-[12px] text-muted">
+      <div className="flex items-center justify-between gap-2"><span>Save the selection</span>{keys('Alt+Shift+S')}</div>
+      <div className="flex items-center justify-between gap-2"><span>Make a task</span>{keys('Alt+Shift+T')}</div>
+      <div className="flex items-center justify-between gap-2"><span>Open this panel</span>{keys('Alt+Shift+A')}</div>
+      <p className="text-[11.5px] text-subtle">Right-click a page or a selection for more. Keys can be changed at chrome://extensions/shortcuts.</p>
+    </section>
   )
 }
