@@ -67,7 +67,7 @@ function common(entry, format, fileName, name) {
 function writeManifest() {
   const manifest = JSON.parse(readFileSync(resolve(root, 'manifest.json'), 'utf8'))
   manifest.version = pkg.version
-  if (e2e) manifest.host_permissions = ['http://127.0.0.1/*']
+  if (e2e) manifest.host_permissions = ['http://127.0.0.1/*', 'https://www.youtube.com/*']
   mkdirSync(out, { recursive: true })
   writeFileSync(resolve(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 }

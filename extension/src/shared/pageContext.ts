@@ -10,6 +10,8 @@ import { countWords, PAGE_CHAR_LIMIT, truncateMiddle } from './truncate'
 /** Saving keeps more than a chat message: Anemo formats long pages in pieces. */
 export const SAVE_CHAR_LIMIT = 600_000
 import type { Extracted } from '@/inpage/extract'
+import { parseVideoUrl, segmentsFromRaw, transcriptText } from './youtube'
+import { fetchTranscriptRaw, readPlayer, type PlayerState, type TranscriptRaw } from './youtubePage'
 
 export type PageSource = 'page' | 'selection' | 'pdf' | 'youtube'
 
@@ -134,11 +136,33 @@ export async function readPage(
   if (tab.id === undefined) throw new PageReadError({ reason: 'failed', message: 'No tab.' })
   const limit = opts.limit ?? PAGE_CHAR_LIMIT
   if (tab.url && looksLikePdf(tab.url)) return pdfContext(api, tab.url, limit)
+  const video = parseVideoUrl(tab.url)
+  if (video?.kind === 'video' && !opts.preferSelection) {
+    const yt = await youtubeContext(tab.id, video.id, limit)
+    if (yt) return yt
+  }
   const extracted = await extractFromTab(tab.id, tab.url)
   if (looksLikePdf(extracted.url, extracted.contentType)) return pdfContext(api, extracted.url, limit)
   const context = toContext(extracted, opts.preferSelection, limit)
   if (!context.content.trim()) throw new PageReadError({ reason: 'empty' })
   return context
+}
+
+/** A YouTube video: its transcript with timestamps (null when there is none: the page is
+ *  read as usual then). */
+async function youtubeContext(tabId: number, videoId: string, limit: number): Promise<PageContext | null> {
+  try {
+    const [state] = await chrome.scripting.executeScript({ target: { tabId }, func: readPlayer })
+    const [raw] = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', func: fetchTranscriptRaw, args: [videoId] })
+    const segments = segmentsFromRaw(raw.result as TranscriptRaw)
+    if (!segments.length) return null
+    const info = state.result as PlayerState
+    const text = `Video: ${info.title}\nChannel: ${info.channel}\n\nTranscript:\n${transcriptText(segments)}`
+    const cut = truncateMiddle(text, limit)
+    return { url: `https://youtu.be/${videoId}`, title: info.title, source: 'youtube', content: cut.text, truncated: cut.truncated, wordCount: countWords(text), selection: '', selectionContext: '' }
+  } catch {
+    return null
+  }
 }
 
 async function pdfContext(api: Api, url: string, limit: number): Promise<PageContext> {

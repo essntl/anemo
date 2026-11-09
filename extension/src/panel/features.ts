@@ -27,7 +27,7 @@ export const FEATURES: FeatureInfo[] = [
     asks: 'blocking and redirecting sites (each site is asked for when you add it)',
     available: false,
   },
-  { key: 'youtubeNotes', label: 'YouTube notes', description: 'Timestamped notes and transcripts for YouTube videos.', asks: 'access to youtube.com', available: false },
+  { key: 'youtubeNotes', label: 'YouTube notes', description: 'Timestamped notes and transcripts for YouTube videos (the Notes tab).', asks: 'access to youtube.com', available: true },
   {
     key: 'browserControl',
     label: 'Browser control',

@@ -13,7 +13,7 @@ export const test = base.extend<{ context: BrowserContext; extensionId: string; 
     const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'anemo-ext-')), {
       channel: 'chromium',
       headless: true,
-      args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`],
+      args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`, '--autoplay-policy=no-user-gesture-required'],
     })
     await provide(context)
     await context.close()

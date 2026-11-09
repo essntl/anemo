@@ -64,6 +64,9 @@
         "default": "Alt+Shift+T"
       },
       "description": "Create a task from this page or selection"
+    },
+    "youtube-note": {
+      "description": "Add a note to the YouTube video (set a key in chrome://extensions/shortcuts)"
     }
   }
 }

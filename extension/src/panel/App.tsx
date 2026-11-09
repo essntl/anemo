@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BookmarkPlus, MessageSquare, Settings } from 'lucide-react'
+import { BookmarkPlus, MessageSquare, NotebookPen, Settings } from 'lucide-react'
 import { storage } from '@/shared/storage'
 import { cn } from './lib/cn'
 import { useConnection } from './state/connection'
@@ -8,6 +8,7 @@ import { SessionProvider } from './state/session'
 import { useStored } from './state/useStored'
 import { applyAccent } from './theme'
 import { CaptureView } from './capture/CaptureView'
+import { NotesView } from './notes/NotesView'
 import { ChatView } from './chat/ChatView'
 import { ConnectionBanner } from './views/ConnectionBanner'
 import { InlineResult } from './views/InlineResult'
@@ -15,7 +16,14 @@ import { PanelNotice } from './views/PanelNotice'
 import { SettingsView } from './views/SettingsView'
 import { SetupView } from './views/SetupView'
 
-export type View = 'chat' | 'capture' | 'settings'
+export type View = 'chat' | 'capture' | 'notes' | 'settings'
+
+/** Shows a chat in the Chat view (e.g. "Explain this moment" from the Notes view). */
+async function openChat(conversationId: string): Promise<void> {
+  const chat = await storage.get('local', 'chat')
+  await storage.set('local', 'chat', { conversationId, drafts: chat?.drafts ?? {} })
+  await storage.set('session', 'panelState', { view: 'chat', conversationId })
+}
 
 /** The query cache for one connection. */
 function Connected({ children }: { children: React.ReactNode }) {
@@ -26,6 +34,7 @@ function Connected({ children }: { children: React.ReactNode }) {
 const TABS: { view: View; label: string; icon: typeof MessageSquare }[] = [
   { view: 'chat', label: 'Chat', icon: MessageSquare },
   { view: 'capture', label: 'Capture', icon: BookmarkPlus },
+  { view: 'notes', label: 'Notes', icon: NotebookPen },
   { view: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -78,6 +87,7 @@ export function App() {
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {view === 'chat' && <ChatView />}
         {view === 'capture' && <CaptureView />}
+        {view === 'notes' && <NotesView onOpenChat={(id) => void openChat(id)} />}
         {view === 'settings' && <SettingsView api={api} connection={connection} />}
       </main>
     </div>

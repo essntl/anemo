@@ -32,6 +32,8 @@ export interface LocalData {
   heldNotifications: HeldNotification[]
   /** The project last chosen for a quick task. */
   lastProjectId: string | null
+  /** The notes document of each YouTube video (video id → document id). */
+  youtubeDocs: Record<string, string>
   /** The focus session as last known (feature 10 keeps it current). */
   focusState: { active: boolean; endsAt: number | null } | null
 }
@@ -61,6 +63,8 @@ export interface SessionData {
     explanation?: string
     at: number
   } | null
+  /** The "add a YouTube note" shortcut: start a note when the Notes view opens. */
+  notesIntent: { at: number } | null
   /** Tabs with translated text (count of translated blocks), for "Restore all". */
   translatedTabs: Record<string, number>
   /** An explanation or translation shown in the panel where the page can't show a box

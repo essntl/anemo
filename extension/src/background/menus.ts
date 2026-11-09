@@ -130,6 +130,15 @@ export function listenForMenus(): void {
   })
   // Keyboard shortcuts (chrome://extensions/shortcuts); a shortcut grants access to the tab.
   chrome.commands.onCommand.addListener((command, tab) => {
+    if (command === 'youtube-note') {
+      if (tab?.windowId !== undefined) void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => undefined)
+      void (async () => {
+        await storage.set('session', 'notesIntent', { at: Date.now() })
+        const state = await storage.get('session', 'panelState')
+        await storage.set('session', 'panelState', { view: 'notes', conversationId: state?.conversationId ?? null })
+      })()
+      return
+    }
     if (!tab?.id || !(command in CAPTURE)) return
     if (tab.windowId !== undefined) void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => undefined)
     void handle(command, tab)
