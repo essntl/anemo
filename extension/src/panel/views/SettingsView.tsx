@@ -10,6 +10,7 @@ import { Switch } from '../ui/Switch'
 import { forgetToken } from '../state/connection'
 import { FEATURES } from '../features'
 import { NotificationsCard } from './NotificationsCard'
+import { TranslateCard } from './TranslateCard'
 import { usePreferences } from '../state/preferences'
 
 function ConnectionCard({ api, connection }: { api: Api; connection: Connection }) {
@@ -110,6 +111,7 @@ export function SettingsView({ api, connection }: { api: Api; connection: Connec
     <div className="flex flex-col gap-4 p-3">
       <ConnectionCard api={api} connection={connection} />
       <FeaturesCard />
+      <TranslateCard />
       <NotificationsCard />
       <p className="px-1 text-[11.5px] text-subtle">
         Anemo Companion {chrome.runtime.getManifest().version} · extension id {chrome.runtime.id}

@@ -26,13 +26,32 @@ const alias = {
   '@anemo/schema': resolve(root, '../frontend/src/api/schema.d.ts'),
 }
 
+/**
+ * Chrome refuses to load a content script it considers "not UTF-8", and its check also
+ * rejects Unicode noncharacters (U+FFFF, U+FDD0…), which minifiers write raw from regex
+ * ranges (highlight.js, KaTeX). Every non-ASCII character becomes a \uXXXX escape, which
+ * means the same in strings, regular expressions, templates and identifiers.
+ */
+const asciiOnly = {
+  name: 'ascii-only',
+  // After the files are written: the minifier would put the characters back.
+  writeBundle(options, bundle) {
+    for (const file of Object.keys(bundle).filter((f) => f.endsWith('.js'))) {
+      const path = resolve(options.dir ?? out, file)
+      const code = readFileSync(path, 'utf8')
+      writeFileSync(path, code.replace(/[\u0080-\uffff]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')))
+    }
+  },
+}
+
 function common(entry, format, fileName, name) {
   return {
     configFile: false,
+    plugins: [asciiOnly],
     mode,
     logLevel: 'warn',
     resolve: { alias },
-    define: { __DEV__: JSON.stringify(watch), 'process.env.NODE_ENV': JSON.stringify(mode) },
+    define: { __DEV__: JSON.stringify(watch), __E2E__: JSON.stringify(e2e), 'process.env.NODE_ENV': JSON.stringify(mode) },
     build: {
       outDir: out,
       emptyOutDir: false,
@@ -54,7 +73,7 @@ function writeManifest() {
 }
 
 // The pages first: their build empties dist/.
-await build({ configFile: resolve(root, 'vite.config.ts'), mode, logLevel: 'warn', build: { outDir: out, watch: watch ? {} : null } })
+await build({ configFile: resolve(root, 'vite.config.ts'), mode, logLevel: 'warn', define: { __E2E__: JSON.stringify(e2e) }, build: { outDir: out, watch: watch ? {} : null } })
 writeManifest()
 await build(common(resolve(root, 'src/background/index.ts'), 'es', 'background.js'))
 const inpage = resolve(root, 'src/inpage/entries')

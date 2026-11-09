@@ -3,11 +3,13 @@
  * is read from chrome.storage when it wakes. Chat streaming runs in the side panel, not
  * here; the worker keeps the event stream (notifications, approvals, focus) and the badge.
  */
-import { log } from '@/shared/env'
+import { E2E, log } from '@/shared/env'
 import { classifySender, type Message } from '@/shared/messages'
 import { storage } from '@/shared/storage'
 import { applyBadge } from './badge'
 import { presenceChanged, releaseHeld, syncStream } from './events'
+import { listenForInline } from './inline'
+import { onInlineClick } from './inlineMenu'
 import { createMenus, listenForMenus } from './menus'
 import { listenForClicks, trackWindows } from './notifier'
 
@@ -30,7 +32,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && 'connection' in changes) void syncStream()
-  if (area === 'local' && 'preferences' in changes) presenceChanged()
+  if (area === 'local' && 'preferences' in changes) {
+    presenceChanged()
+    const before = (changes.preferences.oldValue as { targetLanguage?: string } | undefined)?.targetLanguage
+    const after = (changes.preferences.newValue as { targetLanguage?: string } | undefined)?.targetLanguage
+    if (before !== after) createMenus() // the default language comes first in Translate
+  }
   if (area === 'local' && 'focusState' in changes) {
     const before = changes.focusState.oldValue as { active?: boolean } | undefined
     const after = changes.focusState.newValue as { active?: boolean } | undefined
@@ -63,7 +70,11 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
 
 listenForClicks()
 listenForMenus()
+listenForInline()
 trackWindows()
 // Every time the worker starts (install, browser start, an alarm, a message).
 void syncStream()
 void storage.get('session', 'badge').then((b) => b && applyBadge(b))
+
+// The Playwright build only: tests can't click Chrome's context menu, so they call its handler.
+if (E2E) (globalThis as unknown as { __anemoTest: unknown }).__anemoTest = { onInlineClick }

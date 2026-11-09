@@ -156,11 +156,50 @@ test('saving a page goes through Anemo’s worker and lands in a document', asyn
     const href = await panel.getByRole('link', { name: 'View' }).getAttribute('href')
     const id = href!.split('/').pop()!
     const doc = await (await fetch(`${url}/api/documents/${id}`, { headers: { Authorization: `Bearer ${token}` } })).json()
-    expect(doc.path).toMatch(/^documents\/Web clips\/photosynthesis-explained(-\d+)?\.md$/)
+    expect(doc.path).toMatch(/^documents\/Web clips\/photosynthesis-explained( \(\d+\))?\.md$/)
     expect(doc.content).toMatch(/^# Photosynthesis explained\n\nSource: \[127\.0\.0\.1:\d+\]\(http:\/\/127\.0\.0\.1:\d+\/article\) · Saved /)
     // The fake "echo" model "formats" by repeating what it got: the content, fenced as untrusted.
     expect(doc.content).toContain('untrusted_web_content')
     expect(doc.content).toContain('plants turn **light**')
+  } finally {
+    site.close()
+  }
+})
+
+test('Explain on a page asks Anemo’s inline endpoint (fenced, nothing personal)', async ({ panel, context }) => {
+  const { createServer } = await import('node:http')
+  const { ARTICLE } = await import('./mockAnemo')
+  const site = createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end(ARTICLE)
+  })
+  await new Promise<void>((r) => site.listen(0, '127.0.0.1', r))
+  const port = (site.address() as import('node:net').AddressInfo).port
+  try {
+    await panel.getByLabel('Anemo address').fill(url!)
+    await panel.getByLabel('API token').fill(token!)
+    await panel.getByRole('button', { name: 'Connect' }).click()
+    await expect(panel.getByText('What can I help with?')).toBeVisible()
+    const page = await context.newPage()
+    await page.goto(`http://127.0.0.1:${port}/article`)
+    await page.bringToFront()
+    await page.evaluate(() => {
+      const range = document.createRange()
+      range.selectNodeContents(document.querySelector('article p strong')!)
+      getSelection()!.removeAllRanges()
+      getSelection()!.addRange(range)
+    })
+    const worker = context.serviceWorkers()[0]
+    await worker.evaluate(async () => {
+      const [tab] = await chrome.tabs.query({ active: true, windowType: 'normal' })
+      ;(globalThis as unknown as { __anemoTest: { onInlineClick: (id: string, info: unknown, tab: unknown) => void } }).__anemoTest.onInlineClick(
+        'anemo-explain', { menuItemId: 'anemo-explain', frameId: 0, selectionText: 'light', pageUrl: tab.url, frameUrl: tab.url }, tab)
+    })
+    // The fake "echo" model repeats what Anemo sent it (rendered as Markdown, the fence
+    // tags dropped by the sanitizer): the page, the paragraph, the selection; nothing else.
+    const box = page.locator('anemo-companion .box')
+    await expect(box).toContainText('You said: Page: Photosynthesis explained', { timeout: 20_000 })
+    await expect(box).toContainText('Paragraph 0: plants turn light into chemical energy')
   } finally {
     site.close()
   }

@@ -16,6 +16,7 @@ import { cn } from '../lib/cn'
 import { useSession } from '../state/useSession'
 import { useStored } from '../state/useStored'
 import { activeTab } from '../chat/currentTab'
+import { RestoreTranslations } from './RestoreTranslations'
 import { useCaptureStatus, useCreateTask, useDocuments, useProjects, useStartCapture, useUndoCapture, type Target } from './api'
 
 type Mode = 'page' | 'selection' | 'task'
@@ -104,7 +105,7 @@ function Progress({ id, onAgain }: { id: string; onAgain: () => void }) {
   )
 }
 
-function SaveForm({ mode, page, onDone }: { mode: 'page' | 'selection'; page: PageContext; onDone: () => void }) {
+function SaveForm({ mode, page, explanation, onDone }: { mode: 'page' | 'selection'; page: PageContext; explanation?: string; onDone: () => void }) {
   const start = useStartCapture()
   const [format, setFormat] = useState<'markdown' | 'summary'>('markdown')
   const [choice, setChoice] = useState(mode === 'page' ? 'new' : 'inbox')
@@ -112,7 +113,7 @@ function SaveForm({ mode, page, onDone }: { mode: 'page' | 'selection'; page: Pa
   if (captureId) return <Progress id={captureId} onAgain={onDone} />
   const save = () =>
     start.mutate(
-      { page: mode === 'selection' ? { ...page, source: 'selection', content: page.selection } : page, kind: mode, format, target: targetOf(choice) },
+      { page: mode === 'selection' ? { ...page, source: 'selection', content: page.selection } : page, kind: mode, format, target: targetOf(choice), explanation: mode === 'selection' ? explanation : null },
       { onSuccess: setCaptureId },
     )
   return (
@@ -121,6 +122,7 @@ function SaveForm({ mode, page, onDone }: { mode: 'page' | 'selection'; page: Pa
         <div className="truncate text-[12.5px] font-medium">{page.title || host(page.url)}</div>
         <div className="truncate text-[11.5px] text-muted">{host(page.url)} · {mode === 'selection' ? `${page.selection.split(/\s+/).filter(Boolean).length} words selected` : `${page.wordCount.toLocaleString()} words`}</div>
         {mode === 'selection' && <p className="mt-1.5 line-clamp-4 border-l-2 border-border-strong pl-2 text-[12px] text-muted">{page.selection}</p>}
+        {explanation && <p className="mt-1.5 text-[11.5px] text-muted">With Anemo’s explanation underneath.</p>}
       </div>
       {mode === 'page' && (
         <div role="radiogroup" aria-label="Save as" className="flex rounded-control bg-surface-2 p-0.5">
@@ -202,11 +204,11 @@ const TITLES: Record<Mode, string> = { page: 'Save page', selection: 'Save selec
 export function CaptureView() {
   const { api } = useSession()
   const pending = useStored('session', 'pendingCapture').value ?? null
-  const [chosen, setChosen] = useState<{ mode: Mode; page: PageContext } | null>(null)
+  const [chosen, setChosen] = useState<{ mode: Mode; page: PageContext; explanation?: string } | null>(null)
   const [reading, setReading] = useState<Mode | null>(null)
   const [problem, setProblem] = useState<{ title: string; body: string } | null>(null)
   // From the right-click menu or a shortcut: that page, until you start over.
-  const current = chosen ?? (pending ? { mode: pending.kind, page: pending.page } : null)
+  const current = chosen ?? (pending ? { mode: pending.kind, page: pending.page, explanation: pending.explanation } : null)
 
   const reset = () => {
     setChosen(null)
@@ -235,6 +237,7 @@ export function CaptureView() {
 
   return (
     <div className="flex flex-col gap-3 p-3">
+      <RestoreTranslations />
       {current ? (
         <Card>
           <CardHeader title={TITLES[current.mode]} actions={<Button size="sm" variant="ghost" onClick={reset}>Back</Button>} />
@@ -242,7 +245,7 @@ export function CaptureView() {
             {current.mode === 'task' ? (
               <TaskForm page={current.page} onDone={reset} />
             ) : (
-              <SaveForm mode={current.mode} page={current.page} onDone={reset} />
+              <SaveForm mode={current.mode} page={current.page} explanation={current.explanation} onDone={reset} />
             )}
           </CardBody>
         </Card>

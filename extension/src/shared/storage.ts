@@ -54,7 +54,18 @@ export interface SessionData {
   /** A message for the panel after a context-menu action failed (e.g. the page can't be read). */
   panelNotice: { title: string; body: string; at: number } | null
   /** A capture started from the right-click menu or a shortcut, for the panel to finish. */
-  pendingCapture: { kind: 'page' | 'selection' | 'task'; page: import('./pageContext').PageContext; at: number } | null
+  pendingCapture: {
+    kind: 'page' | 'selection' | 'task'
+    page: import('./pageContext').PageContext
+    /** From the explain box: saved under the selection. */
+    explanation?: string
+    at: number
+  } | null
+  /** Tabs with translated text (count of translated blocks), for "Restore all". */
+  translatedTabs: Record<string, number>
+  /** An explanation or translation shown in the panel where the page can't show a box
+   *  (Chrome's PDF viewer, its own pages). */
+  panelInline: { id: string; mode: 'explain' | 'translate'; selection: string; text: string; status: 'working' | 'done' | 'error'; error?: string; at: number } | null
   /** Saves in progress or done, by id (from the event stream's capture events). */
   captures: Record<string, CaptureStatus>
 }

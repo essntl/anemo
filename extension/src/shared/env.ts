@@ -6,9 +6,12 @@
  */
 declare global {
   const __DEV__: boolean
+  /** True only in the Playwright build (dist-e2e/). */
+  const __E2E__: boolean
 }
 
 export const DEV = typeof __DEV__ !== 'undefined' && __DEV__
+export const E2E = typeof __E2E__ !== 'undefined' && __E2E__
 
 export const log = {
   debug(message: string, ctx?: Record<string, unknown>): void {

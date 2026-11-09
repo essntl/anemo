@@ -8,7 +8,10 @@ import { markTokenLost } from '@/shared/connectionStore'
 import { discussDraft, startLearningChat, type LearningAction } from '@/shared/learning'
 import { PageReadError, readPage, SAVE_CHAR_LIMIT } from '@/shared/pageContext'
 import { failureMessage } from '@/shared/pageFailure'
+import { LANGUAGES } from '@/shared/languages'
+import { withDefaults } from '@/shared/preferences'
 import { storage } from '@/shared/storage'
+import { onInlineClick } from './inlineMenu'
 
 export const MENU = {
   summarize: 'anemo-summarize',
@@ -19,14 +22,34 @@ export const MENU = {
   task: 'anemo-task',
 } as const
 
+export const INLINE = {
+  explain: 'anemo-explain',
+  translate: 'anemo-translate',
+  translatePage: 'anemo-translate-page',
+} as const
+
+/** The languages in a Translate submenu: the default first. */
+function languageItems(defaultCode: string): { code: string; title: string }[] {
+  const first = LANGUAGES.find((l) => l.code === defaultCode) ?? { code: defaultCode, name: defaultCode }
+  return [{ code: first.code, title: `${first.name} (default)` }, ...LANGUAGES.filter((l) => l.code !== first.code).map((l) => ({ code: l.code, title: l.name }))]
+}
+
 export function createMenus(): void {
-  chrome.contextMenus.removeAll(() => {
+  void storage.get('local', 'preferences').then((stored) => {
+    const target = withDefaults(stored).targetLanguage
+    chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: INLINE.explain, title: 'Explain', contexts: ['selection'] })
+    chrome.contextMenus.create({ id: INLINE.translate, title: 'Translate', contexts: ['selection'] })
+    for (const l of languageItems(target)) chrome.contextMenus.create({ id: `${INLINE.translate}:${l.code}`, parentId: INLINE.translate, title: l.title, contexts: ['selection'] })
+    chrome.contextMenus.create({ id: INLINE.translatePage, title: 'Translate page', contexts: ['page'] })
+    for (const l of languageItems(target)) chrome.contextMenus.create({ id: `${INLINE.translatePage}:${l.code}`, parentId: INLINE.translatePage, title: l.title, contexts: ['page'] })
     chrome.contextMenus.create({ id: MENU.discuss, title: 'Discuss in chat', contexts: ['selection'] })
     chrome.contextMenus.create({ id: MENU.saveSelection, title: 'Save selection to Anemo', contexts: ['selection'] })
     chrome.contextMenus.create({ id: MENU.summarize, title: 'Summarize page', contexts: ['page', 'selection'] })
     chrome.contextMenus.create({ id: MENU.quiz, title: 'Quiz me on this page', contexts: ['page', 'selection'] })
     chrome.contextMenus.create({ id: MENU.savePage, title: 'Save page to Anemo', contexts: ['page', 'selection'] })
     chrome.contextMenus.create({ id: MENU.task, title: 'Create a task from this', contexts: ['page', 'selection'] })
+    })
   })
 }
 
@@ -95,6 +118,11 @@ async function handle(id: string, tab: chrome.tabs.Tab): Promise<void> {
 
 export function listenForMenus(): void {
   chrome.contextMenus.onClicked.addListener((info, tab) => {
+    const id = String(info.menuItemId)
+    if (tab?.id && (id === INLINE.explain || id.startsWith(`${INLINE.translate}:`) || id.startsWith(`${INLINE.translatePage}:`))) {
+      onInlineClick(id, info, tab)
+      return
+    }
     if (!tab?.id || !Object.values(MENU).includes(info.menuItemId as never)) return
     // The panel first, while the click still counts as a user action.
     if (tab.windowId !== undefined) void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => undefined)

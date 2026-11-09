@@ -10,6 +10,7 @@ import { applyAccent } from './theme'
 import { CaptureView } from './capture/CaptureView'
 import { ChatView } from './chat/ChatView'
 import { ConnectionBanner } from './views/ConnectionBanner'
+import { InlineResult } from './views/InlineResult'
 import { PanelNotice } from './views/PanelNotice'
 import { SettingsView } from './views/SettingsView'
 import { SetupView } from './views/SetupView'
@@ -73,6 +74,7 @@ export function App() {
       </header>
       <ConnectionBanner api={api} />
       <PanelNotice />
+      <InlineResult />
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {view === 'chat' && <ChatView />}
         {view === 'capture' && <CaptureView />}
