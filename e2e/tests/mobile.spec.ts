@@ -66,14 +66,15 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await page.getByRole('button', { name: 'Open menu' }).click()
   const drawer = page.getByRole('dialog', { name: 'Menu' })
   await expect(drawer).toBeVisible()
-  // Most of the menu is chats: Notifications and Settings are header icons, the pages small tiles.
+  // Most of the menu is chats: Notifications and Settings are header icons, the pages one bar.
   const box = (await drawer.locator('aside').boundingBox())!
   const list = (await drawer.getByLabel('Chats', { exact: true }).boundingBox())!
-  expect(list.height / box.height).toBeGreaterThan(0.4)
+  expect(list.height / box.height).toBeGreaterThan(0.55)
   await expect(drawer.getByRole('link', { name: 'Notifications' })).toBeVisible()
   await expect(drawer.getByRole('combobox', { name: 'Project' })).toBeVisible()
-  // The pages are right there, under the chats.
-  await drawer.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Files', exact: true }).click()
+  // The pages are under the chats, folded into a bar that opens as a card.
+  await drawer.getByRole('button', { name: /^Pages/ }).click()
+  await page.getByRole('dialog', { name: 'Pages' }).getByRole('link', { name: 'Files', exact: true }).click()
   await expect(page).toHaveURL(/\/files/)
   await expect(drawer).toBeHidden()
 
@@ -90,6 +91,86 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await page.getByRole('button', { name: 'Close' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(await seen()).toEqual(expect.arrayContaining(['sheet-in', 'sheet-out']))
+})
+
+test('the pages bar grows into a card in the middle, and folds back', async ({ page }) => {
+  await login(page)
+  await page.goto('/tasks')
+  await page.getByRole('button', { name: 'Open menu' }).click()
+  const drawer = page.getByRole('dialog', { name: 'Menu' })
+  // The bar says which page you are on.
+  const bar = drawer.getByRole('button', { name: 'Pages, on Tasks' })
+  await expect(bar).toBeVisible()
+
+  await bar.click()
+  const card = page.getByRole('dialog', { name: 'Pages' })
+  await expect(card.getByRole('link')).toHaveCount(12)
+  // Once grown, it sits in the middle of the screen, not in the menu.
+  const view = page.viewportSize()!
+  await expect.poll(async () => {
+    const r = (await card.boundingBox())!
+    return Math.abs(r.x + r.width / 2 - view.width / 2) + Math.abs(r.y + r.height / 2 - view.height / 2)
+  }).toBeLessThan(4)
+  await expect(card.getByRole('link', { name: 'Tasks', exact: true })).toHaveAttribute('aria-current', 'page')
+
+  // Esc and a tap outside fold it back; the menu stays open.
+  await page.keyboard.press('Escape')
+  await expect(card).toBeHidden()
+  await expect(drawer).toBeVisible()
+  await bar.click()
+  await page.mouse.click(view.width - 8, 12)
+  await expect(card).toBeHidden()
+  await expect(drawer).toBeVisible()
+
+  // Closed again before it has finished growing, a few times in a row: nothing is left
+  // behind that would block the screen.
+  for (const close of ['Escape', 'tap', 'Escape', 'tap']) {
+    await bar.click()
+    if (close === 'Escape') await page.keyboard.press('Escape')
+    else await page.mouse.click(view.width - 8, 12)
+    await expect(card).toHaveCount(0)
+  }
+  await expect(drawer).toBeVisible()
+
+  // Tapping a page goes there and closes everything.
+  await bar.click()
+  await card.getByRole('link', { name: 'Calendar', exact: true }).click()
+  await expect(page).toHaveURL(/\/calendar/)
+  await expect(drawer).toBeHidden()
+  await expect(card).toBeHidden()
+})
+
+test("a chat's menu low in the list is a sheet that fits on the screen", async ({ page }) => {
+  await login(page)
+  const ids: string[] = []
+  try {
+    // Enough chats that the last one sits at the bottom of the menu.
+    for (let n = 0; n < 12; n++) {
+      const c = (await (await page.request.post('/api/conversations', { data: { title: `E2E sheet ${n}` } })).json()) as { id: string }
+      ids.push(c.id)
+    }
+    await page.goto('/tasks')
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Menu' })
+    const last = drawer.getByRole('button', { name: /^Actions for / }).last()
+    await last.scrollIntoViewIfNeeded()
+    await last.click()
+    const sheet = page.getByRole('dialog', { name: /^Actions for / })
+    await expect(sheet.getByRole('button', { name: 'Delete' })).toBeVisible()
+    // Every action is on the screen, the last one included.
+    const view = page.viewportSize()!
+    await expect.poll(async () => {
+      const r = (await sheet.boundingBox())!
+      return r.y >= 0 && Math.round(r.y + r.height) <= view.height && r.x >= 0 && Math.round(r.x + r.width) <= view.width
+    }).toBe(true)
+    await expect(sheet.getByRole('button', { name: 'Delete' })).toBeInViewport()
+    // A tap above it puts it away; the menu stays.
+    await page.mouse.click(view.width / 2, 20)
+    await expect(sheet).toBeHidden()
+    await expect(drawer).toBeVisible()
+  } finally {
+    for (const id of ids) await page.request.delete(`/api/conversations/${id}`)
+  }
 })
 
 /** A quick one-finger swipe along a horizontal line, as real touch events. */
@@ -352,6 +433,7 @@ test('the Island takes the middle of the top bar and plays and pauses', async ({
     expect(pill.y + pill.height).toBeLessThanOrEqual(48)
     // Go to another page through the menu: still playing.
     await page.getByRole('button', { name: 'Open menu' }).click()
+    await page.getByRole('button', { name: /^Pages/ }).click()
     await page.getByRole('link', { name: 'Tasks', exact: true }).click()
     await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
     await island.getByRole('button', { name: /Show controls/ }).tap()
