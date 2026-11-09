@@ -13,6 +13,8 @@ export interface LocalData {
   preferences: Preferences
   /** Anemo's accent colour (Settings → Appearance), cached for the next panel start. */
   accent: string | null
+  /** The chat open in the panel, and unsent drafts per chat ("new" for a new chat). */
+  chat: { conversationId: string | null; drafts: Record<string, string> }
 }
 
 export interface SessionData {

@@ -15,7 +15,7 @@ test('connects to a real Anemo with a token (Bearer auth and the Origin check)',
   await panel.getByLabel('Anemo address').fill(url!)
   await panel.getByLabel('API token').fill(token!)
   await panel.getByRole('button', { name: 'Connect' }).click()
-  await expect(panel.getByText('Connected', { exact: true })).toBeVisible()
+  await expect(panel.getByText('What can I help with?')).toBeVisible()
 })
 
 test('a wrong token gets Anemo’s 401 and the right message', async ({ panel }) => {
@@ -23,4 +23,48 @@ test('a wrong token gets Anemo’s 401 and the right message', async ({ panel })
   await panel.getByLabel('API token').fill('anemo_definitely-not-valid')
   await panel.getByRole('button', { name: 'Connect' }).click()
   await expect(panel.getByText('The token doesn’t work')).toBeVisible()
+})
+
+/**
+ * Chat against a real Anemo with its scripted fake provider (ENABLE_FAKE_PROVIDER=true and
+ * e2e/scripts/seed-fake.mjs: models "Echo", "Slow echo", "Demo agent"; Echo is the default).
+ */
+test.describe('chat (real Anemo with the fake provider)', () => {
+  test.beforeEach(async ({ panel }) => {
+    await panel.getByLabel('Anemo address').fill(url!)
+    await panel.getByLabel('API token').fill(token!)
+    await panel.getByRole('button', { name: 'Connect' }).click()
+    await expect(panel.getByText('What can I help with?')).toBeVisible()
+  })
+
+  test('streams an answer, and the chat is in the list', async ({ panel }) => {
+    await panel.getByLabel('Message').fill('hello from the panel')
+    await panel.getByLabel('Message').press('Enter')
+    await expect(panel.getByTestId('assistant-message').last()).toContainText('You said: hello from the panel')
+    await panel.getByRole('button', { name: 'All chats' }).click()
+    await expect(panel.getByRole('list', { name: 'Chats' }).getByRole('button').first()).toBeVisible()
+  })
+
+  test('stop ends a slow answer', async ({ panel }) => {
+    await panel.getByLabel('Model').selectOption({ label: 'Slow echo' })
+    await panel.getByLabel('Message').fill('one two three four five six seven eight nine ten eleven twelve')
+    await panel.getByRole('button', { name: 'Send' }).click()
+    await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible()
+    await panel.getByRole('button', { name: 'Stop' }).click()
+    await expect(panel.getByText('Stopped.')).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Send' })).toBeVisible()
+  })
+
+  test('the agent asks a question; answering it lets the run finish', async ({ panel }) => {
+    await panel.getByRole('radio', { name: 'agent' }).click()
+    await panel.getByLabel('Model').selectOption({ label: 'Demo agent' })
+    await panel.getByLabel('Message').fill('please ask me which folder to use')
+    await panel.getByRole('button', { name: 'Send' }).click()
+    const card = panel.getByTestId('approval-card')
+    await expect(card).toBeVisible({ timeout: 20_000 })
+    await card.getByPlaceholder('Your answer').fill('the notes folder')
+    await card.getByRole('button', { name: 'Answer' }).click()
+    await expect(card).toBeHidden({ timeout: 20_000 })
+    await expect(panel.getByTestId('assistant-message').last()).toContainText('notes folder', { timeout: 20_000 })
+  })
 })

@@ -60,6 +60,25 @@ or WAF challenges).
 | 46 | Auto-off | 10 min |
 | 47 | Blocklist | Banking/payment, government/tax, webmail, password managers, accounts.google.com, Chrome Web Store, `chrome://` (editable) |
 
+### Follow-up (2026-11-09): formatting saved content with the inline model
+
+When page or selection content is saved into Anemo, the inline model (your Qwen 27B, 128k
+context) formats it instead of pasting raw text. You took every recommendation:
+
+| # | Topic | Decision |
+|---|---|---|
+| F1 | Which saves | Every save of page/selection content into a document: append to a document, save page as a new document, the explain box's save, the Inbox |
+| F2 | What may change | Formatting only (headings, lists, tables, code, links, removing extraction noise); wording kept, nothing summarised |
+| F3 | Existing documents | Always appended at the end under a heading with source and date; the model sees only the document's heading outline to match its style |
+| F4 | Preview | Saved directly with "Saved · View · Undo" (undo restores the previous revision) |
+| F5 | Failure | Falls back to the extension's own clean Markdown, saying "saved without formatting" |
+| F6 | Long pages | Split by sections and formatted piece by piece with progress. With a 128k window and output about as long as input, a piece is at most ~40k tokens; shorter pages go in one piece |
+| F7 | Setting | "Inline & formatting model" in Settings → Models, falling back to the chat model |
+
+This runs through its own server endpoint (the result goes to Anemo, not into a web page),
+separate from the in-page translate/explain endpoint, which keeps its no-personal-context
+rule.
+
 ## Technical choices
 
 ### Server
@@ -91,3 +110,10 @@ or WAF challenges).
 | E10 | Optional features: `FEATURE_PERMISSIONS` maps each to its permissions; switching one on requests them from the click, switching off releases them. Features without extra permissions start on. Browser control asks for `https://*/*` + `http://*/*` (equivalent to `<all_urls>` for web pages, and already in `optional_host_permissions`). | Permissions are asked for only when a feature is first enabled. |
 | E11 | E2E: Playwright loads `dist-e2e/` (`npm run e2e` builds it) with a mock Anemo (`tests/e2e/mockAnemo.ts`) that checks Bearer, no cookies and the Origin like the real server. The test build alone gets `host_permissions: ["http://127.0.0.1/*"]`, because automation can't click Chrome's permission prompt. `tests/e2e/real-anemo.spec.ts` runs the same flow against a real Anemo when `ANEMO_E2E_URL`/`ANEMO_E2E_TOKEN` are set. | Tests the real extension in a real Chromium; the real-server spec proves the contract end to end. |
 | E12 | Debug logging only in `npm run dev` builds (`__DEV__`); log calls take ids and sizes, never tokens or texts. | "Never log tokens or page content in production." |
+| E13 | Chat streams run events with `fetch` + an SSE parser (`shared/sse.ts`) in the side panel, resuming with `Last-Event-ID` after a drop (backoff 0.5 s doubling to 30 s), stopping at a terminal status, a 401 or a 404. The reducer mirrors Anemo's `runStream.ts`. | EventSource can't send the token. Same events, same rendering as Anemo. |
+| E14 | Server state through TanStack Query with Anemo's query keys; one cache per connection (keyed by server and token). | Same pattern as Anemo; reconnecting never shows the previous server's data. |
+| E15 | The open chat and drafts per chat are in `chrome.storage.local` (`chat`); switching chats takes effect at once in memory, the storage write follows. Each chat is a component keyed by its id. | Reopening the panel resumes; nothing typed right after a switch lands in the wrong chat. |
+| E16 | Panel Markdown: react-markdown (never inserts raw HTML) + GFM + highlight.js (no auto-detect) + KaTeX (`trust` off, fonts bundled). Links: Anemo paths (`/documents/…`) open in Anemo, http/https/mailto in a new tab, anything else (javascript:, data:, protocol-relative) is dropped. Remote images wait for a click. DOMPurify is used where HTML is produced from Markdown (the in-page box, feature 5); in the panel no HTML string is ever produced, so there is nothing for it to clean. | Same safety as Anemo's own Markdown; the spec's sanitising goal without a step that would do nothing. |
+| E17 | Approval cards use `GET /runs/{id}/timeline` (refetched on each tool/approval/plan event) and `POST /approvals/{id}`. Plans can be approved or sent back with feedback; editing steps links to the chat in Anemo. | Your answer 15; Anemo's own decision path. |
+| E18 | The chat view keeps itself scrolled to the bottom with a ResizeObserver on its content (unless you scrolled up). | Approval cards and tool calls load a moment after their event; a scroll on each event missed them. |
+

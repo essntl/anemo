@@ -63,3 +63,38 @@
     background: var(--selection);
   }
 }
+
+/* Rendered Markdown: Anemo's styles (frontend/src/styles/app.css), a little tighter for
+   a side panel. */
+@layer components {
+  .markdown { @apply text-[13.5px] leading-6 break-words; }
+  .markdown > :first-child { margin-top: 0; }
+  .markdown > :last-child { margin-bottom: 0; }
+  .markdown p { @apply my-2.5; }
+  .markdown h1 { @apply mt-5 mb-2.5 text-lg font-semibold; }
+  .markdown h2 { @apply mt-4 mb-2 text-base font-semibold; }
+  .markdown h3 { @apply mt-3 mb-1.5 text-[14px] font-semibold; }
+  .markdown ul { @apply my-2.5 list-disc pl-5; }
+  .markdown ol { @apply my-2.5 list-decimal pl-5; }
+  .markdown li { @apply my-0.5; }
+  .markdown a { @apply text-accent underline underline-offset-2; }
+  .markdown blockquote { @apply my-2.5 border-l-4 border-border-strong pl-3 text-muted; }
+  .markdown hr { @apply my-5 border-border; }
+  .markdown .table-scroll { @apply my-2.5 overflow-x-auto; }
+  .markdown table { @apply w-max max-w-2xl border-collapse text-[12.5px]; }
+  .markdown th, .markdown td { @apply border border-border px-2.5 py-1 text-left; }
+  .markdown th { @apply bg-surface-2 font-semibold; }
+  .markdown :not(pre) > code { @apply rounded-md bg-surface-2 px-1 py-0.5 font-mono text-[0.88em]; }
+  .markdown input[type='checkbox'] { @apply mr-1.5 align-middle; }
+  .markdown li.task-list-item { @apply -ml-5 list-none; }
+  .markdown img { @apply my-2.5 max-w-full rounded-lg; }
+  .markdown .katex-display { @apply my-3 overflow-x-auto overflow-y-hidden py-1; }
+
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in { color: var(--code-keyword); }
+  .hljs-string, .hljs-attr-value, .hljs-regexp, .hljs-addition { color: var(--code-string); }
+  .hljs-number, .hljs-symbol, .hljs-bullet { color: var(--code-number); }
+  .hljs-comment, .hljs-quote, .hljs-meta { color: var(--code-comment); font-style: italic; }
+  .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--code-function); }
+  .hljs-type, .hljs-class, .hljs-attr, .hljs-variable, .hljs-params { color: var(--code-type); }
+  .hljs-deletion { color: var(--error); }
+}

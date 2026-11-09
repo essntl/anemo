@@ -36,7 +36,13 @@ export async function startMockAnemo(): Promise<MockAnemo> {
   routes.set('GET /api/health', (_req, _b, res) => send(res, 200, { status: 'ok' }))
   routes.set('GET /api/auth/me', (_req, _b, res) => send(res, 200, { username: 'admin', session_id: 't1', recent_auth: false, via: 'token' }))
   routes.set('POST /api/permissions/preview', (_req, _b, res) => send(res, 200, {}))
-  routes.set('GET /api/settings', (_req, _b, res) => send(res, 200, { appearance: { accent: '#3478f6', mode: 'system', density: 'comfortable' } }))
+  routes.set('GET /api/settings', (_req, _b, res) =>
+    send(res, 200, {
+      appearance: { accent: '#3478f6', mode: 'system', density: 'comfortable' },
+      general: { default_chat_mode: 'chat', timezone: 'UTC' },
+      models: { chat: 'm-echo' },
+    }),
+  )
   routes.set('DELETE /api/auth/tokens/current', (req, _b, res) => {
     tokens.delete(bearer(req) ?? '')
     res.writeHead(204).end()
@@ -57,9 +63,10 @@ export async function startMockAnemo(): Promise<MockAnemo> {
           return error(res, 403, 'bad_origin', 'Cross-site request blocked')
         }
       }
-      const handler = routes.get(key)
-      if (!handler) return error(res, 404, 'not_found', `No route ${key}`)
-      await handler(req, raw ? JSON.parse(raw) : undefined, res)
+      const found = match(routes, req.method ?? 'GET', path)
+      if (!found) return error(res, 404, 'not_found', `No route ${key}`)
+      ;(req as IncomingMessage & { params: Record<string, string> }).params = found.params
+      await found.handler(req, raw ? JSON.parse(raw) : undefined, res)
     })
   })
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
@@ -69,8 +76,31 @@ export async function startMockAnemo(): Promise<MockAnemo> {
     tokens,
     log,
     routes,
-    close: () => new Promise((r) => server.close(() => r())),
+    close: () =>
+      new Promise((r) => {
+        server.closeAllConnections()
+        server.close(() => r())
+      }),
   }
+}
+
+/** Exact routes first, then patterns with :params ("GET /api/runs/:id/events"). */
+function match(routes: Map<string, Handler>, method: string, path: string): { handler: Handler; params: Record<string, string> } | null {
+  const exact = routes.get(`${method} ${path}`)
+  if (exact) return { handler: exact, params: {} }
+  for (const [key, handler] of routes) {
+    const [m, pattern] = key.split(' ')
+    if (m !== method || !pattern.includes(':')) continue
+    const names: string[] = []
+    const re = new RegExp(`^${pattern.replace(/:(\w+)/g, (_x, n: string) => (names.push(n), '([^/]+)'))}$`)
+    const hit = re.exec(path)
+    if (hit) return { handler, params: Object.fromEntries(names.map((n, i) => [n, decodeURIComponent(hit[i + 1])])) }
+  }
+  return null
+}
+
+export function params(req: IncomingMessage): Record<string, string> {
+  return (req as IncomingMessage & { params?: Record<string, string> }).params ?? {}
 }
 
 function bearer(req: IncomingMessage): string | null {

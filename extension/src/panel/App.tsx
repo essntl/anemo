@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MessageSquare, Settings } from 'lucide-react'
 import { storage } from '@/shared/storage'
 import { cn } from './lib/cn'
 import { useConnection } from './state/connection'
+import { SessionProvider } from './state/session'
 import { useStored } from './state/useStored'
 import { applyAccent } from './theme'
-import { ChatView } from './views/ChatView'
+import { ChatView } from './chat/ChatView'
 import { ConnectionBanner } from './views/ConnectionBanner'
 import { SettingsView } from './views/SettingsView'
 import { SetupView } from './views/SetupView'
 
 export type View = 'chat' | 'settings'
+
+/** The query cache for one connection. */
+function Connected({ children }: { children: React.ReactNode }) {
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } }))
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+}
 
 const TABS: { view: View; label: string; icon: typeof MessageSquare }[] = [
   { view: 'chat', label: 'Chat', icon: MessageSquare },
@@ -36,7 +44,10 @@ export function App() {
   if (!loaded) return null
   if (!connection?.token || !api) return <SetupView connection={connection ?? null} />
 
+  // Keyed by server and token: reconnecting starts with an empty cache.
   return (
+    <Connected key={`${connection.serverUrl} ${connection.token}`}>
+    <SessionProvider value={{ api, connection: { ...connection, token: connection.token } }}>
     <div className="flex h-full flex-col">
       <header className="flex h-11 shrink-0 items-center gap-1 border-b border-border bg-surface px-2">
         <img src="/icons/icon-32.png" alt="" className="mr-1 h-6 w-6 rounded-md" />
@@ -65,5 +76,7 @@ export function App() {
         {view === 'settings' && <SettingsView api={api} connection={connection} />}
       </main>
     </div>
+    </SessionProvider>
+    </Connected>
   )
 }

@@ -9,7 +9,7 @@ test('connects with a valid token, then goes back to setup when it is revoked', 
   await panel.getByLabel('Anemo address').fill(anemo.url)
   await panel.getByLabel('API token').fill('anemo_good-token')
   await panel.getByRole('button', { name: 'Connect' }).click()
-  await expect(panel.getByText('Connected', { exact: true })).toBeVisible()
+  await expect(panel.getByText('What can I help with?')).toBeVisible()
   expect(anemo.log).toContain('POST /api/permissions/preview')
 
   // Revoked in Anemo: the next request is a 401 and the panel says so.
