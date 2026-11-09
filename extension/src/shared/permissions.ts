@@ -35,5 +35,10 @@ export async function hasFeaturePermissions(key: FeatureKey): Promise<boolean> {
 export async function releaseFeature(key: FeatureKey): Promise<void> {
   const wanted = FEATURE_PERMISSIONS[key]
   if (!needsAny(wanted)) return
+  if (key === 'focusBlocking' && chrome.declarativeNetRequest) {
+    // No blocking rule may outlive the switch.
+    const rules = await chrome.declarativeNetRequest.getDynamicRules().catch(() => [])
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: rules.map((r) => r.id) }).catch(() => undefined)
+  }
   await chrome.permissions.remove(wanted).catch(() => false)
 }

@@ -24,8 +24,8 @@ export const FEATURES: FeatureInfo[] = [
     key: 'focusBlocking',
     label: 'Block distractions during focus',
     description: 'Sites on your list show the remaining focus time instead.',
-    asks: 'blocking and redirecting sites (each site is asked for when you add it)',
-    available: false,
+    asks: 'blocking and redirecting sites (each site is asked for when you add it, in the Focus tab)',
+    available: true,
   },
   { key: 'youtubeNotes', label: 'YouTube notes', description: 'Timestamped notes and transcripts for YouTube videos (the Notes tab).', asks: 'access to youtube.com', available: true },
   {

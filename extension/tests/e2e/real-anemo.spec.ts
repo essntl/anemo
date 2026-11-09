@@ -259,3 +259,39 @@ test('a research session: sources reach the session chat as untrusted context, a
     site.close()
   }
 })
+
+test('focus: the panel and Anemo share one timer, and blocking follows it', async ({ panel, context }) => {
+  test.setTimeout(60_000)
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const read = async () => (await (await fetch(`${url}/api/focus/timer`, { headers: auth })).json()) as { state: Record<string, unknown> | null; version: number }
+  await context.route('https://distraction.test/**', (route) => route.fulfill({ body: '<h1>Very distracting</h1>', contentType: 'text/html' }))
+  await panel.getByLabel('Anemo address').fill(url!)
+  await panel.getByLabel('API token').fill(token!)
+  await panel.getByRole('button', { name: 'Connect' }).click()
+  await expect(panel.getByText('What can I help with?')).toBeVisible()
+  await panel.getByRole('button', { name: 'Focus' }).click()
+  // Whatever an earlier run left: stopped first.
+  if ((await read()).state?.status !== 'idle' && (await read()).state) await panel.getByRole('button', { name: 'Stop' }).click()
+  await panel.getByLabel('Site to block').fill('distraction.test')
+  await panel.getByRole('button', { name: 'Add site' }).click()
+  await panel.getByRole('switch', { name: 'Block distractions during focus' }).click()
+
+  await panel.getByRole('button', { name: 'Start focus' }).click()
+  await expect.poll(async () => (await read()).state?.status).toBe('running')
+  const tab = await context.newPage()
+  await tab.goto('https://distraction.test/').catch(() => undefined)
+  await expect(tab).toHaveURL(/blocked\.html/)
+
+  // Paused in Anemo (as a tab would): the panel and the blocking follow through the event stream.
+  const now = await read()
+  const paused = { ...now.state, status: 'paused', started_at: null, paused_at: Date.now(), accumulated: 60_000 }
+  const r = await fetch(`${url}/api/focus/timer`, { method: 'PUT', headers: auth, body: JSON.stringify({ state: paused, base_version: now.version, source: 'tab' }) })
+  expect(r.status).toBe(200)
+  await expect(panel.getByTestId('focus-timer')).toContainText('paused')
+  await expect(tab.getByRole('heading')).toHaveText('Focus is over')
+  // A change on an old version is refused with the current state.
+  const stale = await fetch(`${url}/api/focus/timer`, { method: 'PUT', headers: auth, body: JSON.stringify({ state: now.state, base_version: now.version, source: 'tab' }) })
+  expect(stale.status).toBe(409)
+  await panel.getByRole('button', { name: 'Stop' }).click()
+  await expect.poll(async () => (await read()).state?.status).toBe('idle')
+})

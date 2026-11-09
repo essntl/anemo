@@ -28,13 +28,16 @@ export class ApiError extends Error {
   readonly kind: ErrorKind
   readonly status: number
   readonly code: string
+  /** Anemo's `details` for an error answer (e.g. the current state on a conflict). */
+  readonly details: unknown
 
-  constructor(kind: ErrorKind, message: string, status = 0, code: string = kind) {
+  constructor(kind: ErrorKind, message: string, status = 0, code: string = kind, details?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.kind = kind
     this.status = status
     this.code = code
+    this.details = details
   }
 }
 
@@ -80,7 +83,7 @@ export async function classifyResponse(res: Response): Promise<ApiError | null> 
 }
 
 interface ErrorBody {
-  error?: { code?: string; message?: string }
+  error?: { code?: string; message?: string; details?: unknown }
 }
 
 /** The ApiError for one of Anemo's own JSON error answers. */
@@ -90,7 +93,7 @@ export function fromErrorBody(status: number, body: unknown): ApiError {
   const message = err?.message ?? `Anemo answered with an error (${status}).`
   if (status === 401) return new ApiError('unauthorized', MESSAGES.unauthorized, status, code)
   if (status === 403 && code === 'bad_origin') return new ApiError('origin', MESSAGES.origin, status, code)
-  return new ApiError('http', message, status, code)
+  return new ApiError('http', message, status, code, err?.details)
 }
 
 /** The ApiError for a fetch that threw (no answer at all). */

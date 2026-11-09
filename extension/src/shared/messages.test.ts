@@ -25,3 +25,16 @@ describe('classifySender', () => {
     expect(classifySender('panel.opened', panel, ID, [])).toBe('rejected')
   })
 })
+
+describe('messages from Anemo tabs', () => {
+  const anemo = { id: ID, tab: { id: 3 } as chrome.tabs.Tab, frameId: 0, url: 'https://anemo.example/music' }
+  it('takes music reports from the Anemo address only, top frame only', () => {
+    expect(classifySender({ type: 'music.state', state: {} }, anemo, ID, [], 'https://anemo.example')).toBe('anemo_tab')
+    expect(classifySender({ type: 'music.state', state: {} }, { ...anemo, url: 'https://evil.example/' }, ID, [], 'https://anemo.example')).toBe('rejected')
+    expect(classifySender({ type: 'music.state', state: {} }, { ...anemo, frameId: 2 }, ID, [], 'https://anemo.example')).toBe('rejected')
+    expect(classifySender({ type: 'music.state', state: {} }, anemo, ID, [], null)).toBe('rejected')
+    expect(classifySender({ type: 'music.state', state: {} }, { ...anemo, id: 'other' }, ID, [], 'https://anemo.example')).toBe('rejected')
+    // Nothing else from an Anemo tab.
+    expect(classifySender({ type: 'connection.changed' }, anemo, ID, [], 'https://anemo.example')).toBe('rejected')
+  })
+})

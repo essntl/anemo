@@ -24,6 +24,7 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const alias = {
   '@': resolve(root, 'src'),
   '@anemo/schema': resolve(root, '../frontend/src/api/schema.d.ts'),
+  '@anemo/timer': resolve(root, '../frontend/src/features/focus/timer.ts'),
 }
 
 /**
@@ -67,7 +68,11 @@ function common(entry, format, fileName, name) {
 function writeManifest() {
   const manifest = JSON.parse(readFileSync(resolve(root, 'manifest.json'), 'utf8'))
   manifest.version = pkg.version
-  if (e2e) manifest.host_permissions = ['http://127.0.0.1/*', 'https://www.youtube.com/*']
+  if (e2e) {
+    // The test site blocked during focus (distraction.test), with the blocking itself.
+    manifest.host_permissions = ['http://127.0.0.1/*', 'https://www.youtube.com/*', '*://distraction.test/*', '*://*.distraction.test/*']
+    manifest.permissions = [...manifest.permissions, 'declarativeNetRequest']
+  }
   mkdirSync(out, { recursive: true })
   writeFileSync(resolve(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 }

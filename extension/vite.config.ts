@@ -15,6 +15,8 @@ const here = fileURLToPath(new URL('.', import.meta.url))
 export const alias = {
   '@': resolve(here, 'src'),
   '@anemo/schema': resolve(here, '../frontend/src/api/schema.d.ts'),
+  // The focus timer's rules (pure functions), the same as in Anemo.
+  '@anemo/timer': resolve(here, '../frontend/src/features/focus/timer.ts'),
 }
 
 export default defineConfig(({ mode }) => ({

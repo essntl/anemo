@@ -23,6 +23,8 @@ export interface Preferences {
   notificationTypes: Record<NotificationType, boolean>
   /** Target language for translations (BCP 47 code). */
   targetLanguage: string
+  /** Sites blocked during focus (domains, e.g. "youtube.com"; subdomains included). */
+  focusSites: string[]
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -35,6 +37,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   },
   notificationTypes: { reminder: true, calendar: true, agent: true, approval: true, focus: true },
   targetLanguage: 'en',
+  focusSites: [],
 }
 
 /** Stored preferences merged over the defaults (new fields get their default). */

@@ -29,6 +29,9 @@
       ],
       "@anemo/schema": [
         "../frontend/src/api/schema.d.ts"
+      ],
+      "@anemo/timer": [
+        "../frontend/src/features/focus/timer.ts"
       ]
     },
     "allowImportingTsExtensions": true

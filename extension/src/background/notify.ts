@@ -6,7 +6,9 @@
  *   notification, kind reminder (tasks)   → reminder   the task in Anemo
  *   notification, kind automation/agent   → agent      the chat (panel) or Anemo
  *   notification, kind approval           → approval   the chat in the panel
- *   notification, kind focus              → focus      Anemo's focus page
+ *   notification, kind focus              → (none: the extension sees the timer itself)
+ *   the shared focus timer: a focus phase ran to its end
+ *                                          → focus      Anemo's focus page
  *   approval.requested                    → approval   the chat in the panel (its card)
  *   run.status: an agent run you started ended, after more than 2 minutes or while its
  *   chat isn't open in the panel           → agent      the chat in the panel
@@ -75,10 +77,18 @@ export function fromStoredNotification(n: StoredNotification, at: number): Spec 
     case 'agent':
       return { ...base, id: `n:${n.id}`, type: 'agent', urgent: false }
     case 'focus':
-      return { ...base, id: `n:${n.id}`, type: 'focus', urgent: false }
+      // "Phase finished" in Anemo's Notifications list: the extension follows the timer
+      // and says so itself (fromFocusEnded), once, whichever device finished the phase.
+      return null
     default:
       return null
   }
+}
+
+/** A focus phase ran to its end (seen on the shared timer). Shown even though focus was
+ *  on a moment ago: it is the end of focus. */
+export function fromFocusEnded(notice: { id: string; title: string; body: string }, at: number): Spec {
+  return { id: notice.id, type: 'focus', title: notice.title, message: notice.body, target: { kind: 'anemo', path: '/focus' }, urgent: true, at }
 }
 
 export function fromApprovalRequested(data: { run_id?: string; conversation_id?: string | null }, summary: string | null, at: number): Spec {

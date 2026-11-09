@@ -34,8 +34,10 @@ export interface LocalData {
   lastProjectId: string | null
   /** The notes document of each YouTube video (video id → document id). */
   youtubeDocs: Record<string, string>
-  /** The focus session as last known (feature 10 keeps it current). */
+  /** Whether a focus phase is running, and until when (holds notifications back). */
   focusState: { active: boolean; endsAt: number | null } | null
+  /** Anemo's shared focus timer as last seen, with its settings. */
+  focusTimer: import('./focus').FocusMirror | null
 }
 
 export interface SessionData {
@@ -79,6 +81,10 @@ export interface SessionData {
   /** An explanation or translation shown in the panel where the page can't show a box
    *  (Chrome's PDF viewer, its own pages). */
   panelInline: { id: string; mode: 'explain' | 'translate'; selection: string; text: string; status: 'working' | 'done' | 'error'; error?: string; at: number } | null
+  /** What the music player in each Anemo tab reports, by tab id. */
+  musicTabs: Record<string, import('./music').MusicTab>
+  /** How the last "add to the queue" went (for the panel). */
+  musicAdded: { id: string; ok: boolean; error: string | null; count: number; at: number } | null
   /** Saves in progress or done, by id (from the event stream's capture events). */
   captures: Record<string, CaptureStatus>
 }

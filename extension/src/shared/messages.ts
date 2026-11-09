@@ -17,12 +17,26 @@ export type PanelMessage =
 /** From one of our in-page scripts to the worker. Kept short on purpose. */
 export type InpageMessage = { type: 'inpage.ready'; script: string }
 
-export type Message = PanelMessage | InpageMessage
+/** From our script in an Anemo tab: what its music player is doing. */
+export type AnemoTabMessage =
+  | { type: 'music.state'; state: import('./music').NowPlaying }
+  | { type: 'music.added'; id: string; ok: boolean; error: string | null; count: number }
+
+export type Message = PanelMessage | InpageMessage | AnemoTabMessage
 
 const INPAGE_TYPES = new Set<string>(['inpage.ready'])
 const PANEL_TYPES = new Set<string>(['panel.opened', 'connection.changed', 'features.changed'])
+const ANEMO_TAB_TYPES = new Set<string>(['music.state', 'music.added'])
 
-export type SenderKind = 'extension_page' | 'inpage' | 'rejected'
+export type SenderKind = 'extension_page' | 'inpage' | 'anemo_tab' | 'rejected'
+
+function originOf(url: string | undefined): string | null {
+  try {
+    return url ? new URL(url).origin : null
+  } catch {
+    return null
+  }
+}
 
 /** Where a message came from, or 'rejected' when it must be ignored. */
 export function classifySender(
@@ -30,6 +44,8 @@ export function classifySender(
   sender: chrome.runtime.MessageSender,
   ownId: string,
   injectedTabs: readonly number[],
+  /** The Anemo address: its tabs (top frame) may report what their player is doing. */
+  anemoOrigin: string | null = null,
 ): SenderKind {
   if (sender.id !== ownId) return 'rejected'
   const type = typeof message === 'object' && message !== null ? (message as { type?: unknown }).type : undefined
@@ -40,6 +56,9 @@ export function classifySender(
     return ownPage && PANEL_TYPES.has(type) ? 'extension_page' : 'rejected'
   }
   const tabId = sender.tab.id
+  if (ANEMO_TAB_TYPES.has(type)) {
+    return anemoOrigin !== null && sender.frameId === 0 && originOf(sender.url) === anemoOrigin ? 'anemo_tab' : 'rejected'
+  }
   if (tabId === undefined || !injectedTabs.includes(tabId)) return 'rejected'
   return INPAGE_TYPES.has(type) ? 'inpage' : 'rejected'
 }

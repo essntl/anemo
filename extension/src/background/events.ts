@@ -21,6 +21,7 @@ import {
   eventTime,
   fromAgentRun,
   fromApprovalRequested,
+  fromFocusEnded,
   fromStoredNotification,
   summarize,
   type RunStatusEvent,
@@ -29,6 +30,7 @@ import {
 } from './notify'
 import { show } from './notifier'
 import { refreshResearch } from './research'
+import { forgetFocus, onTimerEvent, refreshFocus, setFocusApi, setFocusEndedHandler } from './focus'
 import { EventStream, type StreamEvent, type StreamState } from './stream'
 
 const CATCH_UP_WINDOW_MS = 1500
@@ -82,6 +84,8 @@ export async function releaseHeld(): Promise<void> {
   await storage.set('local', 'heldNotifications', [])
   await show(held.length === 1 ? held[0] : summarize(held, 'held', Date.now()))
 }
+
+setFocusEndedHandler((notice) => void deliver(fromFocusEnded(notice, Date.now())))
 
 async function remember(id: string): Promise<void> {
   const seen = await storage.get('local', 'events')
@@ -137,6 +141,9 @@ async function onEvent(e: StreamEvent): Promise<void> {
       await storage.set('session', 'captures', { ...kept, [status.id]: status })
       break
     }
+    case 'focus.timer':
+      await onTimerEvent(e.data as unknown as import('@/shared/focus').TimerOut)
+      break
     case 'research.changed':
       await refreshResearch(api)
       break
@@ -179,6 +186,7 @@ async function onWelcome(missed: boolean, cursor: string | null): Promise<void> 
   }
   void refreshApprovals()
   void refreshResearch(api)
+  void refreshFocus()
   setTimeout(() => void flushCatchUp(), CATCH_UP_WINDOW_MS)
 }
 
@@ -209,9 +217,12 @@ export async function syncStream(): Promise<void> {
   if (!connection?.token) {
     await updateBadge({ approvals: 0 })
     await refreshResearch(null)
+    setFocusApi(null)
+    await forgetFocus()
     return
   }
   api = createApi({ serverUrl: connection.serverUrl, token: connection.token, onUnauthorized: () => void markTokenLost() })
+  setFocusApi(api)
   const seen = await storage.get('local', 'events')
   stream = new EventStream({
     serverUrl: connection.serverUrl,

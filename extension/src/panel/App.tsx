@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BookmarkPlus, FlaskConical, MessageSquare, NotebookPen, Settings } from 'lucide-react'
+import { BookmarkPlus, FlaskConical, MessageSquare, NotebookPen, Settings, Timer } from 'lucide-react'
 import { storage } from '@/shared/storage'
 import { cn } from './lib/cn'
 import { useConnection } from './state/connection'
@@ -9,6 +9,7 @@ import { useStored } from './state/useStored'
 import { applyAccent } from './theme'
 import { CaptureView } from './capture/CaptureView'
 import { NotesView } from './notes/NotesView'
+import { FocusView } from './focus/FocusView'
 import { ResearchBar, ResearchView } from './research/ResearchView'
 import { ChatView } from './chat/ChatView'
 import { ConnectionBanner } from './views/ConnectionBanner'
@@ -17,7 +18,7 @@ import { PanelNotice } from './views/PanelNotice'
 import { SettingsView } from './views/SettingsView'
 import { SetupView } from './views/SetupView'
 
-export type View = 'chat' | 'capture' | 'notes' | 'research' | 'settings'
+export type View = 'chat' | 'capture' | 'notes' | 'research' | 'focus' | 'settings'
 
 /** Shows a chat in the Chat view (e.g. "Explain this moment" from the Notes view). */
 async function openChat(conversationId: string): Promise<void> {
@@ -37,6 +38,7 @@ const TABS: { view: View; label: string; icon: typeof MessageSquare }[] = [
   { view: 'capture', label: 'Capture', icon: BookmarkPlus },
   { view: 'notes', label: 'Notes', icon: NotebookPen },
   { view: 'research', label: 'Research', icon: FlaskConical },
+  { view: 'focus', label: 'Focus', icon: Timer },
   { view: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -92,6 +94,7 @@ export function App() {
         {view === 'capture' && <CaptureView />}
         {view === 'notes' && <NotesView onOpenChat={(id) => void openChat(id)} />}
         {view === 'research' && <ResearchView onOpenChat={(id) => void openChat(id)} />}
+        {view === 'focus' && <FocusView />}
         {view === 'settings' && <SettingsView api={api} connection={connection} />}
       </main>
     </div>
