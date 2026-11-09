@@ -14,8 +14,10 @@ from app.providers.base import (
     ConversationRef,
     ImageBlock,
     Message,
+    PageRef,
     TextBlock,
 )
+from app.runtime import pages
 
 CHARS_PER_TOKEN = 4  # rough estimate; good enough for trimming decisions
 IMAGE_TOKENS = 1_600  # what a ~1568px image costs on current vision models
@@ -66,8 +68,8 @@ async def load_history(
 async def resolve_attachments(
     db: AsyncSession, history: list[Message], capabilities: dict[str, bool]
 ) -> list[Message]:
-    """Replace references to attachments and to other chats with model input suited
-    to these capabilities."""
+    """Replace references to attachments and to other chats, and attached web pages, with
+    model input suited to these capabilities."""
     # Imported here: references needs load_history from this module.
     from app.runtime.references import render_reference
 
@@ -80,6 +82,8 @@ async def resolve_attachments(
             elif isinstance(block, ConversationRef):
                 text = await render_reference(db, block.conversation_id, block.title)
                 blocks.append(TextBlock(text=text))
+            elif isinstance(block, PageRef):
+                blocks.append(TextBlock(text=pages.render(block)))
             else:
                 blocks.append(block)
         resolved.append(Message(role=msg.role, content=blocks))

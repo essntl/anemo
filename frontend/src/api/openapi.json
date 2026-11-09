@@ -3085,6 +3085,76 @@
         }
       }
     },
+    "/api/conversations/{conversation_id}/messages/{message_id}/page": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Message Page",
+        "description": "The web page attached to a message (by the browser extension), with its text.",
+        "operationId": "message_page_api_conversations__conversation_id__messages__message_id__page_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageContentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{conversation_id}/regenerate": {
       "post": {
         "tags": [
@@ -11692,6 +11762,66 @@
         }
       }
     },
+    "/api/extension/pdf-text": {
+      "post": {
+        "tags": [
+          "extension"
+        ],
+        "summary": "Pdf Text",
+        "description": "The text of a PDF, page by page, for \"Include this page\" on a PDF the browser shows.\nThe extension fetches the PDF itself (with the browser's own login to the site) and\nsends it here; nothing is stored.",
+        "operationId": "pdf_text_api_extension_pdf_text_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_text_api_extension_pdf_text_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PdfTextOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/automations": {
       "get": {
         "tags": [
@@ -14384,6 +14514,20 @@
           "documents"
         ],
         "title": "Backlinks"
+      },
+      "Body_pdf_text_api_extension_pdf_text_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_pdf_text_api_extension_pdf_text_post"
       },
       "Body_upload_api_attachments_post": {
         "properties": {
@@ -17844,6 +17988,16 @@
             "title": "References",
             "default": []
           },
+          "page": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "skill": {
             "anyOf": [
               {
@@ -18810,6 +18964,123 @@
         "title": "OccurrenceOut",
         "description": "One occurrence in a calendar range. For repeating events `original_start`\nidentifies it (used to change or cancel just this one)."
       },
+      "PageContentOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "word_count": {
+            "type": "integer",
+            "title": "Word Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "title",
+          "source",
+          "word_count",
+          "truncated",
+          "content"
+        ],
+        "title": "PageContentOut"
+      },
+      "PageIn": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Title",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "page",
+              "selection",
+              "pdf",
+              "youtube"
+            ],
+            "title": "Source",
+            "default": "page"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 130000,
+            "minLength": 1,
+            "title": "Content"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "content"
+        ],
+        "title": "PageIn",
+        "description": "A web page attached to a message by the browser extension: its main content (or a\nselection, a PDF's text, a video transcript). Untrusted: it is wrapped and labelled as\ndata for the model (runtime/pages.py) and never becomes part of the message text."
+      },
+      "PageSummary": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "word_count": {
+            "type": "integer",
+            "title": "Word Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "title",
+          "source",
+          "word_count",
+          "truncated"
+        ],
+        "title": "PageSummary",
+        "description": "The page attached to a message, without its content (GET \u2026/page has it)."
+      },
       "PasswordIn": {
         "properties": {
           "password": {
@@ -18838,6 +19109,55 @@
           "path"
         ],
         "title": "PathIn"
+      },
+      "PdfPage": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "text"
+        ],
+        "title": "PdfPage"
+      },
+      "PdfTextOut": {
+        "properties": {
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PdfPage"
+            },
+            "type": "array",
+            "title": "Pages"
+          },
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count"
+          },
+          "pages_read": {
+            "type": "integer",
+            "title": "Pages Read"
+          },
+          "has_text": {
+            "type": "boolean",
+            "title": "Has Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pages",
+          "page_count",
+          "pages_read",
+          "has_text"
+        ],
+        "title": "PdfTextOut"
       },
       "PendingApprovalOut": {
         "properties": {
@@ -23893,6 +24213,16 @@
               }
             ],
             "title": "Skill Id"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

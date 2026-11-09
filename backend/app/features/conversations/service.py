@@ -21,6 +21,9 @@ from app.features.conversations.schemas import (
     ConversationOut,
     MessageOut,
     MessageVersion,
+    PageContentOut,
+    PageIn,
+    PageSummary,
     QuestionMark,
     ReferenceSummary,
     SkillSummary,
@@ -142,6 +145,7 @@ def message_out(
             for b in m.content
             if isinstance(b, dict) and b.get("type") == "conversation"
         ],
+        page=_page_summary(m.content),
         skill=SkillSummary.model_validate(m.skill) if m.skill else None,
         mode=mode if mode is not None else (info[0] if info else None),
         questions=_questions(info),
@@ -488,6 +492,50 @@ async def _reference_blocks(
     return blocks
 
 
+def page_block(page: PageIn) -> dict[str, Any]:
+    """The stored PageRef block for an attached page (see runtime/pages.py)."""
+    return {
+        "type": "page",
+        "url": page.url,
+        "title": page.title.strip(),
+        "source": page.source,
+        "content": page.content,
+        "word_count": len(page.content.split()),
+        "truncated": page.truncated,
+    }
+
+
+def _page(content: list[Any]) -> dict[str, Any] | None:
+    return next((b for b in content if isinstance(b, dict) and b.get("type") == "page"), None)
+
+
+def _page_summary(content: list[Any]) -> PageSummary | None:
+    block = _page(content)
+    if block is None:
+        return None
+    return PageSummary(
+        url=str(block.get("url", "")),
+        title=str(block.get("title", "")),
+        source=str(block.get("source", "page")),
+        word_count=int(block.get("word_count") or 0),
+        truncated=bool(block.get("truncated")),
+    )
+
+
+async def page_content(
+    db: AsyncSession, conversation_id: uuid.UUID, message_id: uuid.UUID
+) -> PageContentOut:
+    """The page attached to a message, with its content."""
+    message = await db.get(ChatMessage, message_id)
+    if message is None or message.conversation_id != conversation_id:
+        raise NotFound("Message not found")
+    block = _page(message.content or [])
+    summary = _page_summary(message.content or [])
+    if block is None or summary is None:
+        raise NotFound("This message has no attached page")
+    return PageContentOut(**summary.model_dump(), content=str(block.get("content", "")))
+
+
 async def send_turn(
     db: AsyncSession,
     conversation_id: uuid.UUID,
@@ -498,6 +546,7 @@ async def send_turn(
     profile_id: uuid.UUID | None = None,
     reference_ids: list[uuid.UUID] | None = None,
     skill_id: uuid.UUID | None = None,
+    page: PageIn | None = None,
 ) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     conv = await _lock_idle_conversation(db, conversation_id)
     references = await _reference_blocks(db, conv.id, reference_ids or [])
@@ -535,8 +584,13 @@ async def send_turn(
         user.content = [attachments.ref_block(a) for a in files] + list(user.content)
     if references:
         user.content = references + list(user.content)
+    if page is not None:
+        # Before the text, like a file: the page, then what to do with it. Its content is
+        # never part of text_plain, so memory extraction and search don't see it.
+        user.content = [page_block(page), *user.content]
     conv.default_mode = mode
-    run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, mode)
+    request = text if text.strip() or page is None else f"About the page: {page.title or page.url}"
+    run = await _start_run(db, conv, assistant, request, conv.model_id, user.id, mode)
     conv.last_message_at = func.now()
     await db.commit()
     await db.refresh(user)

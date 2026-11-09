@@ -71,6 +71,25 @@ class ConversationRef(BaseModel):
     title: str = ""
 
 
+PageSource = Literal["page", "selection", "pdf", "youtube"]
+
+
+class PageRef(BaseModel):
+    """Content of a web page the user attached to a message (from the browser extension):
+    the page's main text, a selection, a PDF's text or a video transcript. Untrusted: the
+    runtime wraps and labels it as data before a request is sent (runtime/pages.py), and
+    it is never part of the message's own text (so never used for memories)."""
+
+    type: Literal["page"] = "page"
+    url: str
+    title: str = ""
+    source: PageSource = "page"
+    content: str
+    word_count: int = 0
+    # The extension cut the middle out to stay within the length limit.
+    truncated: bool = False
+
+
 ContentBlock = Annotated[
     TextBlock
     | ImageBlock
@@ -78,7 +97,8 @@ ContentBlock = Annotated[
     | ToolResultBlock
     | ReasoningBlock
     | AttachmentRef
-    | ConversationRef,
+    | ConversationRef
+    | PageRef,
     Field(discriminator="type"),
 ]
 

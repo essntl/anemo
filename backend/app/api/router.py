@@ -21,6 +21,7 @@ from app.features.calendar.router import router as calendar_router
 from app.features.conversations.router import router as conversations_router
 from app.features.daily_notes.router import router as daily_notes_router
 from app.features.documents.router import router as documents_router
+from app.features.extension.http_router import router as extension_http_router
 from app.features.extension.router import router as extension_router
 from app.features.files.router import router as files_router
 from app.features.focus.router import router as focus_router
@@ -83,6 +84,7 @@ protected.include_router(focus_router)
 protected.include_router(music_router)
 protected.include_router(notifications_router)
 protected.include_router(push_router)
+protected.include_router(extension_http_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)

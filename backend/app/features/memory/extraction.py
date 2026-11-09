@@ -95,6 +95,33 @@ def parse_operations(text: str) -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
 
 
+def _has_page(message: ChatMessage | None) -> bool:
+    return message is not None and any(
+        isinstance(b, dict) and b.get("type") == "page" for b in message.content or []
+    )
+
+
+def without_page_answers(
+    messages: list[ChatMessage], before_first: ChatMessage | None = None
+) -> list[ChatMessage]:
+    """Leave out the answers to messages that carried a web page (the browser extension's
+    "Include this page"): an answer quotes and summarises the page, and a page must never
+    become a memory (it could plant one). The user's own words stay. `before_first`: the
+    message just before the first one, in case the window starts with such an answer."""
+    kept: list[ChatMessage] = []
+    previous = before_first
+    for m in messages:
+        if not (
+            m.role == "assistant"
+            and previous is not None
+            and previous.role == "user"
+            and _has_page(previous)
+        ):
+            kept.append(m)
+        previous = m
+    return kept
+
+
 def _render(messages: list[ChatMessage]) -> str:
     parts = [f"{m.role.upper()}: {m.text_plain.strip()[:3000]}" for m in messages if m.text_plain]
     text = "\n\n".join(parts)
@@ -125,6 +152,15 @@ async def extract(conversation_id: uuid.UUID, upto_seq: int) -> int:
                 .limit(MAX_MESSAGES)
             )
         )[::-1]
+        if messages and messages[0].role == "assistant":
+            before = await db.scalar(
+                select(ChatMessage).where(
+                    ChatMessage.conversation_id == conv.id, ChatMessage.seq == messages[0].seq - 1
+                )
+            )
+        else:
+            before = None
+        messages = without_page_answers(messages, before)
         conv.memory_extracted_seq = upto_seq
         user_text = " ".join(m.text_plain for m in messages if m.role == "user")
         if not user_text.strip():

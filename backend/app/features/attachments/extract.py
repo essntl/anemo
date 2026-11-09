@@ -121,21 +121,24 @@ def _truncate(text: str, note: str | None) -> tuple[str, str | None]:
 # --- PDF ---------------------------------------------------------------------------
 
 
-def _pdf(data: bytes) -> tuple[str, str | None]:
+def pdf_pages(data: bytes, max_pages: int = MAX_PDF_PAGES) -> tuple[list[str], int]:
+    """The text of each page (up to `max_pages`) and the PDF's page count. Raises
+    ExtractionError for a damaged or encrypted PDF."""
     from pypdf import PdfReader
 
     try:
         reader = PdfReader(io.BytesIO(data))
         pages = reader.pages
-        parts: list[str] = []
-        note = None
-        for i, page in enumerate(pages):
-            if i >= MAX_PDF_PAGES:
-                note = f"Only the first {MAX_PDF_PAGES} pages were read."
-                break
-            parts.append(page.extract_text() or "")
+        count = len(pages)
+        texts = [(page.extract_text() or "") for page in pages[:max_pages]]
     except Exception as exc:  # noqa: BLE001 - corrupt or encrypted PDFs
         raise ExtractionError(f"Could not read the PDF: {exc}") from exc
+    return texts, count
+
+
+def _pdf(data: bytes) -> tuple[str, str | None]:
+    parts, count = pdf_pages(data)
+    note = f"Only the first {MAX_PDF_PAGES} pages were read." if count > MAX_PDF_PAGES else None
     text = "\n\n".join(p.strip() for p in parts if p.strip())
     if not text:
         note = "No text found (the PDF may be scanned images; OCR is not supported yet)."

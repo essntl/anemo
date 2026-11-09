@@ -802,6 +802,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversation_id}/messages/{message_id}/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Message Page
+         * @description The web page attached to a message (by the browser extension), with its text.
+         */
+        get: operations["message_page_api_conversations__conversation_id__messages__message_id__page_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}/regenerate": {
         parameters: {
             query?: never;
@@ -2722,6 +2742,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/extension/pdf-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pdf Text
+         * @description The text of a PDF, page by page, for "Include this page" on a PDF the browser shows.
+         *     The extension fetches the PDF itself (with the browser's own login to the site) and
+         *     sends it here; nothing is stored.
+         */
+        post: operations["pdf_text_api_extension_pdf_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automations": {
         parameters: {
             query?: never;
@@ -3432,6 +3474,11 @@ export interface components {
             tasks: components["schemas"]["LinkedTask"][];
             /** Documents */
             documents: components["schemas"]["LinkedDocument"][];
+        };
+        /** Body_pdf_text_api_extension_pdf_text_post */
+        Body_pdf_text_api_extension_pdf_text_post: {
+            /** File */
+            file: string;
         };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
@@ -4743,6 +4790,7 @@ export interface components {
              * @default []
              */
             references: components["schemas"]["ReferenceSummary"][];
+            page?: components["schemas"]["PageSummary"] | null;
             skill?: components["schemas"]["SkillSummary"] | null;
             /** Mode */
             mode?: string | null;
@@ -5071,6 +5119,65 @@ export interface components {
             /** Changed */
             changed: boolean;
         };
+        /** PageContentOut */
+        PageContentOut: {
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Source */
+            source: string;
+            /** Word Count */
+            word_count: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Content */
+            content: string;
+        };
+        /**
+         * PageIn
+         * @description A web page attached to a message by the browser extension: its main content (or a
+         *     selection, a PDF's text, a video transcript). Untrusted: it is wrapped and labelled as
+         *     data for the model (runtime/pages.py) and never becomes part of the message text.
+         */
+        PageIn: {
+            /** Url */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Source
+             * @default page
+             * @enum {string}
+             */
+            source: "page" | "selection" | "pdf" | "youtube";
+            /** Content */
+            content: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /**
+         * PageSummary
+         * @description The page attached to a message, without its content (GET …/page has it).
+         */
+        PageSummary: {
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Source */
+            source: string;
+            /** Word Count */
+            word_count: number;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** PasswordIn */
         PasswordIn: {
             /** Password */
@@ -5080,6 +5187,24 @@ export interface components {
         PathIn: {
             /** Path */
             path: string;
+        };
+        /** PdfPage */
+        PdfPage: {
+            /** Number */
+            number: number;
+            /** Text */
+            text: string;
+        };
+        /** PdfTextOut */
+        PdfTextOut: {
+            /** Pages */
+            pages: components["schemas"]["PdfPage"][];
+            /** Page Count */
+            page_count: number;
+            /** Pages Read */
+            pages_read: number;
+            /** Has Text */
+            has_text: boolean;
         };
         /** PendingApprovalOut */
         PendingApprovalOut: {
@@ -6930,6 +7055,7 @@ export interface components {
             profile_id?: string | null;
             /** Skill Id */
             skill_id?: string | null;
+            page?: components["schemas"]["PageIn"] | null;
         };
         /** TurnOut */
         TurnOut: {
@@ -8985,6 +9111,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    message_page_api_conversations__conversation_id__messages__message_id__page_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageContentOut"];
                 };
             };
             /** @description Validation Error */
@@ -13556,6 +13716,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DestinationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pdf_text_api_extension_pdf_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_text_api_extension_pdf_text_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdfTextOut"];
                 };
             };
             /** @description Validation Error */

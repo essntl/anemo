@@ -100,6 +100,35 @@ class SkillSummary(BaseModel):
     icon: str = "sparkles"
 
 
+PAGE_MAX_CHARS = 130_000  # ~30k tokens, the extension's limit (it cuts longer pages)
+
+
+class PageIn(BaseModel):
+    """A web page attached to a message by the browser extension: its main content (or a
+    selection, a PDF's text, a video transcript). Untrusted: it is wrapped and labelled as
+    data for the model (runtime/pages.py) and never becomes part of the message text."""
+
+    url: str = Field(min_length=1, max_length=2000)
+    title: str = Field("", max_length=300)
+    source: Literal["page", "selection", "pdf", "youtube"] = "page"
+    content: str = Field(min_length=1, max_length=PAGE_MAX_CHARS)
+    truncated: bool = False
+
+
+class PageSummary(BaseModel):
+    """The page attached to a message, without its content (GET …/page has it)."""
+
+    url: str
+    title: str
+    source: str
+    word_count: int
+    truncated: bool
+
+
+class PageContentOut(PageSummary):
+    content: str
+
+
 class MessageOut(BaseModel):
     id: uuid.UUID
     seq: int
@@ -113,6 +142,7 @@ class MessageOut(BaseModel):
     created_at: datetime
     attachments: list[AttachmentSummary] = []
     references: list[ReferenceSummary] = []
+    page: PageSummary | None = None  # a web page attached by the browser extension
     skill: SkillSummary | None = None  # user messages started with a /skill
     mode: str | None = None  # "chat" or "agent" for assistant messages
     questions: list[QuestionMark] = []
@@ -139,10 +169,12 @@ class TurnIn(BaseModel):
     profile_id: uuid.UUID | None = None
     # A skill to answer this message with (chosen with /name in the message box).
     skill_id: uuid.UUID | None = None
+    # A web page attached by the browser extension ("Include this page").
+    page: PageIn | None = None
 
     @model_validator(mode="after")
     def _says_something(self) -> "TurnIn":
-        if not self.text.strip() and not self.attachment_ids:
+        if not self.text.strip() and not self.attachment_ids and self.page is None:
             raise ValueError("Write a message or attach a file")
         return self
 

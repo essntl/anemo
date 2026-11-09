@@ -275,6 +275,7 @@ function Conversation() {
               return (
                 <div key={m.id} className={enter(m.id)}>
                   <UserBubble text={m.text} attachments={m.attachments} references={m.references} skill={m.skill}
+                    page={m.page ? { summary: m.page, conversationId, messageId: m.id } : null}
                     onEdit={canEditLast && m.id === lastUser?.id
                       ? (text) => editLast.mutate({ conversationId, text, modelId: modelOverride })
                       : undefined} />
