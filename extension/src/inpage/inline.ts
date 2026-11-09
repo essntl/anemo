@@ -8,6 +8,7 @@
  * at once. Text in fields, editors and code is never replaced: it is shown in the box.
  */
 import { apply, blocksInRange, isEditable, pageBlocks, restore, tagged, wordCount, type Applied, type Block } from './markers'
+import { whileAlive } from './alive'
 import { getUi, hideOriginal, hideToast, isOverPopover, showBox, showOriginal, toast, type Box } from './ui'
 
 export const ASK_ABOVE_WORDS = 3000
@@ -44,7 +45,13 @@ function connect(): chrome.runtime.Port {
 function request(message: Record<string, unknown>, on: (m: FromWorker) => void): string {
   const id = `r${++seq}`
   listeners.set(id, on)
-  connect().postMessage({ ...message, id })
+  // The extension was reloaded or switched off while this page stayed open.
+  if (!whileAlive(() => connect().postMessage({ ...message, id }))) {
+    port = null
+    listeners.delete(id)
+    toast('Anemo Companion was updated. Reload this page to use it here.', [{ label: 'Reload', run: () => location.reload() }], 10_000)
+    queueMicrotask(() => on({ type: 'error', id, message: 'Anemo Companion was updated. Reload this page to use it here.' }))
+  }
   return id
 }
 

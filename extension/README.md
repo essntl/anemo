@@ -161,6 +161,16 @@ the stricter of the two wins.
   scripts can read it.
 - No tokens or page contents in logs. No remote code, `eval` or inline scripts.
 
+## Updating
+
+Build again (or unzip the new build over the old folder) and press the reload arrow on the
+extension's card in `chrome://extensions`. Settings shows the build's name and version at
+the bottom. Pages that were open during the reload need a reload themselves before
+Explain/Translate work on them again (the extension says so).
+
+If `chrome://extensions` shows old entries under **Errors**, press **Clear all**: they are
+kept from earlier builds until cleared.
+
 ## Known limitations
 
 - **The panel can't read a tab on a new site before you click.** Chrome gives an

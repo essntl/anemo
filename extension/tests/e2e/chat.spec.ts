@@ -14,6 +14,8 @@ test('sends a message and streams the answer', async ({ panel }) => {
   await panel.getByLabel('Message').press('Enter')
   await expect(panel.getByTestId('assistant-message')).toContainText('You said: hello there')
   await expect(panel.getByTestId('user-message')).toHaveText('hello there')
+  await panel.getByRole('button', { name: 'Copy answer' }).click()
+  await expect(panel.getByRole('button', { name: 'Copy answer' })).toHaveText('Copied')
 })
 
 test('reopening the panel resumes the chat and its draft', async ({ panel }) => {
@@ -94,6 +96,12 @@ test('chats can be renamed, favorited, archived and deleted, from the list and t
   await panel.getByRole('menuitem', { name: 'Add to favorites' }).click()
   await expect(chats.getByRole('region', { name: 'Favorites' })).toContainText('first chat')
   // Archive it: gone from Chats, there under Archived.
+  await panel.getByRole('button', { name: 'Actions for first chat' }).click()
+  await panel.getByRole('menuitem', { name: 'Archive' }).click()
+  await expect(chats).not.toContainText('first chat')
+  // Undo brings it back; then archive it for good.
+  await panel.getByRole('status').filter({ hasText: 'Chat archived' }).getByRole('button', { name: 'Undo' }).click()
+  await expect(chats).toContainText('first chat')
   await panel.getByRole('button', { name: 'Actions for first chat' }).click()
   await panel.getByRole('menuitem', { name: 'Archive' }).click()
   await expect(chats).not.toContainText('first chat')

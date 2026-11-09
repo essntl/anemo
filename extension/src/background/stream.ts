@@ -48,6 +48,22 @@ export interface StreamDeps {
   setTimeout: (fn: () => void, ms: number) => unknown
   clearTimeout: (handle: unknown) => void
   random: () => number
+  /** Whether Anemo answers at all (asked before each connection attempt), or null to skip. */
+  reachable: ((serverUrl: string) => Promise<boolean>) | null
+  /** Calls `fn` when the computer gets its network back. */
+  onOnline: ((fn: () => void) => void) | null
+}
+
+/** A quiet check that Anemo answers. A WebSocket that can't connect (no network, the name
+ *  doesn't resolve, Anemo is down) is reported by Chrome as an extension error each time;
+ *  a failed request here is not. So the socket is only opened once this succeeds. */
+async function reachable(serverUrl: string): Promise<boolean> {
+  try {
+    const r = await fetch(new URL('/api/health', serverUrl), { cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(8000) })
+    return r.ok
+  } catch {
+    return false
+  }
 }
 
 const defaultDeps: StreamDeps = {
@@ -55,6 +71,8 @@ const defaultDeps: StreamDeps = {
   setTimeout: (fn, ms) => setTimeout(fn, ms),
   clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
   random: Math.random,
+  reachable,
+  onOnline: (fn) => globalThis.addEventListener?.('online', fn),
 }
 
 export const PING_MS = 20_000
@@ -86,11 +104,23 @@ export class EventStream {
   private timers: unknown[] = []
   private retryTimer: unknown = null
   private silenceTimer: unknown = null
+  /** A reachability check is under way. */
+  private checking = false
   private readonly deps: StreamDeps
 
   constructor(private readonly opts: StreamOptions, deps: Partial<StreamDeps> = {}) {
     this.deps = { ...defaultDeps, ...deps }
     this.lastId = opts.lastId
+    // Back online: try at once instead of waiting out the backoff.
+    this.deps.onOnline?.(() => this.wake())
+  }
+
+  private wake(): void {
+    if (this.stopped || this.ws || this.checking) return
+    if (this.retryTimer) this.deps.clearTimeout(this.retryTimer)
+    this.retryTimer = null
+    this.attempt = 0
+    this.open()
   }
 
   get connected(): boolean {
@@ -129,6 +159,20 @@ export class EventStream {
   private open(): void {
     if (this.stopped) return
     this.opts.onState('connecting')
+    if (!this.deps.reachable) {
+      this.connect()
+      return
+    }
+    this.checking = true
+    void this.deps.reachable(this.opts.serverUrl).then((ok) => {
+      this.checking = false
+      if (this.stopped) return
+      if (ok) this.connect()
+      else this.retry()
+    })
+  }
+
+  private connect(): void {
     let ws: WebSocketLike
     try {
       ws = this.deps.connect(wsUrl(this.opts.serverUrl))

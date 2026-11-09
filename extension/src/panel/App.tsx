@@ -13,7 +13,11 @@ import { FocusView } from './focus/FocusView'
 import { BrowserBar } from './browser/BrowserBar'
 import { ResearchBar, ResearchView } from './research/ResearchView'
 import { ChatView } from './chat/ChatView'
+import { ApprovalsBar } from './views/ApprovalsBar'
 import { ConnectionBanner } from './views/ConnectionBanner'
+import { StatusDot } from './views/StatusDot'
+import { ErrorBoundary } from './ui/ErrorBoundary'
+import { ToastHost } from './ui/ToastHost'
 import { InlineResult } from './views/InlineResult'
 import { PanelNotice } from './views/PanelNotice'
 import { SettingsView } from './views/SettingsView'
@@ -50,6 +54,7 @@ export function App() {
   // and the worker can switch it (a right-click "Save page" opens Capture).
   const panelState = useStored('session', 'panelState')
   const view = (panelState.value?.view as View | undefined) ?? 'chat'
+  const openChatId = useStored('local', 'chat')
 
   useEffect(() => applyAccent(accent.value), [accent.value])
 
@@ -66,7 +71,7 @@ export function App() {
     <SessionProvider value={{ api, connection: { ...connection, token: connection.token } }}>
     <div className="flex h-full flex-col">
       <header className="flex h-11 shrink-0 items-center gap-1 border-b border-border bg-surface px-2">
-        <img src="/icons/icon-32.png" alt="" className="mr-1 h-6 w-6 rounded-md" />
+        <StatusDot />
         <nav className="flex flex-1 items-center gap-0.5" aria-label="Views">
           {TABS.map(({ view: v, label, icon: Icon }) => (
             <button
@@ -88,17 +93,21 @@ export function App() {
       </header>
       <BrowserBar />
       {view !== 'research' && <ResearchBar onOpen={() => go('research')} />}
+      <ApprovalsBar showing={view === 'chat' ? (openChatId.value?.conversationId ?? null) : null} onOpen={(id) => void openChat(id)} />
       <ConnectionBanner api={api} />
       <PanelNotice />
       <InlineResult />
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <ErrorBoundary resetKey={view}>
         {view === 'chat' && <ChatView />}
         {view === 'capture' && <CaptureView />}
         {view === 'notes' && <NotesView onOpenChat={(id) => void openChat(id)} />}
         {view === 'research' && <ResearchView onOpenChat={(id) => void openChat(id)} />}
         {view === 'focus' && <FocusView />}
         {view === 'settings' && <SettingsView api={api} connection={connection} />}
+        </ErrorBoundary>
       </main>
+      <ToastHost />
     </div>
     </SessionProvider>
     </Connected>

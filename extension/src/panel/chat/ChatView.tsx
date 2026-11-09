@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Globe, GraduationCap, List, Plus, Timer } from 'lucide-react'
+import { ArrowDown, BookOpen, Check, Copy, Globe, GraduationCap, List, Plus, Timer } from 'lucide-react'
 import { startLearningChat, type LearningAction } from '@/shared/learning'
 import type { PageContext } from '@/shared/pageContext'
 import { storage } from '@/shared/storage'
@@ -49,12 +49,15 @@ function useStickToBottom() {
   const scroller = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
+  // Scrolled up, away from the newest message: a button offers the way back down.
+  const [away, setAway] = useState(false)
   useEffect(() => {
     const el = scroller.current
     const inner = content.current
     if (!el || !inner) return
     const onScroll = () => {
       pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+      setAway(!pinned.current)
     }
     const observer = new ResizeObserver(() => {
       if (pinned.current) el.scrollTop = el.scrollHeight
@@ -66,7 +69,27 @@ function useStickToBottom() {
       observer.disconnect()
     }
   }, [])
-  return { scroller, content }
+  const toBottom = () => {
+    const el = scroller.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }
+  return { scroller, content, away, toBottom }
+}
+
+/** Copies an answer as it was written (Markdown). */
+function CopyAnswer({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    await navigator.clipboard.writeText(text).catch(() => undefined)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <button type="button" onClick={() => void copy()} aria-label="Copy answer" title="Copy answer" className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px] text-subtle hover:bg-surface-hover hover:text-text">
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  )
 }
 
 function httpOnly(url: string): string | undefined {
@@ -102,7 +125,12 @@ function AssistantMessage({ message, live, conversationId }: { message: ChatMess
       {live?.notice && <div className="text-[11.5px] text-subtle">{live.notice}</div>}
       {status === 'failed' && <div className="text-[12.5px] text-error">{error ?? 'The answer failed.'}</div>}
       {status === 'cancelled' && <div className="text-[11.5px] text-subtle">Stopped.</div>}
-      {!working && (live?.modelLabel ?? message.model_label) && <div className="text-[11px] text-subtle">{live?.modelLabel ?? message.model_label}</div>}
+      {!working && (text || (live?.modelLabel ?? message.model_label)) && (
+        <div className="flex items-center gap-2 text-[11px] text-subtle">
+          {(live?.modelLabel ?? message.model_label) && <span>{live?.modelLabel ?? message.model_label}</span>}
+          {text && <CopyAnswer text={text} />}
+        </div>
+      )}
     </div>
   )
 }
@@ -258,7 +286,7 @@ function Conversation({
     void qc.invalidateQueries({ queryKey: conversationsKey })
   })
   const running = runId !== null && !TERMINAL.includes(live.status)
-  const { scroller, content } = useStickToBottom()
+  const { scroller, content, away, toBottom } = useStickToBottom()
 
   const defaultMode = (conversation.data?.default_mode as Mode | undefined) ?? settings.data?.general.default_chat_mode ?? 'chat'
   const mode = modeChoice ?? defaultMode
@@ -354,6 +382,13 @@ function Conversation({
         {sendError && <div className="mt-3"><Notice tone="error" title="Not sent">{sendError}</Notice></div>}
         </div>
       </div>
+      {away && (
+        <div className="relative h-0">
+          <button type="button" onClick={toBottom} aria-label="Go to the newest message" title="Go to the newest message" className="absolute bottom-2 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card text-muted shadow-float hover:text-text">
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <Composer
         draft={draft}
         onDraft={changeDraft}

@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react'
 import { Archive, ArchiveRestore, ExternalLink, Pencil, Save, Star, StarOff, Trash2 } from 'lucide-react'
 import { ConfirmDialog, PromptDialog } from '../ui/Dialog'
 import type { MenuAction } from '../ui/Menu'
+import { toast } from '../ui/toast'
 import { useSession } from '../state/useSession'
 import { useDeleteConversation, useUpdateConversation, type Conversation } from './api'
 
@@ -16,16 +17,19 @@ export function useChatMenu(conv: Conversation | undefined, opts: { onDeleted?: 
   const [renaming, setRenaming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   if (!conv) return { actions: [], dialogs: null, error: null }
-  const patch = (body: Parameters<typeof update.mutate>[0]['body']) => update.mutate({ id: conv.id, body })
+  const patch = (body: Parameters<typeof update.mutate>[0]['body'], done?: () => void) => update.mutate({ id: conv.id, body }, { onSuccess: done, onError: (err) => toast((err as Error).message, { tone: 'error' }) })
+  // Archiving takes the chat out of sight: say so, with a way back.
+  const archive = (archived: boolean) =>
+    patch({ archived }, () => toast(archived ? 'Chat archived' : 'Chat back in your chats', { action: { label: 'Undo', run: () => update.mutate({ id: conv.id, body: { archived: !archived } }) } }))
   const actions: MenuAction[] = [
-    ...(conv.temporary ? [{ label: 'Keep chat', icon: <Save />, onSelect: () => patch({ temporary: false }) }] : []),
+    ...(conv.temporary ? [{ label: 'Keep chat', icon: <Save />, onSelect: () => patch({ temporary: false }, () => toast('Chat kept')) }] : []),
     { label: 'Rename', icon: <Pencil />, onSelect: () => setRenaming(true) },
     conv.pinned
       ? { label: 'Remove from favorites', icon: <StarOff />, onSelect: () => patch({ pinned: false }) }
       : { label: 'Add to favorites', icon: <Star />, onSelect: () => patch({ pinned: true }) },
     conv.archived
-      ? { label: 'Unarchive', icon: <ArchiveRestore />, onSelect: () => patch({ archived: false }) }
-      : { label: 'Archive', icon: <Archive />, onSelect: () => patch({ archived: true }) },
+      ? { label: 'Unarchive', icon: <ArchiveRestore />, onSelect: () => archive(false) }
+      : { label: 'Archive', icon: <Archive />, onSelect: () => archive(true) },
     { label: 'Open in Anemo', icon: <ExternalLink />, onSelect: () => void chrome.tabs.create({ url: `${connection.serverUrl}/c/${conv.id}` }) },
     { label: 'Delete', icon: <Trash2 />, danger: true, separated: true, onSelect: () => setDeleting(true) },
   ]
@@ -39,7 +43,7 @@ export function useChatMenu(conv: Conversation | undefined, opts: { onDeleted?: 
         body={<>“{conv.title}” is deleted in Anemo too, with its messages. This can’t be undone.</>}
         confirmLabel="Delete"
         danger
-        onConfirm={() => del.mutate(conv.id, { onSuccess: () => opts.onDeleted?.() })}
+        onConfirm={() => del.mutate(conv.id, { onSuccess: () => { toast('Chat deleted'); opts.onDeleted?.() }, onError: (err) => toast((err as Error).message, { tone: 'error' }) })}
       />
     </>
   )
