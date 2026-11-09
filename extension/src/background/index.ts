@@ -10,7 +10,7 @@ import { applyBadge } from './badge'
 import { presenceChanged, releaseHeld, syncStream } from './events'
 import { listenForInline } from './inline'
 import { onInlineClick } from './inlineMenu'
-import { createMenus, listenForMenus } from './menus'
+import { createMenus, handle, listenForMenus } from './menus'
 import { listenForClicks, trackWindows } from './notifier'
 
 const HEARTBEAT = 'anemo-heartbeat'
@@ -77,4 +77,4 @@ void syncStream()
 void storage.get('session', 'badge').then((b) => b && applyBadge(b))
 
 // The Playwright build only: tests can't click Chrome's context menu, so they call its handler.
-if (E2E) (globalThis as unknown as { __anemoTest: unknown }).__anemoTest = { onInlineClick }
+if (E2E) (globalThis as unknown as { __anemoTest: unknown }).__anemoTest = { onInlineClick, handle }

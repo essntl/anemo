@@ -13,7 +13,7 @@ import { markTokenLost } from '@/shared/connectionStore'
 import { log } from '@/shared/env'
 import { withDefaults } from '@/shared/preferences'
 import { storage } from '@/shared/storage'
-import { applyBadge } from './badge'
+import { updateBadge } from './badge'
 import {
   agentRunWorthNotifying,
   catchUp,
@@ -28,6 +28,7 @@ import {
   type StoredNotification,
 } from './notify'
 import { show } from './notifier'
+import { refreshResearch } from './research'
 import { EventStream, type StreamEvent, type StreamState } from './stream'
 
 const CATCH_UP_WINDOW_MS = 1500
@@ -42,13 +43,6 @@ let welcomedAt = 0
 
 async function setStreamState(state: StreamState, retryInMs?: number): Promise<void> {
   await storage.set('session', 'stream', { state, at: Date.now(), retryInMs })
-}
-
-async function updateBadge(patch: Partial<{ focusMinutes: number | null; research: boolean; approvals: number }>): Promise<void> {
-  const current = (await storage.get('session', 'badge')) ?? { focusMinutes: null, research: false, approvals: 0 }
-  const next = { ...current, ...patch }
-  await storage.set('session', 'badge', next)
-  await applyBadge(next).catch(() => undefined)
 }
 
 async function refreshApprovals(): Promise<{ run_id: string; summary: string; created_at: string; conversation_id?: string | null }[]> {
@@ -143,6 +137,9 @@ async function onEvent(e: StreamEvent): Promise<void> {
       await storage.set('session', 'captures', { ...kept, [status.id]: status })
       break
     }
+    case 'research.changed':
+      await refreshResearch(api)
+      break
     default:
       break
   }
@@ -181,6 +178,7 @@ async function onWelcome(missed: boolean, cursor: string | null): Promise<void> 
     await fetchMissed(seen.lastSeenAt)
   }
   void refreshApprovals()
+  void refreshResearch(api)
   setTimeout(() => void flushCatchUp(), CATCH_UP_WINDOW_MS)
 }
 
@@ -210,6 +208,7 @@ export async function syncStream(): Promise<void> {
   api = null
   if (!connection?.token) {
     await updateBadge({ approvals: 0 })
+    await refreshResearch(null)
     return
   }
   api = createApi({ serverUrl: connection.serverUrl, token: connection.token, onUnauthorized: () => void markTokenLost() })

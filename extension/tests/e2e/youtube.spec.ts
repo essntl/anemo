@@ -77,7 +77,8 @@ test('a note takes the time when you start typing, pauses the video, and lands i
 
 test('clicking a timestamp seeks the video; notes stay in time order; edit and delete', async ({ panel }) => {
   for (const [t, text] of [[20, 'later'], [5, 'earlier']] as const) {
-    await yt.evaluate((s) => { document.querySelector('video')!.currentTime = s }, t)
+    // Paused, so a slow run can't move the time on to 00:21 before the note takes it.
+    await yt.evaluate((s) => { const v = document.querySelector('video')!; v.pause(); v.currentTime = s }, t)
     await panel.getByRole('button', { name: 'Add note' }).click()
     await panel.getByLabel('Note', { exact: true }).fill(text)
     await panel.getByRole('button', { name: 'Save note' }).click()

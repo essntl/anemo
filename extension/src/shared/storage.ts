@@ -63,6 +63,15 @@ export interface SessionData {
     explanation?: string
     at: number
   } | null
+  /** Bumped on each research change from Anemo; the panel refreshes its research data. */
+  researchVersion: number
+  /** The active research session (for the panel header, the badge and the menu). */
+  researchActive: { id: string; topic: string } | null
+  /** What the Research view shows: a session, or the list (`sessionId: null`). Unset: the
+   *  active session if there is one, else the list. */
+  researchOpen: { sessionId: string | null } | null
+  /** The source just added from the menu or the shortcut (the Research view offers a note). */
+  researchAdded: { sourceId: string; title: string; at: number } | null
   /** The "add a YouTube note" shortcut: start a note when the Notes view opens. */
   notesIntent: { at: number } | null
   /** Tabs with translated text (count of translated blocks), for "Restore all". */

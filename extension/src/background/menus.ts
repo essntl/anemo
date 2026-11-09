@@ -3,7 +3,7 @@
  * "Anemo Companion ▸ Summarize page" and so on. A click grants access to that tab
  * (activeTab), so these work on any site without other permissions.
  */
-import { createApi, type Api } from '@/shared/api'
+import { createApi, unwrap, type Api } from '@/shared/api'
 import { markTokenLost } from '@/shared/connectionStore'
 import { discussDraft, startLearningChat, type LearningAction } from '@/shared/learning'
 import { PageReadError, readPage, SAVE_CHAR_LIMIT } from '@/shared/pageContext'
@@ -12,6 +12,8 @@ import { LANGUAGES } from '@/shared/languages'
 import { withDefaults } from '@/shared/preferences'
 import { storage } from '@/shared/storage'
 import { onInlineClick } from './inlineMenu'
+import { RESEARCH_MENU } from './research'
+import { addToResearch } from '@/shared/research'
 
 export const MENU = {
   summarize: 'anemo-summarize',
@@ -20,6 +22,7 @@ export const MENU = {
   savePage: 'anemo-save-page',
   saveSelection: 'anemo-save-selection',
   task: 'anemo-task',
+  research: RESEARCH_MENU,
 } as const
 
 export const INLINE = {
@@ -35,7 +38,7 @@ function languageItems(defaultCode: string): { code: string; title: string }[] {
 }
 
 export function createMenus(): void {
-  void storage.get('local', 'preferences').then((stored) => {
+  void Promise.all([storage.get('local', 'preferences'), storage.get('session', 'researchActive')]).then(([stored, research]) => {
     const target = withDefaults(stored).targetLanguage
     chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({ id: INLINE.explain, title: 'Explain', contexts: ['selection'] })
@@ -49,6 +52,8 @@ export function createMenus(): void {
     chrome.contextMenus.create({ id: MENU.quiz, title: 'Quiz me on this page', contexts: ['page', 'selection'] })
     chrome.contextMenus.create({ id: MENU.savePage, title: 'Save page to Anemo', contexts: ['page', 'selection'] })
     chrome.contextMenus.create({ id: MENU.task, title: 'Create a task from this', contexts: ['page', 'selection'] })
+    // Only while a research session is active (background/research.ts shows and hides it).
+    chrome.contextMenus.create({ id: MENU.research, title: 'Add to research', contexts: ['page', 'selection'], visible: Boolean(research) })
     })
   })
 }
@@ -89,10 +94,32 @@ async function openChat(conversationId: string): Promise<void> {
   await storage.set('session', 'panelState', { view: 'chat', conversationId })
 }
 
-async function handle(id: string, tab: chrome.tabs.Tab): Promise<void> {
+async function showView(view: string): Promise<void> {
+  const state = await storage.get('session', 'panelState')
+  await storage.set('session', 'panelState', { view, conversationId: state?.conversationId ?? null })
+}
+
+/** "Add to research" (menu or Alt+Shift+R): the selection if there is one, else the page. */
+async function addResearch(api: Api, tab: chrome.tabs.Tab, mode: 'page' | 'selection' | 'auto'): Promise<void> {
+  const active = unwrap(await api.GET('/api/research/sessions')).find((s) => s.status === 'active')
+  await showView('research')
+  if (!active) {
+    await notice('No research session', 'Start a research session first, then add pages to it.')
+    return
+  }
+  const source = await addToResearch(api, active.id, tab, { mode })
+  await storage.set('session', 'researchAdded', { sourceId: source.id, title: source.title, at: Date.now() })
+}
+
+/** A menu entry or a shortcut, by id (exported for the e2e build, which can't click menus). */
+export async function handle(id: string, tab: chrome.tabs.Tab, selection = false): Promise<void> {
   const api = await currentApi()
   if (!api) return // the panel shows setup
   try {
+    if (id === MENU.research || id === 'add-to-research') {
+      await addResearch(api, tab, id === MENU.research ? (selection ? 'selection' : 'page') : 'auto')
+      return
+    }
     if (id in CAPTURE) {
       await prepareCapture(api, CAPTURE[id], tab)
       return
@@ -126,7 +153,7 @@ export function listenForMenus(): void {
     if (!tab?.id || !Object.values(MENU).includes(info.menuItemId as never)) return
     // The panel first, while the click still counts as a user action.
     if (tab.windowId !== undefined) void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => undefined)
-    void handle(String(info.menuItemId), tab)
+    void handle(String(info.menuItemId), tab, Boolean(info.selectionText))
   })
   // Keyboard shortcuts (chrome://extensions/shortcuts); a shortcut grants access to the tab.
   chrome.commands.onCommand.addListener((command, tab) => {
@@ -139,7 +166,7 @@ export function listenForMenus(): void {
       })()
       return
     }
-    if (!tab?.id || !(command in CAPTURE)) return
+    if (!tab?.id || !(command in CAPTURE || command === 'add-to-research')) return
     if (tab.windowId !== undefined) void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => undefined)
     void handle(command, tab)
   })

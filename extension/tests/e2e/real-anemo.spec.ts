@@ -204,3 +204,58 @@ test('Explain on a page asks Anemo’s inline endpoint (fenced, nothing personal
     site.close()
   }
 })
+
+test('a research session: sources reach the session chat as untrusted context, and the write-up is a document', async ({ panel, context }) => {
+  test.setTimeout(120_000)
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  // One session is active at a time: pause one left by an earlier run.
+  for (const s of await (await fetch(`${url}/api/research/sessions`, { headers: auth })).json()) {
+    if (s.status === 'active') await fetch(`${url}/api/research/sessions/${s.id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ status: 'paused' }) })
+  }
+  const { createServer } = await import('node:http')
+  const { ARTICLE } = await import('./mockAnemo')
+  const site = createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end(ARTICLE)
+  })
+  await new Promise<void>((r) => site.listen(0, '127.0.0.1', r))
+  const port = (site.address() as import('node:net').AddressInfo).port
+  try {
+    await panel.getByLabel('Anemo address').fill(url!)
+    await panel.getByLabel('API token').fill(token!)
+    await panel.getByRole('button', { name: 'Connect' }).click()
+    await expect(panel.getByText('What can I help with?')).toBeVisible()
+    const page = await context.newPage()
+    await page.goto(`http://127.0.0.1:${port}/article`)
+    await page.bringToFront()
+    const topic = `Energy in plants ${Date.now()}`
+    await panel.getByRole('button', { name: 'Research' }).click()
+    await panel.getByLabel('Topic or question').fill(topic)
+    await panel.getByRole('button', { name: 'Start' }).click()
+    await panel.getByLabel('Note (optional)').fill('The overview')
+    await panel.getByRole('button', { name: 'Add this page' }).click()
+    await expect(panel.getByRole('listitem', { name: 'Photosynthesis explained' })).toContainText('The overview')
+
+    await panel.getByRole('button', { name: 'Chat about the sources' }).click()
+    await panel.getByLabel('Message').fill('what do my sources say')
+    await panel.getByLabel('Message').press('Enter')
+    // The echo model repeats what it got: the sources, fenced and numbered.
+    const answer = panel.getByTestId('assistant-message').last()
+    await expect(answer).toContainText('untrusted_research_source', { timeout: 20_000 })
+    await expect(answer).toContainText('plants turn')
+    await expect(answer).toContainText('The overview')
+
+    await panel.getByRole('button', { name: new RegExp(`Research: ${topic}`) }).click()
+    await panel.getByRole('button', { name: 'End & write up' }).click()
+    await panel.getByRole('button', { name: 'End & write up' }).last().click()
+    const link = panel.getByRole('link', { name: 'Open the write-up' })
+    await expect(link).toBeVisible({ timeout: 60_000 })
+    const id = (await link.getAttribute('href'))!.split('/').pop()!
+    const doc = await (await fetch(`${url}/api/documents/${id}`, { headers: auth })).json()
+    expect(doc.path).toMatch(/^documents\/Research\/energy-in-plants-\d+( \(\d+\))?\.md$/)
+    expect(doc.content).toMatch(new RegExp(`^# ${topic}\\n`))
+    expect(doc.content).toMatch(/## Sources\n\n1\. \[Photosynthesis explained\]\(http:\/\/127\.0\.0\.1:\d+\/article\)/)
+  } finally {
+    site.close()
+  }
+})

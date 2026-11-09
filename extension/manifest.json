@@ -67,6 +67,12 @@
     },
     "youtube-note": {
       "description": "Add a note to the YouTube video (set a key in chrome://extensions/shortcuts)"
+    },
+    "add-to-research": {
+      "suggested_key": {
+        "default": "Alt+Shift+R"
+      },
+      "description": "Add this page or the selection to the research session"
     }
   }
 }
