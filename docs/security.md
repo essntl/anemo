@@ -16,6 +16,27 @@ what is not.
 - Logins, setting changes, approvals and denials are in the security log under
   **Settings → Advanced**.
 
+## API tokens (the browser extension)
+
+**Settings → General → Extension and device tokens** makes long-lived logins for Anemo
+Companion (the browser extension, `extension/`) or another device. A token is sent as
+`Authorization: Bearer …`.
+
+- **Shown once.** Only its SHA-256 is stored; the list shows its name, its first
+  characters, when it was made and when and from where it was last used.
+- **Revocable.** Revoking deletes it and it stops working at once; the extension then goes
+  back to its setup screen. Making one needs your password again (it is a login that lasts
+  until revoked); making and revoking one are in the security log.
+- **Less than a login.** A token never counts as "password entered recently", so it can't
+  change providers, agent permissions, the workspace or web settings, MCP servers or
+  notification destinations, and it can't make tokens. It can't log out, confirm the
+  password or manage browser sessions either.
+- **The Origin check.** Changes from another site are refused (see the cross-site check in
+  `backend/app/api/security.py`). The only exception: requests from Anemo Companion's
+  extension id (`EXTENSION_IDS`, default its fixed id) that carry a token. The browser login's
+  cookie is still refused from there. No CORS headers are sent: an extension with permission
+  for your Anemo address doesn't need them, and web pages get none.
+
 ## Share links
 
 Anemo has one user, but you can let someone **read** a single chat, document or

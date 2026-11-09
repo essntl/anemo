@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Field, Input } from '@/components/ui/Input'
 import { useLogout, useRevokeSession, useSessions } from '@/features/auth/api'
+import { TokensCard } from '@/features/auth/TokensCard'
 import { useSaveGeneral, useSettings } from '../api'
 import { Select } from '@/components/ui/Select'
 import { useHasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
@@ -132,6 +133,7 @@ export function GeneralPage() {
       )}
       <ShortcutsCard />
       <SessionsCard />
+      <TokensCard />
     </div>
   )
 }
