@@ -8,6 +8,7 @@ import { classifySender, type Message } from '@/shared/messages'
 import { storage } from '@/shared/storage'
 import { applyBadge } from './badge'
 import { presenceChanged, releaseHeld, syncStream } from './events'
+import { createMenus, listenForMenus } from './menus'
 import { listenForClicks, trackWindows } from './notifier'
 
 const HEARTBEAT = 'anemo-heartbeat'
@@ -17,6 +18,7 @@ async function setUp(): Promise<void> {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
   // Wakes the worker every minute: reconnects the stream if the worker was stopped.
   await chrome.alarms.create(HEARTBEAT, { periodInMinutes: 1 })
+  createMenus()
 }
 
 chrome.runtime.onInstalled.addListener(() => void setUp())
@@ -60,6 +62,7 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
 })
 
 listenForClicks()
+listenForMenus()
 trackWindows()
 // Every time the worker starts (install, browser start, an alarm, a message).
 void syncStream()

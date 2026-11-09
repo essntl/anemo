@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
-import { ArrowUp, Square } from 'lucide-react'
+import { ArrowUp, Globe, Square } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { cn } from '../lib/cn'
 import { useModels, useProfiles, type Mode } from './api'
@@ -18,8 +18,13 @@ export interface ComposerProps {
   onModel: (id: string | null) => void
   profileId: string | null
   onProfile: (id: string | null) => void
-  /** Shown above the text box (e.g. the page chip). */
+  /** Shown above the text box (the page that goes with the message). */
   above?: React.ReactNode
+  /** "Include this page" is on for this message. */
+  pageOn: boolean
+  onTogglePage: () => void
+  /** A page alone can be sent without text. */
+  canSendEmpty?: boolean
 }
 
 const selectClass =
@@ -41,7 +46,7 @@ export function Composer(p: ComposerProps) {
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      if (!p.running && p.draft.trim()) p.onSend()
+      if (!p.running && (p.draft.trim() || p.canSendEmpty)) p.onSend()
     }
   }
 
@@ -90,11 +95,22 @@ export function Composer(p: ComposerProps) {
               {profiles.data?.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
             </select>
           )}
+          <button
+            type="button"
+            aria-pressed={p.pageOn}
+            aria-label="Include this page"
+            title="Include this page"
+            onClick={p.onTogglePage}
+            className={cn('flex h-7 items-center gap-1 rounded-md px-1.5 text-[12px]', p.pageOn ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            <span className="max-[380px]:sr-only">Page</span>
+          </button>
           <div className="flex-1" />
           {p.running ? (
             <Button size="icon" variant="secondary" aria-label="Stop" title="Stop" onClick={p.onStop} icon={<Square className="h-3.5 w-3.5 fill-current" />} />
           ) : (
-            <Button size="icon" variant="primary" aria-label="Send" title="Send (Enter)" disabled={!p.draft.trim()} loading={p.sending} onClick={p.onSend} icon={<ArrowUp className="h-4 w-4" />} />
+            <Button size="icon" variant="primary" aria-label="Send" title="Send (Enter)" disabled={!p.draft.trim() && !p.canSendEmpty} loading={p.sending} onClick={p.onSend} icon={<ArrowUp className="h-4 w-4" />} />
           )}
         </div>
       </div>

@@ -47,6 +47,10 @@ export interface SessionData {
   stream: { state: string; at: number; retryInMs?: number } | null
   /** The badge's inputs (focus minutes > research > pending approvals). */
   badge: { focusMinutes: number | null; research: boolean; approvals: number }
+  /** Something for the panel to open a new chat with ("Discuss in chat"): a page and a draft. */
+  pendingCompose: { page: import('./pageContext').PageContext | null; draft: string; at: number } | null
+  /** A message for the panel after a context-menu action failed (e.g. the page can't be read). */
+  panelNotice: { title: string; body: string; at: number } | null
 }
 
 type Area = 'local' | 'session'

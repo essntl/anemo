@@ -8,6 +8,13 @@ import type { AddressInfo } from 'node:net'
 
 export const EXTENSION_ID = 'jpmimgldkledmklijfmfnbaaimmfjaaf'
 
+export const ARTICLE = `<!doctype html><html lang="en"><head><title>Photosynthesis explained</title></head><body>
+<nav><a href="/">Home</a> <a href="/login">Log in</a></nav>
+<article><h1>Photosynthesis explained</h1>
+${Array.from({ length: 10 }, (_, i) => `<p>Paragraph ${i}: plants turn <strong>light</strong> into chemical energy stored in glucose, releasing oxygen.</p>`).join('\n')}
+<p>Learn more on <a href="/wiki/Chlorophyll">chlorophyll</a>.</p></article>
+<footer>Cookie settings</footer></body></html>`
+
 type Handler = (req: IncomingMessage, body: unknown, res: ServerResponse) => void | Promise<void>
 
 export interface MockAnemo {
@@ -35,6 +42,11 @@ export async function startMockAnemo(): Promise<MockAnemo> {
   const routes = new Map<string, Handler>()
 
   routes.set('GET /api/health', (_req, _b, res) => send(res, 200, { status: 'ok' }))
+  // A web page to read (any site would do; this one is on 127.0.0.1, which the test build may read).
+  routes.set('GET /article', (_req, _b, res) => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+    res.end(ARTICLE)
+  })
   routes.set('GET /api/auth/me', (_req, _b, res) => send(res, 200, { username: 'admin', session_id: 't1', recent_auth: false, via: 'token' }))
   routes.set('POST /api/permissions/preview', (_req, _b, res) => send(res, 200, {}))
   routes.set('GET /api/settings', (_req, _b, res) =>
@@ -56,7 +68,7 @@ export async function startMockAnemo(): Promise<MockAnemo> {
       const path = new URL(req.url ?? '/', 'http://x').pathname
       const key = `${req.method} ${path}`
       log.push(key)
-      if (path !== '/api/health') {
+      if (path.startsWith('/api/') && path !== '/api/health') {
         if (req.headers.cookie) return error(res, 400, 'cookie_sent', 'The extension must not send cookies')
         const token = bearer(req)
         if (!token || !tokens.has(token)) return error(res, 401, 'invalid_token', 'This token is not valid')

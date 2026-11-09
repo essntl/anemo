@@ -1,6 +1,8 @@
 /** Chat data from Anemo: the same endpoints and query keys as Anemo's own chat. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { unwrap, type Schemas } from '@/shared/api'
+import { pageForApi } from '@/shared/learning'
+import type { PageContext } from '@/shared/pageContext'
 import { useSession } from '../state/useSession'
 
 export type Conversation = Schemas['ConversationOut']
@@ -76,6 +78,7 @@ export interface SendInput {
   mode: Mode
   modelId: string | null
   profileId: string | null
+  page?: PageContext | null
 }
 
 /** Sends a message; a new chat is created first. Resolves with the chat and the run. */
@@ -99,6 +102,7 @@ export function useSendTurn() {
             profile_id: input.mode === 'agent' ? input.profileId : null,
             attachment_ids: [],
             reference_ids: [],
+            page: input.page ? pageForApi(input.page) : null,
           },
         }),
       )

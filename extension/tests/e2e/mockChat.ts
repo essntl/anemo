@@ -25,6 +25,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const TERMINAL = ['completed', 'failed', 'cancelled']
 
 export function addChat(anemo: MockAnemo) {
+  /** Every turn's request body, in order. */
+  const turns: Record<string, unknown>[] = []
   const conversations = new Map<string, Record<string, unknown>>()
   const messages = new Map<string, Record<string, unknown>[]>()
   const runs = new Map<string, Run>()
@@ -84,10 +86,12 @@ export function addChat(anemo: MockAnemo) {
   anemo.routes.set('POST /api/conversations/:id/turns', (req, body, res) => {
     const id = params(req).id
     const conv = conversations.get(id)!
-    const { text, mode } = body as { text: string; mode: string }
+    const { text, mode, page } = body as { text: string; mode: string; page?: { url: string; title: string; source: string; content: string; truncated: boolean } | null }
+    turns.push(body as Record<string, unknown>)
     const list = messages.get(id)!
     const base = { reasoning: null, error: null, model_label: 'Echo', created_at: now(), attachments: [], references: [], questions: [], versions: [], version: 0 }
-    const user = { ...base, id: nextId('msg'), seq: list.length, role: 'user', text, status: 'completed', run_id: null }
+    const pageSummary = page ? { url: page.url, title: page.title, source: page.source, word_count: page.content.split(/\s+/).length, truncated: page.truncated } : null
+    const user = { ...base, id: nextId('msg'), seq: list.length, role: 'user', text, status: 'completed', run_id: null, page: pageSummary }
     const runId = nextId('run')
     const assistant = { ...base, id: nextId('msg'), seq: list.length + 1, role: 'assistant', text: '', status: 'streaming', run_id: runId, mode }
     list.push(user, assistant)
@@ -96,7 +100,7 @@ export function addChat(anemo: MockAnemo) {
     conv.default_mode = mode
     const run: Run = { id: runId, conversationId: id, messageId: assistant.id, events: [], listeners: new Set(), status: 'queued', approval: null, resume: null }
     runs.set(runId, run)
-    play(run, text).catch((e) => console.error("mock play failed", e))
+    play(run, text || 'the page').catch((e) => console.error('mock play failed', e))
     send(res, 202, { run_id: runId, user_message: user, assistant_message: assistant })
   })
   anemo.routes.set('GET /api/runs/:id/events', (req, _b, res: ServerResponse) => {
@@ -148,5 +152,5 @@ export function addChat(anemo: MockAnemo) {
     run.resume?.()
     send(res, 200, { ...run.approval, decided_at: now() })
   })
-  return { conversations, messages, runs }
+  return { conversations, messages, runs, turns }
 }

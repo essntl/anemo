@@ -6,7 +6,9 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, List, Plus } from 'lucide-react'
+import { BookOpen, ExternalLink, Globe, GraduationCap, List, Plus } from 'lucide-react'
+import { startLearningChat, type LearningAction } from '@/shared/learning'
+import type { PageContext } from '@/shared/pageContext'
 import { storage } from '@/shared/storage'
 import { TERMINAL, type RunView } from '@/shared/runReducer'
 import { Button } from '../ui/Button'
@@ -29,6 +31,8 @@ import {
 import { Composer } from './Composer'
 import { ConversationList } from './ConversationList'
 import { Markdown } from './Markdown'
+import { readActivePage } from './currentTab'
+import { PagePreview, type PageState } from './PagePreview'
 import { useRunStream } from './useRunStream'
 
 const NEW = 'new'
@@ -61,10 +65,21 @@ function useStickToBottom() {
   return { scroller, content }
 }
 
+function httpOnly(url: string): string | undefined {
+  return /^https?:\/\//i.test(url) ? url : undefined
+}
+
 function UserBubble({ message }: { message: ChatMessage }) {
   return (
-    <div className="flex justify-end" data-testid="user-message">
-      <div className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3 py-2 text-[13.5px]">{message.text}</div>
+    <div className="flex flex-col items-end gap-1.5" data-testid="user-message">
+      {message.page && (
+        <a href={httpOnly(message.page.url)} target="_blank" rel="noopener noreferrer" title={message.page.url} className="flex max-w-[88%] items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1 text-[11.5px] text-muted hover:text-text">
+          <Globe className="h-3 w-3 shrink-0 text-accent" />
+          <span className="truncate">{message.page.title || message.page.url}</span>
+          <span className="shrink-0">· {message.page.word_count.toLocaleString()} words</span>
+        </a>
+      )}
+      {message.text && <div className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3 py-2 text-[13.5px]">{message.text}</div>}
     </div>
   )
 }
@@ -108,31 +123,76 @@ export function ChatView() {
   // Switches at once (the storage write follows), so nothing typed right after a switch
   // lands in the chat being left.
   const [opened, setOpened] = useState<{ id: string | null } | null>(null)
+  // "Discuss in chat" from the right-click menu: a new chat with the page and the quote,
+  // until you send it or open another chat.
+  const pending = useStored('session', 'pendingCompose').value ?? null
   if (!stored.loaded) return null
-  const conversationId = opened ? opened.id : (stored.value?.conversationId ?? null)
+  const composing = pending !== null
+  const conversationId = composing ? null : opened ? opened.id : (stored.value?.conversationId ?? null)
   const open = (id: string | null) => {
     setShowList(false)
     setOpened({ id })
+    if (pending) void storage.set('session', 'pendingCompose', null)
     void openChat(id)
   }
-  if (showList) return <ConversationList current={conversationId} onOpen={open} onNew={() => open(null)} />
+  if (showList && !composing) return <ConversationList current={conversationId} onOpen={open} onNew={() => open(null)} />
   const key = conversationId ?? NEW
-  // Keyed by the chat: opening another one starts fresh (draft, mode, model, run).
-  return <Conversation key={key} conversationId={conversationId} initialDraft={stored.value?.drafts?.[key] ?? ''} onList={() => setShowList(true)} onOpen={open} />
+  // Keyed by the chat: opening another one starts fresh (draft, mode, model, run, page).
+  return (
+    <Conversation
+      key={`${key}:${pending?.at ?? ''}`}
+      conversationId={conversationId}
+      initialDraft={pending ? pending.draft : (stored.value?.drafts?.[key] ?? '')}
+      initialPage={pending?.page ?? null}
+      onList={() => {
+        if (pending) void storage.set('session', 'pendingCompose', null)
+        setShowList(true)
+      }}
+      onOpen={open}
+    />
+  )
 }
 
 function Conversation({
   conversationId,
   initialDraft,
+  initialPage,
   onList,
   onOpen,
 }: {
   conversationId: string | null
   initialDraft: string
+  initialPage: PageContext | null
   onList: () => void
   onOpen: (id: string | null) => void
 }) {
-  const { connection } = useSession()
+  const { connection, api } = useSession()
+  const [pageState, setPageState] = useState<PageState>(initialPage ? { status: 'ready', page: initialPage } : { status: 'off' })
+  const [learning, setLearning] = useState<LearningAction | null>(null)
+  const readPageNow = async () => {
+    setPageState({ status: 'loading' })
+    setPageState(await readActivePage(api))
+  }
+  const togglePage = () => {
+    if (pageState.status === 'off') void readPageNow()
+    else setPageState({ status: 'off' })
+  }
+  const learn = async (action: LearningAction) => {
+    setLearning(action)
+    const state = await readActivePage(api)
+    if (state.status !== 'ready') {
+      setPageState(state)
+      setLearning(null)
+      return
+    }
+    try {
+      onOpen(await startLearningChat(api, state.page, action))
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLearning(null)
+    }
+  }
   const qc = useQueryClient()
   const conversation = useConversation(conversationId)
   const messages = useMessages(conversationId)
@@ -182,13 +242,16 @@ function Conversation({
   const mode = modeChoice ?? defaultMode
   const defaultModelId = conversation.data?.model_id ?? settings.data?.models.chat ?? null
 
+  const page = pageState.status === 'ready' ? pageState.page : null
   const submit = () => {
     const text = draft.trim()
-    if (!text || running) return
+    if ((!text && !page) || running || pageState.status === 'loading') return
     setSendError(null)
     changeDraft('')
+    const sentPage = page
+    setPageState({ status: 'off' }) // per message: the next one has no page unless asked
     send.mutate(
-      { conversationId, text, mode, modelId, profileId },
+      { conversationId, text, mode, modelId, profileId, page: sentPage },
       {
         onSuccess: ({ conversationId: id, turn }) => {
           if (id !== conversationId) onOpen(id) // a new chat: it opens with its run
@@ -197,6 +260,7 @@ function Conversation({
         // A message that couldn't be sent goes back into the box.
         onError: (err) => {
           changeDraft(text)
+          if (sentPage) setPageState({ status: 'ready', page: sentPage })
           setSendError(err.message)
         },
       },
@@ -235,6 +299,14 @@ function Conversation({
             <img src="/icons/icon-48.png" alt="" className="h-9 w-9 rounded-xl opacity-80" />
             <div className="text-[13.5px] font-medium">What can I help with?</div>
             <p className="max-w-[16rem] text-[12px] text-muted">Chats started here are in Anemo too.</p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <Button size="sm" icon={<BookOpen className="h-3.5 w-3.5" />} loading={learning === 'summarize'} disabled={learning !== null} onClick={() => void learn('summarize')}>
+                Summarize this page
+              </Button>
+              <Button size="sm" icon={<GraduationCap className="h-3.5 w-3.5" />} loading={learning === 'quiz'} disabled={learning !== null} onClick={() => void learn('quiz')}>
+                Quiz me on it
+              </Button>
+            </div>
           </div>
         )}
         <div className="flex flex-col gap-4">
@@ -263,6 +335,10 @@ function Conversation({
         onModel={setModelId}
         profileId={profileId}
         onProfile={setProfileChoice}
+        pageOn={pageState.status !== 'off'}
+        onTogglePage={togglePage}
+        canSendEmpty={page !== null}
+        above={<PagePreview state={pageState} onRefresh={() => void readPageNow()} onRemove={() => setPageState({ status: 'off' })} />}
       />
     </div>
   )

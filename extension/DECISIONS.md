@@ -102,6 +102,15 @@ rule.
 | T10 | It relays a fixed list of global events (`FORWARDED`) from the existing Valkey stream, starting at the client's `last_id` (or the newest event); the welcome says `missed` when that id was trimmed, and carries the `cursor` it starts from. | Reuses Anemo's event bus as is; the cursor lets a client resume after a drop even before its first event. |
 | T11 | Presence for "Skip Discord" is one Valkey key (`presence:extension`, 90 s expiry) set from the extension's reports; `notifications.create` checks it once per notification with a Discord copy due (default routing only) and records the skipped copy with status `skipped`. | Fails safe: no key (closed browser, Valkey down) means Discord gets everything as before. |
 
+### Server: page context (feature 3)
+
+| # | Choice | Why |
+|---|---|---|
+| T12 | A `PageRef` content block (`providers/base.py`) on the user message holds url, title, source (page/selection/pdf/youtube), content, word count and a truncated flag; `TurnIn.page` sets it (content ≤ 130,000 characters). `runtime/pages.py` renders it, in `resolve_attachments`, as `<untrusted_page_content source url title>` with a note that it is data, not instructions, and neutralises a closing tag inside the content. | The same path Anemo uses for referenced chats; the block survives edit-last and branch unchanged. |
+| T13 | Page content is never in `text_plain`, so memory extraction, search and titles don't see it; memory retrieval reads only typed text blocks; `memory/extraction.without_page_answers` also leaves out the assistant's answer to a message that carried a page. | Your answer 10: an answer quotes the page, so it could carry a planted "memory" too. |
+| T14 | `MessageOut.page` (summary, no content) and `GET /conversations/{id}/messages/{mid}/page`; Anemo's chat shows a `PageChip` that opens the text as plain text in a dialog, linking only to http(s) addresses. | Your answer 9. |
+| T15 | `POST /api/extension/pdf-text` returns a PDF's text page by page (`attachments.extract.pdf_pages`, shared with attachments; 50 MB, nothing stored). | Your answer 11: the extension fetches the PDF with your cookies; page numbers are kept as `[Page n]`. |
+
 ### Extension
 
 | # | Choice | Why |
@@ -130,4 +139,10 @@ rule.
 | E22 | Clicking a notification opens the panel on the chat (calling `sidePanel.open` before any `await`, while Chrome still counts the click as a user action), with targets kept in memory and in session storage; if Chrome refuses, the chat opens in Anemo in a tab. Tasks and calendar open in Anemo. | `sidePanel.open` only works during a user action. |
 | E23 | Held notifications (focus) are kept in `chrome.storage.local` and released as one summary (or the one itself) when `focusState.active` turns false. Feature 10 keeps `focusState` current. | Survives the worker stopping during a long focus session. |
 | E24 | The badge is computed from three inputs in priority order (focus minutes, research dot, pending approvals); approvals are counted from `GET /api/approvals` on each approval or run event. | Your answer 36. |
+| E25 | Page reading: `inpage/extract.js` is injected on demand (isolated world: the page's scripts can't see it, its CSP doesn't apply) and called by a second `executeScript`; it runs Readability on a clone of the document and converts the article to Markdown there (turndown + GFM; scripts, forms, data URIs and non-http links dropped). Fallbacks: the selection, then the visible text. PDFs (by address or content type) are fetched by the extension with the site's cookies and sent to `/api/extension/pdf-text`. | The worker has no DOM; the page does. Reads only, sends nothing itself. |
+| E26 | Length: ~30k tokens (120,000 characters); longer pages keep about 2/3 of the room for the start and 1/3 for the end, cut at paragraph boundaries, with `[… N words left out …]`; the chip says "shortened". | Your answer 8. |
+| E27 | "Include this page" is per message (a Globe toggle in the composer); the chip shows title, site, word count and "selection/PDF/shortened" before sending, with re-read and remove. The page is sent as `page`, never pasted into the message. | The spec's per-message toggle and chip. |
+| E28 | Learning actions (feature 4): "Summarize this page" and "Quiz me on it" in an empty chat; right-click "Summarize page", "Quiz me on this page" and (on a selection) "Discuss in chat". Summaries and quizzes start a new chat in chat mode with the page attached and a fixed prompt (`shared/learning.ts`); "Discuss" opens a new chat with the page attached and the selection quoted in the box, for you to finish. The worker does the right-click versions (it can read the tab: the click grants access) and the panel follows the chat. | Your answers 13 and 14. |
+| E29 | Chrome puts an extension's right-click entries under one submenu named after the extension: "Anemo Companion ▸ Summarize page" rather than "Anemo: Summarize page". | Chrome's behaviour; not configurable. |
+| E30 | "The active tab" is the active tab of the last focused normal window (the side panel belongs to it). | Also makes the panel testable when opened as a tab. |
 

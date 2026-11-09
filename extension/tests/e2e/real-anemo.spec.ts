@@ -98,3 +98,35 @@ test('a reminder in Anemo becomes a Chrome notification through the event stream
     .poll(() => worker.evaluate(async () => Object.keys(await chrome.notifications.getAll())), { timeout: 90_000, intervals: [2000] })
     .toEqual(expect.arrayContaining([expect.stringMatching(/^n:/)]))
 })
+
+test('a page attached in the panel reaches the model wrapped as untrusted data', async ({ panel, context }) => {
+  const { createServer } = await import('node:http')
+  const { ARTICLE } = await import('./mockAnemo')
+  const site = createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end(ARTICLE)
+  })
+  await new Promise<void>((r) => site.listen(0, '127.0.0.1', r))
+  const port = (site.address() as import('node:net').AddressInfo).port
+  try {
+    await panel.getByLabel('Anemo address').fill(url!)
+    await panel.getByLabel('API token').fill(token!)
+    await panel.getByRole('button', { name: 'Connect' }).click()
+    await expect(panel.getByText('What can I help with?')).toBeVisible()
+    const page = await context.newPage()
+    await page.goto(`http://127.0.0.1:${port}/article`)
+    await page.bringToFront()
+    await panel.getByRole('button', { name: 'Include this page' }).click()
+    await expect(panel.getByTestId('page-chip')).toContainText('Photosynthesis explained')
+    await panel.getByLabel('Message').fill('what is this about')
+    await panel.getByLabel('Message').press('Enter')
+    // The fake "echo" model repeats what it was sent: the page, wrapped by Anemo.
+    const answer = panel.getByTestId('assistant-message').last()
+    await expect(answer).toContainText('untrusted_page_content', { timeout: 20_000 })
+    await expect(answer).toContainText('not instructions')
+    await expect(answer).toContainText('plants turn')
+    await expect(panel.getByTestId('user-message').last()).toContainText('Photosynthesis explained')
+  } finally {
+    site.close()
+  }
+})

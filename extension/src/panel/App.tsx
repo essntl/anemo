@@ -9,6 +9,7 @@ import { useStored } from './state/useStored'
 import { applyAccent } from './theme'
 import { ChatView } from './chat/ChatView'
 import { ConnectionBanner } from './views/ConnectionBanner'
+import { PanelNotice } from './views/PanelNotice'
 import { SettingsView } from './views/SettingsView'
 import { SetupView } from './views/SetupView'
 
@@ -71,6 +72,7 @@ export function App() {
         </nav>
       </header>
       <ConnectionBanner api={api} />
+      <PanelNotice />
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {view === 'chat' && <ChatView />}
         {view === 'settings' && <SettingsView api={api} connection={connection} />}
