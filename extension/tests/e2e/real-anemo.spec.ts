@@ -295,3 +295,17 @@ test('focus: the panel and Anemo share one timer, and blocking follows it', asyn
   await panel.getByRole('button', { name: 'Stop' }).click()
   await expect.poll(async () => (await read()).state?.status).toBe('idle')
 })
+
+test('a file attached in the panel is uploaded to Anemo and goes with the message', async ({ panel }) => {
+  await panel.getByLabel('Anemo address').fill(url!)
+  await panel.getByLabel('API token').fill(token!)
+  await panel.getByRole('button', { name: 'Connect' }).click()
+  await expect(panel.getByText('What can I help with?')).toBeVisible()
+  await panel.locator('input[type=file]').setInputFiles({ name: 'facts.txt', mimeType: 'text/plain', buffer: Buffer.from('The secret word is marzipan.') })
+  await expect(panel.getByTestId('pending-attachment')).toContainText(/\d+ B/) // uploaded
+  await panel.getByLabel('Message').fill('what is in the file')
+  await panel.getByLabel('Message').press('Enter')
+  await expect(panel.getByTestId('user-message').getByTestId('attachment')).toContainText('facts.txt')
+  // The echo model repeats what it was sent: the file's text reached it.
+  await expect(panel.getByTestId('assistant-message').last()).toContainText('marzipan', { timeout: 20_000 })
+})

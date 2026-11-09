@@ -112,3 +112,7 @@
 @keyframes eq { 0%, 100% { height: 30%; } 50% { height: 100%; } }
 .eq-bar { height: 30%; animation: eq 0.9s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .eq-bar { animation: none; height: 60%; } }
+
+/* Find in chat: every match, and the current one. */
+::highlight(chat-find) { background-color: color-mix(in srgb, var(--warning) 35%, transparent); }
+::highlight(chat-find-current) { background-color: var(--warning); color: #000; }

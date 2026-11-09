@@ -111,6 +111,7 @@ export interface SendInput {
   modelId: string | null
   profileId: string | null
   page?: PageContext | null
+  attachmentIds?: string[]
   /** A new chat that is deleted 5 minutes after its last message unless kept. */
   temporary?: boolean
 }
@@ -134,7 +135,7 @@ export function useSendTurn() {
             mode: input.mode,
             model_id: input.modelId,
             profile_id: input.mode === 'agent' ? input.profileId : null,
-            attachment_ids: [],
+            attachment_ids: input.attachmentIds ?? [],
             reference_ids: [],
             page: input.page ? pageForApi(input.page) : null,
           },

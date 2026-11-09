@@ -73,7 +73,7 @@ the same card in Anemo; the extension then goes back to its setup screen at once
 | | Feature | Where |
 |---|---|---|
 | 1 | **Setup & connection**: address + token, a clear message for each way the connection can fail (offline, wrong address, Cloudflare challenge, revoked token…) | first start, Settings tab |
-| 2 | **Chat**: Anemo's chats in the panel, streaming, with chat/agent mode, model picker, approvals, plan and question cards; the chat list is Anemo's own | Chat tab |
+| 2 | **Chat**: Anemo's chats in the panel, streaming, with chat/agent mode, model picker, approvals, plan and question cards; attach files and images (paperclip, paste or drop); find in the open chat (Ctrl+F); manage chats (rename, favorite, archive, delete, temporary) | Chat tab |
 | 3 | **Page context**: the globe button attaches the page you're on (readable text, a PDF's text, a YouTube transcript), marked as untrusted, to your next message; it shows as a chip in Anemo too | Chat tab |
 | 4 | **Learning actions**: Summarize, Quiz me (5 questions, one at a time), Discuss a selection | Chat tab, right-click menu |
 | 5 | **Translate & explain on the page**: select text, right-click, Explain or Translate; Translate page; Restore all. Uses Anemo's "inline" model, with no memories, documents or tools | right-click menu |

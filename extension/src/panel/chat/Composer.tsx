@@ -1,9 +1,11 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react'
-import { ArrowUp, Globe, Square } from 'lucide-react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { ArrowUp, Globe, Paperclip, Square } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Select, type SelectOption } from '../ui/Select'
 import { cn } from '../lib/cn'
 import { useModels, useProfiles, type Mode } from './api'
+import { filesFrom, type Pending } from './attachments'
+import { PendingChip } from './Attachments'
 
 export interface ComposerProps {
   draft: string
@@ -24,8 +26,16 @@ export interface ComposerProps {
   /** "Include this page" is on for this message. */
   pageOn: boolean
   onTogglePage: () => void
-  /** A page alone can be sent without text. */
+  /** A page or files alone can be sent without text. */
   canSendEmpty?: boolean
+  /** Files attached to this message, and adding or removing them. */
+  files: Pending[]
+  onAddFiles: (files: File[]) => void
+  onRemoveFile: (key: string) => void
+  /** Files are still uploading: sending waits. */
+  uploading: boolean
+  /** Send was pressed during an upload: it goes when the upload is done. */
+  queued: boolean
 }
 
 /** A model's name without its provider in front ("OpenAI: GPT-6" → "GPT-6"), since the
@@ -37,6 +47,8 @@ function shortName(display: string, provider: string | null | undefined): string
 
 export function Composer(p: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
+  const picker = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
   const models = useModels()
   const profiles = useProfiles()
 
@@ -51,7 +63,7 @@ export function Composer(p: ComposerProps) {
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      if (!p.running && (p.draft.trim() || p.canSendEmpty)) p.onSend()
+      if (!p.running && (p.draft.trim() || p.canSendEmpty || p.uploading)) p.onSend()
     }
   }
 
@@ -59,17 +71,58 @@ export function Composer(p: ComposerProps) {
   return (
     <div className="shrink-0 border-t border-border bg-surface px-2.5 pb-2.5 pt-2">
       {p.above}
-      <div className="rounded-control border border-border bg-bg focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
+      <div
+        className={cn('rounded-control border bg-bg focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft', dragging ? 'border-accent ring-2 ring-accent-soft' : 'border-border')}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          const files = filesFrom(e.dataTransfer)
+          setDragging(false)
+          if (!files.length) return
+          e.preventDefault()
+          p.onAddFiles(files)
+        }}
+      >
+        {p.files.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-2.5 pt-2.5" aria-label="Attached files">
+            {p.files.map((f) => (
+              <PendingChip key={f.key} file={f} onRemove={() => p.onRemoveFile(f.key)} />
+            ))}
+          </div>
+        )}
+        <input
+          ref={picker}
+          type="file"
+          multiple
+          hidden
+          aria-label="Attach files"
+          onChange={(e) => {
+            p.onAddFiles([...(e.target.files ?? [])])
+            e.target.value = '' // the same file can be picked again
+          }}
+        />
         <textarea
+          onPaste={(e) => {
+            // A pasted image or file is attached; pasted text goes into the box as usual.
+            const files = filesFrom(e.clipboardData)
+            if (!files.length) return
+            e.preventDefault()
+            p.onAddFiles(files)
+          }}
           ref={ref}
           rows={1}
           value={p.draft}
           onChange={(e) => p.onDraft(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={p.mode === 'agent' ? 'Give the agent a task…' : 'Message Anemo…'}
+          placeholder={dragging ? 'Drop files to attach them' : p.mode === 'agent' ? 'Give the agent a task…' : 'Message Anemo…'}
           aria-label="Message"
           className="block max-h-[40vh] w-full resize-none bg-transparent px-3 py-2 text-[13.5px] leading-relaxed placeholder:text-subtle focus:outline-none"
         />
+        {p.queued && <div className="px-3 pb-1 text-[11.5px] text-muted" role="status">Sends when the upload is done…</div>}
         <div className="flex items-center gap-1 px-1.5 pb-1.5">
           <div role="radiogroup" aria-label="Mode" className="flex rounded-md bg-surface-2 p-0.5">
             {(['chat', 'agent'] as const).map((m) => (
@@ -110,6 +163,9 @@ export function Composer(p: ComposerProps) {
               options={[{ value: '', label: 'Default agent' }, ...(profiles.data ?? []).map((pr) => ({ value: pr.id, label: pr.name }))]}
             />
           )}
+          <button type="button" aria-label="Attach files" title="Attach files (or paste, or drop them here)" onClick={() => picker.current?.click()} className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-text">
+            <Paperclip className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             aria-pressed={p.pageOn}
@@ -125,7 +181,7 @@ export function Composer(p: ComposerProps) {
           {p.running ? (
             <Button size="icon" variant="secondary" aria-label="Stop" title="Stop" onClick={p.onStop} icon={<Square className="h-3.5 w-3.5 fill-current" />} />
           ) : (
-            <Button size="icon" variant="primary" aria-label="Send" title="Send (Enter)" disabled={!p.draft.trim() && !p.canSendEmpty} loading={p.sending} onClick={p.onSend} icon={<ArrowUp className="h-4 w-4" />} />
+            <Button size="icon" variant="primary" aria-label="Send" title="Send (Enter)" disabled={!p.draft.trim() && !p.canSendEmpty && !p.uploading} loading={p.sending} onClick={p.onSend} icon={<ArrowUp className="h-4 w-4" />} />
           )}
         </div>
       </div>

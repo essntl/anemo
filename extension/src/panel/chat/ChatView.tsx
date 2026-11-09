@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, BookOpen, Check, Copy, Globe, GraduationCap, List, Plus, Timer } from 'lucide-react'
+import { ArrowDown, BookOpen, Check, Copy, Globe, GraduationCap, List, Plus, Search, Timer } from 'lucide-react'
 import { startLearningChat, type LearningAction } from '@/shared/learning'
 import type { PageContext } from '@/shared/pageContext'
 import { storage } from '@/shared/storage'
@@ -38,6 +38,9 @@ import { PagePreview, type PageState } from './PagePreview'
 import { useRunStream } from './useRunStream'
 import { useChatMenu } from './chatMenu'
 import { TemporaryBadge } from './Temporary'
+import { refusal, upload, type Pending } from './attachments'
+import { SentAttachment } from './Attachments'
+import { FindBar } from './FindBar'
 
 const NEW = 'new'
 
@@ -106,6 +109,13 @@ function UserBubble({ message }: { message: ChatMessage }) {
           <span className="shrink-0">· {message.page.word_count.toLocaleString()} words</span>
         </a>
       )}
+      {message.attachments.length > 0 && (
+        <div className="flex max-w-[88%] flex-wrap justify-end gap-1.5">
+          {message.attachments.map((a) => (
+            <SentAttachment key={a.id} id={a.id} name={a.filename} size={a.size} kind={a.kind} />
+          ))}
+        </div>
+      )}
       {message.text && <div className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3 py-2 text-[13.5px]">{message.text}</div>}
     </div>
   )
@@ -122,6 +132,13 @@ function AssistantMessage({ message, live, conversationId }: { message: ChatMess
     <div className="flex flex-col gap-2" data-testid="assistant-message">
       {isAgent && message.run_id && <AgentActivity runId={message.run_id} version={live?.timelineVersion ?? 0} conversationId={conversationId} />}
       {text ? <Markdown text={text} serverUrl={connection.serverUrl} /> : working ? <div className="flex items-center gap-1.5 text-[12.5px] text-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-accent" />{status === 'waiting_approval' ? 'Waiting for you' : 'Thinking…'}</div> : null}
+      {!working && message.attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {message.attachments.map((a) => (
+            <SentAttachment key={a.id} id={a.id} name={a.filename} size={a.size} kind={a.kind} />
+          ))}
+        </div>
+      )}
       {live?.notice && <div className="text-[11.5px] text-subtle">{live.notice}</div>}
       {status === 'failed' && <div className="text-[12.5px] text-error">{error ?? 'The answer failed.'}</div>}
       {status === 'cancelled' && <div className="text-[11.5px] text-subtle">Stopped.</div>}
@@ -256,6 +273,33 @@ function Conversation({
   const [profileChoice, setProfileChoice] = useState<string | null | undefined>(undefined)
   const [startedRun, setStartedRun] = useState<string | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [files, setFiles] = useState<Pending[]>([])
+  const [finding, setFinding] = useState(false)
+  const [queued, setQueued] = useState(false)
+
+  const addFiles = (added: File[]) => {
+    let count = files.length
+    for (const file of added) {
+      const key = crypto.randomUUID()
+      const why = refusal(file, count)
+      const preview = !why && file.type.startsWith('image/') ? URL.createObjectURL(file) : null
+      setFiles((all) => [...all, { key, name: file.name || 'Pasted image', size: file.size, preview, status: why ? 'error' : 'uploading', error: why ?? undefined }])
+      if (why) continue
+      count += 1
+      upload(api, file).then(
+        (done) => setFiles((all) => all.map((f) => (f.key === key ? { ...f, status: 'ready', id: done.id } : f))),
+        (err: unknown) => setFiles((all) => all.map((f) => (f.key === key ? { ...f, status: 'error', error: err instanceof Error ? err.message : 'The upload failed.' } : f))),
+      )
+    }
+  }
+  const removeFile = (key: string) =>
+    setFiles((all) => {
+      const gone = all.find((f) => f.key === key)
+      if (gone?.preview) URL.revokeObjectURL(gone.preview)
+      return all.filter((f) => f.key !== key)
+    })
+  const ready = files.filter((f) => f.status === 'ready' && f.id)
+  const uploading = files.some((f) => f.status === 'uploading')
 
   const runId = startedRun ?? conversation.data?.active_run_id ?? null
 
@@ -271,6 +315,18 @@ function Conversation({
       document.removeEventListener('visibilitychange', report)
       window.removeEventListener('pagehide', hide)
     }
+  }, [conversationId])
+  // Ctrl+F (⌘F) finds in the open chat: Chrome's own find doesn't reach the side panel.
+  useEffect(() => {
+    if (!conversationId) return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setFinding(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [conversationId])
   const profileId = profileChoice === undefined ? (conversation.data?.profile_id ?? null) : profileChoice
 
@@ -295,13 +351,21 @@ function Conversation({
   const page = pageState.status === 'ready' ? pageState.page : null
   const submit = () => {
     const text = draft.trim()
-    if ((!text && !page) || running || pageState.status === 'loading') return
+    if (uploading) {
+      // Sent as soon as the files are up (the effect below), not dropped.
+      if (text || page || files.some((f) => f.status !== 'error')) setQueued(true)
+      return
+    }
+    setQueued(false)
+    if ((!text && !page && ready.length === 0) || running || pageState.status === 'loading') return
     setSendError(null)
     changeDraft('')
     const sentPage = page
     setPageState({ status: 'off' }) // per message: the next one has no page unless asked
+    const sentFiles = files
+    setFiles([])
     send.mutate(
-      { conversationId, text, mode, modelId, profileId, page: sentPage, temporary: !conversationId && temporary },
+      { conversationId, text, mode, modelId, profileId, page: sentPage, attachmentIds: ready.map((f) => f.id!), temporary: !conversationId && temporary },
       {
         onSuccess: ({ conversationId: id, turn }) => {
           if (id !== conversationId) onOpen(id) // a new chat: it opens with its run
@@ -311,11 +375,21 @@ function Conversation({
         onError: (err) => {
           changeDraft(text)
           if (sentPage) setPageState({ status: 'ready', page: sentPage })
+          setFiles(sentFiles)
           setSendError(err.message)
         },
       },
     )
   }
+
+  // Send was pressed while files were uploading: go now that they are up.
+  const submitLatest = useRef(submit)
+  useEffect(() => {
+    submitLatest.current = submit
+  })
+  useEffect(() => {
+    if (queued && !uploading) submitLatest.current()
+  }, [queued, uploading])
 
   if (conversationId && conversation.isError) {
     return (
@@ -336,10 +410,12 @@ function Conversation({
           {conversationId ? (conversation.data?.title ?? '…') : temporary ? 'Temporary chat' : 'New chat'}
         </div>
         {conversation.data?.temporary && <TemporaryBadge conversation={conversation.data} />}
+        {conversationId && <Button size="icon" variant="ghost" aria-label="Find in this chat" title="Find in this chat (Ctrl+F)" onClick={() => setFinding((v) => !v)} icon={<Search className="h-4 w-4" />} />}
         {conversation.data && <ActionMenu actions={menu.actions} label="Chat actions" />}
         <Button size="icon" variant="ghost" aria-label="New chat" title="New chat" onClick={() => onOpen(null)} icon={<Plus className="h-4 w-4" />} />
         {menu.dialogs}
       </div>
+      {finding && <FindBar root={content} version={list.length + (live.text?.length ?? 0)} onClose={() => setFinding(false)} />}
       {menu.error && <div className="px-3 pt-2"><Notice tone="error" title="That didn’t work">{menu.error}</Notice></div>}
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div ref={content} className="flex min-h-full flex-col">
@@ -395,7 +471,7 @@ function Conversation({
         onSend={submit}
         onStop={() => runId && cancel.mutate(runId)}
         running={running}
-        sending={send.isPending}
+        sending={send.isPending || queued}
         mode={mode}
         onMode={setModeChoice}
         modelId={modelId}
@@ -405,7 +481,12 @@ function Conversation({
         onProfile={setProfileChoice}
         pageOn={pageState.status !== 'off'}
         onTogglePage={togglePage}
-        canSendEmpty={page !== null}
+        canSendEmpty={page !== null || ready.length > 0}
+        files={files}
+        onAddFiles={addFiles}
+        onRemoveFile={removeFile}
+        uploading={uploading}
+        queued={queued}
         above={<PagePreview state={pageState} onRefresh={() => void readPageNow()} onRemove={() => setPageState({ status: 'off' })} />}
       />
     </div>
