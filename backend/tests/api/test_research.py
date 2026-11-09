@@ -189,6 +189,7 @@ async def test_ending_writes_a_document_with_linked_citations(authed, monkeypatc
     assert doc["path"] == "documents/Research/how-does-entropy-work.md"
     text = doc["content"]
     assert text.startswith("# How does entropy work?\n\n*Research write-up (comparison table) · ")
+    assert text.split("\n")[2].endswith(" · 2 sources*")
     assert "Entropy rises ([Heat](https://a.example/heat))." in text
     assert (
         "Heat flows one way ([Heat](https://a.example/heat); [Second](https://b.example/second))."

@@ -42,3 +42,10 @@ def test_the_source_list_is_written_by_code():
         " — p. 12, key table\n"
         "3. [A (bracketed) title](https://blog.example/x) (video)\n"
     )
+
+
+def test_the_source_count_reads_right() -> None:
+    from app.runtime.research_writeup import count_label
+
+    assert count_label(1) == "1 source"
+    assert count_label(2) == "2 sources"
