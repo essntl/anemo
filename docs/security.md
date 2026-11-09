@@ -45,6 +45,15 @@ Companion (the browser extension, `extension/`) or another device. A token is se
   notifications are shown in the browser and not copied to Discord; the skipped copy is
   recorded as `skipped`. A closed browser or lost connection counts as away after 90
   seconds. Destinations an automation names itself, and test messages, are always sent.
+- **Saving web content** (quick capture): the extension sends what it read; the
+  "Inline & formatting" model (Settings → Models) reformats it before it is written into a
+  document. That model sees only the content, fenced and labelled as untrusted, and at most
+  the target document's headings; never the document's text, your memories, other chats or
+  tools. A page could still try to make the formatter write something misleading into the
+  document; review saved clips like any text from the web.
+- **Pages attached to a chat message** are kept apart from the message, wrapped and
+  labelled as untrusted data for the model, and never used for memories (nor are the answers
+  to such messages).
 
 ## Share links
 

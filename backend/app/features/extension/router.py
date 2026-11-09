@@ -56,6 +56,8 @@ FORWARDED = frozenset(
         "conversations.changed",
         "focus.changed",
         "music.changed",
+        "capture.progress",
+        "capture.finished",
     }
 )
 

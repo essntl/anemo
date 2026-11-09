@@ -2764,6 +2764,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Capture
+         * @description Queue a save. Follow it with the `capture.progress` / `capture.finished` events
+         *     or GET /api/capture/{id}.
+         */
+        post: operations["capture_api_capture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/capture/{capture_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Capture Status */
+        get: operations["capture_status_api_capture__capture_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automations": {
         parameters: {
             query?: never;
@@ -3239,6 +3277,16 @@ export interface components {
              */
             density: "comfortable" | "compact";
         };
+        /** AppendTo */
+        AppendTo: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "append";
+            /** Document Id */
+            document_id?: string | null;
+        };
         /** ApprovalOut */
         ApprovalOut: {
             /**
@@ -3584,6 +3632,90 @@ export interface components {
         BulkOut: {
             /** Changed */
             changed: number;
+        };
+        /** CaptureIn */
+        CaptureIn: {
+            page: components["schemas"]["CapturedPage"];
+            /**
+             * Kind
+             * @default page
+             * @enum {string}
+             */
+            kind: "page" | "selection";
+            /**
+             * Format
+             * @default markdown
+             * @enum {string}
+             */
+            format: "markdown" | "summary";
+            /** Target */
+            target: components["schemas"]["NewDocument"] | components["schemas"]["AppendTo"];
+            /** Explanation */
+            explanation?: string | null;
+        };
+        /** CaptureResult */
+        CaptureResult: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Path */
+            path: string;
+            /** Title */
+            title: string;
+            /** Formatted */
+            formatted: boolean;
+            undo: components["schemas"]["Undo"];
+        };
+        /** CaptureStarted */
+        CaptureStarted: {
+            /** Id */
+            id: string;
+        };
+        /** CaptureStatus */
+        CaptureStatus: {
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "formatting" | "saving" | "done" | "failed";
+            /**
+             * Done
+             * @default 0
+             */
+            done: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            result?: components["schemas"]["CaptureResult"] | null;
+            /** Error */
+            error?: string | null;
+        };
+        /**
+         * CapturedPage
+         * @description What the extension read: a page's main content (Markdown), a PDF's text, a selection.
+         */
+        CapturedPage: {
+            /** Url */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Source
+             * @default page
+             * @enum {string}
+             */
+            source: "page" | "selection" | "pdf" | "youtube";
+            /** Content */
+            content: string;
         };
         /** CatalogOut */
         CatalogOut: {
@@ -4862,6 +4994,8 @@ export interface components {
             embeddings?: string | null;
             /** Title */
             title?: string | null;
+            /** Inline */
+            inline?: string | null;
             /** Fallbacks */
             fallbacks?: {
                 [key: string]: string[];
@@ -4971,6 +5105,21 @@ export interface components {
              * @default true
              */
             track_alerts: boolean;
+        };
+        /** NewDocument */
+        NewDocument: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "new";
+            /**
+             * Folder
+             * @default Web clips
+             */
+            folder: string;
+            /** Title */
+            title?: string | null;
         };
         /** NewTokenOut */
         NewTokenOut: {
@@ -7066,6 +7215,21 @@ export interface components {
             run_id: string;
             user_message: components["schemas"]["MessageOut"] | null;
             assistant_message: components["schemas"]["MessageOut"];
+        };
+        /** Undo */
+        Undo: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "restore" | "delete";
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Revision Id */
+            revision_id?: string | null;
         };
         /**
          * UpdateSettings
@@ -13751,6 +13915,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdfTextOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_api_capture_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureStarted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_status_api_capture__capture_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capture_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureStatus"];
                 };
             };
             /** @description Validation Error */

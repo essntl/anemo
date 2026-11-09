@@ -11822,6 +11822,124 @@
         }
       }
     },
+    "/api/capture": {
+      "post": {
+        "tags": [
+          "capture"
+        ],
+        "summary": "Capture",
+        "description": "Queue a save. Follow it with the `capture.progress` / `capture.finished` events\nor GET /api/capture/{id}.",
+        "operationId": "capture_api_capture_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptureIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureStarted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/capture/{capture_id}": {
+      "get": {
+        "tags": [
+          "capture"
+        ],
+        "summary": "Capture Status",
+        "operationId": "capture_status_api_capture__capture_id__get",
+        "parameters": [
+          {
+            "name": "capture_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Capture Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/automations": {
       "get": {
         "tags": [
@@ -13749,6 +13867,30 @@
         "type": "object",
         "title": "AppearanceSettings"
       },
+      "AppendTo": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "append",
+            "title": "Mode",
+            "default": "append"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          }
+        },
+        "type": "object",
+        "title": "AppendTo"
+      },
       "ApprovalOut": {
         "properties": {
           "id": {
@@ -14804,6 +14946,209 @@
           "changed"
         ],
         "title": "BulkOut"
+      },
+      "CaptureIn": {
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/CapturedPage"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "selection"
+            ],
+            "title": "Kind",
+            "default": "page"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "summary"
+            ],
+            "title": "Format",
+            "default": "markdown"
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NewDocument"
+              },
+              {
+                "$ref": "#/components/schemas/AppendTo"
+              }
+            ],
+            "title": "Target",
+            "discriminator": {
+              "propertyName": "mode",
+              "mapping": {
+                "append": "#/components/schemas/AppendTo",
+                "new": "#/components/schemas/NewDocument"
+              }
+            }
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "target"
+        ],
+        "title": "CaptureIn"
+      },
+      "CaptureResult": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "formatted": {
+            "type": "boolean",
+            "title": "Formatted"
+          },
+          "undo": {
+            "$ref": "#/components/schemas/Undo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "path",
+          "title",
+          "formatted",
+          "undo"
+        ],
+        "title": "CaptureResult"
+      },
+      "CaptureStarted": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CaptureStarted"
+      },
+      "CaptureStatus": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "formatting",
+              "saving",
+              "done",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "CaptureStatus"
+      },
+      "CapturedPage": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Title",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "page",
+              "selection",
+              "pdf",
+              "youtube"
+            ],
+            "title": "Source",
+            "default": "page"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 600000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "content"
+        ],
+        "title": "CapturedPage",
+        "description": "What the extension read: a page's main content (Markdown), a PDF's text, a selection."
       },
       "CatalogOut": {
         "properties": {
@@ -18249,6 +18594,18 @@
             ],
             "title": "Title"
           },
+          "inline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inline"
+          },
           "fallbacks": {
             "additionalProperties": {
               "items": {
@@ -18266,7 +18623,8 @@
                 "background",
                 "automation",
                 "embeddings",
-                "title"
+                "title",
+                "inline"
               ]
             },
             "type": "object",
@@ -18568,6 +18926,36 @@
         "type": "object",
         "title": "MusicSettings",
         "description": "How the music player looks and talks."
+      },
+      "NewDocument": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "new",
+            "title": "Mode",
+            "default": "new"
+          },
+          "folder": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Folder",
+            "default": "Web clips"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "title": "NewDocument"
       },
       "NewTokenOut": {
         "properties": {
@@ -24256,6 +24644,41 @@
           "assistant_message"
         ],
         "title": "TurnOut"
+      },
+      "Undo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "restore",
+              "delete"
+            ],
+            "title": "Kind"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "document_id"
+        ],
+        "title": "Undo"
       },
       "UpdateSettings": {
         "properties": {

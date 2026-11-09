@@ -12,6 +12,7 @@ const AUTHORS: Record<string, string> = {
   user: 'You',
   agent: 'An agent',
   external: 'Outside the app',
+  extension: 'Anemo Companion',
 }
 
 /** A document's saved versions, with a preview and "restore". */

@@ -71,8 +71,14 @@ def default_handlers() -> dict[str, Handler]:
 
         await mcp.refresh(uuid.UUID(payload["server_id"]))
 
+    async def capture_save(payload: dict[str, Any]) -> None:
+        from app.features.capture import service as capture
+
+        await capture.run(str(payload["capture_id"]), payload["body"])
+
     return {
         "automation.retry": automation_retry,
+        "capture.save": capture_save,
         "mcp.refresh": mcp_refresh,
         "notify.deliver": notify_deliver,
         "document.index": document_index,
