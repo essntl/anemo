@@ -45,3 +45,37 @@ class PhaseEndedIn(BaseModel):
 
     title: str = Field(min_length=1, max_length=200)
     body: str = Field("", max_length=500)
+
+
+TimerStatus = Literal["idle", "running", "paused"]
+DAY_MS = 24 * 3600 * 1000
+
+
+class FocusTimerState(BaseModel):
+    """The focus timer's state (frontend `features/focus/timer.ts`), times in epoch ms."""
+
+    phase: FocusPhase
+    status: TimerStatus
+    phase_started_at: int | None = Field(None, ge=0)
+    started_at: int | None = Field(None, ge=0)
+    paused_at: int | None = Field(None, ge=0)
+    accumulated: int = Field(0, ge=0, le=DAY_MS)
+    duration: int = Field(ge=0, le=DAY_MS)
+    round: int = Field(0, ge=0, le=10_000)
+    task_id: uuid.UUID | None = None
+    session_id: str = Field(min_length=1, max_length=100)
+
+
+class FocusTimerIn(BaseModel):
+    state: FocusTimerState
+    # The version this change was made on (0 when there is none yet).
+    base_version: int = Field(ge=0)
+    source: str = Field("", max_length=40)
+
+
+class FocusTimerOut(BaseModel):
+    # None until a timer has been used on any device.
+    state: FocusTimerState | None
+    version: int
+    updated_by: str
+    updated_at: datetime | None

@@ -1,22 +1,27 @@
-"""Focus sessions: what the focus timer recorded.
+"""Focus sessions: what the focus timer recorded, and the timer's shared state.
 
-The timer itself runs in the browser (it is per device and works offline); the
-browser sends a session here when a focus phase ends or is cut short. Sessions
-carry a `client_id`, so sending one again (from the offline outbox) is harmless.
+The timer runs in the browser (and works offline there); the browser sends a session
+here when a focus phase ends or is cut short. Sessions carry a `client_id`, so sending
+one again (from the offline outbox) is harmless.
+
+The timer's running state is also kept here, one for all devices and the browser
+extension: each change is sent with the version it was made on, and a change made on
+an older version is refused (409 `timer_conflict`, with the current state), so the
+client takes the newer state instead of overwriting it.
 """
 
 import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import NotFound
+from app.core.errors import Conflict, NotFound
 from app.events import bus
-from app.features.focus.models import FocusSession
-from app.features.focus.schemas import FocusSessionIn
+from app.features.focus.models import FocusSession, FocusTimer
+from app.features.focus.schemas import FocusSessionIn, FocusTimerIn, FocusTimerOut, FocusTimerState
 from app.features.tasks.models import Project, Task
 
 
@@ -93,3 +98,51 @@ async def delete(db: AsyncSession, session_id: uuid.UUID) -> None:
     await db.delete(session)
     await db.commit()
     await notify()
+
+
+TIMER_KEY = "shared"
+
+
+def _timer_out(row: FocusTimer | None) -> FocusTimerOut:
+    if row is None:
+        return FocusTimerOut(state=None, version=0, updated_by="", updated_at=None)
+    return FocusTimerOut(
+        state=FocusTimerState.model_validate(row.state),
+        version=row.version,
+        updated_by=row.updated_by,
+        updated_at=row.updated_at,
+    )
+
+
+async def get_timer(db: AsyncSession) -> FocusTimerOut:
+    return _timer_out(await db.get(FocusTimer, TIMER_KEY, populate_existing=True))
+
+
+async def put_timer(db: AsyncSession, body: FocusTimerIn) -> FocusTimerOut:
+    """Replace the timer's state if it is still at `base_version`. Commits; tells every
+    tab and the extension (`focus.timer`)."""
+    state = body.state.model_dump(mode="json")
+    if body.base_version == 0:
+        stored = await db.scalar(
+            insert(FocusTimer)
+            .values(key=TIMER_KEY, state=state, version=1, updated_by=body.source)
+            .on_conflict_do_nothing(index_elements=["key"])
+            .returning(FocusTimer.version)
+        )
+    else:
+        stored = await db.scalar(
+            update(FocusTimer)
+            .where(FocusTimer.key == TIMER_KEY, FocusTimer.version == body.base_version)
+            .values(state=state, version=FocusTimer.version + 1, updated_by=body.source)
+            .returning(FocusTimer.version)
+        )
+    await db.commit()
+    out = await get_timer(db)
+    if stored is None:
+        raise Conflict(
+            "The timer was changed elsewhere first",
+            code="timer_conflict",
+            details={"current": out.model_dump(mode="json")},
+        )
+    await bus.publish_global("focus.timer", out.model_dump(mode="json"))
+    return out

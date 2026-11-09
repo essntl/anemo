@@ -10414,6 +10414,114 @@
         }
       }
     },
+    "/api/focus/timer": {
+      "get": {
+        "tags": [
+          "focus"
+        ],
+        "summary": "Get Timer",
+        "description": "The timer's shared state (every Anemo tab and the browser extension follow it).",
+        "operationId": "get_timer_api_focus_timer_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FocusTimerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "focus"
+        ],
+        "summary": "Put Timer",
+        "description": "Change the timer. Refused with 409 `timer_conflict` (details: the current state)\nwhen it changed since `base_version`.",
+        "operationId": "put_timer_api_focus_timer_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FocusTimerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FocusTimerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/music/tracks": {
       "get": {
         "tags": [
@@ -17932,6 +18040,177 @@
           "by_hour"
         ],
         "title": "FocusStats"
+      },
+      "FocusTimerIn": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/FocusTimerState"
+          },
+          "base_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Base Version"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Source",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "base_version"
+        ],
+        "title": "FocusTimerIn"
+      },
+      "FocusTimerOut": {
+        "properties": {
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FocusTimerState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "updated_by": {
+            "type": "string",
+            "title": "Updated By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "version",
+          "updated_by",
+          "updated_at"
+        ],
+        "title": "FocusTimerOut"
+      },
+      "FocusTimerState": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "focus",
+              "short_break",
+              "long_break"
+            ],
+            "title": "Phase"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "running",
+              "paused"
+            ],
+            "title": "Status"
+          },
+          "phase_started_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Started At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "paused_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused At"
+          },
+          "accumulated": {
+            "type": "integer",
+            "maximum": 86400000.0,
+            "minimum": 0.0,
+            "title": "Accumulated",
+            "default": 0
+          },
+          "duration": {
+            "type": "integer",
+            "maximum": 86400000.0,
+            "minimum": 0.0,
+            "title": "Duration"
+          },
+          "round": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Round",
+            "default": 0
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Session Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phase",
+          "status",
+          "duration",
+          "session_id"
+        ],
+        "title": "FocusTimerState",
+        "description": "The focus timer's state (frontend `features/focus/timer.ts`), times in epoch ms."
       },
       "GeneralSettings": {
         "properties": {

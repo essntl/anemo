@@ -9,6 +9,7 @@ import { notificationsKey } from '@/features/notifications/api'
 import { showDesktopNotification } from '@/features/notifications/desktop'
 import { alertApproval, alertRunStatus, type RunStatusEvent } from './agentAlerts'
 import { type FocusControl, type MusicControl, onFocusControl, onMusicControl } from './agentControl'
+import { receive as receiveTimer, type TimerOut } from '@/features/focus/timerSync'
 import { tabId, watchUse } from './tab'
 import { conversationKey, conversationsKey, messagesKey } from './api'
 import { TERMINAL } from './runStream'
@@ -80,6 +81,8 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: ['focus'] })
       void qc.invalidateQueries({ queryKey: ['stats'] })
     })
+    // The focus timer was changed elsewhere (another tab or device, the browser extension).
+    source.addEventListener('focus.timer', ((e: MessageEvent<string>) => receiveTimer(JSON.parse(e.data) as TimerOut)) as EventListener)
     // Playlists or the music library changed (this or another device).
     source.addEventListener('music.changed', () => void qc.invalidateQueries({ queryKey: ['music'] }))
     source.addEventListener('calendar.changed', () => void qc.invalidateQueries({ queryKey: ['calendar'] }))

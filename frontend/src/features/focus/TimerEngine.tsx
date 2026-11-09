@@ -6,6 +6,7 @@ import { focusKey } from './api'
 import { flushOutbox, onSessionsSent, useOutbox } from './outbox'
 import * as timer from './timer'
 import { setPageOpener, timerActions, useClock, useTimerStore } from './timerStore'
+import { pullTimer, pushTimer, useTimerSync } from './timerSync'
 
 /**
  * Keeps the focus timer going while the app is open (mounted once, in
@@ -19,6 +20,8 @@ import { setPageOpener, timerActions, useClock, useTimerStore } from './timerSto
  *  - The tab title shows the countdown, if that is on.
  *  - Sessions waiting offline are sent when the connection is back.
  *  - Another tab changing the timer is picked up (they share this device's storage).
+ *  - The shared timer (timerSync.ts) is fetched when the app opens, comes to the front
+ *    or gets back online; a change that couldn't be sent is sent again.
  */
 export function TimerEngine() {
   const navigate = useNavigate()
@@ -82,9 +85,25 @@ export function TimerEngine() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'anemo-timer') void useTimerStore.persist.rehydrate()
       if (e.key === 'anemo-focus-outbox') void useOutbox.persist.rehydrate()
+      if (e.key === 'anemo-timer-sync') void useTimerSync.persist.rehydrate()
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  // The shared timer.
+  useEffect(() => {
+    void pullTimer()
+    const onVisible = () => document.visibilityState === 'visible' && void pullTimer()
+    const onOnline = () => void pullTimer()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    const id = setInterval(() => useTimerSync.getState().dirty && pushTimer(), 60_000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+      clearInterval(id)
+    }
   }, [])
 
   // Sessions recorded while offline.

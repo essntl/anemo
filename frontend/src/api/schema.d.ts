@@ -2454,6 +2454,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/focus/timer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Timer
+         * @description The timer's shared state (every Anemo tab and the browser extension follow it).
+         */
+        get: operations["get_timer_api_focus_timer_get"];
+        /**
+         * Put Timer
+         * @description Change the timer. Refused with 409 `timer_conflict` (details: the current state)
+         *     when it changed since `base_version`.
+         */
+        put: operations["put_timer_api_focus_timer_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/music/tracks": {
         parameters: {
             query?: never;
@@ -4647,6 +4672,65 @@ export interface components {
             heatmap: components["schemas"]["DayValue"][];
             /** By Hour */
             by_hour: number[];
+        };
+        /** FocusTimerIn */
+        FocusTimerIn: {
+            state: components["schemas"]["FocusTimerState"];
+            /** Base Version */
+            base_version: number;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
+        /** FocusTimerOut */
+        FocusTimerOut: {
+            state: components["schemas"]["FocusTimerState"] | null;
+            /** Version */
+            version: number;
+            /** Updated By */
+            updated_by: string;
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /**
+         * FocusTimerState
+         * @description The focus timer's state (frontend `features/focus/timer.ts`), times in epoch ms.
+         */
+        FocusTimerState: {
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "focus" | "short_break" | "long_break";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "idle" | "running" | "paused";
+            /** Phase Started At */
+            phase_started_at?: number | null;
+            /** Started At */
+            started_at?: number | null;
+            /** Paused At */
+            paused_at?: number | null;
+            /**
+             * Accumulated
+             * @default 0
+             */
+            accumulated: number;
+            /** Duration */
+            duration: number;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /** Task Id */
+            task_id?: string | null;
+            /** Session Id */
+            session_id: string;
         };
         /** GeneralSettings */
         GeneralSettings: {
@@ -13516,6 +13600,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_timer_api_focus_timer_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusTimerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_timer_api_focus_timer_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FocusTimerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusTimerOut"];
+                };
             };
             /** @description Validation Error */
             422: {
