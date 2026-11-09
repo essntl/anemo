@@ -22,7 +22,7 @@ async function anemoTab(context: BrowserContext): Promise<Page> {
 }
 
 test('no Anemo tab: open the player; add a link; play, pause and skip', async ({ panel, context }) => {
-  await expect(panel.getByText('Music plays in Anemo, and no Anemo tab is open in this Chrome.')).toBeVisible()
+  await expect(panel.getByText('Plays in Anemo. No Anemo tab is open.')).toBeVisible()
   await panel.getByRole('button', { name: 'Open Anemo’s player' }).click()
   const music = await anemoTab(context)
   await expect(panel.getByTestId('now-playing')).toHaveText('The queue is empty. Add a link below.')

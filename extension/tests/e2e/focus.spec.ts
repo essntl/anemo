@@ -1,5 +1,5 @@
 import type { Page, Worker } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { choose, expect, test } from './fixtures'
 import { addEvents } from './mockEvents'
 import { addFocus, type TimerWire } from './mockFocus'
 
@@ -39,11 +39,13 @@ async function blockDistraction(panel: Page) {
 
 test('start focus for a task: the shared timer runs, the badge counts, the site is blocked', async ({ panel, context }) => {
   await blockDistraction(panel)
-  await panel.getByLabel('Task (optional)').selectOption({ label: 'Write the introduction' })
+  // The task goes on the shared timer at once, then focus starts on it.
+  await choose(panel, 'Task', 'Write the introduction')
+  await expect.poll(() => focus.timer.state?.task_id).toBe('task-1')
   await panel.getByRole('button', { name: 'Start focus' }).click()
   await expect(panel.getByTestId('focus-timer')).toContainText(/2[45]:\d\d/)
   expect(focus.timer.state).toMatchObject({ phase: 'focus', status: 'running', task_id: 'task-1' })
-  expect(focus.puts[0]).toMatchObject({ base_version: 0, source: 'extension' })
+  expect(focus.puts.map((p) => [p.base_version, p.source, p.status])).toEqual([[0, 'extension', 'idle'], [1, 'extension', 'running']])
   await expect.poll(badge).toMatch(/^2[45]m$/)
   await expect.poll(rules).toEqual(['distraction.test'])
 

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { choose, expect, test } from './fixtures'
 import { addCapture } from './mockCapture'
 import { addChat } from './mockChat'
 import { addEvents } from './mockEvents'
@@ -47,7 +47,7 @@ test('save the selection into the Inbox (the default), with its page link', asyn
     getSelection()!.addRange(range)
   })
   await panel.getByRole('button', { name: /Save selection/ }).click()
-  await expect(panel.getByLabel('Save to')).toHaveValue('inbox')
+  await expect(panel.getByRole('listbox', { name: 'Save to' }).getByRole('option', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
   await panel.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(panel.getByTestId('capture-done')).toContainText('Saved to Inbox')
   const body = cap.captures[0] as { kind: string; target: unknown; page: { source: string; content: string; url: string } }
@@ -62,7 +62,7 @@ test('save the selection into the Inbox (the default), with its page link', asyn
 
 test('add the page to an existing document', async ({ panel }) => {
   await panel.getByRole('button', { name: /Save page/ }).click()
-  await panel.getByLabel('Save to').selectOption({ label: 'Biology notes' })
+  await panel.getByRole('listbox', { name: 'Save to' }).getByRole('option', { name: /Biology notes/ }).click()
   await panel.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(panel.getByTestId('capture-done')).toContainText('Saved to Biology notes')
   expect((cap.captures[0] as { target: unknown }).target).toEqual({ mode: 'append', document_id: 'd1' })
@@ -77,7 +77,7 @@ test('quick task: title from the page, link in the notes, no due date, the proje
   await panel.getByRole('button', { name: /Quick task/ }).click()
   await expect(panel.getByLabel('Title')).toHaveValue('Photosynthesis explained')
   await expect(panel.getByLabel('Due date')).toHaveValue('')
-  await panel.getByLabel('Project').selectOption({ label: 'Thesis' })
+  await choose(panel, 'Project', 'Thesis')
   await panel.getByRole('button', { name: 'Create task' }).click()
   await expect(panel.getByTestId('task-done')).toContainText('Task created')
   const task = cap.tasks[0] as { title: string; description: string; due_date: string | null; project_id: string }
@@ -87,5 +87,5 @@ test('quick task: title from the page, link in the notes, no due date, the proje
   expect(task.description).toMatch(/^From \[Photosynthesis explained\]\(http:\/\/127\.0\.0\.1:\d+\/article\)/)
   await panel.getByRole('button', { name: 'Make another' }).click()
   await panel.getByRole('button', { name: /Quick task/ }).click()
-  await expect(panel.getByLabel('Project')).toHaveValue('p1')
+  await expect(panel.getByRole('combobox', { name: 'Project' })).toHaveText('Thesis')
 })

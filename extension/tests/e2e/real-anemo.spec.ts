@@ -4,7 +4,7 @@
  * The URL must be on 127.0.0.1 (the test build may reach only that without a prompt).
  * Use a throwaway install: the tests create chats in it.
  */
-import { expect, test } from './fixtures'
+import { choose, expect, test } from './fixtures'
 
 const url = process.env.ANEMO_E2E_URL
 const token = process.env.ANEMO_E2E_TOKEN
@@ -42,11 +42,11 @@ test.describe('chat (real Anemo with the fake provider)', () => {
     await panel.getByLabel('Message').press('Enter')
     await expect(panel.getByTestId('assistant-message').last()).toContainText('You said: hello from the panel')
     await panel.getByRole('button', { name: 'All chats' }).click()
-    await expect(panel.getByRole('list', { name: 'Chats' }).getByRole('button').first()).toBeVisible()
+    await expect(panel.getByRole('region', { name: 'Chats' }).getByRole('listitem').first()).toBeVisible()
   })
 
   test('stop ends a slow answer', async ({ panel }) => {
-    await panel.getByLabel('Model').selectOption({ label: 'Slow echo' })
+    await choose(panel, 'Model', 'Slow echo')
     await panel.getByLabel('Message').fill('one two three four five six seven eight nine ten eleven twelve')
     await panel.getByRole('button', { name: 'Send' }).click()
     await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible()
@@ -57,7 +57,7 @@ test.describe('chat (real Anemo with the fake provider)', () => {
 
   test('the agent asks a question; answering it lets the run finish', async ({ panel }) => {
     await panel.getByRole('radio', { name: 'agent' }).click()
-    await panel.getByLabel('Model').selectOption({ label: 'Demo agent' })
+    await choose(panel, 'Model', 'Demo agent')
     await panel.getByLabel('Message').fill('please ask me which folder to use')
     await panel.getByRole('button', { name: 'Send' }).click()
     const card = panel.getByTestId('approval-card')

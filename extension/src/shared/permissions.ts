@@ -9,7 +9,7 @@ export type FeatureKey = keyof Features
 export const FEATURE_PERMISSIONS: Record<FeatureKey, chrome.permissions.Permissions> = {
   notifications: {},
   discordSkip: { permissions: ['idle'] },
-  focusBlocking: { permissions: ['declarativeNetRequest'] },
+  focusBlocking: { permissions: ['declarativeNetRequestWithHostAccess'] },
   youtubeNotes: { origins: ['https://www.youtube.com/*'] },
   browserControl: { permissions: ['debugger', 'tabs', 'tabGroups'], origins: ['https://*/*', 'http://*/*'] },
 }
@@ -22,13 +22,14 @@ function needsAny(p: chrome.permissions.Permissions): boolean {
 export async function requestFeature(key: FeatureKey): Promise<boolean> {
   const wanted = FEATURE_PERMISSIONS[key]
   if (!needsAny(wanted)) return true
-  return chrome.permissions.request(wanted)
+  // Refused, or not requestable at all (Chrome throws then): off, never an uncaught error.
+  return chrome.permissions.request(wanted).catch(() => false)
 }
 
 export async function hasFeaturePermissions(key: FeatureKey): Promise<boolean> {
   const wanted = FEATURE_PERMISSIONS[key]
   if (!needsAny(wanted)) return true
-  return chrome.permissions.contains(wanted)
+  return chrome.permissions.contains(wanted).catch(() => false)
 }
 
 /** Give a feature's permissions back. The Anemo address is never removed here. */

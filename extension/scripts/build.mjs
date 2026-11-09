@@ -72,7 +72,7 @@ function writeManifest() {
     // The test site blocked during focus (distraction.test), with the blocking itself.
     manifest.host_permissions = ['http://127.0.0.1/*', 'https://www.youtube.com/*', '*://distraction.test/*', '*://*.distraction.test/*', 'http://localhost/*']
     // Blocking (focus) and browser control (its test pages are on localhost), without Chrome's prompts.
-    manifest.permissions = [...manifest.permissions, 'declarativeNetRequest', 'debugger', 'tabGroups']
+    manifest.permissions = [...manifest.permissions, 'declarativeNetRequestWithHostAccess', 'debugger', 'tabGroups']
   }
   mkdirSync(out, { recursive: true })
   writeFileSync(resolve(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')

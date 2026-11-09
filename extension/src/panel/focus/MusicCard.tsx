@@ -7,7 +7,8 @@ import { useEffect, useState } from 'react'
 import { ExternalLink, ListPlus, Music, Pause, Play, Plus, SkipBack, SkipForward } from 'lucide-react'
 import { BRIDGE_SCRIPT, isMusicPage, pickTab, type MusicCommand } from '@/shared/music'
 import { Button } from '../ui/Button'
-import { Card, CardBody, CardHeader } from '../ui/Card'
+import { Card, CardBody } from '../ui/Card'
+import { cn } from '../lib/cn'
 import { Input } from '../ui/Input'
 import { useSession } from '../state/useSession'
 import { useStored } from '../state/useStored'
@@ -101,17 +102,18 @@ export function MusicCard() {
   if (!target) {
     return (
       <Card>
-        <CardHeader title="Music" description="Anemo’s player, in your Anemo tab." />
-        <CardBody className="flex flex-col gap-2">
-          {anemoTabs ? (
-            <p className="text-[13px] text-muted">Waiting for the Anemo tab… If it doesn’t show up, reload it.</p>
-          ) : (
-            <>
-              <p className="text-[13px] text-muted">Music plays in Anemo, and no Anemo tab is open in this Chrome.</p>
-              <Button size="sm" className="w-fit" icon={<Music className="h-3.5 w-3.5" />} onClick={() => void openAnemo()}>
-                Open Anemo’s player
-              </Button>
-            </>
+        <CardBody className="flex items-center gap-3 pt-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
+            <Music className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13.5px] font-semibold">Music</div>
+            <div className="text-[12px] text-muted">{anemoTabs ? 'Waiting for the Anemo tab… reload it if it doesn’t show up.' : 'Plays in Anemo. No Anemo tab is open.'}</div>
+          </div>
+          {!anemoTabs && (
+            <Button size="sm" icon={<Music className="h-3.5 w-3.5" />} onClick={() => void openAnemo()}>
+              Open Anemo’s player
+            </Button>
           )}
         </CardBody>
       </Card>
@@ -122,34 +124,40 @@ export function MusicCard() {
   const playing = s.status === 'playing' || s.status === 'buffering'
   return (
     <Card>
-      <CardHeader
-        title="Music"
-        description="Anemo’s player, in your Anemo tab."
-        actions={
-          <button type="button" className="inline-flex items-center gap-1 text-[12px] text-accent hover:underline" onClick={() => void showTab()}>
-            Show tab <ExternalLink className="h-3 w-3" />
+      <CardBody className="flex flex-col gap-3 pt-4">
+        <div className="flex items-center gap-3">
+          {/* No cover art: the panel loads no images from other sites. */}
+          <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', playing ? 'bg-accent text-accent-contrast' : 'bg-surface-2 text-muted')}>
+            {playing ? <Equalizer /> : <Music className="h-5 w-5" />}
+          </div>
+          <div className="min-w-0 flex-1" data-testid="now-playing">
+            {s.title ? (
+              <>
+                <div className="truncate text-[13.5px] font-semibold">{s.title}</div>
+                <div className="truncate text-[12px] text-muted">
+                  {s.artist ? `${s.artist} · ` : ''}
+                  {playing ? 'Playing' : 'Paused'} · {s.index + 1} of {s.queueLength}
+                </div>
+              </>
+            ) : (
+              <div className="text-[13px] text-muted">The queue is empty. Add a link below.</div>
+            )}
+          </div>
+          <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text" onClick={() => void showTab()} title="Show the Anemo tab" aria-label="Show the Anemo tab">
+            <ExternalLink className="h-4 w-4" />
           </button>
-        }
-      />
-      <CardBody className="flex flex-col gap-3">
-        <div className="min-w-0" data-testid="now-playing">
-          {s.title ? (
-            <>
-              <div className="truncate text-[13.5px] font-medium">{s.title}</div>
-              <div className="truncate text-[12px] text-muted">
-                {s.artist ? `${s.artist} · ` : ''}
-                {playing ? 'Playing' : 'Paused'} · {s.index + 1} of {s.queueLength}
-              </div>
-            </>
-          ) : (
-            <div className="text-[13px] text-muted">The queue is empty. Add a link below.</div>
-          )}
-          {s.error && <div className="mt-1 text-[12px] text-error">{s.error}</div>}
         </div>
-        <div className="flex items-center gap-1.5">
-          <Button size="icon" variant="ghost" aria-label="Previous" disabled={!s.title} onClick={() => void command({ type: 'prev' })} icon={<SkipBack className="h-4 w-4" />} />
-          <Button size="icon" variant="primary" aria-label={playing ? 'Pause' : 'Play'} disabled={!s.title} onClick={() => void command({ type: 'toggle' })} icon={playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />} />
-          <Button size="icon" variant="ghost" aria-label="Next" disabled={!s.title} onClick={() => void command({ type: 'next' })} icon={<SkipForward className="h-4 w-4" />} />
+        {s.error && <p className="text-[12px] text-error">{s.error}</p>}
+        <div className="flex items-center justify-center gap-4">
+          <button type="button" aria-label="Previous" disabled={!s.title} onClick={() => void command({ type: 'prev' })} className="flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40">
+            <SkipBack className="h-4 w-4" fill="currentColor" />
+          </button>
+          <button type="button" aria-label={playing ? 'Pause' : 'Play'} disabled={!s.title} onClick={() => void command({ type: 'toggle' })} className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-soft transition-transform active:scale-95 disabled:opacity-40">
+            {playing ? <Pause className="h-5 w-5" fill="currentColor" /> : <Play className="h-5 w-5 translate-x-px" fill="currentColor" />}
+          </button>
+          <button type="button" aria-label="Next" disabled={!s.title} onClick={() => void command({ type: 'next' })} className="flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40">
+            <SkipForward className="h-4 w-4" fill="currentColor" />
+          </button>
         </div>
         <form
           className="flex gap-2"
@@ -160,7 +168,7 @@ export function MusicCard() {
             setLink('') // the result (or why not) shows below
           }}
         >
-          <Input aria-label="Link to add to the queue" placeholder="A YouTube, SoundCloud or radio link" value={link} onChange={(e) => setLink(e.target.value)} />
+          <Input aria-label="Link to add to the queue" placeholder="Add a YouTube, SoundCloud or radio link" value={link} onChange={(e) => setLink(e.target.value)} />
           <Button type="submit" size="md" aria-label="Add to the queue" icon={<Plus className="h-4 w-4" />} disabled={!link.trim()} loading={adding && !here}>
             Add
           </Button>
@@ -174,5 +182,16 @@ export function MusicCard() {
         {error && <p className="text-[12px] text-error">{error}</p>}
       </CardBody>
     </Card>
+  )
+}
+
+/** Three bars, moving while music plays. */
+function Equalizer() {
+  return (
+    <span className="flex h-4 items-end gap-[3px]" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <span key={i} className="eq-bar w-[3px] rounded-full bg-current" style={{ animationDelay: `${i * 0.18}s` }} />
+      ))}
+    </span>
   )
 }

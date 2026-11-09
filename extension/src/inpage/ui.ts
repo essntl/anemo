@@ -45,7 +45,7 @@ const CSS = `
 .body { overflow: auto; padding: 10px 14px 12px; font-size: 13.5px; }
 .quote { margin: 0 0 8px; padding-left: 8px; border-left: 3px solid var(--border); color: var(--muted); font-size: 12.5px; max-height: 5.5em; overflow: hidden; }
 .foot { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
-.btn { border: 0; border-radius: 9px; padding: 6px 11px; font: 500 12.5px/1.2 inherit; background: var(--surface); color: var(--text); cursor: pointer; }
+.btn { border: 0; border-radius: 9px; padding: 6px 11px; font: 500 12.5px/1.2 inherit; background: var(--surface); color: var(--text); cursor: pointer; white-space: nowrap; flex: none; }
 .btn:hover { background: var(--hover); }
 .btn.primary { background: var(--accent); color: #fff; }
 .btn:disabled { opacity: 0.5; cursor: default; }
@@ -71,8 +71,13 @@ const CSS = `
 .hljs-comment, .hljs-quote, .hljs-meta { color: var(--code-comment); font-style: italic; }
 .hljs-title, .hljs-section { color: var(--code-function); }
 .hljs-type, .hljs-class, .hljs-attr, .hljs-variable, .hljs-params { color: var(--code-type); }
-.pop { position: absolute; max-width: min(360px, calc(100vw - 24px)); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 8px 10px; font-size: 12.5px; pointer-events: auto; }
-.pop .orig { color: var(--muted); margin-bottom: 6px; max-height: 8em; overflow: auto; white-space: pre-wrap; }
+/* The original text over a translated block. A fixed width: the host is 0 px wide, so a
+   shrink-to-fit box would wrap after every word. */
+.pop { position: absolute; width: min(380px, calc(100vw - 24px)); background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 10px 12px 10px; font-size: 13px; line-height: 1.5; pointer-events: auto; text-align: left; }
+.pop .label { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.pop .label::before { content: ''; width: 8px; height: 8px; border-radius: 3px; background: var(--accent); }
+.pop .orig { color: var(--text); max-height: 12em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pop .actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .toast { position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 8px 10px 8px 12px; font-size: 12.5px; pointer-events: auto; max-width: calc(100vw - 32px); }
 `
 
@@ -98,6 +103,16 @@ export function getUi(): Ui {
   shadow.append(root)
   document.documentElement.append(host)
   ui = { root, host }
+  // Anemo's accent colour (Settings → Appearance), as in the side panel.
+  void chrome.storage?.local
+    .get('accent')
+    .then(({ accent }) => {
+      if (typeof accent === 'string' && /^#[0-9a-f]{6}$/i.test(accent)) {
+        root.style.setProperty('--accent', accent)
+        root.style.setProperty('--accent-soft', `${accent}2e`)
+      }
+    })
+    .catch(() => undefined)
   return ui
 }
 
@@ -264,18 +279,28 @@ export function showOriginal(anchor: DOMRect, original: string, onRestore: () =>
   const { root } = getUi()
   const pop = el('div', 'pop')
   pop.setAttribute('role', 'tooltip')
-  pop.append(el('div', 'muted', 'Original'), el('div', 'orig', original))
-  const restore = el('button', 'btn', 'Restore original')
+  pop.append(el('div', 'label', 'Original'), el('div', 'orig', original))
+  const actions = el('div', 'actions')
+  const close = el('button', 'btn', 'Close')
+  onTrustedClick(close, () => hideOriginal())
+  const restore = el('button', 'btn primary', 'Restore original')
   onTrustedClick(restore, () => {
     onRestore()
     hideOriginal()
   })
-  pop.append(restore)
-  pop.style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - 372)) + window.scrollX}px`
+  actions.append(close, restore)
+  pop.append(actions)
+  const width = Math.min(380, window.innerWidth - 24)
+  pop.style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - width - 12)) + window.scrollX}px`
   pop.style.top = `${anchor.bottom + 6 + window.scrollY}px`
   pop.addEventListener('pointerleave', () => hideOriginal())
   root.append(pop)
   popover = pop
+  // Below the block if it fits, else above it (a block at the bottom of the window).
+  const height = pop.getBoundingClientRect().height
+  if (anchor.bottom + 6 + height > window.innerHeight && anchor.top - 6 - height > 0) {
+    pop.style.top = `${anchor.top - 6 - height + window.scrollY}px`
+  }
 }
 
 export function hideOriginal(): void {

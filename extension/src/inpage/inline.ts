@@ -185,6 +185,8 @@ function mark(entry: Entry): void {
 }
 
 function unmark(entry: Entry): void {
+  // Restored text is the page's again: hovering or selecting it shows nothing.
+  for (const node of entry.applied.nodes) if (byNode.get(node) === entry) byNode.delete(node)
   if (!highlight) return
   for (const r of [...highlight]) {
     if (r instanceof Range && entry.applied.nodes.includes(r.startContainer as Text)) highlight.delete(r)
@@ -249,7 +251,8 @@ function entryAt(x: number, y: number): Entry | null {
   // caretPositionFromPoint from Chrome 128; caretRangeFromPoint before that.
   const doc = document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }
   const node = document.caretPositionFromPoint ? document.caretPositionFromPoint(x, y)?.offsetNode : doc.caretRangeFromPoint?.(x, y)?.startContainer
-  return node instanceof Text ? (byNode.get(node) ?? null) : null
+  const entry = node instanceof Text ? byNode.get(node) : undefined
+  return entry && entries.includes(entry) ? entry : null
 }
 
 let hoverTimer = 0

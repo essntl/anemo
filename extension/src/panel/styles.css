@@ -98,3 +98,17 @@
   .hljs-type, .hljs-class, .hljs-attr, .hljs-variable, .hljs-params { color: var(--code-type); }
   .hljs-deletion { color: var(--error); }
 }
+
+/* Menus and dialogs appear with a short scale and fade (as in Anemo). */
+@layer components {
+  .pop { animation: pop-in 120ms ease-out; transform-origin: var(--radix-popover-content-transform-origin, var(--radix-select-content-transform-origin, center)); }
+  .fade { animation: fade-in 120ms ease-out; }
+}
+@keyframes pop-in { from { opacity: 0; transform: scale(0.97); } }
+@keyframes fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pop, .fade { animation: none; } }
+
+/* The music card's equalizer bars. */
+@keyframes eq { 0%, 100% { height: 30%; } 50% { height: 100%; } }
+.eq-bar { height: 30%; animation: eq 0.9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .eq-bar { animation: none; height: 60%; } }

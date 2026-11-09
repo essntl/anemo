@@ -37,3 +37,9 @@ export const test = base.extend<{ context: BrowserContext; extensionId: string; 
 
 export { EXTENSION_ID }
 export const expect = test.expect
+
+/** Picks an option of one of the panel's dropdowns (styled, not the browser's <select>). */
+export async function choose(page: Page, label: string, option: string | RegExp): Promise<void> {
+  await page.getByRole('combobox', { name: label }).click()
+  await page.getByRole('option', { name: option }).click()
+}

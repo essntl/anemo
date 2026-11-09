@@ -1,5 +1,6 @@
 import { LANGUAGES } from '@/shared/languages'
 import { Card, CardBody, CardHeader } from '../ui/Card'
+import { Select } from '../ui/Select'
 import { usePreferences } from '../state/preferences'
 
 /** The default target language for Translate (right-click) and for explanations. */
@@ -10,14 +11,12 @@ export function TranslateCard() {
       <CardHeader title="Translate & explain" description="Right-click a selection: Anemo Companion ▸ Explain, or ▸ Translate. Uses your Inline & formatting model in Anemo; nothing personal is sent." />
       <CardBody className="flex flex-col gap-1.5">
         <label htmlFor="target-language" className="text-[12.5px] font-medium">Translate into, and explain in</label>
-        <select
+        <Select
           id="target-language"
-          className="h-9 w-full rounded-control border border-border bg-surface px-2 text-[13px]"
           value={prefs.targetLanguage}
-          onChange={(e) => void update((p) => ({ ...p, targetLanguage: e.target.value }))}
-        >
-          {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
-        </select>
+          onValueChange={(v) => void update((p) => ({ ...p, targetLanguage: v }))}
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.name }))}
+        />
         <p className="text-[12px] text-muted">The Translate menu also lists the other languages, for one-off choices.</p>
       </CardBody>
     </Card>

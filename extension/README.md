@@ -103,7 +103,7 @@ Asked for when needed (Chrome asks you; switching a feature off gives it back):
 |---|---|---|
 | Your Anemo address | Setup | Talking to your server, and the music relay in its tabs. |
 | `idle` | "Skip Discord while I'm here" | Telling Anemo whether this computer is in use. |
-| `declarativeNetRequest` | "Block distractions during focus" | The blocking rules. |
+| `declarativeNetRequestWithHostAccess` | "Block distractions during focus" | The blocking rules (they work only on sites you added, which Chrome asks about one by one). |
 | Each site you add to the distraction list | Adding it | Chrome only lets an extension redirect a site it has access to. |
 | A site, with "Always allow on <site>" | Clicking it | Reading that site's tabs from the panel without clicking the toolbar icon first. |
 | `https://www.youtube.com/*` | "YouTube notes" | Reading the video's time, pausing, frames, transcripts. |

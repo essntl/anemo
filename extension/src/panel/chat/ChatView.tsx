@@ -6,13 +6,15 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { BookOpen, ExternalLink, Globe, GraduationCap, List, Plus } from 'lucide-react'
+import { BookOpen, Globe, GraduationCap, List, Plus, Timer } from 'lucide-react'
 import { startLearningChat, type LearningAction } from '@/shared/learning'
 import type { PageContext } from '@/shared/pageContext'
 import { storage } from '@/shared/storage'
 import { TERMINAL, type RunView } from '@/shared/runReducer'
 import { Button } from '../ui/Button'
 import { Notice } from '../ui/Notice'
+import { ActionMenu } from '../ui/Menu'
+import { cn } from '../lib/cn'
 import { useSession } from '../state/useSession'
 import { useStored } from '../state/useStored'
 import { AgentActivity } from './AgentActivity'
@@ -34,6 +36,8 @@ import { Markdown } from './Markdown'
 import { readActivePage } from './currentTab'
 import { PagePreview, type PageState } from './PagePreview'
 import { useRunStream } from './useRunStream'
+import { useChatMenu } from './chatMenu'
+import { TemporaryBadge } from './Temporary'
 
 const NEW = 'new'
 
@@ -122,26 +126,39 @@ export function ChatView() {
   const [showList, setShowList] = useState(false)
   // Switches at once (the storage write follows), so nothing typed right after a switch
   // lands in the chat being left.
-  const [opened, setOpened] = useState<{ id: string | null } | null>(null)
+  const [opened, setOpened] = useState<{ id: string | null; temporary?: boolean } | null>(null)
   // "Discuss in chat" from the right-click menu: a new chat with the page and the quote,
   // until you send it or open another chat.
   const pending = useStored('session', 'pendingCompose').value ?? null
   if (!stored.loaded) return null
   const composing = pending !== null
   const conversationId = composing ? null : opened ? opened.id : (stored.value?.conversationId ?? null)
-  const open = (id: string | null) => {
+  const open = (id: string | null, temporary = false) => {
     setShowList(false)
-    setOpened({ id })
+    setOpened({ id, temporary })
     if (pending) void storage.set('session', 'pendingCompose', null)
     void openChat(id)
   }
-  if (showList && !composing) return <ConversationList current={conversationId} onOpen={open} onNew={() => open(null)} />
+  if (showList && !composing) {
+    return (
+      <ConversationList
+        current={conversationId}
+        onOpen={open}
+        onNew={(temporary) => open(null, temporary)}
+        onCurrentDeleted={() => {
+          setOpened({ id: null })
+          void openChat(null)
+        }}
+      />
+    )
+  }
   const key = conversationId ?? NEW
   // Keyed by the chat: opening another one starts fresh (draft, mode, model, run, page).
   return (
     <Conversation
-      key={`${key}:${pending?.at ?? ''}`}
+      key={`${key}:${pending?.at ?? ''}:${opened?.temporary ? 't' : ''}`}
       conversationId={conversationId}
+      initialTemporary={!conversationId && Boolean(opened?.temporary)}
       initialDraft={pending ? pending.draft : (stored.value?.drafts?.[key] ?? '')}
       initialPage={pending?.page ?? null}
       onList={() => {
@@ -157,16 +174,20 @@ function Conversation({
   conversationId,
   initialDraft,
   initialPage,
+  initialTemporary,
   onList,
   onOpen,
 }: {
   conversationId: string | null
   initialDraft: string
   initialPage: PageContext | null
+  initialTemporary: boolean
   onList: () => void
-  onOpen: (id: string | null) => void
+  onOpen: (id: string | null, temporary?: boolean) => void
 }) {
-  const { connection, api } = useSession()
+  // A new chat can be temporary: deleted 5 minutes after its last message unless kept.
+  const [temporary, setTemporary] = useState(initialTemporary)
+  const { api } = useSession()
   const [pageState, setPageState] = useState<PageState>(initialPage ? { status: 'ready', page: initialPage } : { status: 'off' })
   const [learning, setLearning] = useState<LearningAction | null>(null)
   const readPageNow = async () => {
@@ -195,6 +216,7 @@ function Conversation({
   }
   const qc = useQueryClient()
   const conversation = useConversation(conversationId)
+  const menu = useChatMenu(conversation.data, { onDeleted: () => onOpen(null) })
   const messages = useMessages(conversationId)
   const settings = useAnemoSettings()
   const send = useSendTurn()
@@ -251,7 +273,7 @@ function Conversation({
     const sentPage = page
     setPageState({ status: 'off' }) // per message: the next one has no page unless asked
     send.mutate(
-      { conversationId, text, mode, modelId, profileId, page: sentPage },
+      { conversationId, text, mode, modelId, profileId, page: sentPage, temporary: !conversationId && temporary },
       {
         onSuccess: ({ conversationId: id, turn }) => {
           if (id !== conversationId) onOpen(id) // a new chat: it opens with its run
@@ -280,26 +302,37 @@ function Conversation({
   const list = messages.data ?? []
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-1.5">
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-1.5">
         <Button size="icon" variant="ghost" aria-label="All chats" title="All chats" onClick={onList} icon={<List className="h-4 w-4" />} />
-        <div className="min-w-0 flex-1 truncate text-[13px] font-medium" title={conversation.data?.title}>
-          {conversationId ? (conversation.data?.title ?? '…') : 'New chat'}
+        <div className="min-w-0 flex-1 truncate px-1 text-[13.5px] font-semibold" title={conversation.data?.title}>
+          {conversationId ? (conversation.data?.title ?? '…') : temporary ? 'Temporary chat' : 'New chat'}
         </div>
-        {conversationId && (
-          <a className="inline-flex h-8 w-8 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text" href={`${connection.serverUrl}/c/${conversationId}`} target="_blank" rel="noopener noreferrer" aria-label="Open in Anemo" title="Open in Anemo">
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        )}
+        {conversation.data?.temporary && <TemporaryBadge conversation={conversation.data} />}
+        {conversation.data && <ActionMenu actions={menu.actions} label="Chat actions" />}
         <Button size="icon" variant="ghost" aria-label="New chat" title="New chat" onClick={() => onOpen(null)} icon={<Plus className="h-4 w-4" />} />
+        {menu.dialogs}
       </div>
+      {menu.error && <div className="px-3 pt-2"><Notice tone="error" title="That didn’t work">{menu.error}</Notice></div>}
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div ref={content} className="flex min-h-full flex-col">
         {!conversationId && list.length === 0 && (
           <div className="flex flex-1 flex-col items-center justify-center gap-1.5 text-center">
-            <img src="/icons/icon-48.png" alt="" className="h-9 w-9 rounded-xl opacity-80" />
-            <div className="text-[13.5px] font-medium">What can I help with?</div>
-            <p className="max-w-[16rem] text-[12px] text-muted">Chats started here are in Anemo too.</p>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <div className={cn('mb-1 flex h-11 w-11 items-center justify-center rounded-2xl', temporary ? 'border-2 border-dashed border-accent/60 text-accent' : 'bg-accent-soft')}>
+              {temporary ? <Timer className="h-5 w-5" /> : <img src="/icons/icon-48.png" alt="" className="h-7 w-7 rounded-lg" />}
+            </div>
+            <div className="text-[15px] font-semibold">{temporary ? 'Temporary chat' : 'What can I help with?'}</div>
+            <p className="max-w-[17rem] text-[12.5px] text-muted">
+              {temporary ? 'Deleted 5 minutes after the last message, unless you keep it. Nothing is remembered from it.' : 'Chats started here are in Anemo too.'}
+            </p>
+            <button
+              type="button"
+              aria-pressed={temporary}
+              onClick={() => setTemporary(!temporary)}
+              className={cn('mt-1 flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium', temporary ? 'border-accent bg-accent-soft text-accent' : 'border-border text-muted hover:border-border-strong hover:text-text')}
+            >
+              <Timer className="h-3.5 w-3.5" /> Temporary chat
+            </button>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
               <Button size="sm" icon={<BookOpen className="h-3.5 w-3.5" />} loading={learning === 'summarize'} disabled={learning !== null} onClick={() => void learn('summarize')}>
                 Summarize this page
               </Button>
