@@ -20,6 +20,11 @@ Protocol (JSON text messages):
            worker awake)
   client → {"type": "presence", "active": bool, "discord_skip": bool}
            see features/extension/presence.py
+  client → {"type": "browser.offer", "enabled": bool}   browser control switched on
+           (renewed every 30 s) or off; see features/extension/browser_relay.py
+  server → {"type": "browser.command", "id": "…", "session": "…", "action": "…", …}
+  client → {"type": "browser.result", "id": "…", "ok": bool, "state": {…}, "error": "…"}
+           only for a command sent on this connection (others are ignored)
 
 The token is checked again every minute, so revoking it closes the stream (close code
 4401, also for a bad token). A connection from a web page (any Origin other than an allowed
@@ -30,6 +35,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -40,7 +46,7 @@ from app.core.db import get_sessionmaker
 from app.core.errors import Unauthorized
 from app.events import bus
 from app.features.auth import tokens
-from app.features.extension import presence
+from app.features.extension import browser_relay, presence
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +73,8 @@ HELLO_TIMEOUT_S = 10
 RECHECK_S = 60
 BLOCK_MS = 15_000
 MAX_MESSAGE = 4096
+# A browser result carries the page's text and a screenshot.
+MAX_BROWSER_RESULT = 8 * 1024 * 1024
 
 CLOSE_UNAUTHORIZED = 4401
 CLOSE_BAD_ORIGIN = 4403
@@ -132,10 +140,11 @@ async def _relay(ws: WebSocket, cursor: str) -> None:
                     )
 
 
-async def _listen(ws: WebSocket) -> None:
+async def _listen(ws: WebSocket, conn: str, sent: set[str]) -> None:
     while True:
         text = await ws.receive_text()
-        if len(text) > MAX_MESSAGE:
+        limit = MAX_BROWSER_RESULT if text.startswith('{"type":"browser.result"') else MAX_MESSAGE
+        if len(text) > limit:
             continue
         try:
             message: dict[str, Any] = json.loads(text)
@@ -148,6 +157,31 @@ async def _listen(ws: WebSocket) -> None:
             await presence.report(
                 discord_skip=bool(message.get("discord_skip")), active=bool(message.get("active"))
             )
+        elif kind == "browser.offer":
+            await browser_relay.offer(conn, bool(message.get("enabled")))
+        elif kind == "browser.result":
+            command_id = message.get("id")
+            if not isinstance(command_id, str) or command_id not in sent:
+                continue  # not a command this connection was given
+            sent.discard(command_id)
+            state = message.get("state") if isinstance(message.get("state"), dict) else {}
+            await browser_relay.answer(
+                command_id,
+                {"ok": bool(message.get("ok")), "state": state, "error": message.get("error")},
+            )
+
+
+async def _browser_commands(ws: WebSocket, conn: str, sent: set[str]) -> None:
+    """Commands for the user's Chrome, from the worker, passed on to this extension."""
+    while True:
+        try:
+            async for command in browser_relay.commands(conn):
+                command_id = command.get("id")
+                if isinstance(command_id, str):
+                    sent.add(command_id)
+                    await ws.send_json({**command, "type": "browser.command"})
+        except (RedisError, OSError):
+            await asyncio.sleep(5)
 
 
 async def _recheck(ws: WebSocket, raw: str, ip: str | None) -> None:
@@ -180,10 +214,13 @@ async def events(ws: WebSocket) -> None:
     await ws.send_json({"type": "welcome", "missed": await _missed(last_id), "cursor": cursor})
     log.info("extension connected", extra={"ctx": {"ip": ip}})
 
+    conn = uuid.uuid4().hex
+    sent: set[str] = set()
     tasks = [
         asyncio.create_task(_relay(ws, cursor)),
-        asyncio.create_task(_listen(ws)),
+        asyncio.create_task(_listen(ws, conn, sent)),
         asyncio.create_task(_recheck(ws, raw, ip)),
+        asyncio.create_task(_browser_commands(ws, conn, sent)),
     ]
     try:
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -191,4 +228,5 @@ async def events(ws: WebSocket) -> None:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        await browser_relay.withdraw(conn)
         log.info("extension disconnected", extra={"ctx": {"ip": ip}})

@@ -64,6 +64,10 @@ class Action(BaseModel):
     # Set when something outside the policy forbids the action outright (e.g. the
     # folder is hidden from agents). Always denied, with this as the reason.
     blocked: str | None = None
+    # Set by code for actions the user always wants to see first, whatever the policy
+    # says (e.g. a click or typing in the user's own browser): "allow" becomes "ask", and
+    # an earlier "allow for this run" doesn't skip it. A deny stays a deny.
+    always_ask: str | None = None
 
 
 class Grant(BaseModel):

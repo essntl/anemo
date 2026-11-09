@@ -10,6 +10,8 @@ Evaluation order:
   3. Layers combine as "most restrictive wins": deny > ask > allow.
   4. An `ask` may become `allow` through a run grant, but only if the ceiling
      itself allows the action. Grants never override deny.
+  5. An action marked `always_ask` is asked about even when allowed, every time (no run
+     grant skips it).
 """
 
 from collections.abc import Iterable
@@ -111,6 +113,12 @@ def evaluate(
     # A sub-agent may do nothing that an agent above it may not.
     results.extend(evaluate_policy(layer, action) for layer in ancestors)
     worst = max(results, key=lambda e: _RANK[e.decision])
+
+    # 5. Asked about every time, whatever the policy and earlier approvals say.
+    if action.always_ask:
+        if worst.decision == "deny":
+            return worst
+        return Evaluation(decision="ask", reason=action.always_ask, rule="always-ask")
 
     # 4. Run grants may lift an `ask`, never a deny, and only below the ceiling.
     if worst.decision == "ask" and (ceiling_eval is None or ceiling_eval.decision == "allow"):

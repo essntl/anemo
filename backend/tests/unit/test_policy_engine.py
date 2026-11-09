@@ -178,3 +178,18 @@ def test_property_hard_floor_is_unreachable(action, settings, grants):
     )
     if action.outside_workspace or action.capability.startswith(("settings.", "secrets.")):
         assert result.decision == "deny"
+
+
+def test_always_ask_overrides_allow_and_run_grants_but_not_deny():
+    allow_all = Policy(name="p", default="allow")
+    act = Action(capability="browser.mine", risk="dangerous", always_ask="a click in your Chrome")
+    e = evaluate(act, allow_all)
+    assert e.decision == "ask" and e.reason == "a click in your Chrome"
+    # An earlier "allow for this run" doesn't skip it.
+    grants = [Grant(capability="browser.mine")]
+    assert evaluate(act, allow_all, grants=grants).decision == "ask"
+    # A deny stays a deny.
+    deny = Policy(name="p", rules=[Rule(cap="browser.mine", decision="deny")])
+    assert evaluate(act, deny).decision == "deny"
+    # Without the mark, the policy decides as before.
+    assert evaluate(Action(capability="browser.mine"), allow_all, grants=grants).decision == "allow"
