@@ -30,6 +30,7 @@ import {
 } from './notify'
 import { show } from './notifier'
 import { refreshResearch } from './research'
+import { handleCommand, isOn as browserOn, type Command } from './browserControl'
 import { forgetFocus, onTimerEvent, refreshFocus, setFocusApi, setFocusEndedHandler } from './focus'
 import { EventStream, type StreamEvent, type StreamState } from './stream'
 
@@ -236,6 +237,12 @@ export async function syncStream(): Promise<void> {
       if (state === 'unauthorized') void markTokenLost()
     },
     presence,
+    // Browser control: offered while switched on (and its permissions are given).
+    browserOffer: async () => withDefaults(await storage.get('local', 'preferences')).features.browserControl && (await browserOn()),
+    onCommand: (command) => {
+      const current = stream
+      void handleCommand(command as unknown as Command, (reply) => void current?.send(reply))
+    },
   })
   stream.start()
 }

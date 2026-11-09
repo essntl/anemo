@@ -14,6 +14,7 @@ import { onInlineClick } from './inlineMenu'
 import { createMenus, handle, listenForMenus } from './menus'
 import { listenForClicks, trackWindows } from './notifier'
 import { forgetTab, onMusicMessage, registerBridge } from './music'
+import { checkIdle, IDLE_ALARM, listenForDetach, started as browserStarted, turnOff as browserOff } from './browserControl'
 
 const HEARTBEAT = 'anemo-heartbeat'
 
@@ -31,6 +32,7 @@ chrome.runtime.onStartup.addListener(() => void setUp())
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === HEARTBEAT) void syncStream()
   if (alarm.name === FOCUS_TICK || alarm.name === FOCUS_END) void tick()
+  if (alarm.name === IDLE_ALARM) void checkIdle()
 })
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -40,6 +42,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const before = (changes.preferences.oldValue as { targetLanguage?: string } | undefined)?.targetLanguage
     const after = (changes.preferences.newValue as { targetLanguage?: string } | undefined)?.targetLanguage
     if (before !== after) createMenus() // the default language comes first in Translate
+  }
+  // Browser control switched on or off (the panel's switch or Stop, the idle check).
+  if (area === 'session' && 'browserActive' in changes) {
+    const on = Boolean((changes.browserActive.newValue as { on?: boolean } | null | undefined)?.on)
+    if (on) void browserStarted()
+    else void browserOff()
+    presenceChanged() // tells Anemo now, not in 30 s
   }
   // The timer or the distraction list changed: the badge and the blocking rules follow.
   if (area === 'local' && ('focusTimer' in changes || 'preferences' in changes)) void applyFocus()
@@ -93,6 +102,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 })
 void syncBridge()
 
+listenForDetach()
 listenForClicks()
 listenForMenus()
 listenForInline()
@@ -104,4 +114,4 @@ void storage.get('session', 'badge').then((b) => b && applyBadge(b))
 void tick()
 
 // The Playwright build only: tests can't click Chrome's context menu, so they call its handler.
-if (E2E) (globalThis as unknown as { __anemoTest: unknown }).__anemoTest = { onInlineClick, handle }
+if (E2E) (globalThis as unknown as { __anemoTest: unknown }).__anemoTest = { onInlineClick, handle, checkIdle }

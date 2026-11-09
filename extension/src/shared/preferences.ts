@@ -2,6 +2,7 @@
  * The extension's own preferences (kept in chrome.storage.local). What Anemo itself
  * decides (models, the default chat mode, ...) is read from the server instead.
  */
+import { DEFAULT_BLOCKLIST } from './browserControl'
 
 /** Optional features. Those that need an extra permission start off and ask for it when
  *  switched on; the others start on. */
@@ -25,6 +26,8 @@ export interface Preferences {
   targetLanguage: string
   /** Sites blocked during focus (domains, e.g. "youtube.com"; subdomains included). */
   focusSites: string[]
+  /** Sites browser control never uses (domains, or "domain/path"). */
+  browserBlocklist: string[]
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -38,6 +41,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   notificationTypes: { reminder: true, calendar: true, agent: true, approval: true, focus: true },
   targetLanguage: 'en',
   focusSites: [],
+  browserBlocklist: DEFAULT_BLOCKLIST,
 }
 
 /** Stored preferences merged over the defaults (new fields get their default). */

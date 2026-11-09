@@ -85,6 +85,13 @@ export interface SessionData {
   musicTabs: Record<string, import('./music').MusicTab>
   /** How the last "add to the queue" went (for the panel). */
   musicAdded: { id: string; ok: boolean; error: string | null; count: number; at: number } | null
+  /** Browser control switched on (until the browser closes, it is switched off, or 10
+   *  minutes pass without a command). */
+  browserActive: { on: boolean; since: number; lastCommandAt: number } | null
+  /** The tab the agent uses for each browser session (the conversation). */
+  browserTabs: Record<string, number>
+  /** Something the agent stopped at in a tab (a person check), for the panel. */
+  browserNotice: { tabId: number; title: string; body: string; at: number } | null
   /** Saves in progress or done, by id (from the event stream's capture events). */
   captures: Record<string, CaptureStatus>
 }

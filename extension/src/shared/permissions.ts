@@ -35,6 +35,10 @@ export async function hasFeaturePermissions(key: FeatureKey): Promise<boolean> {
 export async function releaseFeature(key: FeatureKey): Promise<void> {
   const wanted = FEATURE_PERMISSIONS[key]
   if (!needsAny(wanted)) return
+  if (key === 'browserControl') {
+    // Stopped first: the worker detaches from every tab when this goes.
+    await chrome.storage.session.set({ browserActive: null }).catch(() => undefined)
+  }
   if (key === 'focusBlocking' && chrome.declarativeNetRequest) {
     // No blocking rule may outlive the switch.
     const rules = await chrome.declarativeNetRequest.getDynamicRules().catch(() => [])

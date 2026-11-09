@@ -37,6 +37,10 @@ export interface StreamOptions {
   onState: (state: StreamState, detail?: { retryInMs?: number }) => void
   /** What to report about you being at the computer, or null to report nothing. */
   presence: () => Promise<{ active: boolean; discord_skip: boolean } | null>
+  /** Whether browser control is on (told to Anemo with each presence report). */
+  browserOffer?: () => Promise<boolean>
+  /** A browser-control command from Anemo (only ever from this socket). */
+  onCommand?: (command: Record<string, unknown>) => void
 }
 
 export interface StreamDeps {
@@ -116,6 +120,10 @@ export class EventStream {
   async sendPresence(): Promise<void> {
     const p = await this.opts.presence()
     if (p && this.connected) this.ws?.send(JSON.stringify({ type: 'presence', ...p }))
+    if (this.opts.browserOffer && this.connected) {
+      const enabled = await this.opts.browserOffer()
+      this.ws?.send(JSON.stringify({ type: 'browser.offer', enabled }))
+    }
   }
 
   private open(): void {
@@ -160,7 +168,16 @@ export class EventStream {
     } else if (message.type === 'event' && typeof message.id === 'string' && typeof message.event === 'string') {
       this.lastId = message.id
       this.opts.onEvent({ id: message.id, event: message.event, data: message.data ?? {} })
+    } else if (message.type === 'browser.command' && typeof message.id === 'string') {
+      this.opts.onCommand?.(message as Record<string, unknown>)
     }
+  }
+
+  /** Send a message on the open socket (a browser-control result). False when closed. */
+  send(message: Record<string, unknown>): boolean {
+    if (!this.connected || !this.ws) return false
+    this.ws.send(JSON.stringify(message))
+    return true
   }
 
   private onClose(code: number): void {

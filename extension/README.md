@@ -71,7 +71,7 @@ the same card in Anemo; the extension then goes back to its setup screen at once
 | 9 | **Notifications**: reminders, calendar, finished agent runs, approvals, focus over; per-type switches; caught up after the browser was closed; Discord skipped while you're here (optional) | Settings tab |
 | 10 | **Focus mode**: Anemo's focus timer (the same timer as in Anemo), minutes left on the badge, distraction sites blocked during focus | Focus tab |
 | 11 | **Music**: what's playing in your Anemo tab; play, pause, skip; add a link or the YouTube/SoundCloud tab you're on to the end of the queue | Focus tab |
-| 12 | **Browser control** (Anemo's agent using your Chrome) | not built yet |
+| 12 | **Browser control**: Anemo's agent opens pages in an "Anemo" tab group of your Chrome and uses them with your logins; reading and following links are free, every other click and all typing wait for your approval | Settings → Features, then Settings → Browser control |
 
 ### Keyboard shortcuts
 
@@ -107,10 +107,28 @@ Asked for when needed (Chrome asks you; switching a feature off gives it back):
 | Each site you add to the distraction list | Adding it | Chrome only lets an extension redirect a site it has access to. |
 | A site, with "Always allow on <site>" | Clicking it | Reading that site's tabs from the panel without clicking the toolbar icon first. |
 | `https://www.youtube.com/*` | "YouTube notes" | Reading the video's time, pausing, frames, transcripts. |
-| `debugger`, `tabs`, `tabGroups`, all sites | Browser control (not built yet) | |
+| `debugger`, `tabs`, `tabGroups`, all sites | "Browser control" | Acting in the agent's tabs (Chrome's debugger: trusted clicks and typing, the page's structure, screenshots), its tab group, and reaching whichever sites it opens. |
 
 The extension has no access to any site until you click on it, add it to a list, or switch on
 a feature that needs it. Nothing runs on web pages by itself.
+
+## Browser control
+
+1. Settings → Features → **Browser control**: Chrome asks for the debugger, tabs, tab
+   groups and all sites.
+2. Each time you want the agent to use this browser: Settings → Browser control →
+   **Let Anemo use this browser now**. A bar under the panel header shows it is on, with
+   **Stop**. It goes off by itself after 10 minutes without use, and when the browser closes.
+3. Ask in a chat (agent mode), e.g. "check my open pull requests on GitHub in my browser".
+   The agent opens its own tab in an "Anemo" tab group. Reading and following links happen
+   on their own. Every other click and all typing show an approval card first (in the panel
+   and in Anemo).
+
+It never sees your other tabs and never types into password fields. It never uses Anemo
+itself, Chrome's own pages, government sites, banks or anything on the blocklist (editable,
+in the same card). It stops at checks for whether you're a person and asks you to solve
+them in the tab. Anemo's own permission settings ("Your own Chrome") apply as well, and
+the stricter of the two wins.
 
 ## Privacy and security
 
@@ -149,9 +167,12 @@ a feature that needs it. Nothing runs on web pages by itself.
   badge's focus minutes update a little less often there; blocking still ends on time.
 - **Translation in place** can be undone by sites that redraw their text. The extension
   reapplies for 10 seconds, then says the site reverted it.
-- **Browser control** (feature 12) isn't built yet. When it is, use it in a **separate
-  Chrome profile** with only the logins the agent should have: it acts with whatever the
-  browser is signed in to.
+- **Browser control** shows Chrome's "Anemo Companion started debugging this browser"
+  bar while it acts; Chrome doesn't let an extension hide it. Some sites can tell that a
+  debugger is attached and may refuse or ask for a check. Use it in a **separate Chrome
+  profile** with only the logins the agent should have: in its tabs it acts with whatever
+  that browser is signed in to. It isn't offered to automations (nobody would be there to
+  approve), and when it is off, the agent uses Anemo's own sandbox browser instead.
 
 ## Development
 

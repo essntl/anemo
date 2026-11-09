@@ -10,6 +10,7 @@ import { applyAccent } from './theme'
 import { CaptureView } from './capture/CaptureView'
 import { NotesView } from './notes/NotesView'
 import { FocusView } from './focus/FocusView'
+import { BrowserBar } from './browser/BrowserBar'
 import { ResearchBar, ResearchView } from './research/ResearchView'
 import { ChatView } from './chat/ChatView'
 import { ConnectionBanner } from './views/ConnectionBanner'
@@ -85,6 +86,7 @@ export function App() {
           ))}
         </nav>
       </header>
+      <BrowserBar />
       {view !== 'research' && <ResearchBar onOpen={() => go('research')} />}
       <ConnectionBanner api={api} />
       <PanelNotice />

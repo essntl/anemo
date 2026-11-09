@@ -16,6 +16,10 @@ export interface MockEvents {
   sockets: Set<WebSocket>
   /** Close every connection with this code (4401: token revoked). */
   closeAll: (code: number) => void
+  /** browser.offer messages received (browser control on/off). */
+  offers: boolean[]
+  /** Send a browser-control command; resolves with the extension's answer. */
+  command: (command: Record<string, unknown>, within?: number) => Promise<{ ok: boolean; state?: Record<string, unknown>; error?: string }>
 }
 
 export function addEvents(anemo: MockAnemo & { server: import('node:http').Server }): MockEvents {
@@ -24,7 +28,10 @@ export function addEvents(anemo: MockAnemo & { server: import('node:http').Serve
   const history: MockEvents['history'] = []
   const hellos: Record<string, unknown>[] = []
   const presence: Record<string, unknown>[] = []
+  const offers: boolean[] = []
+  const waiting = new Map<string, (answer: { ok: boolean; state?: Record<string, unknown>; error?: string }) => void>()
   let seq = Date.now()
+  let commandSeq = 0
 
   anemo.server.on('upgrade', (req, socket, head) => {
     if (!req.url?.startsWith('/api/extension/ws')) return socket.destroy()
@@ -45,6 +52,11 @@ export function addEvents(anemo: MockAnemo & { server: import('node:http').Serve
         }
         if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }))
         if (msg.type === 'presence') presence.push(msg)
+        if (msg.type === 'browser.offer') offers.push(Boolean(msg.enabled))
+        if (msg.type === 'browser.result' && typeof msg.id === 'string') {
+          waiting.get(msg.id)?.(msg as { ok: boolean; state?: Record<string, unknown>; error?: string })
+          waiting.delete(msg.id)
+        }
       })
       ws.on('close', () => sockets.delete(ws))
     })
@@ -71,6 +83,18 @@ export function addEvents(anemo: MockAnemo & { server: import('node:http').Serve
     sockets,
     closeAll(code) {
       for (const ws of sockets) ws.close(code)
+    },
+    offers,
+    command(command, within = 30_000) {
+      const id = `cmd-${++commandSeq}`
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`no answer to ${String(command.action)}`)), within)
+        waiting.set(id, (answer) => {
+          clearTimeout(timer)
+          resolve(answer)
+        })
+        for (const ws of sockets) ws.send(JSON.stringify({ type: 'browser.command', id, session: 'conv-1', ...command }))
+      })
     },
   }
 }

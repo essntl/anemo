@@ -31,8 +31,8 @@ export const FEATURES: FeatureInfo[] = [
   {
     key: 'browserControl',
     label: 'Browser control',
-    description: 'Let Anemo’s agent use tabs in an “Anemo” tab group. Off by default; comes last.',
+    description: 'Let Anemo’s agent use tabs it opens in an “Anemo” tab group of this Chrome, with your logins. Once allowed, you still switch it on each time (“Browser control” below); it goes off after 10 minutes without use.',
     asks: 'debugger, tabs and tab groups, all sites',
-    available: false,
+    available: true,
   },
 ]

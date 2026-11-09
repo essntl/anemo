@@ -55,9 +55,12 @@ function ActionApproval({ call }: { call: ToolCall }) {
       ) : (
         <div className="flex flex-wrap gap-1.5">
           <Button size="sm" variant="primary" loading={decide.isPending} onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'once' })}>Allow once</Button>
-          <Button size="sm" onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'run' })} disabled={decide.isPending} title="Allow this kind of action in the same place for the rest of this run">
-            Allow for this run
-          </Button>
+          {/* A click or typing in your own Chrome is asked about every time. */}
+          {!call.actions.some((a) => (a as { always_ask?: string | null }).always_ask) && (
+            <Button size="sm" onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'run' })} disabled={decide.isPending} title="Allow this kind of action in the same place for the rest of this run">
+              Allow for this run
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => setDenying(true)} disabled={decide.isPending}>Deny…</Button>
         </div>
       )}
