@@ -26,6 +26,7 @@ from app.features.extension.http_router import router as extension_http_router
 from app.features.extension.router import router as extension_router
 from app.features.files.router import router as files_router
 from app.features.focus.router import router as focus_router
+from app.features.inline.router import router as inline_router
 from app.features.links.router import router as links_router
 from app.features.mcp.router import router as mcp_router
 from app.features.memory.router import router as memory_router
@@ -87,6 +88,7 @@ protected.include_router(notifications_router)
 protected.include_router(push_router)
 protected.include_router(extension_http_router)
 protected.include_router(capture_router)
+protected.include_router(inline_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)

@@ -2802,6 +2802,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inline/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain
+         * @description The explanation as it is written (SSE: `delta` {text}…, then `done` or `error`).
+         */
+        post: operations["explain_api_inline_explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inline/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate */
+        post: operations["translate_api_inline_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automations": {
         parameters: {
             query?: never;
@@ -4250,6 +4287,36 @@ export interface components {
             project_id?: string | null;
             /** Created By */
             created_by: string;
+        };
+        /** ExplainIn */
+        ExplainIn: {
+            /** Text */
+            text: string;
+            /**
+             * Context
+             * @default
+             */
+            context: string;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Target Language
+             * @default en
+             */
+            target_language: string;
+            /**
+             * Breakdown
+             * @default false
+             */
+            breakdown: boolean;
         };
         /** FileChangeOut */
         FileChangeOut: {
@@ -7162,6 +7229,21 @@ export interface components {
         TracksIn: {
             /** Tracks */
             tracks: components["schemas"]["TrackIn"][];
+        };
+        /** TranslateIn */
+        TranslateIn: {
+            /** Text */
+            text: string;
+            /**
+             * Target Language
+             * @default en
+             */
+            target_language: string;
+        };
+        /** TranslateOut */
+        TranslateOut: {
+            /** Text */
+            text: string;
         };
         /** TrashItemOut */
         TrashItemOut: {
@@ -13983,6 +14065,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaptureStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explain_api_inline_explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_api_inline_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateOut"];
                 };
             };
             /** @description Validation Error */
