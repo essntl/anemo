@@ -10,7 +10,7 @@
  */
 import { createApi, unwrap, type Api } from '@/shared/api'
 import { markTokenLost } from '@/shared/connectionStore'
-import { log } from '@/shared/env'
+import { BROWSER_CONTROL, log } from '@/shared/env'
 import { withDefaults } from '@/shared/preferences'
 import { storage } from '@/shared/storage'
 import { updateBadge } from './badge'
@@ -238,7 +238,7 @@ export async function syncStream(): Promise<void> {
     },
     presence,
     // Browser control: offered while switched on (and its permissions are given).
-    browserOffer: async () => withDefaults(await storage.get('local', 'preferences')).features.browserControl && (await browserOn()),
+    browserOffer: async () => BROWSER_CONTROL && withDefaults(await storage.get('local', 'preferences')).features.browserControl && (await browserOn()),
     onCommand: (command) => {
       const current = stream
       void handleCommand(command as unknown as Command, (reply) => void current?.send(reply))

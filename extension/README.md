@@ -43,6 +43,18 @@ id, add that id to `EXTENSION_IDS` in Anemo's `.env` and restart Anemo.
 After pulling a new version: `npm run build` again, then the reload arrow on the
 extension's card in `chrome://extensions`.
 
+### Two builds
+
+- **`npm run build`** → `extension/dist`: everything except browser control. This is the
+  one for your everyday Chrome.
+- **`npm run build:browser`** → `extension/dist-browser`: "Anemo Companion (browser
+  control)", the same plus browser control. Chrome only grants the debugger an extension
+  needs for that at install time, so installing this build shows a warning about it,
+  whether or not you ever switch browser control on. Use it in a **separate Chrome
+  profile** with only the logins the agent should have (see Browser control below).
+
+Both have the same id, so Anemo accepts either. Don't load both into the same profile.
+
 ## Connect it to Anemo
 
 1. **Create a token in Anemo:** Settings → General → **Extension and device tokens**.
@@ -107,15 +119,22 @@ Asked for when needed (Chrome asks you; switching a feature off gives it back):
 | Each site you add to the distraction list | Adding it | Chrome only lets an extension redirect a site it has access to. |
 | A site, with "Always allow on <site>" | Clicking it | Reading that site's tabs from the panel without clicking the toolbar icon first. |
 | `https://www.youtube.com/*` | "YouTube notes" | Reading the video's time, pausing, frames, transcripts. |
-| `debugger`, `tabs`, `tabGroups`, all sites | "Browser control" | Acting in the agent's tabs (Chrome's debugger: trusted clicks and typing, the page's structure, screenshots), its tab group, and reaching whichever sites it opens. |
+| `tabs`, `tabGroups`, all sites | "Browser control" (browser-control build only) | Its tab group, and reaching whichever sites the agent opens. |
+
+The browser-control build also holds `debugger` from install (Chrome doesn't offer it as
+an optional permission): acting in the agent's tabs with trusted clicks and typing,
+reading the page's structure, screenshots. It is used only in the agent's own tabs while
+browser control is switched on.
 
 The extension has no access to any site until you click on it, add it to a list, or switch on
 a feature that needs it. Nothing runs on web pages by itself.
 
 ## Browser control
 
-1. Settings → Features → **Browser control**: Chrome asks for the debugger, tabs, tab
-   groups and all sites.
+0. Install the browser-control build (`npm run build:browser`, then load `dist-browser`),
+   ideally in a separate Chrome profile.
+1. Settings → Features → **Browser control**: Chrome asks for tabs, tab groups and all
+   sites.
 2. Each time you want the agent to use this browser: Settings → Browser control →
    **Let Anemo use this browser now**. A bar under the panel header shows it is on, with
    **Stop**. It goes off by itself after 10 minutes without use, and when the browser closes.

@@ -5,21 +5,28 @@
  *   - inpage/*.js: scripts injected into web pages on demand, one IIFE each
  *   - manifest.json, with the version from package.json
  *
- *   node scripts/build.mjs           production build
- *   node scripts/build.mjs --watch   rebuild on change (development: source maps, debug logs)
+ *   node scripts/build.mjs                     production build, into dist/
+ *   node scripts/build.mjs --browser-control   the build with browser control, into dist-browser/
+ *   node scripts/build.mjs --watch             rebuild on change (development: source maps, debug logs)
+ *
+ * What differs between the builds is in scripts/manifest.mjs.
  */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { resolve, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
+import { manifestFor } from './manifest.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const watch = process.argv.includes('--watch')
 // --e2e: a copy for the Playwright tests in dist-e2e/, which may reach the local mock
 // server without the permission prompt (automation can't click Chrome's own dialogs).
 const e2e = process.argv.includes('--e2e')
+// --browser-control: the build with browser control (the debugger permission from install).
+const browserControl = e2e || process.argv.includes('--browser-control')
+const flavor = e2e ? 'e2e' : browserControl ? 'browser-control' : 'normal'
 const mode = watch ? 'development' : 'production'
-const out = resolve(root, e2e ? 'dist-e2e' : 'dist')
+const out = resolve(root, e2e ? 'dist-e2e' : browserControl ? 'dist-browser' : 'dist')
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const alias = {
   '@': resolve(root, 'src'),
@@ -52,7 +59,7 @@ function common(entry, format, fileName, name) {
     mode,
     logLevel: 'warn',
     resolve: { alias },
-    define: { __DEV__: JSON.stringify(watch), __E2E__: JSON.stringify(e2e), 'process.env.NODE_ENV': JSON.stringify(mode) },
+    define: { __DEV__: JSON.stringify(watch), __E2E__: JSON.stringify(e2e), __BROWSER_CONTROL__: JSON.stringify(browserControl), 'process.env.NODE_ENV': JSON.stringify(mode) },
     build: {
       outDir: out,
       emptyOutDir: false,
@@ -66,20 +73,13 @@ function common(entry, format, fileName, name) {
 }
 
 function writeManifest() {
-  const manifest = JSON.parse(readFileSync(resolve(root, 'manifest.json'), 'utf8'))
-  manifest.version = pkg.version
-  if (e2e) {
-    // The test site blocked during focus (distraction.test), with the blocking itself.
-    manifest.host_permissions = ['http://127.0.0.1/*', 'https://www.youtube.com/*', '*://distraction.test/*', '*://*.distraction.test/*', 'http://localhost/*']
-    // Blocking (focus) and browser control (its test pages are on localhost), without Chrome's prompts.
-    manifest.permissions = [...manifest.permissions, 'declarativeNetRequestWithHostAccess', 'debugger', 'tabGroups']
-  }
+  const manifest = manifestFor(JSON.parse(readFileSync(resolve(root, 'manifest.json'), 'utf8')), { flavor, version: pkg.version })
   mkdirSync(out, { recursive: true })
   writeFileSync(resolve(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 }
 
 // The pages first: their build empties dist/.
-await build({ configFile: resolve(root, 'vite.config.ts'), mode, logLevel: 'warn', define: { __E2E__: JSON.stringify(e2e) }, build: { outDir: out, watch: watch ? {} : null } })
+await build({ configFile: resolve(root, 'vite.config.ts'), mode, logLevel: 'warn', define: { __E2E__: JSON.stringify(e2e), __BROWSER_CONTROL__: JSON.stringify(browserControl) }, build: { outDir: out, watch: watch ? {} : null } })
 writeManifest()
 await build(common(resolve(root, 'src/background/index.ts'), 'es', 'background.js'))
 const inpage = resolve(root, 'src/inpage/entries')
@@ -87,4 +87,4 @@ for (const file of readdirSync(inpage).filter((f) => f.endsWith('.ts'))) {
   const name = basename(file, '.ts')
   await build(common(resolve(inpage, file), 'iife', `inpage/${name}.js`, `anemo_${name.replace(/\W/g, '_')}`))
 }
-console.log(watch ? `Watching for changes (${out})…` : `Built Anemo Companion ${pkg.version} into ${out}`)
+console.log(watch ? `Watching for changes (${out})…` : `Built Anemo Companion ${pkg.version}${browserControl ? ' (browser control)' : ''} into ${out}`)

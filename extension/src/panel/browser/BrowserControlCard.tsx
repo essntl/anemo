@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { Plus, RotateCcw, X } from 'lucide-react'
 import { DEFAULT_BLOCKLIST, normalizeEntry } from '@/shared/browserControl'
+import { BROWSER_CONTROL } from '@/shared/env'
 import { formatWhen } from '@/shared/format'
 import { setBrowserControl } from './switch'
 import { Button } from '../ui/Button'
@@ -19,7 +20,7 @@ export function BrowserControlCard() {
   const active = useStored('session', 'browserActive').value
   const [entry, setEntry] = useState('')
   const [error, setError] = useState<string | null>(null)
-  if (!prefs.features.browserControl) return null
+  if (!BROWSER_CONTROL || !prefs.features.browserControl) return null
   const on = Boolean(active?.on)
 
   const add = async () => {

@@ -38,7 +38,6 @@
   "optional_permissions": [
     "declarativeNetRequestWithHostAccess",
     "idle",
-    "debugger",
     "tabs",
     "tabGroups"
   ],

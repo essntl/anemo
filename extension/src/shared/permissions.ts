@@ -11,7 +11,9 @@ export const FEATURE_PERMISSIONS: Record<FeatureKey, chrome.permissions.Permissi
   discordSkip: { permissions: ['idle'] },
   focusBlocking: { permissions: ['declarativeNetRequestWithHostAccess'] },
   youtubeNotes: { origins: ['https://www.youtube.com/*'] },
-  browserControl: { permissions: ['debugger', 'tabs', 'tabGroups'], origins: ['https://*/*', 'http://*/*'] },
+  // The debugger itself comes with the browser-control build's install (Chrome doesn't
+  // offer it as an optional permission); the normal build has no browser control.
+  browserControl: { permissions: ['tabs', 'tabGroups'], origins: ['https://*/*', 'http://*/*'] },
 }
 
 function needsAny(p: chrome.permissions.Permissions): boolean {

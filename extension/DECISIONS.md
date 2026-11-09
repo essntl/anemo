@@ -70,6 +70,7 @@ or WAF challenges).
 | 51 | Sandbox or your Chrome | The agent picks per call, sandbox by default; your Chrome only while browser control is on and connected, else the sandbox |
 | 52 | Approvals in your Chrome | Free: open, read, scroll, screenshot, follow links. Every other click and all typing ask. Anemo's own permission settings also apply; the stricter wins |
 | 53 | Which tabs | Only tabs the agent opened itself (in its "Anemo" group) |
+| 54 | The debugger permission | Chrome can't make it optional. Two builds: the normal one without browser control (no debugger, no warning), and "Anemo Companion (browser control)" with the debugger from install, for a separate profile |
 
 ### Follow-up (2026-11-09): formatting saved content with the inline model
 
@@ -228,3 +229,4 @@ rule.
 | E74 | The Focus tab follows Anemo's focus page: a ring in the phase's colour with the time left and the cycle's dots, the phase switch, start/pause, stop and skip, the task picker, and today's focused time against your daily goal. Choosing a task changes the shared timer at once. The music card is a small player. | Your request. |
 | E75 | Capture shows the tab it works on, the three actions as tiles, your recent saves (this browser session) with a link to each, and the shortcuts. | Your request. |
 | E76 | In-page translation: the "original" box has a fixed width (it was as narrow as one word, since its host element is 0 px wide), opens above the text when there's no room below, and has Close and Restore. Restored text is forgotten, so selecting it again shows nothing. The in-page UI uses your Anemo accent colour. | Your report. |
+| E77 | Two builds from one source (`scripts/manifest.mjs`): `npm run build` (dist/, no browser control: no debugger, no tabs/tabGroups, no browser-control screens, and the worker refuses commands) and `npm run build:browser` (dist-browser/, "Anemo Companion (browser control)", `debugger` required; tabs, tab groups and all sites still asked for when the feature is switched on). A build-time flag (`__BROWSER_CONTROL__`) hides or shows the feature. Same id, so Anemo's EXTENSION_IDS covers both. The Playwright build is the browser-control one. CI builds both. | Your answer 54. |
