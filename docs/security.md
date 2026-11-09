@@ -205,7 +205,8 @@ The rules are copied onto a run when it starts. Changing settings affects new ru
 
 When a run waits for you, you can approve once, approve for the rest of that run
 (for that kind of action in that place), or deny, with a reason the agent sees.
-An approval for the run never overrides "Never" or the ceiling. Unanswered
+An approval for the run never overrides "Never" or the ceiling, and some actions are
+asked about every time regardless (clicks and typing in your own Chrome). Unanswered
 requests expire after 24 hours and count as denied. Unattended automations follow
 their own setting for this: wait and notify you, skip the action, or stop.
 
@@ -222,6 +223,7 @@ sub-agent depth. When one is reached the run stops and says which.
 | Shell | Runs in a separate container as a non-root user, with a read-only system, no extra privileges and memory/CPU/process limits. The default sandbox has **no network at all**. A second one with internet access is a separate permission. Neither can reach the database. |
 | Web pages and API calls | Addresses on your own network, the Docker host and cloud metadata addresses are refused unless you list them in Settings → Web & Search. Redirects are checked again. |
 | Browser | Its own container without workspace, database or secrets; the same address rules apply to everything it loads. |
+| Your own Chrome (browser control) | Only while you switch it on in Anemo Companion, never for automations, and only in tabs the agent opened in an "Anemo" tab group. Opening, reading and following links are allowed by default ("Your own Chrome" permission); every other click and all typing are asked about every time, whatever the level says ("allow for this run" doesn't apply). The extension never types into password fields and never uses Anemo itself, browser pages, `.gov` sites, banks or its blocklist. Commands reach it only over its authenticated WebSocket. It acts with that browser's logins, so use a separate Chrome profile. |
 | MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
 | Claude Code | Runs in its own container without workspace, database or app secrets, and with no tools of its own: every tool call it makes is a normal Anemo tool call, checked here. |
 
