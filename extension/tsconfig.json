@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": false,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "types": [
+      "chrome",
+      "vite/client",
+      "node"
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@anemo/schema": [
+        "../frontend/src/api/schema.d.ts"
+      ]
+    },
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src",
+    "scripts",
+    "tests",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
+}
