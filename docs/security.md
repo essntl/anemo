@@ -36,6 +36,15 @@ Companion (the browser extension, `extension/`) or another device. A token is se
   extension id (`EXTENSION_IDS`, default its fixed id) that carry a token. The browser login's
   cookie is still refused from there. No CORS headers are sent: an extension with permission
   for your Anemo address doesn't need them, and web pages get none.
+- **The extension's live connection** (`/api/extension/ws`, a WebSocket) accepts only
+  Anemo Companion's origin, and its token in the first message (never in the address, so
+  not in proxy logs). The token is checked again every minute: revoking it closes the
+  connection.
+- **"Skip Discord while I'm here".** When this option is on in the extension, it reports
+  whether the computer is in use (Chrome's idle detection, 5 minutes). While it is,
+  notifications are shown in the browser and not copied to Discord; the skipped copy is
+  recorded as `skipped`. A closed browser or lost connection counts as away after 90
+  seconds. Destinations an automation names itself, and test messages, are always sent.
 
 ## Share links
 

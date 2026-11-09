@@ -20,6 +20,7 @@ from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
+from app.features.extension import presence as extension_presence
 from app.features.notifications import webpush
 from app.features.notifications.models import (
     Notification,
@@ -51,6 +52,7 @@ DISCORD_BODY = 3500  # Discord allows 4096 characters in an embed description
 PUSH_TITLE = 120
 PUSH_BODY = 200  # a notification shows a line or two; never whole texts
 URGENT_KINDS = ("approval", "reminder")
+SKIPPED_NOTE = "Not sent: shown in the browser by Anemo Companion while you were at the computer"
 
 
 class SendError(Exception):
@@ -95,9 +97,25 @@ async def create(
     stmt = select(NotificationDestination).where(NotificationDestination.enabled)
     if destination_ids is not None:
         stmt = stmt.where(NotificationDestination.id.in_(destination_ids))
+    here: bool | None = None  # asked once, only when a Discord copy is due
     for destination in await db.scalars(stmt):
         if destination_ids is None and kind not in destination.kinds:
             continue
+        if destination_ids is None and destination.type == "discord":
+            if here is None:
+                here = await extension_presence.user_is_here()
+            if here:
+                # You're at the computer with Anemo Companion ("Skip Discord while I'm
+                # here"): it shows the notification; the skipped copy is recorded.
+                db.add(
+                    NotificationDelivery(
+                        notification_id=note.id,
+                        destination_id=destination.id,
+                        status="skipped",
+                        last_error=SKIPPED_NOTE,
+                    )
+                )
+                continue
         delivery = NotificationDelivery(notification_id=note.id, destination_id=destination.id)
         db.add(delivery)
         await db.flush()

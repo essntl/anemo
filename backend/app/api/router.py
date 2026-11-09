@@ -4,7 +4,8 @@ Routers in `protected` require a logged-in session for every endpoint.
 Only health checks, the login flow, viewing a share link (a frozen copy the owner
 chose to share, see features/shares/public_router.py) and the one-time approval buttons
 on push notifications (see features/notifications/push_router.py) are reachable
-without one.
+without one. The browser extension's WebSocket (features/extension/router.py) checks its
+API token itself, in its first message.
 """
 
 from fastapi import APIRouter, Depends
@@ -20,6 +21,7 @@ from app.features.calendar.router import router as calendar_router
 from app.features.conversations.router import router as conversations_router
 from app.features.daily_notes.router import router as daily_notes_router
 from app.features.documents.router import router as documents_router
+from app.features.extension.router import router as extension_router
 from app.features.files.router import router as files_router
 from app.features.focus.router import router as focus_router
 from app.features.links.router import router as links_router
@@ -53,6 +55,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth_router)  # endpoints declare their own session requirement
 api_router.include_router(shares_public_router)  # read-only, by secret link
 api_router.include_router(push_public_router)  # one-time approval buttons, by secret token
+api_router.include_router(extension_router)  # WebSocket; authenticates with an API token
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
