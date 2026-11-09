@@ -25,12 +25,22 @@ import { useSidebarSwipe } from './useSidebarSwipe'
  *  scrim, Esc, navigating or a swipe left closes it. See useSidebarSwipe. */
 function SidebarDrawer() {
   const { open, setOpen } = useMobileNav()
+  const foldPagesFirst = (e: Event) => {
+    const { pagesOpen, setPagesOpen } = useMobileNav.getState()
+    if (!pagesOpen) return
+    e.preventDefault()
+    setPagesOpen(false)
+  }
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fade fixed inset-0 z-40 bg-black/40 md:hidden" />
         <RadixDialog.Content
           aria-describedby={undefined}
+          // While the pages card is open, Esc and a tap outside fold the card, not the menu
+          // (right after the card opens, Radix may still hand them to the menu).
+          onEscapeKeyDown={foldPagesFirst}
+          onPointerDownOutside={foldPagesFirst}
           className="drawer fixed inset-y-0 left-0 z-50 flex w-[min(85vw,20rem)] shadow-float focus:outline-none md:hidden"
         >
           <RadixDialog.Title className="sr-only">Menu</RadixDialog.Title>

@@ -63,6 +63,7 @@ runs with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. CI still runs `run-isolat
 - 2026-11-08: dump.rdb removed from the tree and `*.rdb` ignored (no history rewrite).
 - 2026-11-08: conventions: `CLAUDE.md`, `docs/architecture.md` updated, import boundaries (import-linter, dependency-cruiser, no-cycles test) in CI; final report in `REPORT.md`, measured on all branches merged locally (833 backend and 210 frontend tests pass; e2e 74/77 with the known flaky motion spec).
 - 2026-11-08: all 11 PRs merged in order (#21 to #31). Before merging, the branches were rebased into one chain so each PR's CI ran on exactly what `main` became; the trash fix was combined with the symlink fix in `workspace/files.py`, and the conventions PR with the safety net in CI, the Makefile and the dependency files.
+- 2026-11-09: phone menu: "⋯" menus are bottom sheets on phones (one ran off the screen low in the chat list); the pages fold into a bar that grows into a card. Frontend 233 tests pass; e2e mobile 16/16 and the desktop specs with "⋯" menus 17/17.
 
 ## Done
 

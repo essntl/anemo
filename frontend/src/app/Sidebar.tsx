@@ -38,6 +38,7 @@ import { shortcutText } from '@/features/shortcuts/registry'
 import { cn } from '@/lib/cn'
 import { useCurrentProject, useProjectStore } from './projectStore'
 import { useSidebar } from './sidebarStore'
+import { PagesFolder, type PageEntry } from './PagesFolder'
 
 /** One page in the pinned grid under the chats: an icon and a short name. A count sits
  * small on the icon's corner, so the name keeps its room. */
@@ -52,20 +53,6 @@ function PageLink({ to, icon, children, title, badge }: { to: string; icon: Reac
         {badge && <span className="pointer-events-none absolute -right-3 -top-2.5 origin-bottom-left scale-[0.7]">{badge}</span>}
       </span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
-    </NavLink>
-  )
-}
-
-/** One page in the phone menu's grid: the icon above a short name, badge on the corner. */
-function PageTile({ to, icon, children, title, badge }: { to: string; icon: ReactNode; children: ReactNode; title?: string; badge?: ReactNode }) {
-  return (
-    <NavLink to={to} title={title}
-      className={({ isActive }) =>
-        cn('relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-control px-1 text-[12px] font-medium transition-colors',
-          isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
-      <span className="[&>svg]:h-5 [&>svg]:w-5">{icon}</span>
-      <span className="w-full truncate text-center">{children}</span>
-      {badge && <span className="absolute right-1.5 top-1 scale-90">{badge}</span>}
     </NavLink>
   )
 }
@@ -210,7 +197,20 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   const logout = useLogout()
   const openSearch = usePalette((s) => s.setOpen)
   const setCollapsed = useSidebar((s) => s.setCollapsed)
-  const Page = onClose ? PageTile : PageLink
+  const pages: PageEntry[] = [
+    { to: '/home', icon: <House />, label: 'Home' },
+    { to: '/projects', icon: <FolderKanban />, label: 'Projects' },
+    { to: '/files', icon: <FolderOpen />, label: 'Files' },
+    { to: '/documents', icon: <FileText />, label: 'Documents' },
+    { to: '/tasks', icon: <CheckSquare />, label: 'Tasks' },
+    { to: '/calendar', icon: <CalendarDays />, label: 'Calendar' },
+    { to: '/focus', icon: <Timer />, label: 'Focus' },
+    { to: '/music', icon: <Music />, label: 'Music' },
+    { to: '/runs', icon: <History />, label: 'Runs', badge: <RunsBadge /> },
+    { to: '/automations', icon: <Clock />, label: 'Automations' },
+    { to: '/agents', icon: <Bot />, label: 'Agents', title: 'Profiles & Skills' },
+    { to: '/memory', icon: <Brain />, label: 'Memory', badge: <MemoryBadge /> },
+  ]
   return (
     // Normally nothing here scrolls but the chats; in a very low window the sidebar as a
     // whole does, rather than squeezing the chats away.
@@ -275,21 +275,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
 
       {/* The pages, pinned: always in the same place, one tap away. */}
       <Divider className="mx-1 my-2" />
-      {/* On a phone: three columns of small tiles, three rows instead of five. */}
-      <nav aria-label="Pages" className={cn('grid shrink-0 gap-0.5', onClose ? 'grid-cols-3' : 'grid-cols-2')}>
-        <Page to="/home" icon={<House />}>Home</Page>
-        <Page to="/projects" icon={<FolderKanban />}>Projects</Page>
-        <Page to="/files" icon={<FolderOpen />}>Files</Page>
-        <Page to="/documents" icon={<FileText />}>Documents</Page>
-        <Page to="/tasks" icon={<CheckSquare />}>Tasks</Page>
-        <Page to="/calendar" icon={<CalendarDays />}>Calendar</Page>
-        <Page to="/focus" icon={<Timer />}>Focus</Page>
-        <Page to="/music" icon={<Music />}>Music</Page>
-        <Page to="/runs" icon={<History />} badge={<RunsBadge />}>Runs</Page>
-        <Page to="/automations" icon={<Clock />}>Automations</Page>
-        <Page to="/agents" icon={<Bot />} title="Profiles & Skills">Agents</Page>
-        <Page to="/memory" icon={<Brain />} badge={<MemoryBadge />}>Memory</Page>
-      </nav>
+      {onClose ? (
+        // On a phone the pages fold into one bar that opens as a card (PagesFolder).
+        <PagesFolder pages={pages} onNavigate={onClose} />
+      ) : (
+        <nav aria-label="Pages" className="grid shrink-0 grid-cols-2 gap-0.5">
+          {pages.map((p) => (
+            <PageLink key={p.to} to={p.to} icon={p.icon} title={p.title} badge={p.badge}>{p.label}</PageLink>
+          ))}
+        </nav>
+      )}
 
       {/* Sign out is under Settings > General too; on a phone this row would only take room. */}
       {!onClose && <Divider className="mx-1 my-2" />}
