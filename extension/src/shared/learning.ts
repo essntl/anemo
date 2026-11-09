@@ -35,10 +35,11 @@ export async function startLearningChat(api: Api, page: PageContext, action: Lea
 
 /** The draft for "Discuss in chat": the selection, quoted. */
 export function discussDraft(selection: string): string {
-  const quoted = selection
-    .trim()
+  const text = selection.trim()
+  if (!text) return ''
+  const quoted = text
     .split('\n')
     .map((line) => `> ${line}`)
     .join('\n')
-  return quoted ? `${quoted}\n\n` : ''
+  return `${quoted}\n\n`
 }
