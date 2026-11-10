@@ -111,3 +111,16 @@ describe('reading YouTube’s transcript', () => {
     expect(segmentsFromRaw({ kind: 'none', reason: 'x' })).toEqual([])
   })
 })
+
+describe('caption tracks', () => {
+  it('reads json3 and both XML formats', async () => {
+    const { captionSegments } = await import('./youtube')
+    expect(captionSegments(JSON.stringify({ events: [{ tStartMs: 0, dDurationMs: 500 }, { tStartMs: 2500, dDurationMs: 1000, segs: [{ utf8: 'one\ntwo' }] }, { tStartMs: 4000, segs: [{ utf8: '\n' }] }] }))).toEqual([{ start: 2.5, end: 3.5, text: 'one two' }])
+    expect(captionSegments('<?xml version="1.0"?><transcript><text start="1.5" dur="2">Tom &amp;amp; Jerry &#39;s</text><text start="0" dur="1.5">first</text></transcript>')).toEqual([
+      { start: 0, end: 1.5, text: 'first' },
+      { start: 1.5, end: 3.5, text: 'Tom &amp; Jerry \'s' },
+    ])
+    expect(captionSegments('<timedtext format="3"><body><p t="1200" d="800"><s>hi</s><s> there</s></p></body></timedtext>')).toEqual([{ start: 1.2, end: 2, text: 'hi there' }])
+    expect(captionSegments('{broken')).toEqual([])
+  })
+})

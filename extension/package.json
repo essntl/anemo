@@ -1,7 +1,7 @@
 {
   "name": "anemo-companion",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Anemo in the browser: chat, page context, translate and explain, capture, notes, research, focus and notifications.",
   "scripts": {

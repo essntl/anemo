@@ -180,6 +180,7 @@ export function segmentsFromRaw(raw: import('./youtubePage').TranscriptRaw): Seg
       .filter((s): s is { start: number; text: string } => s.start !== null && Boolean(s.text))
     return segs.map((s, i) => ({ start: s.start, end: segs[i + 1]?.start ?? s.start + 5, text: s.text }))
   }
+  if (raw.kind === 'captions') return captionSegments(raw.body)
   if (raw.kind !== 'innertube') return []
   const out: Segment[] = []
   walk(raw.json, (key, value) => {
@@ -194,5 +195,49 @@ export function segmentsFromRaw(raw: import('./youtubePage').TranscriptRaw): Seg
       if (text) out.push({ start, end: start + Number(v.durationMs ?? 0) / 1000, text })
     }
   })
+  return out.sort((a, b) => a.start - b.start)
+}
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, '')
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
+/** A caption track, as YouTube serves it: json3 (`events` with `segs`), or XML
+ *  (`<text start dur>` in seconds, or srv3's `<p t d>` in milliseconds). */
+export function captionSegments(body: string): Segment[] {
+  const out: Segment[] = []
+  const clean = (t: string) => t.replace(/\s+/g, ' ').trim()
+  if (body.trim().startsWith('{')) {
+    let json: { events?: { tStartMs?: number; dDurationMs?: number; segs?: { utf8?: string }[] }[] }
+    try {
+      json = JSON.parse(body)
+    } catch {
+      return []
+    }
+    for (const e of json.events ?? []) {
+      const text = clean((e.segs ?? []).map((s) => s.utf8 ?? '').join(''))
+      if (!text) continue
+      const start = (e.tStartMs ?? 0) / 1000
+      out.push({ start, end: start + (e.dDurationMs ?? 0) / 1000, text })
+    }
+  } else {
+    const attr = (attrs: string, name: string) => new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1]
+    for (const m of body.matchAll(/<(text|p)\b([^>]*)>([\s\S]*?)<\/\1>/g)) {
+      const [, tag, attrs, inner] = m
+      const text = clean(decodeEntities(inner))
+      if (!text) continue
+      const start = tag === 'text' ? Number(attr(attrs, 'start') ?? 0) : Number(attr(attrs, 't') ?? 0) / 1000
+      const dur = tag === 'text' ? Number(attr(attrs, 'dur') ?? 0) : Number(attr(attrs, 'd') ?? 0) / 1000
+      if (Number.isFinite(start)) out.push({ start, end: start + (Number.isFinite(dur) ? dur : 0), text })
+    }
+  }
   return out.sort((a, b) => a.start - b.start)
 }

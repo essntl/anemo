@@ -29,16 +29,18 @@ let docs: ReturnType<typeof addDocs>
 let chat: ReturnType<typeof addChat>
 let yt: Page
 let transcriptAsked: string[]
+let transcriptRefused: boolean
 
 test.beforeEach(async ({ panel, anemo, context }) => {
   chat = addChat(anemo)
   docs = addDocs(anemo)
   transcriptAsked = []
+  transcriptRefused = false
   await context.route('https://www.youtube.com/**', async (route) => {
     const url = new URL(route.request().url())
     if (url.pathname === '/youtubei/v1/get_transcript') {
       transcriptAsked.push(route.request().postData() ?? '')
-      return route.fulfill({ json: TRANSCRIPT })
+      return transcriptRefused ? route.fulfill({ status: 400, json: { error: { code: 400, status: 'FAILED_PRECONDITION' } } }) : route.fulfill({ json: TRANSCRIPT })
     }
     return route.fulfill({ body: WATCH, contentType: 'text/html' })
   })
@@ -122,6 +124,24 @@ test('Explain this moment sends the transcript around it to a new chat', async (
   expect(turn.page.url).toBe(`https://youtu.be/${ID}?t=25`)
   expect(turn.page.content).toContain('[00:00] Energy is conserved, part 0')
   expect(turn.page.content).toContain('[00:40] Energy is conserved, part 40')
+})
+
+test('the transcript panel YouTube shows is read when its transcript request fails', async ({ panel }) => {
+  transcriptRefused = true
+  // YouTube's newer transcript panel, open under the video.
+  await yt.evaluate(() => {
+    const p = document.createElement('ytd-engagement-panel-section-list-renderer')
+    p.setAttribute('target-id', 'PAmodern_transcript_view')
+    p.innerHTML = '<h2>Transcript</h2>' + [['0:00', 'Heat flows'], ['0:20', 'from hot to cold']].map(([t, l]) => `<transcript-segment-view-model><div>${t}</div><span class="yt-core-attributed-string">${l}</span></transcript-segment-view-model>`).join('')
+    document.body.append(p)
+    document.querySelector('video')!.pause()
+    document.querySelector('video')!.currentTime = 25
+  })
+  await panel.getByRole('button', { name: 'Explain this moment' }).click()
+  await expect(panel.getByTestId('assistant-message')).toContainText('You said: Explain what is said around 00:25')
+  const turn = chat.turns.at(-1) as { page: { content: string } }
+  expect(turn.page.content).toContain('[00:00] Heat flows')
+  expect(turn.page.content).toContain('[00:20] from hot to cold')
 })
 
 test('Shorts are not supported, and say so', async ({ panel }) => {
