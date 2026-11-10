@@ -5,7 +5,7 @@ import { formatUpcoming } from '@/lib/format'
 import type { SchedulePreview } from '../api'
 import { type Frequency, FREQUENCY_OPTIONS, type ScheduleForm, WEEKDAYS } from '../scheduleForm'
 
-const TIMED: Frequency[] = ['daily', 'weekdays', 'weekly', 'monthly', 'once']
+const TIMED: Frequency[] = ['daily', 'weekdays', 'weekly', 'monthly', 'once', 'rrule']
 
 interface Props {
   form: ScheduleForm
@@ -37,8 +37,13 @@ export function ScheduleFields({ form, onChange, tz, preview }: Props) {
               onChange={(e) => set({ monthDay: Math.min(28, Math.max(1, Number(e.target.value) || 1)) })} />
           </Field>
         )}
-        {form.frequency === 'once' && (
-          <Field label="On">
+        {form.frequency === 'rrule' && (
+          <Field label="Repeat rule" hint="As tasks and events use, e.g. FREQ=WEEKLY;BYDAY=MO,WE">
+            <Input value={form.rrule} className="font-mono" spellCheck={false} onChange={(e) => set({ rrule: e.target.value })} />
+          </Field>
+        )}
+        {(form.frequency === 'once' || form.frequency === 'rrule') && (
+          <Field label={form.frequency === 'rrule' ? 'Starting' : 'On'}>
             <Input type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} />
           </Field>
         )}

@@ -77,6 +77,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
           enabled: automation?.enabled ?? true,
           profile_id: profileId || null,
           model_id: modelId || null,
+          project_id: automation?.project_id ?? null, // set by the assistant's create_schedule; kept as it is
           on_ask: onAsk,
           notify,
           destination_ids: destinationIds,

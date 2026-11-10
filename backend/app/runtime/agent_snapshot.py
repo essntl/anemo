@@ -9,6 +9,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import browser_client
+from app.features.automations import service as automations
 from app.features.automations.models import Automation
 from app.features.conversations.models import ChatMessage
 from app.features.extension import browser_relay
@@ -70,7 +71,12 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         settings = settings.model_copy(update={"limits": CHAT_LIMITS, "plan_review": "off"})
     if automation is not None:
         # Nobody is there to review a plan; each action is still checked on its own.
-        settings = settings.model_copy(update={"plan_review": "off"})
+        # And nobody watches the clock: the user's cap for scheduled runs applies.
+        cap = (await automations.protections(db)).max_run_minutes * 60
+        limits = settings.limits.model_copy(
+            update={"max_runtime_s": min(settings.limits.max_runtime_s, cap)}
+        )
+        settings = settings.model_copy(update={"plan_review": "off", "limits": limits})
     sub = run.options.get("subagent")
     if sub is not None:
         # A sub-agent gets at most the budget its parent had left, and no plan review.

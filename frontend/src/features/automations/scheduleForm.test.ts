@@ -4,7 +4,7 @@ import { defaultForm, fromSchedule, type Schedule, type ScheduleForm, toSchedule
 
 const TZ = 'Europe/Amsterdam'
 const form = (patch: Partial<ScheduleForm>): ScheduleForm => ({ ...defaultForm(new Date(2026, 9, 1)), ...patch })
-const cron = (expr: string): Schedule => ({ kind: 'cron', cron: expr, every_minutes: null, at: null, tz: TZ })
+const cron = (expr: string): Schedule => ({ kind: 'cron', cron: expr, every_minutes: null, at: null, rrule: null, tz: TZ })
 
 describe('schedule editor', () => {
   it('turns the simple choices into schedules', () => {
@@ -54,5 +54,13 @@ describe('upcoming times', () => {
     expect(formatUpcoming(new Date(2026, 9, 1, 8, 0).toISOString(), now)).toMatch(/^Tomorrow /)
     expect(formatUpcoming(new Date(2026, 9, 5, 8, 0).toISOString(), now)).toMatch(/5/)
     expect(formatUpcoming(new Date(2027, 0, 5, 8, 0).toISOString(), now)).toMatch(/2027/)
+  })
+
+  it('keeps a repeat rule (what the assistant\'s create_schedule makes) as it is', () => {
+    const stored: Schedule = { kind: 'rrule', rrule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=7;BYMINUTE=0', at: new Date('2026-11-11T07:00').toISOString(), cron: null, every_minutes: null, tz: TZ }
+    const shown = fromSchedule(stored)
+    expect(shown).toMatchObject({ frequency: 'rrule', rrule: stored.rrule, date: '2026-11-11', time: '07:00' })
+    expect(toSchedule(shown, TZ)).toEqual(stored)
+    expect(toSchedule({ ...shown, rrule: '  FREQ=DAILY ' }, TZ)).toMatchObject({ kind: 'rrule', rrule: 'FREQ=DAILY' })
   })
 })

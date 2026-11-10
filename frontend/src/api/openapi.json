@@ -1160,6 +1160,65 @@
         }
       }
     },
+    "/api/settings/automations": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Automations Settings",
+        "operationId": "put_automations_settings_api_settings_automations_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/music": {
       "put": {
         "tags": [
@@ -15085,6 +15144,9 @@
           "focus": {
             "$ref": "#/components/schemas/FocusSettings"
           },
+          "automations": {
+            "$ref": "#/components/schemas/AutomationSettings"
+          },
           "music": {
             "$ref": "#/components/schemas/MusicSettings"
           },
@@ -15111,6 +15173,7 @@
           "web",
           "memory",
           "focus",
+          "automations",
           "music",
           "home",
           "files",
@@ -15508,6 +15571,18 @@
             ],
             "title": "Model Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "on_ask": {
             "type": "string",
             "enum": [
@@ -15621,6 +15696,23 @@
               }
             ],
             "title": "Model Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "default": "user"
           },
           "on_ask": {
             "type": "string",
@@ -15839,6 +15931,18 @@
             ],
             "title": "Model Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "on_ask": {
             "anyOf": [
               {
@@ -15915,6 +16019,25 @@
         },
         "type": "object",
         "title": "AutomationPatch"
+      },
+      "AutomationSettings": {
+        "properties": {
+          "paused": {
+            "type": "boolean",
+            "title": "Paused",
+            "default": false
+          },
+          "max_run_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Max Run Minutes",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "title": "AutomationSettings",
+        "description": "Protections for runs that start by themselves (Automations, the schedule tools)."
       },
       "Backlinks": {
         "properties": {
@@ -24059,7 +24182,8 @@
             "enum": [
               "cron",
               "interval",
-              "once"
+              "once",
+              "rrule"
             ],
             "title": "Kind"
           },
@@ -24099,6 +24223,18 @@
               }
             ],
             "title": "At"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
           },
           "tz": {
             "type": "string",

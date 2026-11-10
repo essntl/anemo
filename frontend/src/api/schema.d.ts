@@ -392,6 +392,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Automations Settings */
+        put: operations["put_automations_settings_api_settings_automations_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/music": {
         parameters: {
             query?: never;
@@ -3558,6 +3575,7 @@ export interface components {
             web: components["schemas"]["WebSettings"];
             memory: components["schemas"]["MemorySettings"];
             focus: components["schemas"]["FocusSettings"];
+            automations: components["schemas"]["AutomationSettings"];
             music: components["schemas"]["MusicSettings"];
             home: components["schemas"]["HomeSettings"];
             files: components["schemas"]["FilesSettings"];
@@ -3721,6 +3739,8 @@ export interface components {
             profile_id?: string | null;
             /** Model Id */
             model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /**
              * On Ask
              * @default pause
@@ -3763,6 +3783,13 @@ export interface components {
             profile_id: string | null;
             /** Model Id */
             model_id: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Created By
+             * @default user
+             */
+            created_by: string;
             /**
              * On Ask
              * @enum {string}
@@ -3812,6 +3839,8 @@ export interface components {
             profile_id?: string | null;
             /** Model Id */
             model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** On Ask */
             on_ask?: ("pause" | "deny" | "fail") | null;
             /** Notify */
@@ -3822,6 +3851,22 @@ export interface components {
             document_path?: string | null;
             /** Max Retries */
             max_retries?: number | null;
+        };
+        /**
+         * AutomationSettings
+         * @description Protections for runs that start by themselves (Automations, the schedule tools).
+         */
+        AutomationSettings: {
+            /**
+             * Paused
+             * @default false
+             */
+            paused: boolean;
+            /**
+             * Max Run Minutes
+             * @default 30
+             */
+            max_run_minutes: number;
         };
         /** Backlinks */
         Backlinks: {
@@ -6896,13 +6941,15 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "cron" | "interval" | "once";
+            kind: "cron" | "interval" | "once" | "rrule";
             /** Cron */
             cron?: string | null;
             /** Every Minutes */
             every_minutes?: number | null;
             /** At */
             at?: string | null;
+            /** Rrule */
+            rrule?: string | null;
             /**
              * Tz
              * @default UTC
@@ -9001,6 +9048,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FocusSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_automations_settings_api_settings_automations_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationSettings"];
                 };
             };
             /** @description Validation Error */

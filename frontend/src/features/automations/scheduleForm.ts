@@ -1,13 +1,14 @@
 /**
  * The schedule editor's simple choices ("every weekday at 08:00") and the
- * schedule the server stores (a cron expression, an interval, or one moment).
- * Schedules that fit no simple choice are edited as a cron expression.
+ * schedule the server stores (a cron expression, an interval, a repeat rule, or
+ * one moment). Schedules that fit no simple choice are edited as a cron expression;
+ * repeat rules (RRULE: what the assistant's create_schedule makes) as the rule itself.
  */
 import type { Schemas } from '@/api/client'
 
 export type Schedule = Schemas['Schedule']
 
-export type Frequency = 'minutes' | 'hours' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'once' | 'cron'
+export type Frequency = 'minutes' | 'hours' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'once' | 'cron' | 'rrule'
 
 export interface ScheduleForm {
   frequency: Frequency
@@ -18,9 +19,11 @@ export interface ScheduleForm {
   /** 0 = Sunday … 6 = Saturday (as in cron). */
   weekday: number
   monthDay: number
-  /** YYYY-MM-DD, for "once". */
+  /** YYYY-MM-DD, for "once" and for the start of a repeat rule. */
   date: string
   cron: string
+  /** RFC 5545, e.g. FREQ=WEEKLY;BYDAY=MO,WE. Starts at `date` `time`. */
+  rrule: string
 }
 
 export const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
@@ -32,6 +35,7 @@ export const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
   { value: 'minutes', label: 'Every few minutes' },
   { value: 'once', label: 'Once' },
   { value: 'cron', label: 'Custom (cron)' },
+  { value: 'rrule', label: 'Custom (repeat rule)' },
 ]
 
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -41,7 +45,7 @@ const dayOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 const timeOf = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
 
 export function defaultForm(now = new Date()): ScheduleForm {
-  return { frequency: 'daily', every: 2, time: '08:00', weekday: 1, monthDay: 1, date: dayOf(now), cron: '0 8 * * *' }
+  return { frequency: 'daily', every: 2, time: '08:00', weekday: 1, monthDay: 1, date: dayOf(now), cron: '0 8 * * *', rrule: 'FREQ=DAILY' }
 }
 
 /** "08:05" → "5 8" (cron wants minute first, without leading zeros). */
@@ -51,7 +55,7 @@ function cronTime(time: string): string {
 }
 
 export function toSchedule(form: ScheduleForm, tz: string): Schedule {
-  const base = { cron: null, every_minutes: null, at: null, tz }
+  const base = { cron: null, every_minutes: null, at: null, rrule: null, tz }
   switch (form.frequency) {
     case 'minutes':
       return { ...base, kind: 'interval', every_minutes: Math.max(5, Math.round(form.every)) }
@@ -70,6 +74,11 @@ export function toSchedule(form: ScheduleForm, tz: string): Schedule {
       const at = new Date(`${form.date}T${form.time}`)
       return { ...base, kind: 'once', at: Number.isNaN(at.getTime()) ? null : at.toISOString() }
     }
+    case 'rrule': {
+      // Where the rule starts: its first run, and the time of day of the others.
+      const at = new Date(`${form.date}T${form.time}`)
+      return { ...base, kind: 'rrule', rrule: form.rrule.trim(), at: Number.isNaN(at.getTime()) ? null : at.toISOString() }
+    }
     default:
       return { ...base, kind: 'cron', cron: form.cron.trim() }
   }
@@ -86,6 +95,10 @@ export function fromSchedule(schedule: Schedule, now = new Date()): ScheduleForm
   if (schedule.kind === 'once') {
     const at = schedule.at ? new Date(schedule.at) : now
     return { ...form, frequency: 'once', date: dayOf(at), time: timeOf(at) }
+  }
+  if (schedule.kind === 'rrule') {
+    const at = schedule.at ? new Date(schedule.at) : now
+    return { ...form, frequency: 'rrule', rrule: schedule.rrule ?? '', date: dayOf(at), time: timeOf(at) }
   }
   const cron = (schedule.cron ?? '').trim()
   const match = /^(\d{1,2}) (\d{1,2}) (\*|\d{1,2}) \* (\*|1-5|[0-7])$/.exec(cron)

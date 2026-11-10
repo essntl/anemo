@@ -81,6 +81,15 @@ CATEGORIES: list[Category] = [
         "tab you use.",
         "ask",
     ),
+    # Creating a schedule, and changing what one does or when, are always asked about in
+    # code, whatever this level says (tools/builtin/schedules.py).
+    Category(
+        "automation.manage",
+        "Schedules",
+        "Create, change and delete prompts that run by themselves (Automations). A new "
+        "schedule or a changed prompt or time always asks.",
+        "ask",
+    ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
 ]
@@ -96,6 +105,7 @@ INTERNAL_RULES = [
     Rule(cap="tasks.read", decision="allow"),
     Rule(cap="calendar.read", decision="allow"),
     Rule(cap="automation.state", decision="allow"),  # an automation's own notes
+    Rule(cap="automation.read", decision="allow"),  # looking at the schedules
 ]
 
 

@@ -1192,6 +1192,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
             has_search=bool(web.search_url()),
             has_memory=bool(run.policy.get("memory")),
             is_automation=run.automation_id is not None,
+            unattended=run.automation_id is not None or bool(run.policy.get("automation")),
             has_browser=bool(run.policy.get("browser")),
             can_spawn=run.kind == "agent"
             and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),

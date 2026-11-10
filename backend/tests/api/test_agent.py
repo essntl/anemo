@@ -159,6 +159,10 @@ async def test_agent_uses_tools_and_plan(authed):
             "update_memory",
             "forget_memory",
             "search_memory",
+            "list_schedules",
+            "create_schedule",
+            "update_schedule",
+            "delete_schedule",
             "get_current_time",
             "read_tool_output",
         ]
