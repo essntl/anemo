@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { BellRing, ChevronDown, Clock, Flame, Plus, Settings2, Timer } from 'lucide-react'
+import { BellRing, ChevronDown, Clock, Flame, Plus, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Segmented } from '@/components/ui/Segmented'
@@ -20,6 +20,7 @@ import { TimerDial } from './components/TimerDial'
 import { TimerSettingsForm } from './components/TimerSettingsForm'
 import { PHASE_LABEL, type Phase } from './timer'
 import { timerActions, useTimer } from './timerStore'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 
 function Today() {
@@ -68,20 +69,13 @@ export function FocusPage() {
   useShortcut('focus.addMinute', () => timerActions.addMinute())
 
   return (
-    <div className="mx-auto max-w-5xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Timer className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">Focus</h1>
-          <p className="truncate text-[13px] text-muted">Work in focused stretches, rest on purpose.</p>
-        </div>
+    <div className="mx-auto max-w-5xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Focus">
         <Link to="/stats" className="shrink-0 text-[13px] font-medium text-accent hover:underline">Stats</Link>
-      </div>
+      </PageHeader>
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="flex flex-col items-center px-4 py-6">
+        <Card className="flex flex-col items-center bg-linear-to-b from-accent-soft/60 to-card to-55% px-4 py-6 lg:min-h-[34rem] lg:justify-center">
           <Segmented<Phase>
             label="Timer phase"
             className="mb-6"

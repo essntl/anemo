@@ -63,6 +63,8 @@ export const SHORTCUTS = {
 
   'chat.send': { area: 'chat', keys: [{ key: 'Enter', shift: false }, { key: 'Enter', shift: false, mod: true, quiet: true }], description: 'Send the message' },
   'chat.newline': { area: 'chat', keys: [{ key: 'Enter', shift: true }], description: 'Start a new line' },
+  'chat.allow': { area: 'chat', keys: [{ key: 'Enter', mod: true, shift: true }], description: 'Allow what the agent asks for, once' },
+  'chat.deny': { area: 'chat', keys: [{ key: 'Backspace', mod: true, shift: true }], description: 'Deny what the agent asks for' },
   'chat.skill': { area: 'chat', keys: [{ key: '/' }], description: 'At the start of a message: pick a skill' },
   'chat.quickDelete': { area: 'chat', keys: [{ key: 'Shift' }], prefix: 'Hold', description: 'Over the chat list in the sidebar: delete chats with one click' },
 

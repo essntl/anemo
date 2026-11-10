@@ -21,6 +21,7 @@ import { BarChart } from './BarChart'
 import { Heatmap } from './Heatmap'
 import { HBars, Section, SplitBar, StatTile } from './parts'
 import { type RangeKind, rangeFor, toBars } from './ranges'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const count = (v: number) => String(Math.round(v))
 const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
@@ -40,18 +41,12 @@ export function StatsPage() {
   const hours = useMemo(() => (s ? s.focus.by_hour.map((v, h) => ({ key: String(h), label: `${String(h).padStart(2, '0')}:00`, short: h % 3 === 0 ? String(h) : '', value: v })) : []), [s])
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <ChartColumn className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">Stats</h1>
-          <p className="truncate text-[13px] text-muted">Your focus, tasks and projects over time{project ? ` in ${project.name}` : ''}.</p>
-        </div>
+    <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Stats">
         <Segmented<RangeKind> label="Range" value={kind} onChange={setKind} size="sm"
           options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'half', label: '6 months' }, { value: 'custom', label: 'Custom' }]} />
-      </div>
+      </PageHeader>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">Your focus, tasks and projects over time{project ? ` in ${project.name}` : ''}.</p>
       {kind === 'custom' && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-[13px]">
           <label className="flex items-center gap-2">From

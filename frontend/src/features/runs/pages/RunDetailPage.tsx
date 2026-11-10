@@ -3,6 +3,7 @@
  * (time, tokens, cost), and the activity timeline with the final answer.
  * While the run is active it follows the live event stream.
  */
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
@@ -73,7 +74,8 @@ export function RunDetailPage() {
   const limits = data.limits as { max_steps?: number; max_runtime_s?: number } | null
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
+    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Run" />
       <Link to="/runs" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-text">
         <ArrowLeft className="h-4 w-4" /> Runs
       </Link>
@@ -87,7 +89,7 @@ export function RunDetailPage() {
           </Link>
         )}
       </div>
-      <h1 className="mt-2 whitespace-pre-wrap break-words text-lg font-semibold">{data.request || '(no request)'}</h1>
+      <h2 className="mt-2 whitespace-pre-wrap break-words text-lg font-semibold">{data.request || '(no request)'}</h2>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {data.kind === 'agent' && (

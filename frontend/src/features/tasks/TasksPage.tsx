@@ -16,13 +16,15 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/cn'
-import { type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
+import { PRIORITY_LABELS, type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
 import { TaskBoard } from './components/TaskBoard'
 import { TaskDialog } from './components/TaskDialog'
 import { type TaskInfo, TaskRow } from './components/TaskRow'
-import { type Bucket, BUCKET_LABELS, bucketOf } from './dates'
+import { type Bucket, BUCKET_LABELS, bucketOf, formatDay } from './dates'
+import { parseQuickAdd } from './quickAdd'
 import { byId } from './relations'
 import { Lingering } from '@/components/ui/Lingering'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const BUCKETS: Bucket[] = ['overdue', 'today', 'upcoming', 'later', 'none']
 
@@ -33,6 +35,8 @@ function byUrgency(a: Task, b: Task): number {
     || b.priority - a.priority
     || a.sort_order - b.sort_order
 }
+
+const QUICK_CHIP = "shrink-0 rounded-md bg-accent-soft px-2 py-0.5 text-[12px] font-medium text-accent"
 
 /** The task editor: an existing task, or a new one starting in a status. */
 type Editing = { task: Task | null; status?: TaskStatus } | null
@@ -119,23 +123,21 @@ export function TasksPage() {
     .filter((t) => (t.status === 'done' || t.status === 'cancelled') && onItsOwn(t))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 
+  const understood = parseQuickAdd(quick)
   const quickAdd = () => {
-    const title = quick.trim()
-    if (!title) return
-    create.mutate({ title, project_id: projectFilter || null }, { onSuccess: () => setQuick('') })
+    if (!quick.trim()) return
+    // A day, a priority and tags typed at the end are taken off the title (quickAdd.ts).
+    const { title, due_date, priority, tags } = parseQuickAdd(quick)
+    create.mutate({ title, due_date, priority, tags, project_id: projectFilter || null }, { onSuccess: () => setQuick('') })
   }
 
   return (
-    <div className={cn('mx-auto p-4 md:p-8 md:pt-14', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <CheckSquare className="h-5 w-5" />
-        </div>
-        <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">Tasks</h1>
+    <div className={cn('mx-auto p-4 md:px-8 md:pb-8 md:pt-2', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
+      <PageHeader title="Tasks">
         <Button size="sm" variant="primary" className="shrink-0" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>
           New task
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Search and the view switch share one line; the filters are small pills below. */}
       <div className="mb-2 flex items-center gap-2">
@@ -169,8 +171,12 @@ export function TasksPage() {
           <div className="mb-4 flex items-center gap-2 rounded-card border border-border bg-card px-3 py-1.5 shadow-soft">
             <Plus className="h-4 w-4 shrink-0 text-muted" />
             <input value={quick} onChange={(e) => setQuick(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && quickAdd()}
-              placeholder="Add a task and press Enter" aria-label="Add a task"
+              placeholder="Add a task: “Call the bank fri !high #errands”" aria-label="Add a task"
               className="h-9 min-w-0 flex-1 bg-transparent text-[14px] placeholder:text-subtle focus:outline-none" />
+            {/* What was understood from the end of the text, before it is added. */}
+            {understood.due_date && <span className={QUICK_CHIP}>{formatDay(understood.due_date)}</span>}
+            {understood.priority > 0 && <span className={QUICK_CHIP}>{PRIORITY_LABELS[understood.priority]}</span>}
+            {understood.tags.map((t) => <span key={t} className={QUICK_CHIP}>#{t}</span>)}
             {quick.trim() && <Button size="sm" variant="primary" loading={create.isPending} onClick={quickAdd}>Add</Button>}
           </div>
 

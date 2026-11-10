@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { Link } from 'react-router'
 import { ArrowUp, MessagesSquare, Paperclip, Settings2, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
@@ -13,7 +13,14 @@ import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
 import { type ChatRef, ChatPickerDialog, MAX_REFERENCES, ReferenceChip } from './ChatReference'
 
+/** What a page can ask the message box to do. */
+export interface ComposerHandle {
+  /** Answer with this skill, keeping what is typed. */
+  useSkill: (skill: Skill) => void
+}
+
 interface ComposerProps {
+  handle?: Ref<ComposerHandle>
   /**
    * `referenceIds`: other chats to give the model as context for this message.
    * `skillId`: the skill chosen with / to answer it with.
@@ -43,7 +50,7 @@ interface ComposerProps {
 const MAX_HEIGHT = 240
 
 export function Composer({
-  onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange,
+  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange,
 }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
@@ -79,6 +86,7 @@ export function Composer({
     onSkillChange?.(next)
     textRef.current?.focus()
   }
+  useImperativeHandle(handle, () => ({ useSkill: (next) => chooseSkill(next, slashQuery(text) === null ? text : carried) }))
 
   const onChange = (value: string) => {
     // "/study " typed or pasted in full: the same as choosing it from the menu.
@@ -204,8 +212,8 @@ export function Composer({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
       className={cn(
-        'relative rounded-panel border bg-card p-2 shadow-float transition-colors focus-within:border-accent/50',
-        dragging ? 'border-accent bg-accent-soft' : 'border-border',
+        'relative rounded-panel border bg-card p-2 shadow-soft transition-colors focus-within:border-accent/60',
+        dragging ? 'border-accent bg-accent-soft' : 'border-border-strong',
       )}
     >
       {references.length > 0 && (

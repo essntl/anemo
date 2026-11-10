@@ -13,6 +13,8 @@ export interface NeedsRow {
   title: string
   detail?: string
   to: string
+  /** An approval that can be allowed as it is (not a plan to review or a question). */
+  approval?: { id: string; runId: string }
 }
 
 /**
@@ -35,6 +37,7 @@ export function useNeedsYou(): { rows: NeedsRow[]; ready: boolean } {
         title: a.kind === 'plan' ? 'A plan to review' : 'Approval needed',
         detail: a.summary || a.tool_name || undefined,
         to: a.conversation_id ? `/c/${a.conversation_id}` : `/runs/${a.run_id}`,
+        ...(a.kind !== 'plan' && a.kind !== 'question' ? { approval: { id: a.id, runId: a.run_id } } : {}),
       })
     }
     const pending = memory.data?.pending ?? 0

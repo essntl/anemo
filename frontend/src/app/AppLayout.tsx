@@ -14,7 +14,8 @@ import { ShareDialog } from '@/features/shares/ShareDialog'
 import { ShortcutSheet } from '@/features/shortcuts/ShortcutSheet'
 import { useHasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
 import { useShortcut } from '@/hooks/useShortcut'
-import { MobileTopBar } from './mobileNav'
+import { TopBar } from './mobileNav'
+import { MobileTabBar } from './MobileTabBar'
 import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
 import { Sidebar, SidebarRail } from './Sidebar'
@@ -84,13 +85,15 @@ export function AppLayout() {
       {/* The page column. The Dynamic Island floats at the top centre of it (not of the
           window), over the page header; see features/island/Island.tsx. */}
       <div id="main-column" className="relative flex min-w-0 flex-1 flex-col">
-        {!ownHeader && <MobileTopBar />}
+        {!ownHeader && <TopBar />}
         <Island />
         {/* relative: anything absolutely placed inside a page is held (and clipped) here,
             so it can never make the whole window scroll. */}
         <main className="page relative min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
+        {/* Phones: the tabs along the bottom (a conversation keeps that edge for its message box). */}
+        {!ownHeader && <MobileTabBar />}
       </div>
       <PersistentLayer />
       <ReauthDialog />

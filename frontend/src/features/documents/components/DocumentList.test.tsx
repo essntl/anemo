@@ -26,7 +26,7 @@ describe('the list of documents', () => {
     show({ projectFolder: 'thesis', projectName: 'Thesis' })
     expect(titles().join(' ')).toMatch(/Chapter 3.*Meeting notes/)
     expect(screen.getAllByRole('link')).toHaveLength(2)
-    expect(screen.getByRole('heading')).toHaveTextContent('Thesis')
+    expect(screen.getByText('Thesis')).toBeInTheDocument()
   })
 
   it('Uncategorized leaves out what is in a project’s folder, and keeps other folders', () => {
@@ -36,6 +36,6 @@ describe('the list of documents', () => {
     expect(screen.getByText('Recipes')).toBeInTheDocument()
     expect(screen.queryByText('Chapter 3')).toBeNull()
     expect(screen.queryByText('Meeting notes')).toBeNull()
-    expect(screen.getByRole('heading')).toHaveTextContent('Uncategorized')
+    expect(screen.getByText('Uncategorized')).toBeInTheDocument()
   })
 })

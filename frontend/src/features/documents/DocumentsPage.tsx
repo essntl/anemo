@@ -60,7 +60,7 @@ export function DocumentsPage() {
   const outside = scope.kind === 'uncategorized' ? (projects.data ?? []).map((p) => p.slug) : undefined
 
   return (
-    <div className="island-reserve flex h-full">
+    <div className="flex h-full">
       <aside className={cn('w-full shrink-0 border-r border-border md:w-72', address && 'hidden md:block')}>
         <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} outside={outside} />
       </aside>

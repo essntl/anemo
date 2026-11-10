@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { Bot, History, Search } from 'lucide-react'
+import { Bot, Search } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/Select'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { type RunKindFilter, type RunListItem, type RunStatusFilter, useRuns } from '../api'
 import { RunStatusBadge } from '../components/RunStatusBadge'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const STATUS_OPTIONS: { value: RunStatusFilter; label: string }[] = [
   { value: 'all', label: 'Any status' },
@@ -79,16 +80,9 @@ export function RunsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8 md:pt-14">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <History className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-xl font-semibold">Runs</h1>
-          <p className="text-[13px] text-muted">What your agents did: every step, tool call, approval and file change.</p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-4xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Runs" />
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">What your agents did: every step, tool call, approval and file change.</p>
 
       {/* The search, then the two filters as small pills next to each other. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">

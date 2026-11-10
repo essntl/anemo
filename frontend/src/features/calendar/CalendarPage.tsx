@@ -7,10 +7,11 @@
  * dots and the chosen day's list under it, "Week" is three days, the agenda two weeks,
  * and "+" floats at the bottom.
  */
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DayCellContentArg, EventDropArg, EventInput } from '@fullcalendar/core'
 import dayGridPlugin from '@fullcalendar/daygrid'
-import interactionPlugin, { type DateClickArg, type EventResizeDoneArg } from '@fullcalendar/interaction'
+import interactionPlugin, { type DateClickArg, type DropArg, type EventResizeDoneArg } from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -19,13 +20,14 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
-import { type Task, useTasksDue, useUpdateTask } from '@/features/tasks/api'
+import { type Task, useTasks, useTasksDue, useUpdateTask } from '@/features/tasks/api'
 import { TaskDialog } from '@/features/tasks/components/TaskDialog'
 import { addDays, dayOf, today } from '@/features/tasks/dates'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { browserTimeZone, type Occurrence, useChangeOccurrence, useOccurrencesIn, useSaveEvent } from './api'
 import { DayList } from './components/DayList'
+import { UnscheduledTasks } from './components/UnscheduledTasks'
 import { colorOf, daysOf } from './entries'
 import { EventDialog, type NewEventDefaults } from './components/EventDialog'
 import { Lingering } from '@/components/ui/Lingering'
@@ -156,6 +158,17 @@ export function CalendarPage() {
   }
 
   /** An entry was dragged to another time (or resized): save its new times. */
+  // Open tasks of what the switcher shows that have no date: dragged onto a day, they get one.
+  const allTasks = useTasks()
+  const unscheduled = useMemo(
+    () => (allTasks.data ?? []).filter((t) => !t.due_date && t.status !== 'done' && t.status !== 'cancelled' && inScope(scope, t.project_id)).slice(0, 50),
+    [allTasks.data, scope],
+  )
+  const onDropTask = (arg: DropArg) => {
+    const id = arg.draggedEl.dataset.taskId
+    if (!id) return
+    updateTask.mutate({ id, body: { due_date: dayOf(arg.date), due_time: arg.allDay ? null : `${arg.date.toTimeString().slice(0, 5)}:00` } })
+  }
   const onMoved = (arg: EventDropArg | EventResizeDoneArg) => {
     const { start, end, allDay } = arg.event
     if (!start) return arg.revert()
@@ -198,24 +211,23 @@ export function CalendarPage() {
   )
 
   return (
-    <div className={cn('flex h-full flex-col px-3 pb-3 pt-2 md:p-6 md:pt-14', phoneMonth && 'overflow-y-auto pb-24')}>
-      <div className="mb-3 flex flex-wrap items-center gap-2 md:flex-nowrap">
-        <div className="flex min-w-0 flex-1 items-center gap-0.5">
-          <Button size="icon" variant="ghost" aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
-          <h1 className="min-w-0 truncate px-1 text-[17px] font-semibold md:text-xl" aria-live="polite">{title || 'Calendar'}</h1>
-          <Button size="icon" variant="ghost" aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>
-        </div>
+    <div className={cn('flex h-full flex-col px-3 pb-3 pt-2 md:px-6 md:pb-6 md:pt-1', phoneMonth && 'overflow-y-auto pb-24')}>
+      {/* The month or week shown is the page's title, with the arrows around it. */}
+      <PageHeader title={<span aria-live="polite">{title || 'Calendar'}</span>}
+        before={<Button size="icon" variant="ghost" className="-mx-1 shrink-0" aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>}
+        after={<Button size="icon" variant="ghost" className="-mx-1 shrink-0" aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>}>
         <Button size="sm" variant="secondary" onClick={() => { api()?.today(); setSelected(today()) }}>Today</Button>
         <div className="hidden md:block">{segmented}</div>
         <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={newEvent} className="hidden md:inline-flex">
           New event
         </Button>
-        <div className="w-full md:hidden">{segmented}</div>
-      </div>
+      </PageHeader>
+      <div className="mb-3 md:hidden">{segmented}</div>
       {error && <p className="mb-2 text-[13px] text-error">{errorMessage(error)}</p>}
 
+      <div className={desktop ? 'flex min-h-0 flex-1 gap-3' : 'contents'}>
       <div className={cn(
-        'rounded-card border border-border bg-card p-2 shadow-soft md:p-3',
+        'min-w-0 rounded-card border border-border bg-card p-2 shadow-soft md:p-3',
         // A phone's calendar has the whole width; the month grid sizes itself, the rest fills.
         desktop ? 'min-h-0 flex-1' : 'border-0 bg-transparent p-0 shadow-none',
         !desktop && !phoneMonth && 'min-h-0 flex-1',
@@ -236,6 +248,8 @@ export function CalendarPage() {
           dayMaxEventRows={desktop ? true : 2}
           fixedWeekCount={desktop}
           editable
+          droppable
+          drop={onDropTask}
           eventDisplay={phoneMonth ? 'none' : 'auto'}
           dayCellContent={phoneMonth ? dayCell : undefined}
           dayCellClassNames={(arg) => (phoneMonth && dayOf(arg.date) === selected ? ['fc-day-selected'] : [])}
@@ -257,12 +271,14 @@ export function CalendarPage() {
           noEventsContent="Nothing planned"
         />
       </div>
+      {desktop && <UnscheduledTasks tasks={unscheduled} onOpen={(task) => setOpen({ kind: 'task', task })} />}
+      </div>
       {phoneMonth && <DayList day={selected} entries={entries} onOpen={openEntry} />}
 
       {/* Phones: "+" where the thumb is. */}
       {!desktop && (
         <button type="button" aria-label="New event" onClick={newEvent}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-float active:scale-95">
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-float active:scale-95">
           <Plus className="h-6 w-6" />
         </button>
       )}

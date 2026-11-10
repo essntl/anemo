@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { FileText, Folder, Plus, Search } from 'lucide-react'
@@ -43,15 +44,12 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
-          Documents{(projectName ?? (outside && 'Uncategorized')) && <span className="font-normal text-muted"> · {projectName ?? 'Uncategorized'}</span>}
-        </h1>
-        <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} loading={create.isPending} onClick={() => void newDocument()}>
-          New
-        </Button>
-      </div>
-      <div className="relative px-3 py-2">
+      <PageHeader title="Documents" detail={projectName ?? (outside ? 'Uncategorized' : undefined)}>
+      <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} loading={create.isPending} onClick={() => void newDocument()}>
+        New
+      </Button>
+      </PageHeader>
+      <div className="relative px-3 pb-2 pt-3">
         <Search className="pointer-events-none absolute left-5.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find by title" aria-label="Find by title"
           className="h-9 w-full rounded-control bg-surface-2 pl-8 pr-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />

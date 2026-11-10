@@ -2,6 +2,7 @@
  * File manager for the AI workspace: the same folders agents work in.
  * The URL holds the state (?path=folder&file=path) so views can be linked and reloaded.
  */
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useEffect, useState, type DragEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import {
@@ -332,7 +333,8 @@ export function FilesPage() {
   const error = (notAFolder ? null : folder.error) ?? makeFolder.error ?? saveFile.error ?? upload.error
 
   return (
-    <div className="island-reserve flex h-full">
+    <div className="flex h-full">
+      <PageHeader title="Files" />
       <div className={cn('flex min-w-0 flex-1 flex-col', openFile && 'hidden lg:flex')}>
         <header className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border px-3 py-2.5 md:gap-2 md:px-4">
           <div className="w-full min-w-0 md:w-auto md:flex-1"><Breadcrumbs path={path} onOpen={(p) => go({ path: p, file: null })} /></div>

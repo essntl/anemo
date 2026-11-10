@@ -27,6 +27,7 @@ import {
 import { AutomationDialog } from './components/AutomationDialog'
 import { type AutomationTemplate, TEMPLATES } from './templates'
 import { Lingering } from '@/components/ui/Lingering'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'error'> = {
   running: 'accent',
@@ -137,22 +138,16 @@ export function AutomationsPage() {
   const templates = TEMPLATES.filter((t) => !items.some((a) => a.name === t.name))
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Clock className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold">Automations</h1>
-          <p className="text-[13px] text-muted">
-            Things an agent does by itself on a schedule, and reports back as a{' '}
-            <Link to="/notifications" className="text-accent underline">notification</Link>.
-          </p>
-        </div>
+    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Automations">
         <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>
           New
         </Button>
-      </div>
+      </PageHeader>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">
+        Things an agent does by itself on a schedule, and reports back as a{' '}
+        <Link to="/notifications" className="text-accent underline">notification</Link>.
+        </p>
 
       {automations.isError && <p className="text-[13px] text-error">{errorMessage(automations.error)}</p>}
       {automations.isSuccess && items.length === 0 && (

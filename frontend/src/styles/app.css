@@ -314,15 +314,10 @@
 /*
  * The Dynamic Island floats at the top centre of the page column (#main-column), which
  * carries its width as --island-w (0px while hidden) and data-island="on|off".
- *  .island-clear-left  a header's left part stops short of the Island while it shows; set
+ *  .island-clear-left  a part of the top bar stops short of the Island while it shows; set
  *                      --island-gap to the space between the column edge and it.
- *  .island-reserve     pages whose toolbar starts at the very top (Files, Documents)
- *                      move down by the header height while the Island shows (desktop).
  */
 #main-column[data-island='on'] .island-clear-left { max-width: calc(50% - var(--island-w, 0px) / 2 - var(--island-gap, 1rem)); }
-@media (min-width: 768px) {
-  #main-column[data-island='on'] .island-reserve { padding-top: 3.5rem; transition: padding-top 180ms var(--ease-out); }
-}
 
 /* Centres a line of text on its letters rather than on the font's line box, whose
    space above and below differs between fonts (e.g. MiSans sits high in a pill).

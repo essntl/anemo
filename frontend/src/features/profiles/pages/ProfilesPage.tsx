@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Bot, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import type { Profile, Skill } from '../api'
@@ -13,6 +13,7 @@ import { ProfileList } from '../components/ProfileList'
 import { SkillDialog } from '../components/SkillDialog'
 import { SkillList } from '../components/SkillList'
 import { Lingering } from '@/components/ui/Lingering'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 // Which dialog is open; `item` null means "create a new one".
 type Editing = { kind: 'profile'; item: Profile | null } | { kind: 'skill'; item: Skill | null } | null
@@ -28,18 +29,11 @@ export function ProfilesPage() {
   const [editing, setEditing] = useState<Editing>(null)
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8 md:pt-14">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Bot className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold">Profiles & Skills</h1>
-          <p className="text-[13px] text-muted">
-            Profiles are agent setups you pick in the chat. Skills are instructions you start a message with (type / in the chat), or that agents load when a task needs them.
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-4xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Profiles & Skills" />
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">
+        Profiles are agent setups you pick in the chat. Skills are instructions you start a message with (type / in the chat), or that agents load when a task needs them.
+        </p>
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="tablist" aria-label="Section">

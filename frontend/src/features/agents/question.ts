@@ -14,3 +14,9 @@ export function questionOf(call: ToolCallView) {
 export function pendingQuestion(calls: ToolCallView[] | undefined): ToolCallView | undefined {
   return calls?.find((c) => c.approval?.kind === 'question' && c.approval.status === 'pending')
 }
+
+/** The tool call of this run that waits for a yes or no (not a plan to review or a question). */
+export function pendingApproval(calls: ToolCallView[] | undefined): ToolCallView | undefined {
+  return calls?.find((c) =>
+    c.status === 'waiting_approval' && c.approval?.status === 'pending' && c.approval.kind !== 'plan' && c.approval.kind !== 'question')
+}

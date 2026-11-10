@@ -47,7 +47,7 @@ export const PAGES: PageLink[] = [
   { label: 'Automations', to: '/automations', icon: Clock, keywords: 'schedule cron recurring' },
   { label: 'Profiles & Skills', to: '/agents', icon: Bot, keywords: 'agent profile skill' },
   { label: 'Memory', to: '/memory', icon: Brain, keywords: 'remember' },
-  { label: 'Notifications', to: '/notifications', icon: Bell, keywords: 'reminders alerts' },
+  { label: 'Inbox', to: '/notifications', icon: Bell, keywords: 'notifications reminders alerts approvals needs you' },
   { label: 'Settings', to: '/settings', icon: Settings, keywords: 'preferences' },
   ...SETTINGS_SECTIONS.map((s) => ({
     label: `Settings: ${s.label}`, to: `/settings/${s.to}`, icon: Settings, keywords: 'preferences', onlyWhenSearching: true,

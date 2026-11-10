@@ -2,41 +2,28 @@ import { useState, type ReactNode } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { NavLink, useLocation, useNavigate } from 'react-router'
 import {
-  Bell,
-  Bot,
-  Brain,
-  CalendarDays,
-  CheckSquare,
   ChevronRight,
-  Clock,
-  FileText,
-  FolderKanban,
-  FolderOpen,
-  History,
-  House,
+  Inbox,
   LayoutGrid,
   LogOut,
   MessagesSquare,
-  Music,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Search,
   Settings,
-  Timer,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Logo } from '@/components/ui/Logo'
 import { useLogout, useMe } from '@/features/auth/api'
 import { ConversationList } from '@/features/chat/components/ConversationList'
-import { useMemorySummary } from '@/features/memory/api'
-import { useNotificationSummary } from '@/features/notifications/api'
-import { useRunsSummary } from '@/features/runs/api'
 import { usePalette } from '@/features/search/paletteStore'
 import { shortcutText } from '@/features/shortcuts/registry'
 import { ShortcutKeys } from '@/features/shortcuts/ShortcutKeys'
 import { cn } from '@/lib/cn'
+import { InboxBadge } from './badges'
+import { MORE, PINNED } from './pageList'
 import { PagesFolder, type PageEntry } from './PagesFolder'
 import { ScopeControl } from './ScopeControl'
 import { useSidebar } from './sidebarStore'
@@ -74,64 +61,6 @@ function HeaderLink({ to, label, icon, badge, onClick }: { to: string; label: st
 function Divider({ className }: { className?: string }) {
   return <div aria-hidden className={cn('h-px shrink-0 bg-border', className)} />
 }
-
-/** Agent runs that are working, or that wait for the user (approval or paused). */
-function RunsBadge() {
-  const summary = useRunsSummary()
-  const { active = 0, waiting = 0 } = summary.data ?? {}
-  if (waiting) {
-    return (
-      <span title={`${waiting} waiting for you`}
-        className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-[11px] font-semibold text-white">
-        {waiting}
-      </span>
-    )
-  }
-  if (active) return <span title={`${active} running`} className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-  return null
-}
-
-/** Memory suggestions waiting for the user's decision. */
-function MemoryBadge() {
-  const pending = useMemorySummary().data?.pending ?? 0
-  if (!pending) return null
-  return (
-    <span title={`${pending} suggestion${pending === 1 ? '' : 's'} to review`}
-      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-[11px] font-semibold text-white">
-      {pending}
-    </span>
-  )
-}
-
-/** Notifications not opened yet. */
-function NotificationsBadge() {
-  const unread = useNotificationSummary().data?.unread ?? 0
-  if (!unread) return null
-  return (
-    <span title={`${unread} unread`}
-      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-accent-contrast">
-      {unread > 99 ? '99+' : unread}
-    </span>
-  )
-}
-
-/** The pages always in the list, and the ones behind "More" (desktop). A phone shows all of them in its Pages card. */
-const PINNED: PageEntry[] = [
-  { to: '/home', icon: <House />, label: 'Home' },
-  { to: '/tasks', icon: <CheckSquare />, label: 'Tasks' },
-  { to: '/calendar', icon: <CalendarDays />, label: 'Calendar' },
-  { to: '/documents', icon: <FileText />, label: 'Documents' },
-  { to: '/files', icon: <FolderOpen />, label: 'Files' },
-]
-const MORE: PageEntry[] = [
-  { to: '/projects', icon: <FolderKanban />, label: 'Projects' },
-  { to: '/focus', icon: <Timer />, label: 'Focus' },
-  { to: '/music', icon: <Music />, label: 'Music' },
-  { to: '/runs', icon: <History />, label: 'Runs', badge: <RunsBadge /> },
-  { to: '/automations', icon: <Clock />, label: 'Automations' },
-  { to: '/agents', icon: <Bot />, label: 'Agents', title: 'Profiles & Skills' },
-  { to: '/memory', icon: <Brain />, label: 'Memory', badge: <MemoryBadge /> },
-]
 
 /** Whether the address is on this page (or on something inside it). */
 const isOn = (page: PageEntry, pathname: string) => pathname === page.to || pathname.startsWith(`${page.to}/`)
@@ -207,7 +136,6 @@ export function SidebarRail({ className }: { className?: string }) {
       <Divider className="my-2 w-8" />
       {[...PINNED, ...MORE].map((p) => <RailLink key={p.to} to={p.to} label={p.title ?? p.label} icon={p.icon} badge={p.badge} />)}
       <Divider className="mb-2 mt-auto w-8" />
-      <RailLink to="/notifications" label="Notifications" icon={<Bell />} badge={<NotificationsBadge />} />
       <RailLink to="/settings" label="Settings" icon={<Settings />} />
     </nav>
   )
@@ -235,9 +163,9 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           <span className="ml-0.5 text-[18px] font-bold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
         </NavLink>
         {onClose ? (
-          // On a phone Notifications and Settings sit up here, so the chats get the room.
+          // On a phone the Inbox and Settings sit up here, so the chats get the room.
           <>
-            <HeaderLink to="/notifications" label="Notifications" icon={<Bell />} badge={<NotificationsBadge />} />
+            <HeaderLink to="/notifications" label="Inbox" icon={<Inbox />} badge={<InboxBadge />} />
             <HeaderLink to="/settings" label="Settings" icon={<Settings />} />
             <button type="button" aria-label="Close menu" onClick={onClose}
               className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
@@ -296,7 +224,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           <PagesFolder pages={[...PINNED, ...MORE]} onNavigate={onClose} />
         </>
       ) : (
-        // Who is signed in, with Notifications, Settings and Sign out (under Settings > General too).
+        // Who is signed in, with Settings and Sign out (under Settings > General too).
         <>
           <Divider className="-mx-3 mt-2" />
           <div className="-mb-1 flex shrink-0 items-center gap-1 pt-2">
@@ -304,11 +232,6 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
               {me.data?.username.slice(0, 1) ?? ''}
             </span>
             <span className="ml-1 min-w-0 flex-1 truncate text-[13px] font-medium">{me.data?.username}</span>
-            <NavLink to="/notifications" aria-label="Notifications" title="Notifications"
-              className={({ isActive }) => cn(ICON_BUTTON, 'relative', isActive && 'bg-surface-2 text-accent')}>
-              <Bell className="h-4 w-4" />
-              <span className="absolute -right-1 -top-1 scale-75 empty:hidden"><NotificationsBadge /></span>
-            </NavLink>
             <NavLink to="/settings" aria-label="Settings" title="Settings"
               className={({ isActive }) => cn(ICON_BUTTON, isActive && 'bg-surface-2 text-accent')}>
               <Settings className="h-4 w-4" />
