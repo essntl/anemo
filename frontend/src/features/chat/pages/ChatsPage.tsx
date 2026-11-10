@@ -20,6 +20,7 @@ import { formatWhen } from '@/lib/format'
 import { AGES, ageRange } from '../age'
 import { type BulkAction, type ChatFilters, type Conversation, useBulkChats, useChatTags, useConversations } from '../api'
 import { useChatActions, useMoveChats } from '../chatActions'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const PAGE = 50
 const SORTS = [
@@ -153,13 +154,8 @@ export function ChatsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <MessagesSquare className="h-5 w-5" />
-        </div>
-        <h1 className="min-w-0 flex-1 text-xl font-semibold">All chats</h1>
-      </div>
+    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="All chats" />
 
       {/* The search and the project share a row (the search gives way to a long project
           name); the other filters sit below it, in one row that scrolls sideways on a

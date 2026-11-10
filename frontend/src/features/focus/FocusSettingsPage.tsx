@@ -26,6 +26,13 @@ function MusicSettingsCard() {
           </span>
           <Switch label="Show each new track" checked={m.track_alerts} onChange={(v) => save.mutate({ ...m, track_alerts: v })} />
         </label>
+        <label className="flex items-center justify-between gap-4 py-3">
+          <span>
+            <span className="block text-[13.5px] font-medium">Play while focusing</span>
+            <span className="block text-[12px] text-muted">The music starts with a focus session and pauses for the breaks.</span>
+          </span>
+          <Switch label="Play while focusing" checked={m.play_while_focusing} onChange={(v) => save.mutate({ ...m, play_while_focusing: v })} />
+        </label>
       </CardBody>
     </Card>
   )

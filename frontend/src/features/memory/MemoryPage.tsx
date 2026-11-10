@@ -27,6 +27,7 @@ import {
 } from './api'
 import { MemoryDialog } from './MemoryDialog'
 import { Lingering } from '@/components/ui/Lingering'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const TABS: { id: MemoryStatus; label: string }[] = [
   { id: 'active', label: 'Memories' },
@@ -132,19 +133,8 @@ export function MemoryPage() {
   const items = memories.data ?? []
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Brain className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold">Memory</h1>
-          <p className="text-[13px] text-muted">
-            What the assistant remembers about you across conversations. You can change or delete anything.{' '}
-            <Link to="/settings/memory" className="text-accent underline">Settings</Link>
-          </p>
-        </div>
-        {/* Adding and exporting belong to the page, so they sit by its title. */}
+    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Memory">
         <div className="flex shrink-0 items-center gap-1">
           <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} aria-label="Add memory" onClick={() => setEditing({ memory: null })}
             className="max-sm:h-10 max-sm:w-10 max-sm:justify-center max-sm:rounded-full max-sm:px-0 max-sm:[&>span]:sr-only">
@@ -152,7 +142,11 @@ export function MemoryPage() {
           </Button>
           <ActionMenu actions={[{ label: 'Export all (JSON)', icon: <Download />, download: memoryExportUrl }]} />
         </div>
-      </div>
+      </PageHeader>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">
+        What the assistant remembers about you across conversations. You can change or delete anything.{' '}
+        <Link to="/settings/memory" className="text-accent underline">Settings</Link>
+        </p>
 
       <div className="mb-3">
         <div className="flex rounded-lg bg-surface-2 p-0.5 sm:inline-flex" role="tablist" aria-label="Memory lists">

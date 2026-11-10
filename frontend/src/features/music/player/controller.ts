@@ -223,7 +223,7 @@ function eventsFor(source: SourceKind): AdapterEvents {
         if (t && lastAnnounced !== t.id) {
           lastAnnounced = t.id
           if (trackAlerts) {
-            islandAlert({ title: t.title, body: t.artist || undefined, icon: 'music', image: artworkSrc(t.artwork), tone: 'info', duration: 2400, key: 'now-playing' })
+            islandAlert({ title: t.title, body: t.artist || undefined, icon: 'music', image: artworkSrc(t.artwork), tone: 'info', duration: 2400, key: 'now-playing', deferrable: true })
           }
         }
       } else if (state === 'ended') {

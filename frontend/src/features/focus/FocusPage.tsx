@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { BellRing, ChevronDown, Clock, Flame, Plus, Settings2, Timer } from 'lucide-react'
+import { BellRing, Check, ChevronDown, Clock, Flame, Plus, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Segmented } from '@/components/ui/Segmented'
@@ -16,10 +16,15 @@ import { desktopEnabled } from '@/features/notifications/desktop'
 import { useTasks } from '@/features/tasks/api'
 import { formatMinutes, useTodayFocus } from './api'
 import { TaskPicker } from './components/TaskPicker'
+import { UpNext } from './components/UpNext'
+import { focusQueue } from './queueStore'
 import { TimerDial } from './components/TimerDial'
 import { TimerSettingsForm } from './components/TimerSettingsForm'
 import { PHASE_LABEL, type Phase } from './timer'
-import { timerActions, useTimer } from './timerStore'
+import { timerActions, useTimer, useTimerStore } from './timerStore'
+import { useSettings } from '@/features/settings/api'
+import { useToggleDone } from '@/features/tasks/useToggleDone'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 
 function Today() {
@@ -27,14 +32,21 @@ function Today() {
   const tasks = useTasks()
   const titles = useMemo(() => new Map((tasks.data ?? []).map((t) => [t.id, t.title])), [tasks.data])
   const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const goal = useSettings().data?.focus.daily_goal_minutes ?? 0
   return (
     <div className="px-4 pb-4 pt-3 md:px-5">
       <div className="flex items-center justify-between text-[11.5px] font-semibold uppercase tracking-wider text-muted">
         <span className="flex items-center gap-1.5"><Flame className="h-4 w-4" /> Today</span>
         <span className="text-[13px] normal-case tracking-normal text-text tabular-nums" data-testid="focus-today">
-          {formatMinutes(today.minutes)}
+          {formatMinutes(today.minutes)}{goal > 0 && <span className="font-normal text-muted"> of {formatMinutes(goal)}</span>}
         </span>
       </div>
+      {goal > 0 && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="Today’s focus goal"
+          aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(today.minutes, goal)}>
+          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, (today.minutes / goal) * 100)}%` }} />
+        </div>
+      )}
       {today.sessions.length === 0 && !today.waiting ? (
         <p className="pt-2 text-[13px] text-muted">No sessions yet.</p>
       ) : (
@@ -59,6 +71,25 @@ function Today() {
   )
 }
 
+/** Finishes the task the timer is on, and puts the next one from "Up next" in its place. */
+function DoneButton() {
+  const taskId = useTimerStore((s) => s.timer.taskId)
+  const tasks = useTasks()
+  const { toggle } = useToggleDone()
+  const task = tasks.data?.find((x) => x.id === taskId && x.status !== 'done' && x.status !== 'cancelled')
+  if (!task) return null
+  const done = async () => {
+    await toggle(task)
+    const open = new Set((tasks.data ?? []).filter((x) => x.id !== task.id && x.status !== 'done' && x.status !== 'cancelled').map((x) => x.id))
+    timerActions.setTask(focusQueue.next(open))
+  }
+  return (
+    <Button size="sm" icon={<Check className="h-3.5 w-3.5" />} title="Mark the task done and take the next from Up next" onClick={() => void done()}>
+      Done
+    </Button>
+  )
+}
+
 export function FocusPage() {
   const t = useTimer()
   const [showSettings, setShowSettings] = useState(false)
@@ -68,20 +99,13 @@ export function FocusPage() {
   useShortcut('focus.addMinute', () => timerActions.addMinute())
 
   return (
-    <div className="mx-auto max-w-5xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Timer className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">Focus</h1>
-          <p className="truncate text-[13px] text-muted">Work in focused stretches, rest on purpose.</p>
-        </div>
+    <div className="mx-auto max-w-5xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Focus">
         <Link to="/stats" className="shrink-0 text-[13px] font-medium text-accent hover:underline">Stats</Link>
-      </div>
+      </PageHeader>
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="flex flex-col items-center px-4 py-6">
+        <Card className="flex flex-col items-center bg-linear-to-b from-accent-soft/60 to-card to-55% px-4 py-6 lg:min-h-[34rem] lg:justify-center">
           <Segmented<Phase>
             label="Timer phase"
             className="mb-6"
@@ -93,6 +117,7 @@ export function FocusPage() {
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <Button size="sm" icon={<Plus className="h-3.5 w-3.5" />} onClick={timerActions.addMinute}>1 min</Button>
             <TaskPicker />
+            <DoneButton />
           </div>
           <div className="mt-4 hidden flex-wrap items-center justify-center gap-x-3.5 gap-y-1 text-[11.5px] text-muted md:flex">
             <span><ShortcutKeys id="focus.toggle" /> start / pause</span>
@@ -104,6 +129,7 @@ export function FocusPage() {
 
         <div className="flex flex-col gap-4">
           <Card><Today /></Card>
+          <Card><UpNext /></Card>
           <Card>
             <button type="button" aria-expanded={showSettings} onClick={() => setShowSettings((x) => !x)}
               className="flex w-full items-center gap-2 px-4 py-3.5 text-left md:px-5">

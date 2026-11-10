@@ -2,9 +2,9 @@ import { useToday } from '@/hooks/useNow'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { CalendarClock } from 'lucide-react'
-import { useCurrentProject } from '@/app/projectStore'
+import { inScope, useScope } from '@/app/projectStore'
 import { cn } from '@/lib/cn'
-import { useOccurrences } from '@/features/calendar/api'
+import { useOccurrencesIn } from '@/features/calendar/api'
 import { useTasks } from '@/features/tasks/api'
 import { addDays, dayOf, formatDay } from '@/features/tasks/dates'
 import { dayRange, timeOf } from '../dates'
@@ -16,10 +16,10 @@ interface Item { key: string; day: string; time: string; title: string; to: stri
 
 /** Upcoming: the next 7 days of events and dated tasks, by day. */
 export function UpcomingWidget({ item }: { item: WidgetLayout }) {
-  const project = useCurrentProject()
+  const scope = useScope()
   const day = useToday()
   const range = useMemo(() => dayRange(new Date(day), 8), [day])
-  const events = useOccurrences(range, project?.id ?? null)
+  const events = useOccurrencesIn(range, scope)
   const tasks = useTasks()
   const today = dayOf(new Date(day))
   const items = useMemo(() => {
@@ -31,11 +31,11 @@ export function UpcomingWidget({ item }: { item: WidgetLayout }) {
       }),
       ...(tasks.data ?? [])
         .filter((t) => t.due_date && t.due_date >= today && t.due_date <= last && t.status !== 'done' && t.status !== 'cancelled')
-        .filter((t) => !project || t.project_id === project.id)
+        .filter((t) => inScope(scope, t.project_id))
         .map((t) => ({ key: `t-${t.id}`, day: t.due_date!, time: t.due_time?.slice(0, 5) ?? '', title: t.title, to: `/tasks?task=${t.id}`, task: true })),
     ]
     return out.filter((i) => i.day >= today && i.day <= last).sort((a, b) => a.day.localeCompare(b.day) || a.time.localeCompare(b.time))
-  }, [events.data, tasks.data, project, today])
+  }, [events.data, tasks.data, scope, today])
 
   const rows = ROWS[item.h] + 1
   const shown = items.slice(0, rows)

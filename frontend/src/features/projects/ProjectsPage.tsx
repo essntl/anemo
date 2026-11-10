@@ -22,6 +22,7 @@ import { useProfiles } from '@/features/profiles/api'
 import { useModels } from '@/features/providers/api'
 import { useShareDialog } from '@/features/shares/shareStore'
 import { type Project, useDeleteProject, useProjects, useSaveProject } from '@/features/tasks/api'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const COLORS = ['#6b7280', '#ef4444', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
@@ -163,19 +164,13 @@ export function ProjectsPage() {
   const [editing, setEditing] = useState<{ project: Project | null } | null>(null)
   const all = projects.data ?? []
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <FolderKanban className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold">Projects</h1>
-          <p className="text-[13px] text-muted">Each project has its own chats, tasks, calendar, documents and files.</p>
-        </div>
+    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Projects">
         <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ project: null })}>
           New project
         </Button>
-      </div>
+      </PageHeader>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">Each project has its own chats, tasks, calendar, documents and files.</p>
       {projects.error && <p className="mb-2 text-[13px] text-error">{errorMessage(projects.error)}</p>}
       {projects.isSuccess && all.length === 0 ? (
         <EmptyState icon={<FolderKanban className="h-5 w-5" />} title="No projects yet"

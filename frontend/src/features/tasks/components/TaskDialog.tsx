@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { CornerDownRight, Timer, Trash2 } from 'lucide-react'
+import { CornerDownRight, Timer, Trash2, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { cn } from '@/lib/cn'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
 import { focusOnTask } from '@/features/focus/focusOnTask'
@@ -46,11 +47,16 @@ interface TaskDialogProps {
   onClose: () => void
   /** Open another task in the editor instead (a subtask, its parent, one it waits on). */
   onOpenTask?: (task: Task) => void
+  /**
+   * Shown as a panel beside the task list (very wide screens) instead of over it: the
+   * same editor in one column, and the list stays in reach.
+   */
+  panel?: boolean
 }
 
 const tagList = (text: string) => text.split(',').map((t) => t.trim()).filter(Boolean)
 
-export function TaskDialog({ task, defaults, onClose, onOpenTask }: TaskDialogProps) {
+export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskDialogProps) {
   const projects = useProjects()
   const all = useTasks().data ?? []
   const create = useCreateTask()
@@ -132,16 +138,16 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask }: TaskDialogPr
     if (ok) remove.mutate(task.id, { onSuccess: onClose })
   }
 
-  return (
+  const wide = !panel
+  const body = (
     // Laid out like a document: the title, status and notes take most of the window; what
     // files the task (schedule, project, priority, tags) and the buttons are in a panel
     // at the side. On a phone the panel comes below the notes and the buttons stay in view.
     // Beside the panel the notes are exactly as tall as it is (the left column takes no
     // height of its own), and longer notes scroll inside their box.
-    <Dialog open onOpenChange={(open) => !open && onClose()} className="max-md:pb-0 md:w-[min(96vw,1020px)]" title={task ? 'Task' : 'New task'}>
-      <div className="flex flex-col gap-5 md:grid md:min-h-[min(68dvh,44rem)] md:grid-cols-[minmax(0,1fr)_18rem] md:gap-6">
+      <div className={cn('flex flex-col gap-5', wide && 'md:grid md:min-h-[min(68dvh,44rem)] md:grid-cols-[minmax(0,1fr)_18rem] md:gap-6')}>
         <div className="relative min-w-0">
-        <div className="flex flex-col gap-3 md:absolute md:inset-0">
+        <div className={cn('flex flex-col gap-3', wide && 'md:absolute md:inset-0')}>
           <input aria-label="Title" autoFocus={!task} value={title} maxLength={300} placeholder="What needs doing?"
             onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && void save()}
             className="w-full bg-transparent text-xl font-semibold placeholder:font-medium placeholder:text-subtle focus:outline-none md:text-2xl" />
@@ -165,7 +171,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask }: TaskDialogPr
         </div>
         </div>
 
-        <aside aria-label="Details" className="flex flex-col gap-4 md:border-l md:border-border md:pl-6">
+        <aside aria-label="Details" className={cn('flex flex-col gap-4', wide && 'md:border-l md:border-border md:pl-6')}>
           <Field label="Due date">
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </Field>
@@ -216,7 +222,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask }: TaskDialogPr
 
           {/* Phone: a bar that stays at the bottom of the sheet (which has no padding of its
               own there, so nothing shows under the bar). Desktop: the foot of the panel. */}
-          <div className="sticky bottom-0 -mx-5 mt-auto flex items-center justify-end gap-2 border-t border-border bg-card px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:static md:mx-0 md:border-0 md:p-0 md:pt-2">
+          <div className={cn('sticky bottom-0 -mx-5 mt-auto flex items-center justify-end gap-2 border-t border-border bg-card px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3', wide && 'md:static md:mx-0 md:border-0 md:p-0 md:pt-2')}>
             {task && (
               <Button variant="ghost" className="mr-auto" icon={<Trash2 className="h-4 w-4" />} loading={remove.isPending}
                 onClick={() => void confirmDelete()}>
@@ -230,6 +236,27 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask }: TaskDialogPr
           </div>
         </aside>
       </div>
+  )
+  if (panel) {
+    return (
+      // Not modal: the list beside it stays in use. Esc closes it, as it closes the dialog.
+      <aside role="dialog" aria-label={task ? 'Task' : 'New task'}
+        onKeyDown={(e) => e.key === 'Escape' && !e.defaultPrevented && onClose()}
+        className="flex h-full w-[27rem] shrink-0 flex-col overflow-y-auto rounded-panel border border-border bg-card px-5 pt-4 shadow-soft">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-semibold">{task ? 'Task' : 'New task'}</h2>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-text">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </button>
+        </div>
+        {body}
+      </aside>
+    )
+  }
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()} className="max-md:pb-0 md:w-[min(96vw,1020px)]" title={task ? 'Task' : 'New task'}>
+      {body}
     </Dialog>
   )
 }

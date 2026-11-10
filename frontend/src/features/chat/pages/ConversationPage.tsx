@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
-import { AppWindow, ExternalLink, GitBranch, Star, X } from 'lucide-react'
+import { AppWindow, ExternalLink, GitBranch, Star, X, PanelRight } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { MenuButton, NewChatButton } from '@/app/mobileNav'
 import { fixRequest } from '@/components/diagrams/context'
@@ -14,7 +14,8 @@ import { useShellOutput } from '@/features/agents/shellOutput'
 import { useBrowserStatus } from '@/features/browser/api'
 import { BrowserView } from '@/features/browser/BrowserView'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
-import { RunActivity } from '@/features/agents/components/RunActivity'
+import { ApprovalDock } from '@/features/agents/components/ApprovalCard'
+import { RunActivity, RunPanel } from '@/features/agents/components/RunActivity'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
 import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
@@ -84,6 +85,9 @@ function ChatMenu({ conversation }: { conversation: Conversation }) {
  * or mode picked for one chat, or an answer version being looked at never carries over to
  * the next.
  */
+/** Browser storage: whether the run panel is shown beside a chat. */
+const RUN_PANEL = "anemo.runPanel"
+
 export function ConversationPage() {
   const { conversationId = '' } = useParams()
   return <Conversation key={conversationId} />
@@ -97,6 +101,12 @@ function Conversation() {
   const wide = useMediaQuery(WIDE)
   const desktop = useMediaQuery(DESKTOP)
   const [browserOpen, setBrowserOpen] = useState(false)
+  // The run panel beside the chat (wide screens), remembered on this device.
+  const [runPanel, setRunPanel] = useState(() => { try { return localStorage.getItem(RUN_PANEL) === "1" } catch { return false } })
+  const toggleRunPanel = () => {
+    try { localStorage.setItem(RUN_PANEL, runPanel ? "0" : "1") } catch { /* no storage: just not remembered */ }
+    setRunPanel(!runPanel)
+  }
   const qc = useQueryClient()
   const conversation = useConversation(conversationId)
   const messages = useMessages(conversationId)
@@ -215,8 +225,17 @@ function Conversation() {
       )}
     </h1>
   )
+  // The agent run the panel is about: the one going on, else the last one in the chat.
+  const panelRunId = activeRunId ?? [...list].reverse().find((m) => m.mode === "agent" && m.run_id)?.run_id ?? null
+  const showRunPanel = runPanel && wide && Boolean(panelRunId) && !browserOpen
   const tools = (
     <>
+      {panelRunId && wide && (
+        <Button size="icon" variant={showRunPanel ? "secondary" : "ghost"} aria-label="Run details" aria-pressed={showRunPanel}
+          title="The run’s plan and changed files" onClick={() => { if (browserOpen) { setBrowserOpen(false); if (runPanel) return } toggleRunPanel() }}>
+          <PanelRight className="h-4 w-4" />
+        </Button>
+      )}
       {browser.data?.available && (
         // The agent's browser: beside the chat when there is room, else on its own page.
         <Button size="icon" variant={browserOpen && wide ? 'secondary' : 'ghost'} aria-label="Browser" aria-pressed={browserOpen && wide}
@@ -239,7 +258,8 @@ function Conversation() {
   )
 
   return (
-    <div className="flex h-full">
+    // From `md` up the chat (and what opens beside it) is one panel on the ground, like the sidebar.
+    <div className="flex h-full md:mx-3 md:my-3 md:h-[calc(100%-1.5rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="shrink-0 border-b border-border">
         <div className="flex h-12 items-center gap-1 px-1.5 md:h-14 md:px-6">
@@ -293,7 +313,7 @@ function Conversation() {
                     error={live.error}
                     modelLabel={live.modelLabel}
                     notice={live.notice}
-                    activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live /> : undefined}
+                    activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live docked /> : undefined}
                     questions={live.questions}
                   />
                 ) : (() => {
@@ -343,6 +363,8 @@ function Conversation() {
 
       <div className="mx-auto w-full max-w-3xl px-3 pb-2 md:px-6 md:pb-6">
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
+        {/* What the agent waits for stays in sight here, whatever the chat is scrolled to. */}
+        <ApprovalDock runId={activeRunId} />
         <Composer
           running={Boolean(activeRunId) && !paused && !question}
           placeholder={question ? 'Answer the agent’s question…' : paused ? 'Paused. Send a message to resume with it…' : undefined}
@@ -370,6 +392,15 @@ function Conversation() {
         />
       </div>
     </div>
+    {showRunPanel && panelRunId && (
+      <aside aria-label="Run details" className="flex h-full w-80 shrink-0 flex-col border-l border-border">
+        <div className="flex h-12 shrink-0 items-center border-b border-border pl-5 pr-2 md:h-14">
+          <h2 className="flex-1 text-[14px] font-semibold">This run</h2>
+          <Button size="icon" variant="ghost" aria-label="Hide run details" onClick={toggleRunPanel}><X className="h-4 w-4" /></Button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto"><RunPanel runId={panelRunId} /></div>
+      </aside>
+    )}
     {browserOpen && wide && (
       <aside aria-label="The agent’s browser" className="h-full w-[46%] min-w-[420px] max-w-[900px] shrink-0 border-l border-border">
         <BrowserView conversationId={conversationId}

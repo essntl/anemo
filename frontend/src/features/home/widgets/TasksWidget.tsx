@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { SquareCheckBig } from 'lucide-react'
-import { useCurrentProject } from '@/app/projectStore'
+import { inScope, useScope } from '@/app/projectStore'
 import { Select } from '@/components/ui/Select'
 import { useCreateTask, useProjects, useTasks } from '@/features/tasks/api'
 import { addDays, localDay, today as todayKey } from '@/features/tasks/dates'
@@ -12,25 +12,27 @@ type Due = 'all' | 'today' | 'week' | 'none'
 
 /** Tasks: open tasks with a project and a due filter, "x done · y open", and quick-add. */
 export function TasksWidget({ item }: { item: WidgetLayout }) {
-  const current = useCurrentProject()
+  const scope = useScope()
   const projects = useProjects()
   const tasks = useTasks()
   const create = useCreateTask()
-  // The project chosen in the sidebar, unless another one is picked here.
+  // What the sidebar's switcher shows, unless a project (or everything) is picked here.
   const [projectPick, setProjectPick] = useState<string | null>(null)
-  const projectId = projectPick ?? current?.id ?? ''
+  const projectId = projectPick ?? (scope.kind === 'project' ? scope.project.id : '')
+  // The first choice: all projects, or in Uncategorized (until something is picked here) only what is in none.
+  const unfiled = scope.kind === 'uncategorized' && projectPick === null
   const [due, setDue] = useState<Due>('all')
   const today = todayKey()
 
   const { open, doneToday } = useMemo(() => {
-    const mine = (tasks.data ?? []).filter((t) => !projectId || t.project_id === projectId)
+    const mine = (tasks.data ?? []).filter((t) => (projectId ? t.project_id === projectId : !unfiled || inScope(scope, t.project_id)))
     const open = mine
       .filter((t) => t.status !== 'done' && t.status !== 'cancelled')
       .filter((t) => due === 'all' || (due === 'none' ? !t.due_date : !!t.due_date && t.due_date <= (due === 'today' ? today : addDays(today, 7))))
       .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || b.priority - a.priority)
     const doneToday = mine.filter((t) => t.status === 'done' && t.completed_at && localDay(t.completed_at) >= today).length
     return { open, doneToday }
-  }, [tasks.data, projectId, due, today])
+  }, [tasks.data, projectId, unfiled, scope, due, today])
 
   const rows = ROWS[item.h]
   return (
@@ -43,7 +45,7 @@ export function TasksWidget({ item }: { item: WidgetLayout }) {
       <div className="flex-1 px-2 pb-3">
         <div className="mb-1.5 flex flex-wrap gap-1.5 px-2">
           <Select variant="pill" aria-label="Project" value={projectId} onValueChange={(v) => setProjectPick(v)}
-            options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
+            options={[{ value: '', label: unfiled ? 'Uncategorized' : 'All projects' }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
           <Select variant="pill" aria-label="Due" value={due} onValueChange={(v) => setDue(v as Due)}
             options={[{ value: 'all', label: 'Any time' }, { value: 'today', label: 'Due today' }, { value: 'week', label: 'Due this week' }, { value: 'none', label: 'No date' }]} />
         </div>

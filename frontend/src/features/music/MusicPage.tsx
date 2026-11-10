@@ -4,7 +4,7 @@
  * and pauses here.
  */
 import { useState } from 'react'
-import { Music, Save, Trash2 } from 'lucide-react'
+import { Save, Trash2 } from 'lucide-react'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Card } from '@/components/ui/Card'
 import { promptDialog } from '@/components/ui/dialogs'
@@ -18,6 +18,9 @@ import { PlaylistsPanel } from './components/PlaylistsPanel'
 import { QueuePanel } from './components/QueuePanel'
 import { YouTubeCheck } from './components/YouTubeCheck'
 import { player, usePlayer, usePlayerStore } from './player/controller'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { Select } from '@/components/ui/Select'
+import { SLEEP_CHOICES, stopAfter, useSleepTimer } from './player/sleep'
 
 type Tab = 'queue' | 'playlists'
 
@@ -33,26 +36,24 @@ export function MusicPage() {
     const name = await promptDialog({ title: 'Save the queue as a playlist', label: 'Name', placeholder: 'e.g. Deep focus', confirmLabel: 'Save' })
     if (name?.trim()) create.mutate({ name: name.trim(), tracks: usePlayerStore.getState().queue }, { onSuccess: () => setTab('playlists') })
   }
+  const sleep = useSleepTimer((s) => s.minutes)
   const count = (n: number) => <span className="text-[11px] text-muted tabular-nums">{n}</span>
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Music className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">Music</h1>
-          <p className="truncate text-[13px] text-muted">Queue YouTube, SoundCloud or any stream, and play it from anywhere in Anemo.</p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Music">
+        {/* Stop after: the music pauses by itself (for falling asleep, or the end of a work block). */}
+        <Select variant="pill" aria-label="Stop after" value={sleep === null ? '' : String(sleep)}
+          onValueChange={(v) => stopAfter(v ? Number(v) : null)}
+          options={[{ value: '', label: 'Keep playing' }, ...SLEEP_CHOICES.map((m) => ({ value: String(m), label: `Stop after ${m} min` }))]} />
+      </PageHeader>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">Queue YouTube, SoundCloud or any stream, and play it from anywhere in Anemo.</p>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[400px_minmax(0,1fr)]">
+      {/* The player takes the left side in full height; the queue and the ambient sound are beside it. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+        <NowPlayingCard onYouTubeCheck={() => setCheck(true)} />
+
         <div className="flex min-w-0 flex-col gap-4">
-          <NowPlayingCard onYouTubeCheck={() => setCheck(true)} />
-          <AmbientCard />
-        </div>
-
         <Card className="min-w-0 p-3 md:p-4">
           <div className="mb-3 flex items-center justify-between gap-2 px-1">
             <Segmented<Tab> label="Music" kind="tabs" controls="music" value={tab} onChange={setTab}
@@ -71,6 +72,8 @@ export function MusicPage() {
             {tab === 'queue' ? <QueuePanel /> : <PlaylistsPanel />}
           </div>
         </Card>
+        <AmbientCard />
+        </div>
       </div>
 
       <Lingering value={check}>

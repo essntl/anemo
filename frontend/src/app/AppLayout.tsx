@@ -14,9 +14,11 @@ import { ShareDialog } from '@/features/shares/ShareDialog'
 import { ShortcutSheet } from '@/features/shortcuts/ShortcutSheet'
 import { useHasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
 import { useShortcut } from '@/hooks/useShortcut'
-import { MobileTopBar } from './mobileNav'
+import { TopBar } from './mobileNav'
+import { MobileTabBar } from './MobileTabBar'
 import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
+import { ScopeControl } from './ScopeControl'
 import { Sidebar, SidebarRail } from './Sidebar'
 import { useSidebar } from './sidebarStore'
 import { useSidebarSwipe } from './useSidebarSwipe'
@@ -51,6 +53,9 @@ function SidebarDrawer() {
   )
 }
 
+/** The pages that show only what the switcher allows. */
+const SCOPED = ['/', '/home', '/tasks', '/calendar', '/documents', '/files', '/stats']
+
 export function AppLayout() {
   useAppearanceSync()
   useAppEvents()
@@ -74,18 +79,29 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full">
-      {collapsed ? <SidebarRail className="hidden md:flex" /> : <Sidebar className="hidden w-64 md:flex" />}
+      {/* Desktop: the sidebar is a white panel on the ground, like the cards of a page. */}
+      <div className="hidden shrink-0 p-3 pr-0 md:flex">
+        {collapsed
+          ? <SidebarRail className="flex rounded-panel shadow-soft" />
+          : <Sidebar className="flex w-[17rem] rounded-panel shadow-soft" />}
+      </div>
       <SidebarDrawer />
       {/* The page column. The Dynamic Island floats at the top centre of it (not of the
           window), over the page header; see features/island/Island.tsx. */}
       <div id="main-column" className="relative flex min-w-0 flex-1 flex-col">
-        {!ownHeader && <MobileTopBar />}
+        {!ownHeader && <TopBar />}
+        {/* Phones: what is shown (Uncategorized, a project, All) sits under the title on the pages it changes. */}
+        {!ownHeader && SCOPED.some((p) => (p === '/' ? location.pathname === '/' : location.pathname === p || location.pathname.startsWith(`${p}/`))) && (
+          <div className="shrink-0 px-3 pb-2 md:hidden"><ScopeControl /></div>
+        )}
         <Island />
         {/* relative: anything absolutely placed inside a page is held (and clipped) here,
             so it can never make the whole window scroll. */}
         <main className="page relative min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
+        {/* Phones: the tabs along the bottom (a conversation keeps that edge for its message box). */}
+        {!ownHeader && <MobileTabBar />}
       </div>
       <PersistentLayer />
       <ReauthDialog />

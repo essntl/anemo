@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Bot, ChartColumn, Clock, FolderKanban, Grid3x3, SquareCheckBig, Target } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject } from '@/app/projectStore'
+import { useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -21,17 +21,19 @@ import { BarChart } from './BarChart'
 import { Heatmap } from './Heatmap'
 import { HBars, Section, SplitBar, StatTile } from './parts'
 import { type RangeKind, rangeFor, toBars } from './ranges'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const count = (v: number) => String(Math.round(v))
 const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
 
 export function StatsPage() {
   const today = dayOf(new Date(useToday()))
-  const project = useCurrentProject()
+  const scope = useScope()
+  const project = scope.kind === 'project' ? scope.project : null
   const [kind, setKind] = useState<RangeKind>('week')
   const [custom, setCustom] = useState(() => rangeFor('month', today))
   const range = kind === 'custom' ? custom : rangeFor(kind, today)
-  const stats = useStats(range.from, range.to, project?.id)
+  const stats = useStats(range.from, range.to, project?.id, scope.kind === 'uncategorized')
   const s = stats.data
 
   const focusBars = useMemo(() => (s ? toBars(s.focus.by_day, today) : []), [s, today])
@@ -39,19 +41,16 @@ export function StatsPage() {
   const runBars = useMemo(() => (s ? toBars(s.agents.runs_by_day, today) : []), [s, today])
   const hours = useMemo(() => (s ? s.focus.by_hour.map((v, h) => ({ key: String(h), label: `${String(h).padStart(2, '0')}:00`, short: h % 3 === 0 ? String(h) : '', value: v })) : []), [s])
 
+  const rangeSwitch = (
+    <Segmented<RangeKind> label="Range" value={kind} onChange={setKind} size="sm"
+      options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'half', label: '6 months' }, { value: 'custom', label: 'Custom' }]} />
+  )
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <ChartColumn className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">Stats</h1>
-          <p className="truncate text-[13px] text-muted">Your focus, tasks and projects over time{project ? ` in ${project.name}` : ''}.</p>
-        </div>
-        <Segmented<RangeKind> label="Range" value={kind} onChange={setKind} size="sm"
-          options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'half', label: '6 months' }, { value: 'custom', label: 'Custom' }]} />
-      </div>
+    <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
+      {/* The range sits in the top bar; a phone's bar has no room for it, so there it is the first row of the page. */}
+      <PageHeader title="Stats"><div className="max-md:hidden">{rangeSwitch}</div></PageHeader>
+      <div className="mb-3 md:hidden">{rangeSwitch}</div>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">Your focus, tasks and projects over time{project ? ` in ${project.name}` : scope.kind === 'uncategorized' ? ', for what is in no project' : ''}.</p>
       {kind === 'custom' && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-[13px]">
           <label className="flex items-center gap-2">From

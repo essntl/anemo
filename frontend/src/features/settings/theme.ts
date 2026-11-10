@@ -20,12 +20,12 @@ export interface Appearance {
 
 export const DEFAULT_APPEARANCE: Appearance = {
   mode: 'system',
-  accent: '#3478f6',
+  accent: '#2a6df4',
   density: 'comfortable',
 }
 
 export const ACCENT_PRESETS = [
-  '#3478f6', // blue
+  '#2a6df4', // blue
   '#6b5cf6', // violet
   '#e0457b', // pink
   '#f06a2c', // orange

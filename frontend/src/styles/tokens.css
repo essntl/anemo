@@ -9,23 +9,24 @@
 :root {
   color-scheme: light;
 
-  --accent: #3478f6;
+  --accent: #2a6df4;
   --accent-hover: color-mix(in oklch, var(--accent), black 12%);
   --accent-soft: color-mix(in oklch, var(--accent) 12%, transparent);
   --accent-contrast: #ffffff;
   --selection: color-mix(in oklch, var(--accent) 22%, transparent);
 
-  --bg: #f4f5f8;
+  --bg: #eceef2;
   --surface: #ffffff;
-  --surface-2: #eef0f4;
-  --surface-hover: #e7e9ee;
+  --surface-2: #e9ebf0;
+  --surface-hover: #dfe2e8;
   --card: #ffffff;
   --overlay: rgb(255 255 255 / 0.78);
   --text: #15171c;
-  --text-muted: #6a7080;
-  --text-subtle: #9aa0ad;
-  --border: rgb(15 20 30 / 0.08);
-  --border-strong: rgb(15 20 30 / 0.16);
+  /* Secondary text stays readable on cards and on the grey ground (7:1 and up). */
+  --text-muted: #3d434e;
+  --text-subtle: #555c69;
+  --border: rgb(15 20 30 / 0.1);
+  --border-strong: rgb(15 20 30 / 0.2);
 
   --success: #1f9d55;
   --warning: #d97706;
@@ -43,7 +44,7 @@
   --phase-short: var(--success);
   --phase-long: var(--info);
   /* The unfilled part of a progress ring. */
-  --ring-track: #e8eaef;
+  --ring-track: #e4e7ed;
 
   /* Dynamic Island: a near-black pill in both themes. */
   --island-bg: #0b0c0f;
@@ -70,8 +71,8 @@
   --artwork-scrim: rgb(0 0 0 / 0.45);
   --on-artwork: #ffffff;
 
-  --shadow-soft: 0 1px 2px rgb(15 20 30 / 0.04), 0 4px 16px rgb(15 20 30 / 0.05);
-  --shadow-float: 0 2px 6px rgb(15 20 30 / 0.06), 0 16px 40px rgb(15 20 30 / 0.12);
+  --shadow-soft: 0 1px 2px rgb(18 28 56 / 0.07), 0 4px 14px rgb(18 28 56 / 0.06);
+  --shadow-float: 0 2px 6px rgb(18 28 56 / 0.08), 0 14px 36px rgb(18 28 56 / 0.12);
 
   /* Density: spacing multiplier used by a few layout primitives */
   --density: 1;
@@ -91,10 +92,10 @@
   --card: #181b22;
   --overlay: rgb(21 24 30 / 0.8);
   --text: #eceef2;
-  --text-muted: #9aa1ae;
-  --text-subtle: #6b7280;
-  --border: rgb(255 255 255 / 0.07);
-  --border-strong: rgb(255 255 255 / 0.14);
+  --text-muted: #bcc2cd;
+  --text-subtle: #a0a7b4;
+  --border: rgb(255 255 255 / 0.09);
+  --border-strong: rgb(255 255 255 / 0.16);
 
   --success: #3ccf7a;
   --warning: #f2a93b;

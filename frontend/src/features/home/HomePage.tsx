@@ -4,6 +4,7 @@
  * (or E) lets you move, resize, hide and add widgets. Every widget follows the
  * project switcher.
  */
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useNow } from '@/hooks/useNow'
 import { Check, LayoutGrid, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -71,14 +72,8 @@ export function HomePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8 md:pt-14">
-      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h1 className="text-[26px] font-semibold leading-tight tracking-tight md:text-[28px]">
-            {greeting(now.getHours())}<span className="text-accent">.</span>
-          </h1>
-          <p className="text-[14px] text-muted">{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-        </div>
+    <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Home" detail={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}>
         {editing ? (
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => update(() => resetLayout())}>Reset layout</Button>
@@ -89,7 +84,10 @@ export function HomePage() {
             <LayoutGrid className="h-4 w-4" />
           </Button>
         )}
-      </div>
+      </PageHeader>
+      <h2 className="mb-4 text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
+        {greeting(now.getHours())}<span className="text-accent">.</span>
+      </h2>
 
       {editing && (
         <p className="mb-3 text-[13px] text-muted">

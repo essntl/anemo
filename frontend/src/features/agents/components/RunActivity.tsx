@@ -24,18 +24,19 @@ import {
   ShieldAlert,
   Wrench,
   XCircle,
+  Globe,
 } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
-import { Input } from '@/components/ui/Input'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { FileIcon } from '@/components/ui/FileIcon'
-import { toolOutputUrl, useEditPlan } from '@/features/runs/api'
+import { toolOutputUrl, useEditPlan, useRun } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
-import { formatSize } from '@/lib/format'
-import { type FileChangeView, type Timeline, type ToolCallView, useDecide, useRevertChange, useTimeline } from '../api'
+import { formatCost, formatCount, formatDuration, formatSize } from '@/lib/format'
+import { type FileChangeView, type Timeline, type ToolCallView, useRevertChange, useTimeline } from '../api'
 import { type EditableStep, planIsValid, toEditable } from '../plan'
+import { ApprovalCard } from './ApprovalCard'
 import { PlanEditor } from './PlanEditor'
 import { PlanReviewCard } from './PlanReviewCard'
 import { questionOf } from '../question'
@@ -62,63 +63,6 @@ function describe(call: ToolCallView): string {
   if (call.tool_name === 'update_plan' && call.approval?.kind === 'plan') return 'Propose a plan'
   const summary = call.actions.map((a) => (a as { summary?: string }).summary).find(Boolean)
   return summary && summary !== call.tool_name ? summary : call.tool_name.replaceAll('_', ' ')
-}
-
-function ApprovalCard({ runId, call }: { runId: string; call: ToolCallView }) {
-  const decide = useDecide(runId)
-  const [denying, setDenying] = useState(false)
-  const [reason, setReason] = useState('')
-  const approvalId = call.approval!.id
-  return (
-    <div className="mt-2 rounded-xl border border-warning/40 bg-warning/8 p-3">
-      <div className="flex items-start gap-2 text-[13px]">
-        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-        <div>
-          <div className="font-medium">The agent wants to: {call.approval!.summary}</div>
-          <div className="text-[12px] text-muted">
-            {call.decision_reason} · capability <code className="font-mono">{call.capability}</code>
-            {call.risk && call.risk !== 'safe' ? ` · ${call.risk} risk` : ''}
-          </div>
-        </div>
-      </div>
-      {denying ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Input
-            autoFocus
-            placeholder="Optional: tell the agent why"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className="h-8 text-[13px]"
-          />
-          <Button size="sm" variant="danger" loading={decide.isPending}
-            onClick={() => decide.mutate({ approvalId, decision: 'deny', reason: reason || undefined })}>
-            Deny
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDenying(false)}>Back</Button>
-        </div>
-      ) : (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button size="sm" variant="primary" loading={decide.isPending}
-            onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'once' })}>
-            Allow once
-          </Button>
-          {/* Actions that are asked about every time (a click in your own Chrome) can't
-              be allowed for the whole run. */}
-          {!call.actions.some((a) => a.always_ask) && (
-            <Button size="sm" variant="secondary" disabled={decide.isPending}
-              onClick={() => decide.mutate({ approvalId, decision: 'approve', scope: 'run' })}
-              title="Allow the same kind of action in the same folder for the rest of this run">
-              Allow for this run
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => setDenying(true)}>
-            Deny
-          </Button>
-        </div>
-      )}
-      {decide.isError && <p className="mt-2 text-[12px] text-error">{errorMessage(decide.error)}</p>}
-    </div>
-  )
 }
 
 /** The image a tool showed the model (e.g. read_file on a PNG), if any. */
@@ -165,7 +109,7 @@ function WebDetails({ data }: { data: WebData }) {
   )
 }
 
-function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
+function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; docked?: boolean }) {
   const shell = call.tool_name === 'run_shell'
   // null = not toggled by the user: shell commands open by themselves while running.
   const [toggled, setOpen] = useState<boolean | null>(null)
@@ -238,7 +182,10 @@ function ToolRow({ runId, call }: { runId: string; call: ToolCallView }) {
       {needsApproval &&
         (call.approval?.kind === 'plan' ? <PlanReviewCard runId={runId} call={call} />
           : call.approval?.kind === 'question' ? <QuestionCard runId={runId} call={call} />
-            : <ApprovalCard runId={runId} call={call} />)}
+            : docked
+              // The chat keeps the request above its message box (ApprovalDock).
+              ? <p className="ml-7 mt-1 text-[12px] font-medium text-tool-waiting">Waiting for you: see above the message box.</p>
+              : <ApprovalCard runId={runId} call={call} />)}
     </div>
   )
 }
@@ -350,9 +297,11 @@ interface RunActivityProps {
   live: boolean
   /** Refresh every 2 s (for a sub-agent, which no chat message follows live). */
   poll?: boolean
+  /** The page shows a pending approval itself (ApprovalDock): don't repeat its buttons here. */
+  docked?: boolean
 }
 
-export function RunActivity({ runId, live, poll }: RunActivityProps) {
+export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
   const timeline = useTimeline(runId, poll)
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const data = timeline.data
@@ -385,7 +334,7 @@ export function RunActivity({ runId, live, poll }: RunActivityProps) {
       {isOpen && hasDetails && (
         <div className="border-t border-border px-2 py-2">
           <PlanSection runId={runId} data={data} />
-          {calls.map((c) => <ToolRow key={c.id} runId={runId} call={c} />)}
+          {calls.map((c) => <ToolRow key={c.id} runId={runId} call={c} docked={docked} />)}
           {data.file_changes.length > 0 && (
             <div className="mt-2 border-t border-border pt-2">
               <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-subtle">
@@ -396,6 +345,67 @@ export function RunActivity({ runId, live, poll }: RunActivityProps) {
               ))}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * A chat's latest agent run at a glance, beside the messages: its plan, how its steps
+ * went and the files it changed. The same data as the run's box in the chat.
+ */
+export function RunPanel({ runId }: { runId: string }) {
+  const { data } = useTimeline(runId)
+  const run = useRun(runId, { pollWhileActive: true }).data
+  if (!data) return <p className="p-4 text-[13px] text-muted">Loading…</p>
+  const calls = data.tool_calls
+  const failed = calls.filter((c) => c.status === 'failed' || c.status === 'denied').length
+  const waiting = calls.filter((c) => c.status === 'waiting_approval').length
+  const label = 'px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle'
+  // The web pages the run opened, each once, in the order it read them.
+  const pages = [...new Set(calls.map((c) => c.args.url).filter((u): u is string => typeof u === 'string' && /^https?:\/\//.test(u)))].slice(0, 12)
+  const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
+  return (
+    <div className="flex flex-col gap-4 p-3">
+      <div>
+        <div className={label}>Status</div>
+        <p className="px-2 text-[13px]">{headline(data, ['queued', 'running', 'waiting_subagent'].includes(data.status))}</p>
+        <p className="px-2 text-[12px] text-muted">
+          {calls.length} step{calls.length === 1 ? '' : 's'}
+          {waiting > 0 && ` · ${waiting} waiting for you`}
+          {failed > 0 && ` · ${failed} failed or denied`}
+        </p>
+      </div>
+      <PlanSection runId={runId} data={data} />
+      {data.file_changes.length > 0 && (
+        <div>
+          <div className={label}>Files changed</div>
+          {[...data.file_changes].reverse().map((c) => <FileChangeRow key={c.id} runId={runId} change={c} />)}
+        </div>
+      )}
+      {pages.length > 0 && (
+        <div>
+          <div className={label}>Pages read</div>
+          {pages.map((url) => (
+            <a key={url} href={url} target="_blank" rel="noreferrer noopener" title={url}
+              className="flex h-8 items-center gap-2 rounded-control px-2 text-[13px] hover:bg-surface-hover">
+              <Globe className="h-3.5 w-3.5 shrink-0 text-muted" />
+              <span className="min-w-0 truncate">{host(url)}</span>
+            </a>
+          ))}
+        </div>
+      )}
+      {run && (
+        <div>
+          <div className={label}>Used</div>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-2 text-[13px]">
+            <dt className="text-muted">Model</dt><dd className="truncate text-right">{run.model_label ?? '–'}</dd>
+            <dt className="text-muted">Working time</dt><dd className="text-right tabular-nums">{formatDuration(run.totals.active_s)}</dd>
+            <dt className="text-muted">Tokens</dt><dd className="text-right tabular-nums">{formatCount(run.totals.input_tokens)} in · {formatCount(run.totals.output_tokens)} out</dd>
+            <dt className="text-muted">Cost</dt><dd className="text-right tabular-nums">{formatCost(run.totals.cost_usd)}</dd>
+            <dt className="text-muted">Context</dt><dd className="text-right">{run.totals.compactions ? `Summarized ${run.totals.compactions}×` : 'Full history'}</dd>
+          </dl>
         </div>
       )}
     </div>

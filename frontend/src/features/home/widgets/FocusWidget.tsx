@@ -1,7 +1,7 @@
 import { Pause, Play, RotateCcw, StepForward, Timer } from 'lucide-react'
 import { RollingText } from '@/components/ui/RollingText'
 import { Ring } from '@/components/ui/Ring'
-import { useCurrentProject } from '@/app/projectStore'
+import { useScope } from '@/app/projectStore'
 import { formatMinutes, useTodayFocus } from '@/features/focus/api'
 import { TaskPicker } from '@/features/focus/components/TaskPicker'
 import { TimerDial } from '@/features/focus/components/TimerDial'
@@ -15,8 +15,9 @@ const small = 'flex h-9 w-9 items-center justify-center rounded-full bg-surface-
 /** Focus: the dial with its controls (a single row when the widget is one row tall). */
 export function FocusWidget({ item }: { item: WidgetLayout }) {
   const t = useTimer()
-  const project = useCurrentProject()
-  const today = useTodayFocus(project?.id)
+  const scope = useScope()
+  const project = scope.kind === 'project' ? scope.project : null
+  const today = useTodayFocus(project?.id, scope.kind === 'uncategorized')
   const minutes = (
     <p className="text-[13px] text-muted">
       <span className="font-semibold text-text tabular-nums">{formatMinutes(today.minutes)}</span> focused today{project ? ` in ${project.name}` : ''}

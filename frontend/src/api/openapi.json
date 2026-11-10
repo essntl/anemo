@@ -14756,7 +14756,7 @@
           "stats"
         ],
         "summary": "Get Stats",
-        "description": "Focus, tasks, projects and agent activity from `from` to `to` (local days,\nboth included), grouped by day in the time zone of Settings \u2192 General.",
+        "description": "Focus, tasks, projects and agent activity from `from` to `to` (local days,\nboth included), grouped by day in the time zone of Settings \u2192 General. Of one\nproject (`project_id`), of what is in no project (`no_project`), or of everything.",
         "operationId": "get_stats_api_stats_get",
         "parameters": [
           {
@@ -14795,6 +14795,18 @@
               ],
               "title": "Project Id"
             }
+          },
+          {
+            "name": "no_project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only what is in no project",
+              "default": false,
+              "title": "No Project"
+            },
+            "description": "Only what is in no project"
           },
           {
             "name": "aiw_session",
@@ -15198,7 +15210,7 @@
             "type": "string",
             "pattern": "^#[0-9a-fA-F]{6}$",
             "title": "Accent",
-            "default": "#3478f6"
+            "default": "#2a6df4"
           },
           "density": {
             "type": "string",
@@ -18480,6 +18492,11 @@
             "minimum": 0.0,
             "title": "Daily Goal Minutes",
             "default": 120
+          },
+          "quiet_while_focusing": {
+            "type": "boolean",
+            "title": "Quiet While Focusing",
+            "default": false
           }
         },
         "type": "object",
@@ -20558,6 +20575,11 @@
             "type": "boolean",
             "title": "Track Alerts",
             "default": true
+          },
+          "play_while_focusing": {
+            "type": "boolean",
+            "title": "Play While Focusing",
+            "default": false
           }
         },
         "type": "object",

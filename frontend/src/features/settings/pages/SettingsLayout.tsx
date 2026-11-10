@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, useMatch } from 'react-router'
 import { ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react'
@@ -37,9 +38,9 @@ export function SettingsIndex() {
 export function SettingsLayout() {
   const isIndex = useMatch('/settings') !== null
   return (
-    <div className="mx-auto flex max-w-5xl gap-8 p-4 md:p-8 md:pt-14">
+    <div className="mx-auto flex max-w-5xl gap-8 p-4 md:px-8 md:pb-8 md:pt-2">
       <div className={cn('w-full shrink-0 md:block md:w-52', !isIndex && 'hidden')}>
-        <h1 className="mb-4 px-3 text-xl font-semibold">Settings</h1>
+        <PageHeader title="Settings" />
         <nav className="flex flex-col gap-0.5">
           {SETTINGS_SECTIONS.map((s) => (
             <SectionLink key={s.to} to={s.to} sensitive={s.sensitive}>

@@ -13,6 +13,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { NeedsYouSection } from './NeedsYouSection'
 import {
   type Notification,
   type NotificationKind,
@@ -113,20 +115,16 @@ export function NotificationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-8 md:pt-14">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Bell className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold">Notifications</h1>
-          <p className="text-[13px] text-muted">
-            Reminders, automation results and messages from agents.{' '}
-            <Link to="/settings/notifications" className="text-accent underline">Settings</Link>
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
+      <PageHeader title="Inbox" />
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">
+        What waits for you, then reminders, automation results and messages from agents.{' '}
+        <Link to="/settings/notifications" className="text-accent underline">Settings</Link>
+        </p>
 
+      <NeedsYouSection />
+
+      <h2 className="mb-2 text-[13.5px] font-semibold">Notifications</h2>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="tablist" aria-label="Which notifications">
           {[{ id: false, label: 'All' }, { id: true, label: unread ? `Unread (${unread})` : 'Unread' }].map((t) => (

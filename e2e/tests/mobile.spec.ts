@@ -70,8 +70,8 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   const box = (await drawer.locator('aside').boundingBox())!
   const list = (await drawer.getByLabel('Chats', { exact: true }).boundingBox())!
   expect(list.height / box.height).toBeGreaterThan(0.55)
-  await expect(drawer.getByRole('link', { name: 'Notifications' })).toBeVisible()
-  await expect(drawer.getByRole('combobox', { name: 'Project' })).toBeVisible()
+  await expect(drawer.getByRole('link', { name: 'Inbox' })).toBeVisible()
+  await expect(drawer.getByRole('button', { name: 'Project', exact: true })).toBeVisible()
   // The pages are under the chats, folded into a bar that opens as a card.
   await drawer.getByRole('button', { name: /^Pages/ }).click()
   await page.getByRole('dialog', { name: 'Pages' }).getByRole('link', { name: 'Files', exact: true }).click()

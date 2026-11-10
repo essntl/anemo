@@ -1,17 +1,104 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { Sparkles, Timer } from 'lucide-react'
+import { Loader2, MessageSquare, Timer } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
-import { useCurrentProject } from '@/app/projectStore'
+import { inScope, useScope } from '@/app/projectStore'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
+import { useSlashSkills } from '@/features/profiles/api'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useSetupStatus } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
+import { ShortcutKeys } from '@/features/shortcuts/ShortcutKeys'
+import { SkillIcon } from '@/features/skills/icons'
+import { useTasks } from '@/features/tasks/api'
+import { bucketOf, formatDue } from '@/features/tasks/dates'
 import { cn } from '@/lib/cn'
-import { conversationKey, conversationsKey, createConversation, messagesKey } from '../api'
-import { Composer } from '../components/Composer'
+import { formatWhen } from '@/lib/format'
+import { conversationKey, conversationsKey, createConversation, messagesKey, useConversations } from '../api'
+import { Composer, type ComposerHandle } from '../components/Composer'
 import { ModelPicker } from '../components/ModelPicker'
+
+const PANEL = 'rounded-card bg-card p-2 shadow-soft'
+const PANEL_TITLE = 'flex h-8 items-center px-2 text-[12px] font-semibold'
+const ROW = 'flex min-h-10 items-center gap-2.5 rounded-control px-2 text-[13.5px] hover:bg-surface-hover pointer-coarse:min-h-12'
+
+/**
+ * Under the message box: the chats last talked in, the skills to start a message with,
+ * and the tasks that are due, all for what the sidebar's switcher shows. Each part is
+ * left out while it has nothing in it.
+ */
+function Starters({ onSkill }: { onSkill: (skill: ReturnType<typeof useSlashSkills>[number]) => void }) {
+  const scope = useScope()
+  const chats = useConversations('', scope.kind === 'project' ? { projectId: scope.project.id, limit: 4 } : { noProject: scope.kind === 'uncategorized', limit: 4 })
+  const skills = useSlashSkills().slice(0, 6)
+  const tasks = useTasks()
+  const recent = (chats.data ?? []).slice(0, 4)
+  const due = (tasks.data ?? [])
+    .filter((t) => t.status !== 'done' && t.status !== 'cancelled' && inScope(scope, t.project_id))
+    .filter((t) => ['overdue', 'today'].includes(bucketOf(t)))
+    .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''))
+    .slice(0, 3)
+  if (!recent.length && !skills.length && !due.length) return null
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {recent.length > 0 && (
+        <section className={PANEL} aria-label="Recent chats">
+          <div className={PANEL_TITLE}>
+            <span className="flex-1">Pick up where you left off</span>
+            <Link to="/chats" className="font-medium text-accent hover:underline">All chats</Link>
+          </div>
+          {recent.map((c) => (
+            <Link key={c.id} to={`/c/${c.id}`} className={ROW}>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-muted">
+                {c.active_run_id ? <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" /> : <MessageSquare className="h-3.5 w-3.5" />}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">{c.title}</span>
+              <span className="shrink-0 text-[12px] text-subtle">{c.active_run_id ? 'Working' : formatWhen(c.last_message_at)}</span>
+            </Link>
+          ))}
+        </section>
+      )}
+      <div className="flex flex-col gap-3">
+        {skills.length > 0 && (
+          <section className={PANEL} aria-label="Skills">
+            <div className={PANEL_TITLE}>
+              <span className="flex-1">Start with a skill</span>
+              <Link to="/settings/skills" className="font-medium text-accent hover:underline">Manage</Link>
+            </div>
+            <div className="flex flex-wrap gap-1.5 px-2 pb-2 pt-0.5">
+              {skills.map((s) => (
+                <button key={s.id} type="button" title={s.hint || s.description} onClick={() => onSkill(s)}
+                  className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-2 px-2.5 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:text-muted">
+                  <SkillIcon name={s.icon} /> {s.name}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        {due.length > 0 && (
+          <section className={PANEL} aria-label="Tasks due">
+            <div className={PANEL_TITLE}>
+              <span className="flex-1">Due</span>
+              <Link to="/tasks" className="font-medium text-accent hover:underline">Tasks</Link>
+            </div>
+            {due.map((t) => {
+              const overdue = bucketOf(t) === 'overdue'
+              return (
+                <Link key={t.id} to={`/tasks?task=${t.id}`} className={ROW}>
+                  <span aria-hidden className={cn('h-4 w-4 shrink-0 rounded-full border-2', overdue ? 'border-error' : 'border-border-strong')} />
+                  <span className="min-w-0 flex-1 truncate">{t.title}</span>
+                  <span className={cn('shrink-0 text-[12px]', overdue ? 'font-medium text-error' : 'text-subtle')}>{overdue ? 'Overdue' : formatDue(t)}</span>
+                </Link>
+              )
+            })}
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export function NewChatPage() {
   const navigate = useNavigate()
@@ -26,13 +113,15 @@ export function NewChatPage() {
   const aboutDoc = params.get('doc')
   const mode: Mode = modeOverride ?? (aboutDoc ? 'agent' : (settings.data?.general.default_chat_mode ?? 'chat'))
   // A chat started while a project is chosen belongs to it, and starts with its defaults.
-  const project = useCurrentProject()
+  const scope = useScope()
+  const project = scope.kind === 'project' ? scope.project : null
   const [profileOverride, setProfileId] = useState<string | null | undefined>(undefined)
   const profileId = profileOverride !== undefined ? profileOverride : (project?.default_profile_id ?? null)
   // A temporary chat is deleted five minutes after its last message (?temporary=1 starts one).
   const [temporary, setTemporary] = useState(params.get('temporary') === '1')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const composer = useRef<ComposerHandle>(null)
 
   const start = async (text: string, attachmentIds: string[], referenceIds: string[], skillId: string | null) => {
     setBusy(true)
@@ -62,54 +151,63 @@ export function NewChatPage() {
   const needsSetup = setup.data && !setup.data.has_chat_default
 
   return (
-    // Phones: greeting centered, composer at the bottom within thumb reach.
-    // From `md` up: both centered together.
-    <div className="flex h-full flex-col px-2 pb-2 md:items-center md:justify-center md:px-6 md:pb-0">
-      <div className="flex w-full max-w-3xl flex-1 flex-col md:flex-none">
-        <div className="flex flex-1 flex-col items-center justify-center px-4 text-center md:mb-8 md:flex-none">
-          <div className={cn('mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-accent',
-            temporary ? 'border-2 border-dashed border-accent/60' : 'bg-accent-soft')}>
-            {temporary ? <Timer className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-          </div>
-          <h1 className="text-xl font-semibold md:text-2xl">{temporary ? 'Temporary chat' : 'How can I help today?'}</h1>
+    // Phones: the heading and the starters scroll, the message box stays at the bottom
+    // within thumb reach. From `md` up: the box sits under the heading, the starters under it.
+    <div className="flex h-full flex-col px-2 pb-2 md:items-center md:overflow-y-auto md:px-6 md:pb-8">
+      <PageHeader title="New chat" />
+      <div className="flex min-h-0 w-full max-w-3xl flex-1 flex-col md:flex-none md:pt-[9vh]">
+        <div className="px-2 pt-3 md:mb-4 md:px-1 md:pt-0">
+          <h2 className="text-[24px] font-bold leading-tight tracking-tight md:text-[30px]">{temporary ? 'Temporary chat' : 'What do you need done?'}</h2>
           {temporary && (
-            <p className="mt-2 max-w-sm text-[13px] text-muted">
+            <p className="mt-1.5 max-w-md text-[13.5px] text-muted">
               Deleted 5 minutes after the last message, unless you keep it. Nothing is remembered from it.
             </p>
           )}
-          <button type="button" aria-pressed={temporary} onClick={() => setTemporary(!temporary)}
-            className={cn('mt-3 flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors pointer-coarse:h-10',
-              temporary ? 'border-accent bg-accent-soft text-accent' : 'border-border text-muted hover:border-border-strong hover:text-text')}>
-            <Timer className="h-3.5 w-3.5" /> Temporary chat
-          </button>
           {project && (
-            <p className="mt-2 flex items-center gap-1.5 text-[13px] text-muted">
+            <p className="mt-1.5 flex items-center gap-1.5 text-[13.5px] text-muted">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
               New chat in <span className="font-medium text-text">{project.name}</span>
             </p>
           )}
           {needsSetup && (
-            <p className="mt-2 text-[13px] text-muted">
+            <p className="mt-1.5 text-[13.5px] text-muted">
               First, <Link to="/settings/providers" className="text-accent underline">connect a provider and pick a default model</Link>.
             </p>
           )}
         </div>
-        {error && <p className="mb-2 text-center text-[13px] text-error">{error}</p>}
-        <Composer
-          running={false}
-          disabled={busy || Boolean(needsSetup)}
-          initialText={aboutDoc ? `About my document “${params.get('title') ?? aboutDoc}” (${aboutDoc}): ` : undefined}
-          onSend={start}
-          // Skills that need tools (e.g. web search for /fact-check) switch to Agent mode.
-          onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
-          toolbar={
-            <>
-              <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
-              {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileId} />}
-              <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} />
-            </>
-          }
-        />
+        <div className="order-2 shrink-0 md:order-1">
+          {error && <p className="mb-2 text-center text-[13px] text-error">{error}</p>}
+          <Composer
+            handle={composer}
+            running={false}
+            disabled={busy || Boolean(needsSetup)}
+            initialText={aboutDoc ? `About my document “${params.get('title') ?? aboutDoc}” (${aboutDoc}): ` : undefined}
+            onSend={start}
+            // Skills that need tools (e.g. web search for /fact-check) switch to Agent mode.
+            onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
+            toolbar={
+              <>
+                <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
+                {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileId} />}
+                <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} />
+                <button type="button" aria-pressed={temporary} aria-label="Temporary chat" onClick={() => setTemporary(!temporary)}
+                  title="Temporary chat: deleted 5 minutes after the last message"
+                  className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors pointer-coarse:h-10 pointer-coarse:w-10',
+                    temporary ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+                  <Timer className="h-4 w-4" />
+                </button>
+              </>
+            }
+          />
+          <p className="mt-2 hidden items-center justify-center gap-4 text-[12px] text-subtle md:flex pointer-coarse:hidden">
+            <span className="flex items-center gap-1.5"><ShortcutKeys id="chat.send" /> send</span>
+            <span className="flex items-center gap-1.5"><ShortcutKeys id="chat.newline" /> new line</span>
+            <span className="flex items-center gap-1.5"><ShortcutKeys id="chat.skill" /> skills</span>
+          </p>
+        </div>
+        <div className="order-1 min-h-0 flex-1 overflow-y-auto px-1 py-3 md:order-2 md:mt-5 md:flex-none md:overflow-visible md:px-0 md:py-0">
+          <Starters onSkill={(skill) => composer.current?.useSkill(skill)} />
+        </div>
       </div>
     </div>
   )

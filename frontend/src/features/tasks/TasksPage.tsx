@@ -11,19 +11,22 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { CheckSquare, ChevronRight, KanbanSquare, List, Plus, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject, useProjectStore } from '@/app/projectStore'
+import { inScope, useProjectStore, useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
-import { type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
+import { PRIORITY_LABELS, type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
 import { TaskBoard } from './components/TaskBoard'
 import { TaskDialog } from './components/TaskDialog'
 import { ItemTrashDialog } from '@/features/trash/ItemTrashDialog'
 import { type TaskInfo, TaskRow } from './components/TaskRow'
-import { type Bucket, BUCKET_LABELS, bucketOf } from './dates'
+import { type Bucket, BUCKET_LABELS, bucketOf, formatDay } from './dates'
+import { parseQuickAdd } from './quickAdd'
 import { byId } from './relations'
 import { Lingering } from '@/components/ui/Lingering'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const BUCKETS: Bucket[] = ['overdue', 'today', 'upcoming', 'later', 'none']
 
@@ -35,14 +38,21 @@ function byUrgency(a: Task, b: Task): number {
     || a.sort_order - b.sort_order
 }
 
+/** From this width a task opens in a panel beside the list. */
+const VERY_WIDE = '(min-width: 1440px)'
+
+const QUICK_CHIP = "shrink-0 rounded-md bg-accent-soft px-2 py-0.5 text-[12px] font-medium text-accent"
+
 /** The task editor: an existing task, or a new one starting in a status. */
 type Editing = { task: Task | null; status?: TaskStatus } | null
 
 export function TasksPage() {
   const [params, setParams] = useSearchParams()
   const view = params.get('view') === 'board' ? 'board' : 'list'
-  const projectFilter = useCurrentProject()?.id ?? ''
-  const setProjectId = useProjectStore((s) => s.setProjectId)
+  // What the sidebar's switcher shows: the tasks of no project, of one project, or all.
+  const scope = useScope()
+  const projectFilter = scope.kind === 'project' ? scope.project.id : ''
+  const setView = useProjectStore((s) => s.setView)
   const tagFilter = params.get('tag') ?? ''
   const tasks = useTasks()
   const projects = useProjects()
@@ -87,7 +97,7 @@ export function TasksPage() {
   }
   useEffect(() => {
     if (!linked) return
-    if (projectFilter && linked.project_id !== projectFilter) setProjectId(null)
+    if (!inScope(scope, linked.project_id)) setView('all')
     const hiddenByTag = tagFilter !== '' && !linked.tags.includes(tagFilter)
     if (hiddenByTag || view === 'board') {
       const next = new URLSearchParams(params)
@@ -103,11 +113,13 @@ export function TasksPage() {
     const q = search.trim().toLowerCase()
     return all.filter(
       (t) =>
-        (!projectFilter || t.project_id === projectFilter) &&
+        inScope(scope, t.project_id) &&
         (!tagFilter || t.tags.includes(tagFilter)) &&
         (!q || t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)),
     )
-  }, [all, projectFilter, tagFilter, search])
+  }, [all, scope, tagFilter, search])
+  // Open tasks the switcher keeps out of sight, so they are not forgotten.
+  const elsewhere = scope.kind === 'all' ? 0 : all.filter((t) => t.status !== 'done' && t.status !== 'cancelled' && !inScope(scope, t.project_id)).length
   const openShown = shown.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
   // A subtask whose parent is in the list is shown folded in under it, not on its own.
   const listedParents = new Set(openShown.map((t) => t.id))
@@ -117,24 +129,26 @@ export function TasksPage() {
     .filter((t) => (t.status === 'done' || t.status === 'cancelled') && onItsOwn(t))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 
+  const understood = parseQuickAdd(quick)
   const quickAdd = () => {
-    const title = quick.trim()
-    if (!title) return
-    create.mutate({ title, project_id: projectFilter || null }, { onSuccess: () => setQuick('') })
+    if (!quick.trim()) return
+    // A day, a priority and tags typed at the end are taken off the title (quickAdd.ts).
+    const { title, due_date, priority, tags } = parseQuickAdd(quick)
+    create.mutate({ title, due_date, priority, tags, project_id: projectFilter || null }, { onSuccess: () => setQuick('') })
   }
 
+  // Very wide screens: a task opens beside the list (not over it), so the list stays in reach.
+  const beside = useMediaQuery(VERY_WIDE) && view === 'list'
   return (
-    <div className={cn('mx-auto p-4 md:p-8 md:pt-14', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <CheckSquare className="h-5 w-5" />
-        </div>
-        <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">Tasks</h1>
+    <div className="flex h-full">
+    <div className="min-w-0 flex-1 overflow-y-auto">
+    <div className={cn('mx-auto p-4 md:px-8 md:pb-8 md:pt-2', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
+      <PageHeader title="Tasks">
         <Button size="sm" variant="ghost" className="shrink-0" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>
         <Button size="sm" variant="primary" className="shrink-0" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>
           New task
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Search and the view switch share one line; the filters are small pills below. */}
       <div className="mb-2 flex items-center gap-2">
@@ -152,8 +166,6 @@ export function TasksPage() {
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <Select variant="pill" aria-label="Project" value={projectFilter} onValueChange={(v) => setProjectId(v || null)}
-          options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
         {tags.length > 0 && (
           <Select variant="pill" aria-label="Tag" value={tagFilter} onValueChange={(v) => setParam('tag', v)}
             options={[{ value: '', label: 'All tags' }, ...tags.map((t) => ({ value: t, label: `#${t}` }))]} />
@@ -170,8 +182,12 @@ export function TasksPage() {
           <div className="mb-4 flex items-center gap-2 rounded-card border border-border bg-card px-3 py-1.5 shadow-soft">
             <Plus className="h-4 w-4 shrink-0 text-muted" />
             <input value={quick} onChange={(e) => setQuick(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && quickAdd()}
-              placeholder="Add a task and press Enter" aria-label="Add a task"
+              placeholder="Add a task: “Call the bank fri !high #errands”" aria-label="Add a task"
               className="h-9 min-w-0 flex-1 bg-transparent text-[14px] placeholder:text-subtle focus:outline-none" />
+            {/* What was understood from the end of the text, before it is added. */}
+            {understood.due_date && <span className={QUICK_CHIP}>{formatDay(understood.due_date)}</span>}
+            {understood.priority > 0 && <span className={QUICK_CHIP}>{PRIORITY_LABELS[understood.priority]}</span>}
+            {understood.tags.map((t) => <span key={t} className={QUICK_CHIP}>#{t}</span>)}
             {quick.trim() && <Button size="sm" variant="primary" loading={create.isPending} onClick={quickAdd}>Add</Button>}
           </div>
 
@@ -210,7 +226,17 @@ export function TasksPage() {
         </>
       )}
 
-      <Lingering value={editing}>
+      {elsewhere > 0 && (
+        <p className="mt-2 flex items-center gap-2 rounded-control bg-surface-2 px-3 py-2 text-[12.5px] text-muted">
+          <span className="min-w-0 flex-1">
+            {elsewhere === 1 ? '1 more open task is' : `${elsewhere} more open tasks are`}{' '}
+            {scope.kind !== 'uncategorized' ? 'outside this project' : elsewhere === 1 ? 'filed in a project' : 'filed in projects'}.
+          </span>
+          <button type="button" onClick={() => setView('all')} className="shrink-0 font-medium text-accent hover:underline">Show all</button>
+        </p>
+      )}
+
+      <Lingering value={beside ? null : editing}>
         {(shown) => (
           <TaskDialog key={shown.task?.id ?? 'new'} task={shown.task} onClose={() => setEditing(null)}
             onOpenTask={(task) => setEditing({ task })}
@@ -218,6 +244,15 @@ export function TasksPage() {
         )}
       </Lingering>
       <ItemTrashDialog kind="task" open={trashOpen} onOpenChange={setTrashOpen} />
+    </div>
+    </div>
+    {beside && editing && (
+      <div className="h-full shrink-0 pb-3 pr-3">
+        <TaskDialog panel key={editing.task?.id ?? 'new'} task={editing.task} onClose={() => setEditing(null)}
+          onOpenTask={(task) => setEditing({ task })}
+          defaults={{ status: editing.status, project_id: projectFilter || null }} />
+      </div>
+    )}
     </div>
   )
 }

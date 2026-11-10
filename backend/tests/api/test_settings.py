@@ -7,7 +7,7 @@ async def test_settings_have_defaults(authed):
     r = await authed.get("/api/settings")
     assert r.status_code == 200
     body = r.json()
-    assert body["appearance"] == {"mode": "system", "accent": "#3478f6", "density": "comfortable"}
+    assert body["appearance"] == {"mode": "system", "accent": "#2a6df4", "density": "comfortable"}
     assert body["general"]["default_chat_mode"] == "chat"
 
 
@@ -32,6 +32,8 @@ async def test_focus_home_and_files_sections(authed):
     assert body["general"]["start_page"] == "home"
     assert body["focus"]["focus_minutes"] == 25
     assert body["focus"]["save_to_notifications"] is False
+    assert body["focus"]["quiet_while_focusing"] is False
+    assert body["music"]["play_while_focusing"] is False
     assert body["home"] == {"layout": [], "mobile_layout": []}
     assert body["files"] == {"show_documents_folder": False}
 

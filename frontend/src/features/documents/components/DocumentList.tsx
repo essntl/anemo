@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { FileText, Folder, Plus, Search } from 'lucide-react'
@@ -10,18 +11,24 @@ import { type DocumentSummary, useCreateDocument, useDocuments } from '../api'
 
 /**
  * Documents grouped by folder. New documents go into `currentFolder`. With a project
- * chosen (`projectFolder`), only the documents in that project's folder are listed.
+ * chosen (`projectFolder`), only the documents in that project's folder are listed;
+ * with `outside`, only those in none of these projects' folders (Uncategorized).
  */
-export function DocumentList({ currentFolder, projectFolder, projectName }: { currentFolder: string; projectFolder?: string; projectName?: string }) {
+export function DocumentList({ currentFolder, projectFolder, projectName, outside }: {
+  currentFolder: string; projectFolder?: string; projectName?: string; outside?: string[]
+}) {
   const navigate = useNavigate()
   const documents = useDocuments()
   const create = useCreateDocument()
   const [query, setQuery] = useState('')
 
   const everything = documents.data?.documents ?? []
+  const within = (folder: string, parent: string) => folder === parent || folder.startsWith(`${parent}/`)
   const all = projectFolder
-    ? everything.filter((d) => d.folder === projectFolder || d.folder.startsWith(`${projectFolder}/`))
-    : everything
+    ? everything.filter((d) => within(d.folder, projectFolder))
+    : outside
+      ? everything.filter((d) => !outside.some((f) => within(d.folder, f)))
+      : everything
   const q = query.trim().toLowerCase()
   const shown = q ? all.filter((d) => d.title.toLowerCase().includes(q) || d.path.toLowerCase().includes(q)) : all
   // Folder name -> its documents; the top level ("") first.
@@ -37,15 +44,12 @@ export function DocumentList({ currentFolder, projectFolder, projectName }: { cu
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
-          Documents{projectName && <span className="font-normal text-muted"> · {projectName}</span>}
-        </h1>
-        <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} loading={create.isPending} onClick={() => void newDocument()}>
-          New
-        </Button>
-      </div>
-      <div className="relative px-3 py-2">
+      <PageHeader title="Documents" detail={projectName ?? (outside ? 'Uncategorized' : undefined)}>
+      <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} loading={create.isPending} onClick={() => void newDocument()}>
+        New
+      </Button>
+      </PageHeader>
+      <div className="relative px-3 pb-2 pt-3">
         <Search className="pointer-events-none absolute left-5.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find by title" aria-label="Find by title"
           className="h-9 w-full rounded-control bg-surface-2 pl-8 pr-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
@@ -58,7 +62,9 @@ export function DocumentList({ currentFolder, projectFolder, projectName }: { cu
           <p className="px-2 py-6 text-center text-[13px] text-muted">
             {projectFolder
               ? <>No documents in this project yet. They are Markdown files in <code className="font-mono">documents/{projectFolder}</code>.</>
-              : <>No documents yet. They are Markdown files in the <code className="font-mono">documents</code> folder of your workspace.</>}
+              : outside && everything.length > 0
+                ? <>No documents outside a project yet.</>
+                : <>No documents yet. They are Markdown files in the <code className="font-mono">documents</code> folder of your workspace.</>}
           </p>
         )}
         {documents.isSuccess && all.length > 0 && shown.length === 0 && (

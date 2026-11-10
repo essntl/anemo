@@ -13,6 +13,8 @@ export const messagesKey = (id: string) => ['messages', id] as const
 /** What a list of chats can be narrowed down by (all optional). */
 export interface ChatFilters {
   projectId?: string | null
+  /** Only chats that are in no project. */
+  noProject?: boolean
   tag?: string
   favorite?: boolean
   archived?: boolean
@@ -28,6 +30,7 @@ function listQuery(q: string, f: ChatFilters) {
   return {
     ...(q ? { q } : {}),
     ...(f.projectId ? { project_id: f.projectId } : {}),
+    ...(f.noProject ? { no_project: true } : {}),
     ...(f.tag ? { tag: f.tag } : {}),
     ...(f.favorite ? { favorite: true } : {}),
     ...(f.archived ? { archived: true } : {}),

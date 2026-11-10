@@ -2,6 +2,7 @@
  * File manager for the AI workspace: the same folders agents work in.
  * The URL holds the state (?path=folder&file=path) so views can be linked and reloaded.
  */
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useEffect, useState, type DragEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import {
@@ -23,7 +24,7 @@ import {
   X,
 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject } from '@/app/projectStore'
+import { useCurrentProject, useScope } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { chooseDialog, confirmDialog, promptDialog } from '@/components/ui/dialogs'
@@ -317,14 +318,24 @@ export function FilesPage() {
   }, [openFile, navigate])
 
   const searching = query.trim().length > 0
-  const entries = searching ? (search.data ?? []) : (folder.data?.entries ?? [])
+  // Uncategorized: the projects' own folders (and, in a search, what is in them) stay out of
+  // sight, unless you are inside one of them (a link led there).
+  const scope = useScope()
+  const allProjects = useProjects()
+  const projectFolders = scope.kind === 'uncategorized' ? (allProjects.data ?? []).flatMap((p) => [p.files_path, p.documents_path]) : []
+  const under = (p: string, parent: string) => p === parent || p.startsWith(`${parent}/`)
+  const insideProject = projectFolders.some((f) => under(path, f))
+  const listed = searching ? (search.data ?? []) : (folder.data?.entries ?? [])
+  const entries = insideProject ? listed : listed.filter((e) => !projectFolders.some((f) => under(e.path, f)))
   const selectedEntry = openFile ? entries.find((e) => e.path === openFile) ?? {
     name: openFile.split('/').pop() ?? openFile, path: openFile, is_dir: false, size: 0, modified: '', mime: null,
   } : null
   const error = (notAFolder ? null : folder.error) ?? makeFolder.error ?? saveFile.error ?? upload.error
 
   return (
-    <div className="island-reserve flex h-full">
+    // From `md` up the file manager is one panel on the ground, like the sidebar.
+    <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
+      <PageHeader title="Files" />
       <div className={cn('flex min-w-0 flex-1 flex-col', openFile && 'hidden lg:flex')}>
         <header className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border px-3 py-2.5 md:gap-2 md:px-4">
           <div className="w-full min-w-0 md:w-auto md:flex-1"><Breadcrumbs path={path} onOpen={(p) => go({ path: p, file: null })} /></div>
