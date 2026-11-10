@@ -59,7 +59,7 @@ function Breadcrumbs({ path, onOpen }: { path: string; onOpen: (path: string) =>
   const parts = path ? path.split('/') : []
   return (
     <div className="flex min-w-0 items-center gap-1 text-[13px]">
-      <button type="button" onClick={() => onOpen('')} className="flex items-center gap-1.5 rounded px-1.5 py-1 font-medium hover:bg-surface-hover">
+      <button type="button" onClick={() => onOpen('')} className="flex shrink-0 items-center gap-1.5 rounded px-1.5 py-1 font-medium hover:bg-surface-hover">
         <HardDrive className="h-4 w-4 text-muted" /> Workspace
       </button>
       {parts.map((part, i) => (
@@ -318,6 +318,8 @@ export function FilesPage() {
   }, [openFile, navigate])
 
   const searching = query.trim().length > 0
+  // A file open beside the list leaves the list's header half the room.
+  const compact = Boolean(openFile)
   // Uncategorized: the projects' own folders (and, in a search, what is in them) stay out of
   // sight, unless you are inside one of them (a link led there).
   const scope = useScope()
@@ -338,16 +340,18 @@ export function FilesPage() {
       <PageHeader title="Files" />
       <div className={cn('flex min-w-0 flex-1 flex-col', openFile && 'hidden lg:flex')}>
         <header className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border px-3 py-2.5 md:gap-2 md:px-4">
-          <div className="w-full min-w-0 md:w-auto md:flex-1"><Breadcrumbs path={path} onOpen={(p) => go({ path: p, file: null })} /></div>
+          {/* The path keeps at least this width: when the row is short (a file is open beside it), the rest wraps under it. */}
+          <div className="w-full min-w-0 overflow-hidden md:w-auto md:min-w-48 md:flex-1"><Breadcrumbs path={path} onOpen={(p) => go({ path: p, file: null })} /></div>
           <div className="relative order-last w-full md:order-none md:w-auto">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find by name"
               className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-2 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10 md:w-44" />
           </div>
-          <Button size="sm" variant="ghost" icon={<FilePlus className="h-3.5 w-3.5" />} onClick={() => void newFile()}>File</Button>
-          <Button size="sm" variant="ghost" icon={<FolderPlus className="h-3.5 w-3.5" />} onClick={() => void newFolder()}>Folder</Button>
-          <Button size="sm" variant="secondary" icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={pickFiles}>Upload</Button>
-          <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>
+          {/* With a file open beside the list the buttons are icons only (they keep their names for screen readers, with a tooltip). */}
+          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label="File" title="New file" icon={<FilePlus className="h-3.5 w-3.5" />} onClick={() => void newFile()}>{!compact && 'File'}</Button>
+          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label="Folder" title="New folder" icon={<FolderPlus className="h-3.5 w-3.5" />} onClick={() => void newFolder()}>{!compact && 'Folder'}</Button>
+          <Button size="sm" variant="secondary" className={cn(compact && 'px-2')} aria-label="Upload" title="Upload files" icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={pickFiles}>{!compact && 'Upload'}</Button>
+          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label="Trash" title="Deleted files" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>{!compact && 'Trash'}</Button>
         </header>
         {error && <div className="border-b border-border bg-error/8 px-4 py-2 text-[12.5px] text-error">{errorMessage(error)}</div>}
         {!searching && <PasteBar folder={path} />}

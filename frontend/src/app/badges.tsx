@@ -32,16 +32,16 @@ export function MemoryBadge() {
 }
 
 /**
- * Everything that waits in the Inbox, as one count: approvals and paused runs, memory
- * suggestions and unread notifications. Amber while something needs a decision.
+ * What waits in the Inbox, as one count: approvals and paused runs, and unread
+ * notifications. Amber while something needs a decision. (Memory suggestions are not
+ * counted here: they have their own count on Memory, under More.)
  */
 export function InboxBadge() {
   const waiting = useRunsSummary().data?.waiting ?? 0
-  const pending = useMemorySummary().data?.pending ?? 0
   const unread = useNotificationSummary().data?.unread ?? 0
-  const total = waiting + pending + unread
+  const total = waiting + unread
   if (!total) return null
-  const decide = waiting + pending
+  const decide = waiting
   return (
     <span title={[decide && `${decide} need${decide === 1 ? 's' : ''} you`, unread && `${unread} unread`].filter(Boolean).join(', ')}
       className={cn('flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold', decide ? 'bg-warning text-white' : 'bg-accent text-accent-contrast')}>

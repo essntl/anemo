@@ -153,6 +153,23 @@ export function showPassage(root: HTMLElement, passage: Passage): boolean {
   if (!range) return false
   const target = range.startContainer.parentElement
   target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  highlight(root, range)
+  return true
+}
+
+/**
+ * Shows an element of the document (a heading chosen in the outline): at the top of the
+ * view, at once (a long document scrolled smoothly can stop short), and marked.
+ */
+export function revealElement(root: HTMLElement, el: HTMLElement): void {
+  el.scrollIntoView({ block: 'start' })
+  const range = el.ownerDocument.createRange()
+  range.selectNodeContents(el)
+  highlight(root, range)
+}
+
+/** Marks a range until you start working in the document (CSS Custom Highlight API). */
+function highlight(root: HTMLElement, range: Range): void {
   const css = globalThis.CSS as (typeof CSS & { highlights?: Map<string, unknown> }) | undefined
   const Highlight = (globalThis as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight
   if (css?.highlights && Highlight) {
@@ -166,7 +183,6 @@ export function showPassage(root: HTMLElement, passage: Passage): boolean {
     root.addEventListener('pointerdown', clear)
     root.addEventListener('keydown', clear)
   }
-  return true
 }
 
 /**

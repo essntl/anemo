@@ -6,7 +6,7 @@
  * answer may write it): that opens the document, keeping any #… that points at a part
  * of it.
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useScope } from '@/app/projectStore'
@@ -45,6 +45,9 @@ function DocumentByPath({ address }: { address: string }) {
   )
 }
 
+/** Browser storage: "0" while the document list beside an open document is put away. */
+const LIST = 'anemo.docList'
+
 export function DocumentsPage() {
   const params = useParams()
   // /documents/<id>, or /documents/<path> (the "*" route).
@@ -59,16 +62,24 @@ export function DocumentsPage() {
   const projects = useProjects()
   const outside = scope.kind === 'uncategorized' ? (projects.data ?? []).map((p) => p.slug) : undefined
 
+  // The list beside an open document: shown unless it was put away, remembered on this device.
+  const [listOpen, setListOpen] = useState(() => { try { return localStorage.getItem(LIST) !== '0' } catch { return true } })
+  const toggleList = () => {
+    try { localStorage.setItem(LIST, listOpen ? '0' : '1') } catch { /* no storage: just not remembered */ }
+    setListOpen(!listOpen)
+  }
+
   return (
     // From `md` up the list and the editor are one panel on the ground, like the sidebar.
     <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
-      <aside className={cn('w-full shrink-0 border-r border-border md:w-72', address && 'hidden md:block')}>
+      {/* Beside an open document the list can be put away (the button in the editor's header). */}
+      <aside className={cn('w-full shrink-0 border-r border-border md:w-60', address && 'hidden', address && listOpen && 'md:block')}>
         <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} outside={outside} />
       </aside>
       <section className={cn('min-w-0 flex-1', !address && 'hidden md:block')}>
         {documentId ? (
           // The key gives every document its own fresh editor state.
-          <DocumentEditor key={documentId} id={documentId} />
+          <DocumentEditor key={documentId} id={documentId} list={{ hidden: !listOpen, toggle: toggleList }} />
         ) : address ? (
           <DocumentByPath key={address} address={address} />
         ) : (

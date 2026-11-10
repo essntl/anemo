@@ -92,7 +92,8 @@ export function EditorToolbar({ editor, onPickLink, onPickImage }: {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1.5 md:flex-nowrap md:overflow-x-auto" role="toolbar" aria-label="Formatting">
+    // The buttons wrap onto a second row when the editor is narrow: none is ever scrolled out of sight.
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1.5" role="toolbar" aria-label="Formatting">
       <ToolButton label="Undo" disabled={!state.canUndo} onClick={() => chain().undo().run()}><Undo2 /></ToolButton>
       <ToolButton label="Redo" disabled={!state.canRedo} onClick={() => chain().redo().run()}><Redo2 /></ToolButton>
       <Divider />
