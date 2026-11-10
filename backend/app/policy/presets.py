@@ -71,13 +71,14 @@ CATEGORIES: list[Category] = [
     Category(
         "focus.read",
         "Focus & music",
-        "Look at your focus sessions and focus stats.",
+        "Look at your focus sessions, focus stats and the music queue.",
         "autonomous",
     ),
     Category(
         "focus.control",
         "Control the timer and music",
-        "Start a focus session or queue music in the Anemo tab you use.",
+        "Start or stop a focus session, queue music and control the player in the Anemo "
+        "tab you use.",
         "ask",
     ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),

@@ -7,6 +7,11 @@ Acting (focus.control, "Control the timer and music", asks by default): start a 
 session or queue music. The timer and the player run in the browser, so the tool
 publishes an event and the Anemo tab used most recently acts on it. With no tab
 open, the tool says so instead of failing silently.
+
+The music queue lives in that tab too: get_music_queue (focus.read) asks the tab for it,
+and music_control pauses, resumes, skips or removes one track (features/music/
+player_relay.py). What takes something out of the queue (removing a track, or
+queue_music with replace) counts as dangerous, so "Ask for dangerous actions" asks.
 """
 
 import uuid
@@ -20,6 +25,7 @@ from sqlalchemy import func, select
 from app.core.db import get_sessionmaker
 from app.events import bus, presence
 from app.features.focus import service as focus
+from app.features.music import player_relay
 from app.features.music import service as music
 from app.features.stats import service as stats
 from app.features.tasks.models import Project, Task
@@ -219,8 +225,11 @@ class QueueMusicInput(BaseModel):
 class QueueMusic(Tool):
     name = "queue_music"
     description = (
-        "Play music in Anemo's player (in the tab the user uses): a link (YouTube video or "
-        "playlist, SoundCloud, audio stream) or one of the user's playlists by name."
+        "Add music to the end of the queue of Anemo's player (in the tab the user uses): a "
+        "link (YouTube video or playlist, SoundCloud, audio stream) or one of the user's "
+        "playlists by name. It starts playing if nothing was. Check get_music_queue first "
+        "to avoid adding what is already queued. replace=true throws the current queue "
+        "away instead (it cannot be brought back): only when the user asks for that."
     )
     capability = "focus.control"
     Input = QueueMusicInput
@@ -228,6 +237,15 @@ class QueueMusic(Tool):
 
     def actions(self, args: QueueMusicInput, ctx: ToolContext) -> list[Action]:
         what = f"playlist {args.playlist_name}" if args.playlist_name else (args.url or "")[:120]
+        # Replacing loses the queue, unless this run has seen that it is empty.
+        if args.replace and ctx.state.get("music_queue_length") != 0:
+            return [
+                Action(
+                    capability=self.capability,
+                    risk="dangerous",
+                    summary=f"Replace the music queue with: {what}",
+                )
+            ]
         return [Action(capability=self.capability, summary=f"Queue music: {what}")]
 
     async def run(self, args: QueueMusicInput, ctx: ToolContext) -> ToolResult:
@@ -264,4 +282,147 @@ class QueueMusic(Tool):
         return ToolResult(content=f"Queued {label} in Anemo's player.")
 
 
-FOCUS_TOOLS: list[Tool] = [GetFocusStats(), ListFocusSessions(), StartFocus(), QueueMusic()]
+PLAYER_STATUS = {
+    "playing": "playing",
+    "buffering": "playing (loading)",
+    "paused": "paused",
+    "ended": "stopped (the queue ended)",
+    "unstarted": "not started",
+}
+NO_ANSWER = (
+    "Anemo's tab did not answer in time (it may be asleep in the background). Ask the "
+    "user to bring the Anemo tab to the front, then try again."
+)
+
+
+def _track(track: player_relay.PlayerTrack) -> str:
+    title = track.title or "(untitled)"
+    by = f" - {track.artist}" if track.artist else ""
+    return f"“{title}”{by}{' (live stream)' if track.live else ''} {track.url}".rstrip()
+
+
+def render_player(state: player_relay.PlayerState) -> str:
+    """The player as the model reads it. Positions count from 1, in queue order."""
+    if not state.queue:
+        return "The music queue is empty; nothing is playing."
+    current = min(state.index, len(state.queue) - 1)
+    modes = [m for m in ("shuffle on" if state.shuffle else "", _repeat(state.repeat)) if m]
+    lines = [
+        f"Player: {PLAYER_STATUS[state.status]}{' (' + ', '.join(modes) + ')' if modes else ''}.",
+        f"Current track: position {current + 1}, {_track(state.queue[current])}",
+        f"Queue ({len(state.queue) + state.more} tracks; ▶ marks the current one, those "
+        "before it were played):",
+    ]
+    lines += [
+        f"{'▶' if i == current else ' '} {i + 1}. {_track(t)}" for i, t in enumerate(state.queue)
+    ]
+    if state.more:
+        lines.append(f"(+{state.more} more not listed)")
+    return "\n".join(lines)
+
+
+def _repeat(repeat: str) -> str:
+    return {"all": "repeating the queue", "one": "repeating this track"}.get(repeat, "")
+
+
+async def _ask_player(
+    ctx: ToolContext, command: player_relay.Command, **fields: object
+) -> player_relay.PlayerState | ToolResult:
+    try:
+        state = await player_relay.ask(command, **fields)
+    except player_relay.NotOpen:
+        return ToolResult(content=NOT_OPEN, is_error=True)
+    except player_relay.NoAnswer:
+        return ToolResult(content=NO_ANSWER, is_error=True)
+    ctx.state["music_queue_length"] = len(state.queue) + state.more
+    return state
+
+
+class NoInput(BaseModel):
+    pass
+
+
+class GetMusicQueue(Tool):
+    name = "get_music_queue"
+    description = (
+        "What is in Anemo's music player right now: whether it plays, the current track, "
+        "and every queued track with its position, title and link. Use it before "
+        "queue_music (is it queued already?) and before music_control (which position?). "
+        "It needs Anemo open in a tab; it does not list the user's playlists or library."
+    )
+    capability = "focus.read"
+    Input = NoInput
+
+    def actions(self, args: NoInput, ctx: ToolContext) -> list[Action]:
+        return [Action(capability=self.capability, summary="Look at the music queue")]
+
+    async def run(self, args: NoInput, ctx: ToolContext) -> ToolResult:
+        state = await _ask_player(ctx, "report")
+        if isinstance(state, ToolResult):
+            return state
+        return ToolResult(content=render_player(state))
+
+
+class MusicControlInput(BaseModel):
+    action: Literal["pause", "resume", "skip", "remove"] = Field(
+        description="skip: go to the next track. remove: take one track out of the queue"
+    )
+    position: int | None = Field(
+        None, ge=1, le=10_000, description="For remove: the track's position (get_music_queue)"
+    )
+
+    @model_validator(mode="after")
+    def _position(self) -> "MusicControlInput":
+        if (self.action == "remove") != (self.position is not None):
+            raise ValueError("position goes with remove, and remove needs it")
+        return self
+
+
+class MusicControl(Tool):
+    name = "music_control"
+    description = (
+        "Control Anemo's music player (in the tab the user uses): pause, resume, skip to "
+        "the next track, or remove one track from the queue by its position (look it up "
+        "with get_music_queue right before; positions shift when the queue changes). "
+        "Returns the queue afterwards. It cannot reorder, seek, change the volume or clear "
+        "the queue; to add music use queue_music."
+    )
+    capability = "focus.control"
+    Input = MusicControlInput
+    idempotent = False
+
+    def actions(self, args: MusicControlInput, ctx: ToolContext) -> list[Action]:
+        if args.action == "remove":
+            summary = f"Remove track {args.position} from the music queue"
+            return [Action(capability=self.capability, risk="dangerous", summary=summary)]
+        if args.action == "skip":
+            summary = "Skip to the next track"
+            return [Action(capability=self.capability, risk="moderate", summary=summary)]
+        return [Action(capability=self.capability, summary=f"{args.action.title()} the music")]
+
+    async def run(self, args: MusicControlInput, ctx: ToolContext) -> ToolResult:
+        fields = {"position": args.position} if args.position else {}
+        state = await _ask_player(ctx, args.action, **fields)
+        if isinstance(state, ToolResult):
+            return state
+        if state.problem:
+            return ToolResult(content=f"{state.problem}\n\n{render_player(state)}", is_error=True)
+        did = {
+            "pause": "Paused.",
+            "resume": "Playing.",
+            "skip": "Skipped to the next track.",
+            "remove": f"Removed {_track(state.removed)} from the queue."
+            if state.removed
+            else "Removed.",
+        }[args.action]
+        return ToolResult(content=f"{did}\n\n{render_player(state)}")
+
+
+FOCUS_TOOLS: list[Tool] = [
+    GetFocusStats(),
+    ListFocusSessions(),
+    StartFocus(),
+    QueueMusic(),
+    GetMusicQueue(),
+    MusicControl(),
+]

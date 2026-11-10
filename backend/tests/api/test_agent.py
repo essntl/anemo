@@ -131,6 +131,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "run_shell",
             "read_web_page",  # web_search only appears once SearXNG is set up
             "http_request",
+            "browser_current_tab",  # the tab the user shared (needs no browser container)
             "list_tasks",
             "get_task",
             "create_task",
@@ -149,6 +150,8 @@ async def test_agent_uses_tools_and_plan(authed):
             "list_focus_sessions",
             "start_focus",
             "queue_music",
+            "get_music_queue",
+            "music_control",
             "send_notification",
             "remember",
             "update_memory",

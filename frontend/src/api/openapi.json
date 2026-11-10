@@ -9145,6 +9145,193 @@
         }
       }
     },
+    "/api/trash": {
+      "get": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "List Trash",
+        "description": "Deleted tasks and events, newest first.",
+        "operationId": "list_trash_api_trash_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "task",
+                    "event"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrashedOut"
+                  },
+                  "title": "Response List Trash Api Trash Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trash/{trash_id}/restore": {
+      "post": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Restore",
+        "description": "Put a deleted task or event back as it was.",
+        "operationId": "restore_api_trash__trash_id__restore_post",
+        "parameters": [
+          {
+            "name": "trash_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trash Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trash/{trash_id}": {
+      "delete": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Purge",
+        "description": "Delete one trash item for good (the user only; agents have no tool for it).",
+        "operationId": "purge_api_trash__trash_id__delete",
+        "parameters": [
+          {
+            "name": "trash_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trash Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -11177,6 +11364,59 @@
         }
       }
     },
+    "/api/music/player-state": {
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Player State",
+        "description": "This tab's player (what plays, the queue), sent when an agent's tool asked for it\nwith a `music.control` event carrying a request id. Answers nobody asked for are\ndropped.",
+        "operationId": "player_state_api_music_player_state_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerAnswer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notifications": {
       "get": {
         "tags": [
@@ -11916,6 +12156,155 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/extension/shared-tab": {
+      "put": {
+        "tags": [
+          "extension"
+        ],
+        "summary": "Share Tab",
+        "description": "\"Share this tab with Anemo\": the extension sends the tab's readable content when\nthe user clicks. It replaces what was shared before; the assistant reads it with\nbrowser_current_tab. Tabs the user did not share never reach Anemo.",
+        "operationId": "share_tab_api_extension_shared_tab_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedTabIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedTabState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "extension"
+        ],
+        "summary": "Get Shared Tab",
+        "description": "Which tab is shared now (address and title, not the content).",
+        "operationId": "get_shared_tab_api_extension_shared_tab_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedTabState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "extension"
+        ],
+        "summary": "Stop Sharing",
+        "description": "Forget the shared tab.",
+        "operationId": "stop_sharing_api_extension_shared_tab_delete",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -20941,6 +21330,131 @@
         ],
         "title": "PlanStepIn"
       },
+      "PlayerAnswer": {
+        "properties": {
+          "request": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]+$",
+            "title": "Request"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PlayerState"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request",
+          "state"
+        ],
+        "title": "PlayerAnswer"
+      },
+      "PlayerState": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unstarted",
+              "playing",
+              "paused",
+              "buffering",
+              "ended"
+            ],
+            "title": "Status",
+            "default": "unstarted"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index",
+            "default": 0
+          },
+          "shuffle": {
+            "type": "boolean",
+            "title": "Shuffle",
+            "default": false
+          },
+          "repeat": {
+            "type": "string",
+            "enum": [
+              "off",
+              "all",
+              "one"
+            ],
+            "title": "Repeat",
+            "default": "off"
+          },
+          "queue": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerTrack"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Queue"
+          },
+          "more": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "More",
+            "default": 0
+          },
+          "removed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlayerTrack"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          }
+        },
+        "type": "object",
+        "title": "PlayerState",
+        "description": "The player as its tab reports it. `index`: the current track's place in `queue`\n(0-based; meaningless when the queue is empty)."
+      },
+      "PlayerTrack": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Title",
+            "default": ""
+          },
+          "artist": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Artist",
+            "default": ""
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Url",
+            "default": ""
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PlayerTrack"
+      },
       "PlaylistIn": {
         "properties": {
           "name": {
@@ -24354,6 +24868,116 @@
         "type": "object",
         "title": "SharedProject"
       },
+      "SharedTabIn": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Title",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "page",
+              "selection",
+              "pdf",
+              "youtube"
+            ],
+            "title": "Source",
+            "default": "page"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 130000,
+            "minLength": 1,
+            "title": "Content"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "content"
+        ],
+        "title": "SharedTabIn",
+        "description": "What the extension sends: the same shape as a page attached to a message."
+      },
+      "SharedTabOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "page",
+              "selection",
+              "pdf",
+              "youtube"
+            ],
+            "title": "Source"
+          },
+          "word_count": {
+            "type": "integer",
+            "title": "Word Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "shared_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Shared At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "title",
+          "source",
+          "word_count",
+          "truncated",
+          "shared_at"
+        ],
+        "title": "SharedTabOut",
+        "description": "The shared tab without its content (the content only goes to the assistant)."
+      },
+      "SharedTabState": {
+        "properties": {
+          "tab": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharedTabOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "tab"
+        ],
+        "title": "SharedTabState"
+      },
       "SharedTask": {
         "properties": {
           "title": {
@@ -26175,6 +26799,51 @@
           "deleted_by"
         ],
         "title": "TrashItemOut"
+      },
+      "TrashedOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "task",
+              "event"
+            ],
+            "title": "Kind"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "deleted_by": {
+            "type": "string",
+            "title": "Deleted By"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deleted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "item_id",
+          "title",
+          "deleted_by",
+          "deleted_at"
+        ],
+        "title": "TrashedOut"
       },
       "TurnIn": {
         "properties": {
