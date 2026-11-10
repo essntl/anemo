@@ -25,7 +25,7 @@ test('dialogs, dropdowns and the search palette animate when they close', async 
   const afterDialog = await closings()
   // A dropdown: the project filter on All chats (reached within the app, so the record stays).
   await page.getByRole('link', { name: 'All chats' }).click()
-  await expect(page).toHaveURL(//chats/)
+  await expect(page).toHaveURL(/\/chats/)
   await page.getByRole('combobox', { name: 'Project' }).click()
   await expect(page.getByRole('listbox')).toBeVisible()
   await page.keyboard.press('Escape')
