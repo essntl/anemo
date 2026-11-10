@@ -495,7 +495,7 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
   - A failed job is retried with backoff (default 3 attempts). Once a job fails for good, a
     give-up hook can clean up after it: a `run.execute` job ends its run as failed.
 - **Job types** (`jobs/runner.py`): `run.execute`, `conversation.title`, `memory.extract`,
-  `memory.reindex`, `document.index`, `notify.deliver`, `automation.retry`, `mcp.refresh`.
+  `memory.reindex`, `document.index`, `notify.deliver`, `automation.retry`, `automation.delete`, `mcp.refresh`.
 - **Periodic tasks** (`jobs/scheduler.py`): one loop every 30 s in each worker, running in turn
   `reminders`, `automations` (due runs, grace 1 h), `notifications.prune` (90 days),
   `approvals.expire` (24 h), `chats.temporary` and `updates.check` (about once a day). Each task

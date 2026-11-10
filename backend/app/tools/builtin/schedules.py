@@ -24,11 +24,10 @@ from app.features.automations import service
 from app.features.automations.models import Automation
 from app.features.automations.schedule import Schedule, describe, upcoming
 from app.features.automations.schemas import AutomationIn, AutomationPatch
-from app.features.conversations import service as conversations
-from app.features.conversations.models import Conversation
 from app.features.projects import service as projects
 from app.features.settings import service as settings_service
 from app.features.tasks.models import Project
+from app.jobs import queue
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 
@@ -340,16 +339,21 @@ class DeleteSchedule(Tool):
                     is_error=True,
                 )
             name = automation.name
-            chats = list(
-                await db.scalars(
-                    select(Conversation.id).where(Conversation.automation_id == automation.id)
-                )
+            # It stops at once; the worker then removes it with the chats of its runs.
+            automation.enabled, automation.next_run_at = False, None
+            await queue.enqueue(
+                db,
+                "automation.delete",
+                {"automation_id": str(automation.id)},
+                lane="background",
+                dedupe_key=f"automation.delete:{automation.id}",
             )
-            await conversations.delete_conversations(db, chats)
-            await db.delete(automation)
             await db.commit()
         await service.notify_changed()
-        return ToolResult(content=f"Deleted the schedule “{name}” and its past runs for good.")
+        return ToolResult(
+            content=f"Deleted the schedule “{name}” for good: it no longer runs, and it and "
+            "the chats of its past runs are being removed."
+        )
 
 
 SCHEDULE_TOOLS: list[Tool] = [ListSchedules(), CreateSchedule(), UpdateSchedule(), DeleteSchedule()]

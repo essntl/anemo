@@ -66,6 +66,11 @@ def default_handlers() -> dict[str, Handler]:
 
         await automations.retry_run(uuid.UUID(payload["automation_id"]), int(payload["retry"]))
 
+    async def automation_delete(payload: dict[str, Any]) -> None:
+        from app.features.automations import removal
+
+        await removal.delete_with_runs(uuid.UUID(payload["automation_id"]))
+
     async def mcp_refresh(payload: dict[str, Any]) -> None:
         from app.features.mcp import service as mcp
 
@@ -83,6 +88,7 @@ def default_handlers() -> dict[str, Handler]:
 
     return {
         "automation.retry": automation_retry,
+        "automation.delete": automation_delete,
         "capture.save": capture_save,
         "research.writeup": research_writeup,
         "mcp.refresh": mcp_refresh,

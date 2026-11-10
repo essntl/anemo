@@ -8,8 +8,10 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
+from app.features.automations import removal
 from app.features.automations import service as automations
 from app.features.automations.models import Automation
+from app.jobs.models import Job
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta, ToolCall
 from app.runtime.dispatch import execute_run
@@ -194,7 +196,15 @@ async def test_listing_changing_and_deleting(authed):
         ("list_schedules", "succeeded", "safe"),
         ("delete_schedule", "succeeded", "dangerous"),
     ]
+    # It stopped at once; the worker's job then removes it with the chats of its runs.
+    (off,) = await listed(authed)
+    assert off["enabled"] is False and off["next_run_at"] is None
+    await removal.delete_with_runs(uuid.UUID(sid))
+    await removal.delete_with_runs(uuid.UUID(sid))  # running the job again is harmless
     assert await listed(authed) == []
+    async with get_sessionmaker()() as db:
+        jobs = list(await db.scalars(select(Job).where(Job.type == "automation.delete")))
+    assert [j.payload for j in jobs] == [{"automation_id": sid}]
 
     results = [m for request in FakeAdapter.requests for m in request.messages]
     texts = [b.content for m in results for b in m.content if b.type == "tool_result"]
@@ -204,9 +214,7 @@ async def test_listing_changing_and_deleting(authed):
     last = next(t for t in texts if t.startswith(f"[{sid}] Morning news"))
     assert "Every day at 09:30; next run" in last and "Prompt: Only the headlines" in last
     assert any(t == "Updated “Morning news”: switched off." for t in texts)
-    assert any(
-        "Deleted the schedule “Morning news” and its past runs for good." in t for t in texts
-    )
+    assert any(t.startswith("Deleted the schedule “Morning news” for good") for t in texts)
 
 
 async def test_deleting_asks_by_default_and_a_running_one_is_left_alone(authed):
@@ -336,3 +344,19 @@ async def test_a_repeat_rule_from_the_app_and_a_project(authed):
     assert r.status_code == 404
     async with get_sessionmaker()() as db:
         assert len(list(await db.scalars(select(Automation)))) == 1
+
+
+async def test_the_delete_job_takes_past_runs_along_and_waits_for_a_running_one(authed):
+    import pytest
+
+    await setup(authed)
+    a = await make(authed)
+    script("summarise the news", [TextDelta("ok"), Done("end")])
+    run_id = await fire(authed, a, execute=False)
+    with pytest.raises(RuntimeError):  # retried by the job queue once the run is over
+        await removal.delete_with_runs(uuid.UUID(a["id"]))
+    await execute_run(uuid.UUID(run_id))
+    conversation_id = (await authed.get(f"/api/runs/{run_id}")).json()["conversation_id"]
+    await removal.delete_with_runs(uuid.UUID(a["id"]))
+    assert await listed(authed) == []
+    assert (await authed.get(f"/api/conversations/{conversation_id}")).status_code == 404
