@@ -149,6 +149,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "get_focus_stats",
             "list_focus_sessions",
             "start_focus",
+            "stop_focus",
             "queue_music",
             "get_music_queue",
             "music_control",

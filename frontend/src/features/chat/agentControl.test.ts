@@ -8,6 +8,8 @@ const calls = vi.hoisted(() => ({
   store: { queue: [] as Record<string, unknown>[], index: 0, shuffle: false, repeat: 'off' },
   status: 'paused',
   next: null as number | null,
+  timer: [] as string[],
+  timerState: { status: 'running', accumulated: 0 },
 }))
 
 vi.mock('@/api/client', () => ({
@@ -16,7 +18,14 @@ vi.mock('@/api/client', () => ({
 
 vi.mock('./tab', () => ({ tabId: () => 'this-tab' }))
 vi.mock('@/features/island/alerts', () => ({ islandAlert: (a: { title: string }) => calls.alerts.push(a.title) }))
-vi.mock('@/features/focus/timerStore', () => ({ timerActions: { focusOn: () => {} } }))
+vi.mock('@/features/focus/timerStore', () => ({
+  timerActions: {
+    focusOn: () => calls.timer.push('focusOn'),
+    pause: () => calls.timer.push('pause'),
+    reset: () => calls.timer.push('reset'),
+  },
+  useTimerStore: { getState: () => ({ timer: calls.timerState }) },
+}))
 vi.mock('@/features/music/player/controller', () => ({
   fromLibrary: (t: { ref: string }) => ({ ref: t.ref }),
   buildTracks: async (url: string) => {
@@ -37,7 +46,7 @@ vi.mock('@/features/music/player/controller', () => ({
   },
 }))
 
-const { onMusicControl } = await import('./agentControl')
+const { onFocusControl, onMusicControl } = await import('./agentControl')
 
 const playlist = { name: 'Focus', tracks: [{ ref: 'a' }, { ref: 'b' }] } as never
 
@@ -129,5 +138,36 @@ describe('the agent looking at and controlling the player', () => {
     expect(await onMusicControl({ tab: 'this-tab', action: 'pause' })).toBe(false)
     expect(calls.player).toEqual([])
     expect(calls.posted).toEqual([])
+  })
+})
+
+describe('the agent stopping or pausing the focus timer', () => {
+  beforeEach(() => {
+    calls.timer = []
+    calls.alerts = []
+    calls.timerState = { status: 'running', accumulated: 0 }
+  })
+
+  it('stops the way the Stop button does, which records a session cut short', () => {
+    expect(onFocusControl({ tab: 'this-tab', action: 'stop' })).toBe(true)
+    expect(calls.timer).toEqual(['reset'])
+    expect(calls.alerts).toEqual(['An agent stopped the focus session'])
+  })
+
+  it('pauses a running timer, and stops a paused one', () => {
+    onFocusControl({ tab: 'this-tab', action: 'pause' })
+    calls.timerState = { status: 'paused', accumulated: 60_000 }
+    onFocusControl({ tab: 'this-tab', action: 'pause' }) // paused already
+    onFocusControl({ tab: 'this-tab', action: 'stop' })
+    expect(calls.timer).toEqual(['pause', 'reset'])
+  })
+
+  it('does nothing to an idle timer or in another tab', () => {
+    calls.timerState = { status: 'idle', accumulated: 0 }
+    expect(onFocusControl({ tab: 'this-tab', action: 'stop' })).toBe(true)
+    calls.timerState = { status: 'running', accumulated: 0 }
+    expect(onFocusControl({ tab: 'other-tab', action: 'stop' })).toBe(false)
+    expect(calls.timer).toEqual([])
+    expect(calls.alerts).toEqual([])
   })
 })

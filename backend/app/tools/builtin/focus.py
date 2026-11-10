@@ -15,7 +15,7 @@ queue_music with replace) counts as dangerous, so "Ask for dangerous actions" as
 """
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -170,7 +170,8 @@ class StartFocus(Tool):
     name = "start_focus"
     description = (
         "Start a focus session on the user's focus timer (in the Anemo tab they use), "
-        "optionally for a task."
+        "optionally for a task. Also resumes a paused session. To stop or pause one use "
+        "stop_focus."
     )
     capability = "focus.control"
     Input = StartFocusInput
@@ -206,6 +207,72 @@ class StartFocus(Tool):
         )
         what = f"a {args.minutes}-minute focus session" if args.minutes else "a focus session"
         return ToolResult(content=f"Started {what}{f' on “{task.title}”' if task else ''}.")
+
+
+class StopFocusInput(BaseModel):
+    action: Literal["stop", "pause"] = Field(
+        "stop",
+        description="stop: end the session now. pause: hold it; start_focus resumes it",
+    )
+
+
+class StopFocus(Tool):
+    name = "stop_focus"
+    description = (
+        "Stop or pause the focus session that is running on the user's focus timer (in the "
+        "Anemo tab they use). A stopped session is recorded as cut short, with the whole "
+        "minutes focused, exactly as when the user stops it by hand; this cannot be undone. "
+        "It does not skip to the break and does not change or delete past sessions."
+    )
+    capability = "focus.control"
+    Input = StopFocusInput
+    idempotent = False
+
+    def actions(self, args: StopFocusInput, ctx: ToolContext) -> list[Action]:
+        if args.action == "pause":
+            return [Action(capability=self.capability, summary="Pause the focus session")]
+        return [
+            Action(
+                capability=self.capability,
+                risk="moderate",
+                summary="Stop the focus session (recorded as cut short)",
+            )
+        ]
+
+    async def run(self, args: StopFocusInput, ctx: ToolContext) -> ToolResult:
+        async with get_sessionmaker()() as db:
+            timer = (await focus.get_timer(db)).state
+        # The shared timer says what is running (None: no timer was shared yet; the tab
+        # then decides for itself).
+        focused = None
+        if timer is not None:
+            if timer.status == "idle" and timer.accumulated == 0:
+                return ToolResult(content="No focus session is running.", is_error=True)
+            if args.action == "pause" and timer.status != "running":
+                return ToolResult(content="The focus timer is paused already.", is_error=True)
+            ran = timer.accumulated
+            if timer.status == "running" and timer.started_at is not None:
+                ran += max(0, int(datetime.now(UTC).timestamp() * 1000) - timer.started_at)
+            focused = ran // 60_000 if timer.phase == "focus" else None
+        tab = await presence.pick()
+        if tab is None:
+            return ToolResult(content=NOT_OPEN, is_error=True)
+        await bus.publish_global("focus.control", {"tab": tab, "action": args.action})
+        if args.action == "pause":
+            return ToolResult(content="Paused the focus timer. start_focus resumes it.")
+        if timer is not None and timer.phase != "focus":
+            return ToolResult(content="Stopped the break; the timer is back at the start.")
+        if focused is None:
+            return ToolResult(content="Stopped the focus session.")
+        if focused < 1:
+            return ToolResult(
+                content="Stopped the focus session. It ran for less than a minute, so no "
+                "session is recorded."
+            )
+        return ToolResult(
+            content=f"Stopped the focus session after {_minutes(focused)}; it is recorded "
+            "as cut short."
+        )
 
 
 class QueueMusicInput(BaseModel):
@@ -422,6 +489,7 @@ FOCUS_TOOLS: list[Tool] = [
     GetFocusStats(),
     ListFocusSessions(),
     StartFocus(),
+    StopFocus(),
     QueueMusic(),
     GetMusicQueue(),
     MusicControl(),
