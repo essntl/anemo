@@ -22,7 +22,7 @@ test('rearrange and resize widgets; the layout is saved', async ({ page }) => {
   try {
     await page.request.put('/api/settings/home', { data: { layout: [] } }) // the default layout
     await page.goto('/home')
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Good (morning|afternoon|evening)/)
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible()
     await expect(page.locator('[data-widget="focus"]')).toBeVisible()
     expect((await order(page)).slice(0, 2)).toEqual(['focus', 'today'])
 

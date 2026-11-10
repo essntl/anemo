@@ -38,7 +38,8 @@ export function TopBar() {
   // Each half stops short of the Island while it shows (.island-clear-left in app.css).
   const half = 'island-clear-left flex min-w-0 flex-1 [--island-gap:3.25rem] md:[--island-gap:1.75rem]'
   return (
-    <header className="flex h-12 shrink-0 items-center gap-1 px-1.5 md:h-14 md:gap-3 md:px-8">
+    // overflow-x-clip: a page's buttons can never make the window scroll sideways.
+    <header className="flex h-12 shrink-0 items-center gap-1 overflow-x-clip px-1.5 md:h-14 md:gap-3 md:px-8">
       <MenuButton />
       <div ref={topBarStart} className={cn(half, 'items-center gap-2.5 max-md:pl-1')} />
       <div ref={topBarEnd} className={cn(half, 'ml-auto items-center justify-end gap-1.5 max-md:pr-1')} />

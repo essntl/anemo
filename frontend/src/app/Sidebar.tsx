@@ -28,7 +28,8 @@ import { PagesFolder, type PageEntry } from './PagesFolder'
 import { ScopeControl } from './ScopeControl'
 import { useSidebar } from './sidebarStore'
 
-const ROW = 'flex h-9 min-w-0 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors'
+// 32px rows: with six pages, More and the chats the sidebar still fits a 720px-high window without scrolling.
+const ROW = 'flex h-8 min-w-0 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors pointer-coarse:h-10'
 const ROW_ON = 'bg-surface-2 font-semibold text-text [&>span>svg]:text-accent'
 const ROW_OFF = 'text-text hover:bg-surface-hover [&>span>svg]:text-muted'
 const ICON_BUTTON = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
@@ -207,7 +208,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
 
       {/* The chats take all the free height and are the only thing that scrolls. */}
       {!onClose && <Divider className="-mx-3 mt-2.5" />}
-      <div className="flex min-h-52 flex-1 flex-col">
+      <div className="flex min-h-36 flex-1 flex-col">
         <ConversationList />
         <NavLink to="/chats"
           className={({ isActive }) => cn(ROW, 'mt-1 shrink-0 pointer-coarse:h-11 pointer-coarse:text-[15px]', isActive ? ROW_ON : ROW_OFF)}>

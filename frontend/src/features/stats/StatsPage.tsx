@@ -41,12 +41,15 @@ export function StatsPage() {
   const runBars = useMemo(() => (s ? toBars(s.agents.runs_by_day, today) : []), [s, today])
   const hours = useMemo(() => (s ? s.focus.by_hour.map((v, h) => ({ key: String(h), label: `${String(h).padStart(2, '0')}:00`, short: h % 3 === 0 ? String(h) : '', value: v })) : []), [s])
 
+  const rangeSwitch = (
+    <Segmented<RangeKind> label="Range" value={kind} onChange={setKind} size="sm"
+      options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'half', label: '6 months' }, { value: 'custom', label: 'Custom' }]} />
+  )
   return (
     <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Stats">
-        <Segmented<RangeKind> label="Range" value={kind} onChange={setKind} size="sm"
-          options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'half', label: '6 months' }, { value: 'custom', label: 'Custom' }]} />
-      </PageHeader>
+      {/* The range sits in the top bar; a phone's bar has no room for it, so there it is the first row of the page. */}
+      <PageHeader title="Stats"><div className="max-md:hidden">{rangeSwitch}</div></PageHeader>
+      <div className="mb-3 md:hidden">{rangeSwitch}</div>
       <p className="mb-4 max-w-2xl text-[13px] text-muted">Your focus, tasks and projects over time{project ? ` in ${project.name}` : scope.kind === 'uncategorized' ? ', for what is in no project' : ''}.</p>
       {kind === 'custom' && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-[13px]">
