@@ -222,7 +222,8 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         // On a phone the pages fold into one bar that opens as a card (PagesFolder).
         <>
           <Divider className="-mx-3 my-2" />
-          <PagesFolder pages={[...PINNED, ...MORE]} onNavigate={onClose} />
+          {/* The Inbox is an icon in this menu's header, so the card doesn't repeat it. */}
+          <PagesFolder pages={[...PINNED, ...MORE].filter((p) => p.to !== '/notifications')} onNavigate={onClose} />
         </>
       ) : (
         // Who is signed in, with Settings and Sign out (under Settings > General too).
