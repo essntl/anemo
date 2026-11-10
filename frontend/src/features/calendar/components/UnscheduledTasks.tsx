@@ -4,7 +4,7 @@ import { GripVertical } from 'lucide-react'
 import type { Task } from '@/features/tasks/api'
 
 /**
- * Beside the calendar (wide screens): the open tasks that have no date yet. Dragging one
+ * In the column beside the calendar (wide screens): the open tasks that have no date yet. Dragging one
  * onto a day gives it that day; onto a time, that time too (CalendarPage handles the drop).
  */
 export function UnscheduledTasks({ tasks, onOpen }: { tasks: Task[]; onOpen: (task: Task) => void }) {
@@ -17,7 +17,7 @@ export function UnscheduledTasks({ tasks, onOpen }: { tasks: Task[]; onOpen: (ta
     return () => draggable.destroy()
   }, [])
   return (
-    <aside aria-label="Tasks without a date" className="hidden w-60 shrink-0 flex-col rounded-card border border-border bg-card p-2 shadow-soft lg:flex">
+    <section aria-label="Tasks without a date" className="flex min-h-0 flex-1 flex-col rounded-card border border-border bg-card p-2 shadow-soft">
       <h2 className="px-2 pb-1 pt-1.5 text-[12px] font-semibold">No date yet</h2>
       <div ref={list} className="min-h-0 flex-1 overflow-y-auto">
         {tasks.map((t) => (
@@ -30,6 +30,6 @@ export function UnscheduledTasks({ tasks, onOpen }: { tasks: Task[]; onOpen: (ta
         {tasks.length === 0 && <p className="px-2 py-1 text-[13px] text-muted">Every open task has a date.</p>}
       </div>
       <p className="px-2 pt-2 text-[12px] text-muted">Drag a task onto a day to give it a date.</p>
-    </aside>
+    </section>
   )
 }

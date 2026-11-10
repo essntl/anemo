@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { dismissIslandAlert, islandAlert, useIslandAlerts } from './alerts'
+import { dismissIslandAlert, isQuiet, islandAlert, setQuiet, useIslandAlerts } from './alerts'
 
 describe('island alerts', () => {
   beforeEach(() => vi.useFakeTimers())
@@ -24,6 +24,31 @@ describe('island alerts', () => {
     islandAlert({ title: 'Shuffle off', key: 'mode' })
     expect(useIslandAlerts.getState().current?.title).toBe('Shuffle off')
     expect(useIslandAlerts.getState().queue.map((a) => a.title)).toEqual(['Something else'])
+  })
+
+  it('while quiet, holds what can wait and shows the rest', () => {
+    setQuiet(true)
+    expect(isQuiet()).toBe(true)
+    islandAlert({ title: 'The agent finished', deferrable: true })
+    expect(useIslandAlerts.getState().current).toBeNull()
+    islandAlert({ title: 'Approval needed' })
+    expect(useIslandAlerts.getState().current?.title).toBe('Approval needed')
+    dismissIslandAlert()
+    // The break: the one that waited is shown as it was.
+    setQuiet(false)
+    expect(useIslandAlerts.getState().current?.title).toBe('The agent finished')
+  })
+
+  it('after a quiet stretch, several held alerts become one line', () => {
+    setQuiet(true)
+    islandAlert({ title: 'The agent finished', deferrable: true })
+    islandAlert({ title: 'Low Tide', key: 'now-playing', deferrable: true })
+    islandAlert({ title: 'Slow Morning', key: 'now-playing', deferrable: true })
+    setQuiet(false)
+    const shown = useIslandAlerts.getState().current
+    expect(shown?.title).toBe('2 things happened while you focused')
+    expect(shown?.body).toBe('The agent finished · Slow Morning')
+    expect(shown?.link).toBe('/notifications')
   })
 
   it('can be dismissed', () => {

@@ -19,6 +19,8 @@ import { QueuePanel } from './components/QueuePanel'
 import { YouTubeCheck } from './components/YouTubeCheck'
 import { player, usePlayer, usePlayerStore } from './player/controller'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { Select } from '@/components/ui/Select'
+import { SLEEP_CHOICES, stopAfter, useSleepTimer } from './player/sleep'
 
 type Tab = 'queue' | 'playlists'
 
@@ -34,11 +36,17 @@ export function MusicPage() {
     const name = await promptDialog({ title: 'Save the queue as a playlist', label: 'Name', placeholder: 'e.g. Deep focus', confirmLabel: 'Save' })
     if (name?.trim()) create.mutate({ name: name.trim(), tracks: usePlayerStore.getState().queue }, { onSuccess: () => setTab('playlists') })
   }
+  const sleep = useSleepTimer((s) => s.minutes)
   const count = (n: number) => <span className="text-[11px] text-muted tabular-nums">{n}</span>
 
   return (
     <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Music" />
+      <PageHeader title="Music">
+        {/* Stop after: the music pauses by itself (for falling asleep, or the end of a work block). */}
+        <Select variant="pill" aria-label="Stop after" value={sleep === null ? '' : String(sleep)}
+          onValueChange={(v) => stopAfter(v ? Number(v) : null)}
+          options={[{ value: '', label: 'Keep playing' }, ...SLEEP_CHOICES.map((m) => ({ value: String(m), label: `Stop after ${m} min` }))]} />
+      </PageHeader>
       <p className="mb-4 max-w-2xl text-[13px] text-muted">Queue YouTube, SoundCloud or any stream, and play it from anywhere in Anemo.</p>
 
       {/* The player takes the left side in full height; the queue and the ambient sound are beside it. */}

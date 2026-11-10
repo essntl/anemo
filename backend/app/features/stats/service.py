@@ -78,7 +78,10 @@ async def compute(
     end: date,
     project_id: uuid.UUID | None = None,
     today: date | None = None,
+    *,
+    no_project: bool = False,
 ) -> StatsOut:
+    """`project_id` narrows to one project; `no_project` to what is in none."""
     tz = await user_timezone(db)
     lo, hi = _bounds(start, end, tz)
     today = today or datetime.now(ZoneInfo(tz)).date()
@@ -86,6 +89,8 @@ async def compute(
     in_focus = [FocusSession.phase == "focus"]
     if project_id:
         in_focus.append(FocusSession.project_id == project_id)
+    elif no_project:
+        in_focus.append(FocusSession.project_id.is_(None))
     in_range = [*in_focus, FocusSession.started_at >= lo, FocusSession.started_at < hi]
 
     # Focus: per day, totals, by hour.
@@ -141,7 +146,13 @@ async def compute(
     }
 
     # Tasks.
-    task_scope = [Task.project_id == project_id] if project_id else []
+    task_scope = (
+        [Task.project_id == project_id]
+        if project_id
+        else [Task.project_id.is_(None)]
+        if no_project
+        else []
+    )
     done_day = _local_day(Task.completed_at, tz)
     completed_rows = {
         d: int(n)

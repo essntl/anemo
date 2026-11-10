@@ -182,7 +182,8 @@ test('reference a chat, edit the last message, branch, and save as a document', 
 
     // A new chat that references it: the model receives the earlier chat's text.
     await newChat(page, 'Chat', models.echo)
-    await page.getByRole('button', { name: 'Reference a chat' }).click()
+    await page.getByRole('button', { name: 'Add to the message' }).click()
+    await page.getByRole('button', { name: /^Reference a chat/ }).click()
     const picker = page.getByRole('dialog')
     await picker.getByLabel('Search your chats').fill(mark)
     await picker.getByRole('button', { name: new RegExp(`Earlier ${mark}`) }).click()

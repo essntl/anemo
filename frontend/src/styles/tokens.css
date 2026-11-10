@@ -9,7 +9,7 @@
 :root {
   color-scheme: light;
 
-  --accent: #3478f6;
+  --accent: #2a6df4;
   --accent-hover: color-mix(in oklch, var(--accent), black 12%);
   --accent-soft: color-mix(in oklch, var(--accent) 12%, transparent);
   --accent-contrast: #ffffff;

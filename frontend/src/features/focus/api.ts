@@ -6,12 +6,17 @@ import { useOutbox } from './outbox'
 export type FocusSession = Schemas['FocusSessionOut']
 export const focusKey = ['focus'] as const
 
-/** Focus sessions that started in [start, end), newest first. */
-export function useFocusSessions(range: { start: Date; end: Date; projectId?: string | null }) {
+/**
+ * Focus sessions that started in [start, end), newest first: all of them, those of one
+ * project (`projectId`), or those of no project (`noProject`).
+ */
+export function useFocusSessions(range: { start: Date; end: Date; projectId?: string | null; noProject?: boolean }) {
   const start = range.start.toISOString()
   const end = range.end.toISOString()
   return useQuery({
     queryKey: [...focusKey, 'sessions', start, end, range.projectId ?? null],
+    // The server narrows to a project; the sessions of none are picked out here.
+    select: range.noProject && !range.projectId ? unfiled : undefined,
     queryFn: async () =>
       unwrap(
         await api.GET('/api/focus/sessions', {
@@ -21,6 +26,8 @@ export function useFocusSessions(range: { start: Date; end: Date; projectId?: st
   })
 }
 
+const unfiled = (sessions: FocusSession[]) => sessions.filter((s) => !s.project_id)
+
 export function startOfToday(now = new Date()): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate())
 }
@@ -29,10 +36,10 @@ export function startOfToday(now = new Date()): Date {
  * Today's focus on this device's calendar day: minutes and sessions, including any
  * still waiting in the offline outbox (so the number is right while offline).
  */
-export function useTodayFocus(projectId?: string | null) {
+export function useTodayFocus(projectId?: string | null, noProject = false) {
   const start = startOfToday()
   const end = new Date(start.getTime() + 86_400_000)
-  const sessions = useFocusSessions({ start, end, projectId })
+  const sessions = useFocusSessions({ start, end, projectId, noProject })
   const pending = useOutbox((s) => s.pending)
   return useMemo(() => {
     const stored = sessions.data ?? []

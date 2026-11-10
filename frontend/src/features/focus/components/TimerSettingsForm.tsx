@@ -117,6 +117,9 @@ export function TimerSettingsForm() {
         <Row label="Daily goal" hint="Shown in This week">
           <Stepper label="Daily goal in minutes" unit="min" min={0} max={1440} value={s.daily_goal_minutes} onChange={(v) => set({ daily_goal_minutes: v })} />
         </Row>
+        <Row label="Quiet while focusing" hint="Alerts wait for the break. Approvals still come through">
+          <Switch label="Hold alerts until the break" checked={s.quiet_while_focusing} onChange={(v) => set({ quiet_while_focusing: v })} />
+        </Row>
         <Row label="Keep in Notifications" hint="Also list finished phases under Notifications">
           <Switch label="Keep finished phases in Notifications" checked={s.save_to_notifications} onChange={(v) => set({ save_to_notifications: v })} />
         </Row>

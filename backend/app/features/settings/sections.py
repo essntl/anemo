@@ -64,6 +64,8 @@ class FocusSettings(BaseModel):
     # Also add "phase finished" to the Notifications list (off: they only show here).
     save_to_notifications: bool = False
     daily_goal_minutes: int = Field(120, ge=0, le=1440)
+    # While a focus session runs, alerts wait for the break (approvals still come through).
+    quiet_while_focusing: bool = False
 
 
 class MusicSettings(BaseModel):
@@ -73,6 +75,9 @@ class MusicSettings(BaseModel):
     blur_backdrop: bool = True
     # The Dynamic Island shows the title when a new track starts.
     track_alerts: bool = True
+    # The music follows the focus timer: it plays while a focus session runs and
+    # pauses for the breaks.
+    play_while_focusing: bool = False
 
 
 class WidgetLayout(BaseModel):
@@ -106,7 +111,8 @@ class FilesSettings(BaseModel):
 
 class AppearanceSettings(BaseModel):
     mode: Literal["light", "dark", "system"] = "system"
-    accent: str = Field("#3478f6", pattern=r"^#[0-9a-fA-F]{6}$")
+    # The default has 4.5:1 against white text (the buttons).
+    accent: str = Field("#2a6df4", pattern=r"^#[0-9a-fA-F]{6}$")
     density: Literal["comfortable", "compact"] = "comfortable"
 
 

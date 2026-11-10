@@ -47,6 +47,8 @@ export function alertRunStatus(qc: QueryClient, e: RunStatusEvent): void {
     tone: failed ? 'error' : 'success',
     duration: 6000,
     link: `/c/${e.conversation_id}`,
+    // A finished run can wait for the break; an approval (below) never does.
+    deferrable: true,
   })
 }
 

@@ -258,7 +258,8 @@ function Conversation() {
   )
 
   return (
-    <div className="flex h-full">
+    // From `md` up the chat (and what opens beside it) is one panel on the ground, like the sidebar.
+    <div className="flex h-full md:mx-3 md:my-3 md:h-[calc(100%-1.5rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="shrink-0 border-b border-border">
         <div className="flex h-12 items-center gap-1 px-1.5 md:h-14 md:px-6">

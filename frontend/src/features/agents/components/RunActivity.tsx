@@ -24,15 +24,16 @@ import {
   ShieldAlert,
   Wrench,
   XCircle,
+  Globe,
 } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { FileIcon } from '@/components/ui/FileIcon'
-import { toolOutputUrl, useEditPlan } from '@/features/runs/api'
+import { toolOutputUrl, useEditPlan, useRun } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
-import { formatSize } from '@/lib/format'
+import { formatCost, formatCount, formatDuration, formatSize } from '@/lib/format'
 import { type FileChangeView, type Timeline, type ToolCallView, useRevertChange, useTimeline } from '../api'
 import { type EditableStep, planIsValid, toEditable } from '../plan'
 import { ApprovalCard } from './ApprovalCard'
@@ -356,11 +357,15 @@ export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
  */
 export function RunPanel({ runId }: { runId: string }) {
   const { data } = useTimeline(runId)
+  const run = useRun(runId, { pollWhileActive: true }).data
   if (!data) return <p className="p-4 text-[13px] text-muted">Loading…</p>
   const calls = data.tool_calls
   const failed = calls.filter((c) => c.status === 'failed' || c.status === 'denied').length
   const waiting = calls.filter((c) => c.status === 'waiting_approval').length
   const label = 'px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle'
+  // The web pages the run opened, each once, in the order it read them.
+  const pages = [...new Set(calls.map((c) => c.args.url).filter((u): u is string => typeof u === 'string' && /^https?:\/\//.test(u)))].slice(0, 12)
+  const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
   return (
     <div className="flex flex-col gap-4 p-3">
       <div>
@@ -379,8 +384,29 @@ export function RunPanel({ runId }: { runId: string }) {
           {[...data.file_changes].reverse().map((c) => <FileChangeRow key={c.id} runId={runId} change={c} />)}
         </div>
       )}
-      {!data.plan?.length && data.file_changes.length === 0 && (
-        <p className="px-2 text-[13px] text-muted">No plan and no changed files in this run.</p>
+      {pages.length > 0 && (
+        <div>
+          <div className={label}>Pages read</div>
+          {pages.map((url) => (
+            <a key={url} href={url} target="_blank" rel="noreferrer noopener" title={url}
+              className="flex h-8 items-center gap-2 rounded-control px-2 text-[13px] hover:bg-surface-hover">
+              <Globe className="h-3.5 w-3.5 shrink-0 text-muted" />
+              <span className="min-w-0 truncate">{host(url)}</span>
+            </a>
+          ))}
+        </div>
+      )}
+      {run && (
+        <div>
+          <div className={label}>Used</div>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-2 text-[13px]">
+            <dt className="text-muted">Model</dt><dd className="truncate text-right">{run.model_label ?? '–'}</dd>
+            <dt className="text-muted">Working time</dt><dd className="text-right tabular-nums">{formatDuration(run.totals.active_s)}</dd>
+            <dt className="text-muted">Tokens</dt><dd className="text-right tabular-nums">{formatCount(run.totals.input_tokens)} in · {formatCount(run.totals.output_tokens)} out</dd>
+            <dt className="text-muted">Cost</dt><dd className="text-right tabular-nums">{formatCost(run.totals.cost_usd)}</dd>
+            <dt className="text-muted">Context</dt><dd className="text-right">{run.totals.compactions ? `Summarized ${run.totals.compactions}×` : 'Full history'}</dd>
+          </dl>
+        </div>
       )}
     </div>
   )

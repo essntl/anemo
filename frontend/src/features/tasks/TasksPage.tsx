@@ -15,6 +15,7 @@ import { inScope, useProjectStore, useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { PRIORITY_LABELS, type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
 import { TaskBoard } from './components/TaskBoard'
@@ -35,6 +36,9 @@ function byUrgency(a: Task, b: Task): number {
     || b.priority - a.priority
     || a.sort_order - b.sort_order
 }
+
+/** From this width a task opens in a panel beside the list. */
+const VERY_WIDE = '(min-width: 1440px)'
 
 const QUICK_CHIP = "shrink-0 rounded-md bg-accent-soft px-2 py-0.5 text-[12px] font-medium text-accent"
 
@@ -131,7 +135,11 @@ export function TasksPage() {
     create.mutate({ title, due_date, priority, tags, project_id: projectFilter || null }, { onSuccess: () => setQuick('') })
   }
 
+  // Very wide screens: a task opens beside the list (not over it), so the list stays in reach.
+  const beside = useMediaQuery(VERY_WIDE) && view === 'list'
   return (
+    <div className="flex h-full">
+    <div className="min-w-0 flex-1 overflow-y-auto">
     <div className={cn('mx-auto p-4 md:px-8 md:pb-8 md:pt-2', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
       <PageHeader title="Tasks">
         <Button size="sm" variant="primary" className="shrink-0" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>
@@ -225,13 +233,22 @@ export function TasksPage() {
         </p>
       )}
 
-      <Lingering value={editing}>
+      <Lingering value={beside ? null : editing}>
         {(shown) => (
           <TaskDialog key={shown.task?.id ?? 'new'} task={shown.task} onClose={() => setEditing(null)}
             onOpenTask={(task) => setEditing({ task })}
             defaults={{ status: shown.status, project_id: projectFilter || null }} />
         )}
       </Lingering>
+    </div>
+    </div>
+    {beside && editing && (
+      <div className="h-full shrink-0 pb-3 pr-3">
+        <TaskDialog panel key={editing.task?.id ?? 'new'} task={editing.task} onClose={() => setEditing(null)}
+          onOpenTask={(task) => setEditing({ task })}
+          defaults={{ status: editing.status, project_id: projectFilter || null }} />
+      </div>
+    )}
     </div>
   )
 }

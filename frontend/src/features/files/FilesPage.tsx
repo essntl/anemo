@@ -333,7 +333,8 @@ export function FilesPage() {
   const error = (notAFolder ? null : folder.error) ?? makeFolder.error ?? saveFile.error ?? upload.error
 
   return (
-    <div className="flex h-full">
+    // From `md` up the file manager is one panel on the ground, like the sidebar.
+    <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
       <PageHeader title="Files" />
       <div className={cn('flex min-w-0 flex-1 flex-col', openFile && 'hidden lg:flex')}>
         <header className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border px-3 py-2.5 md:gap-2 md:px-4">

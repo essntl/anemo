@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTimerStore } from '@/features/focus/timerStore'
 import { useSettings } from '@/features/settings/api'
 import { musicKey } from './api'
-import { onLibraryChanged, setPlayerPrefs, usePlayerStore } from './player/controller'
+import { onLibraryChanged, player, setPlayerPrefs, usePlayerStore } from './player/controller'
+import { stopAfter, useSleepTimer } from './player/sleep'
 import { useAmbient } from './player/ambient'
 import { startExtensionBridge } from './extensionBridge'
 
@@ -18,6 +20,33 @@ export function PlayerEngine() {
   useEffect(() => {
     if (music) setPlayerPrefs({ trackAlerts: music.track_alerts })
   }, [music])
+
+  // Settings > Music, "Play while focusing": the music starts with a focus session and
+  // pauses when it ends, is paused or a break begins. Only a change of the timer does
+  // this (never just opening the app), so the buttons stay yours in between.
+  const phase = useTimerStore((s) => s.timer.phase)
+  const status = useTimerStore((s) => s.timer.status)
+  const follow = music?.play_while_focusing ?? false
+  const last = useRef<string | null>(null)
+  useEffect(() => {
+    const now = `${phase}:${status}`
+    const before = last.current
+    last.current = now
+    if (!follow || before === null || before === now) return
+    if (phase === 'focus' && status === 'running') player.play()
+    else player.pause()
+  }, [follow, phase, status])
+
+  // "Stop after" (Music page): pause when the time is up.
+  const until = useSleepTimer((s) => s.until)
+  useEffect(() => {
+    if (until === null) return
+    const id = setTimeout(() => {
+      player.pause()
+      stopAfter(null)
+    }, Math.max(0, until - Date.now()))
+    return () => clearTimeout(id)
+  }, [until])
 
   // Tracks saved to the library from here: refresh the lists that show them.
   useEffect(() => onLibraryChanged(() => void qc.invalidateQueries({ queryKey: musicKey })), [qc])

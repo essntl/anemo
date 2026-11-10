@@ -60,7 +60,8 @@ export function DocumentsPage() {
   const outside = scope.kind === 'uncategorized' ? (projects.data ?? []).map((p) => p.slug) : undefined
 
   return (
-    <div className="flex h-full">
+    // From `md` up the list and the editor are one panel on the ground, like the sidebar.
+    <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
       <aside className={cn('w-full shrink-0 border-r border-border md:w-72', address && 'hidden md:block')}>
         <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} outside={outside} />
       </aside>

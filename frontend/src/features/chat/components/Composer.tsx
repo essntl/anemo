@@ -1,6 +1,7 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
-import { ArrowUp, MessagesSquare, Paperclip, Settings2, Square, SquareSlash, X } from 'lucide-react'
+import { ArrowUp, MessagesSquare, Paperclip, Plus, Settings2, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
@@ -46,6 +47,8 @@ interface ComposerProps {
   onSkillChange?: (skill: Skill | null) => void
 }
 
+const ADD_ITEM = 'flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left text-[13.5px] font-medium hover:bg-surface-hover disabled:opacity-40 pointer-coarse:py-2.5'
+
 /** The box grows with the text up to this height (px), then scrolls. */
 const MAX_HEIGHT = 240
 
@@ -59,6 +62,8 @@ export function Composer({
   const files = useAttachments()
   const [references, setReferences] = useState<ChatRef[]>([])
   const [picking, setPicking] = useState(false)
+  // The "+" menu: attach files, reference a chat, use a skill.
+  const [adding, setAdding] = useState(false)
   // Touch screens: the on-screen keyboard has its own send flow, so Enter adds a line
   // and the box doesn't grab focus (which would pop the keyboard up on every visit).
   const touch = useMediaQuery('(pointer: coarse)')
@@ -307,47 +312,49 @@ export function Composer({
       </div>
       <div className="flex items-center justify-between gap-1 pl-1 md:gap-2">
         <div className="flex min-w-0 items-center gap-0.5 md:gap-1">
-          <button
-            type="button"
-            aria-label="Attach files"
-            title="Attach files (or drop / paste them)"
-            disabled={disabled || files.items.length >= MAX_ATTACHMENTS}
-            onClick={() => fileRef.current?.click()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Reference a chat"
-            title="Reference another chat as context"
-            disabled={disabled || references.length >= MAX_REFERENCES}
-            onClick={() => setPicking(true)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10"
-          >
-            <MessagesSquare className="h-4 w-4" />
-          </button>
-          {slashSkills.length > 0 && (
-            <button
-              type="button"
-              aria-label="Use a skill"
-              title="Use a skill (type / at the start)"
-              disabled={disabled}
-              onClick={() => {
-                if (skill) chooseSkill(null, text)
-                else if (!menuOpen) {
-                  setCarried(text)
-                  setText('/')
-                  setDismissed(null)
-                  textRef.current?.focus()
-                }
-              }}
-              className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-surface-hover hover:text-text disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10',
-                skill ? 'text-accent' : 'text-muted')}
-            >
-              <SquareSlash className="h-4 w-4" />
-            </button>
-          )}
+          {/* One "+" for what can be added to a message: files, another chat, a skill. */}
+          <Popover.Root open={adding} onOpenChange={setAdding}>
+            <Popover.Trigger asChild>
+              <button type="button" aria-label="Add to the message" title="Attach files, reference a chat or use a skill" disabled={disabled}
+                className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 hover:bg-surface-hover disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10',
+                  skill ? 'text-accent' : 'text-text')}>
+                <Plus className={cn('h-4 w-4 transition-transform', adding && 'rotate-45')} />
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content side="top" align="start" sideOffset={8} collisionPadding={12}
+                // Closing gives the focus back to the text box, not to the "+".
+                onCloseAutoFocus={(e) => { e.preventDefault(); textRef.current?.focus() }}
+                className="pop z-50 w-64 rounded-card border border-border bg-card p-1.5 shadow-float">
+                <button type="button" className={ADD_ITEM} disabled={files.items.length >= MAX_ATTACHMENTS}
+                  onClick={() => { setAdding(false); fileRef.current?.click() }}>
+                  <Paperclip className="h-4 w-4 shrink-0 text-muted" />
+                  <span className="min-w-0 flex-1">Attach files<span className="block text-[12px] font-normal text-muted">Or drop or paste them</span></span>
+                </button>
+                <button type="button" className={ADD_ITEM} disabled={references.length >= MAX_REFERENCES}
+                  onClick={() => { setAdding(false); setPicking(true) }}>
+                  <MessagesSquare className="h-4 w-4 shrink-0 text-muted" />
+                  <span className="min-w-0 flex-1">Reference a chat<span className="block text-[12px] font-normal text-muted">Another chat as context</span></span>
+                </button>
+                {slashSkills.length > 0 && (
+                  <button type="button" className={ADD_ITEM}
+                    onClick={() => {
+                      setAdding(false)
+                      if (skill) chooseSkill(null, text)
+                      else if (!menuOpen) {
+                        setCarried(text)
+                        setText('/')
+                        setDismissed(null)
+                        textRef.current?.focus()
+                      }
+                    }}>
+                    <SquareSlash className={cn('h-4 w-4 shrink-0', skill ? 'text-accent' : 'text-muted')} />
+                    <span className="min-w-0 flex-1">{skill ? 'Remove the skill' : 'Use a skill'}<span className="block text-[12px] font-normal text-muted">Or type / at the start</span></span>
+                  </button>
+                )}
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
           <input
             ref={fileRef}
             type="file"

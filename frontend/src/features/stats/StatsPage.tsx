@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Bot, ChartColumn, Clock, FolderKanban, Grid3x3, SquareCheckBig, Target } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject } from '@/app/projectStore'
+import { useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -28,11 +28,12 @@ const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
 
 export function StatsPage() {
   const today = dayOf(new Date(useToday()))
-  const project = useCurrentProject()
+  const scope = useScope()
+  const project = scope.kind === 'project' ? scope.project : null
   const [kind, setKind] = useState<RangeKind>('week')
   const [custom, setCustom] = useState(() => rangeFor('month', today))
   const range = kind === 'custom' ? custom : rangeFor(kind, today)
-  const stats = useStats(range.from, range.to, project?.id)
+  const stats = useStats(range.from, range.to, project?.id, scope.kind === 'uncategorized')
   const s = stats.data
 
   const focusBars = useMemo(() => (s ? toBars(s.focus.by_day, today) : []), [s, today])
@@ -46,7 +47,7 @@ export function StatsPage() {
         <Segmented<RangeKind> label="Range" value={kind} onChange={setKind} size="sm"
           options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'half', label: '6 months' }, { value: 'custom', label: 'Custom' }]} />
       </PageHeader>
-      <p className="mb-4 max-w-2xl text-[13px] text-muted">Your focus, tasks and projects over time{project ? ` in ${project.name}` : ''}.</p>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">Your focus, tasks and projects over time{project ? ` in ${project.name}` : scope.kind === 'uncategorized' ? ', for what is in no project' : ''}.</p>
       {kind === 'custom' && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-[13px]">
           <label className="flex items-center gap-2">From

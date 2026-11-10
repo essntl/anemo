@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
+import { setQuiet } from '@/features/island/alerts'
 import { useSettings } from '@/features/settings/api'
 import { focusKey } from './api'
 import { flushOutbox, onSessionsSent, useOutbox } from './outbox'
@@ -49,6 +50,11 @@ export function TimerEngine() {
       titleCountdown: focus.title_countdown,
     })
   }, [focus])
+
+  // Quiet while focusing (Settings > Focus): alerts that can wait do, until the session ends.
+  const quiet = Boolean(focus?.quiet_while_focusing) && t.phase === 'focus' && t.status === 'running'
+  useEffect(() => setQuiet(quiet), [quiet])
+  useEffect(() => () => setQuiet(false), [])
 
   // The clock.
   useEffect(() => {

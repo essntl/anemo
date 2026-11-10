@@ -27,6 +27,8 @@ export interface IslandAlert {
   key?: string
   /** Clicking the alert opens this page (e.g. the chat that waits for an approval). */
   link?: string
+  /** Can wait for a break while a focus session runs (an agent that finished, a new track). */
+  deferrable?: boolean
 }
 
 export type AlertInput = Omit<IslandAlert, 'id' | 'tone' | 'duration'> & Partial<Pick<IslandAlert, 'tone' | 'duration'>>
@@ -49,7 +51,38 @@ function showNext() {
   if (current) timer = setTimeout(showNext, current.duration)
 }
 
+/*
+ * Quiet: while a focus session runs (Settings > Focus), alerts marked `deferrable` wait.
+ * When it ends they are shown: the one, or a single line that says how many there were.
+ */
+let quiet = false
+let held: AlertInput[] = []
+
+/** Whether alerts are being held back right now. */
+export const isQuiet = () => quiet
+
+export function setQuiet(on: boolean): void {
+  if (quiet === on) return
+  quiet = on
+  if (on) return
+  const waiting = held
+  held = []
+  if (waiting.length === 1) islandAlert(waiting[0])
+  else if (waiting.length > 1) {
+    islandAlert({
+      title: `${waiting.length} things happened while you focused`,
+      body: waiting.slice(0, 3).map((a) => a.title).join(' · '),
+      icon: 'check', tone: 'info', duration: 6000, link: '/notifications',
+    })
+  }
+}
+
 export function islandAlert(input: AlertInput): void {
+  if (quiet && input.deferrable) {
+    // The latest of a kind replaces the earlier one, as on screen.
+    held = [...held.filter((a) => !input.key || a.key !== input.key), input]
+    return
+  }
   const alert: IslandAlert = { tone: 'accent', duration: 3200, ...input, id: nextId++ }
   const { current, queue } = useIslandAlerts.getState()
   if (alert.key) {

@@ -20,13 +20,14 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
-import { type Task, useTasks, useTasksDue, useUpdateTask } from '@/features/tasks/api'
+import { type Task, useProjects, useTasks, useTasksDue, useUpdateTask } from '@/features/tasks/api'
 import { TaskDialog } from '@/features/tasks/components/TaskDialog'
 import { addDays, dayOf, today } from '@/features/tasks/dates'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { browserTimeZone, type Occurrence, useChangeOccurrence, useOccurrencesIn, useSaveEvent } from './api'
 import { DayList } from './components/DayList'
+import { MiniMonth } from './components/MiniMonth'
 import { UnscheduledTasks } from './components/UnscheduledTasks'
 import { colorOf, daysOf } from './entries'
 import { EventDialog, type NewEventDefaults } from './components/EventDialog'
@@ -70,6 +71,8 @@ export function CalendarPage() {
   const [selected, setSelected] = useState(startDate ?? today())
   const phoneMonth = !desktop && view === 'month'
   const [range, setRange] = useState<{ start: string; end: string } | null>(null)
+  // The days of the view itself (a month view's range also holds the days around it).
+  const [shown, setShown] = useState<{ start: string; end: string } | null>(null)
   const [title, setTitle] = useState('')
   const [open, setOpen] = useState<Open>(null)
   // What the sidebar's switcher shows: a project's events and tasks, those of no project, or all.
@@ -81,7 +84,12 @@ export function CalendarPage() {
   const updateTask = useUpdateTask()
   const error = occurrences.error ?? saveEvent.error ?? changeOccurrence.error ?? updateTask.error
 
+  // In All, an event without a colour of its own takes its project's, so the projects can be told apart.
+  const projects = useProjects()
+  const legend = useMemo(() => (scope.kind === 'all' ? (projects.data ?? []).filter((p) => !p.archived) : []), [projects.data, scope.kind])
   const entries = useMemo<EventInput[]>(() => {
+    const projectColor = new Map(legend.map((p) => [p.id, p.color]))
+    const colorFor = (o: Occurrence) => o.color ?? (o.project_id ? projectColor.get(o.project_id) : undefined)
     const events = (occurrences.data ?? []).map((o) => ({
       id: `${o.event_id}:${o.original_start}`,
       title: o.title,
@@ -90,7 +98,7 @@ export function CalendarPage() {
       end: o.all_day ? addDays(o.end_date!, 1) : o.end_at,
       allDay: o.all_day,
       extendedProps: { occurrence: o },
-      ...(o.color ? { backgroundColor: o.color, borderColor: o.color } : {}),
+      ...(colorFor(o) ? { backgroundColor: colorFor(o), borderColor: colorFor(o) } : {}),
     }))
     const due = (tasks.data ?? []).filter((t) => inScope(scope, t.project_id)).map((t) => ({
       id: `task:${t.id}`,
@@ -102,7 +110,7 @@ export function CalendarPage() {
       extendedProps: { task: t },
     }))
     return [...events, ...due]
-  }, [occurrences.data, tasks.data, scope])
+  }, [occurrences.data, tasks.data, scope, legend])
 
   const api = () => calendar.current?.getApi()
   const changeView = (next: View) => {
@@ -226,6 +234,27 @@ export function CalendarPage() {
       {error && <p className="mb-2 text-[13px] text-error">{errorMessage(error)}</p>}
 
       <div className={desktop ? 'flex min-h-0 flex-1 gap-3' : 'contents'}>
+      {/* Wide screens: a column with a small month, the projects' colours (in All) and the tasks without a date. */}
+      {desktop && (
+        <aside aria-label="Calendar tools" className="hidden w-60 shrink-0 flex-col gap-3 lg:flex">
+          <MiniMonth shown={shown} today={today()} onPick={(day) => { api()?.gotoDate(day); setSelected(day) }} />
+          {legend.length > 0 && (
+            <section aria-label="Projects" className="rounded-card border border-border bg-card p-3 text-[13px] shadow-soft">
+              <h2 className="pb-1 text-[12px] font-semibold">Projects</h2>
+              {legend.map((p) => (
+                <div key={p.id} className="flex h-7 items-center gap-2">
+                  <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                  <span className="min-w-0 truncate">{p.name}</span>
+                </div>
+              ))}
+              <div className="flex h-7 items-center gap-2 text-muted">
+                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" /> No project
+              </div>
+            </section>
+          )}
+          <UnscheduledTasks tasks={unscheduled} onOpen={(task) => setOpen({ kind: 'task', task })} />
+        </aside>
+      )}
       <div className={cn(
         'min-w-0 rounded-card border border-border bg-card p-2 shadow-soft md:p-3',
         // A phone's calendar has the whole width; the month grid sizes itself, the rest fills.
@@ -263,6 +292,7 @@ export function CalendarPage() {
           datesSet={(arg) => {
             setRange({ start: arg.start.toISOString(), end: arg.end.toISOString() })
             setTitle(arg.view.title)
+            setShown({ start: dayOf(arg.view.currentStart), end: dayOf(arg.view.currentEnd) })
           }}
           dateClick={onDateClick}
           eventClick={(arg) => openEntry({ extendedProps: arg.event.extendedProps })}
@@ -271,7 +301,6 @@ export function CalendarPage() {
           noEventsContent="Nothing planned"
         />
       </div>
-      {desktop && <UnscheduledTasks tasks={unscheduled} onOpen={(task) => setOpen({ kind: 'task', task })} />}
       </div>
       {phoneMonth && <DayList day={selected} entries={entries} onOpen={openEntry} />}
 

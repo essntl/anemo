@@ -23,7 +23,7 @@ export function PageHeader({ title, detail, before, after, children }: {
   const heading = (
     <>
       {before}
-      <h1 className="min-w-0 truncate text-[17px] font-bold tracking-tight md:text-[19px]">{title}</h1>
+      <h1 className="min-w-0 truncate text-[19px] font-bold tracking-tight">{title}</h1>
       {after}
       {detail && <span className="min-w-0 shrink truncate text-[13px] text-muted max-md:hidden">{detail}</span>}
     </>

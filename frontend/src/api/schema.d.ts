@@ -3319,7 +3319,8 @@ export interface paths {
         /**
          * Get Stats
          * @description Focus, tasks, projects and agent activity from `from` to `to` (local days,
-         *     both included), grouped by day in the time zone of Settings → General.
+         *     both included), grouped by day in the time zone of Settings → General. Of one
+         *     project (`project_id`), of what is in no project (`no_project`), or of everything.
          */
         get: operations["get_stats_api_stats_get"];
         put?: never;
@@ -3462,7 +3463,7 @@ export interface components {
             mode: "light" | "dark" | "system";
             /**
              * Accent
-             * @default #3478f6
+             * @default #2a6df4
              */
             accent: string;
             /**
@@ -4649,6 +4650,11 @@ export interface components {
              * @default 120
              */
             daily_goal_minutes: number;
+            /**
+             * Quiet While Focusing
+             * @default false
+             */
+            quiet_while_focusing: boolean;
         };
         /** FocusStats */
         FocusStats: {
@@ -5397,6 +5403,11 @@ export interface components {
              * @default true
              */
             track_alerts: boolean;
+            /**
+             * Play While Focusing
+             * @default false
+             */
+            play_while_focusing: boolean;
         };
         /** NewDocument */
         NewDocument: {
@@ -15756,6 +15767,8 @@ export interface operations {
                 from: string;
                 to: string;
                 project_id?: string | null;
+                /** @description Only what is in no project */
+                no_project?: boolean;
             };
             header?: never;
             path?: never;

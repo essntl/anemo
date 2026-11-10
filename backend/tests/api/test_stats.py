@@ -88,6 +88,17 @@ async def test_stats_by_local_day_across_dst(authed):
     ).json()
     assert mine["focus"]["total_minutes"] == 75
     assert mine["tasks"]["overdue_now"] == 0
+
+    # Only what is in no project: the two sessions without a task, and the old task.
+    unfiled = (
+        await authed.get(
+            "/api/stats",
+            params={"from": "2026-10-23", "to": "2026-10-26", "no_project": "true"},
+        )
+    ).json()
+    assert unfiled["focus"]["total_minutes"] == 15
+    assert unfiled["focus"]["sessions"] == 2
+    assert unfiled["tasks"]["overdue_now"] == 1
     assert other["id"]
 
     bad = await authed.get("/api/stats", params={"from": "2026-10-26", "to": "2026-10-23"})

@@ -5,7 +5,6 @@ import { House, Inbox, LayoutGrid, MessagesSquare, Plus, Settings } from 'lucide
 import { cn } from '@/lib/cn'
 import { InboxBadge } from './badges'
 import { MORE, PINNED } from './pageList'
-import { ScopeControl } from './ScopeControl'
 
 const TAB = 'relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium'
 
@@ -33,8 +32,6 @@ function MoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
           className="sheet fixed inset-x-0 bottom-0 z-50 rounded-t-panel border border-border bg-card px-3 pt-2 shadow-float focus:outline-none pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div aria-hidden className="mx-auto mb-2 h-1 w-9 rounded-full bg-border-strong" />
           <RadixDialog.Title className="px-2 pb-2 text-[17px] font-bold tracking-tight">More</RadixDialog.Title>
-          {/* What every page shows: Uncategorized, a project, or All (also in the menu). */}
-          <ScopeControl className="mx-1 mb-3" onNavigate={() => onOpenChange(false)} />
           <nav aria-label="More pages" className="grid grid-cols-4 gap-1">
             {[...pages, { to: '/settings', icon: <Settings />, label: 'Settings' }].map((p) => (
               <NavLink key={p.to} to={p.to} title={'title' in p ? p.title : undefined} onClick={() => onOpenChange(false)}

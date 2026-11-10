@@ -18,6 +18,7 @@ import { TopBar } from './mobileNav'
 import { MobileTabBar } from './MobileTabBar'
 import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
+import { ScopeControl } from './ScopeControl'
 import { Sidebar, SidebarRail } from './Sidebar'
 import { useSidebar } from './sidebarStore'
 import { useSidebarSwipe } from './useSidebarSwipe'
@@ -51,6 +52,9 @@ function SidebarDrawer() {
     </RadixDialog.Root>
   )
 }
+
+/** The pages that show only what the switcher allows. */
+const SCOPED = ['/', '/home', '/tasks', '/calendar', '/documents', '/files', '/stats']
 
 export function AppLayout() {
   useAppearanceSync()
@@ -86,6 +90,10 @@ export function AppLayout() {
           window), over the page header; see features/island/Island.tsx. */}
       <div id="main-column" className="relative flex min-w-0 flex-1 flex-col">
         {!ownHeader && <TopBar />}
+        {/* Phones: what is shown (Uncategorized, a project, All) sits under the title on the pages it changes. */}
+        {!ownHeader && SCOPED.some((p) => (p === '/' ? location.pathname === '/' : location.pathname === p || location.pathname.startsWith(`${p}/`))) && (
+          <div className="shrink-0 px-3 pb-2 md:hidden"><ScopeControl /></div>
+        )}
         <Island />
         {/* relative: anything absolutely placed inside a page is held (and clipped) here,
             so it can never make the whole window scroll. */}

@@ -6,6 +6,7 @@ import { approvalsKey } from '@/features/agents/api'
 import { automationsKey } from '@/features/automations/api'
 import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
+import { isQuiet } from '@/features/island/alerts'
 import { showDesktopNotification } from '@/features/notifications/desktop'
 import { alertApproval, alertRunStatus, type RunStatusEvent } from './agentAlerts'
 import { type FocusControl, type MusicControl, onFocusControl, onMusicControl } from './agentControl'
@@ -96,6 +97,8 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: notificationsKey })
       // The focus timer already chimed and told the user in this browser.
       if (note.kind === 'focus') return
+      // Quiet while focusing: it waits in the Inbox, which was just refreshed.
+      if (isQuiet()) return
       const open = () => void navigate(note.link ?? '/notifications')
       if (showDesktopNotification(note, open)) return
       // About what is on screen already (e.g. the agent's question in the open chat).

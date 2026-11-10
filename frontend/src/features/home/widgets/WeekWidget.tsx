@@ -1,7 +1,7 @@
 import { useToday } from '@/hooks/useNow'
 import { useMemo } from 'react'
 import { ChartColumn } from 'lucide-react'
-import { useCurrentProject } from '@/app/projectStore'
+import { useScope } from '@/app/projectStore'
 import { formatMinutes, useFocusSessions } from '@/features/focus/api'
 import { useSettings } from '@/features/settings/api'
 import { BarChart } from '@/features/stats/BarChart'
@@ -12,12 +12,13 @@ import { WidgetHeader } from './parts'
 
 /** This week: focused minutes per day, Monday to Sunday, with the total and the goal. */
 export function WeekWidget({ item }: { item: WidgetLayout }) {
-  const project = useCurrentProject()
+  const scope = useScope()
+  const project = scope.kind === 'project' ? scope.project : null
   const goal = useSettings().data?.focus.daily_goal_minutes ?? 0
   const day = useToday()
   const start = useMemo(() => startOfWeek(new Date(day)), [day])
   const end = useMemo(() => new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7), [start])
-  const sessions = useFocusSessions({ start, end, projectId: project?.id })
+  const sessions = useFocusSessions({ start, end, projectId: project?.id, noProject: scope.kind === 'uncategorized' })
   const today = dayOf(new Date(day))
   const bars = useMemo(() => {
     const byDay = new Map<string, number>()
