@@ -121,7 +121,9 @@ async def test_browser_tools_only_when_the_browser_runs(authed):
     cid = await setup(authed, **{"browser.use": "autonomous"})
     script("hello", [TextDelta("hi"), Done("end")])
     await agent_turn(authed, cid, "hello")
-    assert offered() == []  # the browser container is not running
+    # The browser container is not running. The tab the user shared from their own
+    # Chrome (tests/api/test_shared_tab.py) needs neither it nor browser control.
+    assert offered() == ["browser_current_tab"]
     assert "## Browser" not in FakeAdapter.requests[-1].system
 
 
@@ -141,6 +143,7 @@ async def test_agent_browses_after_one_approval(authed, browser):
     run_id = await agent_turn(authed, cid, "find the otters")
     assert offered() == [  # sorted by name (a stable prompt-cache prefix)
         "browser_click",
+        "browser_current_tab",
         "browser_open",
         "browser_read",
         "browser_screenshot",
@@ -400,3 +403,72 @@ async def test_the_picture_streams_through(authed, browser):
     assert browser.streamed == [640]
     assert (await authed.get(url, params={"width": 5000})).status_code == 422
     # (Signed in only, like every route but the public ones: see test_auth.)
+
+
+async def test_hovering_pressing_keys_and_waiting_in_the_sandbox(authed, browser):
+    cid = await setup(authed, **{"browser.use": "autonomous"})
+    script(
+        "open the menu",
+        [call("browser_open", url="https://shop.example/"), Done("tool_use")],
+        [
+            call("browser_click", ref=1, action="hover"),
+            call("browser_type", keys=["esc", "ctrl+A", "ArrowDown"]),
+            call("browser_type", ref=2, keys=["Tab"]),
+            call("browser_type", ref=2, text="otters", keys=["Enter"]),
+            call("browser_read", wait_for="Results", timeout_s=5),
+            call("browser_read", wait_for="Results", scroll="down"),
+            Done("tool_use"),
+        ],
+        [TextDelta("Done."), Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "open the menu")
+    assert await run_status(authed, run_id) == "completed"
+    sent = [
+        {k: v for k, v in c.items() if k not in ("session", "allowed_hosts")}
+        for c in browser.calls[1:]
+    ]
+    assert sent == [
+        {"action": "hover", "ref": 1},
+        {"action": "press", "keys": ["Escape", "Control+a", "ArrowDown"]},  # names made uniform
+        {"action": "press", "keys": ["Tab"], "ref": 2},
+        {"action": "type", "ref": 2, "text": "otters", "press_enter": False, "keys": ["Enter"]},
+        {"action": "wait", "text": "Results", "timeout_s": 5},
+        {"action": "wait", "text": "Results", "timeout_s": 10},
+        {"action": "read", "scroll": "down"},
+    ]
+    rows = (await timeline(authed, run_id))["tool_calls"][1:]
+    assert [r["status"] for r in rows] == ["succeeded"] * 6
+    # Hovering and waiting change nothing; keys can (Enter submits).
+    risks = ["safe", "moderate", "moderate", "moderate", "safe", "safe"]
+    assert [r["risk"] for r in rows] == risks
+    assert [r["actions"][0]["summary"] for r in rows[:4]] == [
+        'Hover over link "About us" in the browser',
+        "Press Escape, Control+a, ArrowDown",
+        'Press Tab in text field "Search"',
+        'Type “otters” into text field "Search", then press Enter',
+    ]
+
+
+async def test_keys_and_text_are_checked_before_anything_is_sent(authed, browser):
+    cid = await setup(authed, **{"browser.use": "autonomous"})
+    script(
+        "press things",
+        [
+            call("browser_type", keys=["F5"]),
+            call("browser_type", keys=["hello"]),
+            call("browser_type", keys=["Control+Control+a"]),
+            call("browser_type", ref=2),
+            call("browser_type", text="no field"),
+            call("browser_type", keys=["a"] * 11),
+            Done("tool_use"),
+        ],
+        [Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "press things")
+    assert browser.calls == []
+    results = tool_results_sent_to_model()
+    assert len(results) == 6
+    assert "'F5' is not a key" in results[0] and "Control+a" in results[0]
+    assert "give text (with ref), keys, or both" in results[3]
+    assert "text needs ref" in results[4]
+    assert all(r["status"] == "failed" for r in (await timeline(authed, run_id))["tool_calls"])

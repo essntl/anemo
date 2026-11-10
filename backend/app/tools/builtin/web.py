@@ -13,10 +13,11 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import BaseModel, Field, field_validator
 
+from app.features.extension import browser_relay
 from app.policy.models import Action, Risk
 from app.runtime.citations import next_turn
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.web import safe_http
+from app.web import safe_http, transcripts
 from app.web.fetch import FetchError, fetch_page
 from app.web.search import Category, SearchError, TimeRange, provider_for
 
@@ -206,6 +207,148 @@ class ReadWebPage(Tool):
                 },
             },
         )
+
+
+# -- video transcripts --------------------------------------------------------------------
+
+
+class TranscriptInput(BaseModel):
+    url: str = Field(max_length=2000, description="The video's link")
+    lang: str | None = Field(
+        None,
+        min_length=2,
+        max_length=20,
+        pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+        description='Caption language, e.g. "en" or "nb". Default: the video\'s own language',
+    )
+    start: int = Field(0, ge=0, description="Character offset, to continue a long transcript")
+    max_chars: int = Field(15_000, ge=500, le=15_000)
+
+    @field_validator("url")
+    @classmethod
+    def _url(cls, v: str) -> str:
+        return _check_url(v)
+
+
+def render_transcript(t: transcripts.Transcript, start: int, max_chars: int) -> str:
+    """The transcript as the model reads it: the facts about the video, then one line per
+    caption, `[mm:ss] text`. A part ends at the end of a line."""
+    body = "\n".join(f"[{transcripts.clock(s.start)}] {s.text}" for s in t.segments)
+    end = min(len(body), start + max_chars)
+    if end < len(body):
+        line_end = body.rfind("\n", start, end + 1)
+        end = line_end if line_end > start else end
+    part = body[start:end]
+    more_from = end + 1 if body[end : end + 1] == "\n" else end
+    captions = "written by a person" if t.kind == "manual" else "auto-generated (expect errors)"
+    lines = [
+        f"Title: {t.title or '(unknown)'}",
+        f"Channel: {t.channel or '(unknown)'}",
+        f"Length: {transcripts.clock(t.duration_s) if t.duration_s else '(unknown)'}",
+        f"Uploaded: {t.upload_date or '(unknown)'}",
+        f"Captions: {t.language or '(unknown language)'}, {captions}",
+        f"URL: {t.url}",
+        "",
+        f"Transcript {UNTRUSTED}",
+        part or "(nothing at this offset)",
+    ]
+    if end < len(body):
+        lines += [
+            "",
+            f"[Characters {start:,}-{end:,} of {len(body):,}. "
+            f"Call video_transcript again with start={more_from} for more.]",
+        ]
+    return "\n".join(lines)
+
+
+class VideoTranscript(Tool):
+    name = "video_transcript"
+    description = (
+        "Get what is said in an online video as text with timestamps (one line per caption, "
+        "`[mm:ss] text`), plus its title, channel, length and upload date. Works for "
+        "YouTube, and Vimeo, Dailymotion and TED links, when the video has captions "
+        "(written ones are preferred over auto-generated). Use it instead of read_web_page "
+        "to answer what a video says or to quote it. Long transcripts come in parts: call "
+        "again with `start`. It does not transcribe audio itself, so a video without "
+        "captions gives an error, and it cannot read playlists or channels."
+    )
+    capability = "net.fetch"
+    extra_capabilities = ("browser.mine",)
+    Input = TranscriptInput
+    timeout_s = 180.0
+
+    def actions(self, args: TranscriptInput, ctx: ToolContext) -> list[Action]:
+        found = [url_action(ctx, self.capability, args.url, "Read the transcript of", "safe")]
+        if ctx.my_browser and transcripts.is_youtube(args.url):
+            # The fallback when YouTube blocks the server: a read in the user's Chrome.
+            found.append(
+                Action(
+                    capability="browser.mine",
+                    summary="Read the transcript in your Chrome if YouTube blocks Anemo's server",
+                )
+            )
+        return found
+
+    async def run(self, args: TranscriptInput, ctx: ToolContext) -> ToolResult:
+        found = await transcripts.cached(args.url, args.lang)
+        if found is None:
+            try:
+                found = await transcripts.fetch(args.url, args.lang)
+            except transcripts.TranscriptError as exc:
+                fallback = await self._from_chrome(args, ctx, exc)
+                if isinstance(fallback, ToolResult):
+                    return fallback
+                found = fallback
+            await transcripts.remember(args.url, args.lang, found)
+        transcript = found
+        turn = next_turn(ctx.state.get("sources", []))
+        source = {
+            "ref": f"turn{turn}fetch0",
+            "turn": turn,
+            "title": transcript.title or transcript.url,
+            "url": transcript.url,
+        }
+        return ToolResult(
+            content=f"[{source['ref']}] "
+            + render_transcript(transcript, args.start, args.max_chars)
+            + "\n\nCite a moment as a link with its time, e.g. "
+            "([Title, 12:34](https://youtu.be/ID?t=754)).",
+            data={
+                "sources": [source],
+                "web": {"url": transcript.url, "title": transcript.title, "kind": "transcript"},
+            },
+        )
+
+    async def _from_chrome(
+        self, args: TranscriptInput, ctx: ToolContext, failed: transcripts.TranscriptError
+    ) -> transcripts.Transcript | ToolResult:
+        """YouTube refused the server: ask Anemo Companion to read the transcript in the
+        user's Chrome, when browser control is on. Same result either way."""
+        problem = ToolResult(content=failed.message, is_error=True)
+        can_help = failed.problem in ("blocked", "unavailable", "failed")
+        if not (can_help and ctx.my_browser and transcripts.is_youtube(args.url)):
+            if failed.problem == "blocked" and transcripts.is_youtube(args.url):
+                problem.content += (
+                    " With browser control switched on in Anemo Companion, the transcript "
+                    "can be read through the user's own Chrome instead."
+                )
+            return problem
+        lang = {"lang": args.lang} if args.lang else {}
+        try:
+            state = await browser_relay.act(
+                ctx.browser_session or ctx.run_id, "transcript", url=args.url, **lang
+            )
+        except (browser_relay.Unavailable, browser_relay.ActionFailed) as exc:
+            problem.content += f" Reading it through the user's Chrome did not work either: {exc}"
+            return problem
+        found = transcripts.from_json({"url": args.url, **(state.get("transcript") or {})})
+        if not found.segments:
+            problem.content += (
+                " Reading it through the user's Chrome did not work either: the extension "
+                "returned no transcript."
+            )
+            return problem
+        return found
 
 
 # -- raw HTTP ------------------------------------------------------------------------

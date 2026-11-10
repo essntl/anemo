@@ -392,6 +392,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Automations Settings */
+        put: operations["put_automations_settings_api_settings_automations_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/music": {
         parameters: {
             query?: never;
@@ -2238,6 +2255,66 @@ export interface paths {
         patch: operations["update_task_api_tasks__task_id__patch"];
         trace?: never;
     };
+    "/api/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Trash
+         * @description Deleted tasks and events, newest first.
+         */
+        get: operations["list_trash_api_trash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trash/{trash_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore
+         * @description Put a deleted task or event back as it was.
+         */
+        post: operations["restore_api_trash__trash_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trash/{trash_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Purge
+         * @description Delete one trash item for good (the user only; agents have no tool for it).
+         */
+        delete: operations["purge_api_trash__trash_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -2601,6 +2678,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/music/player-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Player State
+         * @description This tab's player (what plays, the queue), sent when an agent's tool asked for it
+         *     with a `music.control` event carrying a request id. Answers nobody asked for are
+         *     dropped.
+         */
+        post: operations["player_state_api_music_player_state_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notifications": {
         parameters: {
             query?: never;
@@ -2784,6 +2883,36 @@ export interface paths {
          */
         post: operations["pdf_text_api_extension_pdf_text_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/extension/shared-tab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Shared Tab
+         * @description Which tab is shared now (address and title, not the content).
+         */
+        get: operations["get_shared_tab_api_extension_shared_tab_get"];
+        /**
+         * Share Tab
+         * @description "Share this tab with Anemo": the extension sends the tab's readable content when
+         *     the user clicks. It replaces what was shared before; the assistant reads it with
+         *     browser_current_tab. Tabs the user did not share never reach Anemo.
+         */
+        put: operations["share_tab_api_extension_shared_tab_put"];
+        post?: never;
+        /**
+         * Stop Sharing
+         * @description Forget the shared tab.
+         */
+        delete: operations["stop_sharing_api_extension_shared_tab_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3446,6 +3575,7 @@ export interface components {
             web: components["schemas"]["WebSettings"];
             memory: components["schemas"]["MemorySettings"];
             focus: components["schemas"]["FocusSettings"];
+            automations: components["schemas"]["AutomationSettings"];
             music: components["schemas"]["MusicSettings"];
             home: components["schemas"]["HomeSettings"];
             files: components["schemas"]["FilesSettings"];
@@ -3609,6 +3739,8 @@ export interface components {
             profile_id?: string | null;
             /** Model Id */
             model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /**
              * On Ask
              * @default pause
@@ -3651,6 +3783,13 @@ export interface components {
             profile_id: string | null;
             /** Model Id */
             model_id: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Created By
+             * @default user
+             */
+            created_by: string;
             /**
              * On Ask
              * @enum {string}
@@ -3700,6 +3839,8 @@ export interface components {
             profile_id?: string | null;
             /** Model Id */
             model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** On Ask */
             on_ask?: ("pause" | "deny" | "fail") | null;
             /** Notify */
@@ -3710,6 +3851,22 @@ export interface components {
             document_path?: string | null;
             /** Max Retries */
             max_retries?: number | null;
+        };
+        /**
+         * AutomationSettings
+         * @description Protections for runs that start by themselves (Automations, the schedule tools).
+         */
+        AutomationSettings: {
+            /**
+             * Paused
+             * @default false
+             */
+            paused: boolean;
+            /**
+             * Max Run Minutes
+             * @default 30
+             */
+            max_run_minutes: number;
         };
         /** Backlinks */
         Backlinks: {
@@ -5756,6 +5913,74 @@ export interface components {
              */
             status: "pending" | "in_progress" | "done" | "skipped";
         };
+        /** PlayerAnswer */
+        PlayerAnswer: {
+            /** Request */
+            request: string;
+            state: components["schemas"]["PlayerState"];
+        };
+        /**
+         * PlayerState
+         * @description The player as its tab reports it. `index`: the current track's place in `queue`
+         *     (0-based; meaningless when the queue is empty).
+         */
+        PlayerState: {
+            /**
+             * Status
+             * @default unstarted
+             * @enum {string}
+             */
+            status: "unstarted" | "playing" | "paused" | "buffering" | "ended";
+            /**
+             * Index
+             * @default 0
+             */
+            index: number;
+            /**
+             * Shuffle
+             * @default false
+             */
+            shuffle: boolean;
+            /**
+             * Repeat
+             * @default off
+             * @enum {string}
+             */
+            repeat: "off" | "all" | "one";
+            /** Queue */
+            queue?: components["schemas"]["PlayerTrack"][];
+            /**
+             * More
+             * @default 0
+             */
+            more: number;
+            removed?: components["schemas"]["PlayerTrack"] | null;
+            /** Problem */
+            problem?: string | null;
+        };
+        /** PlayerTrack */
+        PlayerTrack: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Artist
+             * @default
+             */
+            artist: string;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+            /**
+             * Live
+             * @default false
+             */
+            live: boolean;
+        };
         /** PlaylistIn */
         PlaylistIn: {
             /** Name */
@@ -6716,13 +6941,15 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "cron" | "interval" | "once";
+            kind: "cron" | "interval" | "once" | "rrule";
             /** Cron */
             cron?: string | null;
             /** Every Minutes */
             every_minutes?: number | null;
             /** At */
             at?: string | null;
+            /** Rrule */
+            rrule?: string | null;
             /**
              * Tz
              * @default UTC
@@ -7025,6 +7252,60 @@ export interface components {
             events?: components["schemas"]["SharedEvent"][] | null;
             /** Documents */
             documents?: components["schemas"]["SharedDocument"][] | null;
+        };
+        /**
+         * SharedTabIn
+         * @description What the extension sends: the same shape as a page attached to a message.
+         */
+        SharedTabIn: {
+            /** Url */
+            url: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Source
+             * @default page
+             * @enum {string}
+             */
+            source: "page" | "selection" | "pdf" | "youtube";
+            /** Content */
+            content: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /**
+         * SharedTabOut
+         * @description The shared tab without its content (the content only goes to the assistant).
+         */
+        SharedTabOut: {
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "page" | "selection" | "pdf" | "youtube";
+            /** Word Count */
+            word_count: number;
+            /** Truncated */
+            truncated: boolean;
+            /**
+             * Shared At
+             * Format: date-time
+             */
+            shared_at: string;
+        };
+        /** SharedTabState */
+        SharedTabState: {
+            tab: components["schemas"]["SharedTabOut"] | null;
         };
         /** SharedTask */
         SharedTask: {
@@ -7669,6 +7950,33 @@ export interface components {
             is_dir: boolean;
             /** Deleted By */
             deleted_by: string;
+        };
+        /** TrashedOut */
+        TrashedOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "task" | "event";
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Title */
+            title: string;
+            /** Deleted By */
+            deleted_by: string;
+            /**
+             * Deleted At
+             * Format: date-time
+             */
+            deleted_at: string;
         };
         /** TurnIn */
         TurnIn: {
@@ -8740,6 +9048,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FocusSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_automations_settings_api_settings_automations_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationSettings"];
                 };
             };
             /** @description Validation Error */
@@ -12967,6 +13310,103 @@ export interface operations {
             };
         };
     };
+    list_trash_api_trash_get: {
+        parameters: {
+            query?: {
+                kind?: ("task" | "event") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashedOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_api_trash__trash_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trash_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_api_trash__trash_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trash_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_projects_api_projects_get: {
         parameters: {
             query?: never;
@@ -14053,6 +14493,39 @@ export interface operations {
             };
         };
     };
+    player_state_api_music_player_state_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerAnswer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_notifications_api_notifications_get: {
         parameters: {
             query?: {
@@ -14471,6 +14944,101 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PdfTextOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_shared_tab_api_extension_shared_tab_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedTabState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_tab_api_extension_shared_tab_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedTabIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedTabState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_sharing_api_extension_shared_tab_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

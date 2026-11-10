@@ -71,13 +71,23 @@ CATEGORIES: list[Category] = [
     Category(
         "focus.read",
         "Focus & music",
-        "Look at your focus sessions and focus stats.",
+        "Look at your focus sessions, focus stats and the music queue.",
         "autonomous",
     ),
     Category(
         "focus.control",
         "Control the timer and music",
-        "Start a focus session or queue music in the Anemo tab you use.",
+        "Start or stop a focus session, queue music and control the player in the Anemo "
+        "tab you use.",
+        "ask",
+    ),
+    # Creating a schedule, and changing what one does or when, are always asked about in
+    # code, whatever this level says (tools/builtin/schedules.py).
+    Category(
+        "automation.manage",
+        "Schedules",
+        "Create, change and delete prompts that run by themselves (Automations). A new "
+        "schedule or a changed prompt or time always asks.",
         "ask",
     ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
@@ -95,6 +105,7 @@ INTERNAL_RULES = [
     Rule(cap="tasks.read", decision="allow"),
     Rule(cap="calendar.read", decision="allow"),
     Rule(cap="automation.state", decision="allow"),  # an automation's own notes
+    Rule(cap="automation.read", decision="allow"),  # looking at the schedules
 ]
 
 

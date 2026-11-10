@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { CheckSquare, ChevronRight, KanbanSquare, List, Plus } from 'lucide-react'
+import { CheckSquare, ChevronRight, KanbanSquare, List, Plus, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { useCurrentProject, useProjectStore } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
@@ -19,6 +19,7 @@ import { cn } from '@/lib/cn'
 import { type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
 import { TaskBoard } from './components/TaskBoard'
 import { TaskDialog } from './components/TaskDialog'
+import { ItemTrashDialog } from '@/features/trash/ItemTrashDialog'
 import { type TaskInfo, TaskRow } from './components/TaskRow'
 import { type Bucket, BUCKET_LABELS, bucketOf } from './dates'
 import { byId } from './relations'
@@ -50,6 +51,7 @@ export function TasksPage() {
   const [search, setSearch] = useState('')
   const [showDone, setShowDone] = useState(false)
   const [editing, setEditing] = useState<Editing>(null)
+  const [trashOpen, setTrashOpen] = useState(false)
   // Tasks whose notes are shown in the list.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const toggleNotes = (id: string) =>
@@ -128,6 +130,7 @@ export function TasksPage() {
           <CheckSquare className="h-5 w-5" />
         </div>
         <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">Tasks</h1>
+        <Button size="sm" variant="ghost" className="shrink-0" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>
         <Button size="sm" variant="primary" className="shrink-0" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>
           New task
         </Button>
@@ -214,6 +217,7 @@ export function TasksPage() {
             defaults={{ status: shown.status, project_id: projectFilter || null }} />
         )}
       </Lingering>
+      <ItemTrashDialog kind="task" open={trashOpen} onOpenChange={setTrashOpen} />
     </div>
   )
 }

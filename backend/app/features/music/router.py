@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter
 
 from app.api.deps import Db
-from app.features.music import service
+from app.features.music import player_relay, service
 from app.features.music.schemas import (
     PlaylistIn,
     PlaylistOut,
@@ -89,3 +89,11 @@ async def append_playlist_tracks(
     playlist = await service.get_playlist(db, playlist_id)
     await service.append_tracks(db, playlist, body.track_ids)
     return await service.playlist_with_tracks(db, playlist)
+
+
+@router.post("/player-state", status_code=204)
+async def player_state(body: player_relay.PlayerAnswer) -> None:
+    """This tab's player (what plays, the queue), sent when an agent's tool asked for it
+    with a `music.control` event carrying a request id. Answers nobody asked for are
+    dropped."""
+    await player_relay.answer(body)

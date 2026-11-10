@@ -206,7 +206,9 @@ The rules are copied onto a run when it starts. Changing settings affects new ru
 When a run waits for you, you can approve once, approve for the rest of that run
 (for that kind of action in that place), or deny, with a reason the agent sees.
 An approval for the run never overrides "Never" or the ceiling, and some actions are
-asked about every time regardless (clicks and typing in your own Chrome). Unanswered
+asked about every time regardless: clicks, hovering, typing and key presses in your own
+Chrome, and creating a schedule or changing what one does or when (the request shows the
+prompt and the times). Unanswered
 requests expire after 24 hours and count as denied. Unattended automations follow
 their own setting for this: wait and notify you, skip the action, or stop.
 
@@ -224,6 +226,10 @@ sub-agent depth. When one is reached the run stops and says which.
 | Web pages and API calls | Addresses on your own network, the Docker host and cloud metadata addresses are refused unless you list them in Settings → Web & Search. Redirects are checked again. |
 | Browser | Its own container without workspace, database or secrets; the same address rules apply to everything it loads. |
 | Your own Chrome (browser control) | Only while you switch it on in Anemo Companion, never for automations, and only in tabs the agent opened in an "Anemo" tab group. Opening, reading and following links are allowed by default ("Your own Chrome" permission); every other click and all typing are asked about every time, whatever the level says ("allow for this run" doesn't apply). The extension never types into password fields and never uses Anemo itself, browser pages, `.gov` sites, banks or its blocklist. Commands reach it only over its authenticated WebSocket. It acts with that browser's logins, so use a separate Chrome profile. |
+| A tab you shared | "Share this tab with Anemo" in Anemo Companion sends a copy of that one page's text. The agent can read that copy (no approval; "Never" for "Your own Chrome" takes the tool away), and nothing else: it cannot list or read other tabs, or see the shared one again after it changed. One tab at a time, forgotten after 12 hours or when you stop sharing; kept in Valkey, not the database. Not for automations. |
+| Video transcripts | Read with yt-dlp on the Anemo host, from YouTube, Vimeo, Dailymotion and TED addresses only (checked by host name; yt-dlp's fetch-anything extractor is off), so the tool cannot be pointed at your network. If YouTube blocks the server and browser control is on, the transcript is read through your Chrome instead (a read, like opening a page there). |
+| Schedules | An agent can set up a prompt that runs by itself (an automation) only with your confirmation, every time, whatever the "Schedules" level says. Scheduled runs wait for you when an action needs approval, cannot create or change schedules themselves, are stopped after the time limit for scheduled runs (30 minutes unless changed), run at most every 5 minutes, and all stop starting while "Pause all" is on (Automations page). |
+| Deleting | Files, tasks and calendar events an agent deletes go to a trash only you can restore from or empty. Forgetting a memory and deleting a schedule are permanent; both say so. |
 | MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
 | Claude Code | Runs in its own container without workspace, database or app secrets, and with no tools of its own: every tool call it makes is a normal Anemo tool call, checked here. |
 

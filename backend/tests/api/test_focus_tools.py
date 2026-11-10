@@ -150,3 +150,72 @@ async def test_task_file_tools(authed):
     assert tool_results_sent_to_model()[-1] == "draft.pdf"
     files = (await authed.get(f"/api/tasks/{task['id']}/files")).json()
     assert [f["path"] for f in files] == ["draft.pdf"]
+
+
+async def test_stopping_and_pausing_the_focus_timer(authed):
+    from datetime import UTC, datetime
+
+    from tests.api.test_focus import timer_state
+
+    cid = await setup(authed, **{"focus.control": "autonomous"})
+    script(
+        "stop the timer",
+        [call("stop_focus"), Done("tool_use")],
+        [Done("end")],
+    )
+    # No timer has ever run, and no tab is open.
+    await agent_turn(authed, cid, "stop the timer")
+    assert "Anemo isn't open on any device" in tool_results_sent_to_model()[-1]
+    await presence.active("desk")
+
+    # Idle: nothing to stop, and nothing is sent to the tab.
+    version = 0
+
+    async def timer(**fields) -> None:
+        nonlocal version
+        r = await authed.put(
+            "/api/focus/timer", json={"state": timer_state(**fields), "base_version": version}
+        )
+        assert r.status_code == 200, r.text
+        version = r.json()["version"]
+
+    await timer(status="idle", started_at=None)
+    await agent_turn(authed, cid, "stop the timer")
+    assert tool_results_sent_to_model()[-1] == "No focus session is running."
+    assert await global_events("focus.control") == []
+
+    # Running for 12 minutes: stopped by the tab, the way the user's Stop button does it.
+    now = int(datetime.now(UTC).timestamp() * 1000)
+    await timer(status="running", started_at=now - 12 * 60_000 - 5_000)
+    script(
+        "pause, then stop",
+        [call("stop_focus", action="pause"), call("stop_focus"), Done("tool_use")],
+        [Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "pause, then stop")
+    paused, stopped = tool_results_sent_to_model()[-2:]
+    assert paused == "Paused the focus timer. start_focus resumes it."
+    assert stopped == "Stopped the focus session after 12m; it is recorded as cut short."
+    assert await global_events("focus.control") == [
+        {"tab": "desk", "action": "pause"},
+        {"tab": "desk", "action": "stop"},
+    ]
+    rows = (await timeline(authed, run_id))["tool_calls"]
+    assert [r["risk"] for r in rows] == ["safe", "moderate"]
+
+    # Paused already; under a minute nothing is recorded, and the agent is told.
+    await timer(status="paused", started_at=None, paused_at=now)
+    await agent_turn(authed, cid, "pause, then stop")
+    paused, stopped = tool_results_sent_to_model()[-2:]
+    assert paused == "The focus timer is paused already."
+    assert "less than a minute, so no session is recorded" in stopped
+    await presence.gone("desk")
+
+
+async def test_stopping_the_timer_asks_by_default(authed):
+    cid = await setup(authed)
+    script("stop", [call("stop_focus"), Done("tool_use")], [Done("end")])
+    run_id = await agent_turn(authed, cid, "stop")
+    assert await run_status(authed, run_id) == "waiting_approval"
+    approval = (await authed.get("/api/approvals")).json()[0]
+    assert approval["summary"] == "Stop the focus session (recorded as cut short)"
