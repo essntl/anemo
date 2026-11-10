@@ -15,7 +15,8 @@ import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { useSearchParams } from 'react-router'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { ItemTrashDialog } from '@/features/trash/ItemTrashDialog'
 import { errorMessage } from '@/api/client'
 import { useCurrentProject } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
@@ -70,6 +71,7 @@ export function CalendarPage() {
   const [range, setRange] = useState<{ start: string; end: string } | null>(null)
   const [title, setTitle] = useState('')
   const [open, setOpen] = useState<Open>(null)
+  const [trashOpen, setTrashOpen] = useState(false)
   // With a project chosen in the sidebar: only its events and its tasks.
   const project = useCurrentProject()
   const occurrences = useOccurrences(range, project?.id ?? null)
@@ -206,6 +208,7 @@ export function CalendarPage() {
           <Button size="icon" variant="ghost" aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>
         </div>
         <Button size="sm" variant="secondary" onClick={() => { api()?.today(); setSelected(today()) }}>Today</Button>
+        <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>
         <div className="hidden md:block">{segmented}</div>
         <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={newEvent} className="hidden md:inline-flex">
           New event
@@ -271,6 +274,7 @@ export function CalendarPage() {
         {(shown) => <EventDialog occurrence={shown.occurrence} defaults={shown.defaults} onClose={() => setOpen(null)} />}
       </Lingering>
       <Lingering value={open?.kind === 'task' && open}>{(shown) => <TaskDialog task={shown.task} onClose={() => setOpen(null)} />}</Lingering>
+      <ItemTrashDialog kind="event" open={trashOpen} onOpenChange={setTrashOpen} />
     </div>
   )
 }

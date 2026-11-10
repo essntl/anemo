@@ -1,7 +1,8 @@
 """Task tools: look at and manage the user's to-do list.
 
 Looking is always allowed; changes need the "Manage tasks" permission
-(tasks.write). Deleting counts as dangerous, so the default level asks first.
+(tasks.write). Deleting counts as dangerous, so the default level asks first; a
+deleted task goes to the trash (features/trash), where only the user can restore it.
 Tasks can have a checklist, subtasks (one level deep) and tasks they wait on
 ("blocked by").
 """
@@ -413,8 +414,9 @@ class DeleteTaskInput(BaseModel):
 class DeleteTask(Tool):
     name = "delete_task"
     description = (
-        "Delete a task for good. To finish a task use update_task with status 'done'. "
-        "Its subtasks stay, as ordinary tasks."
+        "Move a task to the trash. Reversible, but only by the user (Tasks > Trash); you "
+        "cannot restore it. To finish a task use update_task with status 'done' instead. "
+        "Its subtasks stay, as ordinary tasks, and become its subtasks again on restore."
     )
     capability = "tasks.write"
     Input = DeleteTaskInput
@@ -430,8 +432,11 @@ class DeleteTask(Tool):
             if task is None:
                 return ToolResult(content=f"No task with id {args.id}.", is_error=True)
             title = task.title
-            await service.delete_task(db, task)
-        return ToolResult(content=f"Deleted the task “{title}”.")
+            await service.delete_task(db, task, deleted_by="agent")
+        return ToolResult(
+            content=f"Moved the task “{title}” to the trash. The user can restore it from "
+            "Tasks > Trash."
+        )
 
 
 class TaskFilesInput(BaseModel):

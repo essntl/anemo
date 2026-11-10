@@ -6,15 +6,21 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from dateutil.rrule import rrulestr
-from sqlalchemy import Text, cast, delete, func, literal_column, select
+from sqlalchemy import Text, cast, delete, func, literal_column, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
+from app.features.calendar.models import CalendarEvent
+from app.features.focus.models import FocusSession
+from app.features.links.models import TaskFile
 from app.features.notifications import service as notifications
 from app.features.settings.service import user_timezone
 from app.features.tasks.models import Project, Task, TaskDependency
 from app.features.tasks.schemas import OPEN_STATUSES, ChecklistItem, clean_checklist
+from app.features.trash import service as trash
+from app.features.trash.models import TrashedItem
 
 
 async def notify() -> None:
@@ -404,10 +410,12 @@ async def _repeat(db: AsyncSession, done: Task) -> None:
     done.rrule = None
 
 
-async def delete_task(db: AsyncSession, task: Task) -> None:
-    """Its subtasks stay, as ordinary tasks; what waited on it no longer does (and a
-    blocked task with nothing left to wait on moves back to "to do")."""
+async def delete_task(db: AsyncSession, task: Task, *, deleted_by: str = "user") -> TrashedItem:
+    """Move a task to the trash (restore_task puts it back). Its subtasks stay, as
+    ordinary tasks; what waited on it no longer does (and a blocked task with nothing
+    left to wait on moves back to "to do")."""
     waiting = await dependents(db, task.id)
+    item = trash.put(db, "task", task.id, task.title, await _snapshot(db, task), deleted_by)
     await db.delete(task)
     await db.flush()
     for other in waiting:
@@ -415,6 +423,143 @@ async def delete_task(db: AsyncSession, task: Task) -> None:
             await _set_status(db, other, "todo")
     await db.commit()
     await notify()
+    return item
+
+
+async def _snapshot(db: AsyncSession, task: Task) -> dict[str, Any]:
+    """The task and everything the database drops or unlinks when it is deleted."""
+
+    async def ids(stmt: Any) -> list[str]:
+        return [str(i) for i in await db.scalars(stmt)]
+
+    files = await db.scalars(select(TaskFile).where(TaskFile.task_id == task.id))
+    return {
+        "task": trash.row_to_json(task),
+        "subtasks": await ids(select(Task.id).where(Task.parent_id == task.id)),
+        "blocked_by": await ids(
+            select(TaskDependency.blocker_id)
+            .where(TaskDependency.task_id == task.id)
+            .order_by(TaskDependency.created_at)
+        ),
+        "blocks": await ids(
+            select(TaskDependency.task_id).where(TaskDependency.blocker_id == task.id)
+        ),
+        "files": [{"path": f.path, "added_at": f.added_at.isoformat()} for f in files],
+        "events": await ids(select(CalendarEvent.id).where(CalendarEvent.task_id == task.id)),
+        "focus_sessions": await ids(select(FocusSession.id).where(FocusSession.task_id == task.id)),
+    }
+
+
+def _uuids(values: Any) -> list[uuid.UUID]:
+    return [uuid.UUID(str(v)) for v in values or []]
+
+
+async def restore_task(db: AsyncSession, item: TrashedItem) -> Task:
+    """Put a deleted task back, under its old id, with what can still be linked to it:
+
+    - its subtasks, when they still exist and are still ordinary tasks without subtasks of
+      their own (a subtask that is in the trash itself is linked when it is restored);
+    - its parent, when that still exists and is not a subtask now (a parent in the trash
+      takes it back when that one is restored);
+    - what it waited on and what waited on it, unless that would now make a loop. Statuses
+      are left as they are: a task that moved from "blocked" to "to do" when this one was
+      deleted is not moved back;
+    - its attached files, calendar events and focus sessions that have no task now.
+    """
+    data = item.payload
+    values = trash.row_values(Task, data.get("task") or {})
+    task_id: uuid.UUID = values["id"]
+    if await db.get(Task, task_id) is not None:
+        raise Conflict("That task exists already", code="already_restored")
+    if values.get("project_id") and await db.get(Project, values["project_id"]) is None:
+        values["project_id"] = None
+    parent_id = values.get("parent_id")
+    if parent_id is not None:
+        parent = await db.get(Task, parent_id)
+        if parent is None:
+            await _remember_subtask(db, parent_id, task_id)
+        if parent is None or parent.parent_id is not None:
+            values["parent_id"] = None
+    task = Task(**values)
+    task.sort_order = await _next_order(db, task.status)
+    db.add(task)
+    await db.flush()
+
+    children = _uuids(data.get("subtasks"))
+    if children and task.parent_id is None:
+        parents = select(Task.parent_id).where(Task.parent_id.is_not(None))
+        await db.execute(
+            update(Task)
+            .where(Task.id.in_(children), Task.parent_id.is_(None), Task.id.not_in(parents))
+            .values(parent_id=task.id)
+        )
+    for child_id in children:
+        await _remember_parent(db, child_id, task.id)
+
+    now = datetime.now(UTC)
+    pairs = [(task.id, b) for b in _uuids(data.get("blocked_by"))]
+    pairs += [(t, task.id) for t in _uuids(data.get("blocks"))]
+    for n, (waiting_id, blocker_id) in enumerate(pairs):
+        other = blocker_id if waiting_id == task.id else waiting_id
+        if await db.get(Task, other) is None:
+            continue
+        if blocker_id == waiting_id or blocker_id in await _downstream(db, waiting_id):
+            continue
+        db.add(
+            TaskDependency(
+                task_id=waiting_id,
+                blocker_id=blocker_id,
+                created_at=now + timedelta(microseconds=n),
+            )
+        )
+        await db.flush()
+
+    for f in data.get("files") or []:
+        await db.execute(
+            insert(TaskFile)
+            .values(task_id=task.id, path=f["path"], added_at=datetime.fromisoformat(f["added_at"]))
+            .on_conflict_do_nothing(index_elements=["task_id", "path"])
+        )
+    for model, key in ((CalendarEvent, "events"), (FocusSession, "focus_sessions")):
+        wanted = _uuids(data.get(key))
+        if wanted:
+            await db.execute(
+                update(model)
+                .where(model.id.in_(wanted), model.task_id.is_(None))
+                .values(task_id=task.id)
+            )
+    await db.delete(item)
+    await db.commit()
+    await db.refresh(task)
+    await notify()
+    return task
+
+
+async def _trashed_task(db: AsyncSession, task_id: uuid.UUID) -> TrashedItem | None:
+    return await db.scalar(
+        select(TrashedItem)
+        .where(TrashedItem.kind == "task", TrashedItem.item_id == task_id)
+        .order_by(TrashedItem.deleted_at.desc())
+        .limit(1)
+    )
+
+
+async def _remember_subtask(db: AsyncSession, parent_id: uuid.UUID, child_id: uuid.UUID) -> None:
+    """The parent is in the trash: note the subtask there, so restoring the parent takes
+    it back. No commit (part of a restore)."""
+    parent = await _trashed_task(db, parent_id)
+    if parent is not None and str(child_id) not in (parent.payload.get("subtasks") or []):
+        subtasks = [*(parent.payload.get("subtasks") or []), str(child_id)]
+        parent.payload = {**parent.payload, "subtasks": subtasks}
+
+
+async def _remember_parent(db: AsyncSession, child_id: uuid.UUID, parent_id: uuid.UUID) -> None:
+    """The subtask is in the trash: restoring it later puts it under its parent again.
+    No commit (part of a restore)."""
+    child = await _trashed_task(db, child_id)
+    if child is not None:
+        row = {**(child.payload.get("task") or {}), "parent_id": str(parent_id)}
+        child.payload = {**child.payload, "task": row}
 
 
 async def reorder(

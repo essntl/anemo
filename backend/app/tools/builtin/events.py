@@ -247,7 +247,11 @@ class DeleteEventInput(BaseModel):
 
 class DeleteEvent(Tool):
     name = "delete_event"
-    description = "Delete an event, or cancel one occurrence of a repeating event."
+    description = (
+        "Move an event (a repeating one: the whole series) to the trash, or cancel one "
+        "occurrence of a repeating event. Both are reversible, but only by the user "
+        "(Calendar > Trash); you cannot restore either."
+    )
     capability = "calendar.write"
     Input = DeleteEventInput
     idempotent = False
@@ -275,12 +279,20 @@ class DeleteEvent(Tool):
             try:
                 if args.occurrence is not None:
                     start = _instant(args.occurrence, event.tz)
-                    await service.set_occurrence(db, event, start, OccurrenceIn(cancelled=True))
-                    return ToolResult(content=f"Cancelled “{title}” on {start:%Y-%m-%d %H:%M}.")
-                await service.delete_event(db, event)
+                    await service.set_occurrence(
+                        db, event, start, OccurrenceIn(cancelled=True), changed_by="agent"
+                    )
+                    return ToolResult(
+                        content=f"Cancelled “{title}” on {start:%Y-%m-%d %H:%M}. The user "
+                        "can put it back from Calendar > Trash."
+                    )
+                await service.delete_event(db, event, deleted_by="agent")
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)
-        return ToolResult(content=f"Deleted the event “{title}”.")
+        return ToolResult(
+            content=f"Moved the event “{title}” to the trash. The user can restore it from "
+            "Calendar > Trash."
+        )
 
 
 EVENT_TOOLS: list[Tool] = [ListEvents(), CreateEvent(), UpdateEvent(), DeleteEvent()]
