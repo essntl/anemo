@@ -8,6 +8,7 @@ something else (an agent's file tools, another program) gets a revision.
 
 import asyncio
 import hashlib
+import html
 import re
 import unicodedata
 import uuid
@@ -57,7 +58,9 @@ def title_of(content: str, path: str) -> str:
         content = content[match.end() :]
     heading = _HEADING.search(content)
     if heading:
-        return re.sub(r"[*_`]", "", heading.group(1)).strip()[:300] or Path(path).stem
+        # The editor writes "&" as "&amp;": the title shows it as it reads.
+        text = html.unescape(re.sub(r"[*_`]", "", heading.group(1)))
+        return text.strip()[:300] or Path(path).stem
     return Path(path).stem
 
 

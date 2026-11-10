@@ -77,9 +77,12 @@ function MorePages() {
       <Popover.Trigger asChild>
         <button type="button" aria-label="More pages" className={cn(ROW, 'w-full text-left', open ? 'bg-surface-hover text-text [&>span>svg]:text-muted' : ROW_OFF)}>
           <span className="shrink-0 [&>svg]:h-[17px] [&>svg]:w-[17px]"><LayoutGrid /></span>
-          <span className="min-w-0 flex-1 truncate">More</span>
+          {/* The arrow sits by the name, so the counts end at the same edge as the Inbox's. */}
+          <span className="flex min-w-0 flex-1 items-center gap-1">
+            <span className="truncate">More</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-subtle" />
+          </span>
           {MORE.map((p) => p.badge && <span key={p.to} className="flex empty:hidden">{p.badge}</span>)}
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-subtle" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>

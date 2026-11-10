@@ -31,12 +31,13 @@ function AllowOnce({ approval }: { approval: NonNullable<NeedsRow['approval']> }
 }
 
 /**
- * The top of the Inbox: what waits for you (approvals, memory suggestions, failed
- * automations, overdue tasks, an update). A plain approval can be allowed right here;
+ * The top of the Inbox: what waits for you (approvals, failed automations, overdue
+ * tasks, an update). A plain approval can be allowed right here;
  * every row opens the place where it is handled. Nothing is drawn while nothing waits.
  */
 export function NeedsYouSection() {
-  const { rows } = useNeedsYou()
+  // Memory suggestions are handled on the Memory page (and counted there), not in the Inbox.
+  const rows = useNeedsYou().rows.filter((r) => r.kind !== 'memory')
   if (rows.length === 0) return null
   return (
     <section aria-label="Needs you" className="mb-5 rounded-card border border-border bg-card shadow-soft">

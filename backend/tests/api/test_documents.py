@@ -63,6 +63,7 @@ def test_titles_chunks_and_paths():
         == "The Real Title"
     )
     assert service.title_of("no heading", "documents/my-note.md") == "my-note"
+    assert service.title_of("# Contents &amp; Rebuild\n", "documents/a.md") == "Contents & Rebuild"
     assert service.word_count("---\ntitle: x\n---\none two three") == 3
     chunks = service.chunk_markdown("# A\n\npara one\n\n## B\n\n" + "word " * 700)
     assert chunks[0] == "# A\n\npara one" and chunks[1].startswith("## B") and len(chunks) == 4
