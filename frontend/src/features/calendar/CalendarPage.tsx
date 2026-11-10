@@ -17,14 +17,14 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import { useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject } from '@/app/projectStore'
+import { inScope, useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { type Task, useTasksDue, useUpdateTask } from '@/features/tasks/api'
 import { TaskDialog } from '@/features/tasks/components/TaskDialog'
 import { addDays, dayOf, today } from '@/features/tasks/dates'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
-import { browserTimeZone, type Occurrence, useChangeOccurrence, useOccurrences, useSaveEvent } from './api'
+import { browserTimeZone, type Occurrence, useChangeOccurrence, useOccurrencesIn, useSaveEvent } from './api'
 import { DayList } from './components/DayList'
 import { colorOf, daysOf } from './entries'
 import { EventDialog, type NewEventDefaults } from './components/EventDialog'
@@ -70,9 +70,9 @@ export function CalendarPage() {
   const [range, setRange] = useState<{ start: string; end: string } | null>(null)
   const [title, setTitle] = useState('')
   const [open, setOpen] = useState<Open>(null)
-  // With a project chosen in the sidebar: only its events and its tasks.
-  const project = useCurrentProject()
-  const occurrences = useOccurrences(range, project?.id ?? null)
+  // What the sidebar's switcher shows: a project's events and tasks, those of no project, or all.
+  const scope = useScope()
+  const occurrences = useOccurrencesIn(range, scope)
   const tasks = useTasksDue(range ? dayOf(new Date(range.start)) : null, range ? dayOf(new Date(range.end)) : null)
   const saveEvent = useSaveEvent()
   const changeOccurrence = useChangeOccurrence()
@@ -90,7 +90,7 @@ export function CalendarPage() {
       extendedProps: { occurrence: o },
       ...(o.color ? { backgroundColor: o.color, borderColor: o.color } : {}),
     }))
-    const due = (tasks.data ?? []).filter((t) => !project || t.project_id === project.id).map((t) => ({
+    const due = (tasks.data ?? []).filter((t) => inScope(scope, t.project_id)).map((t) => ({
       id: `task:${t.id}`,
       title: t.title,
       start: t.due_time ? `${t.due_date}T${t.due_time}` : t.due_date!,
@@ -100,7 +100,7 @@ export function CalendarPage() {
       extendedProps: { task: t },
     }))
     return [...events, ...due]
-  }, [occurrences.data, tasks.data, project])
+  }, [occurrences.data, tasks.data, scope])
 
   const api = () => calendar.current?.getApi()
   const changeView = (next: View) => {

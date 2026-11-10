@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { CheckSquare, ChevronRight, KanbanSquare, List, Plus } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject, useProjectStore } from '@/app/projectStore'
+import { inScope, useProjectStore, useScope } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
@@ -40,8 +40,10 @@ type Editing = { task: Task | null; status?: TaskStatus } | null
 export function TasksPage() {
   const [params, setParams] = useSearchParams()
   const view = params.get('view') === 'board' ? 'board' : 'list'
-  const projectFilter = useCurrentProject()?.id ?? ''
-  const setProjectId = useProjectStore((s) => s.setProjectId)
+  // What the sidebar's switcher shows: the tasks of no project, of one project, or all.
+  const scope = useScope()
+  const projectFilter = scope.kind === 'project' ? scope.project.id : ''
+  const setView = useProjectStore((s) => s.setView)
   const tagFilter = params.get('tag') ?? ''
   const tasks = useTasks()
   const projects = useProjects()
@@ -85,7 +87,7 @@ export function TasksPage() {
   }
   useEffect(() => {
     if (!linked) return
-    if (projectFilter && linked.project_id !== projectFilter) setProjectId(null)
+    if (!inScope(scope, linked.project_id)) setView('all')
     const hiddenByTag = tagFilter !== '' && !linked.tags.includes(tagFilter)
     if (hiddenByTag || view === 'board') {
       const next = new URLSearchParams(params)
@@ -101,11 +103,13 @@ export function TasksPage() {
     const q = search.trim().toLowerCase()
     return all.filter(
       (t) =>
-        (!projectFilter || t.project_id === projectFilter) &&
+        inScope(scope, t.project_id) &&
         (!tagFilter || t.tags.includes(tagFilter)) &&
         (!q || t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)),
     )
-  }, [all, projectFilter, tagFilter, search])
+  }, [all, scope, tagFilter, search])
+  // Open tasks the switcher keeps out of sight, so they are not forgotten.
+  const elsewhere = scope.kind === 'all' ? 0 : all.filter((t) => t.status !== 'done' && t.status !== 'cancelled' && !inScope(scope, t.project_id)).length
   const openShown = shown.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
   // A subtask whose parent is in the list is shown folded in under it, not on its own.
   const listedParents = new Set(openShown.map((t) => t.id))
@@ -149,8 +153,6 @@ export function TasksPage() {
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <Select variant="pill" aria-label="Project" value={projectFilter} onValueChange={(v) => setProjectId(v || null)}
-          options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
         {tags.length > 0 && (
           <Select variant="pill" aria-label="Tag" value={tagFilter} onValueChange={(v) => setParam('tag', v)}
             options={[{ value: '', label: 'All tags' }, ...tags.map((t) => ({ value: t, label: `#${t}` }))]} />
@@ -205,6 +207,16 @@ export function TasksPage() {
             </section>
           )}
         </>
+      )}
+
+      {elsewhere > 0 && (
+        <p className="mt-2 flex items-center gap-2 rounded-control bg-surface-2 px-3 py-2 text-[12.5px] text-muted">
+          <span className="min-w-0 flex-1">
+            {elsewhere === 1 ? '1 more open task is' : `${elsewhere} more open tasks are`}{' '}
+            {scope.kind !== 'uncategorized' ? 'outside this project' : elsewhere === 1 ? 'filed in a project' : 'filed in projects'}.
+          </span>
+          <button type="button" onClick={() => setView('all')} className="shrink-0 font-medium text-accent hover:underline">Show all</button>
+        </p>
       )}
 
       <Lingering value={editing}>

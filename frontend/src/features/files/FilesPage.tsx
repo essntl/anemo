@@ -23,7 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject } from '@/app/projectStore'
+import { useCurrentProject, useScope } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { chooseDialog, confirmDialog, promptDialog } from '@/components/ui/dialogs'
@@ -317,7 +317,15 @@ export function FilesPage() {
   }, [openFile, navigate])
 
   const searching = query.trim().length > 0
-  const entries = searching ? (search.data ?? []) : (folder.data?.entries ?? [])
+  // Uncategorized: the projects' own folders (and, in a search, what is in them) stay out of
+  // sight, unless you are inside one of them (a link led there).
+  const scope = useScope()
+  const allProjects = useProjects()
+  const projectFolders = scope.kind === 'uncategorized' ? (allProjects.data ?? []).flatMap((p) => [p.files_path, p.documents_path]) : []
+  const under = (p: string, parent: string) => p === parent || p.startsWith(`${parent}/`)
+  const insideProject = projectFolders.some((f) => under(path, f))
+  const listed = searching ? (search.data ?? []) : (folder.data?.entries ?? [])
+  const entries = insideProject ? listed : listed.filter((e) => !projectFolders.some((f) => under(e.path, f)))
   const selectedEntry = openFile ? entries.find((e) => e.path === openFile) ?? {
     name: openFile.split('/').pop() ?? openFile, path: openFile, is_dir: false, size: 0, modified: '', mime: null,
   } : null

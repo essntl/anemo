@@ -90,18 +90,25 @@ test('the all-chats overview filters, sorts and changes several chats at once', 
   }
 })
 
-test('the pages are pinned under the chats, which are the only thing that scrolls', async ({ page }) => {
+test('the pages are pinned above the chats, which are the only thing that scrolls', async ({ page }) => {
   await login(page)
   const sidebar = page.locator('aside').first()
   const pages = sidebar.getByRole('navigation', { name: 'Pages' })
-  await expect(pages.getByRole('link')).toHaveCount(12)
+  // Five pages are always there; the other seven open from More.
+  await expect(pages.getByRole('link')).toHaveCount(5)
   await expect(pages.getByRole('link', { name: 'Files', exact: true })).toBeVisible()
   // The chat list takes the free height and scrolls by itself; the column around it does not.
   const list = sidebar.getByLabel('Chats', { exact: true })
   expect(await list.evaluate((el) => [getComputedStyle(el).flexGrow, getComputedStyle(el).overflowY])).toEqual(['1', 'auto'])
   expect(await sidebar.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true)
-  // Short names in the grid; the full one is the tooltip.
-  await expect(pages.getByRole('link', { name: 'Agents' })).toHaveAttribute('title', 'Profiles & Skills')
+  await pages.getByRole('button', { name: 'More pages' }).click()
+  const more = page.getByRole('navigation', { name: 'More pages' })
+  await expect(more.getByRole('link')).toHaveCount(7)
+  // Short names in the card; the full one is the tooltip.
+  await expect(more.getByRole('link', { name: 'Agents' })).toHaveAttribute('title', 'Profiles & Skills')
+  // A page from More joins the list while you are on it.
+  await more.getByRole('link', { name: 'Focus' }).click()
+  await expect(pages.getByRole('link', { name: 'Focus' })).toBeVisible()
 })
 
 test('a project narrows the chat list, and new chats start in it', async ({ page }) => {
@@ -129,8 +136,8 @@ test('a project narrows the chat list, and new chats start in it', async ({ page
 
     // Choose the project in the sidebar: only its chats are listed.
     const sidebar = page.locator('aside').first()
-    await sidebar.getByRole('combobox', { name: 'Project' }).click()
-    await page.getByRole('option', { name }).click()
+    await sidebar.getByRole('button', { name: 'Project', exact: true }).click()
+    await page.getByRole('menuitemradio', { name }).click()
     const chats = sidebar.getByLabel('Chats', { exact: true })
     await expect(chats.getByRole('link', { name: inside })).toBeVisible()
     await expect(chats.getByRole('link', { name: outside })).toHaveCount(0)
@@ -145,10 +152,15 @@ test('a project narrows the chat list, and new chats start in it', async ({ page
     const chat = (await (await page.request.get(`/api/conversations/${id}`)).json()) as { project_id: string }
     expect(chat.project_id).toBe(projectId)
 
-    // Back to everything.
-    await sidebar.getByRole('combobox', { name: 'Project' }).click()
-    await page.getByRole('option', { name: 'All projects' }).click()
+    // Uncategorized: only what is in no project.
+    await sidebar.getByRole('button', { name: 'Uncategorized' }).click()
     await expect(chats.getByRole('link', { name: outside })).toBeVisible()
+    await expect(chats.getByRole('link', { name: inside })).toHaveCount(0)
+
+    // All: everything together.
+    await sidebar.getByRole('button', { name: 'All', exact: true }).click()
+    await expect(chats.getByRole('link', { name: outside })).toBeVisible()
+    await expect(chats.getByRole('link', { name: inside })).toBeVisible()
   } finally {
     await deleteChats(page, name)
     if (projectId) await page.request.delete(`/api/projects/${projectId}`)

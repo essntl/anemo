@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useCurrentProject } from '@/app/projectStore'
+import { inScope, useScope } from '@/app/projectStore'
 import { usePendingApprovals } from '@/features/agents/api'
 import { useAutomations } from '@/features/automations/api'
 import { useMemorySummary } from '@/features/memory/api'
@@ -20,7 +20,7 @@ export interface NeedsRow {
  * tasks, and an Anemo update (or what's new after one). Each row says where it is handled.
  */
 export function useNeedsYou(): { rows: NeedsRow[]; ready: boolean } {
-  const project = useCurrentProject()
+  const scope = useScope()
   const approvals = usePendingApprovals()
   const memory = useMemorySummary()
   const automations = useAutomations()
@@ -46,7 +46,7 @@ export function useNeedsYou(): { rows: NeedsRow[]; ready: boolean } {
     }
     const now = today()
     const overdue = (tasks.data ?? []).filter(
-      (t) => t.due_date && t.due_date < now && t.status !== 'done' && t.status !== 'cancelled' && (!project || t.project_id === project.id),
+      (t) => t.due_date && t.due_date < now && t.status !== 'done' && t.status !== 'cancelled' && inScope(scope, t.project_id),
     ).length
     if (overdue) rows.push({ key: 'overdue', kind: 'overdue', title: `${overdue} overdue task${overdue === 1 ? '' : 's'}`, to: '/tasks' })
     const u = updates.data
@@ -56,5 +56,5 @@ export function useNeedsYou(): { rows: NeedsRow[]; ready: boolean } {
       rows.push({ key: 'update', kind: 'update', title: 'An Anemo update is available', detail: `${u.behind_by} new change${u.behind_by === 1 ? '' : 's'}`, to: '/settings/advanced' })
     }
     return { rows, ready: approvals.isSuccess && memory.isSuccess && automations.isSuccess && tasks.isSuccess }
-  }, [approvals.data, memory.data, automations.data, tasks.data, updates.data, project, approvals.isSuccess, memory.isSuccess, automations.isSuccess, tasks.isSuccess])
+  }, [approvals.data, memory.data, automations.data, tasks.data, updates.data, scope, approvals.isSuccess, memory.isSuccess, automations.isSuccess, tasks.isSuccess])
 }

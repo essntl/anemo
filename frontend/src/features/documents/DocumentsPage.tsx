@@ -9,7 +9,8 @@
 import { useEffect } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { useCurrentProject } from '@/app/projectStore'
+import { useScope } from '@/app/projectStore'
+import { useProjects } from '@/features/tasks/api'
 import { FileText } from 'lucide-react'
 import { api, unwrap } from '@/api/client'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -52,12 +53,16 @@ export function DocumentsPage() {
   const documents = useDocuments()
   const open = documents.data?.documents.find((d) => d.id === documentId)
   // A project's documents live in the folder documents/<its folder name>/.
-  const project = useCurrentProject()
+  const scope = useScope()
+  const project = scope.kind === 'project' ? scope.project : null
+  // Uncategorized: the documents in no project's folder (an archived project's are filed too).
+  const projects = useProjects()
+  const outside = scope.kind === 'uncategorized' ? (projects.data ?? []).map((p) => p.slug) : undefined
 
   return (
     <div className="island-reserve flex h-full">
       <aside className={cn('w-full shrink-0 border-r border-border md:w-72', address && 'hidden md:block')}>
-        <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} />
+        <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} outside={outside} />
       </aside>
       <section className={cn('min-w-0 flex-1', !address && 'hidden md:block')}>
         {documentId ? (

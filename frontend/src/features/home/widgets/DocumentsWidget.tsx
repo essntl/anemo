@@ -1,6 +1,8 @@
 import { Link, useNavigate } from 'react-router'
 import { FileText, Plus } from 'lucide-react'
-import { useCurrentProject } from '@/app/projectStore'
+import { useMemo } from 'react'
+import { useScope } from '@/app/projectStore'
+import { useProjects } from '@/features/tasks/api'
 import { useCreateDocument } from '@/features/documents/api'
 import { useRecentDocuments } from '../api'
 import type { WidgetLayout } from '../layout'
@@ -10,8 +12,20 @@ import { WidgetHeader } from './parts'
 /** Recent documents: the last edited ones with their first line; + starts a new one. */
 export function DocumentsWidget({ item }: { item: WidgetLayout }) {
   const navigate = useNavigate()
-  const project = useCurrentProject()
-  const docs = useRecentDocuments(ROWS[item.h] + (item.w > 1 ? 2 : 0), project?.slug)
+  const scope = useScope()
+  const project = scope.kind === 'project' ? scope.project : null
+  const projects = useProjects()
+  const rows = ROWS[item.h] + (item.w > 1 ? 2 : 0)
+  // Uncategorized: the server can't leave the projects' folders out, so more are asked
+  // for and those in a project's folder are dropped here.
+  const unfiled = scope.kind === 'uncategorized'
+  const docs = useRecentDocuments(unfiled ? rows + 30 : rows, project?.slug)
+  const shown = useMemo(() => {
+    const all = docs.data ?? []
+    if (!unfiled) return all
+    const folders = (projects.data ?? []).map((p) => p.slug)
+    return all.filter((d) => !folders.some((f) => d.folder === f || d.folder.startsWith(`${f}/`))).slice(0, rows)
+  }, [docs.data, projects.data, unfiled, rows])
   const create = useCreateDocument()
   return (
     <>
@@ -23,9 +37,9 @@ export function DocumentsWidget({ item }: { item: WidgetLayout }) {
         </button>
       </WidgetHeader>
       <div className="flex-1 px-2 pb-3">
-        {docs.isSuccess && docs.data.length === 0 && <p className="px-2 py-2 text-[13px] text-muted">No documents yet.</p>}
+        {docs.isSuccess && shown.length === 0 && <p className="px-2 py-2 text-[13px] text-muted">No documents yet.</p>}
         <ul>
-          {(docs.data ?? []).map((d) => (
+          {shown.map((d) => (
             <li key={d.id}>
               <Link to={`/documents/${d.id}`} className="block rounded-control px-2 py-1.5 hover:bg-surface-hover">
                 <span className="block truncate text-[13.5px] font-medium">{d.title}</span>

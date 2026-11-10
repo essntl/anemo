@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { NavLink, useMatch, useNavigate } from 'react-router'
 import { Loader2, Star, Timer, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
-import { useCurrentProject } from '@/app/projectStore'
+import { useScope } from '@/app/projectStore'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { toast } from '@/components/ui/toast'
 import { useShiftHeld } from '@/hooks/useShiftHeld'
@@ -99,13 +99,14 @@ function groupChats(all: Conversation[]): Group[] {
 }
 
 /**
- * The chats in the sidebar, for the project chosen in the switcher (or all of them).
+ * The chats in the sidebar, for what the switcher shows: the chats in no project
+ * (Uncategorized), those of one project, or all of them.
  * They take all the free height and scroll on their own. Finding a chat is up to the
  * search (Ctrl+K) or the All chats page; a filter here would only be a weaker copy.
  */
 export function ConversationList() {
-  const project = useCurrentProject()
-  const conversations = useConversations('', { projectId: project?.id })
+  const scope = useScope()
+  const conversations = useConversations('', scope.kind === 'project' ? { projectId: scope.project.id } : { noProject: scope.kind === 'uncategorized' })
   const all = conversations.data ?? []
   const groups = groupChats(all)
   // Holding Shift over the list puts a delete button on every chat (no confirmation).
@@ -125,7 +126,7 @@ export function ConversationList() {
         ))}
         {conversations.data && all.length === 0 && (
           <p className="px-3 py-2 text-[12px] text-subtle">
-            {project ? `No chats in ${project.name} yet.` : 'No chats yet.'}
+            {scope.kind === 'project' ? `No chats in ${scope.project.name} yet.` : scope.kind === 'uncategorized' ? 'No chats outside a project yet.' : 'No chats yet.'}
           </p>
         )}
       </div>

@@ -2,8 +2,8 @@ import { useToday } from '@/hooks/useNow'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { CalendarDays } from 'lucide-react'
-import { useCurrentProject } from '@/app/projectStore'
-import { useOccurrences, type Occurrence } from '@/features/calendar/api'
+import { inScope, useCurrentProject, useScope } from '@/app/projectStore'
+import { useOccurrencesIn, type Occurrence } from '@/features/calendar/api'
 import { type Task, useCreateTask, useTasks } from '@/features/tasks/api'
 import { dayOf, localDay } from '@/features/tasks/dates'
 import { dayRange, timeOf } from '../dates'
@@ -16,15 +16,16 @@ type Entry = { kind: 'task'; task: Task; sort: string } | { kind: 'event'; event
 /** Today: overdue tasks first, then today's tasks and events in time order; quick-add for today. */
 export function TodayWidget({ item }: { item: WidgetLayout }) {
   const project = useCurrentProject()
+  const scope = useScope()
   const tasks = useTasks()
   const create = useCreateTask()
   const day = useToday()
   const range = useMemo(() => dayRange(new Date(day)), [day])
-  const events = useOccurrences(range, project?.id ?? null)
+  const events = useOccurrencesIn(range, scope)
   const today = dayOf(new Date(day))
 
   const { overdue, entries, doneToday } = useMemo(() => {
-    const mine = (tasks.data ?? []).filter((t) => !project || t.project_id === project.id)
+    const mine = (tasks.data ?? []).filter((t) => inScope(scope, t.project_id))
     const open = mine.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
     const overdue = open.filter((t) => t.due_date && t.due_date < today).sort((a, b) => a.due_date!.localeCompare(b.due_date!))
     const entries: Entry[] = [
@@ -33,7 +34,7 @@ export function TodayWidget({ item }: { item: WidgetLayout }) {
     ].sort((a, b) => a.sort.localeCompare(b.sort))
     const doneToday = mine.filter((t) => t.status === 'done' && t.completed_at && localDay(t.completed_at) >= today).length
     return { overdue, entries, doneToday }
-  }, [tasks.data, events.data, project, today])
+  }, [tasks.data, events.data, scope, today])
 
   const rows = ROWS[item.h] + (item.h === 1 ? 0 : 1)
   const shownOverdue = overdue.slice(0, rows)

@@ -74,7 +74,12 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full">
-      {collapsed ? <SidebarRail className="hidden md:flex" /> : <Sidebar className="hidden w-64 md:flex" />}
+      {/* Desktop: the sidebar is a white panel on the ground, like the cards of a page. */}
+      <div className="hidden shrink-0 p-3 pr-0 md:flex">
+        {collapsed
+          ? <SidebarRail className="flex rounded-panel shadow-soft" />
+          : <Sidebar className="flex w-[17rem] rounded-panel shadow-soft" />}
+      </div>
       <SidebarDrawer />
       {/* The page column. The Dynamic Island floats at the top centre of it (not of the
           window), over the page header; see features/island/Island.tsx. */}

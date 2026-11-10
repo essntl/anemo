@@ -1,5 +1,7 @@
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
+import type { Scope } from '@/app/projectStore'
 
 export type Occurrence = Schemas['OccurrenceOut']
 export type CalendarEvent = Schemas['EventOut']
@@ -12,6 +14,14 @@ export const calendarKey = ['calendar'] as const
 export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
 /** Event occurrences in a range (ISO instants); repeating events come expanded. */
+/** The occurrences of what the sidebar's switcher shows: a project's, those of no project, or all. */
+export function useOccurrencesIn(range: { start: string; end: string } | null, scope: Scope) {
+  const query = useOccurrences(range, scope.kind === 'project' ? scope.project.id : null)
+  const unfiledOnly = scope.kind === 'uncategorized'
+  const data = useMemo(() => (unfiledOnly ? query.data?.filter((o) => !o.project_id) : query.data), [query.data, unfiledOnly])
+  return { ...query, data }
+}
+
 export function useOccurrences(range: { start: string; end: string } | null, projectId: string | null = null) {
   return useQuery({
     queryKey: [...calendarKey, 'range', range?.start, range?.end, projectId],
