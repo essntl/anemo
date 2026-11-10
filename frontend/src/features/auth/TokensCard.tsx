@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Check, Copy, KeyRound, Puzzle } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
-import { Field, Input } from '@/components/ui/Input'
+import { Input } from '@/components/ui/Input'
 import { formatWhen } from '@/lib/format'
 import { useCreateToken, useRevokeToken, useTokens } from './api'
 
@@ -42,6 +42,7 @@ export function TokensCard() {
   const create = useCreateToken()
   const revoke = useRevokeToken()
   const [name, setName] = useState('')
+  const nameId = useId()
   const [shown, setShown] = useState<string | null>(null)
 
   const submit = (e: React.FormEvent) => {
@@ -75,13 +76,20 @@ export function TokensCard() {
         {shown ? (
           <NewToken token={shown} onDone={() => setShown(null)} />
         ) : (
-          <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <Field label="Name" hint="Where it will be used, e.g. “Chrome on my laptop”.">
-              <Input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder="Chrome on my laptop" />
-            </Field>
-            <Button type="submit" variant="primary" icon={<KeyRound className="h-3.5 w-3.5" />} disabled={!name.trim()} loading={create.isPending}>
-              Create token
-            </Button>
+          <form onSubmit={submit} className="flex flex-col">
+            <label htmlFor={nameId} className="mb-1.5 block text-[13px] font-medium">
+              Name
+            </label>
+            {/* The button sits on the input's row (the hint goes under both), so they line up. */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input id={nameId} aria-describedby={`${nameId}-hint`} className="sm:max-w-md" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder="Chrome on my laptop" />
+              <Button type="submit" variant="primary" className="shrink-0" icon={<KeyRound className="h-3.5 w-3.5" />} disabled={!name.trim()} loading={create.isPending}>
+                Create token
+              </Button>
+            </div>
+            <span id={`${nameId}-hint`} className="mt-1 block text-[12px] text-muted">
+              Where it will be used, e.g. “Chrome on my laptop”.
+            </span>
           </form>
         )}
         {create.isError && <p className="text-[13px] text-error">{errorMessage(create.error)}</p>}

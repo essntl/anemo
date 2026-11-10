@@ -35,7 +35,9 @@ describe('the tokens card', () => {
 
   it('shows a new token once, until Done', async () => {
     render(<TokensCard />)
-    await userEvent.type(screen.getByPlaceholderText('Chrome on my laptop'), 'Work laptop')
+    const name = screen.getByLabelText('Name')
+    expect(name).toHaveAccessibleDescription('Where it will be used, e.g. “Chrome on my laptop”.')
+    await userEvent.type(name, 'Work laptop')
     await userEvent.click(screen.getByRole('button', { name: 'Create token' }))
     expect(create).toHaveBeenCalledWith('Work laptop')
     expect(screen.getByTestId('new-token')).toHaveTextContent('anemo_secret-value')
