@@ -98,3 +98,47 @@ Details:
   extension fails loudly rather than silently.
 - **Approvals** are decided on the server, nothing to do in the extension: `hover` and
   `press` always ask (like a click or typing), `wait` is free (like reading).
+
+## 3. YouTube transcripts through the user's Chrome (the fallback of `video_transcript`)
+
+The server reads transcripts itself with yt-dlp (`backend/app/web/transcripts.py`). When
+that fails for a YouTube link because the site blocked the server, the video is not
+available to it, or the read failed for another reason (not when the video simply has no
+captions), and browser control was on when the run started, the server asks the extension.
+The assistant cannot tell which way a transcript came.
+
+One more `action` on `browser.command`:
+
+```
+→ { "type": "browser.command", "id": "…", "session": "…", "action": "transcript",
+    "url": "https://www.youtube.com/watch?v=…",     // any YouTube watch/short link form
+    "lang": "en" }                                   // optional: the caption language wanted
+← { "type": "browser.result", "id": "…", "ok": true,
+    "state": { "transcript": {
+        "title": "…", "channel": "…",
+        "duration_s": 1234,                // whole seconds, or null if unknown
+        "upload_date": "2024-05-01",       // YYYY-MM-DD, or null
+        "language": "en",                  // the track's language code
+        "kind": "manual" | "auto",         // written by a person / auto-generated
+        "segments": [ { "start": 0.0, "text": "…" }, … ]   // start in seconds, in order
+    } } }
+```
+
+- `state` carries only `transcript` here (no page text, elements or screenshot are needed).
+- Track choice, to match the server: a written track before an automatic one; with `lang`,
+  that language (a regional form counts: `en` → `en-US`); without it the video's own
+  language, then English, then what there is.
+- It is a read: the server asks for no approval ("safe" under "Your own Chrome"). It must
+  not play, pause, seek, like or change anything on the page, and it should not steal
+  focus (open the video in the "Anemo" group in the background, or use a tab of that
+  video that is open already).
+- Errors are `{ok: false, error: "<one sentence>"}`; the sentence is shown to the assistant
+  after the server's own reason. Please keep three cases apart in the wording: no captions
+  on this video; video unavailable or age-restricted; YouTube changed its page (the
+  transcript could not be found where it used to be). An empty `segments` list is treated
+  as "the extension returned no transcript", so prefer an error that says why.
+- The server waits up to 90 s (the browser-control timeout) and caches a transcript for an
+  hour, so a long one that the assistant reads in several parts is fetched once.
+
+`extension/src/shared/youtube.ts` already reads transcripts in this order (decision E84);
+what is new is doing it on a command and returning the fields above.

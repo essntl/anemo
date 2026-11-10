@@ -23,7 +23,7 @@ from app.tools.builtin.projects import PROJECT_TOOLS
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.subagent import RunSubagent
 from app.tools.builtin.tasks import TASK_TOOLS
-from app.tools.builtin.web import HttpRequest, ReadWebPage, WebSearch
+from app.tools.builtin.web import HttpRequest, ReadWebPage, VideoTranscript, WebSearch
 from app.tools.builtin.workspace import (
     CreateFolder,
     CurrentTime,
@@ -52,6 +52,7 @@ BUILTIN_TOOLS: list[Tool] = [
     RunShell(),
     WebSearch(),
     ReadWebPage(),
+    VideoTranscript(),
     HttpRequest(),
     *BROWSER_TOOLS,
     BrowserCurrentTab(),

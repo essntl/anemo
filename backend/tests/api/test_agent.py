@@ -130,6 +130,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "edit_document",
             "run_shell",
             "read_web_page",  # web_search only appears once SearXNG is set up
+            "video_transcript",
             "http_request",
             "browser_current_tab",  # the tab the user shared (needs no browser container)
             "list_tasks",
