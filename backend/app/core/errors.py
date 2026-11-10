@@ -51,6 +51,11 @@ class Conflict(AppError):
     code = "conflict"
 
 
+class ServiceUnavailable(AppError):
+    status_code = 503
+    code = "unavailable"
+
+
 class TooManyRequests(AppError):
     status_code = 429
     code = "rate_limited"

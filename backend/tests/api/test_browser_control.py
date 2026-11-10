@@ -227,3 +227,53 @@ async def test_runs_without_browser_control_switched_on_get_no_access(authed, mo
         run = await db.scalar(select(Run).where(Run.id == uuid.UUID(run_id)))
         assert run is not None and run.policy["my_browser"] is False
         assert "The user's own Chrome" not in run.policy["system"]
+
+
+def test_in_your_chrome_hovering_and_keys_always_ask_and_waiting_is_free():
+    ctx = _ctx(my_browser=True)
+    browser._remember(ctx, PAGE, "my_browser")
+    mine = "my_browser"
+    click, type_, read = browser.BrowserClick(), browser.BrowserType(), browser.BrowserRead()
+    grants = [Grant(capability="browser.mine")]
+    hover = browser.ClickInput(ref=1, action="hover", browser=mine)  # even on a plain link
+    keys = browser.TypeInput(keys=["Escape"], browser=mine)
+    for level in ("ask_dangerous", "autonomous"):
+        assert _decide(click, hover, ctx, level, grants) == "ask"
+        assert _decide(type_, keys, ctx, level, grants) == "ask"
+        waiting = browser.ReadInput(wait_for="Done", browser=mine)
+        assert _decide(read, waiting, ctx, level) == "allow"
+    assert _decide(click, hover, ctx, "deny") == "deny"
+    assert click.actions(hover, ctx)[0].summary == (
+        'Hover over link "More" → https://example.com/more (your Chrome)'
+    )
+    assert type_.actions(keys, ctx)[0].summary == "Press Escape (your Chrome)"
+
+
+async def test_new_actions_reach_your_chrome_and_an_old_extension_says_so(monkeypatch):
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def act(session: uuid.UUID, action: str, **fields: Any) -> dict[str, Any]:
+        calls.append((action, fields))
+        if action == "press":
+            raise browser_relay.ActionFailed("Unknown browser action “press”.")
+        return PAGE
+
+    monkeypatch.setattr(browser_relay, "act", act)
+    ctx = _ctx(my_browser=True)
+    mine = "my_browser"
+    await browser.BrowserClick().run(browser.ClickInput(ref=1, action="hover", browser=mine), ctx)
+    await browser.BrowserRead().run(
+        browser.ReadInput(wait_for="Inbox", timeout_s=3, browser=mine), ctx
+    )
+    # Text and keys go as two commands, so keys an extension can't press are not lost
+    # silently: the agent is told.
+    typed = await browser.BrowserType().run(
+        browser.TypeInput(ref=2, text="hi", press_enter=True, keys=["Tab"], browser=mine), ctx
+    )
+    assert typed.is_error and "Unknown browser action" in typed.content
+    assert calls == [
+        ("hover", {"ref": 1}),
+        ("wait", {"text": "Inbox", "timeout_s": 3}),
+        ("type", {"ref": 2, "text": "hi", "press_enter": False}),
+        ("press", {"keys": ["Enter", "Tab"]}),
+    ]

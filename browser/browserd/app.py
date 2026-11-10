@@ -19,7 +19,8 @@ API (all but /health need `Authorization: Bearer <token>`):
   GET    /health
 
 Actions: open (url), read (scroll: none|down|up|top), click (ref),
-type (ref, text, press_enter), screenshot. `ref` is the number of an element in
+type (ref, text, press_enter, keys), screenshot, hover (ref), press (keys, optionally
+ref to focus first) and wait (text, timeout_s). `ref` is the number of an element in
 the last page description (see snapshot.js). A session is created on first use
 and closed after being idle, so nothing needs to be set up beforehand.
 
@@ -197,8 +198,39 @@ async def health() -> dict[str, Any]:
     return {"status": "ok", "sessions": len(_browser.sessions)}
 
 
+# Keys the agent may press: a named key or one letter or digit, optionally with modifiers
+# ("Escape", "ArrowDown", "Control+a", "Shift+Tab"). Names as Playwright expects them.
+AGENT_KEYS = {
+    "Enter", "Escape", "Tab", "Backspace", "Delete", "Space", "Home", "End", "PageUp",
+    "PageDown", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+}  # fmt: skip
+MODIFIERS = {"Control", "Shift", "Alt", "Meta"}
+WAIT_MAX_S = 30
+
+# Whether a text shows on the page: in what it displays, or in the name of a control
+# (case and spacing don't matter).
+WAIT_JS = """(wanted) => {
+  const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase()
+  if (norm(document.body && document.body.innerText).includes(wanted)) return true
+  for (const el of document.querySelectorAll('[aria-label],[placeholder],[title],[alt],input,textarea')) {
+    const box = el.getBoundingClientRect()
+    if (!box.width || !box.height) continue
+    const names = [el.getAttribute('aria-label'), el.getAttribute('placeholder'),
+      el.getAttribute('title'), el.getAttribute('alt'), el.type === 'password' ? '' : el.value]
+    if (names.some((n) => norm(n).includes(wanted))) return true
+  }
+  return false
+}"""
+
+
+def _key_ok(key: str) -> bool:
+    *modifiers, last = key.split("+")
+    named = last in AGENT_KEYS or (len(last) == 1 and last.isascii() and last.isalnum())
+    return named and all(m in MODIFIERS for m in modifiers) and len(set(modifiers)) == len(modifiers)
+
+
 class ActIn(BaseModel):
-    action: Literal["open", "read", "click", "type", "screenshot"]
+    action: Literal["open", "read", "click", "type", "screenshot", "hover", "press", "wait"]
     # Hosts on the user's network this run may reach (from Settings > Web & Search).
     allowed_hosts: list[str] = Field(default_factory=list, max_length=200)
     url: str | None = Field(None, max_length=4000)
@@ -206,6 +238,10 @@ class ActIn(BaseModel):
     text: str | None = Field(None, max_length=20_000)
     press_enter: bool = False
     scroll: Literal["none", "down", "up", "top"] = "none"
+    # press (and, after the text, type): keys pressed one after the other.
+    keys: list[str] = Field(default_factory=list, max_length=10)
+    # wait: until `text` shows on the page, at most this long.
+    timeout_s: float = Field(10, ge=1, le=WAIT_MAX_S)
 
 
 def _problem(exc: Exception) -> str:
@@ -220,6 +256,14 @@ async def _settle(page: Any) -> None:
         await page.wait_for_load_state("domcontentloaded", timeout=SETTLE_MS)
     with suppress(Exception):
         await page.wait_for_load_state("networkidle", timeout=SETTLE_MS)
+
+
+async def _press(page: Any, keys: list[str]) -> None:
+    """Press keys in the element that has the focus (the page itself when none has)."""
+    for key in keys:
+        if not _key_ok(key):
+            raise HTTPException(status_code=422, detail=f"“{key}” is not a key that can be pressed")
+        await page.keyboard.press(key)
 
 
 def _target(page: Any, ref: int | None) -> Any:
@@ -264,7 +308,34 @@ async def _perform(session: Session, body: ActIn) -> str | None:
                 await target.fill(body.text or "")
             if body.press_enter:
                 await target.press("Enter")
+            await _press(page, body.keys)
             await _settle(session.page)
+        elif body.action == "hover":
+            target = _target(page, body.ref)
+            if await target.count() == 0:
+                return f"There is no element [{body.ref}] on the page any more. Read the page again."
+            await target.hover()
+            await page.wait_for_timeout(400)  # menus that open on hover take a moment
+        elif body.action == "press":
+            if not body.keys:
+                raise HTTPException(status_code=422, detail="press needs at least one key")
+            if body.ref is not None:
+                target = _target(page, body.ref)
+                if await target.count() == 0:
+                    return f"There is no element [{body.ref}] on the page any more. Read the page again."
+                await target.focus()
+            await _press(page, body.keys)
+            await _settle(session.page)
+        elif body.action == "wait":
+            wanted = " ".join((body.text or "").split()).lower()
+            if not wanted:
+                raise HTTPException(status_code=422, detail="wait needs the text to wait for")
+            from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+            try:
+                await page.wait_for_function(WAIT_JS, arg=wanted, timeout=body.timeout_s * 1000, polling=250)
+            except PlaywrightTimeout:
+                return f"“{body.text}” did not appear within {body.timeout_s:g} seconds. This is the page as it is now."
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001 - told to the agent, which can try something else

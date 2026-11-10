@@ -37,6 +37,18 @@ PAGES = {
         <p>This website uses a security service to protect against malicious bots.</p>
         <div class="cf-turnstile"><label><input type="checkbox"> Verify you are human</label></div>""",
     "/new": "<title>New tab page</title><p>Opened separately.</p>",
+    "/menu": """<title>Menu</title>
+        <style>#items { display: none } #menu:hover #items { display: block }</style>
+        <div id="menu"><button>Products</button><div id="items"><a href="/about">Otter food</a></div></div>
+        <label>Notes <input id="notes" value="old text"></label>
+        <p id="pressed">nothing pressed</p><div id="dialog">A dialog</div>
+        <script>
+          document.addEventListener('keydown', (e) => {
+            document.getElementById('pressed').textContent = 'pressed ' + (e.ctrlKey ? 'Control+' : '') + e.key
+            if (e.key === 'Escape') document.getElementById('dialog').remove()
+          })
+          setTimeout(() => { document.body.insertAdjacentHTML('beforeend', '<p>Results are   ready</p><button aria-label="Download report"></button>') }, 700)
+        </script>""",
     "/long": "<title>Long</title>" + "".join(f"<p>Paragraph {i}</p>" for i in range(800)),
 }
 
@@ -275,3 +287,38 @@ async def test_user_can_start_a_session_and_scroll(api, site):
         "/sessions/mine/input", json={"kind": "open", "url": "file:///etc/passwd"}, headers=AUTH
     )
     assert bad.status_code == 422
+
+
+async def test_hover_opens_what_only_shows_on_hover(api, site):
+    state = await act(api, action="open", url=site + "/menu")
+    assert "Otter food" not in "\n".join(state["elements"])
+    state = await act(api, action="hover", ref=ref_of(state, "Products"))
+    assert state["note"] is None and 'link "Otter food"' in "\n".join(state["elements"])
+    assert "no element [99]" in (await act(api, action="hover", ref=99))["note"]
+
+
+async def test_pressing_keys(api, site):
+    state = await act(api, action="open", url=site + "/menu")
+    assert "A dialog" in state["text"]
+    state = await act(api, action="press", keys=["Escape"])
+    assert "A dialog" not in state["text"] and "pressed Escape" in state["text"]
+    # In a field: select everything and type over it (keys go where the focus is).
+    notes = ref_of(state, "Notes")
+    state = await act(api, action="press", ref=notes, keys=["Control+a", "x"])
+    assert 'value "x"' in "\n".join(state["elements"])
+    state = await act(api, action="type", ref=notes, text="new", keys=["Tab", "ArrowDown"])
+    assert 'value "new"' in "\n".join(state["elements"]) and "pressed ArrowDown" in state["text"]
+    # Only keys: no text, no shortcuts of the browser itself, and at least one.
+    for bad in (["F5"], ["Control+Shift+Delete+x"], ["hello"], ["Control+Control+a"], []):
+        r = await api.post("/sessions/s1/act", json={"action": "press", "keys": bad}, headers=AUTH)
+        assert r.status_code == 422, bad
+
+
+async def test_waiting_for_text_to_appear(api, site):
+    await act(api, action="open", url=site + "/menu")
+    state = await act(api, action="wait", text="results are ready", timeout_s=10)
+    assert state["note"] is None and "Results are ready" in state["text"]
+    # The name of a control counts too.
+    assert (await act(api, action="wait", text="Download report"))["note"] is None
+    state = await act(api, action="wait", text="never shown", timeout_s=1)
+    assert "did not appear within 1 seconds" in state["note"] and state["title"] == "Menu"

@@ -11,7 +11,7 @@ from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.ask import AskUser
 from app.tools.builtin.automation import AUTOMATION_TOOLS
-from app.tools.builtin.browser import BROWSER_TOOLS
+from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.file_exchange import FILE_EXCHANGE_TOOLS
@@ -54,6 +54,7 @@ BUILTIN_TOOLS: list[Tool] = [
     ReadWebPage(),
     HttpRequest(),
     *BROWSER_TOOLS,
+    BrowserCurrentTab(),
     *TASK_TOOLS,
     *PROJECT_TOOLS,
     *EVENT_TOOLS,
@@ -113,6 +114,8 @@ def toolset_for(
             or (is_memory and not has_memory)
             or (tool in AUTOMATION_TOOLS and not is_automation)
             or (tool in BROWSER_TOOLS and not has_browser)
+            # A tab the user shared from their Chrome: not for unattended runs.
+            or (tool.name == "browser_current_tab" and is_automation)
             or (tool.name == "run_subagent" and not can_spawn)
             or (tool.name == "ask_user" and not can_ask)
             or (tool.name in CHAT_FILE_TOOLS and not has_chat)
