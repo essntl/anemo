@@ -30,6 +30,9 @@ from app.features.notifications.models import NotificationDestination
 from app.features.profiles.models import AgentProfile
 from app.features.providers.models import Model
 from app.features.runs.models import ACTIVE_STATUSES, Approval, Run
+from app.features.settings import service as settings_service
+from app.features.settings.sections import AutomationSettings
+from app.features.tasks.models import Project
 from app.jobs import queue
 from app.workspace import files
 
@@ -86,6 +89,8 @@ async def automation_out(db: AsyncSession, a: Automation) -> AutomationOut:
         enabled=a.enabled,
         profile_id=a.profile_id,
         model_id=a.model_id,
+        project_id=a.project_id,
+        created_by=a.created_by,
         on_ask=a.on_ask,  # type: ignore[arg-type]
         notify=a.notify,  # type: ignore[arg-type]
         destination_ids=[uuid.UUID(d) for d in a.destination_ids]
@@ -118,7 +123,10 @@ async def _check_references(
     destination_ids: list[uuid.UUID] | None,
     document_path: str | None,
     tz: str,
+    project_id: uuid.UUID | None = None,
 ) -> None:
+    if project_id is not None and await db.get(Project, project_id) is None:
+        raise NotFound("Project not found")
     if profile_id is not None and await db.get(AgentProfile, profile_id) is None:
         raise NotFound("Agent profile not found")
     if model_id is not None and await db.get(Model, model_id) is None:
@@ -137,10 +145,22 @@ def _reschedule(automation: Automation) -> None:
     automation.next_run_at = next_run(schedule, _now()) if automation.enabled else None
 
 
-async def create(db: AsyncSession, data: AutomationIn) -> Automation:
+async def protections(db: AsyncSession) -> AutomationSettings:
+    """The user's limits for scheduled runs (Settings section "automations")."""
+    return await settings_service.get_section(db, AutomationSettings, "automations")
+
+
+async def create(db: AsyncSession, data: AutomationIn, *, created_by: str = "user") -> Automation:
+    """A new automation. Adds to the caller's transaction (the caller commits)."""
     document_path = (data.document_path or "").strip() or None
     await _check_references(
-        db, data.profile_id, data.model_id, data.destination_ids, document_path, data.schedule.tz
+        db,
+        data.profile_id,
+        data.model_id,
+        data.destination_ids,
+        document_path,
+        data.schedule.tz,
+        data.project_id,
     )
     automation = Automation(
         name=data.name.strip(),
@@ -149,6 +169,8 @@ async def create(db: AsyncSession, data: AutomationIn) -> Automation:
         schedule=data.schedule.model_dump(mode="json"),
         profile_id=data.profile_id,
         model_id=data.model_id,
+        project_id=data.project_id,
+        created_by=created_by,
         on_ask=data.on_ask,
         notify=data.notify,
         destination_ids=[str(d) for d in data.destination_ids]
@@ -182,6 +204,11 @@ async def update(db: AsyncSession, automation: Automation, data: AutomationPatch
         automation.profile_id = data.profile_id
     if "model_id" in fields:
         automation.model_id = data.model_id
+    if "project_id" in fields:
+        # Checked before it is set: the lookups below flush the session.
+        if data.project_id is not None and await db.get(Project, data.project_id) is None:
+            raise NotFound("Project not found")
+        automation.project_id = data.project_id
     if "destination_ids" in fields:
         automation.destination_ids = (
             [str(d) for d in data.destination_ids] if data.destination_ids is not None else None
@@ -208,6 +235,7 @@ async def update(db: AsyncSession, automation: Automation, data: AutomationPatch
         else None,
         automation.document_path,
         schedule.tz,
+        automation.project_id,
     )
     if timing_changed:
         _reschedule(automation)
@@ -238,6 +266,7 @@ async def start_run(
         default_mode="agent",
         model_id=automation.model_id,
         profile_id=automation.profile_id,
+        project_id=automation.project_id,
         automation_id=automation.id,
     )
     db.add(conversation)
@@ -293,6 +322,10 @@ async def fire_due(now: datetime | None = None) -> int:
     now = now or _now()
     started = 0
     async with get_sessionmaker()() as db:
+        if (await protections(db)).paused:
+            # "Pause all": nothing starts. What comes due meanwhile is left as it is; after
+            # the pause, runs that are over an hour late count as missed (below).
+            return 0
         due = await db.scalars(
             select(Automation)
             .where(Automation.enabled, Automation.next_run_at <= now)

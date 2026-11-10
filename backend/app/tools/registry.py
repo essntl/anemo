@@ -11,7 +11,7 @@ from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.ask import AskUser
 from app.tools.builtin.automation import AUTOMATION_TOOLS
-from app.tools.builtin.browser import BROWSER_TOOLS
+from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.file_exchange import FILE_EXCHANGE_TOOLS
@@ -20,10 +20,11 @@ from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.projects import PROJECT_TOOLS
+from app.tools.builtin.schedules import SCHEDULE_TOOLS, SCHEDULE_WRITE_TOOLS
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.subagent import RunSubagent
 from app.tools.builtin.tasks import TASK_TOOLS
-from app.tools.builtin.web import HttpRequest, ReadWebPage, WebSearch
+from app.tools.builtin.web import HttpRequest, ReadWebPage, VideoTranscript, WebSearch
 from app.tools.builtin.workspace import (
     CreateFolder,
     CurrentTime,
@@ -52,8 +53,10 @@ BUILTIN_TOOLS: list[Tool] = [
     RunShell(),
     WebSearch(),
     ReadWebPage(),
+    VideoTranscript(),
     HttpRequest(),
     *BROWSER_TOOLS,
+    BrowserCurrentTab(),
     *TASK_TOOLS,
     *PROJECT_TOOLS,
     *EVENT_TOOLS,
@@ -61,6 +64,7 @@ BUILTIN_TOOLS: list[Tool] = [
     SendNotification(),
     *MEMORY_TOOLS,
     *AUTOMATION_TOOLS,
+    *SCHEDULE_TOOLS,
     CurrentTime(),
     LoadSkill(),
     RunSubagent(),
@@ -92,13 +96,16 @@ def toolset_for(
     has_search: bool = False,
     has_memory: bool = False,
     is_automation: bool = False,
+    unattended: bool = False,
     has_browser: bool = False,
     can_spawn: bool = False,
     can_ask: bool = False,
     has_chat: bool = False,
     ancestors: Iterable[Policy] = (),
 ) -> list[Tool]:
-    """`ancestors`: for a sub-agent, the policies of the agents above it (a tool one of
+    """`is_automation`: the run was started by an automation (it gets the automation's
+    notes). `unattended`: that, or a sub-agent of such a run: nobody is watching.
+    `ancestors`: for a sub-agent, the policies of the agents above it (a tool one of
     them may not use is not offered). `can_spawn`: the run may start sub-agents.
     `can_ask`: someone is there to answer questions (not an automation or a sub-agent).
     `has_chat`: the run answers in a chat, so it can use the chat's attachments and
@@ -112,7 +119,11 @@ def toolset_for(
             or (tool.name == "web_search" and not has_search)
             or (is_memory and not has_memory)
             or (tool in AUTOMATION_TOOLS and not is_automation)
+            # A run started by a schedule does not make, change or delete schedules.
+            or (tool.name in SCHEDULE_WRITE_TOOLS and unattended)
             or (tool in BROWSER_TOOLS and not has_browser)
+            # A tab the user shared from their Chrome: not for unattended runs.
+            or (tool.name == "browser_current_tab" and unattended)
             or (tool.name == "run_subagent" and not can_spawn)
             or (tool.name == "ask_user" and not can_ask)
             or (tool.name in CHAT_FILE_TOOLS and not has_chat)

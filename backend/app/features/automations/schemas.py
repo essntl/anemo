@@ -17,6 +17,7 @@ class AutomationIn(BaseModel):
     enabled: bool = True
     profile_id: uuid.UUID | None = None  # None: the default agent
     model_id: uuid.UUID | None = None  # None: the profile's or the default model
+    project_id: uuid.UUID | None = None  # the project each run's chat is filed under
     on_ask: OnAsk = "pause"
     notify: Notify = "always"
     destination_ids: list[uuid.UUID] | None = Field(None, max_length=20)
@@ -31,6 +32,7 @@ class AutomationPatch(BaseModel):
     enabled: bool | None = None
     profile_id: uuid.UUID | None = None
     model_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
     on_ask: OnAsk | None = None
     notify: Notify | None = None
     destination_ids: list[uuid.UUID] | None = Field(None, max_length=20)
@@ -47,6 +49,8 @@ class AutomationOut(BaseModel):
     enabled: bool
     profile_id: uuid.UUID | None
     model_id: uuid.UUID | None
+    project_id: uuid.UUID | None = None
+    created_by: str = "user"  # user | agent (the create_schedule tool)
     on_ask: OnAsk
     notify: Notify
     destination_ids: list[uuid.UUID] | None

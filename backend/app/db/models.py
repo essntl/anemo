@@ -26,6 +26,7 @@ from app.features.settings import models as settings_models
 from app.features.shares import models as shares_models
 from app.features.skills import models as skills_models
 from app.features.tasks import models as tasks_models
+from app.features.trash import models as trash_models
 from app.features.usage import models as usage_models
 from app.jobs import models as jobs_models
 from app.knowledge import models as knowledge_models
@@ -56,5 +57,6 @@ __all__ = [
     "shares_models",
     "skills_models",
     "tasks_models",
+    "trash_models",
     "usage_models",
 ]

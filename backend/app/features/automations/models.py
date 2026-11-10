@@ -29,6 +29,12 @@ class Automation(Base, IdMixin, TimestampMixin):
     model_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
     )
+    # The project each run's conversation is filed under (its files and instructions).
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL")
+    )
+    # user | agent (made with the create_schedule tool, after the user's approval).
+    created_by: Mapped[str] = mapped_column(String(10), default="user", server_default="user")
     # Nobody is there to answer when an action needs approval:
     # pause (wait and notify) | deny (refuse it and carry on) | fail (stop the run).
     on_ask: Mapped[str] = mapped_column(String(10), default="pause")

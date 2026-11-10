@@ -47,6 +47,15 @@ class UpdateSettings(BaseModel):
     check: bool = True
 
 
+class AutomationSettings(BaseModel):
+    """Protections for runs that start by themselves (Automations, the schedule tools)."""
+
+    # Nothing starts on a schedule while this is on (a run that is going on finishes).
+    paused: bool = False
+    # A scheduled run is stopped after this long, whatever the agent's own limit says.
+    max_run_minutes: int = Field(30, ge=1, le=24 * 60)
+
+
 class FocusSettings(BaseModel):
     """The focus timer (Focus page, Home widget, Dynamic Island)."""
 
@@ -163,6 +172,7 @@ SECTIONS: dict[str, SectionSpec] = {
     "web": SectionSpec(WebSettings, sensitive=True),
     "memory": SectionSpec(MemorySettings),
     "focus": SectionSpec(FocusSettings),
+    "automations": SectionSpec(AutomationSettings),
     "music": SectionSpec(MusicSettings),
     "home": SectionSpec(HomeSettings),
     "files": SectionSpec(FilesSettings),

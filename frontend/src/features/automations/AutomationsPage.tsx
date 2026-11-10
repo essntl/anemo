@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { ChevronDown, Clock, History, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Clock, History, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
@@ -13,6 +13,7 @@ import { confirmDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Switch } from '@/components/ui/Switch'
 import { RunStatusBadge } from '@/features/runs/components/RunStatusBadge'
+import { useSaveSection, useSettings } from '@/features/settings/api'
 import { cn } from '@/lib/cn'
 import { formatDuration, formatUpcoming, formatWhen } from '@/lib/format'
 import {
@@ -94,6 +95,7 @@ function AutomationCard({ automation, onEdit }: { automation: Automation; onEdit
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="min-w-0 break-words text-[15px] font-semibold">{automation.name}</h2>
             {status && <Badge tone={STATUS_TONES[status] ?? 'neutral'}>{STATUS_LABELS[status] ?? status}</Badge>}
+            {automation.created_by === 'agent' && <Badge tone="neutral">Set up by the assistant</Badge>}
           </div>
           <p className="mt-0.5 text-[13px] text-muted">
             {automation.schedule_text}
@@ -134,6 +136,10 @@ export function AutomationsPage() {
   const automations = useAutomations()
   // null: closed. { automation: null }: creating one.
   const [editing, setEditing] = useState<{ automation: Automation | null; template?: AutomationTemplate } | null>(null)
+  const settings = useSettings()
+  const saveProtections = useSaveSection('automations')
+  const protections = settings.data?.automations
+  const paused = protections?.paused ?? false
   const items = automations.data ?? []
   const templates = TEMPLATES.filter((t) => !items.some((a) => a.name === t.name))
 
@@ -149,6 +155,22 @@ export function AutomationsPage() {
         <Link to="/notifications" className="text-accent underline">notification</Link>.
         </p>
 
+      {protections && (items.length > 0 || paused) && (
+        <div className={cn('mb-3 flex items-center gap-3 rounded-card border px-4 py-2.5', paused ? 'border-warning bg-surface-2' : 'border-border bg-card')}>
+          <Pause className={cn('h-4 w-4 shrink-0', paused ? 'text-warning' : 'text-muted')} />
+          <div className="min-w-0 flex-1 text-[13px]">
+            <div className="font-medium">{paused ? 'All automations are paused' : 'Pause all automations'}</div>
+            <div className="text-muted">
+              {paused
+                ? 'Nothing starts on a schedule until you resume. A run that is going on finishes.'
+                : `Stops every schedule from starting, without switching them off one by one. A scheduled run is stopped after ${protections.max_run_minutes} minutes.`}
+            </div>
+          </div>
+          <Switch label="Pause all automations" checked={paused}
+            onChange={(next) => saveProtections.mutate({ ...protections, paused: next })} />
+        </div>
+      )}
+      {saveProtections.isError && <p className="mb-2 text-[13px] text-error">{errorMessage(saveProtections.error)}</p>}
       {automations.isError && <p className="text-[13px] text-error">{errorMessage(automations.error)}</p>}
       {automations.isSuccess && items.length === 0 && (
         <EmptyState icon={<Clock className="h-5 w-5" />} title="No automations yet"

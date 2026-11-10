@@ -50,6 +50,7 @@ from app.features.skills.router import router as skills_router
 from app.features.stats.router import router as stats_router
 from app.features.system_router import router as system_router
 from app.features.tasks.router import router as tasks_router
+from app.features.trash.router import router as trash_router
 from app.features.updates.router import router as updates_router
 from app.features.usage.router import router as usage_router
 from app.web.router import router as web_router
@@ -80,6 +81,7 @@ protected.include_router(memory_router)
 protected.include_router(documents_router)
 protected.include_router(daily_notes_router)
 protected.include_router(tasks_router)
+protected.include_router(trash_router)
 protected.include_router(projects_router)
 protected.include_router(shares_router)
 protected.include_router(calendar_router)

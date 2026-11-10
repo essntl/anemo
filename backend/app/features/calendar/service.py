@@ -8,11 +8,14 @@ from typing import Any
 from sqlalchemy import delete, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import AppError, NotFound
+from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.calendar import recurrence
 from app.features.calendar.models import CalendarEvent, EventException
 from app.features.calendar.schemas import EventIn, EventOut, OccurrenceIn, OccurrenceOut
+from app.features.tasks.models import Project, Task
+from app.features.trash import service as trash
+from app.features.trash.models import TrashedItem
 
 DEFAULT_DURATION = timedelta(hours=1)
 MAX_RANGE = timedelta(days=400)
@@ -88,10 +91,69 @@ async def update_event(db: AsyncSession, event: CalendarEvent, body: EventIn) ->
     return event
 
 
-async def delete_event(db: AsyncSession, event: CalendarEvent) -> None:
+async def delete_event(
+    db: AsyncSession, event: CalendarEvent, *, deleted_by: str = "user"
+) -> TrashedItem:
+    """Move an event (a repeating one: the whole series, with its changed and cancelled
+    occurrences) to the trash; restore_event puts it back."""
+    exceptions = await db.scalars(select(EventException).where(EventException.event_id == event.id))
+    payload = {
+        "event": trash.row_to_json(event),
+        "exceptions": [trash.row_to_json(e) for e in exceptions],
+    }
+    item = trash.put(db, "event", event.id, event.title, payload, deleted_by)
     await db.delete(event)
     await db.commit()
     await notify()
+    return item
+
+
+async def restore_event(db: AsyncSession, item: TrashedItem) -> CalendarEvent:
+    """Put a deleted event back, under its old id, with its changed and cancelled
+    occurrences. A task or project it belonged to that is gone is dropped from it.
+    A trash entry for one cancelled occurrence puts that occurrence back instead."""
+    if "occurrence" in item.payload:
+        return await _restore_occurrence(db, item)
+    values = trash.row_values(CalendarEvent, item.payload.get("event") or {})
+    if await db.get(CalendarEvent, values["id"]) is not None:
+        raise Conflict("That event exists already", code="already_restored")
+    if values.get("task_id") and await db.get(Task, values["task_id"]) is None:
+        values["task_id"] = None
+    if values.get("project_id") and await db.get(Project, values["project_id"]) is None:
+        values["project_id"] = None
+    event = CalendarEvent(**values)
+    db.add(event)
+    await db.flush()
+    for row in item.payload.get("exceptions") or []:
+        db.add(EventException(**trash.row_values(EventException, row)))
+    await db.delete(item)
+    await db.commit()
+    await db.refresh(event)
+    await notify()
+    return event
+
+
+async def _restore_occurrence(db: AsyncSession, item: TrashedItem) -> CalendarEvent:
+    event = await db.get(CalendarEvent, item.item_id)
+    if event is None:
+        raise Conflict(
+            "The event itself was deleted; restore the event first", code="event_deleted"
+        )
+    row = await db.scalar(
+        select(EventException).where(
+            EventException.event_id == event.id,
+            EventException.original_start == datetime.fromisoformat(item.payload["occurrence"]),
+        )
+    )
+    # No row: the event's schedule changed since, and cancelled occurrences went with it.
+    if row is not None:
+        row.is_cancelled = False
+        if not row.override:
+            await db.delete(row)
+    await db.delete(item)
+    await db.commit()
+    await notify()
+    return event
 
 
 def event_out(event: CalendarEvent) -> EventOut:
@@ -239,9 +301,15 @@ async def occurrences(
 
 
 async def set_occurrence(
-    db: AsyncSession, event: CalendarEvent, original_start: datetime, body: OccurrenceIn
+    db: AsyncSession,
+    event: CalendarEvent,
+    original_start: datetime,
+    body: OccurrenceIn,
+    *,
+    changed_by: str = "user",
 ) -> None:
-    """Cancel or change a single occurrence of a repeating event."""
+    """Cancel or change a single occurrence of a repeating event. A cancelled occurrence
+    gets an entry in the trash, so it can be put back."""
     if not event.rrule:
         raise AppError("This event does not repeat; change the event itself", code="not_recurring")
     if not recurrence.is_occurrence(event.start_at, event.tz, event.rrule, original_start):
@@ -255,6 +323,16 @@ async def set_occurrence(
     if row is None:
         row = EventException(event_id=event.id, original_start=original_start, override={})
         db.add(row)
+    if body.cancelled and not row.is_cancelled:
+        when = original_start.astimezone(recurrence.zone(event.tz))
+        trash.put(
+            db,
+            "event",
+            event.id,
+            f"{event.title} ({when:%Y-%m-%d %H:%M} only)",
+            {"occurrence": original_start.isoformat()},
+            changed_by,
+        )
     row.is_cancelled = body.cancelled
     override = dict(row.override)
     for key, value in body.model_dump(exclude_unset=True, exclude={"cancelled"}).items():
