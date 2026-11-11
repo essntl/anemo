@@ -47,7 +47,6 @@ export function MusicPage() {
           onValueChange={(v) => stopAfter(v ? Number(v) : null)}
           options={[{ value: '', label: 'Keep playing' }, ...SLEEP_CHOICES.map((m) => ({ value: String(m), label: `Stop after ${m} min` }))]} />
       </PageHeader>
-      <p className="mb-4 max-w-2xl text-[13px] text-muted">Queue YouTube, SoundCloud or any stream, and play it from anywhere in Anemo.</p>
 
       {/* The player takes the left side in full height; the queue and the ambient sound are beside it. */}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
