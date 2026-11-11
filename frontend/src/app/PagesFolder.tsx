@@ -4,6 +4,7 @@ import * as RadixDialog from '@radix-ui/react-dialog'
 import { motion } from 'motion/react'
 import { LayoutGrid, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { useMobileNav } from './mobileNavStore'
 
 export interface PageEntry {
@@ -44,12 +45,12 @@ export function PagesFolder({ pages, onNavigate }: { pages: PageEntry[]; onNavig
         <div aria-hidden className="h-12 shrink-0" />
       ) : (
         <motion.button type="button" layoutId={SHAPE} transition={MORPH} onClick={() => setOpen(true)}
-          aria-haspopup="dialog" aria-label={`Pages${here ? `, on ${here.title ?? here.label}` : ''}`}
+          aria-haspopup="dialog" aria-label={here ? t('Pages, on {page}', { page: here.title ?? here.label }) : t('Pages')}
           style={{ borderRadius: 14 }}
           className="flex h-12 w-full shrink-0 items-center gap-3 border border-border bg-surface-2 px-3.5 text-left">
           <motion.span layout="position" className={cn('flex min-w-0 flex-1 items-center gap-2.5 text-[15px] font-medium', here ? 'text-accent' : 'text-text')}>
             <span className="shrink-0 [&>svg]:h-5 [&>svg]:w-5">{here?.icon ?? <LayoutGrid />}</span>
-            <span className="truncate">{here?.label ?? 'Pages'}</span>
+            <span className="truncate">{here?.label ?? t('Pages')}</span>
           </motion.span>
           {/* A count on a page is never folded away: it shows on the bar too. */}
           {/* layout="position": while the card shrinks back into the bar, these keep their shape. */}
@@ -77,13 +78,13 @@ export function PagesFolder({ pages, onNavigate }: { pages: PageEntry[]; onNavig
                 className="pointer-events-auto relative w-[min(100%,21rem)] overflow-hidden border border-border bg-card p-3 shadow-float focus:outline-none">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.16 } }}>
                   <div className="mb-2 flex items-center justify-between pl-2">
-                    <RadixDialog.Title className="text-[15px] font-semibold">Pages</RadixDialog.Title>
-                    <RadixDialog.Close aria-label="Close pages"
+                    <RadixDialog.Title className="text-[15px] font-semibold">{t('Pages')}</RadixDialog.Title>
+                    <RadixDialog.Close aria-label={t('Close pages')}
                       className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
                       <X className="h-5 w-5" />
                     </RadixDialog.Close>
                   </div>
-                  <nav aria-label="Pages" className="grid grid-cols-3 gap-1">
+                  <nav aria-label={t('Pages')} className="grid grid-cols-3 gap-1">
                     {pages.map((p) => (
                       <NavLink key={p.to} to={p.to} title={p.title}
                         onClick={() => { setOpen(false); onNavigate?.() }}

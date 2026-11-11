@@ -3,6 +3,7 @@ import { Check, MessageCircleQuestion, Send } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { type ToolCallView, useDecide } from '../api'
 import { questionOf } from '../question'
 
@@ -25,11 +26,11 @@ export function QuestionCard({ runId, call }: { runId: string; call: ToolCallVie
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-accent/40 bg-accent-soft/40 p-3" role="group" aria-label="The agent's question">
+    <div className="mt-2 rounded-xl border border-accent/40 bg-accent-soft/40 p-3" role="group" aria-label={t("The agent's question")}>
       <div className="flex items-start gap-2">
         <MessageCircleQuestion className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
         <div className="min-w-0">
-          <div className="text-[11.5px] font-medium uppercase tracking-wider text-accent">The agent asks</div>
+          <div className="text-[11.5px] font-medium uppercase tracking-wider text-accent">{t('The agent asks')}</div>
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[14px] font-medium">{question}</p>
         </div>
       </div>
@@ -51,17 +52,17 @@ export function QuestionCard({ runId, call }: { runId: string; call: ToolCallVie
           {multiple && (
             <Button size="sm" variant="primary" disabled={picked.length === 0} loading={decide.isPending}
               onClick={() => answer(picked.join(', '))}>
-              Send {picked.length > 0 ? picked.length : ''}
+              {t('Send')} {picked.length > 0 ? picked.length : ''}
             </Button>
           )}
         </div>
       )}
 
       <form onSubmit={sendOwn} className="mt-3 flex gap-2">
-        <input value={own} onChange={(e) => setOwn(e.target.value)} aria-label="Your answer"
-          placeholder={options.length ? 'Or write your own answer…' : 'Your answer…'}
+        <input value={own} onChange={(e) => setOwn(e.target.value)} aria-label={t('Your answer')}
+          placeholder={options.length ? t('Or write your own answer…') : t('Your answer…')}
           className="h-9 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-[13.5px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
-        <Button type="submit" size="icon" variant="secondary" aria-label="Send answer" disabled={!own.trim() || decide.isPending}>
+        <Button type="submit" size="icon" variant="secondary" aria-label={t('Send answer')} disabled={!own.trim() || decide.isPending}>
           <Send className="h-4 w-4" />
         </Button>
       </form>

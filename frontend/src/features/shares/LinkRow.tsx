@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { formatWhen } from '@/lib/format'
+import { msg, plural, t } from '@/lib/i18n'
 import { type ShareLink, useRefreshShare, useRevokeShare } from './api'
 import { expiryLabel, shareUrl } from './links'
 
-const KIND = { chat: 'Chat', document: 'Document', project: 'Project' } as const
+const KIND = { chat: msg('Chat'), document: msg('Document'), project: msg('Project') } as const
 
 /**
  * One share link: its address with a Copy button, when the copy was made, when it
@@ -40,49 +41,49 @@ export function LinkRow({ link, showTarget = false }: { link: ShareLink; showTar
     <div className="flex flex-col gap-2">
       {showTarget && (
         <div className="flex min-w-0 items-center gap-2">
-          <Badge>{KIND[link.kind]}</Badge>
+          <Badge>{t(KIND[link.kind])}</Badge>
           <span className="min-w-0 truncate text-[14px] font-medium">{link.title}</span>
-          {link.expired && <Badge tone="warning">Expired</Badge>}
+          {link.expired && <Badge tone="warning">{t('Expired')}</Badge>}
         </div>
       )}
       {!link.expired && (
         <div className="flex gap-2">
-          <Input ref={field} readOnly value={url} aria-label="Link" onFocus={(e) => e.target.select()}
+          <Input ref={field} readOnly value={url} aria-label={t('Link')} onFocus={(e) => e.target.select()}
             className="min-w-0 flex-1 font-mono text-[12.5px]" />
           <Button variant="secondary" className="shrink-0" onClick={() => void copy()}
             icon={copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('Copied') : t('Copy')}
           </Button>
         </div>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted">
-        <span>Copy from {formatWhen(link.snapshot_at)}</span>
+        <span>{t('Copy from {when}', { when: formatWhen(link.snapshot_at) })}</span>
         <span className={link.expired ? 'text-warning' : undefined}>{expiryLabel(link)}</span>
-        <span>{link.view_count === 1 ? 'Opened once' : `Opened ${link.view_count} times`}</span>
+        <span>{plural(link.view_count, 'Opened once', 'Opened {n} times')}</span>
         <span className="ml-auto flex items-center gap-1">
           {confirming ? (
             <>
-              <span className="mr-1 text-text">Stop this link working?</span>
-              <Button size="sm" variant="danger" loading={revoke.isPending} onClick={() => revoke.mutate(link.id)}>Revoke</Button>
-              <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Keep</Button>
+              <span className="mr-1 text-text">{t('Stop this link working?')}</span>
+              <Button size="sm" variant="danger" loading={revoke.isPending} onClick={() => revoke.mutate(link.id)}>{t('Revoke')}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>{t('Keep')}</Button>
             </>
           ) : (
             <>
               {!link.expired && (
                 <>
-                  <a href={url} target="_blank" rel="noreferrer" aria-label="Open the link"
+                  <a href={url} target="_blank" rel="noreferrer" aria-label={t('Open the link')}
                     className="flex h-8 w-8 items-center justify-center rounded-control hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                   <Button size="sm" variant="ghost" loading={refresh.isPending} icon={<RefreshCw className="h-3.5 w-3.5" />}
-                    title="Make the copy again from how it is now. The link stays the same."
+                    title={t('Make the copy again from how it is now. The link stays the same.')}
                     onClick={() => refresh.mutate(link.id)}>
-                    Update copy
+                    {t('Update copy')}
                   </Button>
                 </>
               )}
               <Button size="sm" variant="ghost" className="text-error hover:text-error" onClick={() => (link.expired ? revoke.mutate(link.id) : setConfirming(true))}>
-                {link.expired ? 'Remove' : 'Revoke'}
+                {link.expired ? t('Remove') : t('Revoke')}
               </Button>
             </>
           )}

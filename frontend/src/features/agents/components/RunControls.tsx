@@ -4,6 +4,7 @@ import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { usePauseRun, useResumeRun } from '@/features/runs/api'
+import { t } from '@/lib/i18n'
 
 interface RunControlsProps {
   runId: string
@@ -30,28 +31,28 @@ export function RunControls({ runId, status, pauseRequested, withMessage }: RunC
     controls = (
       <div className="flex flex-wrap items-center gap-2">
         {withMessage && (
-          <Input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Optional: a message for the agent"
+          <Input value={message} onChange={(e) => setMessage(e.target.value)} placeholder={t('Optional: a message for the agent')}
             className="h-8 min-w-48 flex-1 text-[13px]" onKeyDown={(e) => e.key === 'Enter' && go()} />
         )}
         <Button size="sm" variant="primary" icon={<Play className="h-3.5 w-3.5" />} loading={resume.isPending} onClick={go}>
-          Resume
+          {t('Resume')}
         </Button>
       </div>
     )
   } else if (pauseRequested && status === 'running') {
     controls = (
       <div className="flex items-center gap-2 text-[12px] text-muted">
-        Pausing after the current step…
+        {t('Pausing after the current step…')}
         <Button size="sm" variant="ghost" loading={resume.isPending} onClick={() => resume.mutate({ runId })}>
-          Keep going
+          {t('Keep going')}
         </Button>
       </div>
     )
   } else if (status === 'running' || status === 'queued') {
     controls = (
       <Button size="sm" variant="ghost" icon={<Pause className="h-3.5 w-3.5" />} loading={pause.isPending}
-        onClick={() => pause.mutate(runId)} title="Pause after the current step">
-        Pause
+        onClick={() => pause.mutate(runId)} title={t('Pause after the current step')}>
+        {t('Pause')}
       </Button>
     )
   }

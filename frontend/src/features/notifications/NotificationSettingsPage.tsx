@@ -14,6 +14,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Switch } from '@/components/ui/Switch'
 import { formatWhen } from '@/lib/format'
+import { msg, rich, t } from '@/lib/i18n'
 import {
   type Destination,
   KIND_LABELS,
@@ -31,9 +32,9 @@ import { currentSubscription, endpointHash, PushPermissionError, type PushSuppor
 import { Lingering } from '@/components/ui/Lingering'
 
 const UNAVAILABLE = {
-  unsupported: 'This browser does not support desktop notifications. On an iPhone or iPad, use push notifications instead.',
-  insecure: 'Browsers only allow desktop notifications over HTTPS. Open the app through its https:// address.',
-  blocked: 'Notifications are blocked for this site. Allow them in the browser’s site settings (the icon next to the address), then reload.',
+  unsupported: msg('This browser does not support desktop notifications. On an iPhone or iPad, use push notifications instead.'),
+  insecure: msg('Browsers only allow desktop notifications over HTTPS. Open the app through its https:// address.'),
+  blocked: msg('Notifications are blocked for this site. Allow them in the browser’s site settings (the icon next to the address), then reload.'),
 }
 
 function DesktopCard() {
@@ -49,21 +50,20 @@ function DesktopCard() {
 
   return (
     <Card>
-      <CardHeader title="On this device" />
+      <CardHeader title={t('On this device')} />
       <CardBody className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4 text-[13px]">
           <div>
-            <div className="font-medium">Desktop notifications</div>
+            <div className="font-medium">{t('Desktop notifications')}</div>
             <div className="text-[12px] text-muted">
-              Shown by your browser while Anemo is open in a tab you are not looking at. Set per browser.
-              With the app closed nothing can be shown; push notifications reach you then.
-              {pushOnHere() && ' Push is on in this browser, so it shows them instead.'}
+              {t('Shown by your browser while Anemo is open in a tab you are not looking at. Set per browser. With the app closed nothing can be shown; push notifications reach you then.')}
+              {pushOnHere() && ' ' + t('Push is on in this browser, so it shows them instead.')}
             </div>
           </div>
-          <Switch label="Desktop notifications" checked={on} disabled={support !== 'ok'} onChange={(next) => void change(next)} />
+          <Switch label={t('Desktop notifications')} checked={on} disabled={support !== 'ok'} onChange={(next) => void change(next)} />
         </div>
-        {support !== 'ok' && <p className="text-[12.5px] text-warning">{UNAVAILABLE[support]}</p>}
-        {refused && support === 'ok' && <p className="text-[12.5px] text-warning">The browser did not give permission.</p>}
+        {support !== 'ok' && <p className="text-[12.5px] text-warning">{t(UNAVAILABLE[support])}</p>}
+        {refused && support === 'ok' && <p className="text-[12.5px] text-warning">{t('The browser did not give permission.')}</p>}
       </CardBody>
     </Card>
   )
@@ -85,11 +85,11 @@ function DestinationRow({ destination, onEdit, thisDevice = false, onRemoveThisD
 
   const confirmDelete = async () => {
     const ok = await confirmDialog({
-      title: `Remove “${destination.name}”?`,
+      title: t('Remove “{name}”?', { name: destination.name }),
       message: push
-        ? 'This device no longer gets push notifications. To get them again, turn push on there.'
-        : 'Notifications are no longer sent there. The saved webhook URL is deleted.',
-      confirmLabel: 'Remove',
+        ? t('This device no longer gets push notifications. To get them again, turn push on there.')
+        : t('Notifications are no longer sent there. The saved webhook URL is deleted.'),
+      confirmLabel: t('Remove'),
       danger: true,
     })
     if (!ok) return
@@ -104,24 +104,24 @@ function DestinationRow({ destination, onEdit, thisDevice = false, onRemoveThisD
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
             <span className="truncate">{destination.name}</span>
-            <Badge>{push ? 'Push' : 'Discord'}</Badge>
-            {thisDevice && <Badge tone="accent">This device</Badge>}
-            {!destination.enabled && <Badge tone="warning">Off</Badge>}
+            <Badge>{push ? t('Push') : 'Discord'}</Badge>
+            {thisDevice && <Badge tone="accent">{t('This device')}</Badge>}
+            {!destination.enabled && <Badge tone="warning">{t('Off')}</Badge>}
           </div>
           <div className="mt-0.5 text-[12px] text-muted">
-            {destination.kinds.length === 0 ? 'Only automations that pick it' : `${destination.kinds.length} of ${Object.keys(KIND_LABELS).length} kinds`}
-            {destination.last_sent_at && <> · last sent {formatWhen(destination.last_sent_at)}</>}
+            {destination.kinds.length === 0 ? t('Only automations that pick it') : t('{n} of {total} kinds', { n: destination.kinds.length, total: Object.keys(KIND_LABELS).length })}
+            {destination.last_sent_at && <> · {t('last sent {when}', { when: formatWhen(destination.last_sent_at) })}</>}
           </div>
         </div>
         <Button size="sm" variant="secondary" icon={<Send className="h-3.5 w-3.5" />} loading={test.isPending}
           onClick={() => test.mutate(destination.id)}>
-          Test
+          {t('Test')}
         </Button>
-        <Switch label={`Send to ${destination.name}`} checked={destination.enabled}
+        <Switch label={t('Send to {name}', { name: destination.name })} checked={destination.enabled}
           onChange={(enabled) => save.mutate({ id: destination.id, form: { ...form, enabled } })} />
         <ActionMenu actions={[
-          { label: 'Edit', icon: <Pencil />, onSelect: onEdit },
-          { label: 'Remove', icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
+          { label: t('Edit'), icon: <Pencil />, onSelect: onEdit },
+          { label: t('Remove'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
         ]} />
       </div>
       {test.data && (
@@ -131,7 +131,7 @@ function DestinationRow({ destination, onEdit, thisDevice = false, onRemoveThisD
         </p>
       )}
       {!test.data && destination.last_error && (
-        <p className="mt-2 text-[12.5px] text-error">Last attempt failed: {destination.last_error}</p>
+        <p className="mt-2 text-[12.5px] text-error">{t('Last attempt failed: {error}', { error: destination.last_error })}</p>
       )}
       {error && <p className="mt-2 text-[12.5px] text-error">{errorMessage(error)}</p>}
     </div>
@@ -139,11 +139,11 @@ function DestinationRow({ destination, onEdit, thisDevice = false, onRemoveThisD
 }
 
 const PUSH_UNAVAILABLE: Record<Exclude<PushSupport, 'ok'>, string> = {
-  unsupported: 'This browser does not support push notifications.',
-  insecure: 'Push notifications need HTTPS. Open the app through its https:// address.',
-  blocked: 'Notifications are blocked for this site. Allow them in the browser’s site settings (the icon next to the address), then reload.',
-  'ios-install': 'On an iPhone or iPad, push notifications work once Anemo is on your Home Screen: Share › Add to Home Screen, then open it from there and come back here.',
-  dev: 'Push notifications need the built app (its service worker is not used by the development server).',
+  unsupported: msg('This browser does not support push notifications.'),
+  insecure: msg('Push notifications need HTTPS. Open the app through its https:// address.'),
+  blocked: msg('Notifications are blocked for this site. Allow them in the browser’s site settings (the icon next to the address), then reload.'),
+  'ios-install': msg('On an iPhone or iPad, push notifications work once Anemo is on your Home Screen: Share › Add to Home Screen, then open it from there and come back here.'),
+  dev: msg('Push notifications need the built app (its service worker is not used by the development server).'),
 }
 
 /** The SHA-256 of this browser's subscription address, once known (null: none). */
@@ -180,21 +180,20 @@ export function PushCard({ devices, onEdit }: { devices: Destination[]; onEdit: 
 
   return (
     <Card>
-      <CardHeader title="Push notifications"
-        description="Notifications on your phone or computer even while Anemo is closed. Turn it on in each browser or phone you want them on; changes ask for your password." />
+      <CardHeader title={t('Push notifications')}
+        description={t('Notifications on your phone or computer even while Anemo is closed. Turn it on in each browser or phone you want them on; changes ask for your password.')} />
       <CardBody className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4 text-[13px]">
           <div>
-            <div className="font-medium">On this device</div>
+            <div className="font-medium">{t('On this device')}</div>
             <div className="text-[12px] text-muted">
-              When an automation needs your approval, the notification has <em>Allow once</em> and <em>Deny</em> buttons.
-              On an iPhone or iPad there are no buttons: tap the notification to answer in the app.
+              {rich('When an automation needs your approval, the notification has <em>Allow once</em> and <em>Deny</em> buttons. On an iPhone or iPad there are no buttons: tap the notification to answer in the app.', { em: (c) => <em>{c}</em> })}
             </div>
           </div>
-          <Switch label="Push notifications on this device" checked={on} disabled={support !== 'ok' || busy}
+          <Switch label={t('Push notifications on this device')} checked={on} disabled={support !== 'ok' || busy}
             onChange={change} />
         </div>
-        {support !== 'ok' && <p className="text-[12.5px] text-warning">{PUSH_UNAVAILABLE[support]}</p>}
+        {support !== 'ok' && <p className="text-[12.5px] text-warning">{t(PUSH_UNAVAILABLE[support])}</p>}
         {error && (
           <p className="text-[12.5px] text-error">
             {error instanceof PushPermissionError ? error.message : errorMessage(error)}
@@ -209,7 +208,7 @@ export function PushCard({ devices, onEdit }: { devices: Destination[]; onEdit: 
           </div>
         )}
         {devices.length === 0 && support === 'ok' && (
-          <p className="text-[12.5px] text-muted">No device has push on yet.</p>
+          <p className="text-[12.5px] text-muted">{t('No device has push on yet.')}</p>
         )}
       </CardBody>
     </Card>
@@ -231,10 +230,9 @@ export function NotificationSettingsPage() {
           <Bell className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold">Notifications</h2>
+          <h2 className="text-lg font-semibold">{t('Notifications')}</h2>
           <p className="text-[13px] text-muted">
-            Reminders, automation results and agent messages are always listed under{' '}
-            <Link to="/notifications" className="text-accent underline">Notifications</Link>. Here you choose where else they go.
+            {rich('Reminders, automation results and agent messages are always listed under <a>Notifications</a>. Here you choose where else they go.', { a: (c) => <Link to="/notifications" className="text-accent underline">{c}</Link> })}
           </p>
         </div>
       </div>
@@ -245,16 +243,16 @@ export function NotificationSettingsPage() {
 
       <Card>
         <CardHeader title="Discord"
-          description="Get notifications in a Discord channel as well. Changes ask for your password."
+          description={t('Get notifications in a Discord channel as well. Changes ask for your password.')}
           actions={
             <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ destination: null })}>
-              Add
+              {t('Add')}
             </Button>
           } />
         <CardBody className="flex flex-col gap-2">
           {destinations.isError && <p className="text-[13px] text-error">{errorMessage(destinations.error)}</p>}
           {destinations.isSuccess && items.length === 0 && (
-            <p className="text-[13px] text-muted">No channel yet. Add one with a webhook URL from Discord.</p>
+            <p className="text-[13px] text-muted">{t('No channel yet. Add one with a webhook URL from Discord.')}</p>
           )}
           {items.map((d) => <DestinationRow key={d.id} destination={d} onEdit={() => setEditing({ destination: d })} />)}
         </CardBody>

@@ -10,6 +10,7 @@ import { topBarEnd, topBarStart } from '@/components/ui/topBarSlots'
 import { cn } from '@/lib/cn'
 import { useMobileNav } from './mobileNavStore'
 import { ScopeControl } from './ScopeControl'
+import { t } from '@/lib/i18n'
 
 const iconButton =
   'flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
@@ -17,7 +18,7 @@ const iconButton =
 export function MenuButton({ className }: { className?: string }) {
   const setOpen = useMobileNav((s) => s.setOpen)
   return (
-    <button type="button" aria-label="Open menu" onClick={() => setOpen(true)} className={cn(iconButton, 'md:hidden', className)}>
+    <button type="button" aria-label={t('Open menu')} onClick={() => setOpen(true)} className={cn(iconButton, 'md:hidden', className)}>
       <Menu className="h-5 w-5" />
     </button>
   )
@@ -25,7 +26,7 @@ export function MenuButton({ className }: { className?: string }) {
 
 export function NewChatButton({ className }: { className?: string }) {
   return (
-    <Link to="/" aria-label="New chat" className={cn(iconButton, 'md:hidden', className)}>
+    <Link to="/" aria-label={t('New chat')} className={cn(iconButton, 'md:hidden', className)}>
       <SquarePen className="h-5 w-5" />
     </Link>
   )

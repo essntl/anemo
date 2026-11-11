@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { setQuiet } from '@/features/island/alerts'
 import { useSettings } from '@/features/settings/api'
+import { t } from '@/lib/i18n'
 import { focusKey } from './api'
 import { flushOutbox, onSessionsSent, useOutbox } from './outbox'
 import * as timer from './timer'
@@ -27,7 +28,7 @@ import { pullTimer, pushTimer, useTimerSync } from './timerSync'
 export function TimerEngine() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const t = useTimerStore((s) => s.timer)
+  const state = useTimerStore((s) => s.timer)
   const prefs = useTimerStore((s) => s.prefs)
   const announcement = useTimerStore((s) => s.announcement)
   const now = useClock((s) => s.now)
@@ -52,13 +53,13 @@ export function TimerEngine() {
   }, [focus])
 
   // Quiet while focusing (Settings > Focus): alerts that can wait do, until the session ends.
-  const quiet = Boolean(focus?.quiet_while_focusing) && t.phase === 'focus' && t.status === 'running'
+  const quiet = Boolean(focus?.quiet_while_focusing) && state.phase === 'focus' && state.status === 'running'
   useEffect(() => setQuiet(quiet), [quiet])
   useEffect(() => () => setQuiet(false), [])
 
   // The clock.
   useEffect(() => {
-    if (t.status !== 'running') return
+    if (state.status !== 'running') return
     let id: ReturnType<typeof setTimeout>
     const tick = () => {
       const current = useTimerStore.getState().timer
@@ -84,7 +85,7 @@ export function TimerEngine() {
       clearTimeout(id)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [t.status, t.startedAt, t.duration, t.accumulated])
+  }, [state.status, state.startedAt, state.duration, state.accumulated])
 
   // Another tab of the app changed the timer.
   useEffect(() => {
@@ -132,16 +133,16 @@ export function TimerEngine() {
 
   // The countdown in the tab title.
   const base = useRef<string | null>(null)
-  const clock = timer.formatClock(timer.remaining(t, now))
+  const clock = timer.formatClock(timer.remaining(state, now))
   useEffect(() => {
     if (base.current === null) base.current = document.title
-    if (!prefs.titleCountdown || t.status === 'idle') {
+    if (!prefs.titleCountdown || state.status === 'idle') {
       document.title = base.current
       return
     }
-    const paused = t.status === 'paused' ? 'Paused · ' : ''
-    document.title = `${paused}${clock} · ${timer.PHASE_LABEL[t.phase]} · ${base.current}`
-  }, [clock, t.status, t.phase, prefs.titleCountdown])
+    const paused = state.status === 'paused' ? `${t('Paused')} · ` : ''
+    document.title = `${paused}${clock} · ${t(timer.PHASE_LABEL[state.phase])} · ${base.current}`
+  }, [clock, state.status, state.phase, prefs.titleCountdown])
 
   // Phase changes, read by screen readers (not every second).
   return (

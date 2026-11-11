@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
 import { toast } from '@/components/ui/toast'
 import { islandAlert } from '@/features/island/alerts'
+import { t } from '@/lib/i18n'
 import { artworkSrc } from './player/detect'
 import { saveToLibrary } from './player/controller'
 import type { Track } from './player/types'
@@ -29,7 +30,7 @@ async function libraryIds(tracks: Track[]): Promise<string[]> {
   const saved = missing.length ? await saveToLibrary(missing) : []
   const ids = new Map(saved.map((t) => [t.id, t.trackId]))
   const out = tracks.map((t) => t.trackId ?? ids.get(t.id) ?? null)
-  if (out.some((id) => !id)) throw new Error("Couldn't save the tracks. Check the connection and try again.")
+  if (out.some((id) => !id)) throw new Error(t("Couldn't save the tracks. Check the connection and try again."))
   return out as string[]
 }
 
@@ -63,16 +64,16 @@ export function useDeletePlaylist() {
     onSuccess: (pl) => {
       refresh()
       toast({
-        message: `Deleted “${pl.name}”`,
+        message: t('Deleted “{name}”', { name: pl.name }),
         duration: 10_000,
         action: {
-          label: 'Undo',
+          label: t('Undo'),
           onClick: () =>
             void api
               .POST('/api/music/playlists', { body: { name: pl.name, track_ids: pl.tracks.map((t) => t.id), sort_order: pl.sort_order } })
               .then(unwrap)
               .then(refresh)
-              .catch(() => toast({ message: `Couldn’t bring back “${pl.name}”. Try again later.` })),
+              .catch(() => toast({ message: t('Couldn’t bring back “{name}”. Try again later.', { name: pl.name }) })),
         },
       })
     },
@@ -124,10 +125,10 @@ export function useAddToPlaylist() {
       const one = v.tracks.length === 1 ? v.tracks[0] : null
       islandAlert(
         added === 0
-          ? { title: 'Already in the playlist', body: v.playlist.name, icon: 'check', tone: 'info', duration: 2000 }
+          ? { title: t('Already in the playlist'), body: v.playlist.name, icon: 'check', tone: 'info', duration: 2000 }
           : {
-              title: `Added to ${v.playlist.name}`,
-              body: one?.title ?? `${added} tracks`,
+              title: t('Added to {name}', { name: v.playlist.name }),
+              body: one?.title ?? t('{n} tracks', { n: added }),
               icon: 'plus',
               image: one ? artworkSrc(one.artwork) : null,
               tone: 'success',

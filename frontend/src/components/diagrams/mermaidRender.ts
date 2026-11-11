@@ -3,6 +3,7 @@
  * only when a page shows a diagram, so pages without one stay as fast as before.
  */
 import mermaid from 'mermaid'
+import { t } from '@/lib/i18n'
 import type { Palette } from './colors'
 import { mermaidConfig } from './mermaidConfig'
 import { sanitizeSvg } from './sanitizeSvg'
@@ -14,8 +15,8 @@ export type MermaidResult = { svg: string; error?: undefined } | { svg?: undefin
 
 /** The first line of Mermaid's message, without its internal noise. */
 function message(err: unknown): string {
-  const text = err instanceof Error ? err.message : typeof err === 'string' ? err : 'The diagram could not be drawn.'
-  return text.trim().split('\n').slice(0, 4).join('\n') || 'The diagram could not be drawn.'
+  const text = err instanceof Error ? err.message : typeof err === 'string' ? err : t('The diagram could not be drawn.')
+  return text.trim().split('\n').slice(0, 4).join('\n') || t('The diagram could not be drawn.')
 }
 
 export async function renderMermaid(source: string, palette: Palette): Promise<MermaidResult> {

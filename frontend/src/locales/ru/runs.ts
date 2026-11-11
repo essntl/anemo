@@ -1,0 +1,32 @@
+import type { Messages } from '@/lib/i18n'
+
+const messages: Messages = {
+  "Needs you": "Ждёт вас",
+  "Stop this run?": "Остановить этот запуск?",
+  "The agent stops right away. Changes it already made stay, and you can revert file changes below.": "Агент остановится сразу. Уже сделанные изменения останутся, а изменения в файлах можно вернуть ниже.",
+  "Stop run": "Остановить запуск",
+  "Run": "Запуск",
+  "Sub-agent of another run": "Субагент другого запуска",
+  "(no request)": "(без запроса)",
+  "Stop": "Остановить",
+  "Open conversation": "Открыть чат",
+  "Steps": "Шаги",
+  "Tool calls": "Вызовы инструментов",
+  "Manage memories": "Управлять воспоминаниями",
+  "Answer": "Ответ",
+  "{n} memory in context | {n} memories in context": "{n} воспоминание в контексте | {n} воспоминания в контексте | {n} воспоминаний в контексте",
+  "Any status": "Любой статус",
+  "Needs you or paused": "Ждёт вас или приостановлено",
+  "Agent runs": "Запуски агентов",
+  "Chat answers": "Ответы в чате",
+  "Everything": "Всё",
+  "Automation": "Автоматизация",
+  "What your agents did: every step, tool call, approval and file change.": "Что делали ваши агенты: каждый шаг, вызов инструмента, подтверждение и изменение файла.",
+  "Search requests": "Поиск запросов",
+  "Kind": "Тип",
+  "No runs here": "Здесь нет запусков",
+  "Switch a chat to Agent mode and give it a task: its runs show up here.": "Переключите чат в режим агента и дайте ему задачу: его запуски появятся здесь.",
+  "Nothing matches these filters.": "Ничего не соответствует этим фильтрам.",
+  "Load more": "Загрузить ещё",
+}
+export default messages

@@ -1,6 +1,7 @@
 """Agent tools for focus and music, the open-tab check they rely on, and task files."""
 
 from app.events import presence
+from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
 from tests.api.test_agent import (
     agent_turn,
@@ -219,3 +220,47 @@ async def test_stopping_the_timer_asks_by_default(authed):
     assert await run_status(authed, run_id) == "waiting_approval"
     approval = (await authed.get("/api/approvals")).json()[0]
     assert approval["summary"] == "Stop the focus session (recorded as cut short)"
+
+
+async def test_a_part_that_is_turned_off_takes_its_tools_from_the_agent(authed):
+    """Settings > Pages: with Music off the agent is not told about the music tools."""
+    cid = await setup(authed)
+    music = {"queue_music", "get_music_queue", "music_control"}
+    focus = {"get_focus_stats", "list_focus_sessions", "start_focus", "stop_focus"}
+
+    script("hello", [TextDelta("Hi."), Done("end")])
+    await agent_turn(authed, cid, "hello")
+    offered = {t.name for t in FakeAdapter.requests[-1].tools}
+    assert music | focus | {"list_tasks", "list_events", "list_schedules"} <= offered
+
+    r = await authed.put(
+        "/api/settings/navigation",
+        json={"pinned": ["home", "notifications", "tasks"], "more": ["focus"], "off": ["music"]},
+    )
+    assert r.status_code == 200, r.text
+    script("hello again", [TextDelta("Hi."), Done("end")])
+    await agent_turn(authed, cid, "hello again")
+    request = FakeAdapter.requests[-1]
+    offered = {t.name for t in request.tools}
+    assert not offered & music
+    # Focus is still on, and so are its tools; nothing else changed.
+    assert focus | {"list_tasks", "list_events", "list_schedules"} <= offered
+    assert "music" not in " ".join(t.description for t in request.tools).lower()
+
+    # Each part takes its own tools away.
+    r = await authed.put(
+        "/api/settings/navigation",
+        json={
+            "pinned": ["home", "notifications"],
+            "more": [],
+            "off": ["music", "focus", "tasks", "calendar", "automations"],
+        },
+    )
+    assert r.status_code == 200, r.text
+    script("and again", [TextDelta("Hi."), Done("end")])
+    await agent_turn(authed, cid, "and again")
+    offered = {t.name for t in FakeAdapter.requests[-1].tools}
+    gone = music | focus | {"list_tasks", "create_task", "list_events", "list_schedules"}
+    assert not offered & gone
+    # Projects, files and the rest stay.
+    assert {"list_projects", "read_file", "update_plan"} <= offered

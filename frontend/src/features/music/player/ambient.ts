@@ -6,15 +6,16 @@
  */
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { msg } from '@/lib/i18n'
 
 export type AmbientKind = 'rain' | 'ocean' | 'brown' | 'pink' | 'white'
 
 export const AMBIENT_KINDS: { id: AmbientKind; label: string }[] = [
-  { id: 'rain', label: 'Rain' },
-  { id: 'ocean', label: 'Ocean' },
-  { id: 'brown', label: 'Brown' },
-  { id: 'pink', label: 'Pink' },
-  { id: 'white', label: 'White' },
+  { id: 'rain', label: msg('Rain') },
+  { id: 'ocean', label: msg('Ocean') },
+  { id: 'brown', label: msg('Brown') },
+  { id: 'pink', label: msg('Pink') },
+  { id: 'white', label: msg('White') },
 ]
 
 interface AmbientState {

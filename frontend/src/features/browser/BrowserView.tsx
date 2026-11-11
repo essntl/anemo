@@ -15,6 +15,7 @@ import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { cn } from '@/lib/cn'
+import { rich, t } from '@/lib/i18n'
 import { useBrowserView, useCloseBrowser } from './api'
 import { inputForKey, pagePoint } from './input'
 import { useBrowserStream } from './useBrowserStream'
@@ -100,9 +101,9 @@ export function BrowserView({ conversationId, actions, className }: Props) {
 
   const confirmClose = async () => {
     const ok = await confirmDialog({
-      title: 'Close this browser?',
-      message: 'Its pages, cookies and logins are gone. The agent starts with a fresh browser next time.',
-      confirmLabel: 'Close browser',
+      title: t('Close this browser?'),
+      message: t('Its pages, cookies and logins are gone. The agent starts with a fresh browser next time.'),
+      confirmLabel: t('Close browser'),
       danger: true,
     })
     if (ok) close.mutate()
@@ -113,14 +114,14 @@ export function BrowserView({ conversationId, actions, className }: Props) {
   return (
     <div className={cn('flex h-full min-h-0 flex-col bg-surface', className)}>
       <div className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-2">
-        <Button size="icon" variant="ghost" aria-label="Back" disabled={!open} onClick={() => queue.push({ kind: 'back' })}>
+        <Button size="icon" variant="ghost" aria-label={t('Back')} disabled={!open} onClick={() => queue.push({ kind: 'back' })}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <Button size="icon" variant="ghost" aria-label="Reload" disabled={!open} onClick={() => queue.push({ kind: 'reload' })}>
+        <Button size="icon" variant="ghost" aria-label={t('Reload')} disabled={!open} onClick={() => queue.push({ kind: 'reload' })}>
           <RotateCw className={cn('h-4 w-4', queue.busy && 'animate-spin')} />
         </Button>
         <form className="min-w-0 flex-1" onSubmit={go}>
-          <input aria-label="Address" spellCheck={false} autoComplete="off" placeholder="Enter an address, e.g. example.com"
+          <input aria-label={t('Address')} spellCheck={false} autoComplete="off" placeholder={t('Enter an address, e.g. example.com')}
             disabled={data !== undefined && !data.available}
             value={typedAddress ?? data?.url ?? ''}
             onFocus={(e) => { setTypedAddress(data?.url ?? ''); e.target.select() }}
@@ -129,7 +130,7 @@ export function BrowserView({ conversationId, actions, className }: Props) {
             className="h-8 w-full rounded-control border border-border bg-bg px-2.5 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
         </form>
         {open && (
-          <Button size="icon" variant="ghost" aria-label="Close browser" loading={close.isPending} onClick={() => void confirmClose()}>
+          <Button size="icon" variant="ghost" aria-label={t('Close browser')} loading={close.isPending} onClick={() => void confirmClose()}>
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
@@ -138,19 +139,18 @@ export function BrowserView({ conversationId, actions, className }: Props) {
 
       <div ref={box} className="min-h-0 flex-1 overflow-auto bg-bg" data-no-swipe>
         {data && !data.available && (
-          <Message title="The browser is not running">
-            Start it on the server with <code className="font-mono">docker compose --profile browser up -d</code>.
+          <Message title={t('The browser is not running')}>
+            {rich('Start it on the server with <code>docker compose --profile browser up -d</code>.', { code: (c) => <code className="font-mono">{c}</code> })}
           </Message>
         )}
         {data?.available && !open && (
-          <Message title="No page is open yet">
-            When the agent opens a page in its browser, you see it here and can use it too. You can also enter an
-            address above.
+          <Message title={t('No page is open yet')}>
+            {t('When the agent opens a page in its browser, you see it here and can use it too. You can also enter an address above.')}
           </Message>
         )}
         {open && shown && (
           // The picture is the browser: clicks, the wheel and the keyboard go to the page.
-          <div tabIndex={0} role="application" aria-label="The agent's browser. Click, type and scroll here."
+          <div tabIndex={0} role="application" aria-label={t("The agent's browser. Click, type and scroll here.")}
             className="cursor-default outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
             onKeyDown={onKeyDown}
             onPaste={(e) => {
@@ -158,7 +158,7 @@ export function BrowserView({ conversationId, actions, className }: Props) {
               const text = e.clipboardData.getData('text')
               if (text) queue.push({ kind: 'type', text })
             }}>
-            <img ref={picture} alt={data?.title || 'Browser page'} draggable={false}
+            <img ref={picture} alt={data?.title || t('Browser page')} draggable={false}
               src={shown}
               className="block w-full select-none"
               onClick={(e) => queue.push({ kind: 'click', ...pointAt(e.clientX, e.clientY) })}
@@ -174,19 +174,19 @@ export function BrowserView({ conversationId, actions, className }: Props) {
           <span className="flex items-center gap-1.5">
             <Globe className="h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">
-              This is the agent’s browser. Click the page, then type; what you do stays for the agent.
+              {t('This is the agent’s browser. Click the page, then type; what you do stays for the agent.')}
             </span>
           </span>
         ) : (
-          <span>One browser per chat, shared by you and the agent.</span>
+          <span>{t('One browser per chat, shared by you and the agent.')}</span>
         )}
         {/* Phones have no keyboard events on a picture: type here instead. */}
         {open && (
           <form className="mt-2 hidden gap-2 pointer-coarse:flex" onSubmit={sendTouchText}>
-            <input aria-label="Text to type into the page" value={touchText} placeholder="Type into the page…"
+            <input aria-label={t('Text to type into the page')} value={touchText} placeholder={t('Type into the page…')}
               autoCapitalize="off" autoCorrect="off" onChange={(e) => setTouchText(e.target.value)}
               className="h-10 min-w-0 flex-1 rounded-control border border-border bg-bg px-2.5 focus:border-accent focus:outline-none" />
-            <Button size="sm" variant="secondary" type="submit">Type</Button>
+            <Button size="sm" variant="secondary" type="submit">{t('Type##verb')}</Button>
             <Button size="sm" variant="ghost" onClick={() => queue.push({ kind: 'key', key: 'Enter' })}>Enter</Button>
           </form>
         )}

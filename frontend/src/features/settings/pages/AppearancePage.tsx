@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { ACCENT_PRESETS, type Density, type ThemeMode, useThemeStore } from '../theme'
+import { t } from '@/lib/i18n'
 
 function Segmented<T extends string>({
   value,
@@ -39,28 +40,28 @@ export function AppearancePage() {
   return (
     <div className="flex flex-col gap-5">
       <Card>
-        <CardHeader title="Theme" description="Light, dark, or follow your system." />
+        <CardHeader title={t('Theme')} description={t('Light, dark, or follow your system.')} />
         <CardBody>
           <Segmented<ThemeMode>
             value={mode}
             onChange={(m) => set({ mode: m })}
             options={[
-              { value: 'light', label: 'Light', icon: <Sun className="h-4 w-4" /> },
-              { value: 'dark', label: 'Dark', icon: <Moon className="h-4 w-4" /> },
-              { value: 'system', label: 'System', icon: <Monitor className="h-4 w-4" /> },
+              { value: 'light', label: t('Light'), icon: <Sun className="h-4 w-4" /> },
+              { value: 'dark', label: t('Dark'), icon: <Moon className="h-4 w-4" /> },
+              { value: 'system', label: t('System'), icon: <Monitor className="h-4 w-4" /> },
             ]}
           />
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader title="Accent color" description="Used for highlights, buttons and selection." />
+        <CardHeader title={t('Accent color')} description={t('Used for highlights, buttons and selection.')} />
         <CardBody className="flex flex-wrap items-center gap-3">
           {ACCENT_PRESETS.map((c) => (
             <button
               key={c}
               type="button"
-              aria-label={`Accent ${c}`}
+              aria-label={t('Accent {color}', { color: c })}
               onClick={() => set({ accent: c })}
               className="flex h-9 w-9 items-center justify-center rounded-full ring-offset-2 ring-offset-card transition-transform hover:scale-105"
               style={{ background: c, boxShadow: accent === c ? `0 0 0 2px ${c}` : undefined }}
@@ -69,7 +70,7 @@ export function AppearancePage() {
             </button>
           ))}
           <label className="ml-2 flex items-center gap-2 text-[13px] text-muted">
-            Custom
+            {t('Custom')}
             <input
               type="color"
               value={accent}
@@ -81,14 +82,14 @@ export function AppearancePage() {
       </Card>
 
       <Card>
-        <CardHeader title="Density" description="Compact fits more on screen." />
+        <CardHeader title={t('Density')} description={t('Compact fits more on screen.')} />
         <CardBody>
           <Segmented<Density>
             value={density}
             onChange={(d) => set({ density: d })}
             options={[
-              { value: 'comfortable', label: 'Comfortable' },
-              { value: 'compact', label: 'Compact' },
+              { value: 'comfortable', label: t('Comfortable') },
+              { value: 'compact', label: t('Compact') },
             ]}
           />
         </CardBody>

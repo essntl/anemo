@@ -122,6 +122,8 @@ async def test_a_message_started_with_a_skill(authed):
     context = last_context()
     assert '<skill name="study" title="Study">' in context
     assert "Let's check your understanding" in context
+    # Skills are written in English; the answer follows the language of the message.
+    assert "Write your answer in the language of the user's message" in " ".join(context.split())
     # The system prompt stays the same (prompt caching): the skill is in the message.
     assert "check your understanding" not in (FakeAdapter.requests[-1].system or "")
 

@@ -5,6 +5,7 @@ import { CloudOff } from 'lucide-react'
 import { errorMessage, onUnauthorized } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { t } from '@/lib/i18n'
 import { meKey, useMe } from './api'
 
 /** Layout route: renders children only for a logged-in user, otherwise redirects to /login. */
@@ -37,9 +38,9 @@ export function RequireAuth() {
   if (unreachable) {
     return (
       <div className="flex h-full items-center justify-center">
-        <EmptyState icon={<CloudOff className="h-6 w-6" />} title="Can’t reach Anemo"
-          description={`${navigator.onLine ? errorMessage(me.error) : 'You’re offline.'} This page tries again when the connection is back.`}
-          action={<Button onClick={() => void me.refetch()} disabled={me.isFetching}>{me.isFetching ? 'Trying…' : 'Try again'}</Button>} />
+        <EmptyState icon={<CloudOff className="h-6 w-6" />} title={t('Can’t reach Anemo')}
+          description={t('{reason} This page tries again when the connection is back.', { reason: navigator.onLine ? errorMessage(me.error) : t('You’re offline.') })}
+          action={<Button onClick={() => void me.refetch()} disabled={me.isFetching}>{me.isFetching ? t('Trying…') : t('Try again')}</Button>} />
       </div>
     )
   }

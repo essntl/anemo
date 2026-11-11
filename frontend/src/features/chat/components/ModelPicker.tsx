@@ -1,5 +1,6 @@
 import { Select } from '@/components/ui/Select'
 import { useModels } from '@/features/providers/api'
+import { t } from '@/lib/i18n'
 
 /**
  * Compact select of usable chat models (model and its provider both enabled).
@@ -20,21 +21,21 @@ export function ModelPicker({
   const options = all.filter((m) => m.enabled && m.provider_enabled && m.capabilities.chat !== false)
   const current = value ?? defaultModelId ?? ''
   const unavailable = current && models.data && !options.some((m) => m.id === current)
-    ? (all.find((m) => m.id === current)?.display_name ?? 'Deleted model')
+    ? (all.find((m) => m.id === current)?.display_name ?? t('Deleted model'))
     : null
   return (
     <Select
-      aria-label="Model"
+      aria-label={t('Model')}
       variant="ghost"
       className="max-w-40 px-1 md:max-w-56 md:px-2"
       value={current}
       onValueChange={(v) => onChange(v || null)}
       options={[
-        ...(!current ? [{ value: '', label: 'No model configured', disabled: true }] : []),
-        ...(unavailable ? [{ value: current, label: `${unavailable} (unavailable)`, disabled: true }] : []),
+        ...(!current ? [{ value: '', label: t('No model configured'), disabled: true }] : []),
+        ...(unavailable ? [{ value: current, label: t('{name} (unavailable)', { name: unavailable }), disabled: true }] : []),
         ...options.map((m) => ({
           value: m.id,
-          label: `${m.display_name}${m.id === defaultModelId ? ' (default)' : ''}`,
+          label: m.id === defaultModelId ? t('{name} (default)', { name: m.display_name }) : m.display_name,
         })),
       ]}
     />

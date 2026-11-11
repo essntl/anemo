@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { detectSource } from '../player/detect'
 import type { PlaylistChoice } from '../player/controller'
 import { askPlaylistChoice } from '../playlistChoice'
@@ -12,8 +13,8 @@ import { askPlaylistChoice } from '../playlistChoice'
  */
 export function PasteLinkForm({
   onAdd,
-  placeholder = 'Paste a YouTube video/playlist, SoundCloud or audio URL',
-  label = 'Music link',
+  placeholder = t('Paste a YouTube video/playlist, SoundCloud or audio URL'),
+  label = t('Music link'),
   size = 'md',
   className,
 }: {
@@ -32,7 +33,7 @@ export function PasteLinkForm({
     const link = value.trim()
     if (!link || busy) return
     if (!detectSource(link)) {
-      setError('That is not a link. Paste a YouTube, SoundCloud or audio link.')
+      setError(t('That is not a link. Paste a YouTube, SoundCloud or audio link.'))
       return
     }
     const choice = await askPlaylistChoice(link)
@@ -43,7 +44,7 @@ export function PasteLinkForm({
       await onAdd(link, choice)
       setValue('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't add that link.")
+      setError(err instanceof Error ? err.message : t("Couldn't add that link."))
     } finally {
       setBusy(false)
     }
@@ -59,8 +60,8 @@ export function PasteLinkForm({
           placeholder={placeholder} aria-label={label} inputMode="url" autoComplete="off" spellCheck={false}
           aria-invalid={!!error || undefined} aria-describedby={error ? `${label}-error` : undefined}
           className={cn('min-w-0 flex-1 bg-transparent placeholder:text-subtle focus:outline-none', sm ? 'h-8 text-[13.5px]' : 'h-9 text-[14px]')} />
-        <Button type="submit" variant="primary" size="sm" disabled={!value.trim() || busy} aria-label={busy ? 'Adding' : undefined}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
+        <Button type="submit" variant="primary" size="sm" disabled={!value.trim() || busy} aria-label={busy ? t('Adding') : undefined}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t('Add')}
         </Button>
       </div>
       {error && <p id={`${label}-error`} role="alert" className="px-1 pt-1.5 text-[12.5px] text-error">{error}</p>}

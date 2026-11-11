@@ -15,11 +15,13 @@ import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { useSearch } from './api'
 import { Highlighted } from './Highlighted'
 import { kindInfo } from './kinds'
+import { useOffPages } from '@/features/settings/navigation'
 import { matchingActions } from './actions'
-import { matchingPages } from './pages'
+import { matchingPages, pageLabel } from './pages'
 import { usePalette } from './paletteStore'
 
 interface Item {
@@ -70,7 +72,7 @@ export function CommandPalette() {
             // Raised and slightly see-through, with a hairline of light along the edge.
             'rounded-3xl border border-border-strong bg-card/85 shadow-[0_28px_90px_-18px_rgb(0_0_0/0.65)] ring-1 ring-white/5 backdrop-blur-2xl',
           )}>
-          <RadixDialog.Title className="sr-only">Search</RadixDialog.Title>
+          <RadixDialog.Title className="sr-only">{t('Search')}</RadixDialog.Title>
           {/* Remounted each time it opens, so it starts empty (but not while it closes,
               or the results would vanish before the closing animation). */}
           <PaletteBody key={session} onDone={() => setOpen(false)} />
@@ -90,7 +92,8 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
   // Nothing typed: suggested pages, three at a time, moving on every few seconds. It
   // waits while you point at them or move with the arrow keys, and people who asked
   // their system for less motion get the whole list instead.
-  const pages = matchingPages(typed)
+  const offPages = useOffPages()
+  const pages = matchingPages(typed, offPages)
   const still = useMediaQuery('(prefers-reduced-motion: reduce)')
   const cycling = typed === '' && !still
   const rounds = Math.ceil(pages.length / SUGGESTIONS)
@@ -104,12 +107,12 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
   const shownPages = cycling ? pages.slice(round * SUGGESTIONS, (round + 1) * SUGGESTIONS) : pages.slice(0, typed ? 4 : 30)
 
   const items: Item[] = [
-    ...matchingActions(typed).map((a) => ({ key: `action:${a.label}`, section: 'Actions', icon: a.icon, title: a.label, run: a.run })),
-    ...shownPages.map((p) => ({ key: `page:${p.to}`, section: typed ? 'Go to' : 'Suggestions', icon: p.icon, title: p.label, to: p.to })),
+    ...matchingActions(typed, offPages).map((a) => ({ key: `action:${a.label}`, section: t('Actions'), icon: a.icon, title: t(a.label), run: a.run })),
+    ...shownPages.map((p) => ({ key: `page:${p.to}`, section: typed ? t('Go to') : t('Suggestions'), icon: p.icon, title: pageLabel(p), to: p.to })),
     ...(typed ? (results.data?.groups ?? []) : []).flatMap((group) =>
       group.hits.map((hit) => ({
         key: `${hit.kind}:${hit.id}`,
-        section: kindInfo(hit.kind).label,
+        section: t(kindInfo(hit.kind).label),
         icon: kindInfo(hit.kind).icon,
         title: hit.title,
         detail: hit.snippet,
@@ -117,7 +120,7 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
       })),
     ),
     ...(typed
-      ? [{ key: 'all', section: 'Search', icon: Search, title: `All results for “${typed}”`, to: `/search?q=${encodeURIComponent(typed)}` }]
+      ? [{ key: 'all', section: t('Search'), icon: Search, title: t('All results for “{query}”', { query: typed }), to: `/search?q=${encodeURIComponent(typed)}` }]
       : []),
   ]
   const active = Math.min(selected, items.length - 1)
@@ -144,19 +147,19 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
     <>
       <div className="flex items-center gap-3 px-4 md:px-5">
         <Search className="h-5 w-5 shrink-0 text-accent" />
-        <input autoFocus value={query} placeholder="Search, or type a page name…" aria-label="Search"
+        <input autoFocus value={query} placeholder={t('Search, or type a page name…')} aria-label={t('Search')}
           role="combobox" aria-expanded aria-controls="palette-list" aria-activedescendant={items[active] ? `palette-${active}` : undefined}
           onChange={(e) => { setQuery(e.target.value); setSelected(0) }} onKeyDown={onKeyDown}
           className="h-14 min-w-0 flex-1 bg-transparent text-[17px] placeholder:text-subtle focus:outline-none md:h-[3.75rem] md:text-[18px]" />
         {results.isFetching && typed && <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" />}
         {/* Clears what was typed; with nothing typed it closes the search (handy on a phone). */}
-        <button type="button" aria-label={query ? 'Clear the search' : 'Close the search'} onClick={() => (query ? setQuery('') : onDone())}
+        <button type="button" aria-label={query ? t('Clear the search') : t('Close the search')} onClick={() => (query ? setQuery('') : onDone())}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted hover:bg-surface-hover hover:text-text md:hidden">
           <X className="h-4 w-4" />
         </button>
         <kbd className="hidden shrink-0 rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] text-subtle md:block">esc</kbd>
       </div>
-      <ul id="palette-list" role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto border-t border-border p-2"
+      <ul id="palette-list" role="listbox" aria-label={t('Results')} className="min-h-0 flex-1 overflow-y-auto border-t border-border p-2"
         onMouseEnter={() => setHeld(true)} onMouseLeave={() => setHeld(false)}>
         {items.map((item, i) => (
           // Suggestions get a new key each round, so the next three rise into place.
@@ -192,7 +195,7 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
             </button>
           </li>
         ))}
-        {items.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-muted">Nothing found.</li>}
+        {items.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-muted">{t('Nothing found.')}</li>}
       </ul>
     </>
   )

@@ -2,6 +2,7 @@ import { useMemorySummary } from '@/features/memory/api'
 import { useNotificationSummary } from '@/features/notifications/api'
 import { useRunsSummary } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
+import { plural, t } from '@/lib/i18n'
 
 /** Agent runs that are working, or that wait for the user (approval or paused). */
 export function RunsBadge() {
@@ -9,13 +10,13 @@ export function RunsBadge() {
   const { active = 0, waiting = 0 } = summary.data ?? {}
   if (waiting) {
     return (
-      <span title={`${waiting} waiting for you`}
+      <span title={t('{n} waiting for you', { n: waiting })}
         className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-[11px] font-semibold text-white">
         {waiting}
       </span>
     )
   }
-  if (active) return <span title={`${active} running`} className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+  if (active) return <span title={t('{n} running', { n: active })} className="h-2 w-2 animate-pulse rounded-full bg-accent" />
   return null
 }
 
@@ -24,7 +25,7 @@ export function MemoryBadge() {
   const pending = useMemorySummary().data?.pending ?? 0
   if (!pending) return null
   return (
-    <span title={`${pending} suggestion${pending === 1 ? '' : 's'} to review`}
+    <span title={plural(pending, '{n} suggestion to review', '{n} suggestions to review')}
       className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-[11px] font-semibold text-white">
       {pending}
     </span>
@@ -43,7 +44,7 @@ export function InboxBadge() {
   if (!total) return null
   const decide = waiting
   return (
-    <span title={[decide && `${decide} need${decide === 1 ? 's' : ''} you`, unread && `${unread} unread`].filter(Boolean).join(', ')}
+    <span title={[decide && plural(decide, '{n} needs you', '{n} need you'), unread && t('{n} unread', { n: unread })].filter(Boolean).join(', ')}
       className={cn('flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold', decide ? 'bg-warning text-white' : 'bg-accent text-accent-contrast')}>
       {total > 99 ? '99+' : total}
     </span>

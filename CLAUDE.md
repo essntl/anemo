@@ -101,7 +101,8 @@ Reference: `frontend/src/features/stats/`.
 1. `features/<area>/<Area>Page.tsx` plus `api.ts` with the queries (`useQuery` with an exported
    query key constant) and mutations (`useMutation`, then update or invalidate those keys).
 2. Add the route in `app/router.tsx` with `page(() => import(...), 'AreaPage')` (lazy), the entry
-   in `features/search/pages.ts` (command palette) and, if it belongs there, in `app/Sidebar.tsx`.
+   in `features/search/pages.ts` (command palette) and, if it belongs in the menus, in `PAGE_INFO`
+   (`features/settings/navigation.ts`).
 3. A keyboard shortcut goes into `features/shortcuts/registry.ts`, nowhere else.
 4. Tests next to the code (`*.test.ts(x)`, vitest + Testing Library); an e2e spec in `e2e/tests/`
    for a new flow.
@@ -139,6 +140,13 @@ Reference: `frontend/src/features/stats/`.
   `border-border`, `bg-accent`…); no hard-coded colours; `cn()` to combine classes; reuse
   `components/ui` before writing a new control.
 - *Shared helpers*: `lib/format.ts` for dates, sizes, durations and costs; don't add another copy.
+- *Text the user sees*: English in the code, through `t('…')`, `plural(…)` or `rich(…)` from `lib/i18n.tsx`
+  (`msg('…')` in a module-level constant, shown with `t(x.label)`); dates with `dateLocale()`. Add the
+  Ukrainian and Russian translation to `src/locales/<language>/<area>.ts` (style and glossary:
+  `src/locales/README.md`); `locales.test.ts` fails until every text has one.
+- *Pages in the menus*: a new page is added to `PAGE_INFO` in `features/settings/navigation.ts` (and to
+  `PageId` in the backend's `settings/sections.py`), so it can be arranged or turned off in Settings > Pages.
+  If it has agent tools, list them in `FEATURE_TOOLS` (`tools/registry.py`) so they go when the page is off.
 
 ## Tests
 

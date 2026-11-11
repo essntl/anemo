@@ -1,5 +1,6 @@
 import { ListPlus, Plus, X } from 'lucide-react'
 import { chooseDialog } from '@/components/ui/dialogs'
+import { t } from '@/lib/i18n'
 import { type Task, useTasks } from '@/features/tasks/api'
 import { focusQueue, useFocusQueue } from '../queueStore'
 import { timerActions, useTimerStore } from '../timerStore'
@@ -25,8 +26,8 @@ export function UpNext() {
       .slice(0, 100)
       .map((t) => ({ value: t.id, label: t.title }))
     const id = await chooseDialog({
-      title: 'Queue a task', message: 'It comes up when the task you are on is done.', options,
-      empty: 'No other open tasks. Add some in Tasks.',
+      title: t('Queue a task'), message: t('It comes up when the task you are on is done.'), options,
+      empty: t('No other open tasks. Add some in Tasks.'),
     })
     if (id) focusQueue.add(id)
   }
@@ -38,18 +39,18 @@ export function UpNext() {
   return (
     <div className="px-4 pb-3 pt-3 md:px-5">
       <div className="flex items-center justify-between text-[11.5px] font-semibold uppercase tracking-wider text-muted">
-        <span className="flex items-center gap-1.5"><ListPlus className="h-4 w-4" /> Up next</span>
+        <span className="flex items-center gap-1.5"><ListPlus className="h-4 w-4" /> {t('Up next')}</span>
         {queued.length > 0 && <span className="text-[13px] normal-case tracking-normal text-text tabular-nums">{queued.length}</span>}
       </div>
-      {queued.length === 0 && <p className="pt-2 text-[13px] text-muted">Line up the tasks for your next sessions.</p>}
+      {queued.length === 0 && <p className="pt-2 text-[13px] text-muted">{t('Line up the tasks for your next sessions.')}</p>}
       <ul className="mt-1">
-        {queued.map((t) => (
-          <li key={t.id} className="flex items-center gap-1 text-[13px]">
-            <button type="button" onClick={() => startNow(t)} title="Work on this now"
+        {queued.map((task) => (
+          <li key={task.id} className="flex items-center gap-1 text-[13px]">
+            <button type="button" onClick={() => startNow(task)} title={t('Work on this now')}
               className="-ml-2 min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-left hover:bg-surface-hover">
-              {t.title}
+              {task.title}
             </button>
-            <button type="button" aria-label={`Take “${t.title}” off the queue`} onClick={() => focusQueue.remove(t.id)}
+            <button type="button" aria-label={t('Take “{title}” off the queue', { title: task.title })} onClick={() => focusQueue.remove(task.id)}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
               <X className="h-3.5 w-3.5" />
             </button>
@@ -58,7 +59,7 @@ export function UpNext() {
       </ul>
       <button type="button" onClick={() => void add()}
         className="-ml-2 mt-1 flex h-8 items-center gap-1.5 rounded-control px-2 text-[13px] font-medium text-accent hover:bg-surface-hover pointer-coarse:h-10">
-        <Plus className="h-3.5 w-3.5" /> Queue a task
+        <Plus className="h-3.5 w-3.5" /> {t('Queue a task')}
       </button>
     </div>
   )

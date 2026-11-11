@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
+import { rich, t } from '@/lib/i18n'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { NeedsYouSection } from './NeedsYouSection'
 import {
@@ -64,7 +65,7 @@ function NotificationRow({ note }: { note: Notification }) {
         <div className="flex items-start gap-2">
           <button type="button" onClick={open} className="min-w-0 flex-1 text-left">
             <span className={cn('break-words text-[14px]', unread ? 'font-semibold' : 'font-medium')}>{note.title}</span>
-            {unread && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-accent align-middle" aria-label="Unread" />}
+            {unread && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-accent align-middle" aria-label={t('Unread')} />}
           </button>
           <span className="shrink-0 pt-0.5 text-[12px] text-muted">{formatWhen(note.created_at)}</span>
         </div>
@@ -76,18 +77,18 @@ function NotificationRow({ note }: { note: Notification }) {
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]">
           {long && (
             <button type="button" className="text-accent hover:underline" onClick={() => setExpanded(!expanded)}>
-              {expanded ? 'Show less' : 'Show all'}
+              {expanded ? t('Show less') : t('Show all')}
             </button>
           )}
-          {note.link && <button type="button" className="text-accent hover:underline" onClick={open}>Open</button>}
+          {note.link && <button type="button" className="text-accent hover:underline" onClick={open}>{t('Open')}</button>}
           {unread && !note.link && (
             <button type="button" className="text-accent hover:underline" onClick={() => markRead.mutate([note.id])}>
-              Mark as read
+              {t('Mark as read')}
             </button>
           )}
         </div>
       </div>
-      <button type="button" aria-label="Delete notification" onClick={() => remove.mutate(note.id)}
+      <button type="button" aria-label={t('Delete notification')} onClick={() => remove.mutate(note.id)}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
         <X className="h-4 w-4" />
       </button>
@@ -106,9 +107,9 @@ export function NotificationsPage() {
 
   const clearAll = async () => {
     const ok = await confirmDialog({
-      title: 'Delete all notifications?',
-      message: 'This empties the list. What the notifications were about (tasks, runs, documents) is not affected.',
-      confirmLabel: 'Delete all',
+      title: t('Delete all notifications?'),
+      message: t('This empties the list. What the notifications were about (tasks, runs, documents) is not affected.'),
+      confirmLabel: t('Delete all'),
       danger: true,
     })
     if (ok) clear.mutate()
@@ -116,39 +117,38 @@ export function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Inbox" />
+      <PageHeader title={t('Inbox')} />
       <p className="mb-4 max-w-2xl text-[13px] text-muted">
-        What waits for you, then reminders, automation results and messages from agents.{' '}
-        <Link to="/settings/notifications" className="text-accent underline">Settings</Link>
+        {rich('What waits for you, then reminders, automation results and messages from agents. <a>Settings</a>', { a: (c) => <Link to="/settings/notifications" className="text-accent underline">{c}</Link> })}
         </p>
 
       <NeedsYouSection />
 
-      <h2 className="mb-2 text-[13.5px] font-semibold">Notifications</h2>
+      <h2 className="mb-2 text-[13.5px] font-semibold">{t('Notifications')}</h2>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="tablist" aria-label="Which notifications">
-          {[{ id: false, label: 'All' }, { id: true, label: unread ? `Unread (${unread})` : 'Unread' }].map((t) => (
-            <button key={t.label} type="button" role="tab" aria-selected={unreadOnly === t.id} onClick={() => setUnreadOnly(t.id)}
+        <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="tablist" aria-label={t('Which notifications')}>
+          {[{ id: false, label: t('All') }, { id: true, label: unread ? t('Unread ({n})', { n: unread }) : t('Unread') }].map((tab) => (
+            <button key={tab.label} type="button" role="tab" aria-selected={unreadOnly === tab.id} onClick={() => setUnreadOnly(tab.id)}
               className={cn('flex h-8 items-center rounded-md px-3 text-[13px] font-medium transition-colors pointer-coarse:h-10',
-                unreadOnly === t.id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
-              {t.label}
+                unreadOnly === tab.id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
+              {tab.label}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-1">
           <Button size="sm" variant="secondary" icon={<CheckCheck className="h-4 w-4" />} disabled={!unread}
             loading={markRead.isPending} onClick={() => markRead.mutate(undefined)}>
-            Mark all as read
+            {t('Mark all as read')}
           </Button>
-          <ActionMenu actions={[{ label: 'Delete all', icon: <Trash2 />, danger: true, onSelect: () => void clearAll() }]} />
+          <ActionMenu actions={[{ label: t('Delete all'), icon: <Trash2 />, danger: true, onSelect: () => void clearAll() }]} />
         </div>
       </div>
 
       {notifications.isError && <p className="text-[13px] text-error">{errorMessage(notifications.error)}</p>}
       {notifications.isSuccess && items.length === 0 && (
         <EmptyState icon={<Bell className="h-5 w-5" />}
-          title={unreadOnly ? 'Nothing unread' : 'No notifications yet'}
-          description={unreadOnly ? 'You have seen everything.' : 'Reminders for tasks and events, and what your automations report, show up here.'} />
+          title={unreadOnly ? t('Nothing unread') : t('No notifications yet')}
+          description={unreadOnly ? t('You have seen everything.') : t('Reminders for tasks and events, and what your automations report, show up here.')} />
       )}
       <div className="flex flex-col gap-2">
         {items.map((note) => <NotificationRow key={note.id} note={note} />)}
@@ -156,7 +156,7 @@ export function NotificationsPage() {
       {notifications.hasNextPage && (
         <div className="mt-4 flex justify-center">
           <Button variant="secondary" loading={notifications.isFetchingNextPage} onClick={() => void notifications.fetchNextPage()}>
-            Load more
+            {t('Load more')}
           </Button>
         </div>
       )}

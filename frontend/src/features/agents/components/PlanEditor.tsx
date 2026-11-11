@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { t } from '@/lib/i18n'
 import type { EditableStep } from '../plan'
 
 const MAX_STEPS = 30
@@ -24,17 +25,17 @@ export function PlanEditor({ steps, onChange }: { steps: EditableStep[]; onChang
           <input
             value={step.title}
             maxLength={200}
-            aria-label={`Step ${i + 1}`}
+            aria-label={t('Step {n}', { n: i + 1 })}
             onChange={(e) => update(i, e.target.value)}
             className="h-8 min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10"
           />
-          <button type="button" aria-label="Move up" className={iconButton} disabled={i === 0} onClick={() => move(i, -1)}>
+          <button type="button" aria-label={t('Move up')} className={iconButton} disabled={i === 0} onClick={() => move(i, -1)}>
             <ArrowUp className="h-3.5 w-3.5" />
           </button>
-          <button type="button" aria-label="Move down" className={iconButton} disabled={i === steps.length - 1} onClick={() => move(i, 1)}>
+          <button type="button" aria-label={t('Move down')} className={iconButton} disabled={i === steps.length - 1} onClick={() => move(i, 1)}>
             <ArrowDown className="h-3.5 w-3.5" />
           </button>
-          <button type="button" aria-label="Remove step" className={iconButton} disabled={steps.length === 1}
+          <button type="button" aria-label={t('Remove step')} className={iconButton} disabled={steps.length === 1}
             onClick={() => onChange(steps.filter((_, j) => j !== i))}>
             <X className="h-3.5 w-3.5" />
           </button>
@@ -43,7 +44,7 @@ export function PlanEditor({ steps, onChange }: { steps: EditableStep[]; onChang
       <div>
         <Button size="sm" variant="ghost" icon={<Plus className="h-3.5 w-3.5" />} disabled={steps.length >= MAX_STEPS}
           onClick={() => onChange([...steps, { title: '', status: 'pending' }])}>
-          Add step
+          {t('Add step')}
         </Button>
       </div>
     </div>

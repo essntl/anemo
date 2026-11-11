@@ -485,6 +485,9 @@ class MusicControl(Tool):
         return ToolResult(content=f"{did}\n\n{render_player(state)}")
 
 
+# The ones of the music player: they go when Music is turned off, the rest with Focus.
+MUSIC_TOOL_NAMES = frozenset({"queue_music", "get_music_queue", "music_control"})
+
 FOCUS_TOOLS: list[Tool] = [
     GetFocusStats(),
     ListFocusSessions(),

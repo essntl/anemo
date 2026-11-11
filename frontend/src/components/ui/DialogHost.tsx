@@ -1,5 +1,6 @@
 /** Shows the dialogs requested with confirmDialog / promptDialog / chooseDialog (see dialogs.ts). */
 import { useRef, useState, type FormEvent } from 'react'
+import { t } from '@/lib/i18n'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
 import { type ChooseOptions, type Request, useDialogQueue } from './dialogs'
@@ -26,7 +27,7 @@ function ChooseDialog({ request }: { request: ChooseOptions & { resolve: (value:
   return (
     <Dialog open onOpenChange={(open) => !open && finish(null)} title={request.title} description={request.message}>
       {request.options.length === 0 ? (
-        <p className="text-[13px] text-muted">{request.empty ?? 'Nothing to choose from.'}</p>
+        <p className="text-[13px] text-muted">{request.empty ?? t('Nothing to choose from.')}</p>
       ) : (
         <ul className="-mx-2 flex max-h-[50dvh] flex-col gap-0.5 overflow-y-auto" role="listbox" aria-label={request.title}>
           {request.options.map((o) => (
@@ -44,7 +45,7 @@ function ChooseDialog({ request }: { request: ChooseOptions & { resolve: (value:
         </ul>
       )}
       <div className="mt-4 flex justify-end">
-        <Button variant="ghost" onClick={() => finish(null)}>Cancel</Button>
+        <Button variant="ghost" onClick={() => finish(null)}>{t('Cancel')}</Button>
       </div>
     </Dialog>
   )
@@ -79,7 +80,7 @@ function AskDialog({ request }: { request: Exclude<Request, { kind: 'choose' }> 
     input.setSelectionRange(0, dot > 0 ? dot : input.value.length)
   }
 
-  const confirmLabel = request.confirmLabel ?? (request.kind === 'confirm' ? 'OK' : 'Save')
+  const confirmLabel = request.confirmLabel ?? (request.kind === 'confirm' ? t('OK') : t('Save'))
   return (
     <Dialog
       open
@@ -100,7 +101,7 @@ function AskDialog({ request }: { request: Exclude<Request, { kind: 'choose' }> 
           </label>
         )}
         <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" onClick={() => finish(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => finish(false)}>{t('Cancel')}</Button>
           <Button type="submit" variant={request.kind === 'confirm' && request.danger ? 'danger' : 'primary'}
             disabled={request.kind === 'prompt' && !value.trim() && !request.allowEmpty}>
             {confirmLabel}

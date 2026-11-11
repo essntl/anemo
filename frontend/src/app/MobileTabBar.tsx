@@ -3,8 +3,9 @@ import * as RadixDialog from '@radix-ui/react-dialog'
 import { NavLink, useLocation } from 'react-router'
 import { House, Inbox, LayoutGrid, MessagesSquare, Plus, Settings } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { InboxBadge } from './badges'
-import { MORE, PINNED } from './pageList'
+import { usePages } from './pageList'
 
 const TAB = 'relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium'
 
@@ -23,16 +24,17 @@ function Tab({ to, label, icon, badge, end }: { to: string; label: string; icon:
 /** The pages a tab does not lead to, as a sheet from the bottom edge: one tap each. */
 function MoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const tabs = new Set(['/home', '/notifications'])
-  const pages = [...PINNED, ...MORE].filter((p) => !tabs.has(p.to))
+  const { pinned, more } = usePages()
+  const pages = [...pinned, ...more].filter((p) => !tabs.has(p.to))
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fade fixed inset-0 z-40 bg-black/35" />
         <RadixDialog.Content aria-describedby={undefined}
           className="sheet fixed inset-x-0 bottom-0 z-50 rounded-t-panel border border-border bg-card px-3 pt-2 shadow-float focus:outline-none pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <RadixDialog.Title className="px-2 pb-2 text-[17px] font-bold tracking-tight">More</RadixDialog.Title>
-          <nav aria-label="More pages" className="grid grid-cols-4 gap-1">
-            {[...pages, { to: '/settings', icon: <Settings />, label: 'Settings' }].map((p) => (
+          <RadixDialog.Title className="px-2 pb-2 text-[17px] font-bold tracking-tight">{t('More')}</RadixDialog.Title>
+          <nav aria-label={t('More pages')} className="grid grid-cols-4 gap-1">
+            {[...pages, { to: '/settings', icon: <Settings />, label: t('Settings') }].map((p) => (
               <NavLink key={p.to} to={p.to} title={'title' in p ? p.title : undefined} onClick={() => onOpenChange(false)}
                 className={({ isActive }) =>
                   cn('relative flex h-[4.75rem] min-w-0 flex-col items-center justify-center gap-1.5 rounded-control px-1 text-[12.5px] font-medium [&>svg]:h-6 [&>svg]:w-6',
@@ -59,21 +61,22 @@ function MoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
 export function MobileTabBar() {
   const [more, setMore] = useState(false)
   const { pathname } = useLocation()
-  const inMore = [...PINNED, ...MORE].some((p) => !['/home', '/notifications'].includes(p.to) && (pathname === p.to || pathname.startsWith(`${p.to}/`)))
+  const { pinned, more: rest } = usePages()
+  const inMore = [...pinned, ...rest].some((p) => !['/home', '/notifications'].includes(p.to) && (pathname === p.to || pathname.startsWith(`${p.to}/`)))
     || pathname.startsWith('/settings')
   return (
     <>
-      <nav aria-label="Main" className="flex h-14 shrink-0 items-stretch border-t border-border bg-surface px-1 md:hidden">
-        <Tab to="/home" label="Home" icon={<House />} />
-        <Tab to="/chats" label="Chats" icon={<MessagesSquare />} />
-        <NavLink to="/" end aria-label="New chat" className="flex flex-1 items-center justify-center">
+      <nav aria-label={t('Main')} className="flex h-14 shrink-0 items-stretch border-t border-border bg-surface px-1 md:hidden">
+        <Tab to="/home" label={t('Home')} icon={<House />} />
+        <Tab to="/chats" label={t('Chats')} icon={<MessagesSquare />} />
+        <NavLink to="/" end aria-label={t('New chat')} className="flex flex-1 items-center justify-center">
           <span className="flex h-10 w-12 items-center justify-center rounded-control bg-accent text-accent-contrast shadow-soft"><Plus className="h-5 w-5" /></span>
         </NavLink>
-        <Tab to="/notifications" label="Inbox" icon={<Inbox />} badge={<InboxBadge />} />
+        <Tab to="/notifications" label={t('Inbox')} icon={<Inbox />} badge={<InboxBadge />} />
         <button type="button" aria-haspopup="dialog" aria-expanded={more} onClick={() => setMore(true)}
           className={cn(TAB, inMore ? 'text-accent' : 'text-muted')}>
           <span className="[&>svg]:h-[22px] [&>svg]:w-[22px]"><LayoutGrid /></span>
-          More
+          {t('More')}
         </button>
       </nav>
       <MoreSheet open={more} onOpenChange={setMore} />

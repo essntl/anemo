@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { Check, ChevronDown, Search, SquareCheckBig, Target, X } from 'lucide-react'
 import { useCurrentProject } from '@/app/projectStore'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { useTasks } from '@/features/tasks/api'
 import { matchTasks } from '../taskMatch'
 import { timerActions, useTimerStore } from '../timerStore'
@@ -46,7 +47,7 @@ export function TaskPicker({ className }: { className?: string }) {
         <span className="flex min-w-0 items-center gap-1 rounded-full border border-border bg-surface-2 py-1 pl-2.5 pr-1 text-[13px]">
           <SquareCheckBig className="h-3.5 w-3.5 shrink-0 text-accent" />
           <Link to={`/tasks?task=${linked.id}`} className="min-w-0 truncate font-medium hover:underline">{linked.title}</Link>
-          <button type="button" aria-label="Stop linking this task" onClick={() => choose(null)}
+          <button type="button" aria-label={t('Stop linking this task')} onClick={() => choose(null)}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-8 pointer-coarse:w-8">
             <X className="h-3.5 w-3.5" />
           </button>
@@ -57,7 +58,7 @@ export function TaskPicker({ className }: { className?: string }) {
           <button type="button"
             className={cn('flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10',
               !linked && 'border border-dashed border-border-strong')}>
-            {linked ? <>Change <ChevronDown className="h-3.5 w-3.5" /></> : <><Target className="h-4 w-4" /> Link a task</>}
+            {linked ? <>{t('Change')} <ChevronDown className="h-3.5 w-3.5" /></> : <><Target className="h-4 w-4" /> {t('Link a task')}</>}
           </button>
         </Popover.Trigger>
         <Popover.Portal>
@@ -66,11 +67,11 @@ export function TaskPicker({ className }: { className?: string }) {
             <div className="flex items-center gap-2 border-b border-border px-2 pb-1.5">
               <Search className="h-4 w-4 shrink-0 text-muted" />
               <input autoFocus value={query} onChange={(e) => { setQuery(e.target.value); setActive(0) }} onKeyDown={onKeyDown}
-                placeholder="Find a task" aria-label="Find a task" role="combobox" aria-expanded aria-controls="focus-task-list"
+                placeholder={t('Find a task')} aria-label={t('Find a task')} role="combobox" aria-expanded aria-controls="focus-task-list"
                 aria-activedescendant={matches[active] ? `focus-task-${matches[active].id}` : undefined}
                 className="h-9 min-w-0 flex-1 bg-transparent text-[14px] placeholder:text-subtle focus:outline-none" />
             </div>
-            <ul ref={list} id="focus-task-list" role="listbox" aria-label="Open tasks" className="max-h-72 overflow-y-auto py-1">
+            <ul ref={list} id="focus-task-list" role="listbox" aria-label={t('Open tasks')} className="max-h-72 overflow-y-auto py-1">
               {matches.map((t, i) => (
                 <li key={t.id} id={`focus-task-${t.id}`} role="option" aria-selected={t.id === taskId}
                   onMouseEnter={() => setActive(i)} onClick={() => choose(t.id)}
@@ -82,7 +83,7 @@ export function TaskPicker({ className }: { className?: string }) {
               ))}
               {tasks.isSuccess && matches.length === 0 && (
                 <li className="px-2.5 py-3 text-[13px] text-muted">
-                  {query ? 'No open task matches.' : 'No open tasks. Add some in Tasks to track time per task.'}
+                  {query ? t('No open task matches.') : t('No open tasks. Add some in Tasks to track time per task.')}
                 </li>
               )}
             </ul>

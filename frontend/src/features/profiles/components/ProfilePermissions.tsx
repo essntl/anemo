@@ -1,6 +1,7 @@
 import { Select } from '@/components/ui/Select'
 import { type Level, usePermissionCatalog } from '@/features/agents/api'
 import { useSettings } from '@/features/settings/api'
+import { t } from '@/lib/i18n'
 
 /**
  * Per-category permission overrides for a profile. "Same as Settings" keeps the
@@ -32,17 +33,17 @@ export function ProfilePermissions({
         const global = (globalLevels[cat.capability] as string | undefined) ?? cat.default_level
         return (
           <div key={cat.capability} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-            <span className="min-w-36 flex-1 text-[13px]">{cat.label}</span>
+            <span className="min-w-36 flex-1 text-[13px]">{t(cat.label)}</span>
             <Select
-              aria-label={`${cat.label} for this profile`}
+              aria-label={t('{name} for this profile', { name: t(cat.label) })}
               className="h-9 w-full text-[12.5px] sm:w-60"
               value={value[cat.capability] ?? ''}
               onValueChange={(v) => set(cat.capability, v)}
               options={[
-                { value: '', label: `Same as Settings (${label(global)})` },
+                { value: '', label: t('Same as Settings ({level})', { level: t(label(global)) }) },
                 ...levels
                   .filter((l) => cat.workspace_scoped || l.level !== 'workspace')
-                  .map((l) => ({ value: l.level, label: l.label })),
+                  .map((l) => ({ value: l.level, label: t(l.label) })),
               ]}
             />
           </div>

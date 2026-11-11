@@ -1337,6 +1337,65 @@
         }
       }
     },
+    "/api/settings/navigation": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Navigation Settings",
+        "operationId": "put_navigation_settings_api_settings_navigation_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NavigationSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/files": {
       "put": {
         "tags": [
@@ -5021,6 +5080,7 @@
           "permissions"
         ],
         "summary": "Tools",
+        "description": "The built-in tools, without those of the parts of the app that are turned off.",
         "operationId": "tools_api_tools_get",
         "parameters": [
           {
@@ -15300,6 +15360,9 @@
           "home": {
             "$ref": "#/components/schemas/HomeSettings"
           },
+          "navigation": {
+            "$ref": "#/components/schemas/NavigationSettings"
+          },
           "files": {
             "$ref": "#/components/schemas/FilesSettings"
           },
@@ -15323,6 +15386,7 @@
           "automations",
           "music",
           "home",
+          "navigation",
           "files",
           "setup",
           "updates"
@@ -18911,6 +18975,17 @@
             "type": "boolean",
             "title": "Carry Over Daily Notes",
             "default": false
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "system",
+              "en",
+              "uk",
+              "ru"
+            ],
+            "title": "Language",
+            "default": "system"
           }
         },
         "type": "object",
@@ -20725,6 +20800,99 @@
         "type": "object",
         "title": "MusicSettings",
         "description": "How the music player looks and talks."
+      },
+      "NavigationSettings": {
+        "properties": {
+          "pinned": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "home",
+                "notifications",
+                "tasks",
+                "calendar",
+                "documents",
+                "files",
+                "projects",
+                "focus",
+                "music",
+                "runs",
+                "automations",
+                "agents",
+                "memory"
+              ]
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Pinned",
+            "default": [
+              "home",
+              "notifications",
+              "tasks",
+              "calendar",
+              "documents",
+              "files"
+            ]
+          },
+          "more": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "home",
+                "notifications",
+                "tasks",
+                "calendar",
+                "documents",
+                "files",
+                "projects",
+                "focus",
+                "music",
+                "runs",
+                "automations",
+                "agents",
+                "memory"
+              ]
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "More",
+            "default": [
+              "projects",
+              "focus",
+              "music",
+              "runs",
+              "automations",
+              "agents",
+              "memory"
+            ]
+          },
+          "off": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "home",
+                "notifications",
+                "tasks",
+                "calendar",
+                "documents",
+                "files",
+                "projects",
+                "focus",
+                "music",
+                "runs",
+                "automations",
+                "agents",
+                "memory"
+              ]
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Off"
+          }
+        },
+        "type": "object",
+        "title": "NavigationSettings",
+        "description": "Where each page of the app goes (Settings > Pages): in the sidebar's list, behind\n\"More\", or off. A page that is off is not in any menu or in search, and the agents\ndon't get its tools (tools/registry.py: FEATURE_TOOLS). A page in none of the lists\n(one added in a later version) is shown under \"More\"."
       },
       "NewDocument": {
         "properties": {

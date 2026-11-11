@@ -9,6 +9,11 @@
  * ended while the app was closed.
  */
 
+// This file is also built into the browser extension (extension/tsconfig.json: @anemo/timer),
+// so it imports nothing from the app. `msg` only marks a text for translation (as lib/i18n's
+// does); the app shows it with t(…).
+const msg = (text: string): string => text
+
 export type Phase = 'focus' | 'short_break' | 'long_break'
 export type TimerStatus = 'idle' | 'running' | 'paused'
 
@@ -241,9 +246,9 @@ export function formatClock(ms: number): string {
 }
 
 export const PHASE_LABEL: Record<Phase, string> = {
-  focus: 'Focus',
-  short_break: 'Short break',
-  long_break: 'Long break',
+  focus: msg('Focus'),
+  short_break: msg('Short break'),
+  long_break: msg('Long break'),
 }
 
 /** The phase's colour token (styles/tokens.css). */

@@ -1,4 +1,5 @@
 import { startOfToday } from '@/features/focus/api'
+import { dateLocale } from '@/lib/i18n'
 
 /** Monday of this week (weeks start on Monday). */
 export function startOfWeek(now = new Date()): Date {
@@ -16,5 +17,5 @@ export function dayRange(day: Date, days = 1): { start: string; end: string } {
 
 /** "09:30" for a timed occurrence. */
 export function timeOf(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' })
 }

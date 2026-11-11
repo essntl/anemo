@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
 import { runsKey, runsSummaryKey } from '@/features/runs/api'
+import { msg, t } from '@/lib/i18n'
 import type { Schedule } from './scheduleForm'
 
 export type Automation = Schemas['AutomationOut']
@@ -10,17 +11,17 @@ export type NotifyWhen = Automation['notify']
 
 export const automationsKey = ['automations'] as const
 
-/** What the last (or current) run did, in the words shown in the list. */
+/** What the last (or current) run did, in the words shown in the list (show them with `t`). */
 export const STATUS_LABELS: Record<string, string> = {
-  running: 'Running',
-  waiting: 'Needs your approval',
-  paused: 'Paused',
-  completed: 'Done',
-  failed: 'Failed',
-  cancelled: 'Stopped',
-  retrying: 'Failed, will retry',
-  missed: 'Missed (the app was off)',
-  skipped: 'Skipped (still running)',
+  running: msg('Running'),
+  waiting: msg('Needs your approval'),
+  paused: msg('Paused'),
+  completed: msg('Done'),
+  failed: msg('Failed'),
+  cancelled: msg('Stopped'),
+  retrying: msg('Failed, will retry'),
+  missed: msg('Missed (the app was off)'),
+  skipped: msg('Skipped (still running)'),
 }
 
 export function useAutomations() {
@@ -55,7 +56,7 @@ function problemOf(error: unknown): string {
     const first = (error.details as { msg?: string }[])[0]?.msg
     if (first) return first.replace(/^Value error, /, '')
   }
-  return error instanceof Error ? error.message : 'This schedule cannot be used.'
+  return error instanceof Error ? error.message : t('This schedule cannot be used.')
 }
 
 /** Asks the server what a schedule means: in words, and when it runs next. */

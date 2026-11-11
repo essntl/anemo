@@ -1,10 +1,12 @@
 import { X } from 'lucide-react'
+import { t } from '@/lib/i18n'
 import { useToasts } from './toast'
 
 /** Shows the notices queued with toast(). Mounted once in AppLayout. */
 export function ToastHost() {
   const { toasts, dismiss, remove } = useToasts()
   if (!toasts.length) return null
+  const dismissLabel = t('Dismiss##close')
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-3"
       role="status" aria-live="polite">
@@ -19,7 +21,7 @@ export function ToastHost() {
               {t.action.label}
             </button>
           )}
-          <button type="button" aria-label="Dismiss" onClick={() => dismiss(t.id)}
+          <button type="button" aria-label={dismissLabel} onClick={() => dismiss(t.id)}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text">
             <X className="h-3.5 w-3.5" />
           </button>

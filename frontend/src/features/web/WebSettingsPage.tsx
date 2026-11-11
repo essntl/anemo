@@ -14,6 +14,7 @@ import { Field, Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { withReauth } from '@/features/auth/reauthStore'
 import { settingsKey, useSettings } from '@/features/settings/api'
+import { rich, t } from '@/lib/i18n'
 
 type WebSettings = Required<Schemas['WebSettings']>
 type TestResult = Schemas['SearchTestOut']
@@ -32,7 +33,7 @@ function SearchTest({ url }: { url: string }) {
     <div className="flex flex-col gap-2">
       <div>
         <Button size="sm" variant="secondary" loading={test.isPending} onClick={() => test.mutate()}>
-          Test search
+          {t('Test search')}
         </Button>
       </div>
       {test.isError && <p className="text-[12.5px] text-error">{errorMessage(test.error)}</p>}
@@ -72,28 +73,27 @@ function WebForm({ initial }: { initial: WebSettings }) {
   return (
     <div className="flex flex-col gap-5">
       <Card>
-        <CardHeader title="Web search" description="Agents search the web through your SearXNG instance. Without one, the web search tool is not offered." />
+        <CardHeader title={t('Web search')} description={t('Agents search the web through your SearXNG instance. Without one, the web search tool is not offered.')} />
         <CardBody className="flex flex-col gap-4">
           <Field label="SearXNG URL"
-            hint={envUrl ? `Empty: uses ${envUrl} from the .env file.` : 'e.g. http://searxng:8080 or http://192.168.1.20:8888'}>
+            hint={envUrl ? t('Empty: uses {url} from the .env file.', { url: envUrl }) : t('e.g. http://searxng:8080 or http://192.168.1.20:8888')}>
             <Input value={form.searxng_url} placeholder={envUrl ?? 'http://searxng:8080'}
               onChange={(e) => setForm({ ...form, searxng_url: e.target.value })} />
           </Field>
           <p className="text-[12px] text-muted">
-            SearXNG must allow JSON results: in its <code className="font-mono">settings.yml</code> set{' '}
-            <code className="font-mono">search: formats: [html, json]</code>.
+            {rich('SearXNG must allow JSON results: in its <code>settings.yml</code> set <code>search: formats: [html, json]</code>.', { code: (c) => <code className="font-mono">{c}</code> })}
           </p>
           <SearchTest url={form.searxng_url} />
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Results per search">
+            <Field label={t('Results per search')}>
               <Input type="number" min={1} max={20} value={form.search_results}
                 onChange={(e) => setForm({ ...form, search_results: Number(e.target.value) || 1 })} />
             </Field>
-            <Field label="Safe search">
+            <Field label={t('Safe search')}>
               <Select value={form.safesearch} onValueChange={(v) => setForm({ ...form, safesearch: v as WebSettings['safesearch'] })}
-                options={[{ value: 'off', label: 'Off' }, { value: 'moderate', label: 'Moderate' }, { value: 'strict', label: 'Strict' }]} />
+                options={[{ value: 'off', label: t('Off') }, { value: 'moderate', label: t('Moderate') }, { value: 'strict', label: t('Strict') }]} />
             </Field>
-            <Field label="Language" hint='"auto" or a code like en, de-DE'>
+            <Field label={t('Language')} hint={t('"auto" or a code like en, de-DE')}>
               <Input value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} />
             </Field>
           </div>
@@ -101,29 +101,27 @@ function WebForm({ initial }: { initial: WebSettings }) {
       </Card>
 
       <Card>
-        <CardHeader title="Your network"
-          description="Web pages, API calls and the browser used by agents can't reach your home network, this server or its containers. Allow specific hosts here when an agent should talk to them." />
+        <CardHeader title={t('Your network')}
+          description={t("Web pages, API calls and the browser used by agents can't reach your home network, this server or its containers. Allow specific hosts here when an agent should talk to them.")} />
         <CardBody className="flex flex-col gap-3">
-          <Field label="Allowed hosts" hint="One per line: a host name (nas.lan), an IP address (192.168.1.20) or a range (192.168.1.0/24).">
+          <Field label={t('Allowed hosts')} hint={t('One per line: a host name (nas.lan), an IP address (192.168.1.20) or a range (192.168.1.0/24).')}>
             <Textarea rows={4} value={hosts} onChange={(e) => setHosts(e.target.value)} className="font-mono text-[12.5px]"
               placeholder={'homeassistant.lan\n192.168.1.20'} />
           </Field>
           <div className="flex gap-2.5 rounded-control border border-warning/40 bg-warning/8 px-3 py-2.5 text-[12.5px]">
             <Network className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <p>
-              An allowed host is reachable by any agent run that may read web pages, call APIs or use the browser, including runs
-              steered by text on a web page. Allow only what agents need, and prefer services with their own login.
-              Shell commands with network access are separate: they can reach your network anyway.
+              {t('An allowed host is reachable by any agent run that may read web pages, call APIs or use the browser, including runs steered by text on a web page. Allow only what agents need, and prefer services with their own login. Shell commands with network access are separate: they can reach your network anyway.')}
             </p>
           </div>
         </CardBody>
       </Card>
 
       <div className="flex items-center gap-3">
-        <Button variant="primary" disabled={!dirty} loading={save.isPending} onClick={() => save.mutate()}>Save</Button>
-        {dirty && <Button variant="ghost" onClick={() => { setForm(initial); setHosts(initial.allowed_private_hosts.join('\n')) }}>Discard</Button>}
+        <Button variant="primary" disabled={!dirty} loading={save.isPending} onClick={() => save.mutate()}>{t('Save')}</Button>
+        {dirty && <Button variant="ghost" onClick={() => { setForm(initial); setHosts(initial.allowed_private_hosts.join('\n')) }}>{t('Discard')}</Button>}
         {save.isError && <span className="text-[13px] text-error">{errorMessage(save.error)}</span>}
-        {save.isSuccess && !dirty && <span className="text-[13px] text-success">Saved. New agent runs use these settings.</span>}
+        {save.isSuccess && !dirty && <span className="text-[13px] text-success">{t('Saved. New agent runs use these settings.')}</span>}
       </div>
     </div>
   )
@@ -139,10 +137,9 @@ export function WebSettingsPage() {
           <Globe className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold">Web & Search</h2>
+          <h2 className="text-lg font-semibold">{t('Web & Search')}</h2>
           <p className="text-[13px] text-muted">
-            How agents search and read the web. Whether they may at all is set in{' '}
-            <Link to="/settings/permissions" className="text-accent underline">Agent Permissions</Link>.
+            {rich('How agents search and read the web. Whether they may at all is set in <a>Agent Permissions</a>.', { a: (c) => <Link to="/settings/permissions" className="text-accent underline">{c}</Link> })}
           </p>
         </div>
       </div>

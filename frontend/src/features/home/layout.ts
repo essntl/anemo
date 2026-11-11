@@ -8,6 +8,7 @@
  * default size, at the end, or next to a related widget for those in ADDED_AFTER),
  * sizes are clamped, duplicates removed.
  */
+import { msg } from '@/lib/i18n'
 
 export const WIDGET_IDS = ['focus', 'today', 'daily', 'music', 'needs', 'week', 'tasks', 'ask', 'documents', 'upcoming', 'briefing'] as const
 export type WidgetId = (typeof WIDGET_IDS)[number]
@@ -27,17 +28,36 @@ export interface WidgetLayout {
 export const MAX_SPAN = 3
 
 export const WIDGETS: Record<WidgetId, { name: string; path: string }> = {
-  focus: { name: 'Focus', path: '/focus' },
-  today: { name: 'Today', path: '/tasks' },
-  daily: { name: 'Daily note', path: '/documents' },
-  music: { name: 'Music', path: '/music' },
-  needs: { name: 'Needs you', path: '/notifications' },
-  week: { name: 'This week', path: '/stats' },
-  tasks: { name: 'Tasks', path: '/tasks' },
-  ask: { name: 'Ask Anemo', path: '/' },
-  documents: { name: 'Recent documents', path: '/documents' },
-  upcoming: { name: 'Upcoming', path: '/calendar' },
-  briefing: { name: 'Briefing', path: '/automations' },
+  focus: { name: msg('Focus'), path: '/focus' },
+  today: { name: msg('Today'), path: '/tasks' },
+  daily: { name: msg('Daily note'), path: '/documents' },
+  music: { name: msg('Music'), path: '/music' },
+  needs: { name: msg('Needs you'), path: '/notifications' },
+  week: { name: msg('This week'), path: '/stats' },
+  tasks: { name: msg('Tasks'), path: '/tasks' },
+  ask: { name: msg('Ask Anemo'), path: '/' },
+  documents: { name: msg('Recent documents'), path: '/documents' },
+  upcoming: { name: msg('Upcoming'), path: '/calendar' },
+  briefing: { name: msg('Briefing'), path: '/automations' },
+}
+
+/** The pages a widget shows something of: it leaves Home once all of them are turned off (Settings > Pages). */
+const WIDGET_PAGES: Partial<Record<WidgetId, string[]>> = {
+  focus: ['focus'],
+  week: ['focus'],
+  music: ['music'],
+  tasks: ['tasks'],
+  today: ['tasks', 'calendar'],
+  upcoming: ['tasks', 'calendar'],
+  documents: ['documents'],
+  daily: ['documents'],
+  briefing: ['automations'],
+}
+
+/** Whether a widget has a page left to show, given the pages that are off. */
+export function widgetAvailable(id: WidgetId, offPages: readonly string[]): boolean {
+  const pages = WIDGET_PAGES[id]
+  return !pages || pages.some((page) => !offPages.includes(page))
 }
 
 export const DEFAULT_LAYOUT: WidgetLayout[] = [

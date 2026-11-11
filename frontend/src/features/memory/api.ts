@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
+import { msg } from '@/lib/i18n'
 import { settingsKey } from '@/features/settings/api'
 
 export type Memory = Schemas['MemoryOut']
@@ -11,10 +12,10 @@ export const memoriesKey = ['memories'] as const
 export const memorySummaryKey = ['memories', 'summary'] as const
 
 export const KIND_LABELS: Record<MemoryKind, string> = {
-  preference: 'Preference',
-  fact: 'Fact',
-  project: 'Project',
-  instruction: 'Instruction',
+  preference: msg('Preference'),
+  fact: msg('Fact'),
+  project: msg('Project'),
+  instruction: msg('Instruction'),
 }
 
 export function useMemories(status: MemoryStatus, q: string) {

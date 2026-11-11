@@ -15,6 +15,7 @@ import { Select } from '@/components/ui/Select'
 import { useCurrentProject } from '@/app/projectStore'
 import { useProjects } from '@/features/tasks/api'
 import { Switch } from '@/components/ui/Switch'
+import { plural, t } from '@/lib/i18n'
 import { addDays, dayOf, REMINDER_OPTIONS, today } from '@/features/tasks/dates'
 import {
   browserTimeZone,
@@ -132,10 +133,12 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
     }
   }
 
+  const reminderChoices = REMINDER_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))
   const reminderOptions = REMINDER_OPTIONS.some((o) => o.value === remind)
-    ? REMINDER_OPTIONS
-    : [...REMINDER_OPTIONS, { value: remind, label: `${remind} minutes before` }]
-  const heading = mode === 'new' ? 'New event' : mode === 'occurrence' ? 'This event' : source?.rrule ? 'All events in the series' : 'Event'
+    ? reminderChoices
+    : [...reminderChoices, { value: remind, label: plural(Number(remind), '{n} minute before', '{n} minutes before') }]
+  const repeatChoices = REPEAT_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))
+  const heading = mode === 'new' ? t('New event') : mode === 'occurrence' ? t('This event') : source?.rrule ? t('All events in the series') : t('Event')
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(94vw,560px)]" title={heading}
@@ -143,74 +146,74 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
         <>
           {mode !== 'new' && (
             <Button variant="ghost" className="mr-auto" icon={<Trash2 className="h-4 w-4" />} loading={remove.isPending} onClick={del}>
-              {mode === 'occurrence' ? 'Delete this one' : source?.rrule ? 'Delete all' : 'Delete'}
+              {mode === 'occurrence' ? t('Delete this one') : source?.rrule ? t('Delete all') : t('Delete')}
             </Button>
           )}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={pending} disabled={invalid} onClick={submit}>
-            {mode === 'new' ? 'Add event' : 'Save'}
+            {mode === 'new' ? t('Add event') : t('Save')}
           </Button>
         </>
       }>
       <div className="flex flex-col gap-4">
-        <Field label="Title">
-          <Input autoFocus={mode === 'new'} value={title} maxLength={300} placeholder="What is it?"
+        <Field label={t('Title')}>
+          <Input autoFocus={mode === 'new'} value={title} maxLength={300} placeholder={t('What is it?')}
             onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !invalid && submit()} />
         </Field>
         {mode !== 'occurrence' && (
           <div className="flex items-center justify-between text-[13px]">
-            <span className="font-medium">All day</span>
-            <Switch label="All day" checked={allDay} onChange={setAllDay} />
+            <span className="font-medium">{t('All day')}</span>
+            <Switch label={t('All day')} checked={allDay} onChange={setAllDay} />
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Starts">
+          <Field label={t('Starts')}>
             <Input type="date" value={startDate} onChange={(e) => changeStartDate(e.target.value)} />
           </Field>
           {!allDay && (
-            <Field label="Time">
+            <Field label={t('Time')}>
               <Input type="time" value={startTime} onChange={(e) => changeStartTime(e.target.value)} />
             </Field>
           )}
-          <Field label="Ends">
+          <Field label={t('Ends')}>
             <Input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
           </Field>
           {!allDay && (
-            <Field label="Time">
+            <Field label={t('Time')}>
               <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
             </Field>
           )}
         </div>
-        {endInstant < startInstant && <p className="-mt-2 text-[12.5px] text-error">The end is before the start.</p>}
+        {endInstant < startInstant && <p className="-mt-2 text-[12.5px] text-error">{t('The end is before the start.')}</p>}
         {mode !== 'occurrence' && (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Repeat">
+            <Field label={t('Repeat')}>
               <Select value={repeat} onValueChange={(v) => setRepeat(v as Repeat)}
-                options={repeat === 'custom' ? [...REPEAT_OPTIONS, { value: 'custom', label: `Custom (${source?.rrule ?? ''})` }] : REPEAT_OPTIONS} />
+                options={repeat === 'custom' ? [...repeatChoices, { value: 'custom', label: t('Custom ({rule})', { rule: source?.rrule ?? '' }) }] : repeatChoices} />
             </Field>
             {repeat !== 'none' && repeat !== 'custom' && (
-              <Field label="Until (optional)">
+              <Field label={t('Until (optional)')}>
                 <Input type="date" value={until} min={startDate} onChange={(e) => setUntil(e.target.value)} />
               </Field>
             )}
-            <Field label="Reminder">
+            <Field label={t('Reminder')}>
               <Select value={remind} onValueChange={setRemind} options={reminderOptions} />
             </Field>
           </div>
         )}
-        <Field label="Location">
+        <Field label={t('Location')}>
           <Input value={location} maxLength={300} onChange={(e) => setLocation(e.target.value)} />
         </Field>
         {mode !== 'occurrence' && (projects.data?.length ?? 0) > 0 && (
-          <Field label="Project">
+          <Field label={t('Project')}>
             <Select value={projectId} onValueChange={setProjectId}
-              options={[{ value: '', label: 'No project' }, ...(projects.data ?? []).filter((p) => !p.archived || p.id === projectId).map((p) => ({ value: p.id, label: p.name }))]} />
+              options={[{ value: '', label: t('No project') }, ...(projects.data ?? []).filter((p) => !p.archived || p.id === projectId).map((p) => ({ value: p.id, label: p.name }))]} />
           </Field>
         )}
-        <Field label="Notes">
+        <Field label={t('Notes')}>
           <Textarea rows={3} value={description} maxLength={20_000} onChange={(e) => setDescription(e.target.value)} />
         </Field>
-        {source?.created_by === 'agent' && <p className="text-[12px] text-muted">Added by an agent.</p>}
+        {source?.created_by === 'agent' && <p className="text-[12px] text-muted">{t('Added by an agent.')}</p>}
         {error && <p className="text-[12.5px] text-error">{errorMessage(error)}</p>}
       </div>
     </Dialog>
@@ -239,11 +242,11 @@ export function EventDialog({ occurrence, defaults, onClose }: EventDialogProps)
   if (scope === 'all') return <SeriesForm eventId={occurrence.event_id} onClose={onClose} />
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} title={occurrence.title}
-      description="This event repeats. What do you want to change?">
+      description={t('This event repeats. What do you want to change?')}>
       <div className="flex flex-col gap-2">
-        <Button variant="secondary" className="justify-start" onClick={() => setScope('one')}>Only this event</Button>
+        <Button variant="secondary" className="justify-start" onClick={() => setScope('one')}>{t('Only this event')}</Button>
         <Button variant="secondary" className="justify-start" icon={<RepeatIcon className="h-4 w-4" />} onClick={() => setScope('all')}>
-          All events in the series
+          {t('All events in the series')}
         </Button>
       </div>
     </Dialog>

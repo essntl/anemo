@@ -250,6 +250,10 @@ question you gave, "next", "more"), until the user clearly moves on to something
 or starts another skill.
 
 {instructions}
+
+These instructions are written in English, whatever language the user uses. Write your \
+answer in the language of the user's message, including the headings and labels the \
+instructions name, unless the user asks for another language.
 </skill>"""
 
 

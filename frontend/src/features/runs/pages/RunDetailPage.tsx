@@ -20,6 +20,7 @@ import { useShellOutput } from '@/features/agents/shellOutput'
 import { useCancelRun } from '@/features/chat/api'
 import { type RunEvent, TERMINAL, useRunStream } from '@/features/chat/runStream'
 import { formatCost, formatCount, formatDuration, formatWhen } from '@/lib/format'
+import { plural, t } from '@/lib/i18n'
 import { runKey, runsKey, runsSummaryKey, useRun } from '../api'
 import { RunStatusBadge } from '../components/RunStatusBadge'
 
@@ -63,9 +64,9 @@ export function RunDetailPage() {
 
   const stop = async () => {
     const ok = await confirmDialog({
-      title: 'Stop this run?',
-      message: 'The agent stops right away. Changes it already made stay, and you can revert file changes below.',
-      confirmLabel: 'Stop run',
+      title: t('Stop this run?'),
+      message: t('The agent stops right away. Changes it already made stay, and you can revert file changes below.'),
+      confirmLabel: t('Stop run'),
       danger: true,
     })
     if (ok) cancel.mutate(runId, { onSuccess: refresh })
@@ -75,9 +76,9 @@ export function RunDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Run" />
+      <PageHeader title={t('Run')} />
       <Link to="/runs" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-text">
-        <ArrowLeft className="h-4 w-4" /> Runs
+        <ArrowLeft className="h-4 w-4" /> {t('Runs')}
       </Link>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -85,11 +86,11 @@ export function RunDetailPage() {
         <span className="text-[12px] text-muted">{formatWhen(data.created_at)}</span>
         {data.parent_run_id && (
           <Link to={`/runs/${data.parent_run_id}`} className="text-[12px] text-accent hover:underline">
-            Sub-agent of another run
+            {t('Sub-agent of another run')}
           </Link>
         )}
       </div>
-      <h2 className="mt-2 whitespace-pre-wrap break-words text-lg font-semibold">{data.request || '(no request)'}</h2>
+      <h2 className="mt-2 whitespace-pre-wrap break-words text-lg font-semibold">{data.request || t('(no request)')}</h2>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {data.kind === 'agent' && (
@@ -97,33 +98,33 @@ export function RunDetailPage() {
         )}
         {active && (
           <Button size="sm" variant="ghost" icon={<Square className="h-3.5 w-3.5" />} loading={cancel.isPending} onClick={() => void stop()}>
-            Stop
+            {t('Stop')}
           </Button>
         )}
         {data.conversation_id && (
           <Link to={`/c/${data.conversation_id}`}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] text-muted hover:bg-surface-hover hover:text-text">
-            <MessageSquare className="h-3.5 w-3.5" /> {data.conversation_title ?? 'Open conversation'}
+            <MessageSquare className="h-3.5 w-3.5" /> {data.conversation_title ?? t('Open conversation')}
           </Link>
         )}
       </div>
 
       <Card className="mt-5">
         <CardBody className="grid grid-cols-2 gap-4 py-4 sm:grid-cols-4">
-          <Stat label="Agent">{data.kind === 'agent' ? (data.profile_name ?? 'Default agent') : 'Chat'}</Stat>
-          <Stat label="Model">{data.model_label ?? '–'}</Stat>
-          <Stat label="Working time">{formatDuration(data.totals.active_s)}</Stat>
-          <Stat label="Steps">
+          <Stat label={t('Agent')}>{data.kind === 'agent' ? (data.profile_name ?? t('Default agent')) : t('Chat')}</Stat>
+          <Stat label={t('Model')}>{data.model_label ?? '–'}</Stat>
+          <Stat label={t('Working time')}>{formatDuration(data.totals.active_s)}</Stat>
+          <Stat label={t('Steps')}>
             {data.step}
             {limits?.max_steps ? <span className="text-subtle"> / {limits.max_steps}</span> : null}
           </Stat>
-          <Stat label="Tool calls">{data.totals.tool_calls}</Stat>
-          <Stat label="Tokens">
-            {formatCount(data.totals.input_tokens)} in · {formatCount(data.totals.output_tokens)} out
+          <Stat label={t('Tool calls')}>{data.totals.tool_calls}</Stat>
+          <Stat label={t('Tokens')}>
+            {t('{input} in · {output} out', { input: formatCount(data.totals.input_tokens), output: formatCount(data.totals.output_tokens) })}
           </Stat>
-          <Stat label="Cost">{formatCost(data.totals.cost_usd)}</Stat>
-          <Stat label="Context">
-            {data.totals.compactions ? `Summarized ${data.totals.compactions}×` : 'Full history'}
+          <Stat label={t('Cost')}>{formatCost(data.totals.cost_usd)}</Stat>
+          <Stat label={t('Context')}>
+            {data.totals.compactions ? t('Summarized {n}×', { n: data.totals.compactions }) : t('Full history')}
           </Stat>
         </CardBody>
       </Card>
@@ -135,12 +136,12 @@ export function RunDetailPage() {
       {data.memories_used.length > 0 && (
         <details className="mt-4 rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[13px]">
           <summary className="cursor-pointer text-[12.5px] font-medium text-muted hover:text-text">
-            {data.memories_used.length} memor{data.memories_used.length === 1 ? 'y' : 'ies'} in context
+            {plural(data.memories_used.length, '{n} memory in context', '{n} memories in context')}
           </summary>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {data.memories_used.map((m) => <li key={m.id}>{m.content}</li>)}
           </ul>
-          <Link to="/memory" className="mt-2 inline-block text-[12.5px] text-accent hover:underline">Manage memories</Link>
+          <Link to="/memory" className="mt-2 inline-block text-[12.5px] text-accent hover:underline">{t('Manage memories')}</Link>
         </details>
       )}
 
@@ -148,7 +149,7 @@ export function RunDetailPage() {
         {data.kind === 'agent' && <RunActivity runId={runId} live={active} />}
         {answer ? (
           <div className="mt-2">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-subtle">Answer</div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-subtle">{t('Answer')}</div>
             <Markdown text={answer} />
           </div>
         ) : null}

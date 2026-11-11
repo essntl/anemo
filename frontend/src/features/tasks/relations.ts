@@ -4,6 +4,7 @@
  * from that list; the server checks the same rules when something is saved.
  */
 import { chooseDialog } from '@/components/ui/dialogs'
+import { plural, t } from '@/lib/i18n'
 import type { Task } from './api'
 
 export type ChecklistItem = Task['checklist'][number]
@@ -91,11 +92,11 @@ export function openSubtasksLeft(all: Task[], finishing: string[]): number {
 export async function askAboutSubtasks(open: number): Promise<SubtasksChoice | undefined | null> {
   if (open === 0) return undefined
   const answer = await chooseDialog({
-    title: open === 1 ? 'It has an open subtask' : `It has ${open} open subtasks`,
-    message: 'Finish them along with it, or keep them open?',
+    title: plural(open, 'It has an open subtask', 'It has {n} open subtasks'),
+    message: t('Finish them along with it, or keep them open?'),
     options: [
-      { value: 'finish', label: open === 1 ? 'Finish it too' : 'Finish them too' },
-      { value: 'keep', label: open === 1 ? 'Keep it open' : 'Keep them open' },
+      { value: 'finish', label: open === 1 ? t('Finish it too') : t('Finish them too') },
+      { value: 'keep', label: open === 1 ? t('Keep it open') : t('Keep them open') },
     ],
   })
   return answer === 'finish' || answer === 'keep' ? answer : null

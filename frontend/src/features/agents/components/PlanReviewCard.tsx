@@ -3,6 +3,7 @@ import { ListChecks } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { t } from '@/lib/i18n'
 import { type ToolCallView, useDecide } from '../api'
 import { type EditableStep, planIsValid, toEditable } from '../plan'
 import { PlanEditor } from './PlanEditor'
@@ -26,8 +27,8 @@ export function PlanReviewCard({ runId, call }: { runId: string; call: ToolCallV
       <div className="flex items-start gap-2 text-[13px]">
         <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
         <div>
-          <div className="font-medium">Review the agent's plan</div>
-          <div className="text-[12px] text-muted">Nothing happens until you approve it. You can change the steps first.</div>
+          <div className="font-medium">{t("Review the agent's plan")}</div>
+          <div className="text-[12px] text-muted">{t('Nothing happens until you approve it. You can change the steps first.')}</div>
         </div>
       </div>
       <div className="mt-3">
@@ -41,24 +42,24 @@ export function PlanReviewCard({ runId, call }: { runId: string; call: ToolCallV
       </div>
       {rejecting ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Input autoFocus placeholder="What should change? (sent to the agent)" value={feedback}
+          <Input autoFocus placeholder={t('What should change? (sent to the agent)')} value={feedback}
             onChange={(e) => setFeedback(e.target.value)} className="h-8 min-w-48 flex-1 text-[13px]" />
           <Button size="sm" variant="danger" loading={decide.isPending}
             onClick={() => decide.mutate({ approvalId, decision: 'deny', reason: feedback || undefined })}>
-            Send back
+            {t('Send back')}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>Back</Button>
+          <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>{t('Back')}</Button>
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button size="sm" variant="primary" loading={decide.isPending} disabled={!planIsValid(steps)}
             onClick={() => decide.mutate({ approvalId, decision: 'approve', plan: edited ? steps : undefined })}>
-            {edited ? 'Approve edited plan' : 'Approve plan'}
+            {edited ? t('Approve edited plan') : t('Approve plan')}
           </Button>
-          {!editing && <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Edit steps</Button>}
-          {edited && <Button size="sm" variant="ghost" onClick={() => setSteps(proposed)}>Undo changes</Button>}
+          {!editing && <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>{t('Edit steps')}</Button>}
+          {edited && <Button size="sm" variant="ghost" onClick={() => setSteps(proposed)}>{t('Undo changes')}</Button>}
           <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => setRejecting(true)}>
-            Reject
+            {t('Reject')}
           </Button>
         </div>
       )}

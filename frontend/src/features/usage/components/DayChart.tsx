@@ -1,5 +1,6 @@
 /** A small bar chart: one bar per day. Plain HTML and CSS, no chart library. */
 import { dayLabel } from '../ranges'
+import { t } from '@/lib/i18n'
 
 export interface DayBar {
   day: string // YYYY-MM-DD
@@ -11,7 +12,7 @@ export interface DayBar {
 export function DayChart({ bars, formatValue }: { bars: DayBar[]; formatValue: (value: number) => string }) {
   const max = Math.max(...bars.map((b) => b.value), 0)
   if (bars.length === 0 || max === 0) {
-    return <p className="py-8 text-center text-[13px] text-muted">Nothing to show for this period.</p>
+    return <p className="py-8 text-center text-[13px] text-muted">{t('Nothing to show for this period.')}</p>
   }
   // With many days only some get a label, so they stay readable.
   const labelEvery = Math.ceil(bars.length / 8)
@@ -19,7 +20,7 @@ export function DayChart({ bars, formatValue }: { bars: DayBar[]; formatValue: (
     <div>
       <div className="mb-1 text-[11px] text-subtle">{formatValue(max)}</div>
       <div className="flex h-36 items-end gap-[3px] border-b border-border" role="img"
-        aria-label={`Per day, highest ${formatValue(max)}`}>
+        aria-label={t('Per day, highest {value}', { value: formatValue(max) })}>
         {bars.map((bar) => (
           <div key={bar.day} tabIndex={0} title={`${dayLabel(bar.day)}: ${bar.detail}`}
             className="group flex h-full min-w-0 flex-1 items-end outline-none">

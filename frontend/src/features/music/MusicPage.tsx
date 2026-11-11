@@ -11,6 +11,7 @@ import { promptDialog } from '@/components/ui/dialogs'
 import { Lingering } from '@/components/ui/Lingering'
 import { Segmented } from '@/components/ui/Segmented'
 import { useShortcut } from '@/hooks/useShortcut'
+import { t } from '@/lib/i18n'
 import { useCreatePlaylist, usePlaylists } from './api'
 import { AmbientCard } from './components/AmbientCard'
 import { NowPlayingCard } from './components/NowPlayingCard'
@@ -33,7 +34,7 @@ export function MusicPage() {
   useShortcut('music.toggle', () => player.toggle())
 
   const saveQueue = async () => {
-    const name = await promptDialog({ title: 'Save the queue as a playlist', label: 'Name', placeholder: 'e.g. Deep focus', confirmLabel: 'Save' })
+    const name = await promptDialog({ title: t('Save the queue as a playlist'), label: t('Name'), placeholder: t('e.g. Deep focus'), confirmLabel: t('Save') })
     if (name?.trim()) create.mutate({ name: name.trim(), tracks: usePlayerStore.getState().queue }, { onSuccess: () => setTab('playlists') })
   }
   const sleep = useSleepTimer((s) => s.minutes)
@@ -41,11 +42,11 @@ export function MusicPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Music">
+      <PageHeader title={t('Music')}>
         {/* Stop after: the music pauses by itself (for falling asleep, or the end of a work block). */}
-        <Select variant="pill" aria-label="Stop after" value={sleep === null ? '' : String(sleep)}
+        <Select variant="pill" aria-label={t('Stop after')} value={sleep === null ? '' : String(sleep)}
           onValueChange={(v) => stopAfter(v ? Number(v) : null)}
-          options={[{ value: '', label: 'Keep playing' }, ...SLEEP_CHOICES.map((m) => ({ value: String(m), label: `Stop after ${m} min` }))]} />
+          options={[{ value: '', label: t('Keep playing') }, ...SLEEP_CHOICES.map((m) => ({ value: String(m), label: t('Stop after {n} min', { n: m }) }))]} />
       </PageHeader>
 
       {/* The player takes the left side in full height; the queue and the ambient sound are beside it. */}
@@ -55,19 +56,19 @@ export function MusicPage() {
         <div className="flex min-w-0 flex-col gap-4">
         <Card className="min-w-0 p-3 md:p-4">
           <div className="mb-3 flex items-center justify-between gap-2 px-1">
-            <Segmented<Tab> label="Music" kind="tabs" controls="music" value={tab} onChange={setTab}
+            <Segmented<Tab> label={t('Music')} kind="tabs" controls="music" value={tab} onChange={setTab}
               options={[
-                { value: 'queue', label: <>Queue {count(p.queue.length)}</>, ariaLabel: `Queue, ${p.queue.length} tracks` },
-                { value: 'playlists', label: <>Playlists {count(playlists.data?.length ?? 0)}</>, ariaLabel: `Playlists, ${playlists.data?.length ?? 0}` },
+                { value: 'queue', label: <>{t('Queue')} {count(p.queue.length)}</>, ariaLabel: t('Queue, {n} tracks', { n: p.queue.length }) },
+                { value: 'playlists', label: <>{t('Playlists')} {count(playlists.data?.length ?? 0)}</>, ariaLabel: t('Playlists, {n}', { n: playlists.data?.length ?? 0 }) },
               ]} />
             {tab === 'queue' && p.queue.length > 0 && (
-              <ActionMenu label="Queue options" actions={[
-                { label: 'Save as playlist', icon: <Save />, onSelect: () => void saveQueue() },
-                { label: 'Clear queue', icon: <Trash2 />, danger: true, onSelect: player.clear },
+              <ActionMenu label={t('Queue options')} actions={[
+                { label: t('Save as playlist'), icon: <Save />, onSelect: () => void saveQueue() },
+                { label: t('Clear queue'), icon: <Trash2 />, danger: true, onSelect: player.clear },
               ]} />
             )}
           </div>
-          <div role="tabpanel" id={`music-${tab}`} aria-label={tab === 'queue' ? 'Queue' : 'Playlists'}>
+          <div role="tabpanel" id={`music-${tab}`} aria-label={tab === 'queue' ? t('Queue') : t('Playlists')}>
             {tab === 'queue' ? <QueuePanel /> : <PlaylistsPanel />}
           </div>
         </Card>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
+import { plural, t } from '@/lib/i18n'
 
 export type TaskFile = Schemas['TaskFileOut']
 export type Backlinks = Schemas['Backlinks']
@@ -40,7 +41,7 @@ export function useUploadToTask(taskId: string) {
       const res = await fetch(`/api/tasks/${taskId}/files/upload`, { method: 'POST', body: form, credentials: 'same-origin' })
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }
-        throw new ApiError(res.status, body.error?.code ?? `http_${res.status}`, body.error?.message ?? 'Upload failed')
+        throw new ApiError(res.status, body.error?.code ?? `http_${res.status}`, body.error?.message ?? t('Upload failed'))
       }
       return (await res.json()) as TaskFile[]
     },
@@ -93,9 +94,8 @@ export function useTaskBacklinks(taskId: string | null) {
 
 /** "Linked from 2 tasks and 1 document", or null when nothing links to it. */
 export function linkedFromText(b: Backlinks): string | null {
-  const parts = [
-    b.tasks.length ? `${b.tasks.length} task${b.tasks.length === 1 ? '' : 's'}` : '',
-    b.documents.length ? `${b.documents.length} document${b.documents.length === 1 ? '' : 's'}` : '',
-  ].filter(Boolean)
-  return parts.length ? `Linked from ${parts.join(' and ')}.` : null
+  const tasks = b.tasks.length ? plural(b.tasks.length, '{n} task', '{n} tasks') : ''
+  const documents = b.documents.length ? plural(b.documents.length, '{n} document', '{n} documents') : ''
+  if (tasks && documents) return t('Linked from {tasks} and {documents}.', { tasks, documents })
+  return tasks || documents ? t('Linked from {items}.', { items: tasks || documents }) : null
 }

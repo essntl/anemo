@@ -11,6 +11,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { Code2, Image as ImageIcon } from 'lucide-react'
 import { DiagramBlock } from '@/components/diagrams/DiagramBlock'
 import { isDiagramLanguage } from '@/components/diagrams/languages'
+import { t } from '@/lib/i18n'
 
 class CodeBlockView implements NodeView {
   dom: HTMLElement
@@ -63,7 +64,7 @@ class CodeBlockView implements NodeView {
           <button type="button" onClick={this.toggle} aria-pressed={editing}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-surface-hover hover:text-text [&_svg]:h-3 [&_svg]:w-3">
             {editing ? <ImageIcon /> : <Code2 />}
-            {editing ? 'Done' : 'Edit'}
+            {editing ? t('Done') : t('Edit')}
           </button>
         } />,
     )

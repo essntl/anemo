@@ -6,6 +6,7 @@ import { useRef, useState, type PointerEvent, type ReactNode, type WheelEvent } 
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { Maximize2, Minus, Plus, X } from 'lucide-react'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
+import { t } from '@/lib/i18n'
 
 const MIN = 0.25
 const MAX = 8
@@ -58,10 +59,10 @@ export function DiagramViewer({ title, onClose, children }: { title: string; onC
           <div className="flex items-center gap-2 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <RadixDialog.Title className="min-w-0 flex-1 truncate text-[14px] font-medium">{title}</RadixDialog.Title>
             <span className="w-12 text-right text-[12px] tabular-nums text-muted">{Math.round(view.scale * 100)}%</span>
-            <button type="button" className={button} onClick={() => zoom(1 / 1.25)} aria-label="Zoom out" title="Zoom out (−)"><Minus /></button>
-            <button type="button" className={button} onClick={() => zoom(1.25)} aria-label="Zoom in" title="Zoom in (+)"><Plus /></button>
-            <button type="button" className={button} onClick={reset} aria-label="Fit to window" title="Fit to window (0)"><Maximize2 /></button>
-            <RadixDialog.Close className={button} aria-label="Close" title="Close (Esc)"><X /></RadixDialog.Close>
+            <button type="button" className={button} onClick={() => zoom(1 / 1.25)} aria-label={t('Zoom out')} title={t('Zoom out (−)')}><Minus /></button>
+            <button type="button" className={button} onClick={() => zoom(1.25)} aria-label={t('Zoom in')} title={t('Zoom in (+)')}><Plus /></button>
+            <button type="button" className={button} onClick={reset} aria-label={t('Fit to window')} title={t('Fit to window (0)')}><Maximize2 /></button>
+            <RadixDialog.Close className={button} aria-label={t('Close')} title={t('Close (Esc)')}><X /></RadixDialog.Close>
           </div>
           <div ref={stage} data-testid="diagram-stage"
             className="relative flex min-h-0 flex-1 cursor-grab touch-none items-center justify-center overflow-hidden active:cursor-grabbing"

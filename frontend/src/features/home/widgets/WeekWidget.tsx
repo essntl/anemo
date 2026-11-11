@@ -2,6 +2,7 @@ import { useToday } from '@/hooks/useNow'
 import { useMemo } from 'react'
 import { ChartColumn } from 'lucide-react'
 import { useScope } from '@/app/projectStore'
+import { dateLocale, rich, t } from '@/lib/i18n'
 import { formatMinutes, useFocusSessions } from '@/features/focus/api'
 import { useSettings } from '@/features/settings/api'
 import { BarChart } from '@/features/stats/BarChart'
@@ -31,8 +32,8 @@ export function WeekWidget({ item }: { item: WidgetLayout }) {
       const key = dayOf(d)
       return {
         key,
-        label: d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' }),
-        short: d.toLocaleDateString(undefined, { weekday: 'narrow' }),
+        label: d.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'short' }),
+        short: d.toLocaleDateString(dateLocale(), { weekday: 'narrow' }),
         value: byDay.get(key) ?? 0,
         highlight: key === today,
       }
@@ -41,10 +42,11 @@ export function WeekWidget({ item }: { item: WidgetLayout }) {
   const total = bars.reduce((s, b) => s + b.value, 0)
   return (
     <>
-      <WidgetHeader title="This week" icon={<ChartColumn />} to="/stats">
+      <WidgetHeader title={t('This week')} icon={<ChartColumn />} to="/stats">
         <span className="text-[12px] text-muted tabular-nums">
-          <span className="font-semibold text-text">{formatMinutes(total)}</span>
-          {goal > 0 && ` of ${formatMinutes(goal * 7)}`}
+          {goal > 0
+            ? rich('<b>{done}</b> of {goal}', { b: (c) => <span className="font-semibold text-text">{c}</span> }, { done: formatMinutes(total), goal: formatMinutes(goal * 7) })
+            : <span className="font-semibold text-text">{formatMinutes(total)}</span>}
         </span>
       </WidgetHeader>
       <div className="flex-1 px-4 pb-4 pt-2">

@@ -1,4 +1,5 @@
 import { Select } from '@/components/ui/Select'
+import { t } from '@/lib/i18n'
 import { useProfiles } from '../api'
 
 /** Which agent profile an agent-mode message uses ("" = the default agent). */
@@ -8,12 +9,12 @@ export function ProfilePicker({ value, onChange }: { value: string | null; onCha
   return (
     <Select
       variant="ghost"
-      aria-label="Agent profile"
+      aria-label={t('Agent profile')}
       className="max-w-40"
       value={value ?? ''}
       onValueChange={(v) => onChange(v || null)}
       options={[
-        { value: '', label: 'Default agent' },
+        { value: '', label: t('Default agent') },
         ...profiles.data.map((p) => ({ value: p.id, label: p.name })),
       ]}
     />

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { matchSkills, slashQuery, typedCommand } from './slash'
+import { setLocaleForTest } from '@/lib/i18n'
+import { localSkills, matchSkills, slashQuery, typedCommand } from './slash'
 
 const skills = [
   { id: '1', slug: 'study', name: 'Study', description: 'Learn a concept step by step.' },
@@ -33,5 +34,52 @@ describe('slash commands', () => {
     expect(typedCommand(skills, '/study')).toBeNull()
     expect(typedCommand(skills, '/unknown thing')).toBeNull()
     expect(typedCommand(skills, 'see /study x')).toBeNull()
+  })
+})
+
+describe('slash commands in other languages', () => {
+  const builtin = [
+    { id: '1', slug: 'study', name: 'Study', description: 'Learn.', hint: 'Learn a new concept', builtin: true },
+    { id: '3', slug: 'plan', name: 'Plan', description: 'Steps.', hint: 'Plan a project, task or idea', builtin: true },
+    // Edited by the user: their words stay.
+    { id: '4', slug: 'review', name: 'Критика', description: 'Feedback.', hint: 'Моя підказка', builtin: true },
+    // The user's own skill, named in Ukrainian (its slug is whatever the server made of it).
+    { id: '9', slug: 'skill-9', name: 'Лист клієнту', description: 'Написати лист.' },
+  ]
+  const uk = {
+    'study##command': 'вивчити', 'plan##command': 'план', 'review##command': 'рецензія',
+    'Study##skill': 'Вивчення', 'Plan##skill': 'План', 'Learn a new concept': 'Розібратися в новій темі',
+  }
+  afterEach(() => setLocaleForTest('en'))
+
+  it('leaves the skills as they are in English', () => {
+    const [study] = localSkills(builtin)
+    expect(study).toMatchObject({ command: 'study', name: 'Study', hint: 'Learn a new concept' })
+  })
+
+  it('gives built-in skills a command, name and hint in the language', () => {
+    setLocaleForTest('uk', uk)
+    const [study, plan, review, own] = localSkills(builtin)
+    expect(study).toMatchObject({ command: 'вивчити', name: 'Вивчення', hint: 'Розібратися в новій темі' })
+    expect(plan).toMatchObject({ command: 'план', name: 'План' })
+    expect(review).toMatchObject({ command: 'рецензія', name: 'Критика', hint: 'Моя підказка' })
+    expect(own).toBe(builtin[3])
+  })
+
+  it('opens the menu for letters of any alphabet', () => {
+    expect(slashQuery('/Пл')).toBe('пл')
+    expect(slashQuery('/план що робити')).toBeNull()
+  })
+
+  it('finds and calls a skill by its translated command, its slug, or its own name', () => {
+    setLocaleForTest('uk', uk)
+    const skills = localSkills(builtin)
+    expect(matchSkills(skills, 'пл').map((s) => s.slug)).toEqual(['plan'])
+    expect(matchSkills(skills, 'pl').map((s) => s.slug)).toEqual(['plan'])
+    expect(matchSkills(skills, 'лист').map((s) => s.slug)).toEqual(['skill-9'])
+    expect(typedCommand(skills, '/План відпустка в горах')).toEqual({ skill: skills[1], rest: 'відпустка в горах' })
+    expect(typedCommand(skills, '/plan trip')?.skill.slug).toBe('plan')
+    expect(typedCommand(skills, '/лист-клієнту про затримку')).toEqual({ skill: skills[3], rest: 'про затримку' })
+    expect(typedCommand(skills, '/невідоме щось')).toBeNull()
   })
 })

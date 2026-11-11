@@ -1,11 +1,13 @@
+import { msg } from '@/lib/i18n'
+
 /** How long ago a chat was last active, as offered by the "When" filter of All chats. */
 export const AGES = [
-  { value: '', label: 'Any time' },
-  { value: 'today', label: 'Today' },
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: 'week', label: 'Past week' },
-  { value: 'month', label: 'Past month' },
-  { value: 'older', label: 'Older' },
+  { value: '', label: msg('Any time') },
+  { value: 'today', label: msg('Today') },
+  { value: 'yesterday', label: msg('Yesterday') },
+  { value: 'week', label: msg('Past week') },
+  { value: 'month', label: msg('Past month') },
+  { value: 'older', label: msg('Older') },
 ]
 
 /**

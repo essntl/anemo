@@ -7,6 +7,7 @@
  * while embedded players (YouTube, SoundCloud) and anything else are other windows. The
  * remote can add to the end of the queue, but never replace or clear it.
  */
+import { t } from '@/lib/i18n'
 import { player, usePlayerRuntime, usePlayerStore } from './player/controller'
 
 export const FROM_EXTENSION = 'anemo-companion'
@@ -82,14 +83,14 @@ async function run(command: BridgeCommand): Promise<void> {
       break
     case 'add':
       if (!/^https?:\/\//i.test(command.url)) {
-        post({ type: 'added', id: command.id, ok: false, error: 'The link must start with https:// or http://.' })
+        post({ type: 'added', id: command.id, ok: false, error: t('The link must start with https:// or http://.') })
         return
       }
       try {
         const tracks = await player.add(command.url)
         post({ type: 'added', id: command.id, ok: true, count: tracks.length })
       } catch (err) {
-        post({ type: 'added', id: command.id, ok: false, error: err instanceof Error ? err.message : "Couldn't add that link." })
+        post({ type: 'added', id: command.id, ok: false, error: err instanceof Error ? err.message : t("Couldn't add that link.") })
       }
       break
   }

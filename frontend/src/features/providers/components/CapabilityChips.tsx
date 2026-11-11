@@ -3,23 +3,24 @@ import * as Popover from '@radix-ui/react-popover'
 import { Info } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { useCloseOnScroll } from '@/hooks/useCloseOnScroll'
+import { msg, t } from '@/lib/i18n'
 
 const CAPABILITY_LABELS: Record<string, string> = {
-  tools: 'Tools',
-  vision: 'Vision',
-  reasoning: 'Reasoning',
+  tools: msg('Tools'),
+  vision: msg('Vision'),
+  reasoning: msg('Reasoning'),
   pdf: 'PDF',
   structured_output: 'JSON',
-  embeddings: 'Embeddings',
+  embeddings: msg('Embeddings'),
 }
 
 export function CapabilityChips({ capabilities }: { capabilities: Record<string, boolean> }) {
   const on = Object.keys(CAPABILITY_LABELS).filter((k) => capabilities[k])
-  if (on.length === 0) return <span className="text-[12px] text-subtle">Chat only</span>
+  if (on.length === 0) return <span className="text-[12px] text-subtle">{t('Chat only')}</span>
   return (
     <div className="flex flex-wrap gap-1">
       {on.map((k) => (
-        <Badge key={k} tone={k === 'reasoning' ? 'accent' : 'neutral'}>{CAPABILITY_LABELS[k]}</Badge>
+        <Badge key={k} tone={k === 'reasoning' ? 'accent' : 'neutral'}>{t(CAPABILITY_LABELS[k])}</Badge>
       ))}
     </div>
   )
@@ -35,7 +36,7 @@ export function CapabilityInfo({ name, capabilities }: { name: string; capabilit
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
-        aria-label={`What ${name} can do`}
+        aria-label={t('What {name} can do', { name })}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text"
       >
         <Info className="h-4 w-4" />

@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import { loadScript, playerHost } from './host'
 import type { Adapter, AdapterEvents, Track } from './types'
 
@@ -115,7 +116,7 @@ export class SoundCloudAdapter implements Adapter {
         iframe.allow = 'autoplay; encrypted-media'
         iframe.width = '200'
         iframe.height = '200'
-        iframe.title = 'SoundCloud player'
+        iframe.title = t('SoundCloud player')
         iframe.src = widgetSrc(track.url, autoplay)
         playerHost().appendChild(iframe)
         const w = SC.Widget(iframe)
@@ -148,11 +149,11 @@ export class SoundCloudAdapter implements Adapter {
           // Inside a set the widget moves on by itself; only the end of the last sound counts.
           if (this.index >= this.count - 1) this.events.onState('ended')
         })
-        w.bind(E.ERROR, () => this.events.onError('SoundCloud could not play this link.'))
+        w.bind(E.ERROR, () => this.events.onError(t('SoundCloud could not play this link.')))
       })
       .catch(() => {
         this.mounting = false
-        this.events.onError('SoundCloud could not be reached.')
+        this.events.onError(t('SoundCloud could not be reached.'))
       })
   }
 

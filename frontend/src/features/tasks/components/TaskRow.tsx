@@ -8,6 +8,7 @@ import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
 import { focusOnTask } from '@/features/focus/focusOnTask'
 import { cn } from '@/lib/cn'
+import { plural, t } from '@/lib/i18n'
 import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask } from '../api'
 import { bucketOf, formatDue } from '../dates'
 import { checklistProgress, isOpen, openBlockers, subtasksOf } from '../relations'
@@ -28,9 +29,9 @@ export function BlockedBadge({ task, info }: { task: Task; info: TaskInfo }) {
   if (!isOpen(task) || blockers.length === 0) return null
   const names = blockers.map((t) => t.title).join(', ')
   return (
-    <span title={`Waits on: ${names}`} aria-label={`Waits on ${blockers.length === 1 ? names : `${blockers.length} tasks`}`}
+    <span title={t('Waits on: {names}', { names })} aria-label={blockers.length === 1 ? t('Waits on {names}', { names }) : plural(blockers.length, 'Waits on {n} task', 'Waits on {n} tasks')}
       className="flex shrink-0 items-center gap-1 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">
-      <Lock className="h-3 w-3" /> {blockers.length === 1 ? 'Waits on 1' : `Waits on ${blockers.length}`}
+      <Lock className="h-3 w-3" /> {t('Waits on {n}', { n: blockers.length })}
     </span>
   )
 }
@@ -51,13 +52,13 @@ export function TaskMeta({ task, project, info, nested = false }: { task: Task; 
       {task.due_date && (
         <span className={cn('flex items-center gap-1', overdue && 'font-medium text-error')}>
           <CalendarDays className="h-3 w-3" /> {formatDue(task)}
-          {task.remind_minutes != null && <Bell className="h-3 w-3" aria-label="Has a reminder" />}
+          {task.remind_minutes != null && <Bell className="h-3 w-3" aria-label={t('Has a reminder')} />}
           {task.rrule && <Repeat className="h-3 w-3" aria-label={describeRepeat(task.rrule)}><title>{describeRepeat(task.rrule)}</title></Repeat>}
         </span>
       )}
       {task.priority > 0 && (
         <span className={cn('flex items-center gap-1', PRIORITY_TONE[task.priority])}>
-          <Flag className="h-3 w-3" /> {PRIORITY_LABELS[task.priority]}
+          <Flag className="h-3 w-3" /> {t(PRIORITY_LABELS[task.priority])}
         </span>
       )}
       {project && (
@@ -67,18 +68,18 @@ export function TaskMeta({ task, project, info, nested = false }: { task: Task; 
       )}
       {task.tags.map((tag) => <span key={tag}>#{tag}</span>)}
       {checklist && (
-        <span className="flex items-center gap-1" aria-label={`Checklist: ${checklist.done} of ${checklist.total} done`}>
+        <span className="flex items-center gap-1" aria-label={t('Checklist: {done} of {total} done', { done: checklist.done, total: checklist.total })}>
           <ListChecks className="h-3 w-3" /> {checklist.done}/{checklist.total}
         </span>
       )}
       {subtasks.length > 0 && (
         <span className="flex items-center gap-1"
-          aria-label={`Subtasks: ${subtasks.filter((t) => t.status === 'done').length} of ${subtasks.length} done`}>
+          aria-label={t('Subtasks: {done} of {total} done', { done: subtasks.filter((s) => s.status === 'done').length, total: subtasks.length })}>
           <ListTree className="h-3 w-3" /> {subtasks.filter((t) => t.status === 'done').length}/{subtasks.length}
         </span>
       )}
       {parent && (
-        <span className="flex min-w-0 items-center gap-1" title={`Subtask of “${parent.title}”`}>
+        <span className="flex min-w-0 items-center gap-1" title={t('Subtask of “{title}”', { title: parent.title })}>
           <CornerDownRight className="h-3 w-3 shrink-0" /> <span className="truncate">{parent.title}</span>
         </span>
       )}
@@ -133,10 +134,10 @@ export function TaskRow({ task, projects, info, onOpen, notesShown, onToggleNote
     void remove.mutateAsync(task.id).then(
       () =>
         toast({
-          message: `Deleted “${task.title}”`,
+          message: t('Deleted “{title}”', { title: task.title }),
           duration: 10_000, // time to notice and undo
           action: {
-            label: 'Undo',
+            label: t('Undo'),
             onClick: () =>
               create.mutate({
                 title: task.title, description: task.description, status: task.status, priority: task.priority,
@@ -155,7 +156,7 @@ export function TaskRow({ task, projects, info, onOpen, notesShown, onToggleNote
   return (
     <div ref={row} aria-current={linked || undefined} className={cn('rounded-control', linked && 'flash')}>
       <div className="group flex items-start gap-3 rounded-control px-2 py-2 hover:bg-surface-hover">
-        <button type="button" role="checkbox" aria-checked={done} aria-label={done ? `Reopen “${task.title}”` : `Complete “${task.title}”`}
+        <button type="button" role="checkbox" aria-checked={done} aria-label={done ? t('Reopen “{title}”', { title: task.title }) : t('Complete “{title}”', { title: task.title })}
           onClick={() => void toggle(task)}
           className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors pointer-coarse:h-6 pointer-coarse:w-6',
             done ? 'border-success bg-success text-white' : 'border-border-strong hover:border-accent')}>
@@ -167,34 +168,34 @@ export function TaskRow({ task, projects, info, onOpen, notesShown, onToggleNote
           </span>
           <TaskMeta task={task} project={project} info={info} nested={nested} />
         </button>
-        {task.status === 'in_progress' && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">In progress</span>}
-        {task.status === 'waiting' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted">Waiting</span>}
+        {task.status === 'in_progress' && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">{t('In progress')}</span>}
+        {task.status === 'waiting' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted">{t('Waiting')}</span>}
         {openBlockers(task, info.byId).length > 0 && !finished
           ? <BlockedBadge task={task} info={info} />
-          : task.status === 'blocked' && <span className="shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">Blocked</span>}
+          : task.status === 'blocked' && <span className="shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] text-warning">{t('Blocked')}</span>}
         {subtasks.length > 0 && (
-          <button type="button" aria-expanded={showSubtasks} aria-label={`Subtasks of “${task.title}”`}
-            title={showSubtasks ? 'Hide subtasks' : 'Show subtasks'} onClick={() => setShowSubtasks(!showSubtasks)}
+          <button type="button" aria-expanded={showSubtasks} aria-label={t('Subtasks of “{title}”', { title: task.title })}
+            title={showSubtasks ? t('Hide subtasks') : t('Show subtasks')} onClick={() => setShowSubtasks(!showSubtasks)}
             className={cn(side, 'hover:text-text')}>
             <ListTree className={cn('h-4 w-4', showSubtasks && 'text-accent')} />
           </button>
         )}
         {hasNotes && (
-          <button type="button" aria-expanded={expanded} aria-label={`Notes of “${task.title}”`} title={expanded ? 'Hide notes' : 'Show notes'}
+          <button type="button" aria-expanded={expanded} aria-label={t('Notes of “{title}”', { title: task.title })} title={expanded ? t('Hide notes') : t('Show notes')}
             onClick={() => onToggleNotes(task.id)} className={cn(side, 'hover:text-text')}>
             <ChevronRight className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')} />
           </button>
         )}
         {!finished && (
-          <ActionMenu label={`More for “${task.title}”`}
+          <ActionMenu label={t('More for “{title}”', { title: task.title })}
             className="-my-1 h-8 w-8 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:-my-2 pointer-coarse:h-10 pointer-coarse:w-10 pointer-coarse:opacity-100"
             actions={[
-              { label: 'Focus on this', icon: <Timer />, onSelect: () => focusOnTask(task) },
-              { label: 'Open', icon: <PanelRightOpen />, onSelect: () => onOpen(task) },
+              { label: t('Focus on this'), icon: <Timer />, onSelect: () => focusOnTask(task) },
+              { label: t('Open'), icon: <PanelRightOpen />, onSelect: () => onOpen(task) },
             ]} />
         )}
         {finished && (
-          <button type="button" aria-label={`Delete “${task.title}”`} title="Delete" disabled={remove.isPending} onClick={removeNow}
+          <button type="button" aria-label={t('Delete “{title}”', { title: task.title })} title={t('Delete')} disabled={remove.isPending} onClick={removeNow}
             className={cn(side, 'hover:text-error')}>
             <Trash2 className="h-4 w-4" />
           </button>
@@ -207,13 +208,13 @@ export function TaskRow({ task, projects, info, onOpen, notesShown, onToggleNote
             <Markdown text={task.description} />
           </div>
           <button type="button" onClick={() => onOpen(task)} className="mt-1 text-[12.5px] font-medium text-accent hover:underline">
-            Open task
+            {t('Open task')}
           </button>
         </div>
       )}
       {showSubtasks && subtasks.length > 0 && (
         // Folded in under the parent, with a line down the side like the notes.
-        <div role="group" aria-label={`Subtasks of “${task.title}”`} className="mb-1 ml-5 border-l-2 border-border pl-2 pointer-coarse:ml-6">
+        <div role="group" aria-label={t('Subtasks of “{title}”', { title: task.title })} className="mb-1 ml-5 border-l-2 border-border pl-2 pointer-coarse:ml-6">
           {subtasks.map((sub) => (
             <TaskRow key={sub.id} task={sub} projects={projects} info={info} onOpen={onOpen} notesShown={notesShown}
               onToggleNotes={onToggleNotes} linkedId={linkedId} nested />

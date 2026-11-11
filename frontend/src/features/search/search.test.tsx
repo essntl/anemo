@@ -51,3 +51,20 @@ describe('usage periods', () => {
     expect(daysIn(rangeFor('all', now))).toBeNull()
   })
 })
+
+describe('search box and pages that are turned off', () => {
+  it('does not offer a page that is off, or its actions', async () => {
+    const { matchingActions } = await import('./actions')
+    expect(matchingPages('music').map((p) => p.to)).toContain('/music')
+    expect(matchingPages('music', ['music']).map((p) => p.to)).not.toContain('/music')
+    expect(matchingPages('', ['music', 'focus']).map((p) => p.to)).not.toEqual(expect.arrayContaining(['/music', '/focus', '/stats']))
+    expect(matchingActions('music').length).toBeGreaterThan(0)
+    expect(matchingActions('music', ['music'])).toEqual([])
+    expect(matchingActions('focus', ['music']).map((a) => a.label)).toContain('Start focus')
+  })
+
+  it('keeps Settings > Focus & music until both pages are off', () => {
+    expect(matchingPages('settings focus', ['music']).map((p) => p.to)).toContain('/settings/focus')
+    expect(matchingPages('settings focus', ['music', 'focus']).map((p) => p.to)).not.toContain('/settings/focus')
+  })
+})

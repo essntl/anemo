@@ -9,6 +9,8 @@
  * listener on window/document that doesn't go through this list.
  */
 
+import { msg } from '@/lib/i18n'
+
 export interface KeyCombo {
   /** KeyboardEvent.key: one character (compared without case) or a name like 'Escape'. */
   key: string
@@ -40,53 +42,53 @@ export interface Area {
 }
 
 export const AREAS: Area[] = [
-  { id: 'everywhere', title: 'Everywhere' },
-  { id: 'search', title: 'Search box', pages: (p) => p === '/search' },
-  { id: 'chat', title: 'Chat', pages: (p) => p === '/' || p.startsWith('/c/') || p === '/chats' },
-  { id: 'home', title: 'Home', pages: (p) => p === '/home' },
-  { id: 'focus', title: 'Focus', pages: (p) => p === '/focus' },
-  { id: 'music', title: 'Music', pages: (p) => p === '/music' },
-  { id: 'files', title: 'Files', pages: (p) => p === '/files' },
-  { id: 'diagram', title: 'Diagram or chart in full screen' },
+  { id: 'everywhere', title: msg('Everywhere') },
+  { id: 'search', title: msg('Search box'), pages: (p) => p === '/search' },
+  { id: 'chat', title: msg('Chat'), pages: (p) => p === '/' || p.startsWith('/c/') || p === '/chats' },
+  { id: 'home', title: msg('Home'), pages: (p) => p === '/home' },
+  { id: 'focus', title: msg('Focus'), pages: (p) => p === '/focus' },
+  { id: 'music', title: msg('Music'), pages: (p) => p === '/music' },
+  { id: 'files', title: msg('Files'), pages: (p) => p === '/files' },
+  { id: 'diagram', title: msg('Diagram or chart in full screen') },
 ]
 
 const ARROWS: KeyCombo[] = [{ key: 'ArrowUp' }, { key: 'ArrowDown' }, { key: 'ArrowLeft' }, { key: 'ArrowRight' }]
 
 export const SHORTCUTS = {
-  'app.search': { area: 'everywhere', keys: [{ key: 'k', mod: true }], description: 'Search everything, open a page or run an action' },
-  'app.sidebar': { area: 'everywhere', keys: [{ key: '\\', mod: true }], description: 'Fold or unfold the sidebar' },
-  'app.shortcuts': { area: 'everywhere', keys: [{ key: '?' }], description: 'Show these keyboard shortcuts' },
-  'app.close': { area: 'everywhere', keys: [{ key: 'Escape' }], description: 'Close a dialog, a menu or the Island’s controls' },
+  'app.search': { area: 'everywhere', keys: [{ key: 'k', mod: true }], description: msg('Search everything, open a page or run an action') },
+  'app.sidebar': { area: 'everywhere', keys: [{ key: '\\', mod: true }], description: msg('Fold or unfold the sidebar') },
+  'app.shortcuts': { area: 'everywhere', keys: [{ key: '?' }], description: msg('Show these keyboard shortcuts') },
+  'app.close': { area: 'everywhere', keys: [{ key: 'Escape' }], description: msg('Close a dialog, a menu or the Island’s controls') },
 
-  'search.move': { area: 'search', keys: [{ key: 'ArrowUp' }, { key: 'ArrowDown' }], description: 'Move through the results' },
-  'search.open': { area: 'search', keys: [{ key: 'Enter' }], description: 'Open the chosen result or run the action' },
+  'search.move': { area: 'search', keys: [{ key: 'ArrowUp' }, { key: 'ArrowDown' }], description: msg('Move through the results') },
+  'search.open': { area: 'search', keys: [{ key: 'Enter' }], description: msg('Open the chosen result or run the action') },
 
-  'chat.send': { area: 'chat', keys: [{ key: 'Enter', shift: false }, { key: 'Enter', shift: false, mod: true, quiet: true }], description: 'Send the message' },
-  'chat.newline': { area: 'chat', keys: [{ key: 'Enter', shift: true }], description: 'Start a new line' },
-  'chat.allow': { area: 'chat', keys: [{ key: 'Enter', mod: true, shift: true }], description: 'Allow what the agent asks for, once' },
-  'chat.deny': { area: 'chat', keys: [{ key: 'Backspace', mod: true, shift: true }], description: 'Deny what the agent asks for' },
-  'chat.skill': { area: 'chat', keys: [{ key: '/' }], description: 'At the start of a message: pick a skill' },
-  'chat.quickDelete': { area: 'chat', keys: [{ key: 'Shift' }], prefix: 'Hold', description: 'Over the chat list in the sidebar: delete chats with one click' },
+  'chat.send': { area: 'chat', keys: [{ key: 'Enter', shift: false }, { key: 'Enter', shift: false, mod: true, quiet: true }], description: msg('Send the message') },
+  'chat.newline': { area: 'chat', keys: [{ key: 'Enter', shift: true }], description: msg('Start a new line') },
+  'chat.allow': { area: 'chat', keys: [{ key: 'Enter', mod: true, shift: true }], description: msg('Allow what the agent asks for, once') },
+  'chat.deny': { area: 'chat', keys: [{ key: 'Backspace', mod: true, shift: true }], description: msg('Deny what the agent asks for') },
+  'chat.skill': { area: 'chat', keys: [{ key: '/' }], description: msg('At the start of a message: pick a skill') },
+  'chat.quickDelete': { area: 'chat', keys: [{ key: 'Shift' }], prefix: msg('Hold'), description: msg('Over the chat list in the sidebar: delete chats with one click') },
 
-  'home.edit': { area: 'home', keys: [{ key: 'e' }], description: 'Edit the layout, or stop editing' },
-  'home.stopEditing': { area: 'home', keys: [{ key: 'Escape' }], description: 'Stop editing the layout' },
-  'home.move': { area: 'home', keys: ARROWS.map((k) => ({ ...k, shift: false })), description: 'While editing: move the focused widget' },
-  'home.resize': { area: 'home', keys: ARROWS.map((k) => ({ ...k, shift: true })), description: 'While editing: make the focused widget wider, narrower, taller or shorter' },
-  'home.hide': { area: 'home', keys: [{ key: 'Delete', shift: false }, { key: 'Backspace', shift: false, quiet: true }], description: 'While editing: hide the focused widget' },
+  'home.edit': { area: 'home', keys: [{ key: 'e' }], description: msg('Edit the layout, or stop editing') },
+  'home.stopEditing': { area: 'home', keys: [{ key: 'Escape' }], description: msg('Stop editing the layout') },
+  'home.move': { area: 'home', keys: ARROWS.map((k) => ({ ...k, shift: false })), description: msg('While editing: move the focused widget') },
+  'home.resize': { area: 'home', keys: ARROWS.map((k) => ({ ...k, shift: true })), description: msg('While editing: make the focused widget wider, narrower, taller or shorter') },
+  'home.hide': { area: 'home', keys: [{ key: 'Delete', shift: false }, { key: 'Backspace', shift: false, quiet: true }], description: msg('While editing: hide the focused widget') },
 
-  'focus.toggle': { area: 'focus', keys: [{ key: ' ' }], description: 'Start or pause the timer' },
-  'focus.reset': { area: 'focus', keys: [{ key: 'r' }], description: 'Reset the timer' },
-  'focus.skip': { area: 'focus', keys: [{ key: 's' }], description: 'Skip to the next phase' },
-  'focus.addMinute': { area: 'focus', keys: [{ key: '+' }, { key: '=', quiet: true }], description: 'Add a minute' },
+  'focus.toggle': { area: 'focus', keys: [{ key: ' ' }], description: msg('Start or pause the timer') },
+  'focus.reset': { area: 'focus', keys: [{ key: 'r' }], description: msg('Reset the timer') },
+  'focus.skip': { area: 'focus', keys: [{ key: 's' }], description: msg('Skip to the next phase') },
+  'focus.addMinute': { area: 'focus', keys: [{ key: '+' }, { key: '=', quiet: true }], description: msg('Add a minute') },
 
-  'music.toggle': { area: 'music', keys: [{ key: ' ' }], description: 'Play or pause' },
+  'music.toggle': { area: 'music', keys: [{ key: ' ' }], description: msg('Play or pause') },
 
-  'files.save': { area: 'files', keys: [{ key: 's', mod: true }], description: 'Save the file you are editing' },
-  'files.paste': { area: 'files', keys: [{ key: 'v', mod: true }], description: 'Paste what you cut or copied into the open folder' },
-  'files.cancelPaste': { area: 'files', keys: [{ key: 'Escape' }], description: 'Forget what you cut or copied' },
-  'diagram.zoomIn': { area: 'diagram', keys: [{ key: '+' }, { key: '=', quiet: true }], description: 'Zoom in' },
-  'diagram.zoomOut': { area: 'diagram', keys: [{ key: '-' }], description: 'Zoom out' },
-  'diagram.fit': { area: 'diagram', keys: [{ key: '0' }], description: 'Fit to the window' },
+  'files.save': { area: 'files', keys: [{ key: 's', mod: true }], description: msg('Save the file you are editing') },
+  'files.paste': { area: 'files', keys: [{ key: 'v', mod: true }], description: msg('Paste what you cut or copied into the open folder') },
+  'files.cancelPaste': { area: 'files', keys: [{ key: 'Escape' }], description: msg('Forget what you cut or copied') },
+  'diagram.zoomIn': { area: 'diagram', keys: [{ key: '+' }, { key: '=', quiet: true }], description: msg('Zoom in') },
+  'diagram.zoomOut': { area: 'diagram', keys: [{ key: '-' }], description: msg('Zoom out') },
+  'diagram.fit': { area: 'diagram', keys: [{ key: '0' }], description: msg('Fit to the window') },
 } satisfies Record<string, Shortcut>
 
 export type ShortcutId = keyof typeof SHORTCUTS

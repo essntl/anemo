@@ -8,6 +8,7 @@ import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/cn'
+import { plural, t } from '@/lib/i18n'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
 import { focusOnTask } from '@/features/focus/focusOnTask'
@@ -35,8 +36,9 @@ const NEW_PROJECT = '__new__'
 
 /** Reminder choices plus the current value when it is not one of them (set by an agent). */
 function reminderOptions(current: string) {
-  if (REMINDER_OPTIONS.some((o) => o.value === current)) return REMINDER_OPTIONS
-  return [...REMINDER_OPTIONS, { value: current, label: `${current} minutes before` }]
+  const options = REMINDER_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))
+  if (REMINDER_OPTIONS.some((o) => o.value === current)) return options
+  return [...options, { value: current, label: plural(Number(current), '{n} minute before', '{n} minutes before') }]
 }
 
 interface TaskDialogProps {
@@ -86,7 +88,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
 
   const chooseProject = async (value: string) => {
     if (value !== NEW_PROJECT) return setProjectId(value)
-    const name = await promptDialog({ title: 'New project', label: 'Name', confirmLabel: 'Create' })
+    const name = await promptDialog({ title: t('New project'), label: t('Name'), confirmLabel: t('Create') })
     if (!name) return
     const project = await saveProject.mutateAsync({ name, color: '#6b7280' }).catch(() => null)
     if (project) setProjectId(project.id)
@@ -134,7 +136,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
   }
   const confirmDelete = async () => {
     if (!task) return
-    const ok = await confirmDialog({ title: 'Delete this task?', message: task.title, confirmLabel: 'Delete', danger: true })
+    const ok = await confirmDialog({ title: t('Delete this task?'), message: task.title, confirmLabel: t('Delete'), danger: true })
     if (ok) remove.mutate(task.id, { onSuccess: onClose })
   }
 
@@ -148,61 +150,61 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
       <div className={cn('flex flex-col gap-5', wide && 'md:grid md:min-h-[min(68dvh,44rem)] md:grid-cols-[minmax(0,1fr)_18rem] md:gap-6')}>
         <div className="relative min-w-0">
         <div className={cn('flex flex-col gap-3', wide && 'md:absolute md:inset-0')}>
-          <input aria-label="Title" autoFocus={!task} value={title} maxLength={300} placeholder="What needs doing?"
+          <input aria-label={t('Title')} autoFocus={!task} value={title} maxLength={300} placeholder={t('What needs doing?')}
             onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && void save()}
             className="w-full bg-transparent text-xl font-semibold placeholder:font-medium placeholder:text-subtle focus:outline-none md:text-2xl" />
           {/* The status and the notes box are moved out by their own padding, so their text
               starts on the same line as the heading and the title above them. */}
           <div className="flex flex-wrap items-center gap-2 md:-ml-3">
-            <Select variant="pill" aria-label="Status" value={status} onValueChange={(v) => setStatus(v as TaskStatus)}
-              options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))} />
+            <Select variant="pill" aria-label={t('Status')} value={status} onValueChange={(v) => setStatus(v as TaskStatus)}
+              options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label: t(label) }))} />
             {parent && (
-              <button type="button" disabled={!openTask} onClick={() => openTask?.(parent)} title={`Subtask of “${parent.title}”`}
+              <button type="button" disabled={!openTask} onClick={() => openTask?.(parent)} title={t('Subtask of “{title}”', { title: parent.title })}
                 className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted enabled:hover:text-accent">
-                <CornerDownRight className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Subtask of {parent.title}</span>
+                <CornerDownRight className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{t('Subtask of {title}', { title: parent.title })}</span>
               </button>
             )}
-            {task?.created_by === 'agent' && <span className="text-[12px] text-muted">Added by an agent.</span>}
+            {task?.created_by === 'agent' && <span className="text-[12px] text-muted">{t('Added by an agent.')}</span>}
           </div>
           <div className="md:-ml-1"><ChecklistEditor items={checklist} onChange={setChecklist} /></div>
           {/* Stored as Markdown, like documents. An empty editor gives an empty text. */}
-          <RichEditor variant="notes" className="md:-ml-3 md:flex-1" label="Notes" initial={task?.description ?? ''} onOpenAppLink={openLink}
+          <RichEditor variant="notes" className="md:-ml-3 md:flex-1" label={t('Notes')} initial={task?.description ?? ''} onOpenAppLink={openLink}
             onChange={(markdown) => setDescription(markdown.trim() ? tidyMarkdown(markdown) : '')} />
         </div>
         </div>
 
-        <aside aria-label="Details" className={cn('flex flex-col gap-4', wide && 'md:border-l md:border-border md:pl-6')}>
-          <Field label="Due date">
+        <aside aria-label={t('Details')} className={cn('flex flex-col gap-4', wide && 'md:border-l md:border-border md:pl-6')}>
+          <Field label={t('Due date')}>
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </Field>
-          <Field label="Time (optional)">
+          <Field label={t('Time (optional)')}>
             <Input type="time" value={dueTime} disabled={!dueDate} onChange={(e) => setDueTime(e.target.value)} />
           </Field>
-          <Field label="Reminder" hint={dueDate && !dueTime ? 'Counted from 09:00 on the due day' : undefined}>
+          <Field label={t('Reminder')} hint={dueDate && !dueTime ? t('Counted from 09:00 on the due day') : undefined}>
             <Select value={remind} onValueChange={setRemind} disabled={!dueDate} options={reminderOptions(remind)} />
           </Field>
-          <Field label="Repeat" hint={repeat && dueDate ? 'Finishing it adds the next one' : undefined}>
+          <Field label={t('Repeat')} hint={repeat && dueDate ? t('Finishing it adds the next one') : undefined}>
             <Select value={dueDate ? repeat : ''} onValueChange={setRepeat} disabled={!dueDate} options={repeatOptions(repeat)} />
           </Field>
-          <Field label="Project">
+          <Field label={t('Project')}>
             <Select value={projectId} onValueChange={(v) => void chooseProject(v)}
               options={[
-                { value: '', label: 'No project' },
+                { value: '', label: t('No project') },
                 ...(projects.data ?? []).filter((p) => !p.archived || p.id === projectId).map((p) => ({ value: p.id, label: p.name })),
-                { value: NEW_PROJECT, label: 'New project…' },
+                { value: NEW_PROJECT, label: t('New project…') },
               ]} />
           </Field>
-          <Field label="Priority">
+          <Field label={t('Priority')}>
             <Select value={priority} onValueChange={setPriority}
-              options={PRIORITY_LABELS.map((label, i) => ({ value: String(i), label }))} />
+              options={PRIORITY_LABELS.map((label, i) => ({ value: String(i), label: t(label) }))} />
           </Field>
-          <Field label="Tags" hint="Comma-separated">
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="errands, phone" />
+          <Field label={t('Tags')} hint={t('Comma-separated')}>
+            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder={t('errands, phone')} />
           </Field>
-          <Field label="Subtask of" hint={hasSubtasks ? 'It has subtasks of its own, so it can’t be one.' : undefined}>
-            <Select value={parentId} onValueChange={setParentId} disabled={hasSubtasks} aria-label="Subtask of"
+          <Field label={t('Subtask of')} hint={hasSubtasks ? t('It has subtasks of its own, so it can’t be one.') : undefined}>
+            <Select value={parentId} onValueChange={setParentId} disabled={hasSubtasks} aria-label={t('Subtask of')}
               options={[
-                { value: '', label: 'Not a subtask' },
+                { value: '', label: t('Not a subtask') },
                 // The current parent stays listed even when it is finished.
                 ...[...(parent && !parents.includes(parent) ? [parent] : []), ...parents].map((p) => ({ value: p.id, label: p.title })),
               ]} />
@@ -212,10 +214,10 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
           )}
           <BlockedByEditor task={task} all={all} blockedBy={blockedBy} onChange={setBlockedBy} onOpen={openTask} />
           <TaskAttachments taskId={task?.id ?? null} projectId={projectId || null} />
-          <BacklinkList title="Linked from" links={backlinks.data} />
+          <BacklinkList title={t('Linked from')} links={backlinks.data} />
           {task && status !== 'done' && status !== 'cancelled' && (
             <Button variant="secondary" icon={<Timer className="h-4 w-4" />} onClick={() => focusOnTask(task)}>
-              Focus on this
+              {t('Focus on this')}
             </Button>
           )}
           {error && <p className="text-[12.5px] text-error">{errorMessage(error)}</p>}
@@ -226,12 +228,12 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
             {task && (
               <Button variant="ghost" className="mr-auto" icon={<Trash2 className="h-4 w-4" />} loading={remove.isPending}
                 onClick={() => void confirmDelete()}>
-                Delete
+                {t('Delete')}
               </Button>
             )}
-            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
             <Button variant="primary" loading={pending} disabled={!title.trim()} onClick={() => void save()}>
-              {task ? 'Save' : 'Add task'}
+              {task ? t('Save') : t('Add task')}
             </Button>
           </div>
         </aside>
@@ -240,14 +242,14 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
   if (panel) {
     return (
       // Not modal: the list beside it stays in use. Esc closes it, as it closes the dialog.
-      <aside role="dialog" aria-label={task ? 'Task' : 'New task'}
+      <aside role="dialog" aria-label={task ? t('Task') : t('New task')}
         onKeyDown={(e) => e.key === 'Escape' && !e.defaultPrevented && onClose()}
         className="flex h-full w-[27rem] shrink-0 flex-col overflow-y-auto rounded-panel border border-border bg-card px-5 pt-4 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold">{task ? 'Task' : 'New task'}</h2>
+          <h2 className="text-base font-semibold">{task ? t('Task') : t('New task')}</h2>
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-text">
             <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{t('Close')}</span>
           </button>
         </div>
         {body}
@@ -255,7 +257,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
     )
   }
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} className="max-md:pb-0 md:w-[min(96vw,1020px)]" title={task ? 'Task' : 'New task'}>
+    <Dialog open onOpenChange={(open) => !open && onClose()} className="max-md:pb-0 md:w-[min(96vw,1020px)]" title={task ? t('Task') : t('New task')}>
       {body}
     </Dialog>
   )

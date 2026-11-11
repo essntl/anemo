@@ -4,6 +4,7 @@ import { Logo } from '@/components/ui/Logo'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
+import { t } from '@/lib/i18n'
 import { useLogin, useMe } from './api'
 
 export function LoginPage() {
@@ -32,11 +33,11 @@ export function LoginPage() {
         <div className="mb-6 flex flex-col items-center text-center">
           <Logo className="mb-2 h-14 w-14 text-accent" />
           <h1 className="text-lg font-semibold">Anemo</h1>
-          <p className="text-[13px] text-muted">Sign in to continue</p>
+          <p className="text-[13px] text-muted">{t('Sign in to continue')}</p>
         </div>
 
         <div className="flex flex-col gap-4">
-          <Field label="Username">
+          <Field label={t('Username')}>
             <Input
               autoFocus
               autoComplete="username"
@@ -44,7 +45,7 @@ export function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
             />
           </Field>
-          <Field label="Password">
+          <Field label={t('Password')}>
             <Input
               type="password"
               autoComplete="current-password"
@@ -64,7 +65,7 @@ export function LoginPage() {
             loading={login.isPending}
             disabled={!username || !password}
           >
-            Sign in
+            {t('Sign in')}
           </Button>
         </div>
       </form>

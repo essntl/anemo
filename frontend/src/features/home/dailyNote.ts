@@ -8,6 +8,7 @@
  * Every change is a function from the current text to the new one, so a change can
  * be applied again on top of a newer version when the file changed elsewhere.
  */
+import { dateLocale } from '@/lib/i18n'
 
 export interface Note {
   /** Position among the notes (0 = first). */
@@ -129,5 +130,5 @@ export function shiftDay(day: string, by: number): string {
 /** "Thu 5 Nov" for the widget's header. */
 export function shortDay(day: string): string {
   const [y, m, d] = day.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 }

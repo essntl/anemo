@@ -1,5 +1,6 @@
 import { toast } from '@/components/ui/toast'
 import type { RunEvent } from '@/features/chat/runStream'
+import { t } from '@/lib/i18n'
 import { deleteMemory } from './api'
 
 /**
@@ -12,10 +13,10 @@ export function noticeMemoryEvent(event: RunEvent, onChanged: () => void): void 
   const text = content.length > 90 ? `${content.slice(0, 90)}…` : content
   onChanged()
   toast({
-    message: `${action === 'created' ? 'Saved to memory' : 'Memory updated'}: ${text}`,
+    message: action === 'created' ? t('Saved to memory: {text}', { text }) : t('Memory updated: {text}', { text }),
     action:
       action === 'created'
-        ? { label: 'Undo', onClick: () => void deleteMemory(id).then(onChanged, onChanged) }
+        ? { label: t('Undo'), onClick: () => void deleteMemory(id).then(onChanged, onChanged) }
         : undefined,
   })
 }

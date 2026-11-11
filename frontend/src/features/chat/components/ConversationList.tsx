@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { useShiftHeld } from '@/hooks/useShiftHeld'
 import { cn } from '@/lib/cn'
 import { dayLabel } from '@/lib/format'
+import { t } from '@/lib/i18n'
 import { type Conversation, useConversations, useDeleteConversation } from '../api'
 import { useChatActions } from '../chatActions'
 import { formatRemaining, useNow } from '../remaining'
@@ -16,7 +17,7 @@ import { formatRemaining, useNow } from '../remaining'
 function TimeLeft({ expiresAt }: { expiresAt: string }) {
   const now = useNow(15_000)
   return (
-    <span className="shrink-0 text-[11px] tabular-nums text-subtle group-hover:invisible" title="Deleted unless you keep it">
+    <span className="shrink-0 text-[11px] tabular-nums text-subtle group-hover:invisible" title={t('Deleted unless you keep it')}>
       {formatRemaining(new Date(expiresAt).getTime() - now, 'short')}
     </span>
   )
@@ -28,7 +29,7 @@ function QuickDelete({ conv }: { conv: Conversation }) {
   const navigate = useNavigate()
   const open = useMatch(`/c/${conv.id}`) !== null
   return (
-    <button type="button" aria-label={`Delete ${conv.title} now`} title="Delete now (Shift is held)"
+    <button type="button" aria-label={t('Delete {title} now', { title: conv.title })} title={t('Delete now (Shift is held)')}
       disabled={remove.isPending}
       onClick={() =>
         void remove.mutateAsync(conv.id).then(
@@ -71,7 +72,7 @@ function Item({ conv, quickDelete }: { conv: Conversation; quickDelete: boolean 
         <QuickDelete conv={conv} />
       ) : (
         // Hover (or keyboard focus) reveals the menu; touch screens always show it.
-        <ActionMenu actions={actions} label={`Actions for ${conv.title}`}
+        <ActionMenu actions={actions} label={t('Actions for {title}', { title: conv.title })}
           className="absolute right-0 top-0 h-9 w-9 opacity-0 focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:opacity-100" />
       )}
     </div>
@@ -86,9 +87,9 @@ type Group = { label: string; kind?: 'temporary' | 'favorites'; chats: Conversat
 function groupChats(all: Conversation[]): Group[] {
   const groups: Group[] = []
   const temporary = all.filter((c) => c.temporary)
-  if (temporary.length) groups.push({ label: 'Temporary', kind: 'temporary', chats: temporary })
+  if (temporary.length) groups.push({ label: t('Temporary'), kind: 'temporary', chats: temporary })
   const favorites = all.filter((c) => c.pinned && !c.temporary)
-  if (favorites.length) groups.push({ label: 'Favorites', kind: 'favorites', chats: favorites })
+  if (favorites.length) groups.push({ label: t('Favorites'), kind: 'favorites', chats: favorites })
   for (const chat of all.filter((c) => !c.pinned && !c.temporary)) {
     const label = dayLabel(chat.last_message_at)
     const last = groups[groups.length - 1]
@@ -114,7 +115,7 @@ export function ConversationList() {
 
   return (
     <div className="mt-3 flex min-h-0 flex-1 flex-col">
-      <div aria-label="Chats" className="group/list min-h-0 flex-1 overflow-y-auto">
+      <div aria-label={t('Chats')} className="group/list min-h-0 flex-1 overflow-y-auto">
         {groups.map((group) => (
           <section key={group.label}>
             <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-text/75">
@@ -126,7 +127,7 @@ export function ConversationList() {
         ))}
         {conversations.data && all.length === 0 && (
           <p className="px-3 py-2 text-[12px] text-subtle">
-            {scope.kind === 'project' ? `No chats in ${scope.project.name} yet.` : scope.kind === 'uncategorized' ? 'No chats outside a project yet.' : 'No chats yet.'}
+            {scope.kind === 'project' ? t('No chats in {name} yet.', { name: scope.project.name }) : scope.kind === 'uncategorized' ? t('No chats outside a project yet.') : t('No chats yet.')}
           </p>
         )}
       </div>

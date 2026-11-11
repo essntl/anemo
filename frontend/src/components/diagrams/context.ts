@@ -1,4 +1,5 @@
 import { createContext } from 'react'
+import { t } from '@/lib/i18n'
 
 export interface DiagramProblem {
   kind: 'mermaid' | 'chart'
@@ -14,12 +15,14 @@ export const DiagramFixContext = createContext<((problem: DiagramProblem) => voi
 
 /** The message sent for "Fix diagram". */
 export function fixRequest({ kind, source, error }: DiagramProblem): string {
-  const what = kind === 'chart' ? 'chart' : 'Mermaid diagram'
-  const firstLine = source.trim().split('\n')[0]?.slice(0, 80) ?? ''
-  return (
-    `The ${what} in your answer can't be drawn` +
-    (firstLine ? ` (it starts with \`${firstLine.replace(/`/g, "'")}\`)` : '') +
-    `. The error was:\n\n> ${error.split('\n').join('\n> ')}\n\n` +
-    `Please send the whole ${kind === 'chart' ? 'chart' : 'diagram'} again, corrected.`
-  )
+  const start = (source.trim().split('\n')[0]?.slice(0, 80) ?? '').replace(/`/g, "'")
+  const quoted = error.split('\n').join('\n> ')
+  if (kind === 'chart') {
+    return start
+      ? t("The chart in your answer can't be drawn (it starts with `{start}`). The error was:\n\n> {error}\n\nPlease send the whole chart again, corrected.", { start, error: quoted })
+      : t("The chart in your answer can't be drawn. The error was:\n\n> {error}\n\nPlease send the whole chart again, corrected.", { error: quoted })
+  }
+  return start
+    ? t("The Mermaid diagram in your answer can't be drawn (it starts with `{start}`). The error was:\n\n> {error}\n\nPlease send the whole diagram again, corrected.", { start, error: quoted })
+    : t("The Mermaid diagram in your answer can't be drawn. The error was:\n\n> {error}\n\nPlease send the whole diagram again, corrected.", { error: quoted })
 }

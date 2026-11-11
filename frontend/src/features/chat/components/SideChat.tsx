@@ -10,6 +10,7 @@ import { pendingQuestion } from '@/features/agents/question'
 import { useShellOutput } from '@/features/agents/shellOutput'
 import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
 import { useResumeRun } from '@/features/runs/api'
+import { t } from '@/lib/i18n'
 import {
   type ChatMessage,
   type Conversation,
@@ -192,10 +193,10 @@ function Thread({ conversationId, onRestart, onGone, prepare = same, display = s
       // Directly under the panel's tabs, and outside what scrolls: no message shows above it.
       <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border pl-3 pr-1.5">
         <span className="min-w-0 flex-1 truncate text-[12px] text-muted" title={conversation.data?.title}>{conversation.data?.title}</span>
-        <Link to={`/c/${conversationId}`} aria-label="Open as a full chat" title="Open as a full chat" className={HEAD_BUTTON}>
+        <Link to={`/c/${conversationId}`} aria-label={t('Open as a full chat')} title={t('Open as a full chat')} className={HEAD_BUTTON}>
           <Maximize2 className="h-3.5 w-3.5" />
         </Link>
-        <button type="button" aria-label="Start a new chat" title="Start a new chat (this one stays in your chats)" onClick={onRestart} className={HEAD_BUTTON}>
+        <button type="button" aria-label={t('Start a new chat')} title={t('Start a new chat (this one stays in your chats)')} onClick={onRestart} className={HEAD_BUTTON}>
           <SquarePen className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -207,7 +208,7 @@ function Thread({ conversationId, onRestart, onGone, prepare = same, display = s
         <Composer
           running={Boolean(activeRunId) && !paused && !question}
           autoFocus={false}
-          placeholder={question ? 'Answer the agent’s question…' : paused ? 'Paused. Send a message to resume with it…' : placeholder}
+          placeholder={question ? t('Answer the agent’s question…') : paused ? t('Paused. Send a message to resume with it…') : placeholder}
           conversationId={conversationId}
           skills={!question && !paused}
           filesOnly={!question && !paused}

@@ -3,17 +3,18 @@
  * they can be tested without a page.
  */
 import type { Schemas } from '@/api/client'
+import { msg } from '@/lib/i18n'
 
 type Model = Schemas['ModelOut']
 type ModelDefaults = Schemas['ModelDefaults']
 export type StepId = NonNullable<Schemas['SetupSettings']['step']>
 
 export const STEPS: { id: StepId; title: string; optional: boolean }[] = [
-  { id: 'provider', title: 'Model provider', optional: false },
-  { id: 'models', title: 'Helper models', optional: true },
-  { id: 'you', title: 'You', optional: false },
-  { id: 'parts', title: 'Optional parts', optional: true },
-  { id: 'notifications', title: 'Notifications', optional: true },
+  { id: 'provider', title: msg('Model provider'), optional: false },
+  { id: 'models', title: msg('Helper models'), optional: true },
+  { id: 'you', title: msg('You'), optional: false },
+  { id: 'parts', title: msg('Optional parts'), optional: true },
+  { id: 'notifications', title: msg('Notifications'), optional: true },
 ]
 
 /** Where the setup starts: where it was left, or at the beginning. */

@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { Loader2, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react'
 import { Slider } from '@/components/ui/Slider'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { spring } from '@/lib/motion'
 import { useSettings } from '@/features/settings/api'
 import { formatSeconds } from '../format'
@@ -46,7 +47,7 @@ function Waveform({ seed, progress }: { seed: string | null; progress: number })
 export function LivePill() {
   return (
     <span className="flex items-center gap-1.5 rounded-full bg-live/12 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-live">
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live motion-reduce:animate-none" /> LIVE
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live motion-reduce:animate-none" /> {t('LIVE')}
     </span>
   )
 }
@@ -57,9 +58,9 @@ export function SeekBar({ className }: { className?: string }) {
   if (p.track?.live) return <div className={cn('flex justify-center', className)}><LivePill /></div>
   return (
     <div className={className}>
-      <Slider label="Seek" commit="release" value={p.position} max={Math.max(1, p.duration)} step={1}
+      <Slider label={t('Seek')} commit="release" value={p.position} max={Math.max(1, p.duration)} step={1}
         disabled={!p.duration} onChange={player.seek}
-        valueText={(v) => `${formatSeconds(v)} of ${formatSeconds(p.duration)}`} />
+        valueText={(v) => t('{position} of {duration}', { position: formatSeconds(v), duration: formatSeconds(p.duration) })} />
       <div className="mt-0.5 flex justify-between text-[11px] font-medium text-muted tabular-nums">
         <span>{formatSeconds(p.position)}</span>
         <span>{formatSeconds(p.duration)}</span>
@@ -73,11 +74,11 @@ export function VolumeControl({ className }: { className?: string }) {
   const Icon = p.volume === 0 ? VolumeX : p.volume < 0.5 ? Volume1 : Volume2
   return (
     <div className={cn('flex items-center gap-2 text-muted', className)}>
-      <button type="button" aria-label={p.volume ? 'Mute' : 'Unmute'} onClick={player.toggleMute}
+      <button type="button" aria-label={p.volume ? t('Mute') : t('Unmute')} onClick={player.toggleMute}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-surface-hover hover:text-text pointer-coarse:h-11 pointer-coarse:w-11">
         <Icon className="h-4 w-4" />
       </button>
-      <Slider label="Volume" className="flex-1" value={p.volume} onChange={player.setVolume} valueText={(v) => `${Math.round(v * 100)}%`} />
+      <Slider label={t('Volume')} className="flex-1" value={p.volume} onChange={player.setVolume} valueText={(v) => `${Math.round(v * 100)}%`} />
     </div>
   )
 }
@@ -93,7 +94,7 @@ export function NowPlayingCard({ onYouTubeCheck }: { onYouTubeCheck: () => void 
   return (
     // A panel in the track's own hue, with light controls on it: inside it the dark theme's
     // tokens apply (data-theme), so sliders and text keep their contrast in both themes.
-    <section data-theme="dark" aria-label="Now playing" style={{ backgroundImage: trackGradient(seed) }}
+    <section data-theme="dark" aria-label={t('Now playing')} style={{ backgroundImage: trackGradient(seed) }}
       className="relative flex flex-col justify-center overflow-hidden rounded-panel p-5 text-white shadow-float md:p-7 lg:min-h-[min(42rem,calc(100dvh-7rem))]">
       {/* Settings > Music: the cover, blurred, deepens the colour. Off, the gradient is all there is to paint. */}
       {blur && p.track?.artwork && (
@@ -105,9 +106,9 @@ export function NowPlayingCard({ onYouTubeCheck }: { onYouTubeCheck: () => void 
           <Artwork track={p.track} className="h-full w-full bg-white/10 [&_svg]:text-white/50" />
         </motion.div>
         <div className="mt-5 min-h-[52px] text-center">
-          <h2 className="line-clamp-2 text-[24px] font-bold leading-tight tracking-tight md:text-[28px]">{p.track?.title ?? 'Nothing playing'}</h2>
+          <h2 className="line-clamp-2 text-[24px] font-bold leading-tight tracking-tight md:text-[28px]">{p.track?.title ?? t('Nothing playing')}</h2>
           <p className="mt-0.5 truncate text-[14px] text-white/75">
-            {p.track ? p.track.artist || SOURCE_LABEL[p.track.source] : 'Paste a link to start'}
+            {p.track ? p.track.artist || t(SOURCE_LABEL[p.track.source]) : t('Paste a link to start')}
           </p>
         </div>
 
@@ -115,22 +116,22 @@ export function NowPlayingCard({ onYouTubeCheck }: { onYouTubeCheck: () => void 
         <SeekBar className="mt-2" />
 
         <div className="mx-auto mt-3 flex max-w-sm items-center justify-between">
-          <ModeToggle label={p.shuffle ? 'Shuffle on' : 'Shuffle off'} active={p.shuffle} onClick={player.toggleShuffle}>
+          <ModeToggle label={p.shuffle ? t('Shuffle on') : t('Shuffle off')} active={p.shuffle} onClick={player.toggleShuffle}>
             <Shuffle />
           </ModeToggle>
-          <button type="button" aria-label="Previous" className={iconButton} onClick={player.prev} disabled={empty}>
+          <button type="button" aria-label={t('Previous')} className={iconButton} onClick={player.prev} disabled={empty}>
             <SkipBack fill="currentColor" />
           </button>
-          <button type="button" onClick={player.toggle} disabled={empty} aria-label={p.playing ? 'Pause' : 'Play'}
+          <button type="button" onClick={player.toggle} disabled={empty} aria-label={p.playing ? t('Pause') : t('Play')}
             className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-white text-black shadow-[0_10px_24px_rgb(0_0_0/0.35)] transition-transform active:scale-95 disabled:opacity-40 motion-reduce:transition-none">
             {p.status === 'buffering' ? <Loader2 className="h-6 w-6 animate-spin" />
               : p.playing ? <Pause className="h-7 w-7" fill="currentColor" />
               : <Play className="h-7 w-7 translate-x-0.5" fill="currentColor" />}
           </button>
-          <button type="button" aria-label="Next" className={iconButton} onClick={player.next} disabled={empty}>
+          <button type="button" aria-label={t('Next')} className={iconButton} onClick={player.next} disabled={empty}>
             <SkipForward fill="currentColor" />
           </button>
-          <ModeToggle label={REPEAT_LABEL[p.repeat]} active={p.repeat !== 'off'} onClick={player.cycleRepeat}>
+          <ModeToggle label={t(REPEAT_LABEL[p.repeat])} active={p.repeat !== 'off'} onClick={player.cycleRepeat}>
             <RepeatIcon />
           </ModeToggle>
         </div>
@@ -142,7 +143,7 @@ export function NowPlayingCard({ onYouTubeCheck }: { onYouTubeCheck: () => void 
             <p>{p.error}</p>
             {p.track?.source === 'youtube' && (
               <button type="button" onClick={onYouTubeCheck} className="mt-1 font-semibold underline underline-offset-2">
-                Run a YouTube check
+                {t('Run a YouTube check')}
               </button>
             )}
           </div>

@@ -10,6 +10,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { Lingering } from '@/components/ui/Lingering'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { STATUS_LABELS, type Task, useCreateTask } from '../api'
 import { type ChecklistItem, blockerCandidates, checklistProgress, isOpen, newItem, subtasksOf, waitingOn } from '../relations'
 import { useToggleDone } from '../useToggleDone'
@@ -56,22 +57,22 @@ export function ChecklistEditor({ items, onChange }: { items: ChecklistItem[]; o
   }
 
   return (
-    <section aria-label="Checklist" className="shrink-0">
+    <section aria-label={t('Checklist')} className="shrink-0">
       {progress && (
         <div className="mb-1 flex items-center gap-1.5 text-[12px] text-muted">
-          <ListChecks className="h-3.5 w-3.5" /> Checklist <span className="tabular-nums">{progress.done}/{progress.total}</span>
+          <ListChecks className="h-3.5 w-3.5" /> {t('Checklist')} <span className="tabular-nums">{progress.done}/{progress.total}</span>
         </div>
       )}
       <ul className="flex max-h-56 flex-col overflow-y-auto">
         {items.map((item) => (
           <li key={item.id} className="group flex items-center gap-2 rounded-control py-0.5 pr-1 hover:bg-surface-hover">
-            <Checkbox checked={item.done} aria-label={`Done: ${item.text || 'item'}`} onChange={(e) => set(item.id, { done: e.target.checked })} />
-            <input value={item.text} maxLength={500} aria-label="Checklist item"
+            <Checkbox checked={item.done} aria-label={t('Done: {item}', { item: item.text || t('item') })} onChange={(e) => set(item.id, { done: e.target.checked })} />
+            <input value={item.text} maxLength={500} aria-label={t('Checklist item')}
               onChange={(e) => set(item.id, { text: e.target.value })} onKeyDown={(e) => onItemKey(e, item)}
               // An item emptied and left: it goes (the server refuses empty ones).
               onBlur={() => item.text.trim() === '' && remove(item.id)}
               className={cn('h-7 min-w-0 flex-1 bg-transparent text-[13.5px] focus:outline-none', item.done && 'text-muted line-through')} />
-            <button type="button" aria-label={`Remove “${item.text}”`} title="Remove" onClick={() => remove(item.id)}
+            <button type="button" aria-label={t('Remove “{title}”', { title: item.text })} title={t('Remove')} onClick={() => remove(item.id)}
               className={cn(iconButton, 'h-6 w-6 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100')}>
               <X className="h-3.5 w-3.5" />
             </button>
@@ -80,8 +81,8 @@ export function ChecklistEditor({ items, onChange }: { items: ChecklistItem[]; o
       </ul>
       <div className="flex items-center gap-2 py-0.5">
         <Plus className="mx-[1px] h-4 w-4 shrink-0 text-subtle" />
-        <input ref={addField} value={draft} maxLength={500} placeholder={items.length ? 'Add an item' : 'Add a checklist item'}
-          aria-label="Add a checklist item" onChange={(e) => setDraft(e.target.value)}
+        <input ref={addField} value={draft} maxLength={500} placeholder={items.length ? t('Add an item') : t('Add a checklist item')}
+          aria-label={t('Add a checklist item')} onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
@@ -100,7 +101,7 @@ function DoneButton({ task }: { task: Task }) {
   const { toggle } = useToggleDone()
   const done = task.status === 'done'
   return (
-    <button type="button" role="checkbox" aria-checked={done} aria-label={done ? `Reopen “${task.title}”` : `Complete “${task.title}”`}
+    <button type="button" role="checkbox" aria-checked={done} aria-label={done ? t('Reopen “{title}”', { title: task.title }) : t('Complete “{title}”', { title: task.title })}
       onClick={() => void toggle(task)}
       className={cn('flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors pointer-coarse:h-6 pointer-coarse:w-6',
         done ? 'border-success bg-success text-white' : 'border-border-strong hover:border-accent')}>
@@ -115,7 +116,7 @@ function RelatedTask({ task, onOpen, children }: { task: Task; onOpen?: (task: T
   return (
     <li className="group flex items-center gap-2 rounded-control px-1 py-1 hover:bg-surface-hover">
       {children}
-      <button type="button" disabled={!onOpen} onClick={() => onOpen?.(task)} title={onOpen ? 'Open' : undefined}
+      <button type="button" disabled={!onOpen} onClick={() => onOpen?.(task)} title={onOpen ? t('Open') : undefined}
         className={cn('min-w-0 flex-1 truncate text-left text-[13px] enabled:hover:text-accent', finished && 'text-muted line-through')}>
         {task.title}
       </button>
@@ -145,12 +146,12 @@ export function SubtaskList({ task, all, projectId, tags, onOpen }: {
   }
 
   return (
-    <section aria-label="Subtasks">
-      <Heading icon={<ListTree />} title="Subtasks">
+    <section aria-label={t('Subtasks')}>
+      <Heading icon={<ListTree />} title={t('Subtasks')}>
         {subtasks.length > 0 && <span className="text-[12px] tabular-nums text-muted">{done}/{subtasks.length}</span>}
       </Heading>
       {!task ? (
-        <p className="text-[12.5px] text-muted">Add the task first, then add subtasks to it.</p>
+        <p className="text-[12.5px] text-muted">{t('Add the task first, then add subtasks to it.')}</p>
       ) : (
         <>
           <ul className="flex flex-col">
@@ -160,7 +161,7 @@ export function SubtaskList({ task, all, projectId, tags, onOpen }: {
           </ul>
           <div className="flex items-center gap-2 px-1 py-0.5">
             <Plus className="h-4 w-4 shrink-0 text-subtle" />
-            <input value={draft} maxLength={300} placeholder="Add a subtask" aria-label="Add a subtask"
+            <input value={draft} maxLength={300} placeholder={t('Add a subtask')} aria-label={t('Add a subtask')}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -195,23 +196,23 @@ export function BlockedByEditor({ task, all, blockedBy, onChange, onOpen }: {
   const stillOpen = chosen.filter(isOpen).length
 
   return (
-    <section aria-label="Waits on">
-      <Heading icon={<Lock />} title="Waits on">
-        <button type="button" aria-label="Choose a task it waits on" title="Choose a task it waits on" onClick={() => setPicking(true)} className={iconButton}>
+    <section aria-label={t('Waits on')}>
+      <Heading icon={<Lock />} title={t('Waits on')}>
+        <button type="button" aria-label={t('Choose a task it waits on')} title={t('Choose a task it waits on')} onClick={() => setPicking(true)} className={iconButton}>
           <Plus className="h-4 w-4" />
         </button>
       </Heading>
       {chosen.length === 0 ? (
-        <p className="text-[12.5px] text-muted">Nothing. Add the tasks that have to be done first.</p>
+        <p className="text-[12.5px] text-muted">{t('Nothing. Add the tasks that have to be done first.')}</p>
       ) : (
         <>
           <ul className="flex flex-col">
-            {chosen.map((t) => (
-              <RelatedTask key={t.id} task={t} onOpen={onOpen}>
-                <span className={cn('h-2 w-2 shrink-0 rounded-full', isOpen(t) ? 'bg-warning' : 'bg-success')}
-                  title={STATUS_LABELS[t.status]} aria-label={STATUS_LABELS[t.status]} />
-                <button type="button" aria-label={`Stop waiting on “${t.title}”`} title="Remove"
-                  onClick={() => onChange(blockedBy.filter((id) => id !== t.id))}
+            {chosen.map((other) => (
+              <RelatedTask key={other.id} task={other} onOpen={onOpen}>
+                <span className={cn('h-2 w-2 shrink-0 rounded-full', isOpen(other) ? 'bg-warning' : 'bg-success')}
+                  title={t(STATUS_LABELS[other.status])} aria-label={t(STATUS_LABELS[other.status])} />
+                <button type="button" aria-label={t('Stop waiting on “{title}”', { title: other.title })} title={t('Remove')}
+                  onClick={() => onChange(blockedBy.filter((id) => id !== other.id))}
                   className={cn(iconButton, 'order-last h-6 w-6 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100')}>
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -219,13 +220,13 @@ export function BlockedByEditor({ task, all, blockedBy, onChange, onOpen }: {
             ))}
           </ul>
           <p className="mt-0.5 text-[12px] text-muted">
-            {stillOpen ? 'Blocked while any of these is open.' : 'All done: nothing blocks it.'}
+            {stillOpen ? t('Blocked while any of these is open.') : t('All done: nothing blocks it.')}
           </p>
         </>
       )}
       {blocks.length > 0 && (
         <div className="mt-3">
-          <h4 className="mb-1 text-[12px] font-medium text-muted">Blocks</h4>
+          <h4 className="mb-1 text-[12px] font-medium text-muted">{t('Blocks')}</h4>
           <ul className="flex flex-col">
             {blocks.map((t) => <RelatedTask key={t.id} task={t} onOpen={onOpen} />)}
           </ul>
@@ -233,7 +234,7 @@ export function BlockedByEditor({ task, all, blockedBy, onChange, onOpen }: {
       )}
       <Lingering value={picking || null}>
         {() => (
-          <TaskPickerDialog title="Waits on" description="The task is blocked while any task it waits on is open."
+          <TaskPickerDialog title={t('Waits on')} description={t('The task is blocked while any task it waits on is open.')}
             tasks={blockerCandidates(all, task?.id ?? null, blockedBy)}
             onPick={(t) => onChange([...blockedBy, t.id])} onClose={() => setPicking(false)} />
         )}
@@ -257,21 +258,21 @@ export function TaskPickerDialog({ title, description, tasks, onPick, onClose }:
   const shown = tasks.filter((t) => !q || t.title.toLowerCase().includes(q)).slice(0, MAX_SHOWN)
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} title={title} description={description} className="md:w-[min(92vw,480px)]">
-      <Input value={search} autoFocus placeholder="Search tasks…" aria-label="Search tasks" onChange={(e) => setSearch(e.target.value)} />
+      <Input value={search} autoFocus placeholder={t('Search tasks…')} aria-label={t('Search tasks')} onChange={(e) => setSearch(e.target.value)} />
       <ul className="mt-3 max-h-[45dvh] overflow-y-auto rounded-control border border-border" role="listbox" aria-label={title}>
-        {shown.length === 0 && <li className="p-4 text-[13px] text-muted">{tasks.length ? 'Nothing matches.' : 'No other tasks to choose.'}</li>}
-        {shown.map((t) => (
-          <li key={t.id}>
+        {shown.length === 0 && <li className="p-4 text-[13px] text-muted">{tasks.length ? t('Nothing matches.') : t('No other tasks to choose.')}</li>}
+        {shown.map((task) => (
+          <li key={task.id}>
             <button type="button" role="option" aria-selected={false}
               onClick={() => {
-                onPick(t)
+                onPick(task)
                 onClose()
               }}
               className="flex w-full items-center gap-3 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-surface-hover">
               <CheckSquare className="h-4 w-4 shrink-0 text-muted" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13.5px] font-medium">{t.title}</span>
-                <span className="block truncate text-[11.5px] text-muted">{STATUS_LABELS[t.status]}</span>
+                <span className="block truncate text-[13.5px] font-medium">{task.title}</span>
+                <span className="block truncate text-[11.5px] text-muted">{t(STATUS_LABELS[task.status])}</span>
               </span>
             </button>
           </li>

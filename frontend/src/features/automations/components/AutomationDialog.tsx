@@ -14,20 +14,21 @@ import { browserTimeZone } from '@/features/calendar/api'
 import { useDestinations } from '@/features/notifications/api'
 import { useProfiles } from '@/features/profiles/api'
 import { useModels } from '@/features/providers/api'
+import { msg, rich, t } from '@/lib/i18n'
 import { type Automation, type NotifyWhen, type OnAsk, useSaveAutomation, useSchedulePreview } from '../api'
 import { defaultForm, fromSchedule, toSchedule } from '../scheduleForm'
 import type { AutomationTemplate } from '../templates'
 import { ScheduleFields } from './ScheduleFields'
 
 const ON_ASK_OPTIONS: { value: OnAsk; label: string }[] = [
-  { value: 'pause', label: 'Wait for me, and notify me' },
-  { value: 'deny', label: 'Skip that action and carry on' },
-  { value: 'fail', label: 'Stop the run' },
+  { value: 'pause', label: msg('Wait for me, and notify me') },
+  { value: 'deny', label: msg('Skip that action and carry on') },
+  { value: 'fail', label: msg('Stop the run') },
 ]
 const NOTIFY_OPTIONS: { value: NotifyWhen; label: string }[] = [
-  { value: 'always', label: 'Every result' },
-  { value: 'on_failure', label: 'Only when it fails' },
-  { value: 'never', label: 'Never' },
+  { value: 'always', label: msg('Every result') },
+  { value: 'on_failure', label: msg('Only when it fails') },
+  { value: 'never', label: msg('Never') },
 ]
 
 function Section({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
@@ -90,78 +91,78 @@ export function AutomationDialog({ automation, template, onClose }: { automation
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(94vw,640px)]"
-      title={automation ? `Edit “${automation.name}”` : 'New automation'}
-      description="An agent does this by itself, on a schedule."
+      title={automation ? t('Edit “{name}”', { name: automation.name }) : t('New automation')}
+      description={t('An agent does this by itself, on a schedule.')}
       footer={
         <>
           {save.isError && <span className="mr-auto self-center text-[12.5px] text-error">{errorMessage(save.error)}</span>}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={save.isPending} disabled={!valid} onClick={submit}>
-            {automation ? 'Save' : 'Create automation'}
+            {automation ? t('Save') : t('Create automation')}
           </Button>
         </>
       }>
       <div className="flex flex-col gap-4">
-        <Field label="Name">
-          <Input value={name} maxLength={120} placeholder="e.g. Morning news" autoFocus={!automation}
+        <Field label={t('Name')}>
+          <Input value={name} maxLength={120} placeholder={t('e.g. Morning news')} autoFocus={!automation}
             onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="What should it do?" hint="Written like a message to the agent. It cannot ask you questions, so say everything it needs.">
+        <Field label={t('What should it do?')} hint={t('Written like a message to the agent. It cannot ask you questions, so say everything it needs.')}>
           <Textarea rows={5} value={prompt} maxLength={50_000}
-            placeholder="Search for today's news about open-source AI and give me the five most important stories, each with a link."
+            placeholder={t("Search for today's news about open-source AI and give me the five most important stories, each with a link.")}
             onChange={(e) => setPrompt(e.target.value)} />
         </Field>
         <ScheduleFields form={schedule} onChange={setSchedule} tz={tz} preview={preview} />
       </div>
 
-      <Section title="Agent"
-        hint={<>What it may do without asking comes from the profile’s permissions (<Link to="/settings/permissions" className="text-accent underline">Agent Permissions</Link>).</>}>
+      <Section title={t('Agent')}
+        hint={rich('What it may do without asking comes from the profile’s permissions (<a>Agent Permissions</a>).', { a: (c) => <Link to="/settings/permissions" className="text-accent underline">{c}</Link> })}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Profile">
+          <Field label={t('Profile')}>
             <Select value={profileId} onValueChange={setProfileId}
-              options={[{ value: '', label: 'Default agent' }, ...(profiles.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
+              options={[{ value: '', label: t('Default agent') }, ...(profiles.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
           </Field>
-          <Field label="Model">
+          <Field label={t('Model')}>
             <Select value={modelId} onValueChange={setModelId}
-              options={[{ value: '', label: 'Default (profile or Settings)' }, ...usableModels.map((m) => ({ value: m.id, label: m.display_name }))]} />
+              options={[{ value: '', label: t('Default (profile or Settings)') }, ...usableModels.map((m) => ({ value: m.id, label: m.display_name }))]} />
           </Field>
-          <Field label="If an action needs my approval" hint="Nobody is there when it runs. It is never approved automatically.">
-            <Select value={onAsk} options={ON_ASK_OPTIONS} onValueChange={(v) => setOnAsk(v as OnAsk)} />
+          <Field label={t('If an action needs my approval')} hint={t('Nobody is there when it runs. It is never approved automatically.')}>
+            <Select value={onAsk} options={ON_ASK_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} onValueChange={(v) => setOnAsk(v as OnAsk)} />
           </Field>
-          <Field label="If a run fails" hint="For example when the model provider is down.">
+          <Field label={t('If a run fails')} hint={t('For example when the model provider is down.')}>
             <Select value={retries} onValueChange={setRetries}
               options={[
-                { value: '0', label: 'Do not retry' },
-                { value: '1', label: 'Retry once' },
-                { value: '2', label: 'Retry twice' },
-                { value: '3', label: 'Retry 3 times' },
+                { value: '0', label: t('Do not retry') },
+                { value: '1', label: t('Retry once') },
+                { value: '2', label: t('Retry twice') },
+                { value: '3', label: t('Retry 3 times') },
               ]} />
           </Field>
         </div>
       </Section>
 
-      <Section title="Result" hint="The agent’s final answer. Every run can also be opened from the automation’s history.">
+      <Section title={t('Result')} hint={t('The agent’s final answer. Every run can also be opened from the automation’s history.')}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Notify me">
-            <Select value={notify} options={NOTIFY_OPTIONS} onValueChange={(v) => setNotify(v as NotifyWhen)} />
+          <Field label={t('Notify me')}>
+            <Select value={notify} options={NOTIFY_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} onValueChange={(v) => setNotify(v as NotifyWhen)} />
           </Field>
-          <Field label="Save as a document (optional)" hint="A path in Documents. {date} and {time} are filled in; the same path is replaced.">
+          <Field label={t('Save as a document (optional)')} hint={t('A path in Documents. {date} and {time} are filled in; the same path is replaced.')}>
             <Input value={documentPath} maxLength={300} placeholder="briefings/{date}" spellCheck={false}
               onChange={(e) => setDocumentPath(e.target.value)} />
           </Field>
         </div>
         {notify !== 'never' && channels.length > 0 && (
           <fieldset className="mt-3">
-            <legend className="mb-1 text-[13px] font-medium">Besides the app, send to</legend>
+            <legend className="mb-1 text-[13px] font-medium">{t('Besides the app, send to')}</legend>
             <label className="flex items-center gap-2 rounded-control px-2 py-1.5 text-[13px] hover:bg-surface-hover">
               <input type="radio" name="destinations" className="accent-[var(--accent)]" checked={destinationIds === null}
                 onChange={() => setDestinationIds(null)} />
-              The channels and devices set to receive automation results
+              {t('The channels and devices set to receive automation results')}
             </label>
             <label className="flex items-center gap-2 rounded-control px-2 py-1.5 text-[13px] hover:bg-surface-hover">
               <input type="radio" name="destinations" className="accent-[var(--accent)]" checked={destinationIds !== null}
                 onChange={() => setDestinationIds([])} />
-              Only these:
+              {t('Only these:')}
             </label>
             {destinationIds !== null && (
               <div className="ml-6 flex flex-col">
@@ -170,8 +171,8 @@ export function AutomationDialog({ automation, template, onClose }: { automation
                     <input type="checkbox" className="accent-[var(--accent)]" checked={destinationIds.includes(c.id)}
                       onChange={(e) => setDestinationIds(e.target.checked ? [...destinationIds, c.id] : destinationIds.filter((id) => id !== c.id))} />
                     {c.name}
-                    {c.type === 'webpush' && <span className="text-subtle">· push</span>}
-                    {!c.enabled && <span className="text-subtle">(off)</span>}
+                    {c.type === 'webpush' && <span className="text-subtle">· {t('push')}</span>}
+                    {!c.enabled && <span className="text-subtle">{t('(off)')}</span>}
                   </label>
                 ))}
               </div>
@@ -180,8 +181,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
         )}
         {notify !== 'never' && destinations.isSuccess && channels.length === 0 && (
           <p className="mt-3 text-[12.5px] text-muted">
-            Notifications appear in the app. To also get them on your phone, turn on push notifications or add a Discord channel in{' '}
-            <Link to="/settings/notifications" className="text-accent underline">Settings</Link>.
+            {rich('Notifications appear in the app. To also get them on your phone, turn on push notifications or add a Discord channel in <a>Settings</a>.', { a: (c) => <Link to="/settings/notifications" className="text-accent underline">{c}</Link> })}
           </p>
         )}
       </Section>

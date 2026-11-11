@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
 import { withReauth } from '@/features/auth/reauthStore'
+import { msg } from '@/lib/i18n'
 
 export type McpServer = Schemas['McpServerOut']
 export type McpTool = Schemas['McpToolOut']
@@ -11,9 +12,9 @@ export type Risk = McpTool['risk']
 export const mcpKey = ['mcp'] as const
 
 export const RISK_LABELS: Record<Risk, string> = {
-  safe: 'Only reads',
-  moderate: 'Makes changes',
-  dangerous: 'Risky',
+  safe: msg('Only reads'),
+  moderate: msg('Makes changes'),
+  dangerous: msg('Risky'),
 }
 
 export function useMcpServers() {

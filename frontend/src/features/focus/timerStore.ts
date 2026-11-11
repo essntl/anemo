@@ -17,6 +17,7 @@ import { persist } from 'zustand/middleware'
 import { api } from '@/api/client'
 import { showDesktopNotification } from '@/features/notifications/desktop'
 import { islandAlert } from '@/features/island/alerts'
+import { msg, plural, t } from '@/lib/i18n'
 import { enqueueSession } from './outbox'
 import { type Chime, playSound } from './sounds'
 import { bindTimer, pushTimer } from './timerSync'
@@ -59,15 +60,15 @@ export function setPageOpener(fn: (path: string) => void): void {
 }
 
 const NOTICE: Record<Phase, (p: FocusPrefs) => { title: string; body: string }> = {
-  focus: (p) => ({ title: 'Break time', body: `Session complete. Enjoy ${p.shortBreakMinutes} minutes off.` }),
-  short_break: (p) => ({ title: 'Back to focus', body: `${p.focusMinutes} minutes on the clock.` }),
-  long_break: (p) => ({ title: 'Back to focus', body: `${p.focusMinutes} minutes on the clock.` }),
+  focus: (p) => ({ title: t('Break time'), body: plural(p.shortBreakMinutes, 'Session complete. Enjoy {n} minutes off.', 'Session complete. Enjoy {n} minutes off.') }),
+  short_break: (p) => ({ title: t('Back to focus'), body: plural(p.focusMinutes, '{n} minutes on the clock.', '{n} minutes on the clock.') }),
+  long_break: (p) => ({ title: t('Back to focus'), body: plural(p.focusMinutes, '{n} minutes on the clock.', '{n} minutes on the clock.') }),
 }
 
 function afterFinished(finished: Phase, next: TimerState, prefs: FocusPrefs): { title: string; body: string } {
   const notice =
     finished === 'focus' && next.phase === 'long_break'
-      ? { title: 'Long break', body: `Cycle complete. Enjoy ${prefs.longBreakMinutes} minutes off.` }
+      ? { title: t('Long break'), body: plural(prefs.longBreakMinutes, 'Cycle complete. Enjoy {n} minutes off.', 'Cycle complete. Enjoy {n} minutes off.') }
       : NOTICE[finished](prefs)
   playSound('chime', prefs.chime, prefs.chimeVolume)
   islandAlert({
@@ -116,16 +117,19 @@ function announce(text: string) {
   useTimerStore.setState({ announcement: text })
 }
 
+const STARTED: Record<Phase, string> = { focus: msg('Focus started'), short_break: msg('Short break started'), long_break: msg('Long break started') }
+const SKIPPED: Record<Phase, string> = { focus: msg('Skipped to focus'), short_break: msg('Skipped to short break'), long_break: msg('Skipped to long break') }
+
 export const timerActions = {
   start() {
     apply((t, _p, now) => timer.start(t, now))
-    const { prefs, timer: t } = useTimerStore.getState()
+    const { prefs, timer: state } = useTimerStore.getState()
     playSound('start', prefs.chime, prefs.chimeVolume)
-    announce(`${timer.PHASE_LABEL[t.phase]} started`)
+    announce(t(STARTED[state.phase]))
   },
   pause() {
     apply((t, _p, now) => timer.pause(t, now))
-    announce('Timer paused')
+    announce(t('Timer paused'))
   },
   toggle() {
     if (useTimerStore.getState().timer.status === 'running') timerActions.pause()
@@ -135,11 +139,11 @@ export const timerActions = {
     apply((t, p, now) => timer.reset(t, p, now))
     const { prefs } = useTimerStore.getState()
     playSound('reset', prefs.chime, prefs.chimeVolume)
-    announce('Timer reset')
+    announce(t('Timer reset'))
   },
   skip() {
     const { state } = apply((t, p, now) => timer.skip(t, p, now))
-    announce(`Skipped to ${timer.PHASE_LABEL[state.phase].toLowerCase()}`)
+    announce(t(SKIPPED[state.phase]))
   },
   addMinute() {
     apply((t, _p, now) => timer.addMinutes(t, 1, now))

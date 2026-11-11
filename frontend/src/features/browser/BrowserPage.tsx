@@ -7,6 +7,7 @@ import { Link, useParams } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import { DialogHost } from '@/components/ui/DialogHost'
 import { useConversation } from '@/features/chat/api'
+import { t } from '@/lib/i18n'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
 import { BrowserView } from './BrowserView'
 
@@ -18,7 +19,7 @@ export function BrowserPage() {
   const popup = window.opener !== null
   const title = conversation.data?.title
   useEffect(() => {
-    if (title) document.title = `Browser · ${title}`
+    if (title) document.title = t('Browser · {title}', { title })
   }, [title])
 
   return (
@@ -27,7 +28,7 @@ export function BrowserPage() {
         <Link to={`/c/${conversationId}`}
           className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border px-3 text-[14px] text-muted hover:text-text">
           <ArrowLeft className="h-4 w-4" />
-          <span className="min-w-0 truncate">Back to {conversation.data?.title ?? 'the chat'}</span>
+          <span className="min-w-0 truncate">{title === undefined ? t('Back to the chat') : t('Back to {title}', { title })}</span>
         </Link>
       )}
       <BrowserView conversationId={conversationId} className="min-h-0 flex-1" />

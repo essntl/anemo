@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
 import { withReauth } from '@/features/auth/reauthStore'
+import { msg } from '@/lib/i18n'
 import { deviceName, endpointHash, subscribeThisDevice, unsubscribeThisDevice } from './push'
 
 export type Notification = Schemas['NotificationOut']
@@ -12,11 +13,11 @@ export const destinationsKey = ['notification-destinations'] as const
 
 /** What a destination can receive, in the words used in Settings. */
 export const KIND_LABELS: Record<NotificationKind, string> = {
-  reminder: 'Reminders for tasks and events',
-  automation: 'Results of automations',
-  approval: 'An automation needs my approval, or an agent asks me something',
-  agent: 'Messages agents send me',
-  focus: 'The focus timer finished a phase',
+  reminder: msg('Reminders for tasks and events'),
+  automation: msg('Results of automations'),
+  approval: msg('An automation needs my approval, or an agent asks me something'),
+  agent: msg('Messages agents send me'),
+  focus: msg('The focus timer finished a phase'),
 }
 
 const PAGE = 30

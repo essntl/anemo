@@ -12,6 +12,7 @@ import { type Editor, EditorContent, useEditor } from '@tiptap/react'
 import { Lingering } from '@/components/ui/Lingering'
 import { isAppLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { uploadAsset } from '../api'
 import { editorExtensions } from '../editorExtensions'
 import { assetUrl } from '../markdown'
@@ -40,7 +41,7 @@ interface RichEditorProps {
   onOpenAppLink?: (path: string) => void
 }
 
-export function RichEditor({ initial, onChange, onError, variant = 'document', label = 'Document text', onOpenAppLink, className }: RichEditorProps) {
+export function RichEditor({ initial, onChange, onError, variant = 'document', label = t('Document text'), onOpenAppLink, className }: RichEditorProps) {
   const notes = variant === 'notes'
   const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -57,7 +58,7 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
         if (pos === undefined) chain?.insertContent(image).run()
         else chain?.insertContentAt(pos, image).run()
       } catch (err) {
-        onError?.(err instanceof Error ? err.message : 'The image could not be added')
+        onError?.(err instanceof Error ? err.message : t('The image could not be added'))
       }
     }
   }

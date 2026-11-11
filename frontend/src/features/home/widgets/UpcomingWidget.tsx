@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { CalendarClock } from 'lucide-react'
 import { inScope, useScope } from '@/app/projectStore'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { useOccurrencesIn } from '@/features/calendar/api'
 import { useTasks } from '@/features/tasks/api'
 import { addDays, dayOf, formatDay } from '@/features/tasks/dates'
@@ -43,10 +44,10 @@ export function UpcomingWidget({ item }: { item: WidgetLayout }) {
   const days = [...new Set(shown.map((i) => i.day))]
   return (
     <>
-      <WidgetHeader title="Upcoming" icon={<CalendarClock />} to="/calendar" />
+      <WidgetHeader title={t('Upcoming')} icon={<CalendarClock />} to="/calendar" />
       <div className="flex-1 px-2 pb-3">
         {events.isSuccess && tasks.isSuccess && items.length === 0 && (
-          <p className="px-2 py-2 text-[13px] text-muted">Nothing in the next 7 days.</p>
+          <p className="px-2 py-2 text-[13px] text-muted">{t('Nothing in the next 7 days.')}</p>
         )}
         <div className={cn(wide && 'grid grid-cols-2 gap-x-3')}>
           {days.map((day) => (

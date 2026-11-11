@@ -10,6 +10,7 @@
  * latest state once). They are never stored.
  */
 import { create } from 'zustand'
+import { plural } from '@/lib/i18n'
 
 export type AlertTone = 'accent' | 'success' | 'info' | 'warning' | 'error'
 export type AlertIcon = 'timer' | 'coffee' | 'music' | 'plus' | 'skip' | 'bot' | 'approval' | 'warning' | 'check' | 'shuffle' | 'repeat'
@@ -70,7 +71,7 @@ export function setQuiet(on: boolean): void {
   if (waiting.length === 1) islandAlert(waiting[0])
   else if (waiting.length > 1) {
     islandAlert({
-      title: `${waiting.length} things happened while you focused`,
+      title: plural(waiting.length, '{n} thing happened while you focused', '{n} things happened while you focused'),
       body: waiting.slice(0, 3).map((a) => a.title).join(' · '),
       icon: 'check', tone: 'info', duration: 6000, link: '/notifications',
     })

@@ -9,7 +9,9 @@
  */
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DayCellContentArg, EventDropArg, EventInput } from '@fullcalendar/core'
+import type { DayCellContentArg, EventDropArg, EventInput, LocaleInput } from '@fullcalendar/core'
+import ruLocale from '@fullcalendar/core/locales/ru'
+import ukLocale from '@fullcalendar/core/locales/uk'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin, { type DateClickArg, type DropArg, type EventResizeDoneArg } from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
@@ -27,6 +29,7 @@ import { TaskDialog } from '@/features/tasks/components/TaskDialog'
 import { addDays, dayOf, today } from '@/features/tasks/dates'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { currentLocale, dateLocale, type Locale, msg, t } from '@/lib/i18n'
 import { browserTimeZone, type Occurrence, useChangeOccurrence, useOccurrencesIn, useSaveEvent } from './api'
 import { DayList } from './components/DayList'
 import { MiniMonth } from './components/MiniMonth'
@@ -44,11 +47,13 @@ const FC_VIEW: Record<View, { desktop: string; phone: string }> = {
   agenda: { desktop: 'listWeek', phone: 'listTwoWeeks' },
 }
 const VIEW_LABEL: Record<View, { desktop: string; phone: string }> = {
-  month: { desktop: 'Month', phone: 'Month' },
-  week: { desktop: 'Week', phone: '3 days' },
-  day: { desktop: 'Day', phone: 'Day' },
-  agenda: { desktop: 'Agenda', phone: 'Agenda' },
+  month: { desktop: msg('Month'), phone: msg('Month') },
+  week: { desktop: msg('Week'), phone: msg('3 days') },
+  day: { desktop: msg('Day'), phone: msg('Day') },
+  agenda: { desktop: msg('Agenda'), phone: msg('Agenda') },
 }
+/** FullCalendar's own texts and date formats in the app's language; English keeps the browser's formats. */
+const FC_LOCALE: Partial<Record<Locale, LocaleInput>> = { uk: ukLocale, ru: ruLocale }
 const CUSTOM_VIEWS = {
   timeGridThreeDay: { type: 'timeGrid', duration: { days: 3 } },
   listTwoWeeks: { type: 'list', duration: { weeks: 2 } },
@@ -144,7 +149,7 @@ export function CalendarPage() {
     return (
       <div className="flex flex-col items-center gap-1 py-1">
         <span className="fc-phone-day-number">{arg.date.getDate()}</span>
-        <span className="flex h-1.5 items-center gap-0.5" aria-label={found.length ? `${found.length} planned` : undefined}>
+        <span className="flex h-1.5 items-center gap-0.5" aria-label={found.length ? t('{n} planned', { n: found.length }) : undefined}>
           {found.slice(0, 3).map((color, i) => (
             <span key={i} className={cn('h-1.5 w-1.5 rounded-full', !color && 'border border-muted')}
               style={color ? { backgroundColor: color } : undefined} />
@@ -210,12 +215,12 @@ export function CalendarPage() {
   }
 
   const segmented = (
-    <div className="flex rounded-lg bg-surface-2 p-0.5 max-md:w-full" role="radiogroup" aria-label="View">
+    <div className="flex rounded-lg bg-surface-2 p-0.5 max-md:w-full" role="radiogroup" aria-label={t('View')}>
       {(Object.keys(FC_VIEW) as View[]).map((v) => (
         <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => changeView(v)}
           className={cn('h-8 rounded-md px-3 text-[13px] font-medium transition-colors max-md:h-9 max-md:flex-1',
             view === v ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
-          {VIEW_LABEL[v][device]}
+          {t(VIEW_LABEL[v][device])}
         </button>
       ))}
     </div>
@@ -223,37 +228,37 @@ export function CalendarPage() {
 
   // On a phone the arrows are slim: with Today they must fit beside the Dynamic Island.
   const ARROW = 'shrink-0 max-md:w-8! md:-mx-1'
-  const previous = <Button size="icon" variant="ghost" className={ARROW} aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
-  const next = <Button size="icon" variant="ghost" className={ARROW} aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>
+  const previous = <Button size="icon" variant="ghost" className={ARROW} aria-label={t('Previous')} onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
+  const next = <Button size="icon" variant="ghost" className={ARROW} aria-label={t('Next')} onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>
   return (
     <div className={cn('flex h-full flex-col px-3 pb-3 pt-2 md:px-6 md:pb-6 md:pt-1', phoneMonth && 'overflow-y-auto pb-24')}>
       {/* The month or week shown is the page's title, with the arrows around it. On a phone the
           title is short and stands alone (what is shown is the line under it), the arrows sit
           with Today at the right, and the Trash is beside the view switch: nothing is cut off. */}
-      <PageHeader title={<span aria-live="polite">{(desktop || !shown ? title : shortTitle(shown, view === 'month', navigator.language)) || 'Calendar'}</span>}
+      <PageHeader title={<span aria-live="polite">{(desktop || !shown ? title : shortTitle(shown, view === 'month', dateLocale() ?? navigator.language)) || t('Calendar')}</span>}
         before={desktop ? previous : undefined} after={desktop ? next : undefined}>
         {!desktop && <span className="-mr-1 flex shrink-0 items-center">{previous}{next}</span>}
-        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => { api()?.today(); setSelected(today()) }}>Today</Button>
-        {desktop && <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>}
+        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => { api()?.today(); setSelected(today()) }}>{t('Today')}</Button>
+        {desktop && <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>{t('Trash')}</Button>}
         <div className="hidden md:block">{segmented}</div>
         <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={newEvent} className="hidden md:inline-flex">
-          New event
+          {t('New event')}
         </Button>
       </PageHeader>
       <div className="mb-3 flex items-center gap-1 md:hidden">
         <div className="min-w-0 flex-1">{segmented}</div>
-        <Button size="icon" variant="ghost" className="shrink-0" aria-label="Trash" title="Deleted events" onClick={() => setTrashOpen(true)}><Trash2 className="h-4 w-4" /></Button>
+        <Button size="icon" variant="ghost" className="shrink-0" aria-label={t('Trash')} title={t('Deleted events')} onClick={() => setTrashOpen(true)}><Trash2 className="h-4 w-4" /></Button>
       </div>
       {error && <p className="mb-2 text-[13px] text-error">{errorMessage(error)}</p>}
 
       <div className={desktop ? 'flex min-h-0 flex-1 gap-3' : 'contents'}>
       {/* Wide screens: a column with a small month, the projects' colours (in All) and the tasks without a date. */}
       {desktop && (
-        <aside aria-label="Calendar tools" className="hidden w-60 shrink-0 flex-col gap-3 lg:flex">
+        <aside aria-label={t('Calendar tools')} className="hidden w-60 shrink-0 flex-col gap-3 lg:flex">
           <MiniMonth shown={shown} today={today()} onPick={(day) => { api()?.gotoDate(day); setSelected(day) }} />
           {legend.length > 0 && (
-            <section aria-label="Projects" className="rounded-card border border-border bg-card p-3 text-[13px] shadow-soft">
-              <h2 className="pb-1 text-[12px] font-semibold">Projects</h2>
+            <section aria-label={t('Projects')} className="rounded-card border border-border bg-card p-3 text-[13px] shadow-soft">
+              <h2 className="pb-1 text-[12px] font-semibold">{t('Projects')}</h2>
               {legend.map((p) => (
                 <div key={p.id} className="flex h-7 items-center gap-2">
                   <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
@@ -261,7 +266,7 @@ export function CalendarPage() {
                 </div>
               ))}
               <div className="flex h-7 items-center gap-2 text-muted">
-                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" /> No project
+                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" /> {t('No project')}
               </div>
             </section>
           )}
@@ -283,7 +288,7 @@ export function CalendarPage() {
           initialDate={startDate}
           headerToolbar={false}
           height={phoneMonth ? 'auto' : '100%'}
-          locale={navigator.language}
+          locale={FC_LOCALE[currentLocale()] ?? navigator.language}
           firstDay={1}
           nowIndicator
           dayMaxEvents
@@ -311,7 +316,7 @@ export function CalendarPage() {
           eventClick={(arg) => openEntry({ extendedProps: arg.event.extendedProps })}
           eventDrop={onMoved}
           eventResize={onMoved}
-          noEventsContent="Nothing planned"
+          noEventsContent={t('Nothing planned')}
         />
       </div>
       </div>
@@ -319,7 +324,7 @@ export function CalendarPage() {
 
       {/* Phones: "+" where the thumb is. */}
       {!desktop && (
-        <button type="button" aria-label="New event" onClick={newEvent}
+        <button type="button" aria-label={t('New event')} onClick={newEvent}
           className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-float active:scale-95">
           <Plus className="h-6 w-6" />
         </button>

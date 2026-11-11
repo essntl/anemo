@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { Dialog } from '@/components/ui/Dialog'
 import { Lingering } from '@/components/ui/Lingering'
 import { Select } from '@/components/ui/Select'
+import { msg, t } from '@/lib/i18n'
 import { type ShareTarget, useCreateShare, useShares } from './api'
 import { LinkRow } from './LinkRow'
 import { EXPIRY_OPTIONS, PROJECT_SECTIONS, type ProjectSection } from './links'
@@ -13,9 +14,9 @@ import { useShareDialog } from './shareStore'
 
 /** What a copy holds, said plainly, so there are no surprises about what a visitor sees. */
 const INCLUDED = {
-  chat: 'The copy has the messages and the names of attached files. Not the files themselves, the model’s reasoning or what an agent did.',
-  document: 'The copy has the document’s text. Images stored in your workspace are not shown.',
-  project: 'The copy has what you tick above; documents can be read in full. Never the project’s chats, files or instructions. Images stored in your workspace are not shown.',
+  chat: msg('The copy has the messages and the names of attached files. Not the files themselves, the model’s reasoning or what an agent did.'),
+  document: msg('The copy has the document’s text. Images stored in your workspace are not shown.'),
+  project: msg('The copy has what you tick above; documents can be read in full. Never the project’s chats, files or instructions. Images stored in your workspace are not shown.'),
 }
 
 function ShareLinks({ target }: { target: ShareTarget }) {
@@ -34,10 +35,10 @@ function ShareLinks({ target }: { target: ShareTarget }) {
     <Dialog
       open
       onOpenChange={(open) => !open && close()}
-      title={`Share “${target.title}”`}
-      description="Anyone with the link can read a copy as it is now, without logging in. They cannot change anything or see the rest of your workspace."
+      title={t('Share “{title}”', { title: target.title })}
+      description={t('Anyone with the link can read a copy as it is now, without logging in. They cannot change anything or see the rest of your workspace.')}
       className="md:w-[min(92vw,540px)]"
-      footer={<Button variant="ghost" onClick={close}>Done</Button>}
+      footer={<Button variant="ghost" onClick={close}>{t('Done')}</Button>}
     >
       {(links.data ?? []).length > 0 && (
         <div className="mb-5 flex flex-col gap-4 border-b border-border pb-5">
@@ -49,26 +50,26 @@ function ShareLinks({ target }: { target: ShareTarget }) {
       <div className="flex flex-col gap-3">
         {isProject && (
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1.5 text-[13px] font-medium">Include</legend>
+            <legend className="mb-1.5 text-[13px] font-medium">{t('Include')}</legend>
             {PROJECT_SECTIONS.map((s) => (
               <label key={s.value} className="flex items-center gap-2.5 text-[14px]">
                 <Checkbox checked={sections.includes(s.value)} onChange={(e) => toggle(s.value, e.target.checked)} />
-                <span>{s.label} <span className="text-[12.5px] text-muted">({s.hint})</span></span>
+                <span>{t(s.label)} <span className="text-[12.5px] text-muted">({t(s.hint)})</span></span>
               </label>
             ))}
           </fieldset>
         )}
         <div className="flex items-end gap-2">
           <label className="min-w-0 flex-1">
-            <span className="mb-1.5 block text-[13px] font-medium">The link works for</span>
-            <Select aria-label="The link works for" value={days} onValueChange={setDays} options={EXPIRY_OPTIONS} />
+            <span className="mb-1.5 block text-[13px] font-medium">{t('The link works for')}</span>
+            <Select aria-label={t('The link works for')} value={days} onValueChange={setDays} options={EXPIRY_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} />
           </label>
           <Button variant="primary" className="shrink-0" loading={create.isPending} disabled={isProject && sections.length === 0}
             icon={<Link2 className="h-4 w-4" />} onClick={submit}>
-            {(links.data ?? []).length > 0 ? 'Create another link' : 'Create link'}
+            {(links.data ?? []).length > 0 ? t('Create another link') : t('Create link')}
           </Button>
         </div>
-        <p className="text-[12.5px] text-muted">{INCLUDED[target.kind]}</p>
+        <p className="text-[12.5px] text-muted">{t(INCLUDED[target.kind])}</p>
         {create.isError && <p className="text-[13px] text-error">{errorMessage(create.error)}</p>}
       </div>
     </Dialog>

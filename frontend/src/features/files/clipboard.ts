@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@/lib/i18n'
 import type { Entry } from './api'
 
 /**
@@ -21,7 +22,7 @@ export const useClipboard = create<Clipboard>((set) => ({
 
 /** Why it can't be pasted into `folder` (null: it can). */
 export function cannotPaste(item: { path: string; is_dir: boolean }, mode: 'cut' | 'copy', folder: string, parent: string): string | null {
-  if (item.is_dir && (folder === item.path || folder.startsWith(`${item.path}/`))) return 'A folder can’t go inside itself'
-  if (mode === 'cut' && parent === folder) return 'It is already here'
+  if (item.is_dir && (folder === item.path || folder.startsWith(`${item.path}/`))) return t('A folder can’t go inside itself')
+  if (mode === 'cut' && parent === folder) return t('It is already here')
   return null
 }

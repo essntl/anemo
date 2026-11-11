@@ -37,6 +37,7 @@ import { api } from '@/api/client'
 import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
 import { formatSize } from '@/lib/format'
+import { dateLocale, rich, t } from '@/lib/i18n'
 import {
   downloadUrl,
   type Entry,
@@ -60,7 +61,7 @@ function Breadcrumbs({ path, onOpen }: { path: string; onOpen: (path: string) =>
   return (
     <div className="flex min-w-0 items-center gap-1 text-[13px]">
       <button type="button" onClick={() => onOpen('')} className="flex shrink-0 items-center gap-1.5 rounded px-1.5 py-1 font-medium hover:bg-surface-hover">
-        <HardDrive className="h-4 w-4 text-muted" /> Workspace
+        <HardDrive className="h-4 w-4 text-muted" /> {t('Workspace')}
       </button>
       {parts.map((part, i) => (
         <span key={i} className="flex min-w-0 items-center gap-1">
@@ -87,9 +88,9 @@ function useMoveToProject(onShowFolder: (path: string) => void) {
     const isDocument = entry.path === 'documents' || entry.path.startsWith('documents/')
     const folderOf = (p: (typeof active)[number]) => (isDocument ? p.documents_path : p.files_path)
     const chosen = await chooseDialog({
-      title: `Move “${entry.name}” to a project`,
-      message: isDocument ? 'It goes into the project’s documents.' : 'It goes into the project’s files.',
-      empty: 'There are no projects yet. Create one under Projects.',
+      title: t('Move “{name}” to a project', { name: entry.name }),
+      message: isDocument ? t('It goes into the project’s documents.') : t('It goes into the project’s files.'),
+      empty: t('There are no projects yet. Create one under Projects.'),
       options: active.map((p) => ({
         value: p.id,
         label: p.name,
@@ -103,7 +104,7 @@ function useMoveToProject(onShowFolder: (path: string) => void) {
     const folder = folderOf(project)
     // mutateAsync: the row is gone from this folder before the answer arrives.
     void move.mutateAsync({ source: entry.path, destination: joinPath(folder, entry.name), keep_both: true }).then(
-      () => toast({ message: `Moved to ${project.name}.`, action: { label: 'Show', onClick: () => onShowFolder(folder) } }),
+      () => toast({ message: t('Moved to {name}.', { name: project.name }), action: { label: t('Show'), onClick: () => onShowFolder(folder) } }),
       (err: unknown) => toast({ message: errorMessage(err) }),
     )
   }
@@ -126,8 +127,8 @@ function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
 
   const rename = async () => {
     const name = await promptDialog({
-      title: `Rename ${entry.is_dir ? 'folder' : 'file'}`, label: 'New name', initial: entry.name,
-      selectName: !entry.is_dir, confirmLabel: 'Rename',
+      title: entry.is_dir ? t('Rename folder') : t('Rename file'), label: t('New name'), initial: entry.name,
+      selectName: !entry.is_dir, confirmLabel: t('Rename'),
     })
     if (name && name !== entry.name) move.mutate({ source: entry.path, destination: joinPath(folder, name) })
   }
@@ -137,9 +138,9 @@ function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
     // Say where it is used first: tasks and documents that link to it.
     const used = await fileBacklinks(entry.path).then(linkedFromText, () => null)
     const ok = await confirmDialog({
-      title: `Move "${entry.name}" to the trash?`,
-      message: used ? `${used} Those links stop working until you restore it from Trash.` : 'You can restore it from Trash later.',
-      confirmLabel: 'Move to trash', danger: true,
+      title: t('Move "{name}" to the trash?', { name: entry.name }),
+      message: used ? t('{used} Those links stop working until you restore it from Trash.', { used }) : t('You can restore it from Trash later.'),
+      confirmLabel: t('Move to trash'), danger: true,
     })
     if (ok) trash.mutate(entry.path)
   }
@@ -158,30 +159,30 @@ function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
         {error && <span className="ml-2 text-[12px] text-error">{errorMessage(error)}</span>}
       </button>
       <span className="hidden w-20 text-right text-[12px] text-muted sm:block">{entry.is_dir ? '' : formatSize(entry.size, { kbDecimals: 1 })}</span>
-      <span className="hidden w-36 text-right text-[12px] text-muted md:block">{new Date(entry.modified).toLocaleString()}</span>
+      <span className="hidden w-36 text-right text-[12px] text-muted md:block">{new Date(entry.modified).toLocaleString(dateLocale())}</span>
       {/* Desktop: icons appear on hover (always on touch screens). Phones: a "⋯" menu. */}
       <span className="hidden w-48 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100 md:flex">
         {!entry.is_dir && (
-          <a href={downloadUrl(entry.path)} download aria-label="Download" title="Download" className={icon}>
+          <a href={downloadUrl(entry.path)} download aria-label={t('Download')} title={t('Download')} className={icon}>
             <Download className="h-3.5 w-3.5" />
           </a>
         )}
-        <button type="button" aria-label="Cut" title="Cut (then paste in another folder)" onClick={cut} className={icon}><Scissors className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Copy" title="Copy (then paste in a folder)" onClick={copy} className={icon}><Copy className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Rename" title="Rename" onClick={() => void rename()} className={icon}><Pencil className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Move to a project" title="Move to a project" onClick={() => void toProject.run(entry)} className={icon}><FolderKanban className="h-3.5 w-3.5" /></button>
-        <button type="button" aria-label="Delete" title="Move to trash" onClick={() => void remove()} className={cn(icon, 'hover:text-error')}><Trash2 className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label={t('Cut')} title={t('Cut (then paste in another folder)')} onClick={cut} className={icon}><Scissors className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label={t('Copy')} title={t('Copy (then paste in a folder)')} onClick={copy} className={icon}><Copy className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label={t('Rename')} title={t('Rename')} onClick={() => void rename()} className={icon}><Pencil className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label={t('Move to a project')} title={t('Move to a project')} onClick={() => void toProject.run(entry)} className={icon}><FolderKanban className="h-3.5 w-3.5" /></button>
+        <button type="button" aria-label={t('Delete')} title={t('Move to trash')} onClick={() => void remove()} className={cn(icon, 'hover:text-error')}><Trash2 className="h-3.5 w-3.5" /></button>
       </span>
       <ActionMenu
         className="md:hidden"
-        label={`Actions for ${entry.name}`}
+        label={t('Actions for {name}', { name: entry.name })}
         actions={[
-          ...(entry.is_dir ? [] : [{ label: 'Download', icon: <Download />, download: downloadUrl(entry.path) }]),
-          { label: 'Cut', icon: <Scissors />, onSelect: cut },
-          { label: 'Copy', icon: <Copy />, onSelect: copy },
-          { label: 'Rename', icon: <Pencil />, onSelect: () => void rename() },
-          { label: 'Move to a project', icon: <FolderKanban />, onSelect: () => void toProject.run(entry) },
-          { label: 'Move to trash', icon: <Trash2 />, onSelect: () => void remove(), danger: true },
+          ...(entry.is_dir ? [] : [{ label: t('Download'), icon: <Download />, download: downloadUrl(entry.path) }]),
+          { label: t('Cut'), icon: <Scissors />, onSelect: cut },
+          { label: t('Copy'), icon: <Copy />, onSelect: copy },
+          { label: t('Rename'), icon: <Pencil />, onSelect: () => void rename() },
+          { label: t('Move to a project'), icon: <FolderKanban />, onSelect: () => void toProject.run(entry) },
+          { label: t('Move to trash'), icon: <Trash2 />, onSelect: () => void remove(), danger: true },
         ]}
       />
     </div>
@@ -193,7 +194,7 @@ function PasteBar({ folder }: { folder: string }) {
   const { item, mode, clear } = useClipboard()
   const move = useMove()
   const copy = useCopy()
-  const why = item ? cannotPaste(item, mode, folder, parentOf(item.path)) : 'Nothing to paste'
+  const why = item ? cannotPaste(item, mode, folder, parentOf(item.path)) : t('Nothing to paste')
   const paste = () => {
     if (!item || why) return
     const body = { source: item.path, destination: joinPath(folder, item.name), keep_both: true }
@@ -205,19 +206,25 @@ function PasteBar({ folder }: { folder: string }) {
   useShortcut('files.cancelPaste', clear, { enabled: Boolean(item), keepDefault: true })
   if (!item) return null
   const error = move.error ?? copy.error
+  // The name is drawn by <name> (it is not part of the translated text).
+  const hintParts = {
+    name: () => <span className="font-medium">{item.name}</span>,
+    rest: (c: string) => <span className="text-muted">{c}</span>,
+  }
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border bg-accent-soft/40 px-4 py-2 text-[13px]" role="status">
       {mode === 'cut' ? <Scissors className="h-4 w-4 shrink-0 text-accent" /> : <Copy className="h-4 w-4 shrink-0 text-accent" />}
       <span className="min-w-0 flex-1 truncate">
-        <span className="font-medium">{item.name}</span>
-        <span className="text-muted"> {mode === 'cut' ? 'cut' : 'copied'}: open the folder it should go to, then paste</span>
+        {mode === 'cut'
+          ? rich('<name></name><rest> cut: open the folder it should go to, then paste</rest>', hintParts)
+          : rich('<name></name><rest> copied: open the folder it should go to, then paste</rest>', hintParts)}
         {error && <span className="ml-2 text-error">{errorMessage(error)}</span>}
       </span>
       <Button size="sm" variant="primary" icon={<ClipboardPaste className="h-3.5 w-3.5" />} disabled={Boolean(why)}
-        title={why ?? 'Paste here (Ctrl+V)'} loading={move.isPending || copy.isPending} onClick={paste}>
-        Paste here
+        title={why ?? t('Paste here (Ctrl+V)')} loading={move.isPending || copy.isPending} onClick={paste}>
+        {t('Paste here')}
       </Button>
-      <Button size="sm" variant="ghost" icon={<X className="h-3.5 w-3.5" />} onClick={clear}>Cancel</Button>
+      <Button size="sm" variant="ghost" icon={<X className="h-3.5 w-3.5" />} onClick={clear}>{t('Cancel')}</Button>
     </div>
   )
 }
@@ -228,7 +235,7 @@ function UsedIn({ path }: { path: string }) {
   if (!links.data || (!links.data.tasks.length && !links.data.documents.length)) return null
   return (
     <div className="max-h-48 shrink-0 overflow-y-auto border-t border-border px-4 py-3">
-      <BacklinkList title="Used in" links={links.data} />
+      <BacklinkList title={t('Used in')} links={links.data} />
     </div>
   )
 }
@@ -271,12 +278,12 @@ export function FilesPage() {
   }
 
   const newFolder = async () => {
-    const name = await promptDialog({ title: 'New folder', label: 'Folder name', confirmLabel: 'Create' })
+    const name = await promptDialog({ title: t('New folder'), label: t('Folder name'), confirmLabel: t('Create') })
     if (name) makeFolder.mutate(joinPath(path, name))
   }
   const newFile = async () => {
     const name = await promptDialog({
-      title: 'New file', label: 'File name', initial: 'untitled.md', selectName: true, confirmLabel: 'Create',
+      title: t('New file'), label: t('File name'), initial: 'untitled.md', selectName: true, confirmLabel: t('Create'),
     })
     if (!name) return
     try {
@@ -337,21 +344,21 @@ export function FilesPage() {
   return (
     // From `md` up the file manager is one panel on the ground, like the sidebar.
     <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
-      <PageHeader title="Files" />
+      <PageHeader title={t('Files')} />
       <div className={cn('flex min-w-0 flex-1 flex-col', openFile && 'hidden lg:flex')}>
         <header className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border px-3 py-2.5 md:gap-2 md:px-4">
           {/* The path keeps at least this width: when the row is short (a file is open beside it), the rest wraps under it. */}
           <div className="w-full min-w-0 overflow-hidden md:w-auto md:min-w-48 md:flex-1"><Breadcrumbs path={path} onOpen={(p) => go({ path: p, file: null })} /></div>
           <div className="relative order-last w-full md:order-none md:w-auto">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find by name"
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Find by name')}
               className="h-8 w-full rounded-control bg-surface-2 pl-8 pr-2 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10 md:w-44" />
           </div>
           {/* With a file open beside the list the buttons are icons only (they keep their names for screen readers, with a tooltip). */}
-          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label="File" title="New file" icon={<FilePlus className="h-3.5 w-3.5" />} onClick={() => void newFile()}>{!compact && 'File'}</Button>
-          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label="Folder" title="New folder" icon={<FolderPlus className="h-3.5 w-3.5" />} onClick={() => void newFolder()}>{!compact && 'Folder'}</Button>
-          <Button size="sm" variant="secondary" className={cn(compact && 'px-2')} aria-label="Upload" title="Upload files" icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={pickFiles}>{!compact && 'Upload'}</Button>
-          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label="Trash" title="Deleted files" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>{!compact && 'Trash'}</Button>
+          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label={t('File')} title={t('New file')} icon={<FilePlus className="h-3.5 w-3.5" />} onClick={() => void newFile()}>{!compact && t('File')}</Button>
+          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label={t('Folder')} title={t('New folder')} icon={<FolderPlus className="h-3.5 w-3.5" />} onClick={() => void newFolder()}>{!compact && t('Folder')}</Button>
+          <Button size="sm" variant="secondary" className={cn(compact && 'px-2')} aria-label={t('Upload')} title={t('Upload files')} icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={pickFiles}>{!compact && t('Upload')}</Button>
+          <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label={t('Trash')} title={t('Deleted files')} icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>{!compact && t('Trash')}</Button>
         </header>
         {error && <div className="border-b border-border bg-error/8 px-4 py-2 text-[12.5px] text-error">{errorMessage(error)}</div>}
         {!searching && <PasteBar folder={path} />}
@@ -374,8 +381,8 @@ export function FilesPage() {
           {!folder.isPending && entries.length === 0 && (
             <EmptyState
               icon={<Folder className="h-5 w-5" />}
-              title={searching ? 'Nothing matches' : 'This folder is empty'}
-              description={searching ? undefined : 'Drop files here, or create a file or folder.'}
+              title={searching ? t('Nothing matches') : t('This folder is empty')}
+              description={searching ? undefined : t('Drop files here, or create a file or folder.')}
             />
           )}
         </div>

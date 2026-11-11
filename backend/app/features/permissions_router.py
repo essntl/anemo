@@ -10,6 +10,8 @@ from app import browser_client
 from app.api.deps import Db
 from app.features.mcp import service as mcp
 from app.features.profiles import service as profiles
+from app.features.settings import service as settings_service
+from app.features.settings.sections import NavigationSettings
 from app.policy.presets import CATEGORIES, LEVEL_LABELS, Level, PermissionSettings
 from app.policy.summary import PermissionSummary, summarize
 from app.tools import registry
@@ -83,8 +85,12 @@ async def preview(body: PermissionSettings, db: Db) -> PermissionSummary:
 
 
 @router.get("/tools", response_model=list[ToolOut])
-async def tools() -> list[ToolOut]:
+async def tools(db: Db) -> list[ToolOut]:
+    """The built-in tools, without those of the parts of the app that are turned off."""
+    navigation = await settings_service.get_section(db, NavigationSettings, "navigation")
+    turned_off = registry.tools_of(navigation.off)
     return [
         ToolOut(name=t.name, description=t.description, capability=t.capability)
         for t in registry.all_tools()
+        if t.name not in turned_off
     ]

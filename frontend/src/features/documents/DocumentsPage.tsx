@@ -15,6 +15,7 @@ import { FileText } from 'lucide-react'
 import { api, unwrap } from '@/api/client'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { useDocuments } from './api'
 import { documentPathFromAddress } from './passage'
 import { DocumentEditor } from './components/DocumentEditor'
@@ -39,8 +40,8 @@ function DocumentByPath({ address }: { address: string }) {
   if (!found.isError) return null
   return (
     <div className="p-8 text-[13px]">
-      <p className="text-error">There is no document {path}.</p>
-      <Link to="/documents" className="mt-2 inline-block text-accent underline">All documents</Link>
+      <p className="text-error">{t('There is no document {path}.', { path })}</p>
+      <Link to="/documents" className="mt-2 inline-block text-accent underline">{t('All documents')}</Link>
     </div>
   )
 }
@@ -83,8 +84,8 @@ export function DocumentsPage() {
         ) : address ? (
           <DocumentByPath key={address} address={address} />
         ) : (
-          <EmptyState icon={<FileText className="h-5 w-5" />} title="Choose a document"
-            description="Or create one. Documents are plain Markdown files in your workspace, so agents and other tools can work with them too." />
+          <EmptyState icon={<FileText className="h-5 w-5" />} title={t('Choose a document')}
+            description={t('Or create one. Documents are plain Markdown files in your workspace, so agents and other tools can work with them too.')} />
         )}
       </section>
     </div>

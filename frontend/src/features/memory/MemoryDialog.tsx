@@ -5,18 +5,19 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
+import { msg, t } from '@/lib/i18n'
 import { KIND_LABELS, type Memory, type MemoryKind, useApproveMemory, useCreateMemory, useUpdateMemory } from './api'
 
 const KIND_HINTS: Record<MemoryKind, string> = {
-  preference: 'How you like things',
-  fact: 'About you, your life or work',
-  project: 'Something you are working on',
-  instruction: 'A standing order: always in context',
+  preference: msg('How you like things'),
+  fact: msg('About you, your life or work'),
+  project: msg('Something you are working on'),
+  instruction: msg('A standing order: always in context'),
 }
 const IMPORTANCE = [
-  { value: '0.3', label: 'Low' },
-  { value: '0.5', label: 'Normal' },
-  { value: '0.8', label: 'High' },
+  { value: '0.3', label: msg('Low') },
+  { value: '0.5', label: msg('Normal') },
+  { value: '0.8', label: msg('High') },
 ]
 const nearest = (importance: number) => (importance < 0.4 ? '0.3' : importance > 0.65 ? '0.8' : '0.5')
 
@@ -49,35 +50,35 @@ export function MemoryDialog({ memory, onClose }: { memory: Memory | null; onClo
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(94vw,520px)]"
-      title={!memory ? 'Add a memory' : suggestion ? 'Edit and save suggestion' : 'Edit memory'}
+      title={!memory ? t('Add a memory') : suggestion ? t('Edit and save suggestion') : t('Edit memory')}
       footer={
         <>
           {error && <span className="mr-auto self-center text-[12.5px] text-error">{errorMessage(error)}</span>}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={pending} disabled={content.trim().length < 1} onClick={() => void save()}>
-            {suggestion ? 'Save to memory' : 'Save'}
+            {suggestion ? t('Save to memory') : t('Save')}
           </Button>
         </>
       }>
-      <Field label="What to remember" hint="One clear statement works best. Never passwords or keys.">
-        <Textarea autoFocus rows={3} maxLength={2000} value={content} placeholder="Prefers short answers with examples."
+      <Field label={t('What to remember')} hint={t('One clear statement works best. Never passwords or keys.')}>
+        <Textarea autoFocus rows={3} maxLength={2000} value={content} placeholder={t('Prefers short answers with examples.')}
           onChange={(e) => setContent(e.target.value)} />
       </Field>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <Field label="Kind" hint={KIND_HINTS[kind]}>
+        <Field label={t('Kind')} hint={t(KIND_HINTS[kind])}>
           <Select value={kind} onValueChange={(v) => setKind(v as MemoryKind)}
-            options={Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label }))} />
+            options={Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label: t(label) }))} />
         </Field>
-        <Field label="Importance">
-          <Select value={importance} onValueChange={setImportance} options={IMPORTANCE} />
+        <Field label={t('Importance')}>
+          <Select value={importance} onValueChange={setImportance} options={IMPORTANCE.map((o) => ({ value: o.value, label: t(o.label) }))} />
         </Field>
       </div>
       <div className="mt-4 flex items-center justify-between gap-3 text-[13px]">
         <div>
-          <div className="font-medium">Always in context</div>
-          <div className="text-[12px] text-muted">Otherwise it is used when a message relates to it.</div>
+          <div className="font-medium">{t('Always in context')}</div>
+          <div className="text-[12px] text-muted">{t('Otherwise it is used when a message relates to it.')}</div>
         </div>
-        <Switch label="Always in context" checked={pinned} onChange={setPinned} />
+        <Switch label={t('Always in context')} checked={pinned} onChange={setPinned} />
       </div>
     </Dialog>
   )

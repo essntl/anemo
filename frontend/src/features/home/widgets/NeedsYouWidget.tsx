@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { AlarmClock, Brain, Clock, Inbox, Pin, PinOff, ShieldQuestion, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import type { WidgetLayout } from '../layout'
 import { type NeedsRow, useNeedsYou } from '../useNeedsYou'
 import { ROWS } from './rows'
@@ -21,17 +22,17 @@ export function NeedsYouWidget({ item, onPin }: { item: WidgetLayout; onPin: (pi
   const n = ROWS[item.h] + 1
   return (
     <>
-      <WidgetHeader title="Needs you" icon={<Inbox />}>
+      <WidgetHeader title={t('Needs you')} icon={<Inbox />}>
         {rows.length > 0 && <span className="rounded-full bg-warning px-2 py-0.5 text-[11px] font-semibold text-white">{rows.length}</span>}
         <button type="button" onClick={() => onPin(!item.pinned)} aria-pressed={!!item.pinned}
-          aria-label={item.pinned ? 'Hide when there is nothing' : 'Keep showing when there is nothing'}
-          title={item.pinned ? 'Pinned: shown even when empty' : 'Hidden when there is nothing'}
+          aria-label={item.pinned ? t('Hide when there is nothing') : t('Keep showing when there is nothing')}
+          title={item.pinned ? t('Pinned: shown even when empty') : t('Hidden when there is nothing')}
           className={cn('flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-hover pointer-coarse:h-10 pointer-coarse:w-10', item.pinned ? 'text-accent' : 'text-muted')}>
           {item.pinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
         </button>
       </WidgetHeader>
       <div className="flex-1 px-2 pb-3">
-        {rows.length === 0 && <p className="px-2 py-2 text-[13px] text-muted">Nothing needs you right now.</p>}
+        {rows.length === 0 && <p className="px-2 py-2 text-[13px] text-muted">{t('Nothing needs you right now.')}</p>}
         <ul>
           {rows.slice(0, n).map((r) => (
             <li key={r.key}>

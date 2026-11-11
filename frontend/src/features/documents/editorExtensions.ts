@@ -1,6 +1,7 @@
 import { Image } from '@tiptap/extension-image'
 import { mergeAttributes } from '@tiptap/core'
 import { imageHost, loadsWithoutAsking } from '@/lib/remoteImages'
+import { t } from '@/lib/i18n'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { TableKit } from '@tiptap/extension-table'
 import { Placeholder } from '@tiptap/extensions'
@@ -28,7 +29,8 @@ const SafeImage = Image.extend({
         'inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-muted hover:text-text'
       button.title = src ?? ''
       const alt = node.attrs.alt as string | null
-      button.textContent = `${alt ? `${alt}: ` : ''}show image from ${imageHost(src ?? '')}`
+      const host = imageHost(src ?? '')
+      button.textContent = alt ? t('{alt}: show image from {host}', { alt, host }) : t('show image from {host}', { host })
       const dom = document.createElement('span')
       dom.append(button)
       button.addEventListener('click', (event) => {
@@ -52,5 +54,5 @@ export const editorExtensions = [
   TaskList,
   TaskItem.configure({ nested: true }),
   SafeImage,
-  Placeholder.configure({ placeholder: 'Write something…' }),
+  Placeholder.configure({ placeholder: () => t('Write something…') }),
 ]

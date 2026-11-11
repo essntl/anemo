@@ -69,6 +69,7 @@ export const router = createBrowserRouter([
               { index: true, element: <SettingsIndex /> },
               { path: 'general', ...page(() => import('@/features/settings/pages/GeneralPage'), 'GeneralPage') },
               { path: 'appearance', ...page(() => import('@/features/settings/pages/AppearancePage'), 'AppearancePage') },
+              { path: 'pages', ...page(() => import('@/features/settings/pages/PagesPage'), 'PagesPage') },
               { path: 'focus', ...page(() => import('@/features/focus/FocusSettingsPage'), 'FocusSettingsPage') },
               { path: 'skills', ...page(() => import('@/features/skills/SkillsSettingsPage'), 'SkillsSettingsPage') },
               { path: 'providers', ...page(() => import('@/features/providers/ProvidersPage'), 'ProvidersPage') },
