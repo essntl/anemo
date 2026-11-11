@@ -31,6 +31,16 @@ describe('runReducer', () => {
     expect(view.notice).toMatch(/interruption/)
   })
 
+  it('says why a model was switched, when the provider gave a reason', () => {
+    const fallback = (reason?: string) => apply([{ type: 'run.fallback', data: { from: 'Fable · Claude', to: 'Opus · Claude', reason } }]).notice
+    expect(fallback('The Claude subscription usage limit is reached.')).toBe(
+      'Fable · Claude was unavailable (The Claude subscription usage limit is reached.), switched to Opus · Claude',
+    )
+    expect(fallback()).toBe('Fable · Claude was unavailable, switched to Opus · Claude')
+    expect(fallback('unavailable')).toBe('Fable · Claude was unavailable, switched to Opus · Claude')
+    expect(fallback('x'.repeat(500))!.length).toBeLessThan(240)
+  })
+
   it('captures errors from the final status', () => {
     const view = apply([{ type: 'run.status', data: { status: 'failed', error: { message: 'boom' } } }])
     expect(view.status).toBe('failed')
