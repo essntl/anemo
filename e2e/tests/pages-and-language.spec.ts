@@ -82,6 +82,16 @@ test('the app in Ukrainian and Russian', async ({ page }) => {
     await expect(page.getByRole('navigation', { name: 'Сторінки' }).getByRole('link', { name: 'Завдання' })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'uk')
 
+    // Skills are called in the language too: "/план " picks the Plan skill, as "/plan " does.
+    await page.goto('/')
+    const box = page.locator('main textarea').first() // the message box (a combobox while its menu is open)
+    await box.fill('/пл')
+    await expect(page.getByRole('option', { name: /План.*\/план/ })).toBeVisible()
+    await box.pressSequentially('ан ')
+    await expect(page.getByRole('button', { name: /^Навичка: План/ })).toBeVisible()
+    await expect(box).toHaveValue('')
+    await page.goto('/settings/general')
+
     // It is remembered: a reload shows it at once.
     await page.reload()
     await expect(page.getByRole('button', { name: 'Новий чат' })).toBeVisible()

@@ -6,7 +6,7 @@ import { Lingering } from '@/components/ui/Lingering'
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { SkillIcon } from '@/features/skills/icons'
-import { matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
+import { localSkills, matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
@@ -73,7 +73,8 @@ export function Composer({
 
   // Skills: typing / at the start opens a menu of them; the chosen one is shown as a chip.
   const allSkills = useSlashSkills()
-  const slashSkills = skillsOn ? allSkills : []
+  // In the app's language: "/план" calls the Plan skill (the English command works too).
+  const slashSkills = skillsOn ? localSkills(allSkills) : []
   const [skill, setSkill] = useState<Skill | null>(null)
   const [active, setActive] = useState(0)
   // The text for which the menu was closed with Escape (it stays closed until that changes).
@@ -267,7 +268,7 @@ export function Composer({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
                     <span className="text-[13.5px] font-medium">{s.name}</span>
-                    <span className="font-mono text-[12px] text-subtle">/{s.slug}</span>
+                    <span className="font-mono text-[12px] text-subtle">/{s.command ?? s.slug}</span>
                   </div>
                   <div className="truncate text-[12.5px] text-muted">{s.hint || s.description}</div>
                 </div>

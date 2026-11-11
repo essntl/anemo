@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { Composer } from './Composer'
 
-vi.mock('@/features/profiles/api', () => ({ useSlashSkills: () => ({ data: [] }) }))
+// The hook returns the skills themselves (an array), not a query.
+vi.mock('@/features/profiles/api', () => ({ useSlashSkills: () => [] }))
 vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => false }))
 
 function renderComposer(onSend: (text: string) => void | Promise<unknown>) {
