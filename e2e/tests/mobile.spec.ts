@@ -71,7 +71,7 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   const list = (await drawer.getByLabel('Chats', { exact: true }).boundingBox())!
   expect(list.height / box.height).toBeGreaterThan(0.55)
   await expect(drawer.getByRole('link', { name: 'Inbox' })).toBeVisible()
-  await expect(drawer.getByRole('button', { name: 'Project', exact: true })).toBeVisible()
+  await expect(drawer.getByRole('button', { name: /^Showing / })).toBeVisible()
   // The pages are under the chats, folded into a bar that opens as a card.
   await drawer.getByRole('button', { name: /^Pages/ }).click()
   await page.getByRole('dialog', { name: 'Pages' }).getByRole('link', { name: 'Files', exact: true }).click()
@@ -305,6 +305,50 @@ test('files: open a file full screen, go back, and use the row menu', async ({ p
   }
 })
 
+test('a document on a phone: small bars, one row of formatting, the panel slides in', async ({ page }) => {
+  await login(page)
+  const title = `E2E phone doc ${Math.random().toString(36).slice(2, 8)}`
+  const doc = (await (await page.request.post('/api/documents', { data: { title } })).json()) as { id: string; path: string }
+  try {
+    // The list: what is shown (Uncategorized, a project, All) is a line under the title, not a row of its own.
+    await page.goto('/documents')
+    const bar = page.locator('#main-column > header')
+    await expect(bar.getByRole('button', { name: /^Showing / })).toBeVisible()
+    expect((await bar.boundingBox())!.height).toBeLessThanOrEqual(48)
+
+    await page.goto(`/documents/${doc.id}`)
+    const editor = page.getByLabel('Document text')
+    await expect(editor.getByRole('heading', { name: title })).toBeVisible()
+    // The app's top bar makes way for the document's own header.
+    await expect(page.getByRole('button', { name: 'Open menu' })).toBeHidden()
+    await expect(page.getByRole('link', { name: 'All documents' })).toBeVisible()
+    // The formatting buttons are one row, and the text starts in the top fifth of the screen.
+    const toolbar = page.getByRole('toolbar', { name: 'Formatting' })
+    expect((await toolbar.boundingBox())!.height).toBeLessThanOrEqual(56)
+    expect((await editor.boundingBox())!.y).toBeLessThan(page.viewportSize()!.height * 0.2)
+    // What is not in the row is one tap away.
+    await toolbar.getByRole('button', { name: 'Lists and blocks' }).tap()
+    const blocks = page.getByRole('group', { name: 'Lists and blocks' })
+    await expect(blocks.getByRole('button', { name: 'Checklist' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(blocks).toHaveCount(0)
+
+    // The outline, details and chat slide in over the text.
+    await page.getByRole('button', { name: 'Outline, details and chat' }).tap()
+    const panel = page.getByRole('dialog', { name: 'About this document' })
+    await expect(panel.getByRole('tab', { name: /^Outline/ })).toBeVisible()
+    await panel.getByRole('tab', { name: 'Chat' }).tap()
+    await expect(panel.getByPlaceholder('Ask for a change…')).toBeVisible()
+    await panel.getByRole('button', { name: 'Close' }).tap()
+    await expect(panel).toHaveCount(0)
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+  } finally {
+    await page.request.delete(`/api/documents/${doc.id}`).catch(() => undefined)
+    const trash = (await (await page.request.get('/api/files/trash')).json()) as { id: string; original_path: string }[]
+    for (const item of trash.filter((t) => t.original_path === doc.path)) await page.request.delete(`/api/files/trash/${item.id}`)
+  }
+})
+
 test('calendar on a phone: month with dots and the chosen day listed, + adds to that day', async ({ page }) => {
   await login(page)
   const title = `E2E phone event ${Math.random().toString(36).slice(2, 8)}`
@@ -318,6 +362,10 @@ test('calendar on a phone: month with dots and the chosen day listed, + adds to 
     await expect(views.getByRole('radio', { name: 'Agenda' })).toHaveAttribute('aria-checked', 'true')
     await expect(views.getByRole('radio', { name: '3 days' })).toBeVisible()
     await views.getByRole('radio', { name: 'Month' }).click()
+    // The month's name is whole in the top bar (it used to be cut off beside the buttons).
+    const heading = page.locator('#main-column > header').getByRole('heading', { level: 1 })
+    await expect(heading).toHaveText(/\d{4}/)
+    expect(await heading.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
 
     // Today is chosen; "+" adds an event to the chosen day.
     const dayList = page.getByRole('region', { name: /^On / })

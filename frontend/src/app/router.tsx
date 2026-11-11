@@ -47,9 +47,10 @@ export const router = createBrowserRouter([
           { path: 'search', ...page(() => import('@/features/search/SearchPage'), 'SearchPage') },
           { path: 'files', ...page(() => import('@/features/files/FilesPage'), 'FilesPage') },
           { path: 'documents', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage') },
-          { path: 'documents/:documentId', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage') },
+          // On a phone an open document has its own header (back, title, actions).
+          { path: 'documents/:documentId', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage'), handle: { ownPhoneHeader: true } satisfies RouteHandle },
           // A document addressed by its file: /documents/<folder>/<name>.md
-          { path: 'documents/*', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage') },
+          { path: 'documents/*', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage'), handle: { ownPhoneHeader: true } satisfies RouteHandle },
           { path: 'tasks', ...page(() => import('@/features/tasks/TasksPage'), 'TasksPage') },
           { path: 'calendar', ...page(() => import('@/features/calendar/CalendarPage'), 'CalendarPage') },
           { path: 'focus', ...page(() => import('@/features/focus/FocusPage'), 'FocusPage') },

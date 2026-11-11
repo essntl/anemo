@@ -20,6 +20,7 @@ import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { ItemTrashDialog } from '@/features/trash/ItemTrashDialog'
 import { errorMessage } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
+import { shortTitle } from './title'
 import { Button } from '@/components/ui/Button'
 import { type Task, useProjects, useTasks, useTasksDue, useUpdateTask } from '@/features/tasks/api'
 import { TaskDialog } from '@/features/tasks/components/TaskDialog'
@@ -220,20 +221,27 @@ export function CalendarPage() {
     </div>
   )
 
+  const previous = <Button size="icon" variant="ghost" className="shrink-0 md:-mx-1" aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
+  const next = <Button size="icon" variant="ghost" className="shrink-0 md:-mx-1" aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>
   return (
     <div className={cn('flex h-full flex-col px-3 pb-3 pt-2 md:px-6 md:pb-6 md:pt-1', phoneMonth && 'overflow-y-auto pb-24')}>
-      {/* The month or week shown is the page's title, with the arrows around it. */}
-      <PageHeader title={<span aria-live="polite">{title || 'Calendar'}</span>}
-        before={<Button size="icon" variant="ghost" className="-mx-1 shrink-0" aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>}
-        after={<Button size="icon" variant="ghost" className="-mx-1 shrink-0" aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>}>
-        <Button size="sm" variant="secondary" onClick={() => { api()?.today(); setSelected(today()) }}>Today</Button>
-        <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>
+      {/* The month or week shown is the page's title, with the arrows around it. On a phone the
+          title is short and stands alone (what is shown is the line under it), the arrows sit
+          with Today at the right, and the Trash is beside the view switch: nothing is cut off. */}
+      <PageHeader title={<span aria-live="polite">{(desktop || !shown ? title : shortTitle(shown, view === 'month', navigator.language)) || 'Calendar'}</span>}
+        before={desktop ? previous : undefined} after={desktop ? next : undefined}>
+        {!desktop && <span className="-mr-1 flex shrink-0 items-center">{previous}{next}</span>}
+        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => { api()?.today(); setSelected(today()) }}>Today</Button>
+        {desktop && <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>}
         <div className="hidden md:block">{segmented}</div>
         <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={newEvent} className="hidden md:inline-flex">
           New event
         </Button>
       </PageHeader>
-      <div className="mb-3 md:hidden">{segmented}</div>
+      <div className="mb-3 flex items-center gap-1 md:hidden">
+        <div className="min-w-0 flex-1">{segmented}</div>
+        <Button size="icon" variant="ghost" className="shrink-0" aria-label="Trash" title="Deleted events" onClick={() => setTrashOpen(true)}><Trash2 className="h-4 w-4" /></Button>
+      </div>
       {error && <p className="mb-2 text-[13px] text-error">{errorMessage(error)}</p>}
 
       <div className={desktop ? 'flex min-h-0 flex-1 gap-3' : 'contents'}>

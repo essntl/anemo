@@ -241,6 +241,7 @@
  *   .pop     menus, dropdowns, the search palette: grow from the button that opened them
  *   .sheet   dialogs: slide up from the bottom on phones, pop in the middle from `md`
  *   .drawer  the phone menu: slides in from the left
+ *   .drawer-right  a panel over the page on a narrow screen: slides in from the right
  *   .toast   notices at the bottom: rise in, sink out (data-leaving, see toast.ts)
  *   .page    the page area: cross-fades when you go to another page (view transition)
  *
@@ -269,6 +270,8 @@
 @keyframes pop-out { to { opacity: 0; scale: 0.97; } }
 @keyframes drawer-in { from { transform: translateX(-100%); } }
 @keyframes drawer-out { to { transform: translateX(-100%); } }
+@keyframes drawer-right-in { from { transform: translateX(100%); } }
+@keyframes drawer-right-out { to { transform: translateX(100%); } }
 @keyframes sheet-in { from { transform: translateY(100%); } }
 @keyframes sheet-out { to { transform: translateY(100%); } }
 @keyframes rise-in { from { opacity: 0; transform: translateY(0.75rem); } }
@@ -288,6 +291,8 @@
 
 .drawer[data-state='open'] { animation: drawer-in 220ms var(--ease-out); }
 .drawer[data-state='closed'] { animation: drawer-out 160ms var(--ease-in) forwards; }
+.drawer-right[data-state='open'] { animation: drawer-right-in 220ms var(--ease-out); }
+.drawer-right[data-state='closed'] { animation: drawer-right-out 160ms var(--ease-in) forwards; }
 
 .sheet[data-state='open'] { animation: pop-in var(--motion-in) var(--ease-out); }
 .sheet[data-state='closed'] { animation: pop-out var(--motion-out) var(--ease-in) forwards; }
@@ -338,7 +343,7 @@
 
 /* Something on its way out no longer takes clicks. */
 .fade[data-state='closed'], .pop[data-state='closed'], .sheet[data-state='closed'],
-.drawer[data-state='closed'], .toast[data-leaving] { pointer-events: none; }
+.drawer[data-state='closed'], .drawer-right[data-state='closed'], .toast[data-leaving] { pointer-events: none; }
 
 /* Going to another page: only the page area changes, the sidebar stays still.
    React Router starts the view transition (see app/router.tsx). */
@@ -349,7 +354,7 @@
 ::view-transition-new(page) { animation: page-in 180ms var(--ease-out) 60ms both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span, .eq-bar { animation: none !important; }
+  .drawer, .drawer-right, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span, .eq-bar { animation: none !important; }
   .shimmer { color: var(--text-muted); background: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

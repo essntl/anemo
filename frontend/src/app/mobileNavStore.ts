@@ -19,4 +19,6 @@ export const useMobileNav = create<MobileNavState>((set) => ({
 /** Route `handle` for pages that render their own phone top bar (see AppLayout). */
 export interface RouteHandle {
   ownMobileHeader?: boolean
+  /** The page has its own header on a phone only (an open document): the app's top bar is hidden there. */
+  ownPhoneHeader?: boolean
 }

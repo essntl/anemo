@@ -18,7 +18,6 @@ import { TopBar } from './mobileNav'
 import { MobileTabBar } from './MobileTabBar'
 import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
-import { ScopeControl } from './ScopeControl'
 import { Sidebar, SidebarRail } from './Sidebar'
 import { useSidebar } from './sidebarStore'
 import { useSidebarSwipe } from './useSidebarSwipe'
@@ -75,7 +74,10 @@ export function AppLayout() {
   // Close the phone menu whenever the page changes (e.g. after tapping a link in it).
   useEffect(() => setOpen(false), [location.pathname, location.search, setOpen])
   // Pages like a conversation put the menu button into their own header instead.
-  const ownHeader = useMatches().some((m) => (m.handle as RouteHandle | undefined)?.ownMobileHeader)
+  const handles = useMatches().map((m) => m.handle as RouteHandle | undefined)
+  const ownHeader = handles.some((h) => h?.ownMobileHeader)
+  const ownPhoneHeader = handles.some((h) => h?.ownPhoneHeader)
+  const scoped = SCOPED.some((p) => (p === '/' ? location.pathname === '/' : location.pathname === p || location.pathname.startsWith(`${p}/`)))
 
   return (
     <div className="flex h-full">
@@ -89,11 +91,8 @@ export function AppLayout() {
       {/* The page column. The Dynamic Island floats at the top centre of it (not of the
           window), over the page header; see features/island/Island.tsx. */}
       <div id="main-column" className="relative flex min-w-0 flex-1 flex-col">
-        {!ownHeader && <TopBar />}
-        {/* Phones: what is shown (Uncategorized, a project, All) sits under the title on the pages it changes. */}
-        {!ownHeader && SCOPED.some((p) => (p === '/' ? location.pathname === '/' : location.pathname === p || location.pathname.startsWith(`${p}/`))) && (
-          <div className="shrink-0 px-3 pb-2 md:hidden"><ScopeControl /></div>
-        )}
+        {/* Phones: what is shown (Uncategorized, a project, All) is a line under the title on the pages it changes. */}
+        {!ownHeader && <TopBar scoped={scoped} phoneHidden={ownPhoneHeader} />}
         <Island />
         {/* relative: anything absolutely placed inside a page is held (and clipped) here,
             so it can never make the whole window scroll. */}

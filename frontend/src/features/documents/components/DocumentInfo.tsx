@@ -1,13 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { FileText, History, SquareCheckBig } from 'lucide-react'
+import { FileText, History, SquareCheckBig, X } from 'lucide-react'
 import { useDocumentBacklinks } from '@/features/links/api'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { useRevisions } from '../api'
 import type { OutlineItem } from '../outline'
 
-type Tab = 'outline' | 'details'
+type Tab = 'outline' | 'details' | 'chat'
+const TABS = [['outline', 'Outline'], ['details', 'Details'], ['chat', 'Chat']] as const
+
+/** Browser storage: the tab of the panel beside a document that was open last. */
+const TAB = 'anemo.docPanelTab'
+
+function lastTab(): Tab {
+  try {
+    const stored = localStorage.getItem(TAB)
+    return TABS.some(([id]) => id === stored) ? (stored as Tab) : 'outline'
+  } catch {
+    return 'outline'
+  }
+}
 
 const LABEL = 'px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle'
 const ROW = 'flex min-h-8 w-full items-center gap-2 rounded-control px-2 text-left text-[13px] hover:bg-surface-hover'
@@ -96,11 +109,12 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
 }
 
 /**
- * Beside a document: its outline on one tab, and on the other what the file is, what
- * links to it and its latest versions. Two tabs, so a long outline is never mixed up
- * with the rest. Shown and hidden with the button in the editor's header.
+ * Beside a document, on three tabs: its outline; what the file is, what links to it and
+ * its latest versions; and a chat with the assistant to have the document changed. Tabs,
+ * so a long outline is never mixed up with the rest. Shown and hidden with the button in
+ * the editor's header; on a narrow screen it slides in over the text (`onClose`).
  */
-export function DocumentInfo({ documentId, path, words, outline, active, onJump, onHistory }: {
+export function DocumentInfo({ documentId, path, words, outline, active, onJump, onHistory, notice, chat, onClose }: {
   documentId: string
   path: string
   words: number
@@ -109,25 +123,42 @@ export function DocumentInfo({ documentId, path, words, outline, active, onJump,
   active: number
   onJump: (index: number) => void
   onHistory: () => void
+  /** Something to decide about the document (an agent edited it), above the tabs. */
+  notice?: ReactNode
+  /** The chat tab's content. */
+  chat: ReactNode
+  /** Set when the panel lies over the text: a button to put it away. */
+  onClose?: () => void
 }) {
-  const [tab, setTab] = useState<Tab>('outline')
+  const [tab, setTabState] = useState<Tab>(lastTab)
+  const setTab = (next: Tab) => {
+    try { localStorage.setItem(TAB, next) } catch { /* no storage: just not remembered */ }
+    setTabState(next)
+  }
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-border p-2">
-        <div role="tablist" aria-label="About this document" className="flex rounded-lg bg-surface-2 p-0.5">
-          {([['outline', 'Outline'], ['details', 'Details']] as const).map(([id, label]) => (
+      {notice}
+      <div className="flex shrink-0 items-center gap-1 border-b border-border p-2">
+        <div role="tablist" aria-label="About this document" className="flex min-w-0 flex-1 rounded-lg bg-surface-2 p-0.5">
+          {TABS.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-              className={cn('flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md text-[12.5px] font-medium transition-colors',
+              className={cn('flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:text-[13.5px]',
                 tab === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
               {label}
               {id === 'outline' && outline.length > 0 && <span className="text-[11px] font-normal tabular-nums text-subtle">{outline.length}</span>}
             </button>
           ))}
         </div>
+        {onClose && (
+          <button type="button" aria-label="Close" onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
-      {tab === 'outline'
-        ? <Outline outline={outline} active={active} onJump={onJump} />
-        : <Details documentId={documentId} path={path} words={words} onHistory={onHistory} />}
+      {tab === 'outline' && <Outline outline={outline} active={active} onJump={onJump} />}
+      {tab === 'details' && <Details documentId={documentId} path={path} words={words} onHistory={onHistory} />}
+      {tab === 'chat' && chat}
     </div>
   )
 }

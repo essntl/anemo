@@ -45,6 +45,8 @@ interface ComposerProps {
   skills?: boolean
   /** A skill was chosen (e.g. to switch to Agent mode for one that needs tools). */
   onSkillChange?: (skill: Skill | null) => void
+  /** Take the focus when shown (not on touch screens). Default true; off for a chat beside something you type in. */
+  autoFocus?: boolean
 }
 
 const ADD_ITEM = 'flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left text-[13.5px] font-medium hover:bg-surface-hover disabled:opacity-40 pointer-coarse:py-2.5'
@@ -53,7 +55,7 @@ const ADD_ITEM = 'flex w-full items-center gap-3 rounded-control px-2.5 py-2 tex
 const MAX_HEIGHT = 240
 
 export function Composer({
-  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange,
+  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
 }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
@@ -293,7 +295,7 @@ export function Composer({
         <textarea
           ref={textRef}
           rows={1}
-          autoFocus={!touch}
+          autoFocus={autoFocus && !touch}
           value={text}
           disabled={disabled}
           placeholder={
