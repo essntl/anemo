@@ -74,7 +74,7 @@ class FakeRunner:
             "tools": [f"mcp__anemo__{t['name']}" for t in body["tools"]],
             "mcp_servers": [{"name": "anemo"}],
             "model": body["model"],
-            "cli_version": "2.1.308",
+            "cli_version": "2.1.321",
         }
         parked = self.parked.setdefault(sid, set())
         data = body["input"]
