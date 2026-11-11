@@ -8,7 +8,11 @@
  * survives reloads (the state is saved on the device) and can finish a phase that
  * ended while the app was closed.
  */
-import { msg } from '@/lib/i18n'
+
+// This file is also built into the browser extension (extension/tsconfig.json: @anemo/timer),
+// so it imports nothing from the app. `msg` only marks a text for translation (as lib/i18n's
+// does); the app shows it with t(…).
+const msg = (text: string): string => text
 
 export type Phase = 'focus' | 'short_break' | 'long_break'
 export type TimerStatus = 'idle' | 'running' | 'paused'
