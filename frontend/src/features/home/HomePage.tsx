@@ -73,7 +73,7 @@ export function HomePage() {
 
   return (
     <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Home" detail={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}>
+      <PageHeader title="Home">
         {editing ? (
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => update(() => resetLayout())}>Reset layout</Button>
@@ -85,9 +85,14 @@ export function HomePage() {
           </Button>
         )}
       </PageHeader>
-      <h2 className="mb-4 text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
-        {greeting(now.getHours())}<span className="text-accent">.</span>
-      </h2>
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+        <h2 className="text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
+          {greeting(now.getHours())}<span className="text-accent">.</span>
+        </h2>
+        <span className="text-[13px] text-muted md:text-sm">
+          {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+        </span>
+      </div>
 
       {editing && (
         <p className="mb-3 text-[13px] text-muted">
