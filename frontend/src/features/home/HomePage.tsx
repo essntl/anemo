@@ -75,6 +75,8 @@ export function HomePage() {
     }
   }
 
+  // Without a title in the top bar, the greeting is the page's main heading.
+  const Greeting = phone ? 'h2' : 'h1'
   const tools = editing ? (
     <div className="flex items-center gap-1.5">
       <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => update(() => resetLayout())}>Reset layout</Button>
@@ -91,9 +93,9 @@ export function HomePage() {
       {phone && <PageHeader title="Home">{tools}</PageHeader>}
       <div className="mb-4 flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h2 className="text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
+          <Greeting className="text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
             {greeting(now.getHours())}<span className="text-accent">.</span>
-          </h2>
+          </Greeting>
           <span className="text-[13px] text-muted md:text-sm">
             {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
           </span>

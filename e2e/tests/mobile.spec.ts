@@ -50,8 +50,13 @@ const SCREENS = [
  * button on those pages): a swipe from the left, here across the top bar.
  */
 async function openMenu(page: Page) {
-  await swipe(page, 60, 320, 24)
-  await expect(page.getByRole('dialog', { name: 'Menu' })).toBeVisible()
+  // Right after a page load the app may not be listening yet: wait for its tab bar, and
+  // swipe again if the first one came too early.
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  await expect(async () => {
+    await swipe(page, 60, 320, 24)
+    await expect(page.getByRole('dialog', { name: 'Menu' })).toBeVisible({ timeout: 1500 })
+  }).toPass({ timeout: 15_000 })
 }
 
 async function horizontalOverflow(page: Page): Promise<number> {
