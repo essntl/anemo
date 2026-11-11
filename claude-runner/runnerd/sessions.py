@@ -7,7 +7,8 @@ the tool with Anemo's own permission engine and posts the result in its next
 request, which resolves the parked call; the CLI then continues (its next model
 request) and the runner streams that back. Claude Code never runs anything itself.
 
-What was verified against the pinned CLI (2.1.308) and shaped this code:
+What was verified against the CLI (first 2.1.308; the tests check it for each pin) and
+shaped this code:
 - The CLI calls an MCP tool while the response is still streaming, and passes
   Claude's tool_use id in the call's `_meta["claudecode/toolUseId"]`.
 - Closing stdin (or cancelling the call) while a call is parked makes the CLI record

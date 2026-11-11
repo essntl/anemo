@@ -291,6 +291,17 @@ async def set_capability(db: AsyncSession, model_id: uuid.UUID, name: str, value
 
 async def test_model(db: AsyncSession, model: Model) -> tuple[TestResult, Usage | None]:
     """Runs a tiny streamed completion. Returns the result and the Usage (if any)."""
+    if model.provider.type == "claude_code":
+        # Only the worker can reach the claude-runner, so no request can be made from
+        # here (trying used to report "the container is not running", whatever its
+        # state). What can be said is the runner's own status.
+        status = await _test_claude_code()
+        if status.ok:
+            status.detail = (
+                "A subscription model can't be tried from here. Send it a message in a "
+                "chat to try it."
+            )
+        return status, None
     adapter = make_adapter(await build_config(db, model.provider))
     req = ChatRequest(
         model=model.model_key,

@@ -1,7 +1,7 @@
 # Exact pins: a Claude Code upgrade changes the cached prompt prefix, so upgrades are
-# deliberate (change these, rebuild the image). claude-agent-sdk 0.2.172 bundles
-# Claude Code 2.1.308; the Dockerfile checks that version at build time.
-claude-agent-sdk==0.2.172
+# deliberate (change these, rebuild the image). claude-agent-sdk 0.2.180 bundles
+# Claude Code 2.1.321; the Dockerfile checks that version at build time.
+claude-agent-sdk==0.2.180
 mcp==2.3.0
 fastapi==0.162.0
 uvicorn==0.54.0

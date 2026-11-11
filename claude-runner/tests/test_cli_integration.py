@@ -212,7 +212,7 @@ def test_health_reports_only_three_facts(runner: Runner) -> None:
     runner.start()
     h = httpx.get(f"{runner.url}/health", timeout=60).json()
     assert set(h) == {"ok", "logged_in", "auth_method", "cli_version", "subscription", "message"}
-    assert h["cli_version"].startswith("2.1.308")
+    assert h["cli_version"].startswith("2.1.321")
     assert h["subscription"] is False  # the tests use an API key, not a subscription
     assert httpx.post(f"{runner.url}/sessions/x/turn", json=message("x")).status_code == 401
 
@@ -230,3 +230,27 @@ def test_oneshot_has_no_tools_and_no_session(runner: Runner) -> None:
     init = next(e for e in events if e["type"] == "init")
     assert init["tools"] == [] and init["mcp_servers"] == []
     assert not list((runner.tmp / "config" / "projects").glob("*/*.jsonl"))  # not persisted
+
+
+def test_a_turn_whose_worker_went_away_does_not_keep_the_session_busy(runner: Runner) -> None:
+    """The model is silent (a stalled request) and the worker gives up or dies without
+    interrupting: the session must come free again, not stay "busy" until a restart."""
+    import httpx
+
+    from tests.conftest import TOKEN
+
+    runner.start(RUNNER_LOCK_WAIT_S="20")
+    runner.api.stall_s = 600.0
+    with httpx.stream(
+        "POST", f"{runner.url}/sessions/conv:stuck:agent/turn", json=message("hello?"),
+        headers={"Authorization": f"Bearer {TOKEN}"}, timeout=120,
+    ) as r:
+        for line in r.iter_lines():
+            if line.strip() and json.loads(line)["type"] == "accepted":
+                break  # ... and the worker is gone
+    runner.api.stall_s = 0.0
+    runner.api.replies.append(([text("Here now.")], "end_turn"))
+    events = runner.turn("conv:stuck:agent", message("still there?"))
+    assert [e for e in events if e["type"] == "error"] == []
+    assert events[-1]["type"] == "end"
+    assert "Here now." in "".join(e["text"] for e in events if e["type"] == "text")

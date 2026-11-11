@@ -26,7 +26,7 @@ as before.
    command above. The prebuilt image runs as user id 1000; if your `PUID` is
    different, build it yourself so the worker can read the runner's token. It is
    published by `.github/workflows/images.yml`; each runner image is also
-   tagged with the Claude Code version it contains (`claude-code-2.1.308`).
+   tagged with the Claude Code version it contains (`claude-code-2.1.321`).
 
    To have it start with everything else, add `claude` to `COMPOSE_PROFILES` in
    `.env` (for example `COMPOSE_PROFILES=browser,claude`).
@@ -44,7 +44,7 @@ as before.
    subscription (Claude Code)**. There is no key or address to enter. The provider
    card shows whether the runner is running and signed in, and the command to fix
    it when it is not. Use **Add models** to pick models (Opus 5.5, Sonnet 5.5, Haiku
-   5.5, Fable 5.1), and choose one as a default under *Default models*.
+   5.5, Fable 5.2), and choose one as a default under *Default models*.
 
 4. Optional: check prompt caching against your subscription. It runs a short agent
    conversation (8 turns, each reading a small file) and prints, for every model
@@ -175,7 +175,7 @@ Things that start a new prefix (and so one full cache write):
 
 ## Versions
 
-Pinned in `claude-runner/requirements.txt`: `claude-agent-sdk` 0.2.172, which bundles
-Claude Code 2.1.308 (checked when the image is built). To upgrade, change the pins,
+Pinned in `claude-runner/requirements.txt`: `claude-agent-sdk` 0.2.180, which bundles
+Claude Code 2.1.321 (checked when the image is built). To upgrade, change the pins,
 rebuild (`docker compose --profile claude build claude-runner`) and run the tests in
 `claude-runner/tests`; expect one cache write per conversation afterwards.

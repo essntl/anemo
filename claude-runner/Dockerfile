@@ -8,10 +8,10 @@ FROM python:3.13-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Exact versions (requirements.txt): the Agent SDK 0.2.172 wheel bundles Claude Code
-# 2.1.308. A CLI upgrade changes the cached prompt prefix, so it only happens when
+# Exact versions (requirements.txt): the Agent SDK 0.2.180 wheel bundles Claude Code
+# 2.1.321. A CLI upgrade changes the cached prompt prefix, so it only happens when
 # these pins change and the image is rebuilt (the auto-updater is off as well).
-ARG CLAUDE_CODE_VERSION=2.1.308
+ARG CLAUDE_CODE_VERSION=2.1.321
 COPY requirements.txt /opt/runnerd/requirements.txt
 RUN python -m venv /opt/runnerd && /opt/runnerd/bin/pip install --no-cache-dir \
         -r /opt/runnerd/requirements.txt \

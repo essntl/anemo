@@ -27,7 +27,7 @@ MODELS: list[tuple[str, str, int, int]] = [
     ("claude-opus-5-5", "Claude Opus 5.5 (subscription)", 1_000_000, 128_000),
     ("claude-sonnet-5-5", "Claude Sonnet 5.5 (subscription)", 1_000_000, 128_000),
     ("claude-haiku-5-5", "Claude Haiku 5.5 (subscription)", 1_000_000, 128_000),
-    ("claude-fable-5-1", "Claude Fable 5.1 (subscription)", 1_000_000, 128_000),
+    ("claude-fable-5-2", "Claude Fable 5.2 (subscription)", 1_000_000, 128_000),
 ]
 
 

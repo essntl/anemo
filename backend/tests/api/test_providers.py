@@ -150,3 +150,40 @@ async def test_delete_provider_removes_models_and_secrets(authed):
     assert (await authed.get("/api/models")).json() == []
     async with get_sessionmaker()() as db:
         assert list(await db.scalars(select(Secret))) == []
+
+
+async def test_testing_a_subscription_model_reports_the_runner_not_a_missing_container(authed):
+    """Only the worker can reach the claude-runner, so the app cannot send the model a
+    request; it used to say "the container is not running" whatever its state."""
+    import json
+
+    from app import claude_runner_client
+    from app.core.redis import get_redis
+
+    r = await authed.post("/api/providers", json={"name": "Claude Max", "type": "claude_code"})
+    pid = r.json()["id"]
+    (model,) = (
+        await authed.post(
+            f"/api/providers/{pid}/models/import", json={"model_keys": ["claude-fable-5-2"]}
+        )
+    ).json()
+    url = f"/api/models/{model['id']}/test"
+
+    status = {"running": True, "logged_in": True, "auth_method": "claude.ai"}
+    await get_redis().set(
+        claude_runner_client.STATUS_KEY, json.dumps({**status, "cli_version": "2.1.321"})
+    )
+    result = (await authed.post(url)).json()
+    assert result["ok"] is True
+    assert result["message"] == "Signed in with a Claude subscription (Claude Code 2.1.321)."
+    assert "can't be tried from here" in result["detail"]
+
+    await get_redis().set(
+        claude_runner_client.STATUS_KEY, json.dumps({**status, "logged_in": False})
+    )
+    result = (await authed.post(url)).json()
+    assert result["ok"] is False and "not signed in" in result["message"]
+
+    await get_redis().delete(claude_runner_client.STATUS_KEY)
+    result = (await authed.post(url)).json()
+    assert result["ok"] is False and "not running" in result["message"]
