@@ -10,6 +10,7 @@ const GLOBAL_KEY_LISTENERS: Record<string, string> = {
   '/src/hooks/useShiftHeld.ts': 'Shift held over the chat list (chat.quickDelete)',
   '/src/features/island/Island.tsx': 'Esc closes the expanded Island (app.close)',
   '/src/features/chat/tab.ts': 'notices that the tab is in use; not a shortcut',
+  '/src/app/useBackToClose.ts': 'notes a real Esc press, so "back" does not close a second layer after it; not a shortcut',
 }
 
 describe('shortcuts go through the registry', () => {

@@ -44,7 +44,7 @@ export function NewChatButton({ className }: { className?: string }) {
  */
 export function TopBar({ scoped, phoneHidden }: { scoped?: boolean; phoneHidden?: boolean }) {
   // Each half stops short of the Island while it shows (.island-clear-left in app.css).
-  const half = 'island-clear-left flex min-w-0 flex-1 [--island-gap:0.75rem] md:[--island-gap:1.75rem]'
+  const half = 'island-clear-left flex min-w-0 flex-1 [--island-gap:0.5rem] md:[--island-gap:1.75rem]'
   return (
     // overflow-x-clip: a page's buttons can never make the window scroll sideways.
     <header className={cn('flex h-12 shrink-0 items-center gap-1 overflow-x-clip px-1.5 md:h-14 md:gap-3 md:px-8', phoneHidden && 'max-md:hidden')}>
@@ -54,8 +54,9 @@ export function TopBar({ scoped, phoneHidden }: { scoped?: boolean; phoneHidden?
         <div ref={topBarStart} className="flex min-w-0 items-center gap-2.5" />
         {scoped && <div className="flex min-w-0 md:hidden"><ScopeControl variant="inline" /></div>}
       </div>
-      {/* On a phone the buttons take the room they need and the title gets the rest. */}
-      <div ref={topBarEnd} className={cn(half, 'ml-auto items-center justify-end gap-1.5 max-md:flex-none max-md:pr-1')} />
+      {/* On a phone the buttons take the room they need, at their full width (the Island
+          makes way for them, not they for it), and the title gets the rest. */}
+      <div ref={topBarEnd} className={cn(half, 'ml-auto items-center justify-end gap-1.5 max-md:flex-none max-md:whitespace-nowrap max-md:pr-1 max-md:*:shrink-0')} />
     </header>
   )
 }

@@ -197,6 +197,62 @@ async function swipe(page: Page, fromX: number, toX: number, y: number) {
   await cdp.detach()
 }
 
+/** A finger that goes down at (x, fromY) and moves straight to toY before it lifts. */
+async function pull(page: Page, x: number, fromY: number, toY: number) {
+  const cdp = await page.context().newCDPSession(page)
+  const at = (y: number) => ({ touchPoints: [{ x, y }] })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', ...at(fromY) })
+  for (const part of [0.25, 0.5, 0.75, 1]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', ...at(fromY + (toY - fromY) * part) })
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+}
+
+test('a bottom sheet pulls down to close, and back closes what is open instead of leaving the page', async ({ page }) => {
+  // The device's own back gesture reaches the app through CloseWatcher, which a test cannot
+  // press. Without it the app keeps a history entry while something is open: that is what
+  // going back in the browser's history exercises here.
+  await page.addInitScript(() => {
+    ;(window as unknown as { CloseWatcher?: unknown }).CloseWatcher = undefined
+  })
+  await login(page)
+  await page.goto('/tasks')
+  const more = page.getByRole('dialog', { name: 'More' })
+  const openMore = async () => {
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'More' }).tap()
+    await expect(more).toBeVisible()
+    // Once it has slid in.
+    await more.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)))
+  }
+
+  // Pulled down by its bar, the sheet goes away.
+  await openMore()
+  const box = (await more.boundingBox())!
+  await pull(page, box.x + box.width / 2, box.y + 10, box.y + 260)
+  await expect(more).toBeHidden()
+
+  // Back closes it, and the page stays.
+  await openMore()
+  await page.goBack()
+  await expect(more).toBeHidden()
+  await expect(page).toHaveURL(/\/tasks$/)
+
+  // The menu drawer too.
+  await openMenu(page)
+  await page.goBack()
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toBeHidden()
+  await expect(page).toHaveURL(/\/tasks$/)
+
+  // A page opened from the sheet: back returns to where the sheet was opened, in one step.
+  await openMore()
+  await more.getByRole('link', { name: 'Projects', exact: true }).tap()
+  await expect(page).toHaveURL(/\/projects$/)
+  await page.goBack()
+  await expect(page).toHaveURL(/\/tasks$/)
+  await expect(more).toBeHidden()
+})
+
 test('swiping opens and closes the menu, but not from a text field', async ({ page }) => {
   await login(page)
   await page.goto('/tasks')

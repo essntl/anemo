@@ -16,7 +16,7 @@ import { player, usePlayer } from '@/features/music/player/controller'
 import { dismissIslandAlert, useIslandAlerts } from './alerts'
 import { AlertBadge, IslandButton } from './IslandParts'
 import { useIslandVisible } from './islandStore'
-import { useIslandSide } from './useIslandSide'
+import { useIslandPlace } from './useIslandSide'
 
 /** How the content of each state appears: a quick blur and scale, or a fade with reduced motion. */
 const content = {
@@ -27,9 +27,13 @@ const content = {
 
 type Mode = 'hidden' | 'compact' | 'expanded' | 'alert'
 
+/** How many pixels the room must grow before the Island tries again to show more. */
+const ROOM_SLACK = 6
+
 /**
- * The Dynamic Island: a dark pill at the top centre of the page area (on a phone, at the
- * right end of the top bar when the page has no buttons there: see useIslandSide). It is
+ * The Dynamic Island: a dark pill at the top centre of the page area. On a phone it sits
+ * at the right end of the top bar when the page has no buttons there, and where it has
+ * some, it stays in the middle and gives up what does not fit (see useIslandPlace). It is
  *  - hidden while no timer runs and nothing has played,
  *  - compact: the timer (ring, phase, clock) and/or music (cover, bars),
  *  - expanded (click it, or Enter): controls for both; Esc or a click outside closes it,
@@ -49,7 +53,8 @@ export function Island() {
   const wrap = useRef<HTMLDivElement>(null)
   const pill = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
-  const side = useIslandSide()
+  const { place, room } = useIslandPlace()
+  const side = place === 'end' ? 'end' : 'center'
 
   // Activity already there when the app opens is just there; only new activity animates in.
   const [settled, setSettled] = useState(false)
@@ -63,6 +68,30 @@ export function Island() {
   const hasActivity = showTimer || showMusic
   const mode: Mode = alert ? 'alert' : expanded && hasActivity ? 'expanded' : hasActivity ? 'compact' : 'hidden'
   const phaseColor = PHASE_COLOR[timer.phase]
+
+  // Between a title and buttons on a phone the room is measured, and the Island gives up
+  // what does not fit, a step at a time: first the track's title and the timer's numbers,
+  // then (with timer and music together) the cover. The timer's circle and the music's
+  // bars always stay, and whatever fits is shown: alone, the timer keeps its numbers
+  // wherever there is room for them.
+  const both = showTimer && showMusic
+  const fitKey = `${place}|${showTimer}|${showMusic}|${p.track?.id ?? ''}`
+  const [fit, setFit] = useState({ key: '', dropped: 0, room: 0 })
+  // What was given up stays given up until there is clearly more room than when it went
+  // (the measured room moves by a pixel with how the title is cut), or something else shows.
+  const dropped = place === 'between' && fit.key === fitKey && room <= fit.room + ROOM_SLACK ? fit.dropped : 0
+  useLayoutEffect(() => {
+    const el = pill.current
+    if (place !== 'between' || mode !== 'compact' || !el) return
+    const most = both ? 2 : 1
+    // Watched anew after every step and every change of the room: the first report says
+    // how wide the pill is now.
+    const observer = new ResizeObserver(() => {
+      if (dropped < most && el.offsetWidth > room) setFit({ key: fitKey, dropped: dropped + 1, room })
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [place, mode, room, fitKey, dropped, both])
 
   // Nothing left to control: the next activity starts compact again.
   if (!hasActivity && expanded) setExpanded(false)
@@ -106,7 +135,9 @@ export function Island() {
     }
     if (mode !== 'compact' || !pill.current) return
     const el = pill.current
-    const publish = () => column.style.setProperty('--island-w', `${Math.ceil(el.getBoundingClientRect().width)}px`)
+    // offsetWidth, not the drawn box: while the pill animates to a new size its drawn
+    // width is still on the way there, and nothing reports when it has arrived.
+    const publish = () => column.style.setProperty('--island-w', `${el.offsetWidth}px`)
     publish()
     const observer = new ResizeObserver(publish)
     observer.observe(el)
@@ -136,6 +167,8 @@ export function Island() {
       <AnimatePresence>
         {mode !== 'hidden' && (
           <motion.div ref={pill} layout data-testid="island" data-mode={mode}
+            // Opened, it counts as something to close (back on a phone closes it: app/overlays.ts).
+            data-overlay={mode === 'expanded' ? 'open' : undefined}
             initial={settled ? { opacity: 0, scale: 0.6, y: -10 } : false}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.6, y: -10 }}
@@ -162,22 +195,25 @@ export function Island() {
               {mode === 'compact' && (
                 <motion.button key="compact" ref={toggleRef} {...content} type="button" aria-expanded={false}
                   aria-label={`${summary}. Show controls`} onClick={() => setExpanded(true)}
-                  className="flex h-9 items-center gap-2.5 px-3 md:h-10">
+                  className={cn('flex h-9 items-center md:h-10', dropped ? 'gap-2 px-2.5' : 'gap-2.5 px-3')}>
                   {showTimer && (
                     <span className="flex items-center gap-2">
                       <Ring progress={timer.progress} size={20} stroke={3} color={phaseColor} track="var(--island-track)" />
                       <span className="hidden text-[12px] font-semibold text-island-muted sm:inline">
                         {timer.phase === 'focus' ? 'Focus' : 'Break'}
                       </span>
-                      <RollingText value={formatClock(timer.remaining)}
-                        className={cn('text-[14px] font-semibold', timer.status === 'paused' && 'text-island-muted')} />
+                      {/* Without the room for them, the circle alone tells how far the timer is. */}
+                      {dropped < 1 && (
+                        <RollingText value={formatClock(timer.remaining)}
+                          className={cn('text-[14px] font-semibold', timer.status === 'paused' && 'text-island-muted')} />
+                      )}
                     </span>
                   )}
-                  {showTimer && showMusic && <span className="h-4 w-px bg-island-track" />}
+                  {both && dropped < 1 && <span className="h-4 w-px bg-island-track" />}
                   {showMusic && (
                     <span className="flex min-w-0 items-center gap-2">
-                      <Artwork track={p.track} className="h-6 w-6 rounded-md md:h-7 md:w-7" />
-                      {!showTimer && <span className="max-w-[110px] truncate text-[13px] font-medium sm:max-w-[160px]">{p.track!.title}</span>}
+                      {!(both && dropped >= 2) && <Artwork track={p.track} className="h-6 w-6 rounded-md md:h-7 md:w-7" />}
+                      {!showTimer && dropped < 1 && <span className="max-w-[110px] truncate text-[13px] font-medium sm:max-w-[160px]">{p.track!.title}</span>}
                       <Equalizer playing={p.status === 'playing'} className="text-accent" />
                     </span>
                   )}

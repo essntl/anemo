@@ -30,7 +30,6 @@ function MoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
         <RadixDialog.Overlay className="fade fixed inset-0 z-40 bg-black/35" />
         <RadixDialog.Content aria-describedby={undefined}
           className="sheet fixed inset-x-0 bottom-0 z-50 rounded-t-panel border border-border bg-card px-3 pt-2 shadow-float focus:outline-none pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div aria-hidden className="mx-auto mb-2 h-1 w-9 rounded-full bg-border-strong" />
           <RadixDialog.Title className="px-2 pb-2 text-[17px] font-bold tracking-tight">More</RadixDialog.Title>
           <nav aria-label="More pages" className="grid grid-cols-4 gap-1">
             {[...pages, { to: '/settings', icon: <Settings />, label: 'Settings' }].map((p) => (
