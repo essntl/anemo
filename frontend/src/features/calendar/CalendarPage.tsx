@@ -221,8 +221,10 @@ export function CalendarPage() {
     </div>
   )
 
-  const previous = <Button size="icon" variant="ghost" className="shrink-0 md:-mx-1" aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
-  const next = <Button size="icon" variant="ghost" className="shrink-0 md:-mx-1" aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>
+  // On a phone the arrows are slim: with Today they must fit beside the Dynamic Island.
+  const ARROW = 'shrink-0 max-md:w-8! md:-mx-1'
+  const previous = <Button size="icon" variant="ghost" className={ARROW} aria-label="Previous" onClick={() => api()?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
+  const next = <Button size="icon" variant="ghost" className={ARROW} aria-label="Next" onClick={() => api()?.next()}><ChevronRight className="h-4 w-4" /></Button>
   return (
     <div className={cn('flex h-full flex-col px-3 pb-3 pt-2 md:px-6 md:pb-6 md:pt-1', phoneMonth && 'overflow-y-auto pb-24')}>
       {/* The month or week shown is the page's title, with the arrows around it. On a phone the

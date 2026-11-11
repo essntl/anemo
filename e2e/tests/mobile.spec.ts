@@ -511,6 +511,9 @@ test('the Island sits in the top bar, at the right where that end is free, and p
       return Math.abs(Math.round(pill.x + pill.width / 2 - width / 2))
     }).toBeLessThanOrEqual(2)
     await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
+    // On a phone the Trash is not in the bar, where it ran under the Island, but beside the view switch.
+    await expect(bar.getByRole('button', { name: 'Trash' })).toHaveCount(0)
+    await expect(page.getByRole('main').getByRole('button', { name: 'Trash' })).toBeVisible()
     await island.getByRole('button', { name: /Show controls/ }).tap()
     await island.getByRole('button', { name: 'Pause music' }).tap()
     await expect(island.getByRole('button', { name: 'Play music' })).toBeVisible()
