@@ -23,6 +23,16 @@ def video() -> str:
     return uuid.uuid4().hex[:11]
 
 
+class Unread(httpx.AsyncByteStream):
+    """A response body that has not been read yet."""
+
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+
+    async def __aiter__(self):
+        yield self.data
+
+
 class Fake:
     def __init__(self) -> None:
         self.lookups = 0  # how often "yt-dlp" was asked
@@ -57,11 +67,15 @@ def youtube(monkeypatch):
         if start >= len(AUDIO):
             return httpx.Response(416)
         end = min(int(asked[2]) if asked[2] else len(AUDIO) - 1, len(AUDIO) - 1)
+        part = AUDIO[start : end + 1]
+        # A body that still has to be read, as from a real host (one given as `content`
+        # counts as read already, and cannot be passed on piece by piece).
         return httpx.Response(
             206,
-            content=AUDIO[start : end + 1],
+            stream=Unread(part),
             headers={
                 "Content-Type": "audio/mp4",
+                "Content-Length": str(len(part)),
                 "Content-Range": f"bytes {start}-{end}/{len(AUDIO)}",
             },
         )
