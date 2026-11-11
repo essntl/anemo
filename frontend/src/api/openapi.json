@@ -11476,6 +11476,141 @@
         }
       }
     },
+    "/api/music/audio/youtube/{video_id}": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Youtube Audio",
+        "description": "A YouTube track as plain audio, for an <audio> element: fetched by this server and\npassed on, byte ranges included (so the player can seek). See features/music/streams.py.",
+        "operationId": "youtube_audio_api_music_audio_youtube__video_id__get",
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{11}$",
+              "description": "A YouTube video id",
+              "title": "Video Id"
+            },
+            "description": "A YouTube video id"
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "audio/mp4": {}
+            }
+          },
+          "206": {
+            "content": {
+              "audio/mp4": {}
+            },
+            "description": "Partial Content"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/audio/youtube/{video_id}/prepare": {
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "summary": "Prepare Youtube Audio",
+        "description": "Look up where a track's audio is ahead of time (the track that plays next), so it\nstarts without the wait.",
+        "operationId": "prepare_youtube_audio_api_music_audio_youtube__video_id__prepare_post",
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{11}$",
+              "description": "A YouTube video id",
+              "title": "Video Id"
+            },
+            "description": "A YouTube video id"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notifications": {
       "get": {
         "tags": [
@@ -20580,6 +20715,11 @@
             "type": "boolean",
             "title": "Play While Focusing",
             "default": false
+          },
+          "server_audio": {
+            "type": "boolean",
+            "title": "Server Audio",
+            "default": true
           }
         },
         "type": "object",

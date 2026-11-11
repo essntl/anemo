@@ -1,9 +1,11 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, Path
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import Db
-from app.features.music import player_relay, service
+from app.features.music import player_relay, service, streams
 from app.features.music.schemas import (
     PlaylistIn,
     PlaylistOut,
@@ -97,3 +99,32 @@ async def player_state(body: player_relay.PlayerAnswer) -> None:
     with a `music.control` event carrying a request id. Answers nobody asked for are
     dropped."""
     await player_relay.answer(body)
+
+
+VideoId = Annotated[str, Path(pattern=streams.VIDEO_ID, description="A YouTube video id")]
+
+
+@router.get(
+    "/audio/youtube/{video_id}",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"audio/mp4": {}}}, 206: {"content": {"audio/mp4": {}}}},
+)
+async def youtube_audio(
+    video_id: VideoId, range_header: Annotated[str | None, Header(alias="Range")] = None
+) -> StreamingResponse:
+    """A YouTube track as plain audio, for an <audio> element: fetched by this server and
+    passed on, byte ranges included (so the player can seek). See features/music/streams.py."""
+    upstream = await streams.open_stream(video_id, streams.byte_range(range_header))
+    return StreamingResponse(
+        upstream.body(),
+        status_code=upstream.status_code,
+        media_type=upstream.stream.mime,
+        headers=upstream.headers,
+    )
+
+
+@router.post("/audio/youtube/{video_id}/prepare", status_code=204)
+async def prepare_youtube_audio(video_id: VideoId) -> None:
+    """Look up where a track's audio is ahead of time (the track that plays next), so it
+    starts without the wait."""
+    await streams.resolve(video_id)

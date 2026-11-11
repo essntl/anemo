@@ -18,7 +18,7 @@ export function PlayerEngine() {
   const music = useSettings().data?.music
 
   useEffect(() => {
-    if (music) setPlayerPrefs({ trackAlerts: music.track_alerts })
+    if (music) setPlayerPrefs({ trackAlerts: music.track_alerts, serverAudio: music.server_audio })
   }, [music])
 
   // Settings > Music, "Play while focusing": the music starts with a focus session and

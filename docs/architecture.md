@@ -752,6 +752,22 @@ plus generated ambient noise (Web Audio). `detect.ts` turns a pasted link into a
 source. An interrupted track resumes at its position; an unplayable one is skipped,
 at most `MAX_SKIPS` (3) in a row, so a dead playlist stops instead of spinning.
 
+A YouTube track plays one of two ways. **Through the server** (Settings → Music, "Keep
+playing in the background", on by default): `GET /api/music/audio/youtube/<id>`
+(`features/music/streams.py`) has yt-dlp name the video's audio-only streams, picks one,
+remembers its address in Valkey until it runs out, and passes the bytes on, ranges
+included, to the `<audio>` backend. That keeps playing while the app is out of sight or
+the screen is off, which an embedded player cannot (the phone's browser pauses it and
+the page may not start it again), and puts the media keys and the lock screen's buttons
+on the app's own handlers. Nothing is stored. **Through YouTube's embedded player**: when
+the setting is off, for live streams, and for any track the server could not fetch (the
+player falls back by itself and says why once; after three in a row it stops asking for
+the session). SoundCloud always uses its widget: it only offers segmented streams.
+
+A pause that the app did not ask for is undone only when it comes with the page going
+out of sight (the interruption above). At any other time it is somebody's doing, through
+a media key or the phone's media notification, and stands.
+
 **Dynamic Island** states: `hidden` (nothing going on) → `compact` (timer or track) →
 `expanded` (controls, on click/tap) and `alert` (a short message that morphs in and
 back: phase ended, new track, agent finished or waiting for approval). It reserves
