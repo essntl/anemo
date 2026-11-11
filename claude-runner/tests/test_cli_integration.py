@@ -212,7 +212,7 @@ def test_health_reports_only_three_facts(runner: Runner) -> None:
     runner.start()
     h = httpx.get(f"{runner.url}/health", timeout=60).json()
     assert set(h) == {"ok", "logged_in", "auth_method", "cli_version", "subscription", "message"}
-    assert h["cli_version"].startswith("2.1.308")
+    assert h["cli_version"].startswith("2.1.321")
     assert h["subscription"] is False  # the tests use an API key, not a subscription
     assert httpx.post(f"{runner.url}/sessions/x/turn", json=message("x")).status_code == 401
 
