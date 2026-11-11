@@ -42,9 +42,10 @@ function Starters({ onSkill }: { onSkill: (skill: ReturnType<typeof useSlashSkil
     .slice(0, 3)
   if (!recent.length && !skills.length && !due.length) return null
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    // grid-cols-1: the one column is as wide as the page, however long a chat's title is.
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {recent.length > 0 && (
-        <section className={PANEL} aria-label="Recent chats">
+        <section className={cn(PANEL, 'min-w-0')} aria-label="Recent chats">
           <div className={PANEL_TITLE}>
             <span className="flex-1">Pick up where you left off</span>
             <Link to="/chats" className="font-medium text-accent hover:underline">All chats</Link>
@@ -60,7 +61,7 @@ function Starters({ onSkill }: { onSkill: (skill: ReturnType<typeof useSlashSkil
           ))}
         </section>
       )}
-      <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
         {skills.length > 0 && (
           <section className={PANEL} aria-label="Skills">
             <div className={PANEL_TITLE}>

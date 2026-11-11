@@ -289,6 +289,20 @@
 .pop[data-state='open'] { animation: pop-in var(--motion-in) var(--ease-out); }
 .pop[data-state='closed'] { animation: pop-out var(--motion-out) var(--ease-in) forwards; }
 
+/* Phones: every bottom sheet has a pull bar at its top. It follows a finger that pulls
+   it down and goes away when let go far enough (app/useSheetSwipe.ts). */
+@media (max-width: 767px) {
+  .sheet::before {
+    content: '';
+    display: block;
+    flex: none;
+    width: 2.25rem;
+    height: 0.25rem;
+    margin: 0 auto 0.5rem;
+    border-radius: 9999px;
+    background: var(--color-border-strong);
+  }
+}
 .drawer[data-state='open'] { animation: drawer-in 220ms var(--ease-out); }
 .drawer[data-state='closed'] { animation: drawer-out 160ms var(--ease-in) forwards; }
 .drawer-right[data-state='open'] { animation: drawer-right-in 220ms var(--ease-out); }
@@ -323,8 +337,11 @@
  * carries its width as --island-w (0px while hidden) and data-island="on|off".
  *  .island-clear-left  a part of the top bar stops short of the Island while it shows; set
  *                      --island-gap to the space between the column edge and it.
+ * On a phone the Island sits at the right end of the bar when the page has no buttons
+ * there (data-island-side="end"): the title's part then reaches up to it.
  */
 #main-column[data-island='on'] .island-clear-left { max-width: calc(50% - var(--island-w, 0px) / 2 - var(--island-gap, 1rem)); }
+#main-column[data-island='on'][data-island-side='end'] .island-clear-left { max-width: calc(100% - var(--island-w, 0px) - var(--island-gap, 1rem) - 0.5rem); }
 
 /* Centres a line of text on its letters rather than on the font's line box, whose
    space above and below differs between fonts (e.g. MiSans sits high in a pill).

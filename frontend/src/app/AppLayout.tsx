@@ -20,6 +20,8 @@ import { PersistentLayer } from './PersistentLayer'
 import { type RouteHandle, useMobileNav } from './mobileNavStore'
 import { Sidebar, SidebarRail } from './Sidebar'
 import { useSidebar } from './sidebarStore'
+import { useBackToClose } from './useBackToClose'
+import { useSheetSwipe } from './useSheetSwipe'
 import { useSidebarSwipe } from './useSidebarSwipe'
 
 /** On phones the sidebar slides in from the left (menu button, or swipe right); the
@@ -60,6 +62,9 @@ export function AppLayout() {
   useAppEvents()
   useServiceWorkerLinks()
   useSidebarSwipe()
+  // Phones: a bottom sheet follows a pull down and goes away; back closes what is open.
+  useSheetSwipe()
+  useBackToClose()
   const location = useLocation()
   // Desktop: the sidebar can be folded to a strip of icons (its button, or Ctrl+\).
   const collapsed = useSidebar((s) => s.collapsed)

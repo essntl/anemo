@@ -3,6 +3,10 @@
  * is stored on the server, one for phones and one for wider screens; "Edit layout"
  * (or E) lets you move, resize, hide and add widgets. Every widget follows the
  * project switcher.
+ *
+ * From `md` up the page has no title in the top bar (the greeting is its heading) and
+ * the layout button sits on the greeting's line. A phone keeps "Home" in the bar, where
+ * the project switcher hangs under it, with the button beside it.
  */
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useNow } from '@/hooks/useNow'
@@ -71,27 +75,32 @@ export function HomePage() {
     }
   }
 
+  // Without a title in the top bar, the greeting is the page's main heading.
+  const Greeting = phone ? 'h2' : 'h1'
+  const tools = editing ? (
+    <div className="flex items-center gap-1.5">
+      <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => update(() => resetLayout())}>Reset layout</Button>
+      <Button size="sm" variant="primary" icon={<Check className="h-4 w-4" />} onClick={() => setEditing(false)}>Done</Button>
+    </div>
+  ) : (
+    <Button size="icon" variant="ghost" aria-label="Edit layout" title="Edit layout (E)" onClick={() => setEditing(true)}>
+      <LayoutGrid className="h-4 w-4" />
+    </Button>
+  )
+
   return (
     <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Home">
-        {editing ? (
-          <div className="flex items-center gap-1.5">
-            <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => update(() => resetLayout())}>Reset layout</Button>
-            <Button size="sm" variant="primary" icon={<Check className="h-4 w-4" />} onClick={() => setEditing(false)}>Done</Button>
-          </div>
-        ) : (
-          <Button size="icon" variant="ghost" aria-label="Edit layout" title="Edit layout (E)" onClick={() => setEditing(true)}>
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-        )}
-      </PageHeader>
-      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-        <h2 className="text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
-          {greeting(now.getHours())}<span className="text-accent">.</span>
-        </h2>
-        <span className="text-[13px] text-muted md:text-sm">
-          {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-        </span>
+      {phone && <PageHeader title="Home">{tools}</PageHeader>}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <Greeting className="text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
+            {greeting(now.getHours())}<span className="text-accent">.</span>
+          </Greeting>
+          <span className="text-[13px] text-muted md:text-sm">
+            {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          </span>
+        </div>
+        {!phone && <div className="shrink-0">{tools}</div>}
       </div>
 
       {editing && (

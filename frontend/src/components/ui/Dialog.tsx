@@ -34,7 +34,8 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
           onAnimationEnd={(e) => closing && e.target === e.currentTarget && done()}
           className={cn(
             'sheet fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-panel border border-border bg-card p-5 shadow-float focus:outline-none',
-            'pb-[max(1.25rem,env(safe-area-inset-bottom))]',
+            // On a phone the pull bar (.sheet in app.css) sits above the title.
+            'pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:pt-2.5',
             'md:inset-x-auto md:bottom-auto md:left-1/2 md:top-1/2 md:w-[min(92vw,440px)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-panel md:p-6',
             className,
           )}
