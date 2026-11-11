@@ -39,6 +39,14 @@ test('documents: write, autosave, outside changes, history and delete', async ({
       expect(doc.content).toContain('Hello from the browser test. **Bold words.**')
     }).toPass()
 
+    // Beside the text: the outline, and a chat to have the document changed.
+    const panel = page.getByRole('complementary', { name: 'About this document' })
+    await expect(panel.getByRole('navigation', { name: 'Outline' }).getByRole('button', { name: title })).toBeVisible()
+    await panel.getByRole('tab', { name: 'Chat' }).click()
+    await expect(panel.getByRole('heading', { name: 'Edit with the assistant' })).toBeVisible()
+    await expect(panel.getByPlaceholder('Ask for a change…')).toBeVisible()
+    await panel.getByRole('tab', { name: /^Outline/ }).click()
+
     // Changed elsewhere (as an agent would) while nothing is unsaved here: it shows up.
     const current = await (await page.request.get(`/api/documents/${id}`)).json()
     await page.request.put(`/api/documents/${id}`, {

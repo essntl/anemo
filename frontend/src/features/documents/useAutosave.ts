@@ -102,6 +102,26 @@ export function useAutosave(doc: DocumentContent) {
     }
   }, [doc.id, qc])
 
+  /**
+   * Saves what is pending and waits for it. False when the server does not have our text
+   * afterwards (a conflict to decide, or the save failed).
+   */
+  const flush = useCallback(async (): Promise<boolean> => {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (conflict.current) return false
+      if (saving.current) {
+        await new Promise((resolve) => window.setTimeout(resolve, 50))
+        continue
+      }
+      const content = latest.current
+      if (content === saved.current) return true
+      await saveRef.current()
+      // Nothing was typed meanwhile and it still isn't there: it could not be saved.
+      if (latest.current === content && saved.current !== content) return false
+    }
+    return false
+  }, [])
+
   return {
     text,
     setText,
@@ -110,6 +130,7 @@ export function useAutosave(doc: DocumentContent) {
     /** Hash of the version our edits are based on. */
     baseHash: () => hash.current,
     saveNow: () => void save(),
+    flush,
     /** After a conflict: write our text over the other version. */
     overwrite: () => void save(true),
   }

@@ -12,7 +12,14 @@ vi.mock('../api', () => ({
 const confirm = vi.fn(async (_options: unknown) => true)
 vi.mock('@/components/ui/dialogs', () => ({ confirmDialog: (options: unknown) => confirm(options) }))
 
-const { AgentEditBar } = await import('./AgentEditBar')
+const { useAgentEdit } = await import('../agentEdit')
+const { AgentEditNotice } = await import('./AgentEditNotice')
+
+/** As the editor does it: the notice shows while there is an edit to decide about. */
+function AgentEditBar({ documentId, onReview }: { documentId: string; onReview: () => void }) {
+  const edit = useAgentEdit(documentId)
+  return edit ? <AgentEditNotice edit={edit} onReview={onReview} /> : null
+}
 
 beforeEach(() => {
   localStorage.clear()
@@ -20,7 +27,7 @@ beforeEach(() => {
   revisions = [revision('r2', 'agent', true), revision('r1', 'user')]
 })
 
-describe('the bar over a document an agent edited', () => {
+describe('the notice beside a document an agent edited', () => {
   it('shows while the latest version is the agent’s, and opens the history', async () => {
     const onReview = vi.fn()
     render(<AgentEditBar documentId="d1" onReview={onReview} />)

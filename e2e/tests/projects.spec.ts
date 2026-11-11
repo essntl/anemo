@@ -136,8 +136,10 @@ test('a project narrows the chat list, and new chats start in it', async ({ page
 
     // Choose the project in the sidebar: only its chats are listed.
     const sidebar = page.locator('aside').first()
-    await sidebar.getByRole('button', { name: 'Project', exact: true }).click()
+    const switcher = sidebar.getByRole('button', { name: /^Showing / })
+    await switcher.click()
     await page.getByRole('menuitemradio', { name }).click()
+    await expect(sidebar.getByRole('button', { name: `Showing ${name}` })).toBeVisible()
     const chats = sidebar.getByLabel('Chats', { exact: true })
     await expect(chats.getByRole('link', { name: inside })).toBeVisible()
     await expect(chats.getByRole('link', { name: outside })).toHaveCount(0)
@@ -153,12 +155,14 @@ test('a project narrows the chat list, and new chats start in it', async ({ page
     expect(chat.project_id).toBe(projectId)
 
     // Uncategorized: only what is in no project.
-    await sidebar.getByRole('button', { name: 'Uncategorized' }).click()
+    await switcher.click()
+    await page.getByRole('menuitemradio', { name: 'Uncategorized' }).click()
     await expect(chats.getByRole('link', { name: outside })).toBeVisible()
     await expect(chats.getByRole('link', { name: inside })).toHaveCount(0)
 
     // All: everything together.
-    await sidebar.getByRole('button', { name: 'All', exact: true }).click()
+    await switcher.click()
+    await page.getByRole('menuitemradio', { name: 'All', exact: true }).click()
     await expect(chats.getByRole('link', { name: outside })).toBeVisible()
     await expect(chats.getByRole('link', { name: inside })).toBeVisible()
   } finally {
