@@ -12,27 +12,28 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { formatCost, formatCount, formatWhen } from '@/lib/format'
+import { msg, plural, rich, t } from '@/lib/i18n'
 import { type GroupBy, type UsageGroup, type UsageTotals, useUsageRecords, useUsageSummary } from './api'
 import { type DayBar, DayChart } from './components/DayChart'
 import { daysIn, type RangeId, rangeFor, RANGES } from './ranges'
 
-const GROUPINGS: { value: Exclude<GroupBy, 'day'>; label: string }[] = [
-  { value: 'model', label: 'By model' },
-  { value: 'kind', label: 'By kind of work' },
-  { value: 'provider', label: 'By provider' },
-  { value: 'profile', label: 'By agent profile' },
-  { value: 'automation', label: 'By automation' },
+const GROUPINGS: { value: Exclude<GroupBy, 'day'>; label: string; column: string }[] = [
+  { value: 'model', label: msg('By model'), column: msg('model') },
+  { value: 'kind', label: msg('By kind of work'), column: msg('kind of work') },
+  { value: 'provider', label: msg('By provider'), column: msg('provider') },
+  { value: 'profile', label: msg('By agent profile'), column: msg('agent profile') },
+  { value: 'automation', label: msg('By automation'), column: msg('automation') },
 ]
 const KIND_LABELS: Record<string, string> = {
-  chat: 'Chat', agent: 'Agent', title: 'Naming chats', memory: 'Memory', embedding: 'Search index',
-  summarize: 'Summaries', test: 'Connection tests',
+  chat: msg('Chat'), agent: msg('Agent'), title: msg('Naming chats'), memory: msg('Memory'), embedding: msg('Search index'),
+  summarize: msg('Summaries'), test: msg('Connection tests'),
 } // prettier-ignore
 
 type Metric = 'cost' | 'tokens' | 'requests'
 const METRICS: { value: Metric; label: string }[] = [
-  { value: 'cost', label: 'Cost' },
-  { value: 'tokens', label: 'Tokens' },
-  { value: 'requests', label: 'Calls' },
+  { value: 'cost', label: msg('Cost') },
+  { value: 'tokens', label: msg('Tokens') },
+  { value: 'requests', label: msg('Calls') },
 ]
 
 const valueOf = (t: UsageTotals, metric: Metric) =>
@@ -42,11 +43,11 @@ const formatMetric = (metric: Metric) => (value: number) =>
 
 /** "$1.20", or "$1.20 + unknown" when some calls have no known cost. */
 function Cost({ totals }: { totals: UsageTotals }) {
-  if (totals.unknown_cost_requests === totals.requests && totals.requests > 0) return <>unknown</>
+  if (totals.unknown_cost_requests === totals.requests && totals.requests > 0) return <>{t('unknown')}</>
   return (
     <>
       {formatCost(totals.cost_usd)}
-      {totals.unknown_cost_requests > 0 && <span className="text-muted"> + unknown</span>}
+      {totals.unknown_cost_requests > 0 && <span className="text-muted"> + {t('unknown')}</span>}
     </>
   )
 }
@@ -62,18 +63,18 @@ function Stat({ label, children, hint }: { label: string; children: ReactNode; h
 }
 
 function Breakdown({ groups, grouping }: { groups: UsageGroup[]; grouping: GroupBy }) {
-  if (groups.length === 0) return <p className="text-[13px] text-muted">Nothing in this period.</p>
-  const label = (g: UsageGroup) => (grouping === 'kind' ? (KIND_LABELS[g.label] ?? g.label) : g.label)
+  if (groups.length === 0) return <p className="text-[13px] text-muted">{t('Nothing in this period.')}</p>
+  const label = (g: UsageGroup) => (grouping === 'kind' ? (KIND_LABELS[g.label] ? t(KIND_LABELS[g.label]) : g.label) : g.label)
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-[13px]">
         <thead className="text-[11px] uppercase tracking-wider text-subtle">
           <tr>
-            <th className="py-1.5 pr-3 font-semibold">{GROUPINGS.find((g) => g.value === grouping)?.label.replace('By ', '')}</th>
-            <th className="px-3 py-1.5 text-right font-semibold">Cost</th>
-            <th className="px-3 py-1.5 text-right font-semibold">Calls</th>
-            <th className="px-3 py-1.5 text-right font-semibold">Tokens in</th>
-            <th className="py-1.5 pl-3 text-right font-semibold">Tokens out</th>
+            <th className="py-1.5 pr-3 font-semibold">{t(GROUPINGS.find((g) => g.value === grouping)?.column ?? '')}</th>
+            <th className="px-3 py-1.5 text-right font-semibold">{t('Cost')}</th>
+            <th className="px-3 py-1.5 text-right font-semibold">{t('Calls')}</th>
+            <th className="px-3 py-1.5 text-right font-semibold">{t('Tokens in')}</th>
+            <th className="py-1.5 pl-3 text-right font-semibold">{t('Tokens out')}</th>
           </tr>
         </thead>
         <tbody>
@@ -96,7 +97,7 @@ function RecentCalls({ range }: { range: ReturnType<typeof rangeFor> }) {
   const records = useUsageRecords(range)
   const rows = records.data?.pages.flat() ?? []
   if (records.isError) return <p className="text-[13px] text-error">{errorMessage(records.error)}</p>
-  if (records.isSuccess && rows.length === 0) return <p className="text-[13px] text-muted">No model calls in this period.</p>
+  if (records.isSuccess && rows.length === 0) return <p className="text-[13px] text-muted">{t('No model calls in this period.')}</p>
   return (
     <>
       <ul className="text-[13px]">
@@ -106,14 +107,14 @@ function RecentCalls({ range }: { range: ReturnType<typeof rangeFor> }) {
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{r.model_key}</span>
               <span className="block truncate text-[12px] text-muted">
-                {KIND_LABELS[r.request_kind] ?? r.request_kind} · {r.provider_name}
-                {r.run_id && <> · <Link to={`/runs/${r.run_id}`} className="text-accent hover:underline">run</Link></>}
+                {KIND_LABELS[r.request_kind] ? t(KIND_LABELS[r.request_kind]) : r.request_kind} · {r.provider_name}
+                {r.run_id && <> · <Link to={`/runs/${r.run_id}`} className="text-accent hover:underline">{t('run')}</Link></>}
               </span>
             </span>
             <span className="shrink-0 text-right tabular-nums">
-              <span className="block">{r.cost_usd == null ? 'unknown' : formatCost(r.cost_usd)}</span>
+              <span className="block">{r.cost_usd == null ? t('unknown') : formatCost(r.cost_usd)}</span>
               <span className="block text-[12px] text-muted">
-                {r.input_tokens == null ? '?' : formatCount(r.input_tokens)} in · {r.output_tokens == null ? '?' : formatCount(r.output_tokens)} out
+                {t('{input} in · {output} out', { input: r.input_tokens == null ? '?' : formatCount(r.input_tokens), output: r.output_tokens == null ? '?' : formatCount(r.output_tokens) })}
               </span>
             </span>
           </li>
@@ -122,7 +123,7 @@ function RecentCalls({ range }: { range: ReturnType<typeof rangeFor> }) {
       {records.hasNextPage && (
         <div className="mt-3 flex justify-center">
           <Button size="sm" variant="secondary" loading={records.isFetchingNextPage} onClick={() => void records.fetchNextPage()}>
-            Load more
+            {t('Load more')}
           </Button>
         </div>
       )}
@@ -151,7 +152,7 @@ export function UsagePage() {
     return {
       day,
       value: g ? valueOf(g, metric) : 0,
-      detail: g ? `${g.requests} call${g.requests === 1 ? '' : 's'}, ${formatCost(g.cost_usd)}${g.unknown_cost_requests ? ' + unknown' : ''}` : 'nothing',
+      detail: g ? plural(g.requests, '{n} call, {cost}', '{n} calls, {cost}', { cost: formatCost(g.cost_usd) + (g.unknown_cost_requests ? ' + ' + t('unknown') : '') }) : t('nothing'),
     }
   })
 
@@ -162,39 +163,38 @@ export function UsagePage() {
           <BarChart3 className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold">Usage</h2>
+          <h2 className="text-lg font-semibold">{t('Usage')}</h2>
           <p className="text-[13px] text-muted">
-            Model calls, tokens and cost. Costs are what the provider reported, or worked out from the prices set in{' '}
-            <Link to="/settings/providers" className="text-accent underline">Providers & Models</Link>.
+            {rich('Model calls, tokens and cost. Costs are what the provider reported, or worked out from the prices set in <a>Providers & Models</a>.', { a: (c) => <Link to="/settings/providers" className="text-accent underline">{c}</Link> })}
           </p>
         </div>
-        <Select className="w-full sm:w-44" aria-label="Period" value={rangeId} options={RANGES.map((r) => ({ value: r.id, label: r.label }))}
+        <Select className="w-full sm:w-44" aria-label={t('Period')} value={rangeId} options={RANGES.map((r) => ({ value: r.id, label: t(r.label) }))}
           onValueChange={(v) => chooseRange(v as RangeId)} />
       </div>
 
       {byDay.isError && <p className="text-[13px] text-error">{errorMessage(byDay.error)}</p>}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Cost" hint={totals && totals.unknown_cost_requests > 0
-          ? `${totals.unknown_cost_requests} call${totals.unknown_cost_requests === 1 ? '' : 's'} without a known price`
+        <Stat label={t('Cost')} hint={totals && totals.unknown_cost_requests > 0
+          ? plural(totals.unknown_cost_requests, '{n} call without a known price', '{n} calls without a known price')
           : undefined}>
           {/* The note below says when part of it is unknown. */}
-          {!totals ? '…' : totals.requests > 0 && totals.unknown_cost_requests === totals.requests ? 'unknown' : formatCost(totals.cost_usd)}
+          {!totals ? '…' : totals.requests > 0 && totals.unknown_cost_requests === totals.requests ? t('unknown') : formatCost(totals.cost_usd)}
         </Stat>
-        <Stat label="Model calls">{totals ? formatCount(totals.requests) : '…'}</Stat>
-        <Stat label="Tokens in">{totals ? formatCount(totals.input_tokens) : '…'}</Stat>
-        <Stat label="Tokens out">{totals ? formatCount(totals.output_tokens) : '…'}</Stat>
+        <Stat label={t('Model calls')}>{totals ? formatCount(totals.requests) : '…'}</Stat>
+        <Stat label={t('Tokens in')}>{totals ? formatCount(totals.input_tokens) : '…'}</Stat>
+        <Stat label={t('Tokens out')}>{totals ? formatCount(totals.output_tokens) : '…'}</Stat>
       </div>
 
       <Card>
-        <CardHeader title="Per day"
-          actions={<Select className="h-9 w-28" aria-label="What the chart shows" value={metric} options={METRICS} onValueChange={(v) => setMetric(v as Metric)} />} />
+        <CardHeader title={t('Per day')}
+          actions={<Select className="h-9 w-28" aria-label={t('What the chart shows')} value={metric} options={METRICS.map((m) => ({ value: m.value, label: t(m.label) }))} onValueChange={(v) => setMetric(v as Metric)} />} />
         <CardBody><DayChart bars={bars} formatValue={formatMetric(metric)} /></CardBody>
       </Card>
 
       <Card>
-        <CardHeader title="Breakdown"
-          actions={<Select className="h-9 w-48" aria-label="Group by" value={grouping} options={GROUPINGS} onValueChange={(v) => setGrouping(v as Exclude<GroupBy, 'day'>)} />} />
+        <CardHeader title={t('Breakdown')}
+          actions={<Select className="h-9 w-48" aria-label={t('Group by')} value={grouping} options={GROUPINGS.map((g) => ({ value: g.value, label: t(g.label) }))} onValueChange={(v) => setGrouping(v as Exclude<GroupBy, 'day'>)} />} />
         <CardBody>
           {breakdown.isError
             ? <p className="text-[13px] text-error">{errorMessage(breakdown.error)}</p>
@@ -203,7 +203,7 @@ export function UsagePage() {
       </Card>
 
       <Card>
-        <CardHeader title="Model calls" description="Every single call in this period, newest first." />
+        <CardHeader title={t('Model calls')} description={t('Every single call in this period, newest first.')} />
         <CardBody><RecentCalls range={range} /></CardBody>
       </Card>
     </div>

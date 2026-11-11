@@ -8,6 +8,7 @@ import { ExternalLink } from 'lucide-react'
 import { TERMINAL } from '@/features/chat/runStream'
 import { useRun } from '@/features/runs/api'
 import { RunStatusBadge } from '@/features/runs/components/RunStatusBadge'
+import { t } from '@/lib/i18n'
 import { RunActivity } from './RunActivity'
 
 export function SubagentRun({ runId }: { runId: string }) {
@@ -18,11 +19,11 @@ export function SubagentRun({ runId }: { runId: string }) {
   return (
     <div className="rounded-lg border border-border">
       <div className="flex flex-wrap items-center gap-2 px-2.5 py-1.5">
-        <span className="font-medium">Sub-agent</span>
+        <span className="font-medium">{t('Sub-agent')}</span>
         {run.data.profile_name && <span className="text-muted">{run.data.profile_name}</span>}
         <RunStatusBadge status={run.data.status} />
         <Link to={`/runs/${runId}`} className="ml-auto inline-flex items-center gap-1 text-accent hover:underline">
-          Open <ExternalLink className="h-3 w-3" />
+          {t('Open')} <ExternalLink className="h-3 w-3" />
         </Link>
       </div>
       <div className="px-1.5 [&>div]:mb-1.5">

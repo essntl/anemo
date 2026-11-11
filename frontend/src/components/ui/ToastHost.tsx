@@ -6,7 +6,7 @@ import { useToasts } from './toast'
 export function ToastHost() {
   const { toasts, dismiss, remove } = useToasts()
   if (!toasts.length) return null
-  const dismissLabel = t('Dismiss')
+  const dismissLabel = t('Dismiss##close')
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-3"
       role="status" aria-live="polite">

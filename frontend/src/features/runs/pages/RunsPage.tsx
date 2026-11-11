@@ -10,32 +10,33 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
+import { msg, plural, t } from '@/lib/i18n'
 import { type RunKindFilter, type RunListItem, type RunStatusFilter, useRuns } from '../api'
 import { RunStatusBadge } from '../components/RunStatusBadge'
 import { PageHeader } from '@/components/ui/PageHeader'
 
 const STATUS_OPTIONS: { value: RunStatusFilter; label: string }[] = [
-  { value: 'all', label: 'Any status' },
-  { value: 'active', label: 'Running' },
-  { value: 'waiting', label: 'Needs you or paused' },
-  { value: 'completed', label: 'Done' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'all', label: msg('Any status') },
+  { value: 'active', label: msg('Running') },
+  { value: 'waiting', label: msg('Needs you or paused') },
+  { value: 'completed', label: msg('Done') },
+  { value: 'failed', label: msg('Failed') },
+  { value: 'cancelled', label: msg('Cancelled') },
 ]
 const KIND_OPTIONS: { value: RunKindFilter; label: string }[] = [
-  { value: 'agent', label: 'Agent runs' },
-  { value: 'chat', label: 'Chat answers' },
-  { value: 'all', label: 'Everything' },
+  { value: 'agent', label: msg('Agent runs') },
+  { value: 'chat', label: msg('Chat answers') },
+  { value: 'all', label: msg('Everything') },
 ]
 
 function RunRow({ run }: { run: RunListItem }) {
-  const who = run.profile_name ?? (run.kind === 'agent' ? 'Default agent' : 'Chat')
-  const meta = [run.automation_id ? 'Automation' : null, who, run.conversation_title, run.model_label]
+  const who = run.profile_name ?? (run.kind === 'agent' ? t('Default agent') : t('Chat'))
+  const meta = [run.automation_id ? t('Automation') : null, who, run.conversation_title, run.model_label]
     .filter(Boolean)
     .join(' · ')
   const numbers = run.kind === 'agent'
     ? [
-        `${run.totals.tool_calls} action${run.totals.tool_calls === 1 ? '' : 's'}`,
+        plural(run.totals.tool_calls, '{n} action', '{n} actions'),
         run.totals.active_s > 0 ? formatDuration(run.totals.active_s) : null,
         run.totals.cost_usd != null ? formatCost(run.totals.cost_usd) : null,
       ].filter(Boolean).join(' · ')
@@ -46,7 +47,7 @@ function RunRow({ run }: { run: RunListItem }) {
     <Link to={`/runs/${run.id}`}
       className="flex items-start gap-3 rounded-card border border-border bg-card px-4 py-3 shadow-soft transition-colors hover:border-border-strong hover:bg-surface-hover">
       <div className="min-w-0 flex-1">
-        <div className="line-clamp-2 break-words text-[14px] font-medium">{run.request || '(no request)'}</div>
+        <div className="line-clamp-2 break-words text-[14px] font-medium">{run.request || t('(no request)')}</div>
         <div className="mt-1.5 flex min-w-0 items-center gap-2">
           <RunStatusBadge status={run.status} />
           <span className="min-w-0 truncate text-[12px] text-muted">{meta}</span>
@@ -81,27 +82,27 @@ export function RunsPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Runs" />
-      <p className="mb-4 max-w-2xl text-[13px] text-muted">What your agents did: every step, tool call, approval and file change.</p>
+      <PageHeader title={t('Runs')} />
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">{t('What your agents did: every step, tool call, approval and file change.')}</p>
 
       {/* The search, then the two filters as small pills next to each other. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <form className="relative w-full md:w-auto md:min-w-48 md:flex-1" onSubmit={(e) => { e.preventDefault(); setParam('q', query.trim(), '') }}>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} onBlur={() => setParam('q', query.trim(), '')}
-            placeholder="Search requests" aria-label="Search requests"
+            placeholder={t('Search requests')} aria-label={t('Search requests')}
             className="h-10 w-full rounded-control border border-border bg-surface pl-9 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
         </form>
-        <Select variant="pill" aria-label="Status" value={status} options={STATUS_OPTIONS}
+        <Select variant="pill" aria-label={t('Status')} value={status} options={STATUS_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))}
           onValueChange={(v) => setParam('status', v, 'all')} />
-        <Select variant="pill" aria-label="Kind" value={kind} options={KIND_OPTIONS}
+        <Select variant="pill" aria-label={t('Kind')} value={kind} options={KIND_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))}
           onValueChange={(v) => setParam('kind', v, 'agent')} />
       </div>
 
       {runs.isError && <p className="text-[13px] text-error">{errorMessage(runs.error)}</p>}
       {runs.isSuccess && items.length === 0 && (
-        <EmptyState icon={<Bot className="h-5 w-5" />} title="No runs here"
-          description={status === 'all' && !q ? 'Switch a chat to Agent mode and give it a task: its runs show up here.' : 'Nothing matches these filters.'} />
+        <EmptyState icon={<Bot className="h-5 w-5" />} title={t('No runs here')}
+          description={status === 'all' && !q ? t('Switch a chat to Agent mode and give it a task: its runs show up here.') : t('Nothing matches these filters.')} />
       )}
       <div className="flex flex-col gap-2">
         {items.map((run) => <RunRow key={run.id} run={run} />)}
@@ -109,7 +110,7 @@ export function RunsPage() {
       {runs.hasNextPage && (
         <div className="mt-4 flex justify-center">
           <Button variant="secondary" loading={runs.isFetchingNextPage} onClick={() => void runs.fetchNextPage()}>
-            Load more
+            {t('Load more')}
           </Button>
         </div>
       )}

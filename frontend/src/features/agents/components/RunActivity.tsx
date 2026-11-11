@@ -34,6 +34,7 @@ import { FileIcon } from '@/components/ui/FileIcon'
 import { toolOutputUrl, useEditPlan, useRun } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
 import { formatCost, formatCount, formatDuration, formatSize } from '@/lib/format'
+import { dateLocale, msg, plural, rich, t } from '@/lib/i18n'
 import { type FileChangeView, type Timeline, type ToolCallView, useRevertChange, useTimeline } from '../api'
 import { type EditableStep, planIsValid, toEditable } from '../plan'
 import { ApprovalCard } from './ApprovalCard'
@@ -46,21 +47,23 @@ import { ShellDetails } from './ShellCall'
 import { SubagentRun } from './SubagentRun'
 
 const STATUS: Record<string, { icon: typeof Circle; tone: string; label: string }> = {
-  pending: { icon: Clock, tone: 'text-muted', label: 'Queued' },
-  waiting_approval: { icon: ShieldAlert, tone: 'text-tool-waiting', label: 'Needs approval' },
-  running: { icon: Loader2, tone: 'text-tool-running', label: 'Running' },
-  waiting_child: { icon: Loader2, tone: 'text-tool-running', label: 'Sub-agent working' },
-  succeeded: { icon: CheckCircle2, tone: 'text-tool-ok', label: 'Done' },
-  failed: { icon: XCircle, tone: 'text-error', label: 'Failed' },
-  denied: { icon: Ban, tone: 'text-tool-denied', label: 'Blocked' },
-  cancelled: { icon: Ban, tone: 'text-muted', label: 'Cancelled' },
-  interrupted: { icon: XCircle, tone: 'text-warning', label: 'Interrupted' },
+  pending: { icon: Clock, tone: 'text-muted', label: msg('Queued') },
+  waiting_approval: { icon: ShieldAlert, tone: 'text-tool-waiting', label: msg('Needs approval') },
+  running: { icon: Loader2, tone: 'text-tool-running', label: msg('Running') },
+  waiting_child: { icon: Loader2, tone: 'text-tool-running', label: msg('Sub-agent working') },
+  succeeded: { icon: CheckCircle2, tone: 'text-tool-ok', label: msg('Done') },
+  failed: { icon: XCircle, tone: 'text-error', label: msg('Failed') },
+  denied: { icon: Ban, tone: 'text-tool-denied', label: msg('Blocked') },
+  cancelled: { icon: Ban, tone: 'text-muted', label: msg('Cancelled') },
+  interrupted: { icon: XCircle, tone: 'text-warning', label: msg('Interrupted') },
 }
 
+const DECISION: Record<string, string> = { allow: msg('allow'), ask: msg('ask'), deny: msg('deny') }
+
 function describe(call: ToolCallView): string {
-  if (call.tool_name === 'ask_user') return `Ask you: ${questionOf(call).question}`
-  if (call.tool_name === 'load_skill') return `Load skill “${String(call.args.name ?? '')}”`
-  if (call.tool_name === 'update_plan' && call.approval?.kind === 'plan') return 'Propose a plan'
+  if (call.tool_name === 'ask_user') return t('Ask you: {question}', { question: questionOf(call).question })
+  if (call.tool_name === 'load_skill') return t('Load skill “{name}”', { name: String(call.args.name ?? '') })
+  if (call.tool_name === 'update_plan' && call.approval?.kind === 'plan') return t('Propose a plan')
   const summary = call.actions.map((a) => (a as { summary?: string }).summary).find(Boolean)
   return summary && summary !== call.tool_name ? summary : call.tool_name.replaceAll('_', ' ')
 }
@@ -79,7 +82,7 @@ function GivenFiles({ files }: { files: GivenFile[] }) {
     <div className="ml-7 mt-1 flex flex-wrap gap-1.5">
       {files.map((f) => (
           <a key={f.attachment_id} href={`/api/attachments/${f.attachment_id}/content`} download={f.filename}
-            title={`Download ${f.filename}`}
+            title={t('Download {name}', { name: f.filename })}
             className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1 text-[12px] hover:border-accent/60 hover:text-accent">
             <FileIcon name={f.filename} kind={f.kind} className="h-3.5 w-3.5 shrink-0 text-muted" />
             <span className="truncate">{f.filename}</span>
@@ -120,9 +123,9 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
   const image = shownImage(call)
   const asking = call.tool_name === 'ask_user'
   const s = asking && call.status === 'waiting_approval'
-    ? { ...STATUS.waiting_approval, icon: MessageCircleQuestion, label: 'Waiting for you' }
+    ? { ...STATUS.waiting_approval, icon: MessageCircleQuestion, label: msg('Waiting for you') }
     : asking && call.status === 'succeeded'
-      ? { ...STATUS.succeeded, label: questionOf(call).answer ? 'Answered' : 'Left to the agent' }
+      ? { ...STATUS.succeeded, label: questionOf(call).answer ? msg('Answered') : msg('Left to the agent') }
       : (STATUS[call.status] ?? STATUS.pending)
   const Icon = s.icon
   const needsApproval = call.status === 'waiting_approval' && call.approval?.status === 'pending'
@@ -135,21 +138,21 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
         className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] hover:bg-surface-hover pointer-coarse:py-2.5">
         <Icon className={cn('h-3.5 w-3.5 shrink-0', s.tone, (call.status === 'running' || call.status === 'waiting_child') && 'animate-spin')} />
         <span className="min-w-0 flex-1 truncate">{describe(call)}</span>
-        <span className={cn('shrink-0 text-[11.5px]', s.tone)}>{s.label}</span>
+        <span className={cn('shrink-0 text-[11.5px]', s.tone)}>{t(s.label)}</span>
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-subtle transition-transform', open && 'rotate-90')} />
       </button>
       {open && (
         <div className="ml-7 mt-1 space-y-2 text-[12px]">
           <div className="text-muted">
             <span className="font-mono">{call.tool_name}</span>
-            {call.decision && <> · permission: {call.decision} ({call.decision_reason})</>}
+            {call.decision && <> · {t('permission: {decision} ({reason})', { decision: t(DECISION[call.decision] ?? call.decision), reason: call.decision_reason ?? '' })}</>}
           </div>
           {shell && <ShellDetails call={call} />}
           {childRunId && <SubagentRun runId={childRunId} />}
           {web && <WebDetails data={web} />}
           {asking && (
             <div className="text-muted">
-              {questionOf(call).answer ? <>You answered: <span className="text-text">{questionOf(call).answer}</span></> : 'You left it to the agent.'}
+              {questionOf(call).answer ? rich('You answered: <answer></answer>', { answer: () => <span className="text-text">{questionOf(call).answer}</span> }) : t('You left it to the agent.')}
             </div>
           )}
           {!shell && !asking && Object.keys(call.args).length > 0 && (
@@ -166,15 +169,15 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
           {output && (
             <a href={toolOutputUrl(runId, call.id)} target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-1 text-accent hover:underline">
-              <Download className="h-3.5 w-3.5" /> Full output ({output.chars.toLocaleString()} characters)
+              <Download className="h-3.5 w-3.5" /> {t('Full output ({count} characters)', { count: output.chars.toLocaleString(dateLocale()) })}
             </a>
           )}
         </div>
       )}
       {image && (
         <div className="ml-7 mt-1">
-          <ZoomableImage src={`/api/attachments/${image.attachment_id}/content`} alt="Image the agent viewed"
-            title={`What the agent saw (${image.width}×${image.height})`}
+          <ZoomableImage src={`/api/attachments/${image.attachment_id}/content`} alt={t('Image the agent viewed')}
+            title={t('What the agent saw ({width}×{height})', { width: image.width, height: image.height })}
             className="max-h-32 max-w-56 rounded-lg border border-border object-contain" />
         </div>
       )}
@@ -184,18 +187,18 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
           : call.approval?.kind === 'question' ? <QuestionCard runId={runId} call={call} />
             : docked
               // The chat keeps the request above its message box (ApprovalDock).
-              ? <p className="ml-7 mt-1 text-[12px] font-medium text-tool-waiting">Waiting for you: see above the message box.</p>
+              ? <p className="ml-7 mt-1 text-[12px] font-medium text-tool-waiting">{t('Waiting for you: see above the message box.')}</p>
               : <ApprovalCard runId={runId} call={call} />)}
     </div>
   )
 }
 
 const OP_LABEL: Record<string, string> = {
-  create: 'Created',
-  modify: 'Edited',
-  delete: 'Deleted',
-  move: 'Moved',
-  mkdir: 'Created folder',
+  create: msg('Created'),
+  modify: msg('Edited'),
+  delete: msg('Deleted'),
+  move: msg('Moved'),
+  mkdir: msg('Created folder'),
 }
 
 function FileChangeRow({ runId, change }: { runId: string; change: FileChangeView }) {
@@ -206,7 +209,7 @@ function FileChangeRow({ runId, change }: { runId: string; change: FileChangeVie
     } catch (err) {
       if (err instanceof ApiError && ['changed_since', 'not_empty'].includes(err.code)) {
         const ok = await confirmDialog({
-          title: 'Revert anyway?', message: err.message, confirmLabel: 'Revert anyway', danger: true,
+          title: t('Revert anyway?'), message: err.message, confirmLabel: t('Revert anyway'), danger: true,
         })
         if (ok) await revert.mutateAsync({ changeId: change.id, force: true })
       }
@@ -216,15 +219,15 @@ function FileChangeRow({ runId, change }: { runId: string; change: FileChangeVie
     <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-[13px]">
       <FileDiff className="h-3.5 w-3.5 shrink-0 text-muted" />
       <span className={cn('min-w-0 flex-1 truncate', change.reverted_at && 'line-through opacity-60')}>
-        {OP_LABEL[change.op] ?? change.op} <span className="font-mono text-[12px]">{change.path}</span>
+        {t(OP_LABEL[change.op] ?? change.op)} <span className="font-mono text-[12px]">{change.path}</span>
         {change.dest_path && <> → <span className="font-mono text-[12px]">{change.dest_path}</span></>}
       </span>
       {change.reverted_at ? (
-        <span className="text-[11.5px] text-muted">Reverted</span>
+        <span className="text-[11.5px] text-muted">{t('Reverted')}</span>
       ) : (
         <Button size="sm" variant="ghost" icon={<Undo2 className="h-3.5 w-3.5" />} loading={revert.isPending}
           onClick={() => void run()}>
-          Revert
+          {t('Revert')}
         </Button>
       )}
       {revert.isError && !(revert.error instanceof ApiError && revert.error.code === 'changed_since') && (
@@ -244,11 +247,11 @@ function PlanSection({ runId, data }: { runId: string; data: Timeline }) {
   return (
     <div className="mb-2 px-2">
       <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-subtle">
-        Plan
+        {t('Plan')}
         {data.status === 'paused' && !draft && (
           <button type="button" onClick={() => setDraft(toEditable(plan))}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 normal-case tracking-normal text-muted hover:bg-surface-hover hover:text-text">
-            <Pencil className="h-3 w-3" /> Edit
+            <Pencil className="h-3 w-3" /> {t('Edit')}
           </button>
         )}
       </div>
@@ -258,11 +261,11 @@ function PlanSection({ runId, data }: { runId: string; data: Timeline }) {
           <div className="mt-2 flex gap-2">
             <Button size="sm" variant="primary" loading={edit.isPending} disabled={!planIsValid(draft)}
               onClick={() => edit.mutate({ runId, steps: draft }, { onSuccess: () => setDraft(null) })}>
-              Save plan
+              {t('Save plan')}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>Cancel</Button>
+            <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>{t('Cancel')}</Button>
           </div>
-          <p className="mt-1.5 text-[12px] text-muted">The agent follows the new plan when you resume.</p>
+          <p className="mt-1.5 text-[12px] text-muted">{t('The agent follows the new plan when you resume.')}</p>
           {edit.isError && <p className="text-[12px] text-error">{errorMessage(edit.error)}</p>}
         </div>
       ) : (
@@ -283,12 +286,12 @@ function PlanSection({ runId, data }: { runId: string; data: Timeline }) {
 
 function headline(data: Timeline, live: boolean): string {
   const pending = data.tool_calls.find((c) => c.status === 'waiting_approval' && c.approval?.status === 'pending')
-  if (pending?.approval?.kind === 'question') return 'The agent has a question for you'
-  if (pending) return pending.approval?.kind === 'plan' ? 'Waiting for you to review the plan' : 'Waiting for your approval'
-  if (data.status === 'paused') return 'Paused'
-  if (live) return 'Working…'
+  if (pending?.approval?.kind === 'question') return t('The agent has a question for you')
+  if (pending) return pending.approval?.kind === 'plan' ? t('Waiting for you to review the plan') : t('Waiting for your approval')
+  if (data.status === 'paused') return t('Paused')
+  if (live) return t('Working…')
   const n = data.tool_calls.length
-  return `${n} action${n === 1 ? '' : 's'}`
+  return plural(n, '{n} action', '{n} actions')
 }
 
 interface RunActivityProps {
@@ -338,7 +341,7 @@ export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
           {data.file_changes.length > 0 && (
             <div className="mt-2 border-t border-border pt-2">
               <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-subtle">
-                Files changed
+                {t('Files changed')}
               </div>
               {[...data.file_changes].reverse().map((c) => (
                 <FileChangeRow key={c.id} runId={runId} change={c} />
@@ -358,7 +361,7 @@ export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
 export function RunPanel({ runId }: { runId: string }) {
   const { data } = useTimeline(runId)
   const run = useRun(runId, { pollWhileActive: true }).data
-  if (!data) return <p className="p-4 text-[13px] text-muted">Loading…</p>
+  if (!data) return <p className="p-4 text-[13px] text-muted">{t('Loading…')}</p>
   const calls = data.tool_calls
   const failed = calls.filter((c) => c.status === 'failed' || c.status === 'denied').length
   const waiting = calls.filter((c) => c.status === 'waiting_approval').length
@@ -369,24 +372,24 @@ export function RunPanel({ runId }: { runId: string }) {
   return (
     <div className="flex flex-col gap-4 p-3">
       <div>
-        <div className={label}>Status</div>
+        <div className={label}>{t('Status')}</div>
         <p className="px-2 text-[13px]">{headline(data, ['queued', 'running', 'waiting_subagent'].includes(data.status))}</p>
         <p className="px-2 text-[12px] text-muted">
-          {calls.length} step{calls.length === 1 ? '' : 's'}
-          {waiting > 0 && ` · ${waiting} waiting for you`}
-          {failed > 0 && ` · ${failed} failed or denied`}
+          {plural(calls.length, '{n} step', '{n} steps')}
+          {waiting > 0 && ` · ${plural(waiting, '{n} waiting for you', '{n} waiting for you')}`}
+          {failed > 0 && ` · ${t('{n} failed or denied', { n: failed })}`}
         </p>
       </div>
       <PlanSection runId={runId} data={data} />
       {data.file_changes.length > 0 && (
         <div>
-          <div className={label}>Files changed</div>
+          <div className={label}>{t('Files changed')}</div>
           {[...data.file_changes].reverse().map((c) => <FileChangeRow key={c.id} runId={runId} change={c} />)}
         </div>
       )}
       {pages.length > 0 && (
         <div>
-          <div className={label}>Pages read</div>
+          <div className={label}>{t('Pages read')}</div>
           {pages.map((url) => (
             <a key={url} href={url} target="_blank" rel="noreferrer noopener" title={url}
               className="flex h-8 items-center gap-2 rounded-control px-2 text-[13px] hover:bg-surface-hover">
@@ -398,13 +401,13 @@ export function RunPanel({ runId }: { runId: string }) {
       )}
       {run && (
         <div>
-          <div className={label}>Used</div>
+          <div className={label}>{t('Used')}</div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-2 text-[13px]">
-            <dt className="text-muted">Model</dt><dd className="truncate text-right">{run.model_label ?? '–'}</dd>
-            <dt className="text-muted">Working time</dt><dd className="text-right tabular-nums">{formatDuration(run.totals.active_s)}</dd>
-            <dt className="text-muted">Tokens</dt><dd className="text-right tabular-nums">{formatCount(run.totals.input_tokens)} in · {formatCount(run.totals.output_tokens)} out</dd>
-            <dt className="text-muted">Cost</dt><dd className="text-right tabular-nums">{formatCost(run.totals.cost_usd)}</dd>
-            <dt className="text-muted">Context</dt><dd className="text-right">{run.totals.compactions ? `Summarized ${run.totals.compactions}×` : 'Full history'}</dd>
+            <dt className="text-muted">{t('Model')}</dt><dd className="truncate text-right">{run.model_label ?? '–'}</dd>
+            <dt className="text-muted">{t('Working time')}</dt><dd className="text-right tabular-nums">{formatDuration(run.totals.active_s)}</dd>
+            <dt className="text-muted">{t('Tokens')}</dt><dd className="text-right tabular-nums">{t('{input} in · {output} out', { input: formatCount(run.totals.input_tokens), output: formatCount(run.totals.output_tokens) })}</dd>
+            <dt className="text-muted">{t('Cost')}</dt><dd className="text-right tabular-nums">{formatCost(run.totals.cost_usd)}</dd>
+            <dt className="text-muted">{t('Context')}</dt><dd className="text-right">{run.totals.compactions ? t('Summarized {n}×', { n: run.totals.compactions }) : t('Full history')}</dd>
           </dl>
         </div>
       )}

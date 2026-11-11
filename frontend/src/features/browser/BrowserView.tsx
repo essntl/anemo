@@ -186,7 +186,7 @@ export function BrowserView({ conversationId, actions, className }: Props) {
             <input aria-label={t('Text to type into the page')} value={touchText} placeholder={t('Type into the page…')}
               autoCapitalize="off" autoCorrect="off" onChange={(e) => setTouchText(e.target.value)}
               className="h-10 min-w-0 flex-1 rounded-control border border-border bg-bg px-2.5 focus:border-accent focus:outline-none" />
-            <Button size="sm" variant="secondary" type="submit">{t('Type')}</Button>
+            <Button size="sm" variant="secondary" type="submit">{t('Type##verb')}</Button>
             <Button size="sm" variant="ghost" onClick={() => queue.push({ kind: 'key', key: 'Enter' })}>Enter</Button>
           </form>
         )}

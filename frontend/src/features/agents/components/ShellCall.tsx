@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react'
 import { Globe } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import type { ToolCallView } from '../api'
 import { useShellOutput } from '../shellOutput'
 
@@ -21,7 +22,7 @@ interface ShellResult {
 }
 
 function formatDuration(ms: number): string {
-  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`
+  return ms < 1000 ? t('{n} ms', { n: ms }) : t('{n} s', { n: (ms / 1000).toFixed(ms < 10_000 ? 1 : 0) })
 }
 
 export function ShellDetails({ call }: { call: ToolCallView }) {
@@ -45,20 +46,20 @@ export function ShellDetails({ call }: { call: ToolCallView }) {
         <span className="font-mono">{shell?.cwd ?? args.cwd ?? '.'}</span>
         {network && (
           <span className="flex items-center gap-1 text-warning">
-            <Globe className="h-3 w-3" /> internet
+            <Globe className="h-3 w-3" /> {t('internet')}
           </span>
         )}
         {shell && (
           <>
             <span className={cn('font-medium', shell.exit_code === 0 ? 'text-tool-ok' : 'text-error')}>
-              {shell.exit_code === null ? 'no exit code' : `exit ${shell.exit_code}`}
+              {shell.exit_code === null ? t('no exit code') : t('exit {code}', { code: shell.exit_code })}
             </span>
             <span>{formatDuration(shell.duration_ms)}</span>
-            {shell.timed_out && <span className="text-error">timed out</span>}
-            {shell.truncated && <span>output shortened</span>}
+            {shell.timed_out && <span className="text-error">{t('timed out')}</span>}
+            {shell.truncated && <span>{t('output shortened')}</span>}
           </>
         )}
-        {running && <span className="text-tool-running">running…</span>}
+        {running && <span className="text-tool-running">{t('running…')}</span>}
       </div>
       <pre ref={outputRef}
         className="max-h-80 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed">
@@ -69,7 +70,7 @@ export function ShellDetails({ call }: { call: ToolCallView }) {
           <>
             {shell.stdout}
             {shell.stderr && <span className="text-error">{shell.stderr}</span>}
-            {!shell.stdout && !shell.stderr && <span className="text-subtle">(no output)</span>}
+            {!shell.stdout && !shell.stderr && <span className="text-subtle">{t('(no output)')}</span>}
           </>
         ) : (
           output ?? (running ? '' : <span className="text-subtle">{call.result ?? ''}</span>)

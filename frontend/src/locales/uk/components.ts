@@ -1,7 +1,7 @@
 import type { Messages } from '@/lib/i18n'
 
 const messages: Messages = {
-  "Dismiss": "Закрити сповіщення",
+  "Dismiss##close": "Закрити сповіщення",
   "More actions": "Інші дії",
   "Nothing to choose from.": "Немає з чого вибирати.",
   "View {alt}": "Переглянути: {alt}",

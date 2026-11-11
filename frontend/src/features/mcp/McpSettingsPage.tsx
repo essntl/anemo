@@ -15,16 +15,17 @@ import { confirmDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
+import { plural, rich, t } from '@/lib/i18n'
 import { type McpServer, useDeleteMcpServer, useMcpServers, useRefreshMcpServer, useSetMcpServerEnabled } from './api'
 import { ServerDialog } from './components/ServerDialog'
 import { ToolList } from './components/ToolList'
 import { Lingering } from '@/components/ui/Lingering'
 
 function StatusBadge({ server }: { server: McpServer }) {
-  if (!server.enabled) return <Badge>Off</Badge>
-  if (server.status === 'ok') return <Badge tone="success">Connected</Badge>
-  if (server.status === 'error') return <Badge tone="error">Not working</Badge>
-  return <Badge tone="accent">Checking…</Badge>
+  if (!server.enabled) return <Badge>{t('Off')}</Badge>
+  if (server.status === 'ok') return <Badge tone="success">{t('Connected')}</Badge>
+  if (server.status === 'error') return <Badge tone="error">{t('Not working')}</Badge>
+  return <Badge tone="accent">{t('Checking…')}</Badge>
 }
 
 function ServerCard({ server, onEdit }: { server: McpServer; onEdit: () => void }) {
@@ -37,9 +38,9 @@ function ServerCard({ server, onEdit }: { server: McpServer; onEdit: () => void 
 
   const confirmDelete = async () => {
     const ok = await confirmDialog({
-      title: `Remove “${server.name}”?`,
-      message: 'Agents can no longer use its tools. Saved headers or variables are deleted.',
-      confirmLabel: 'Remove',
+      title: t('Remove “{name}”?', { name: server.name }),
+      message: t('Agents can no longer use its tools. Saved headers or variables are deleted.'),
+      confirmLabel: t('Remove'),
       danger: true,
     })
     if (ok) remove.mutate(server.id)
@@ -50,15 +51,15 @@ function ServerCard({ server, onEdit }: { server: McpServer; onEdit: () => void 
       <CardBody className="py-4">
         <div className="flex items-start gap-3">
           <div className="pt-1">
-            <Switch label={`Use ${server.name}`} checked={server.enabled}
+            <Switch label={t('Use {name}', { name: server.name })} checked={server.enabled}
               onChange={(enabled) => setEnabled.mutate({ id: server.id, enabled })} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="min-w-0 break-words text-[15px] font-semibold">{server.name}</h3>
               <StatusBadge server={server} />
-              <Badge>{server.transport === 'stdio' ? 'Local' : 'Remote'}</Badge>
-              {server.review_count > 0 && <Badge tone="warning">{server.review_count} to review</Badge>}
+              <Badge>{server.transport === 'stdio' ? t('Local') : t('Remote')}</Badge>
+              {server.review_count > 0 && <Badge tone="warning">{t('{n} to review', { n: server.review_count })}</Badge>}
             </div>
             <p className="mt-0.5 break-all font-mono text-[12px] text-muted">{where}</p>
             {server.status === 'error' && server.last_error && (
@@ -66,19 +67,19 @@ function ServerCard({ server, onEdit }: { server: McpServer; onEdit: () => void 
             )}
           </div>
           <ActionMenu actions={[
-            { label: 'Edit', icon: <Pencil />, onSelect: onEdit },
-            { label: 'Remove', icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
+            { label: t('Edit'), icon: <Pencil />, onSelect: onEdit },
+            { label: t('Remove'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
           ]} />
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
           <Button size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen(!open)}>
-            {server.tool_count} tool{server.tool_count === 1 ? '' : 's'}
+            {plural(server.tool_count, '{n} tool', '{n} tools')}
             <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
           </Button>
           <Button size="sm" variant="ghost" icon={<RefreshCw className="h-3.5 w-3.5" />}
             loading={refresh.isPending || server.status === 'checking'} onClick={() => refresh.mutate(server.id)}>
-            Check again
+            {t('Check again')}
           </Button>
         </div>
         {error && <p className="mt-2 pl-12 text-[12.5px] text-error">{errorMessage(error)}</p>}
@@ -103,21 +104,19 @@ export function McpSettingsPage() {
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold">MCP</h2>
           <p className="text-[13px] text-muted">
-            Connect MCP servers to give agents more tools. Whether those tools ask first is the “MCP tools” level in{' '}
-            <Link to="/settings/permissions" className="text-accent underline">Agent Permissions</Link> (they always ask by
-            default); you can make exceptions per tool here.
+            {rich('Connect MCP servers to give agents more tools. Whether those tools ask first is the “MCP tools” level in <a>Agent Permissions</a> (they always ask by default); you can make exceptions per tool here.', { a: (c) => <Link to="/settings/permissions" className="text-accent underline">{c}</Link> })}
           </p>
         </div>
         <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ server: null })}>
-          Add
+          {t('Add')}
         </Button>
       </div>
 
       {servers.isError && <p className="text-[13px] text-error">{errorMessage(servers.error)}</p>}
       {servers.isSuccess && items.length === 0 && (
         <Card>
-          <EmptyState icon={<Plug className="h-5 w-5" />} title="No MCP servers yet"
-            description="Add a remote server by its URL, or a local one by the command that starts it. Its tools then show up for agents in Agent mode." />
+          <EmptyState icon={<Plug className="h-5 w-5" />} title={t('No MCP servers yet')}
+            description={t('Add a remote server by its URL, or a local one by the command that starts it. Its tools then show up for agents in Agent mode.')} />
         </Card>
       )}
       {items.map((server) => <ServerCard key={server.id} server={server} onEdit={() => setEditing({ server })} />)}

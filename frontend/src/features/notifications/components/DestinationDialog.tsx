@@ -5,6 +5,7 @@ import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Input'
+import { t } from '@/lib/i18n'
 import { type Destination, type DestinationForm, KIND_LABELS, type NotificationKind, useSaveDestination } from '../api'
 
 const KINDS = Object.keys(KIND_LABELS) as NotificationKind[]
@@ -25,45 +26,45 @@ export function DestinationDialog({ destination, onClose }: { destination: Desti
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(94vw,520px)]"
-      title={destination ? `Edit “${destination.name}”` : 'Add a Discord channel'}
+      title={destination ? t('Edit “{name}”', { name: destination.name }) : t('Add a Discord channel')}
       description={push
-        ? 'A browser or phone with push notifications on.'
-        : 'In Discord: channel settings › Integrations › Webhooks › New Webhook › Copy Webhook URL.'}
+        ? t('A browser or phone with push notifications on.')
+        : t('In Discord: channel settings › Integrations › Webhooks › New Webhook › Copy Webhook URL.')}
       footer={
         <>
           {save.isError && <span className="mr-auto self-center text-[12.5px] text-error">{errorMessage(save.error)}</span>}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={save.isPending} disabled={!valid}
             onClick={() => save.mutate({ id: destination?.id, form }, { onSuccess: onClose })}>
-            {destination ? 'Save' : 'Add'}
+            {destination ? t('Save') : t('Add')}
           </Button>
         </>
       }>
       <div className="flex flex-col gap-4">
-        <Field label="Name">
-          <Input value={form.name} maxLength={100} placeholder="e.g. My Discord" autoFocus={!destination}
+        <Field label={t('Name')}>
+          <Input value={form.name} maxLength={100} placeholder={t('e.g. My Discord')} autoFocus={!destination}
             onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
-        {!push && <Field label="Webhook URL"
+        {!push && <Field label={t('Webhook URL')}
           hint={destination
-            ? `Saved (ends in ${destination.url_hint?.replace(/•/g, '') ?? '…'}). Leave empty to keep it.`
-            : 'Stored encrypted and never shown again. Anyone with this URL can post to the channel.'}>
+            ? t('Saved (ends in {hint}). Leave empty to keep it.', { hint: destination.url_hint?.replace(/•/g, '') ?? '…' })
+            : t('Stored encrypted and never shown again. Anyone with this URL can post to the channel.')}>
           <Input type="password" autoComplete="off" value={form.url}
-            placeholder={destination ? 'Paste a new URL to replace it' : 'https://discord.com/api/webhooks/…'}
+            placeholder={destination ? t('Paste a new URL to replace it') : 'https://discord.com/api/webhooks/…'}
             onChange={(e) => setForm({ ...form, url: e.target.value })} />
         </Field>}
         <fieldset>
-          <legend className="mb-1.5 text-[13px] font-medium">Send here</legend>
+          <legend className="mb-1.5 text-[13px] font-medium">{t('Send here')}</legend>
           <div className="flex flex-col gap-0.5">
             {KINDS.map((kind) => (
               <label key={kind} className="flex items-center gap-2 rounded-control px-2 py-1.5 text-[13px] hover:bg-surface-hover pointer-coarse:py-2.5">
                 <input type="checkbox" className="accent-[var(--accent)]" checked={form.kinds.includes(kind)}
                   onChange={(e) => toggle(kind, e.target.checked)} />
-                {KIND_LABELS[kind]}
+                {t(KIND_LABELS[kind])}
               </label>
             ))}
           </div>
-          <p className="mt-1 text-[12px] text-muted">An automation can also be set to send its results to specific channels and devices.</p>
+          <p className="mt-1 text-[12px] text-muted">{t('An automation can also be set to send its results to specific channels and devices.')}</p>
         </fieldset>
       </div>
     </Dialog>

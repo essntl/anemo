@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/toast'
 import { useDecide } from '@/features/agents/api'
 import { type NeedsRow, useNeedsYou } from '@/features/home/useNeedsYou'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 
 const ICON: Record<NeedsRow['kind'], ReactNode> = {
   approval: <ShieldQuestion />,
@@ -25,7 +26,7 @@ function AllowOnce({ approval }: { approval: NonNullable<NeedsRow['approval']> }
   return (
     <Button size="sm" variant="primary" loading={decide.isPending}
       onClick={() => decide.mutate({ approvalId: approval.id, decision: 'approve', scope: 'once' }, { onError: (err) => toast({ message: errorMessage(err) }) })}>
-      Allow once
+      {t('Allow once')}
     </Button>
   )
 }
@@ -40,9 +41,9 @@ export function NeedsYouSection() {
   const rows = useNeedsYou().rows.filter((r) => r.kind !== 'memory')
   if (rows.length === 0) return null
   return (
-    <section aria-label="Needs you" className="mb-5 rounded-card border border-border bg-card shadow-soft">
+    <section aria-label={t('Needs you')} className="mb-5 rounded-card border border-border bg-card shadow-soft">
       <h2 className="flex h-11 items-center gap-2 border-b border-border px-4 text-[13.5px] font-semibold">
-        <span className="flex-1">Needs you</span>
+        <span className="flex-1">{t('Needs you')}</span>
         <span className="rounded-full bg-warning px-2 py-0.5 text-[11px] font-semibold text-white">{rows.length}</span>
       </h2>
       <ul>
@@ -55,7 +56,7 @@ export function NeedsYouSection() {
             </Link>
             {r.approval && <AllowOnce approval={r.approval} />}
             <Link to={r.to} className="inline-flex h-8 shrink-0 items-center rounded-control bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10">
-              Open
+              {t('Open')}
             </Link>
           </li>
         ))}

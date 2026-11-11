@@ -5,6 +5,7 @@
  * repeat rules (RRULE: what the assistant's create_schedule makes) as the rule itself.
  */
 import type { Schemas } from '@/api/client'
+import { msg } from '@/lib/i18n'
 
 export type Schedule = Schemas['Schedule']
 
@@ -27,18 +28,18 @@ export interface ScheduleForm {
 }
 
 export const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
-  { value: 'daily', label: 'Every day' },
-  { value: 'weekdays', label: 'Monday to Friday' },
-  { value: 'weekly', label: 'Every week' },
-  { value: 'monthly', label: 'Every month' },
-  { value: 'hours', label: 'Every few hours' },
-  { value: 'minutes', label: 'Every few minutes' },
-  { value: 'once', label: 'Once' },
-  { value: 'cron', label: 'Custom (cron)' },
-  { value: 'rrule', label: 'Custom (repeat rule)' },
+  { value: 'daily', label: msg('Every day') },
+  { value: 'weekdays', label: msg('Monday to Friday') },
+  { value: 'weekly', label: msg('Every week') },
+  { value: 'monthly', label: msg('Every month') },
+  { value: 'hours', label: msg('Every few hours') },
+  { value: 'minutes', label: msg('Every few minutes') },
+  { value: 'once', label: msg('Once') },
+  { value: 'cron', label: msg('Custom (cron)') },
+  { value: 'rrule', label: msg('Custom (repeat rule)') },
 ]
 
-export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+export const WEEKDAYS = [msg('Sunday'), msg('Monday'), msg('Tuesday'), msg('Wednesday'), msg('Thursday'), msg('Friday'), msg('Saturday')]
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const dayOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`

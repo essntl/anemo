@@ -1,13 +1,14 @@
 /** The periods offered on the Usage page, and the days inside a period (for the chart). */
+import { dateLocale, msg } from '@/lib/i18n'
 
 export type RangeId = 'today' | '7d' | '30d' | 'month' | 'all'
 
 export const RANGES: { id: RangeId; label: string }[] = [
-  { id: 'today', label: 'Today' },
-  { id: '7d', label: 'Last 7 days' },
-  { id: '30d', label: 'Last 30 days' },
-  { id: 'month', label: 'This month' },
-  { id: 'all', label: 'All time' },
+  { id: 'today', label: msg('Today') },
+  { id: '7d', label: msg('Last 7 days') },
+  { id: '30d', label: msg('Last 30 days') },
+  { id: 'month', label: msg('This month') },
+  { id: 'all', label: msg('All time') },
 ]
 
 export interface Range {
@@ -61,5 +62,5 @@ export function daysIn(range: Range): string[] | null {
 /** "2026-10-03" → "3 Oct". */
 export function dayLabel(key: string): string {
   const [y, m, d] = key.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  return new Date(y, m - 1, d).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })
 }

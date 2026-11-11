@@ -9,6 +9,9 @@ import { ModelDefaultsCard } from './components/ModelDefaultsCard'
 import { ProviderCard } from './components/ProviderCard'
 import { ProviderDialog } from './components/ProviderDialog'
 import { Lingering } from '@/components/ui/Lingering'
+import { rich, t } from '@/lib/i18n'
+
+const gettingStarted = { b: (c: string) => <strong className="text-accent">{c}</strong> }
 
 export function ProvidersPage() {
   const providers = useProviders()
@@ -23,22 +26,21 @@ export function ProvidersPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Providers & Models</h2>
-          <p className="text-[13px] text-muted">Connect AI providers, pick models, and choose defaults per task.</p>
+          <h2 className="text-lg font-semibold">{t('Providers & Models')}</h2>
+          <p className="text-[13px] text-muted">{t('Connect AI providers, pick models, and choose defaults per task.')}</p>
         </div>
         <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>
-          Add provider
+          {t('Add provider')}
         </Button>
       </div>
 
       {setup.data && !setup.data.has_chat_default && (
         <div className="rounded-card border border-accent/30 bg-accent-soft px-5 py-4 text-[13px]">
-          <strong className="text-accent">Getting started:</strong>{' '}
           {!setup.data.has_provider
-            ? 'add a provider (OpenAI, Anthropic, OpenRouter or a local server).'
+            ? rich('<b>Getting started:</b> add a provider (OpenAI, Anthropic, OpenRouter or a local server).', gettingStarted)
             : !setup.data.has_model
-              ? 'use “Add models” on your provider to pick the models you want.'
-              : 'choose a default chat model below.'}
+              ? rich('<b>Getting started:</b> use “Add models” on your provider to pick the models you want.', gettingStarted)
+              : rich('<b>Getting started:</b> choose a default chat model below.', gettingStarted)}
         </div>
       )}
 
@@ -46,9 +48,9 @@ export function ProvidersPage() {
         <Card>
           <EmptyState
             icon={<Plug className="h-5 w-5" />}
-            title="No providers yet"
-            description="Add an AI provider to start chatting. Keys are encrypted and stay on your server."
-            action={<Button variant="primary" onClick={() => setAdding(true)}>Add provider</Button>}
+            title={t('No providers yet')}
+            description={t('Add an AI provider to start chatting. Keys are encrypted and stay on your server.')}
+            action={<Button variant="primary" onClick={() => setAdding(true)}>{t('Add provider')}</Button>}
           />
         </Card>
       )}

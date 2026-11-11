@@ -5,6 +5,7 @@
  * registers the subscription with the server as a notification destination.
  */
 import { api, unwrap } from '@/api/client'
+import { t } from '@/lib/i18n'
 
 export type PushSupport =
   | 'ok'
@@ -73,7 +74,7 @@ export function deviceName(userAgent: string, maxTouchPoints = 0): string {
             ? 'Chrome'
             : /Safari\//.test(ua)
               ? 'Safari'
-              : 'Browser'
+              : t('Browser')
   const system = /iPhone/.test(ua)
     ? 'iPhone'
     : /iPad/.test(ua) || (/Macintosh/.test(ua) && maxTouchPoints > 1)
@@ -89,7 +90,7 @@ export function deviceName(userAgent: string, maxTouchPoints = 0): string {
               : /Linux/.test(ua)
                 ? 'Linux'
                 : null
-  return system ? `${browser} on ${system}` : browser
+  return system ? t('{browser} on {system}', { browser, system }) : browser
 }
 
 /** The server key as PushManager.subscribe() wants it. */
@@ -135,7 +136,7 @@ async function registration(): Promise<ServiceWorkerRegistration> {
   // The worker is registered on load (main.tsx); wait for it, but not forever.
   const ready = navigator.serviceWorker.ready
   const timeout = new Promise<never>((_, reject) =>
-    window.setTimeout(() => reject(new Error('The app’s service worker is not running. Reload the page and try again.')), 10_000),
+    window.setTimeout(() => reject(new Error(t('The app’s service worker is not running. Reload the page and try again.'))), 10_000),
   )
   return Promise.race([ready, timeout])
 }
@@ -162,7 +163,7 @@ export class PushPermissionError extends Error {}
  */
 export async function subscribeThisDevice(register: (sub: PushSubscriptionJSON) => Promise<unknown>): Promise<void> {
   const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
-  if (permission !== 'granted') throw new PushPermissionError('The browser did not give permission.')
+  if (permission !== 'granted') throw new PushPermissionError(t('The browser did not give permission.'))
   const { public_key } = unwrap(await api.GET('/api/push/key'))
   const key = base64UrlToBytes(public_key)
   const reg = await registration()

@@ -10,13 +10,14 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { msg, rich, t } from '@/lib/i18n'
 import { type McpServer, type Transport, useSaveMcpServer } from '../api'
 import { badLines, parseArgs, parsePairs, splitCommand } from '../lines'
 
 const TRANSPORTS: { value: Transport; label: string }[] = [
-  { value: 'http', label: 'Remote server (URL)' },
-  { value: 'sse', label: 'Remote server, older SSE type' },
-  { value: 'stdio', label: 'Local program (npx, uvx, …)' },
+  { value: 'http', label: msg('Remote server (URL)') },
+  { value: 'sse', label: msg('Remote server, older SSE type') },
+  { value: 'stdio', label: msg('Local program (npx, uvx, …)') },
 ]
 
 export function ServerDialog({ server, onClose }: { server: McpServer | null; onClose: () => void }) {
@@ -67,70 +68,70 @@ export function ServerDialog({ server, onClose }: { server: McpServer | null; on
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(94vw,580px)]"
-      title={server ? `Edit “${server.name}”` : 'Add an MCP server'}
-      description="MCP servers give agents extra tools, for example for GitHub, a database or your smart home."
+      title={server ? t('Edit “{name}”', { name: server.name }) : t('Add an MCP server')}
+      description={t('MCP servers give agents extra tools, for example for GitHub, a database or your smart home.')}
       footer={
         <>
           {save.isError && <span className="mr-auto self-center text-[12.5px] text-error">{errorMessage(save.error)}</span>}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={save.isPending} disabled={!valid} onClick={submit}>
-            {server ? 'Save' : 'Add server'}
+            {server ? t('Save') : t('Add server')}
           </Button>
         </>
       }>
       <div className="flex flex-col gap-4">
+        {/* "Type" is also a verb elsewhere (typing in the browser): the empty {kind} keeps this translation apart. */}
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Name" hint={server ? undefined : 'Shown to you and to the agent'}>
-            <Input value={name} maxLength={60} placeholder="e.g. GitHub" autoFocus={!server} onChange={(e) => setName(e.target.value)} />
+          <Field label={t('Name')} hint={server ? undefined : t('Shown to you and to the agent')}>
+            <Input value={name} maxLength={60} placeholder={t('e.g. GitHub')} autoFocus={!server} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Type" hint={server ? 'Cannot be changed later; add a new server instead' : undefined}>
-            <Select value={transport} options={TRANSPORTS} disabled={server !== null} onValueChange={(v) => setTransport(v as Transport)} />
+          <Field label={t('Type')} hint={server ? t('Cannot be changed later; add a new server instead') : undefined}>
+            <Select value={transport} options={TRANSPORTS.map((o) => ({ ...o, label: t(o.label) }))} disabled={server !== null} onValueChange={(v) => setTransport(v as Transport)} />
           </Field>
         </div>
 
         {!local && (
-          <Field label="URL" hint={transport === 'sse' ? 'Usually ends in /sse' : 'Usually ends in /mcp'}>
+          <Field label={t('URL')} hint={t('Usually ends in {path}', { path: transport === 'sse' ? '/sse' : '/mcp' })}>
             <Input value={url} maxLength={1000} spellCheck={false} placeholder="https://example.com/mcp" onChange={(e) => setUrl(e.target.value)} />
           </Field>
         )}
         {local && (
           <>
-            <Field label="Command" hint="The program to start, e.g. npx or uvx">
+            <Field label={t('Command')} hint={t('The program to start, e.g. npx or uvx')}>
               <Input value={command} maxLength={500} spellCheck={false} className="font-mono" placeholder="npx"
                 onChange={(e) => setCommand(e.target.value)} onBlur={tidyCommand} />
             </Field>
-            <Field label="Arguments" hint="One per line">
+            <Field label={t('Arguments')} hint={t('One per line')}>
               <Textarea rows={3} value={args} spellCheck={false} className="font-mono text-[12.5px]"
                 placeholder={'-y\n@modelcontextprotocol/server-everything'} onChange={(e) => setArgs(e.target.value)} />
             </Field>
             <p className="-mt-2 text-[12px] text-muted">
-              Local programs run in the separate MCP host container, which is off by default. Start it once
-              with <code className="font-mono">docker compose --profile mcp up -d</code>.
+              {rich('Local programs run in the separate MCP host container, which is off by default. Start it once with <code>docker compose --profile mcp up -d</code>.', { code: (c) => <code className="font-mono">{c}</code> })}
             </p>
           </>
         )}
 
-        <Field label={local ? 'Environment variables (optional)' : 'Headers (optional)'}
-          error={wrong.length > 0 ? `Not “name${separator} value”: ${wrong[0]}` : undefined}
+        <Field label={local ? t('Environment variables (optional)') : t('Headers (optional)')}
+          error={wrong.length > 0 ? t('Not “name{separator} value”: {line}', { separator, line: wrong[0] }) : undefined}
           hint={savedNames.length > 0
-            ? `Saved: ${savedNames.join(', ')}. Leave empty to keep them; anything you enter replaces them all.`
-            : 'One per line. Stored encrypted and never shown again.'}>
+            ? t('Saved: {names}. Leave empty to keep them; anything you enter replaces them all.', { names: savedNames.join(', ') })
+            : t('One per line. Stored encrypted and never shown again.')}>
           <Textarea rows={2} value={secrets} spellCheck={false} autoComplete="off" className="font-mono text-[12.5px]"
             placeholder={local ? 'API_KEY=…' : 'Authorization: Bearer …'} onChange={(e) => setSecrets(e.target.value)} />
         </Field>
         {savedNames.length > 0 && secrets.trim() === '' && (
           <label className="-mt-2 flex items-center gap-2 text-[13px]">
             <input type="checkbox" className="accent-[var(--accent)]" checked={clearSecrets} onChange={(e) => setClearSecrets(e.target.checked)} />
-            Remove the saved {local ? 'variables' : 'headers'}
+            {local ? t('Remove the saved variables') : t('Remove the saved headers')}
           </label>
         )}
 
         <div className="flex gap-2.5 rounded-control border border-warning/40 bg-warning/8 px-3 py-2.5 text-[12.5px]">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <p>
-            Only add servers you trust. A server sees everything an agent sends to its tools, and what its tools
-            answer can try to steer the agent. {local && 'A local program can also use the internet and whatever you put in its variables. '}
-            Its tools ask you before they run unless you allow them.
+            {t('Only add servers you trust. A server sees everything an agent sends to its tools, and what its tools answer can try to steer the agent.')}{' '}
+            {local && `${t('A local program can also use the internet and whatever you put in its variables.')} `}
+            {t('Its tools ask you before they run unless you allow them.')}
           </p>
         </div>
       </div>

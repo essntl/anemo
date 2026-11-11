@@ -6,6 +6,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Input } from '@/components/ui/Input'
 import { formatWhen } from '@/lib/format'
+import { t } from '@/lib/i18n'
 import { useCreateToken, useRevokeToken, useTokens } from './api'
 
 /** The token just created: shown once, here, until the card is left. */
@@ -17,21 +18,20 @@ function NewToken({ token, onDone }: { token: string; onDone: () => void }) {
   }
   return (
     <div className="flex flex-col gap-2 rounded-control border border-border bg-surface-2 p-3" role="status">
-      <div className="text-[13px] font-medium">Copy the token now: it is shown only this once.</div>
+      <div className="text-[13px] font-medium">{t('Copy the token now: it is shown only this once.')}</div>
       <div className="flex items-center gap-2">
         <code className="min-w-0 flex-1 break-all rounded-md bg-surface px-2 py-1.5 font-mono text-[12px]" data-testid="new-token">
           {token}
         </code>
         <Button size="sm" icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} onClick={copy}>
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('Copied') : t('Copy')}
         </Button>
       </div>
       <p className="text-[12px] text-muted">
-        Paste it into Anemo Companion (or the device it is for). Anyone with this token can use your workspace,
-        except changes that need your password, until you revoke it here.
+        {t('Paste it into Anemo Companion (or the device it is for). Anyone with this token can use your workspace, except changes that need your password, until you revoke it here.')}
       </p>
       <div>
-        <Button size="sm" variant="ghost" onClick={onDone}>Done</Button>
+        <Button size="sm" variant="ghost" onClick={onDone}>{t('Done')}</Button>
       </div>
     </div>
   )
@@ -58,9 +58,9 @@ export function TokensCard() {
 
   const askRevoke = async (id: string, label: string) => {
     const ok = await confirmDialog({
-      title: `Revoke “${label}”?`,
-      message: 'Whatever uses this token is signed out at once (for the extension: it goes back to its setup screen).',
-      confirmLabel: 'Revoke',
+      title: t('Revoke “{name}”?', { name: label }),
+      message: t('Whatever uses this token is signed out at once (for the extension: it goes back to its setup screen).'),
+      confirmLabel: t('Revoke'),
       danger: true,
     })
     if (ok) revoke.mutate(id)
@@ -69,8 +69,8 @@ export function TokensCard() {
   return (
     <Card>
       <CardHeader
-        title="Extension and device tokens"
-        description="Long-lived logins for Anemo Companion (the browser extension) or other devices. Each is shown once when created and can be revoked here."
+        title={t('Extension and device tokens')}
+        description={t('Long-lived logins for Anemo Companion (the browser extension) or other devices. Each is shown once when created and can be revoked here.')}
       />
       <CardBody className="flex flex-col gap-4">
         {shown ? (
@@ -78,37 +78,41 @@ export function TokensCard() {
         ) : (
           <form onSubmit={submit} className="flex flex-col">
             <label htmlFor={nameId} className="mb-1.5 block text-[13px] font-medium">
-              Name
+              {t('Name')}
             </label>
             {/* The button sits on the input's row (the hint goes under both), so they line up. */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input id={nameId} aria-describedby={`${nameId}-hint`} className="sm:max-w-md" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder="Chrome on my laptop" />
+              <Input id={nameId} aria-describedby={`${nameId}-hint`} className="sm:max-w-md" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder={t('Chrome on my laptop')} />
               <Button type="submit" variant="primary" className="shrink-0" icon={<KeyRound className="h-3.5 w-3.5" />} disabled={!name.trim()} loading={create.isPending}>
-                Create token
+                {t('Create token')}
               </Button>
             </div>
             <span id={`${nameId}-hint`} className="mt-1 block text-[12px] text-muted">
-              Where it will be used, e.g. “Chrome on my laptop”.
+              {t('Where it will be used, e.g. “Chrome on my laptop”.')}
             </span>
           </form>
         )}
         {create.isError && <p className="text-[13px] text-error">{errorMessage(create.error)}</p>}
         {(tokens.data?.length ?? 0) > 0 && (
           <div className="flex flex-col divide-y divide-border">
-            {tokens.data?.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 py-3">
+            {tokens.data?.map((tok) => (
+              <div key={tok.id} className="flex items-center gap-3 py-3">
                 <Puzzle className="h-4 w-4 shrink-0 text-muted" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13px] font-medium">
-                    {t.name} <span className="font-mono text-[11px] text-subtle">{t.prefix}…</span>
+                    {tok.name} <span className="font-mono text-[11px] text-subtle">{tok.prefix}…</span>
                   </div>
                   <div className="text-[12px] text-muted">
-                    created {formatWhen(t.created_at)} ·{' '}
-                    {t.last_used_at ? `last used ${formatWhen(t.last_used_at)}${t.last_used_ip ? ` from ${t.last_used_ip}` : ''}` : 'never used'}
+                    {t('created {when}', { when: formatWhen(tok.created_at) })} ·{' '}
+                    {tok.last_used_at
+                      ? tok.last_used_ip
+                        ? t('last used {when} from {ip}', { when: formatWhen(tok.last_used_at), ip: tok.last_used_ip })
+                        : t('last used {when}', { when: formatWhen(tok.last_used_at) })
+                      : t('never used')}
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => void askRevoke(t.id, t.name)}>
-                  Revoke
+                <Button size="sm" variant="ghost" onClick={() => void askRevoke(tok.id, tok.name)}>
+                  {t('Revoke')}
                 </Button>
               </div>
             ))}

@@ -1,0 +1,32 @@
+import type { Messages } from '@/lib/i18n'
+
+const messages: Messages = {
+  "Needs you": "Чекає на вас",
+  "Stop this run?": "Зупинити цей запуск?",
+  "The agent stops right away. Changes it already made stay, and you can revert file changes below.": "Агент зупиниться негайно. Уже зроблені зміни залишаться, а зміни у файлах можна повернути нижче.",
+  "Stop run": "Зупинити запуск",
+  "Run": "Запуск",
+  "Sub-agent of another run": "Субагент іншого запуску",
+  "(no request)": "(без запиту)",
+  "Stop": "Зупинити",
+  "Open conversation": "Відкрити чат",
+  "Steps": "Кроки",
+  "Tool calls": "Виклики інструментів",
+  "Manage memories": "Керувати спогадами",
+  "Answer": "Відповідь",
+  "{n} memory in context | {n} memories in context": "{n} спогад у контексті | {n} спогади в контексті | {n} спогадів у контексті",
+  "Any status": "Будь-який статус",
+  "Needs you or paused": "Чекає на вас або призупинено",
+  "Agent runs": "Запуски агентів",
+  "Chat answers": "Відповіді в чаті",
+  "Everything": "Усе",
+  "Automation": "Автоматизація",
+  "What your agents did: every step, tool call, approval and file change.": "Що робили ваші агенти: кожен крок, виклик інструмента, підтвердження та зміна файлу.",
+  "Search requests": "Пошук запитів",
+  "Kind": "Тип",
+  "No runs here": "Тут немає запусків",
+  "Switch a chat to Agent mode and give it a task: its runs show up here.": "Перемкніть чат у режим агента й дайте йому завдання: його запуски з’являться тут.",
+  "Nothing matches these filters.": "Нічого не відповідає цим фільтрам.",
+  "Load more": "Завантажити ще",
+}
+export default messages

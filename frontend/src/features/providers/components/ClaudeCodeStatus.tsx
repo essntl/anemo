@@ -1,5 +1,6 @@
 import { CheckCircle2, CircleAlert, Copy, Power } from 'lucide-react'
 import { useClaudeCodeStatus } from '../api'
+import { t } from '@/lib/i18n'
 
 function Command({ text }: { text: string }) {
   return (
@@ -9,8 +10,8 @@ function Command({ text }: { text: string }) {
       </code>
       <button
         type="button"
-        aria-label="Copy command"
-        title="Copy"
+        aria-label={t('Copy command')}
+        title={t('Copy')}
         className="rounded-control p-1 text-muted hover:bg-surface-hover"
         onClick={() => void navigator.clipboard?.writeText(text)}
       >
@@ -26,11 +27,11 @@ function Command({ text }: { text: string }) {
 export function ClaudeCodeStatus() {
   const status = useClaudeCodeStatus()
   const s = status.data
-  if (!s) return <p className="text-[13px] text-muted">Checking the claude-runner…</p>
+  if (!s) return <p className="text-[13px] text-muted">{t('Checking the claude-runner…')}</p>
   if (s.state === 'signed_in') {
     return (
       <p className="flex items-center gap-1.5 text-[13px] text-success">
-        <CheckCircle2 className="h-4 w-4" /> Signed in with a Claude subscription
+        <CheckCircle2 className="h-4 w-4" /> {t('Signed in with a Claude subscription')}
         {s.cli_version ? <span className="text-muted">· Claude Code {s.cli_version}</span> : null}
       </p>
     )
@@ -39,10 +40,10 @@ export function ClaudeCodeStatus() {
     return (
       <div className="text-[13px]">
         <p className="flex items-center gap-1.5 text-warning">
-          <CircleAlert className="h-4 w-4" /> Not signed in with a Claude subscription
-          {s.auth_method ? <span className="text-muted">(signed in as: {s.auth_method})</span> : null}
+          <CircleAlert className="h-4 w-4" /> {t('Not signed in with a Claude subscription')}
+          {s.auth_method ? <span className="text-muted">{t('(signed in as: {method})', { method: s.auth_method })}</span> : null}
         </p>
-        <p className="mt-1 text-muted">Sign in once, from a terminal on the server:</p>
+        <p className="mt-1 text-muted">{t('Sign in once, from a terminal on the server:')}</p>
         <Command text={s.login_command} />
       </div>
     )
@@ -50,9 +51,9 @@ export function ClaudeCodeStatus() {
   return (
     <div className="text-[13px]">
       <p className="flex items-center gap-1.5 text-error">
-        <Power className="h-4 w-4" /> The claude-runner is not running
+        <Power className="h-4 w-4" /> {t('The claude-runner is not running')}
       </p>
-      <p className="mt-1 text-muted">Start it, then sign in once:</p>
+      <p className="mt-1 text-muted">{t('Start it, then sign in once:')}</p>
       <Command text={s.start_command} />
       <Command text={s.login_command} />
     </div>

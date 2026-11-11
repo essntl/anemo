@@ -29,6 +29,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { msg, t } from '@/lib/i18n'
 import { usePermissionSummary } from '../api'
 
 export type Mode = 'chat' | 'agent'
@@ -46,7 +47,7 @@ export function ModeSwitch({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5 md:gap-1">
-      <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label="Mode">
+      <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label={t('Mode')}>
         {(['chat', 'agent'] as const).map((m) => (
           <button
             key={m}
@@ -60,7 +61,7 @@ export function ModeSwitch({
             )}
           >
             {m === 'chat' ? <MessageSquare className="hidden h-3.5 w-3.5 sm:block" /> : <Bot className="hidden h-3.5 w-3.5 sm:block" />}
-            {m === 'chat' ? 'Chat' : 'Agent'}
+            {m === 'chat' ? t('Chat') : t('Agent')}
           </button>
         ))}
       </div>
@@ -71,10 +72,10 @@ export function ModeSwitch({
 
 /** The four answers to "may it do this?", with how each looks. */
 const GROUPS = {
-  allowed: { title: 'Without asking', short: 'Free', icon: Check, tone: 'text-success', tint: 'bg-success/12' },
-  partly: { title: 'Mostly without asking', short: 'Mostly', icon: Contrast, tone: 'text-success', tint: 'bg-success/8' },
-  ask: { title: 'Asks you first', short: 'Asks', icon: CircleHelp, tone: 'text-warning', tint: 'bg-warning/12' },
-  never: { title: 'Not allowed', short: 'Never', icon: Ban, tone: 'text-error', tint: 'bg-error/10' },
+  allowed: { title: msg('Without asking'), short: msg('Free'), icon: Check, tone: 'text-success', tint: 'bg-success/12' },
+  partly: { title: msg('Mostly without asking'), short: msg('Mostly'), icon: Contrast, tone: 'text-success', tint: 'bg-success/8' },
+  ask: { title: msg('Asks you first'), short: msg('Asks'), icon: CircleHelp, tone: 'text-warning', tint: 'bg-warning/12' },
+  never: { title: msg('Not allowed'), short: msg('Never'), icon: Ban, tone: 'text-error', tint: 'bg-error/10' },
 } as const
 type GroupKey = keyof typeof GROUPS
 const ORDER: GroupKey[] = ['allowed', 'partly', 'ask', 'never']
@@ -114,9 +115,9 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
   return (
     <Popover.Root onOpenChange={() => setFocused(null)}>
       <Popover.Trigger asChild>
-        <button type="button" aria-label="Permissions"
+        <button type="button" aria-label={t('Permissions')}
           className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-9">
-          <ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Permissions</span>
+          <ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t('Permissions')}</span>
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -124,7 +125,7 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
           className="pop z-50 max-h-[var(--radix-popover-content-available-height)] w-[26rem] max-w-[calc(100vw-24px)] overflow-y-auto rounded-card border border-border bg-card p-3.5 text-[13px] shadow-float">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-accent" />
-            <span className="flex-1 font-semibold">What the agent may do</span>
+            <span className="flex-1 font-semibold">{t('What the agent may do')}</span>
           </div>
           {/* The legend, with how many of each. */}
           <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -133,20 +134,20 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
               if (!count) return null
               const g = GROUPS[key]
               return (
-                <span key={key} title={g.title}
+                <span key={key} title={t(g.title)}
                   className={cn('flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium', g.tint, g.tone)}>
-                  <g.icon className="h-3 w-3" /> {g.short} <span className="tabular-nums opacity-70">{count}</span>
+                  <g.icon className="h-3 w-3" /> {t(g.short)} <span className="tabular-nums opacity-70">{count}</span>
                 </span>
               )
             })}
           </div>
-          <ul className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3" aria-label="Permissions">
+          <ul className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3" aria-label={t('Permissions')}>
             {items.map((i) => {
               const g = GROUPS[i.group]
               const Icon = ICONS[i.capability] ?? Wrench
               return (
                 <li key={i.capability}>
-                  <button type="button" aria-label={`${i.label}: ${i.detail}`} aria-pressed={focused === i.capability}
+                  <button type="button" aria-label={`${t(i.label)}: ${t(i.detail)}`} aria-pressed={focused === i.capability}
                     onMouseEnter={() => setFocused(i.capability)} onFocus={() => setFocused(i.capability)}
                     onClick={() => setFocused(i.capability)}
                     className={cn('relative flex h-full w-full items-center gap-2 rounded-lg border py-1.5 pl-2 pr-3.5 text-left transition-colors',
@@ -155,7 +156,7 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     <span className={cn('min-w-0 flex-1 text-[12px] leading-tight', i.group === 'never' && 'text-muted line-through')}>
-                      {i.label}
+                      {t(i.label)}
                     </span>
                     <g.icon className={cn('absolute right-1 top-1 h-2.5 w-2.5', g.tone)} aria-hidden />
                   </button>
@@ -168,19 +169,18 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
               of jumping, while the pointer moves over the tiles. */}
           <p className="mt-2.5 min-h-[calc(2*1.5em+0.75rem)] rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12px] leading-[1.5] text-muted max-sm:min-h-[calc(3*1.5em+0.75rem)]" aria-live="polite">
             {shown ? (
-              <><span className="font-medium text-text">{shown.label}:</span> {shown.detail}. {shown.description}</>
+              <><span className="font-medium text-text">{t(shown.label)}:</span> {t(shown.detail)}. {t(shown.description)}</>
             ) : (
-              'Point at or tap a permission to see what it covers.'
+              t('Point at or tap a permission to see what it covers.')
             )}
           </p>
           {summary.data && (
             <div className="mt-2.5 flex flex-wrap items-center gap-x-1 border-t border-border pt-2.5 text-[12px] text-muted">
               <span>
-                Limits: {summary.data.max_steps} steps, {summary.data.max_tool_calls} tool calls,{' '}
-                {Math.round(summary.data.max_runtime_s / 60)} min.
-                {summary.data.plan_review === 'always' && ' You review its plan first.'}
+                {t('Limits: {steps} steps, {calls} tool calls, {minutes} min.', { steps: summary.data.max_steps, calls: summary.data.max_tool_calls, minutes: Math.round(summary.data.max_runtime_s / 60) })}
+                {summary.data.plan_review === 'always' && ` ${t('You review its plan first.')}`}
               </span>
-              <Link to={profileId ? '/agents' : '/settings/permissions'} className="ml-auto text-accent underline">Change</Link>
+              <Link to={profileId ? '/agents' : '/settings/permissions'} className="ml-auto text-accent underline">{t('Change')}</Link>
             </div>
           )}
           <Popover.Arrow className="fill-card" />

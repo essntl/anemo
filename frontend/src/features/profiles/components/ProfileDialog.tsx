@@ -9,6 +9,7 @@ import { LimitsFields } from '@/features/agents/components/LimitsFields'
 import { DEFAULT_LIMITS } from '@/features/agents/limits'
 import { useModels } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
+import { t } from '@/lib/i18n'
 import { type Profile, type ProfileInput, useSaveProfile, useSkills } from '../api'
 import { ProfilePermissions } from './ProfilePermissions'
 
@@ -67,68 +68,68 @@ export function ProfileDialog({ profile, onClose }: { profile: Profile | null; o
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(94vw,680px)]"
-      title={profile ? `Edit “${profile.name}”` : 'New agent profile'}
-      description="A named agent setup: its instructions, model, permissions and skills."
+      title={profile ? t('Edit “{name}”', { name: profile.name }) : t('New agent profile')}
+      description={t('A named agent setup: its instructions, model, permissions and skills.')}
       footer={
         <>
           {save.isError && <span className="mr-auto self-center text-[12.5px] text-error">{errorMessage(save.error)}</span>}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={save.isPending} disabled={!form.name.trim()} onClick={submit}>
-            {profile ? 'Save' : 'Create profile'}
+            {profile ? t('Save') : t('Create profile')}
           </Button>
         </>
       }>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Name">
-          <Input value={form.name} maxLength={100} placeholder="e.g. Researcher" onChange={(e) => set({ name: e.target.value })} />
+        <Field label={t('Name')}>
+          <Input value={form.name} maxLength={100} placeholder={t('e.g. Researcher')} onChange={(e) => set({ name: e.target.value })} />
         </Field>
-        <Field label="Model" hint="The chat's model picker still wins when set">
+        <Field label={t('Model')} hint={t("The chat's model picker still wins when set")}>
           <Select value={form.default_model_id ?? ''} onValueChange={(v) => set({ default_model_id: v || null })}
-            options={[{ value: '', label: 'Agent default (Settings)' }, ...usable.map((m) => ({ value: m.id, label: m.display_name }))]} />
+            options={[{ value: '', label: t('Agent default (Settings)') }, ...usable.map((m) => ({ value: m.id, label: m.display_name }))]} />
         </Field>
       </div>
       <div className="mt-4">
-        <Field label="Description">
-          <Input value={form.description} maxLength={500} placeholder="What this agent is for"
+        <Field label={t('Description')}>
+          <Input value={form.description} maxLength={500} placeholder={t('What this agent is for')}
             onChange={(e) => set({ description: e.target.value })} />
         </Field>
       </div>
       <div className="mt-4">
-        <Field label="Instructions" hint="Added to the agent's system prompt: role, style, rules, context about you.">
+        <Field label={t('Instructions')} hint={t("Added to the agent's system prompt: role, style, rules, context about you.")}>
           <Textarea rows={6} value={form.instructions} maxLength={50_000}
-            placeholder="You research topics thoroughly and cite your sources…"
+            placeholder={t('You research topics thoroughly and cite your sources…')}
             onChange={(e) => set({ instructions: e.target.value })} />
         </Field>
       </div>
 
-      <Section title="Permissions" hint="Override the global permissions for runs with this profile. Changing them asks for your password.">
+      <Section title={t('Permissions')} hint={t('Override the global permissions for runs with this profile. Changing them asks for your password.')}>
         <ProfilePermissions value={form.permission_levels} onChange={(permission_levels) => set({ permission_levels })} />
       </Section>
 
-      <Section title="Plan review">
+      <Section title={t('Plan review')}>
         <Select value={form.plan_review ?? ''} onValueChange={(v) => set({ plan_review: (v || null) as ProfileInput['plan_review'] })}
           options={[
-            { value: '', label: `Same as Settings (${settings.data?.permissions.plan_review === 'always' ? 'review first' : 'off'})` },
-            { value: 'always', label: 'Review the plan before it acts' },
-            { value: 'off', label: 'No plan review' },
+            { value: '', label: settings.data?.permissions.plan_review === 'always' ? t('Same as Settings (review first)') : t('Same as Settings (off)') },
+            { value: 'always', label: t('Review the plan before it acts') },
+            { value: 'off', label: t('No plan review') },
           ]} />
       </Section>
 
-      <Section title="Limits">
+      <Section title={t('Limits')}>
         <div className="mb-3 flex items-center justify-between gap-3 text-[13px]">
-          <span>Use custom limits for this profile</span>
-          <Switch label="Custom limits" checked={form.limits != null}
+          <span>{t('Use custom limits for this profile')}</span>
+          <Switch label={t('Custom limits')} checked={form.limits != null}
             onChange={(on) => set({ limits: on ? { ...DEFAULT_LIMITS, ...globalLimits } : null })} />
         </div>
         {form.limits && <LimitsFields value={form.limits} onChange={(limits) => set({ limits })} />}
       </Section>
 
-      <Section title="Skills" hint="Skills the agent can load when a task calls for them.">
+      <Section title={t('Skills')} hint={t('Skills the agent can load when a task calls for them.')}>
         <Select value={form.skill_mode} onValueChange={(v) => set({ skill_mode: v as ProfileInput['skill_mode'] })}
           options={[
-            { value: 'all', label: 'All enabled skills' },
-            { value: 'selected', label: 'Only the skills selected below' },
-            { value: 'none', label: 'No skills' },
+            { value: 'all', label: t('All enabled skills') },
+            { value: 'selected', label: t('Only the skills selected below') },
+            { value: 'none', label: t('No skills') },
           ]} />
         {form.skill_mode === 'selected' && (
           <div className="mt-2 flex flex-col gap-1">
@@ -139,13 +140,13 @@ export function ProfileDialog({ profile, onClose }: { profile: Profile | null; o
                   onChange={(e) => set({ skill_ids: e.target.checked ? [...form.skill_ids, s.id] : form.skill_ids.filter((id) => id !== s.id) })} />
                 <span>
                   <span className="font-medium">{s.name}</span>
-                  {!s.enabled && <span className="text-subtle"> (disabled)</span>}
+                  {!s.enabled && <span className="text-subtle"> {t('(disabled)')}</span>}
                   <span className="block text-[12px] text-muted">{s.description}</span>
                 </span>
               </label>
             ))}
             {skills.data?.every((s) => !s.model_invocable) && (
-              <p className="text-[12.5px] text-muted">No skills agents may load yet. Add some under Settings → Skills.</p>
+              <p className="text-[12.5px] text-muted">{t('No skills agents may load yet. Add some under Settings → Skills.')}</p>
             )}
           </div>
         )}

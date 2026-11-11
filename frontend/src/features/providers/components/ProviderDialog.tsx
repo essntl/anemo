@@ -6,6 +6,7 @@ import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { type Provider, type ProviderIn, useCreateProvider, useProviderTypes, useUpdateProvider } from '../api'
 import { ClaudeCodeStatus } from './ClaudeCodeStatus'
+import { t } from '@/lib/i18n'
 
 type ProviderType = ProviderIn['type']
 
@@ -20,7 +21,7 @@ function parseHeaders(text: string): Record<string, string> | string {
   } catch {
     // fall through
   }
-  return 'Headers must be a JSON object of strings, e.g. {"X-Api-Version": "2"}'
+  return t('Headers must be a JSON object of strings, e.g. {"X-Api-Version": "2"}')
 }
 
 /** Add a provider, or edit one when `provider` is given. Secrets are write-only. */
@@ -85,46 +86,44 @@ export function ProviderDialog({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={editing ? `Edit ${provider?.name}` : 'Add provider'}
+      title={editing ? t('Edit {name}', { name: String(provider?.name) }) : t('Add provider')}
       description={
         subscription
-          ? 'Uses your Claude subscription through Claude Code. Every tool call still goes through Agent Permissions.'
-          : 'API keys are encrypted on the server and never shown again.'
+          ? t('Uses your Claude subscription through Claude Code. Every tool call still goes through Agent Permissions.')
+          : t('API keys are encrypted on the server and never shown again.')
       }
       className="md:w-[min(92vw,520px)]"
       footer={
         <>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('Cancel')}</Button>
           <Button variant="primary" loading={pending} onClick={submit}>
-            {editing ? 'Save' : 'Add provider'}
+            {editing ? t('Save') : t('Add provider')}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         {!editing && (
-          <Field label="Type">
-            <Select aria-label="Type" value={type} onValueChange={(v) => setType(v as ProviderType)}
+          <Field label={t('Type')}>
+            <Select aria-label={t('Type')} value={type} onValueChange={(v) => setType(v as ProviderType)}
               options={(types.data ?? []).map((t) => ({ value: t.type, label: t.label }))} />
           </Field>
         )}
-        <Field label="Name">
+        <Field label={t('Name')}>
           <Input value={name} placeholder={typeInfo?.label} onChange={(e) => setName(e.target.value)} />
         </Field>
         {subscription ? (
           <div className="flex flex-col gap-2 rounded-control border border-border p-3">
             <ClaudeCodeStatus />
             <p className="text-[12px] text-muted">
-              No key is needed or stored: Claude Code keeps its own login in the claude-runner
-              container. Chat and agent runs on these models (automations too) count against your
-              subscription&apos;s usage limits. See docs/claude-code.md.
+              {t("No key is needed or stored: Claude Code keeps its own login in the claude-runner container. Chat and agent runs on these models (automations too) count against your subscription's usage limits. See docs/claude-code.md.")}
             </p>
           </div>
         ) : (
           <>
             <Field
-              label="Base URL"
-              hint={typeInfo?.default_base_url ? `Leave empty to use ${typeInfo.default_base_url}` : undefined}
+              label={t('Base URL')}
+              hint={typeInfo?.default_base_url ? t('Leave empty to use {url}', { url: typeInfo.default_base_url }) : undefined}
             >
               <Input
                 value={baseUrl}
@@ -133,28 +132,28 @@ export function ProviderDialog({
               />
             </Field>
             <Field
-              label="API key"
+              label={t('API key')}
               hint={
                 editing
                   ? provider?.api_key_masked
-                    ? `Stored key ${provider.api_key_masked}. Leave empty to keep it.`
-                    : 'No key stored.'
+                    ? t('Stored key {key}. Leave empty to keep it.', { key: provider.api_key_masked })
+                    : t('No key stored.')
                   : typeInfo && !typeInfo.needs_key
-                    ? 'Optional for most local servers.'
+                    ? t('Optional for most local servers.')
                     : undefined
               }
             >
               <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
             </Field>
             <details className="text-[13px]">
-              <summary className="cursor-pointer text-muted">Advanced: extra HTTP headers</summary>
+              <summary className="cursor-pointer text-muted">{t('Advanced: extra HTTP headers')}</summary>
               <div className="mt-2">
                 <Field
-                  label="Headers (JSON)"
+                  label={t('Headers (JSON)')}
                   hint={
                     editing && provider?.header_names.length
-                      ? `Currently set: ${provider.header_names.join(', ')}. Entering a value replaces them.`
-                      : 'Stored encrypted.'
+                      ? t('Currently set: {names}. Entering a value replaces them.', { names: provider.header_names.join(', ') })
+                      : t('Stored encrypted.')
                   }
                 >
                   <textarea

@@ -7,6 +7,7 @@
  *   plural(count, '{n} file', '{n} files')          // {n} is the count
  *   rich('Read <b>this</b> first', { b: (c) => <strong>{c}</strong> })
  *   const TABS = [{ id: 'all', label: msg('All') }]  // outside a component: translate with t(tab.label) when shown
+ *   t('Type##verb')                                  // "Type"; the part after ## only tells two meanings apart
  *
  * `t` reads the language when it is called, so call it while rendering (or in a
  * handler), never at the top of a module. Changing the language draws the whole app
@@ -117,9 +118,15 @@ function fill(text: string, vars?: Vars): string {
   return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole))
 }
 
+/** The English text of a key: without the `##meaning` that tells apart two uses of the same words. */
+const english = (text: string): string => {
+  const at = text.indexOf('##')
+  return at < 0 ? text : text.slice(0, at)
+}
+
 /** The text in the current language, with `{name}` places filled in. */
 export function t(text: string, vars?: Vars): string {
-  return fill(useLocaleStore.getState().messages[text] ?? text, vars)
+  return fill(useLocaleStore.getState().messages[text] ?? english(text), vars)
 }
 
 /** Marks a text for translation where `t` cannot be called yet (a constant of a module). Show it with `t(...)`. */

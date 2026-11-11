@@ -12,6 +12,7 @@ import { errorMessage } from '@/api/client'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
+import { msg, t } from '@/lib/i18n'
 import { type SearchGroup, type SearchKind, useSearch } from './api'
 import { Highlighted } from './Highlighted'
 import { kindInfo, KINDS } from './kinds'
@@ -21,7 +22,7 @@ function Group({ group, onShowAll }: { group: SearchGroup; onShowAll?: () => voi
   return (
     <section>
       <h2 className="mb-1.5 flex items-center gap-2 px-1 text-[12px] font-semibold uppercase tracking-wider text-subtle">
-        <info.icon className="h-3.5 w-3.5" /> {info.label}
+        <info.icon className="h-3.5 w-3.5" /> {t(info.label)}
       </h2>
       <div className="overflow-hidden rounded-card border border-border bg-card shadow-soft">
         {group.hits.map((hit) => (
@@ -39,7 +40,7 @@ function Group({ group, onShowAll }: { group: SearchGroup; onShowAll?: () => voi
       </div>
       {group.has_more && onShowAll && (
         <button type="button" onClick={onShowAll} className="mt-1.5 px-1 text-[13px] text-accent hover:underline">
-          Show more {info.label.toLowerCase()}
+          {t('Show more {kind}', { kind: t(info.label).toLowerCase() })}
         </button>
       )}
     </section>
@@ -73,32 +74,32 @@ export function SearchPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Search" />
+      <PageHeader title={t('Search')} />
       <form onSubmit={submit} className="relative mb-3">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
-        <input autoFocus={!q} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Search"
-          placeholder="Search chats, documents, tasks, files…"
+        <input autoFocus={!q} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label={t('Search')}
+          placeholder={t('Search chats, documents, tasks, files…')}
           className="h-11 w-full rounded-control border border-border bg-surface pl-10 pr-3 text-[15px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
       </form>
 
-      <div className="mb-4 flex flex-wrap gap-1" role="tablist" aria-label="Kind of result">
-        {[{ kind: null, label: 'Everything' }, ...KINDS].map((k) => (
+      <div className="mb-4 flex flex-wrap gap-1" role="tablist" aria-label={t('Kind of result')}>
+        {[{ kind: null, label: msg('Everything') }, ...KINDS].map((k) => (
           <button key={k.label} type="button" role="tab" aria-selected={kind === k.kind} onClick={() => show({ kind: k.kind })}
             className={cn('h-8 rounded-full px-3 text-[13px] font-medium transition-colors pointer-coarse:h-10',
               kind === k.kind ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
-            {k.label}
+            {t(k.label)}
           </button>
         ))}
       </div>
 
       {results.isError && <p className="text-[13px] text-error">{errorMessage(results.error)}</p>}
       {!q && (
-        <EmptyState icon={<Search className="h-5 w-5" />} title="Search your workspace"
-          description="Chats, documents, memories, tasks, calendar events, files and automations. Press Ctrl+K anywhere for a quick search." />
+        <EmptyState icon={<Search className="h-5 w-5" />} title={t('Search your workspace')}
+          description={t('Chats, documents, memories, tasks, calendar events, files and automations. Press Ctrl+K anywhere for a quick search.')} />
       )}
       {q && results.isSuccess && groups.length === 0 && (
-        <EmptyState icon={<Search className="h-5 w-5" />} title={`Nothing found for “${q}”`}
-          description={kind ? 'Try “Everything”, or fewer words: every word has to match.' : 'Try fewer or different words: every word has to match.'} />
+        <EmptyState icon={<Search className="h-5 w-5" />} title={t('Nothing found for “{query}”', { query: q })}
+          description={kind ? t('Try “Everything”, or fewer words: every word has to match.') : t('Try fewer or different words: every word has to match.')} />
       )}
       <div className={cn('flex flex-col gap-5', results.isPlaceholderData && 'opacity-60')}>
         {groups.map((group) => (
@@ -107,7 +108,7 @@ export function SearchPage() {
       </div>
       {results.data?.by_meaning && groups.length > 0 && (
         <p className="mt-4 flex items-center gap-1.5 text-[12px] text-muted">
-          <Sparkles className="h-3.5 w-3.5" /> Documents and memories were also searched by meaning, not only by these words.
+          <Sparkles className="h-3.5 w-3.5" /> {t('Documents and memories were also searched by meaning, not only by these words.')}
         </p>
       )}
     </div>

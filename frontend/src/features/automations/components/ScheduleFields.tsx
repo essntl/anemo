@@ -2,10 +2,14 @@
 import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { formatUpcoming } from '@/lib/format'
+import { t } from '@/lib/i18n'
 import type { SchedulePreview } from '../api'
 import { type Frequency, FREQUENCY_OPTIONS, type ScheduleForm, WEEKDAYS } from '../scheduleForm'
 
 const TIMED: Frequency[] = ['daily', 'weekdays', 'weekly', 'monthly', 'once', 'rrule']
+
+// "Runs" and "On" mean something else elsewhere in the app (the Runs page, a switch that is on):
+// the ##meaning in their keys tells the translations apart.
 
 interface Props {
   form: ScheduleForm
@@ -22,45 +26,45 @@ export function ScheduleFields({ form, onChange, tz, preview }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Runs">
-          <Select value={form.frequency} options={FREQUENCY_OPTIONS} onValueChange={(v) => set({ frequency: v as Frequency })} />
+        <Field label={t('Runs##how often')}>
+          <Select value={form.frequency} options={FREQUENCY_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} onValueChange={(v) => set({ frequency: v as Frequency })} />
         </Field>
         {form.frequency === 'weekly' && (
-          <Field label="On">
+          <Field label={t('On##day')}>
             <Select value={String(form.weekday)} onValueChange={(v) => set({ weekday: Number(v) })}
-              options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: String(d), label: WEEKDAYS[d] }))} />
+              options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: String(d), label: t(WEEKDAYS[d]) }))} />
           </Field>
         )}
         {form.frequency === 'monthly' && (
-          <Field label="On day" hint="1 to 28, so it exists in every month">
+          <Field label={t('On day')} hint={t('1 to 28, so it exists in every month')}>
             <Input type="number" min={1} max={28} value={form.monthDay}
               onChange={(e) => set({ monthDay: Math.min(28, Math.max(1, Number(e.target.value) || 1)) })} />
           </Field>
         )}
         {form.frequency === 'rrule' && (
-          <Field label="Repeat rule" hint="As tasks and events use, e.g. FREQ=WEEKLY;BYDAY=MO,WE">
+          <Field label={t('Repeat rule')} hint={t('As tasks and events use, e.g. {example}', { example: 'FREQ=WEEKLY;BYDAY=MO,WE' })}>
             <Input value={form.rrule} className="font-mono" spellCheck={false} onChange={(e) => set({ rrule: e.target.value })} />
           </Field>
         )}
         {(form.frequency === 'once' || form.frequency === 'rrule') && (
-          <Field label={form.frequency === 'rrule' ? 'Starting' : 'On'}>
+          <Field label={form.frequency === 'rrule' ? t('Starting') : t('On##day')}>
             <Input type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} />
           </Field>
         )}
         {TIMED.includes(form.frequency) && (
-          <Field label="At">
+          <Field label={t('At')}>
             <Input type="time" value={form.time} onChange={(e) => set({ time: e.target.value })} />
           </Field>
         )}
         {(form.frequency === 'hours' || form.frequency === 'minutes') && (
-          <Field label={form.frequency === 'hours' ? 'Every … hours' : 'Every … minutes'}
-            hint={form.frequency === 'minutes' ? 'At least 5' : undefined}>
+          <Field label={form.frequency === 'hours' ? t('Every … hours') : t('Every … minutes')}
+            hint={form.frequency === 'minutes' ? t('At least 5') : undefined}>
             <Input type="number" min={form.frequency === 'minutes' ? 5 : 1} max={form.frequency === 'minutes' ? 720 : 168}
               value={form.every} onChange={(e) => set({ every: Number(e.target.value) || 0 })} />
           </Field>
         )}
         {form.frequency === 'cron' && (
-          <Field label="Cron expression" hint="minute hour day month weekday, e.g. 30 7 * * 1,3,5">
+          <Field label={t('Cron expression')} hint={t('minute hour day month weekday, e.g. {example}', { example: '30 7 * * 1,3,5' })}>
             <Input value={form.cron} className="font-mono" spellCheck={false} onChange={(e) => set({ cron: e.target.value })} />
           </Field>
         )}
@@ -72,14 +76,14 @@ export function ScheduleFields({ form, onChange, tz, preview }: Props) {
           <>
             <span className="font-medium">{preview.text}</span>
             {preview.nextRuns.length > 0 ? (
-              <span className="text-muted"> · next: {preview.nextRuns.slice(0, 3).map((t) => formatUpcoming(t)).join(', ')}</span>
+              <span className="text-muted"> · {t('next: {times}', { times: preview.nextRuns.slice(0, 3).map((at) => formatUpcoming(at)).join(', ') })}</span>
             ) : (
-              <span className="text-error"> · that time has already passed</span>
+              <span className="text-error"> · {t('that time has already passed')}</span>
             )}
-            <div className="mt-0.5 text-muted">Times are in {tz}.</div>
+            <div className="mt-0.5 text-muted">{t('Times are in {tz}.', { tz })}</div>
           </>
         ) : (
-          <span className="text-muted">Checking the schedule…</span>
+          <span className="text-muted">{t('Checking the schedule…')}</span>
         )}
       </div>
     </div>

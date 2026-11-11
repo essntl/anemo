@@ -20,6 +20,6 @@ const messages: Messages = {
   "One browser per chat, shared by you and the agent.": "Один браузер на чат, спільний для вас і агента.",
   "Text to type into the page": "Текст для введення на сторінці",
   "Type into the page…": "Введіть текст для сторінки…",
-  "Type": "Ввести",
+  "Type##verb": "Ввести",
 }
 export default messages

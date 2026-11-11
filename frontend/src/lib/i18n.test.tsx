@@ -62,3 +62,13 @@ describe('dateLocale', () => {
     expect(dateLocale()).toBe('uk')
   })
 })
+
+describe('a text with two meanings', () => {
+  it('shows the words without the ##meaning, and each meaning has its own translation', () => {
+    expect(t('Type##verb')).toBe('Type')
+    setLocaleForTest('uk', { 'Type##verb': 'Ввести', Type: 'Тип' })
+    expect([t('Type##verb'), t('Type')]).toEqual(['Ввести', 'Тип'])
+    // Not translated yet: still no ## on screen.
+    expect(t('On##day')).toBe('On')
+  })
+})

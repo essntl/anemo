@@ -4,16 +4,17 @@ import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { plural, t } from '@/lib/i18n'
 import { type Profile, useDeleteProfile, useProfiles } from '../api'
 
 function describe(p: Profile): string[] {
   const facts: string[] = []
   const overrides = Object.keys(p.permission_levels).length
-  if (overrides) facts.push(`${overrides} permission${overrides === 1 ? '' : 's'} changed`)
-  if (p.limits) facts.push('custom limits')
-  if (p.plan_review === 'always') facts.push('reviews plans')
-  if (p.plan_review === 'off') facts.push('no plan review')
-  facts.push(p.skill_mode === 'all' ? 'all skills' : p.skill_mode === 'none' ? 'no skills' : `${p.skill_ids.length} skills`)
+  if (overrides) facts.push(plural(overrides, '{n} permission changed', '{n} permissions changed'))
+  if (p.limits) facts.push(t('custom limits'))
+  if (p.plan_review === 'always') facts.push(t('reviews plans'))
+  if (p.plan_review === 'off') facts.push(t('no plan review'))
+  facts.push(p.skill_mode === 'all' ? t('all skills') : p.skill_mode === 'none' ? t('no skills') : plural(p.skill_ids.length, '{n} skills', '{n} skills'))
   return facts
 }
 
@@ -23,9 +24,9 @@ export function ProfileList({ onEdit }: { onEdit: (profile: Profile) => void }) 
 
   const confirmDelete = async (p: Profile) => {
     const ok = await confirmDialog({
-      title: `Delete “${p.name}”?`,
-      message: 'Past runs keep their history. Chats using this profile switch back to the default agent.',
-      confirmLabel: 'Delete',
+      title: t('Delete “{name}”?', { name: p.name }),
+      message: t('Past runs keep their history. Chats using this profile switch back to the default agent.'),
+      confirmLabel: t('Delete'),
       danger: true,
     })
     if (ok) remove.mutate(p.id)
@@ -33,8 +34,8 @@ export function ProfileList({ onEdit }: { onEdit: (profile: Profile) => void }) 
 
   if (profiles.isSuccess && profiles.data.length === 0) {
     return (
-      <EmptyState icon={<Bot className="h-5 w-5" />} title="No profiles yet"
-        description="Without a profile, agents use your global permissions and no special instructions. Create one for a recurring kind of work, like research or coding." />
+      <EmptyState icon={<Bot className="h-5 w-5" />} title={t('No profiles yet')}
+        description={t('Without a profile, agents use your global permissions and no special instructions. Create one for a recurring kind of work, like research or coding.')} />
     )
   }
   return (
@@ -53,8 +54,8 @@ export function ProfileList({ onEdit }: { onEdit: (profile: Profile) => void }) 
             </div>
           </button>
           <ActionMenu actions={[
-            { label: 'Edit', icon: <Pencil />, onSelect: () => onEdit(p) },
-            { label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete(p) },
+            { label: t('Edit'), icon: <Pencil />, onSelect: () => onEdit(p) },
+            { label: t('Delete'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete(p) },
           ]} />
         </div>
       ))}

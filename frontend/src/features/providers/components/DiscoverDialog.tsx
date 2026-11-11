@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { type Provider, useDiscover, useImportModels } from '../api'
+import { plural, t } from '@/lib/i18n'
 import { CapabilityChips, CapabilityInfo } from './CapabilityChips'
 
 /** Lists the models a provider offers and imports the selected ones. */
@@ -47,23 +48,23 @@ export function DiscoverDialog({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={`Models from ${provider.name}`}
-      description="Pick the models you want to use. You can adjust their capabilities afterwards."
+      title={t('Models from {name}', { name: provider.name })}
+      description={t('Pick the models you want to use. You can adjust their capabilities afterwards.')}
       className="md:w-[min(94vw,640px)]"
       footer={
         <>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('Cancel')}</Button>
           <Button variant="primary" disabled={selected.size === 0} loading={importModels.isPending} onClick={submit}>
-            Add {selected.size || ''} model{selected.size === 1 ? '' : 's'}
+            {selected.size ? plural(selected.size, 'Add {n} model', 'Add {n} models') : t('Add models')}
           </Button>
         </>
       }
     >
-      <Input placeholder="Filter models…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <Input placeholder={t('Filter models…')} value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="mt-3 max-h-[50vh] overflow-y-auto rounded-control border border-border">
-        {discover.isPending && <p className="p-4 text-[13px] text-muted">Asking the provider…</p>}
+        {discover.isPending && <p className="p-4 text-[13px] text-muted">{t('Asking the provider…')}</p>}
         {discover.isError && <p className="p-4 text-[13px] text-error">{errorMessage(discover.error)}</p>}
-        {discover.data && visible.length === 0 && <p className="p-4 text-[13px] text-muted">No models match.</p>}
+        {discover.data && visible.length === 0 && <p className="p-4 text-[13px] text-muted">{t('No models match.')}</p>}
         {visible.map((m) => (
           // The tags sit outside the label, so pressing the phone's info button
           // does not also tick the model.
@@ -78,8 +79,8 @@ export function DiscoverDialog({
                 <div className="truncate text-[13px] font-medium">{m.display_name ?? m.model_key}</div>
                 <div className="truncate font-mono text-[11px] text-muted">
                   {m.model_key}
-                  {m.context_window ? ` · ${Math.round(m.context_window / 1000)}k context` : ''}
-                  {m.already_added ? ' · added' : ''}
+                  {m.context_window ? ' · ' + t('{n}k context', { n: Math.round(m.context_window / 1000) }) : ''}
+                  {m.already_added ? ' · ' + t('added') : ''}
                 </div>
               </div>
             </label>

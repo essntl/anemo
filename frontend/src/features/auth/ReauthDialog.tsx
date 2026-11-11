@@ -3,6 +3,7 @@ import { api, errorMessage, unwrap } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Input'
+import { t } from '@/lib/i18n'
 import { useReauthStore } from './reauthStore'
 
 /** Mounted once in the app layout. */
@@ -35,15 +36,15 @@ export function ReauthDialog() {
     <Dialog
       open={pending !== null}
       onOpenChange={(open) => !open && close(false)}
-      title="Confirm it's you"
-      description="This is a security-sensitive setting. Enter your password to continue."
+      title={t("Confirm it's you")}
+      description={t('This is a security-sensitive setting. Enter your password to continue.')}
       footer={
         <>
           <Button variant="ghost" onClick={() => close(false)}>
-            Cancel
+            {t('Cancel')}
           </Button>
           <Button variant="primary" loading={busy} disabled={!password} onClick={submit}>
-            Confirm
+            {t('Confirm')}
           </Button>
         </>
       }
@@ -54,7 +55,7 @@ export function ReauthDialog() {
           void submit()
         }}
       >
-        <Field label="Password" error={error}>
+        <Field label={t('Password')} error={error}>
           <Input
             type="password"
             autoFocus
