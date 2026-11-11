@@ -52,10 +52,11 @@ interface SideChatProps {
 const same = (text: string) => text
 const HEAD_BUTTON = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-9 pointer-coarse:w-9'
 
-/** The column both states share: what scrolls, and the message box under it. */
-function Column({ scroll, children, footer }: { scroll?: React.Ref<HTMLDivElement>; children: ReactNode; footer: ReactNode }) {
+/** The column both states share: a row that stays (the chat's name), what scrolls, and the message box under it. */
+function Column({ header, scroll, children, footer }: { header?: ReactNode; scroll?: React.Ref<HTMLDivElement>; children: ReactNode; footer: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {header}
       <div ref={scroll} className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       <div className="shrink-0 p-2 pt-1">{footer}</div>
     </div>
@@ -187,7 +188,18 @@ function Thread({ conversationId, onRestart, onGone, prepare = same, display = s
   }
 
   return (
-    <Column scroll={scroll} footer={
+    <Column scroll={scroll} header={
+      // Directly under the panel's tabs, and outside what scrolls: no message shows above it.
+      <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border pl-3 pr-1.5">
+        <span className="min-w-0 flex-1 truncate text-[12px] text-muted" title={conversation.data?.title}>{conversation.data?.title}</span>
+        <Link to={`/c/${conversationId}`} aria-label="Open as a full chat" title="Open as a full chat" className={HEAD_BUTTON}>
+          <Maximize2 className="h-3.5 w-3.5" />
+        </Link>
+        <button type="button" aria-label="Start a new chat" title="Start a new chat (this one stays in your chats)" onClick={onRestart} className={HEAD_BUTTON}>
+          <SquarePen className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    } footer={
       <>
         {error && <p role="alert" className="mb-2 px-1 text-[13px] text-error">{error}</p>}
         {/* What the agent waits for stays in sight here, whatever the chat is scrolled to. */}
@@ -204,15 +216,6 @@ function Thread({ conversationId, onRestart, onGone, prepare = same, display = s
         />
       </>
     }>
-      <div className="sticky top-0 z-10 flex h-9 items-center gap-0.5 border-b border-border bg-surface pl-3 pr-1.5">
-        <span className="min-w-0 flex-1 truncate text-[12px] text-muted" title={conversation.data?.title}>{conversation.data?.title}</span>
-        <Link to={`/c/${conversationId}`} aria-label="Open as a full chat" title="Open as a full chat" className={HEAD_BUTTON}>
-          <Maximize2 className="h-3.5 w-3.5" />
-        </Link>
-        <button type="button" aria-label="Start a new chat" title="Start a new chat (this one stays in your chats)" onClick={onRestart} className={HEAD_BUTTON}>
-          <SquarePen className="h-3.5 w-3.5" />
-        </button>
-      </div>
       {messages.data && list.length === 0 ? empty((text) => void onSend(text).catch(() => undefined)) : (
         <div className="flex flex-col gap-4 p-3">
           {list.map((m) => {

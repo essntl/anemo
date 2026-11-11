@@ -52,9 +52,10 @@ function MoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
 
 /**
  * Phones: the bar along the bottom edge, where thumbs reach. Home, the chats, a new chat
- * in the middle, the Inbox with its count, and More for every other page. The menu in
- * the top bar still holds the chat list and the project switcher. Hidden from `md` up,
- * and on a conversation, where the message box has the bottom edge.
+ * in the middle, the Inbox with its count, and More for every other page. With it on
+ * screen the top bar needs no menu button (a swipe from the left still opens the menu
+ * with the chat list). Hidden from `md` up, and on a conversation, where the message box
+ * has the bottom edge.
  */
 export function MobileTabBar() {
   const [more, setMore] = useState(false)

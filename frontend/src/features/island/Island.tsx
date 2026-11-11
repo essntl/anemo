@@ -16,6 +16,7 @@ import { player, usePlayer } from '@/features/music/player/controller'
 import { dismissIslandAlert, useIslandAlerts } from './alerts'
 import { AlertBadge, IslandButton } from './IslandParts'
 import { useIslandVisible } from './islandStore'
+import { useIslandSide } from './useIslandSide'
 
 /** How the content of each state appears: a quick blur and scale, or a fade with reduced motion. */
 const content = {
@@ -27,7 +28,8 @@ const content = {
 type Mode = 'hidden' | 'compact' | 'expanded' | 'alert'
 
 /**
- * The Dynamic Island: a dark pill at the top centre of the page area. It is
+ * The Dynamic Island: a dark pill at the top centre of the page area (on a phone, at the
+ * right end of the top bar when the page has no buttons there: see useIslandSide). It is
  *  - hidden while no timer runs and nothing has played,
  *  - compact: the timer (ring, phase, clock) and/or music (cover, bars),
  *  - expanded (click it, or Enter): controls for both; Esc or a click outside closes it,
@@ -47,6 +49,7 @@ export function Island() {
   const wrap = useRef<HTMLDivElement>(null)
   const pill = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
+  const side = useIslandSide()
 
   // Activity already there when the app opens is just there; only new activity animates in.
   const [settled, setSettled] = useState(false)
@@ -96,6 +99,7 @@ export function Island() {
     const column = wrap.current?.parentElement
     if (!column) return
     column.dataset.island = mode === 'hidden' ? 'off' : 'on'
+    column.dataset.islandSide = side
     if (mode === 'hidden') {
       column.style.setProperty('--island-w', '0px')
       return
@@ -107,7 +111,7 @@ export function Island() {
     const observer = new ResizeObserver(publish)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [mode])
+  }, [mode, side])
 
   const open = (path: string) => {
     setExpanded(false)
@@ -121,10 +125,12 @@ export function Island() {
   ].filter(Boolean).join(', ')
 
   return (
-    // Compact, the Island keeps clear of a phone's top-bar buttons (px-12); opened or
-    // alerting it may use the whole width, as its content is sized to the screen.
-    <div ref={wrap} className={cn('pointer-events-none absolute inset-x-0 top-1.5 z-30 flex justify-center px-3 md:top-2',
-      mode === 'compact' && 'max-md:px-12')}>
+    // Compact and in the middle, the Island keeps clear of a phone's top-bar buttons
+    // (px-12); opened or alerting it may use the whole width, as its content is sized to
+    // the screen. At the right end it grows from there (the pill's layout animation
+    // carries it from one place to the other).
+    <div ref={wrap} className={cn('pointer-events-none absolute inset-x-0 top-1.5 z-30 flex px-3 md:top-2',
+      side === 'end' ? 'justify-end' : 'justify-center', mode === 'compact' && side === 'center' && 'max-md:px-12')}>
       {/* Alerts are read out; the timer's phase changes are announced by the timer itself. */}
       <div className="sr-only" role="status" aria-live="polite">{alert ? `${alert.title}. ${alert.body ?? ''}` : ''}</div>
       <AnimatePresence>

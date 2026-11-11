@@ -45,6 +45,15 @@ const SCREENS = [
   '/settings/advanced',
 ]
 
+/**
+ * Opens the menu drawer the way a phone does where the tab bar shows (there is no menu
+ * button on those pages): a swipe from the left, here across the top bar.
+ */
+async function openMenu(page: Page) {
+  await swipe(page, 60, 320, 24)
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toBeVisible()
+}
+
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
 }
@@ -63,7 +72,10 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await login(page)
   // The desktop sidebar is hidden; the drawer holds the navigation.
   await expect(page.getByRole('link', { name: 'Files', exact: true })).toBeHidden()
-  await page.getByRole('button', { name: 'Open menu' }).click()
+  // With the tab bar on screen the top bar has no menu button: a swipe opens the menu.
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
+  await openMenu(page)
   const drawer = page.getByRole('dialog', { name: 'Menu' })
   await expect(drawer).toBeVisible()
   // Most of the menu is chats: Notifications and Settings are header icons, the pages one bar.
@@ -79,7 +91,7 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
   await expect(drawer).toBeHidden()
 
   // Closing slides it back out instead of making it vanish.
-  await page.getByRole('button', { name: 'Open menu' }).click()
+  await openMenu(page)
   await page.getByRole('button', { name: 'Close menu' }).click()
   await expect(page.getByRole('dialog', { name: 'Menu' })).toBeHidden()
   expect(await seen()).toContain('drawer-out')
@@ -96,7 +108,7 @@ test('the menu drawer opens, navigates and closes', async ({ page }) => {
 test('the pages bar grows into a card in the middle, and folds back', async ({ page }) => {
   await login(page)
   await page.goto('/tasks')
-  await page.getByRole('button', { name: 'Open menu' }).click()
+  await openMenu(page)
   const drawer = page.getByRole('dialog', { name: 'Menu' })
   // The bar says which page you are on.
   const bar = drawer.getByRole('button', { name: 'Pages, on Tasks' })
@@ -150,7 +162,7 @@ test("a chat's menu low in the list is a sheet that fits on the screen", async (
       ids.push(c.id)
     }
     await page.goto('/tasks')
-    await page.getByRole('button', { name: 'Open menu' }).click()
+    await openMenu(page)
     const drawer = page.getByRole('dialog', { name: 'Menu' })
     const last = drawer.getByRole('button', { name: /^Actions for / }).last()
     await last.scrollIntoViewIfNeeded()
@@ -320,7 +332,7 @@ test('a document on a phone: small bars, one row of formatting, the panel slides
     const editor = page.getByLabel('Document text')
     await expect(editor.getByRole('heading', { name: title })).toBeVisible()
     // The app's top bar makes way for the document's own header.
-    await expect(page.getByRole('button', { name: 'Open menu' })).toBeHidden()
+    await expect(page.locator('#main-column > header')).toBeHidden()
     await expect(page.getByRole('link', { name: 'All documents' })).toBeVisible()
     // The formatting buttons are one row, and the text starts in the top fifth of the screen.
     const toolbar = page.getByRole('toolbar', { name: 'Formatting' })
@@ -464,25 +476,40 @@ test('installable: manifest, icons and a service worker that never caches /api',
   }
 })
 
-test('the Island takes the middle of the top bar and plays and pauses', async ({ page, baseURL }) => {
+test('the Island sits in the top bar, at the right where that end is free, and plays and pauses', async ({ page, baseURL }) => {
   await login(page)
   try {
     await startMusic(page, baseURL!)
     const island = page.getByTestId('island')
-    // It replaces the Anemo name in the top bar, between the menu and new-chat buttons.
-    const bar = page.locator('header').filter({ has: page.getByRole('button', { name: 'Open menu' }) }).first()
-    await expect(bar.getByText('Anemo')).toBeHidden()
+    const bar = page.locator('#main-column > header')
+    const title = bar.getByRole('heading', { level: 1 })
+    const width = page.viewportSize()!.width
     await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
     // (once its change of shape has settled)
     await expect.poll(async () => Math.round((await island.boundingBox())!.height)).toBeLessThanOrEqual(36)
-    const pill = (await island.boundingBox())!
-    const menu = (await page.getByRole('button', { name: 'Open menu' }).first().boundingBox())!
-    expect(pill.x).toBeGreaterThanOrEqual(menu.x + menu.width)
-    expect(pill.y + pill.height).toBeLessThanOrEqual(48)
-    // Go to another page through the menu: still playing.
-    await page.getByRole('button', { name: 'Open menu' }).click()
-    await page.getByRole('button', { name: /^Pages/ }).click()
-    await page.getByRole('link', { name: 'Tasks', exact: true }).click()
+    expect((await island.boundingBox())!.y + (await island.boundingBox())!.height).toBeLessThanOrEqual(48)
+
+    // The Inbox has no buttons at the right of its bar: the Island moves there, and the
+    // title and the line under it have the room (it is still playing).
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: /Inbox/ }).tap()
+    await expect(title).toHaveText('Inbox')
+    await expect.poll(async () => {
+      const pill = (await island.boundingBox())!
+      return Math.round(width - (pill.x + pill.width))
+    }).toBeLessThanOrEqual(16)
+    const atRight = (await island.boundingBox())!
+    const heading = (await title.boundingBox())!
+    expect(heading.x + heading.width).toBeLessThanOrEqual(atRight.x)
+    expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+
+    // Tasks has buttons there: the Island stays in the middle.
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'More' }).tap()
+    await page.getByRole('dialog', { name: 'More' }).getByRole('link', { name: 'Tasks', exact: true }).tap()
+    await expect(title).toHaveText('Tasks')
+    await expect.poll(async () => {
+      const pill = (await island.boundingBox())!
+      return Math.abs(Math.round(pill.x + pill.width / 2 - width / 2))
+    }).toBeLessThanOrEqual(2)
     await expect(island).toHaveAttribute('data-mode', 'compact', { timeout: 10_000 })
     await island.getByRole('button', { name: /Show controls/ }).tap()
     await island.getByRole('button', { name: 'Pause music' }).tap()
