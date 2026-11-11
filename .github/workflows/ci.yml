@@ -94,7 +94,9 @@ jobs:
           cache-dependency-path: e2e/package-lock.json
       - run: npm ci
         working-directory: e2e
-      - run: npx playwright install --with-deps chromium
+      # Survives an unreachable Ubuntu mirror: see the script.
+      - name: Install the test browser
+        run: sh ../.github/scripts/install-test-browser.sh
         working-directory: e2e
       - run: sh e2e/run-isolated.sh
       - uses: actions/upload-artifact@v4
@@ -123,5 +125,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run build:browser
-      - run: npx playwright install --with-deps chromium
+      # Survives an unreachable Ubuntu mirror: see the script.
+      - name: Install the test browser
+        run: sh ../.github/scripts/install-test-browser.sh
       - run: npm run e2e
