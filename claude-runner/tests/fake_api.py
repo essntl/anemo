@@ -35,6 +35,7 @@ def _prefix_chars(a: str, b: str) -> int:
 class FakeApi:
     def __init__(self, word_delay: float = 0.0) -> None:
         self.word_delay = word_delay  # seconds between streamed words (streaming tests)
+        self.stall_s = 0.0  # seconds a model request waits before it is answered at all
         self.replies: deque[tuple[list[dict[str, Any]], str]] = deque()
         self.requests: list[dict[str, Any]] = []  # /v1/messages bodies, in order
         self.lock = threading.Lock()
@@ -95,6 +96,8 @@ class FakeApi:
             "cache_creation_input_tokens": max(total - read - 3, 0),
             "output_tokens": 1,
         }
+        if self.stall_s and body.get("stream"):
+            time.sleep(self.stall_s)
         if not body.get("stream"):
             out = json.dumps({"id": f"msg_{n}", "type": "message", "role": "assistant",
                               "model": body.get("model"), "content": blocks,

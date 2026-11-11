@@ -77,7 +77,8 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
     case 'run.model':
       return { ...state, modelLabel: str(data.label) || state.modelLabel }
     case 'run.fallback':
-      return { ...state, notice: `${str(data.from)} was unavailable, switched to ${str(data.to)}` }
+      // The reason is the provider's own error, e.g. a usage limit: say it, don't hide it.
+      return { ...state, notice: `${str(data.from)} was unavailable${fallbackReason(data.reason)}, switched to ${str(data.to)}` }
     case 'run.restarted':
       // The worker restarted the run from scratch: drop what was streamed so far.
       return { ...state, text: '', reasoning: '', notice: 'Resumed after an interruption' }
@@ -143,4 +144,11 @@ export function useRunStream(
   }, [runId])
 
   return view
+}
+
+/** " (the reason)" for the fallback notice, shortened; nothing when there is none. */
+function fallbackReason(reason: unknown): string {
+  const text = typeof reason === 'string' ? reason.trim() : ''
+  if (!text || text === 'unavailable') return ''
+  return ` (${text.length > 160 ? `${text.slice(0, 157)}…` : text})`
 }

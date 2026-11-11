@@ -213,9 +213,29 @@ async def _turn_events(session: Session, body: TurnIn) -> AsyncIterator[bytes]:
         session.last_used = time.monotonic()
         if not finished and session.alive and session.in_turn and not session.parked:
             # The worker went away while the model was still answering (the run was
-            # cancelled): stop the answer rather than let it use the subscription.
-            with suppress(Exception):
-                await asyncio.shield(session.interrupt())
+            # cancelled, or it stopped waiting): stop the answer rather than let it use
+            # the subscription. This code is usually being cancelled itself at that
+            # moment (the connection closed), and anything awaited here would be cut
+            # short, leaving the lock held for good and the chat "busy" until a
+            # restart. So the interrupt runs as its own task, which frees the session.
+            task = asyncio.create_task(_interrupt_then_release(session))
+            _cleanups.add(task)
+            task.add_done_callback(_cleanups.discard)
+        else:
+            session.lock.release()
+
+
+_cleanups: set[asyncio.Task[None]] = set()  # keeps the tasks above alive until they end
+
+
+async def _interrupt_then_release(session: Session) -> None:
+    try:
+        await session.interrupt()
+    except Exception:  # noqa: BLE001 - the session must come free whatever happens
+        log.warning("interrupt failed", extra={"ctx": {"key": session.key}}, exc_info=True)
+        with suppress(Exception):
+            await session.stop("interrupt failed")
+    finally:
         session.lock.release()
 
 
