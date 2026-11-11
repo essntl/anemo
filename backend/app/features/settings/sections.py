@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.features.memory.schemas import MemorySettings
 from app.policy.presets import PermissionSettings
@@ -27,6 +27,8 @@ class GeneralSettings(BaseModel):
     start_page: Literal["home", "new_chat"] = "home"
     # Home's daily note: unticked notes of the last day with notes start the next one.
     carry_over_daily_notes: bool = False
+    # The language of the app: one of its translations, or what the browser asks for.
+    language: Literal["system", "en", "uk", "ru"] = "system"
 
 
 SetupStep = Literal["provider", "models", "you", "parts", "notifications"]
@@ -115,6 +117,51 @@ class HomeSettings(BaseModel):
     mobile_layout: list[WidgetLayout] = Field(default_factory=list, max_length=40)
 
 
+PageId = Literal[
+    "home",
+    "notifications",
+    "tasks",
+    "calendar",
+    "documents",
+    "files",
+    "projects",
+    "focus",
+    "music",
+    "runs",
+    "automations",
+    "agents",
+    "memory",
+]
+# Home is where the app opens and the Inbox is where approvals wait: these stay.
+PAGES_ALWAYS_ON: frozenset[str] = frozenset({"home", "notifications"})
+
+
+class NavigationSettings(BaseModel):
+    """Where each page of the app goes (Settings > Pages): in the sidebar's list, behind
+    "More", or off. A page that is off is not in any menu or in search, and the agents
+    don't get its tools (tools/registry.py: FEATURE_TOOLS). A page in none of the lists
+    (one added in a later version) is shown under "More"."""
+
+    pinned: list[PageId] = Field(
+        default=["home", "notifications", "tasks", "calendar", "documents", "files"],
+        max_length=20,
+    )
+    more: list[PageId] = Field(
+        default=["projects", "focus", "music", "runs", "automations", "agents", "memory"],
+        max_length=20,
+    )
+    off: list[PageId] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def _each_page_once(self) -> "NavigationSettings":
+        pages = [*self.pinned, *self.more, *self.off]
+        if len(pages) != len(set(pages)):
+            raise ValueError("a page can only be in one place")
+        if PAGES_ALWAYS_ON & set(self.off):
+            raise ValueError("Home and the Inbox cannot be turned off")
+        return self
+
+
 class FilesSettings(BaseModel):
     """The Files page."""
 
@@ -179,6 +226,7 @@ SECTIONS: dict[str, SectionSpec] = {
     "automations": SectionSpec(AutomationSettings),
     "music": SectionSpec(MusicSettings),
     "home": SectionSpec(HomeSettings),
+    "navigation": SectionSpec(NavigationSettings),
     "files": SectionSpec(FilesSettings),
     "setup": SectionSpec(SetupSettings),
     "updates": SectionSpec(UpdateSettings),

@@ -443,6 +443,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/navigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Navigation Settings */
+        put: operations["put_navigation_settings_api_settings_navigation_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/files": {
         parameters: {
             query?: never;
@@ -1341,7 +1358,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Tools */
+        /**
+         * Tools
+         * @description The built-in tools, without those of the parts of the app that are turned off.
+         */
         get: operations["tools_api_tools_get"];
         put?: never;
         post?: never;
@@ -3621,6 +3641,7 @@ export interface components {
             automations: components["schemas"]["AutomationSettings"];
             music: components["schemas"]["MusicSettings"];
             home: components["schemas"]["HomeSettings"];
+            navigation: components["schemas"]["NavigationSettings"];
             files: components["schemas"]["FilesSettings"];
             setup: components["schemas"]["SetupSettings"];
             updates: components["schemas"]["UpdateSettings"];
@@ -4966,6 +4987,12 @@ export interface components {
              * @default false
              */
             carry_over_daily_notes: boolean;
+            /**
+             * Language
+             * @default system
+             * @enum {string}
+             */
+            language: "system" | "en" | "uk" | "ru";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5612,6 +5639,42 @@ export interface components {
              * @default true
              */
             server_audio: boolean;
+        };
+        /**
+         * NavigationSettings
+         * @description Where each page of the app goes (Settings > Pages): in the sidebar's list, behind
+         *     "More", or off. A page that is off is not in any menu or in search, and the agents
+         *     don't get its tools (tools/registry.py: FEATURE_TOOLS). A page in none of the lists
+         *     (one added in a later version) is shown under "More".
+         */
+        NavigationSettings: {
+            /**
+             * Pinned
+             * @default [
+             *       "home",
+             *       "notifications",
+             *       "tasks",
+             *       "calendar",
+             *       "documents",
+             *       "files"
+             *     ]
+             */
+            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            /**
+             * More
+             * @default [
+             *       "projects",
+             *       "focus",
+             *       "music",
+             *       "runs",
+             *       "automations",
+             *       "agents",
+             *       "memory"
+             *     ]
+             */
+            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            /** Off */
+            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
         };
         /** NewDocument */
         NewDocument: {
@@ -9211,6 +9274,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HomeSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_navigation_settings_api_settings_navigation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NavigationSettings"];
                 };
             };
             /** @description Validation Error */

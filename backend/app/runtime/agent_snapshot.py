@@ -20,7 +20,12 @@ from app.features.profiles.models import AgentProfile
 from app.features.projects import service as projects
 from app.features.runs.models import Run
 from app.features.settings import service as settings_service
-from app.features.settings.sections import GeneralSettings, ModelDefaults, TaskType
+from app.features.settings.sections import (
+    GeneralSettings,
+    ModelDefaults,
+    NavigationSettings,
+    TaskType,
+)
 from app.features.skills.service import prompt_section as skill_prompt_section
 from app.features.skills.service import skills_for_profile
 from app.policy.models import Limits
@@ -131,6 +136,7 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
             system += AUTOMATION_ON_ASK[inherited["on_ask"]] + "\n"
     general = await settings_service.get_section(db, GeneralSettings, "general")
     used = await _add_turn_context(db, run, transcript, general.timezone, memory_settings)
+    navigation = await settings_service.get_section(db, NavigationSettings, "navigation")
     run.options = {**run.options, "memory_context": used}
     run.policy = {
         "policy": snap_policy.model_dump(by_alias=True),
@@ -143,6 +149,8 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         "project": {"id": str(project.id), "name": project.name} if project else None,
         "system": system,
         "memory": memory_settings.enabled,
+        # The parts of the app that are turned off: their tools are not offered.
+        "off": list(navigation.off),
         "mcp_tools": mcp_refs,
         # Browser tools are only offered when the browser container is running.
         "browser": has_browser,

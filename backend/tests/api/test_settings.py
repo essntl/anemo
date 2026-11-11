@@ -65,3 +65,57 @@ async def test_focus_home_and_files_sections(authed):
     assert r.status_code == 422
     r = await authed.put("/api/settings/focus", json={"focus_minutes": 0})
     assert r.status_code == 422
+
+
+async def test_language_is_a_general_setting(authed):
+    general = (await authed.get("/api/settings")).json()["general"]
+    assert general["language"] == "system"
+    r = await authed.put("/api/settings/general", json={**general, "language": "uk"})
+    assert r.status_code == 200
+    assert (await authed.get("/api/settings")).json()["general"]["language"] == "uk"
+    r = await authed.put("/api/settings/general", json={**general, "language": "tlh"})
+    assert r.status_code == 422
+
+
+async def test_navigation_says_where_each_page_goes(authed):
+    navigation = (await authed.get("/api/settings")).json()["navigation"]
+    assert navigation == {
+        "pinned": ["home", "notifications", "tasks", "calendar", "documents", "files"],
+        "more": ["projects", "focus", "music", "runs", "automations", "agents", "memory"],
+        "off": [],
+    }
+    new = {
+        "pinned": ["home", "music", "tasks"],
+        "more": ["notifications", "files", "documents", "projects", "runs", "agents", "memory"],
+        "off": ["calendar", "focus", "automations"],
+    }
+    r = await authed.put("/api/settings/navigation", json=new)
+    assert r.status_code == 200, r.text
+    assert (await authed.get("/api/settings")).json()["navigation"] == new
+
+
+async def test_navigation_refuses_what_makes_no_sense(authed):
+    for bad in (
+        # A page in two places.
+        {"pinned": ["home", "tasks"], "more": ["tasks"], "off": []},
+        # Home and the Inbox stay.
+        {"pinned": ["tasks"], "more": [], "off": ["home"]},
+        {"pinned": ["home"], "more": [], "off": ["notifications"]},
+        # Not a page of the app.
+        {"pinned": ["home", "casino"], "more": [], "off": []},
+    ):
+        r = await authed.put("/api/settings/navigation", json=bad)
+        assert r.status_code == 422, bad
+        assert r.json()["error"]["code"] == "validation_error"
+
+
+async def test_tools_of_a_page_that_is_off_are_not_listed(authed):
+    names = {t["name"] for t in (await authed.get("/api/tools")).json()}
+    assert {"queue_music", "start_focus", "list_tasks", "create_event"} <= names
+    await authed.put(
+        "/api/settings/navigation",
+        json={"pinned": ["home", "notifications"], "more": ["focus"], "off": ["music", "tasks"]},
+    )
+    names = {t["name"] for t in (await authed.get("/api/tools")).json()}
+    assert not names & {"queue_music", "get_music_queue", "music_control", "list_tasks"}
+    assert {"start_focus", "create_event"} <= names

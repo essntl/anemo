@@ -15,7 +15,7 @@ from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.file_exchange import FILE_EXCHANGE_TOOLS
-from app.tools.builtin.focus import FOCUS_TOOLS
+from app.tools.builtin.focus import FOCUS_TOOLS, MUSIC_TOOL_NAMES
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
@@ -73,6 +73,20 @@ BUILTIN_TOOLS: list[Tool] = [
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 # Tools that only work in a run that answers in a chat.
 CHAT_FILE_TOOLS = {"save_attachment", "attach_file"}
+# The tools of the parts of the app that can be turned off (Settings > Pages): a part
+# that is off is not offered to any agent, so the model never hears of it.
+FEATURE_TOOLS: dict[str, frozenset[str]] = {
+    "tasks": frozenset(t.name for t in TASK_TOOLS),
+    "calendar": frozenset(t.name for t in EVENT_TOOLS),
+    "focus": frozenset(t.name for t in FOCUS_TOOLS) - MUSIC_TOOL_NAMES,
+    "music": MUSIC_TOOL_NAMES,
+    "automations": frozenset(t.name for t in SCHEDULE_TOOLS),
+}
+
+
+def tools_of(features: Iterable[str]) -> set[str]:
+    """The names of the tools that belong to these parts of the app."""
+    return {name for f in features for name in FEATURE_TOOLS.get(f, ())}
 
 
 def get(name: str) -> Tool | None:
@@ -102,6 +116,7 @@ def toolset_for(
     can_ask: bool = False,
     has_chat: bool = False,
     ancestors: Iterable[Policy] = (),
+    off: Iterable[str] = (),
 ) -> list[Tool]:
     """`is_automation`: the run was started by an automation (it gets the automation's
     notes). `unattended`: that, or a sub-agent of such a run: nobody is watching.
@@ -109,13 +124,16 @@ def toolset_for(
     them may not use is not offered). `can_spawn`: the run may start sub-agents.
     `can_ask`: someone is there to answer questions (not an automation or a sub-agent).
     `has_chat`: the run answers in a chat, so it can use the chat's attachments and
-    attach files to the answer."""
+    attach files to the answer. `off`: the parts of the app the user turned off
+    (Settings > Pages); their tools are not offered."""
     offered = []
+    turned_off = tools_of(off)
     for tool in BUILTIN_TOOLS:
         is_memory = tool in MEMORY_TOOLS
         # Tools that cannot work in this setup are not offered at all.
         if (
-            (tool.name == "load_skill" and not has_skills)
+            tool.name in turned_off
+            or (tool.name == "load_skill" and not has_skills)
             or (tool.name == "web_search" and not has_search)
             or (is_memory and not has_memory)
             or (tool in AUTOMATION_TOOLS and not is_automation)

@@ -1199,6 +1199,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
             can_ask=run.kind == "agent" and run.automation_id is None and run.depth == 0,
             has_chat=answer_message is not None,
             ancestors=ancestors,
+            off=run.policy.get("off") or (),
         )
         uses_browser = bool(run.policy.get("browser"))
         in_project = run.policy.get("project")
