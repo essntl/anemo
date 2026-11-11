@@ -27,6 +27,7 @@ import {
 import { promptDialog } from '@/components/ui/dialogs'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 
 /** One thing the toolbar does. */
 interface Tool {
@@ -129,41 +130,41 @@ export function EditorToolbar({ editor, onPickLink, onPickImage }: {
 
   const editLink = async () => {
     const current = (editor.getAttributes('link').href as string | undefined) ?? ''
-    const url = await promptDialog({ title: 'Link', label: 'Address (empty removes the link)', initial: current, placeholder: 'https://', confirmLabel: 'Apply' })
+    const url = await promptDialog({ title: t('Link'), label: t('Address (empty removes the link)'), initial: current, placeholder: 'https://', confirmLabel: t('Apply') })
     if (url === null) return
     if (!url.trim()) chain().extendMarkRange('link').unsetLink().run()
     else chain().extendMarkRange('link').setLink({ href: url.trim() }).run()
   }
 
-  const undo: Tool = { label: 'Undo', icon: <Undo2 />, disabled: !state.canUndo, run: () => chain().undo().run() }
-  const redo: Tool = { label: 'Redo', icon: <Redo2 />, disabled: !state.canRedo, run: () => chain().redo().run() }
+  const undo: Tool = { label: t('Undo'), icon: <Undo2 />, disabled: !state.canUndo, run: () => chain().undo().run() }
+  const redo: Tool = { label: t('Redo'), icon: <Redo2 />, disabled: !state.canRedo, run: () => chain().redo().run() }
   const headings: Tool[] = [
-    ...(onPickImage ? [{ label: 'Heading 1', icon: <Heading1 />, active: state.h1, run: () => chain().toggleHeading({ level: 1 }).run() }] : []),
-    { label: 'Heading 2', icon: <Heading2 />, active: state.h2, run: () => chain().toggleHeading({ level: 2 }).run() },
-    { label: 'Heading 3', icon: <Heading3 />, active: state.h3, run: () => chain().toggleHeading({ level: 3 }).run() },
+    ...(onPickImage ? [{ label: t('Heading 1'), icon: <Heading1 />, active: state.h1, run: () => chain().toggleHeading({ level: 1 }).run() }] : []),
+    { label: t('Heading 2'), icon: <Heading2 />, active: state.h2, run: () => chain().toggleHeading({ level: 2 }).run() },
+    { label: t('Heading 3'), icon: <Heading3 />, active: state.h3, run: () => chain().toggleHeading({ level: 3 }).run() },
   ]
-  const bold: Tool = { label: 'Bold', icon: <Bold />, active: state.bold, run: () => chain().toggleBold().run() }
-  const italic: Tool = { label: 'Italic', icon: <Italic />, active: state.italic, run: () => chain().toggleItalic().run() }
-  const strike: Tool = { label: 'Strikethrough', icon: <Strikethrough />, active: state.strike, run: () => chain().toggleStrike().run() }
-  const code: Tool = { label: 'Inline code', icon: <Code />, active: state.code, run: () => chain().toggleCode().run() }
-  const link: Tool = { label: 'Link', icon: <Link2 />, active: state.link, run: () => void editLink() }
-  const appLink: Tool = { label: 'Link to a document, task or file', icon: <FileSymlink />, run: onPickLink }
+  const bold: Tool = { label: t('Bold'), icon: <Bold />, active: state.bold, run: () => chain().toggleBold().run() }
+  const italic: Tool = { label: t('Italic'), icon: <Italic />, active: state.italic, run: () => chain().toggleItalic().run() }
+  const strike: Tool = { label: t('Strikethrough'), icon: <Strikethrough />, active: state.strike, run: () => chain().toggleStrike().run() }
+  const code: Tool = { label: t('Inline code'), icon: <Code />, active: state.code, run: () => chain().toggleCode().run() }
+  const link: Tool = { label: t('Link'), icon: <Link2 />, active: state.link, run: () => void editLink() }
+  const appLink: Tool = { label: t('Link to a document, task or file'), icon: <FileSymlink />, run: onPickLink }
   const blocks: Tool[] = [
-    { label: 'Bullet list', icon: <List />, active: state.bullet, run: () => chain().toggleBulletList().run() },
-    { label: 'Numbered list', icon: <ListOrdered />, active: state.ordered, run: () => chain().toggleOrderedList().run() },
-    { label: 'Checklist', icon: <ListChecks />, active: state.task, run: () => chain().toggleTaskList().run() },
-    { label: 'Quote', icon: <Quote />, active: state.quote, run: () => chain().toggleBlockquote().run() },
-    { label: 'Code block', icon: <CodeSquare />, active: state.codeBlock, run: () => chain().toggleCodeBlock().run() },
+    { label: t('Bullet list'), icon: <List />, active: state.bullet, run: () => chain().toggleBulletList().run() },
+    { label: t('Numbered list'), icon: <ListOrdered />, active: state.ordered, run: () => chain().toggleOrderedList().run() },
+    { label: t('Checklist'), icon: <ListChecks />, active: state.task, run: () => chain().toggleTaskList().run() },
+    { label: t('Quote'), icon: <Quote />, active: state.quote, run: () => chain().toggleBlockquote().run() },
+    { label: t('Code block'), icon: <CodeSquare />, active: state.codeBlock, run: () => chain().toggleCodeBlock().run() },
   ]
   const inserts: Tool[] = onPickImage ? [
-    { label: 'Image', icon: <ImagePlus />, run: onPickImage },
-    { label: 'Table', icon: <Table />, active: state.table, run: () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
-    { label: 'Divider line', icon: <Minus />, run: () => chain().setHorizontalRule().run() },
+    { label: t('Image'), icon: <ImagePlus />, run: onPickImage },
+    { label: t('Table'), icon: <Table />, active: state.table, run: () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
+    { label: t('Divider line'), icon: <Minus />, run: () => chain().setHorizontalRule().run() },
   ] : []
   const buttons = (tools: Tool[]) => tools.map((tool) => <ToolButton key={tool.label} tool={tool} />)
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1.5 max-md:py-1" role="toolbar" aria-label="Formatting">
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1.5 max-md:py-1" role="toolbar" aria-label={t('Formatting')}>
       {desktop ? (
         <>
           {buttons([undo, redo])}
@@ -179,21 +180,21 @@ export function EditorToolbar({ editor, onPickLink, onPickImage }: {
       ) : (
         <>
           {buttons([undo, redo])}
-          <ToolMenu label="Headings" icon={<Heading />} tools={headings} />
+          <ToolMenu label={t('Headings')} icon={<Heading />} tools={headings} />
           {buttons([bold, italic, link])}
-          <ToolMenu label="Lists and blocks" icon={<List />} tools={blocks} />
-          <ToolMenu label="More" icon={<Plus />} tools={[strike, code, appLink, ...inserts]} />
+          <ToolMenu label={t('Lists and blocks')} icon={<List />} tools={blocks} />
+          <ToolMenu label={t('More')} icon={<Plus />} tools={[strike, code, appLink, ...inserts]} />
         </>
       )}
       {state.table && (
         <>
           {desktop && <Divider />}
           {([
-            ['Row +', () => chain().addRowAfter().run()],
-            ['Row −', () => chain().deleteRow().run()],
-            ['Column +', () => chain().addColumnAfter().run()],
-            ['Column −', () => chain().deleteColumn().run()],
-            ['Delete table', () => chain().deleteTable().run()],
+            [t('Row +'), () => chain().addRowAfter().run()],
+            [t('Row −'), () => chain().deleteRow().run()],
+            [t('Column +'), () => chain().addColumnAfter().run()],
+            [t('Column −'), () => chain().deleteColumn().run()],
+            [t('Delete table'), () => chain().deleteTable().run()],
           ] as const).map(([label, run]) => (
             <button key={label} type="button" onMouseDown={keepFocus} onClick={run}
               className="h-8 shrink-0 rounded-lg px-2 text-[12px] text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10">

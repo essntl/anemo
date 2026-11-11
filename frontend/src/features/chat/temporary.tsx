@@ -10,6 +10,7 @@ import { Timer } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { useCloseOnScroll } from '@/hooks/useCloseOnScroll'
+import { t } from '@/lib/i18n'
 import { type Conversation, useUpdateConversation } from './api'
 import { formatRemaining, useNow } from './remaining'
 
@@ -46,13 +47,15 @@ export function TemporaryLabel({ conversation }: { conversation: Conversation })
   const answering = Boolean(conversation.active_run_id)
   const time = answering ? '5:00' : formatRemaining(left, 'clock')
   const when = answering
-    ? 'It is deleted 5 minutes after the answer'
-    : left > 0 ? `It is deleted in ${time} (5 minutes after the last message)` : 'It is being deleted'
+    ? t('It is deleted 5 minutes after the answer unless you keep it. Nothing is remembered from it.')
+    : left > 0
+      ? t('It is deleted in {time} (5 minutes after the last message) unless you keep it. Nothing is remembered from it.', { time })
+      : t('It is being deleted unless you keep it. Nothing is remembered from it.')
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" aria-label={`Temporary chat, ${time} left`}
+        <button type="button" aria-label={t('Temporary chat, {time} left', { time })}
           onPointerEnter={show} onPointerLeave={hide} onClick={toggle}
           className="flex h-6 shrink-0 items-center gap-1 rounded-full border border-dashed border-accent/60 bg-accent-soft/50 px-2 text-[12px] font-medium tabular-nums text-accent hover:bg-accent-soft pointer-coarse:h-8">
           <Timer className="h-3.5 w-3.5" /> {time}
@@ -61,12 +64,12 @@ export function TemporaryLabel({ conversation }: { conversation: Conversation })
       <Popover.Portal>
         <Popover.Content align="start" sideOffset={6} collisionPadding={12} onPointerEnter={show} onPointerLeave={hide}
           className="pop z-50 w-72 rounded-card border border-border bg-card p-3.5 text-[13px] shadow-float">
-          <p className="flex items-center gap-1.5 font-semibold"><Timer className="h-4 w-4 text-accent" /> Temporary chat</p>
-          <p className="mt-1.5 text-muted">{when} unless you keep it. Nothing is remembered from it.</p>
+          <p className="flex items-center gap-1.5 font-semibold"><Timer className="h-4 w-4 text-accent" /> {t('Temporary chat')}</p>
+          <p className="mt-1.5 text-muted">{when}</p>
           {keep.isError && <p className="mt-2 text-error">{errorMessage(keep.error)}</p>}
           <Button size="sm" variant="primary" className="mt-3 w-full justify-center" loading={keep.isPending}
             onClick={() => keep.mutate({ id: conversation.id, body: { temporary: false } }, { onSuccess: () => setOpen(false) })}>
-            Keep chat
+            {t('Keep chat')}
           </Button>
         </Popover.Content>
       </Popover.Portal>

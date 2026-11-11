@@ -1,4 +1,5 @@
 import { addDays } from '@/features/tasks/dates'
+import { dateLocale, t } from '@/lib/i18n'
 import type { Bar } from './BarChart'
 import type { DayValue } from './api'
 
@@ -20,8 +21,8 @@ export function toBars(series: DayValue[], today: string): Bar[] {
   if (series.length <= 62) {
     return series.map((d) => ({
       key: d.day,
-      label: date(d.day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }),
-      short: series.length > 7 ? String(date(d.day).getDate()) : date(d.day).toLocaleDateString(undefined, { weekday: 'narrow' }),
+      label: date(d.day).toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric', month: 'short' }),
+      short: series.length > 7 ? String(date(d.day).getDate()) : date(d.day).toLocaleDateString(dateLocale(), { weekday: 'narrow' }),
       value: d.value,
       highlight: d.day === today,
     }))
@@ -37,8 +38,8 @@ export function toBars(series: DayValue[], today: string): Bar[] {
   }
   return weeks.map((w) => ({
     key: w.start,
-    label: `Week of ${date(w.start).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`,
-    short: date(w.start).toLocaleDateString(undefined, { month: 'short' }).slice(0, 3),
+    label: t('Week of {date}', { date: date(w.start).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' }) }),
+    short: date(w.start).toLocaleDateString(dateLocale(), { month: 'short' }).slice(0, 3),
     value: w.value,
     highlight: w.today,
   }))

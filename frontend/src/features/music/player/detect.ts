@@ -1,3 +1,4 @@
+import { msg } from '@/lib/i18n'
 import type { SourceKind } from './types'
 
 export type Detected =
@@ -54,7 +55,7 @@ export function detectSource(input: string): Detected | null {
 export const SOURCE_LABEL: Record<SourceKind, string> = {
   youtube: 'YouTube',
   soundcloud: 'SoundCloud',
-  audio: 'Stream',
+  audio: msg('Stream'),
 }
 
 export function youtubeThumb(id: string): string {

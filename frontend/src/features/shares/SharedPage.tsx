@@ -16,6 +16,7 @@ import { Markdown } from '@/components/ui/Markdown'
 import { splitFrontMatter } from '@/features/documents/markdown'
 import { cn } from '@/lib/cn'
 import { formatUpcoming } from '@/lib/format'
+import { dateLocale, msg, t } from '@/lib/i18n'
 import { type Shared, useShared } from './api'
 
 type SharedMessage = NonNullable<Shared['messages']>[number]
@@ -23,8 +24,8 @@ type SharedProject = NonNullable<Shared['project']>
 type SharedEvent = NonNullable<SharedProject['events']>[number]
 type SharedTask = NonNullable<SharedProject['tasks']>[number]
 
-const KIND = { chat: 'Chat', document: 'Document', project: 'Project' } as const
-const STATUS: Record<string, string> = { todo: 'To do', in_progress: 'In progress', blocked: 'Blocked', done: 'Done' }
+const KIND = { chat: msg('· shared chat, read-only'), document: msg('· shared document, read-only'), project: msg('· shared project, read-only') } as const
+const STATUS: Record<string, string> = { todo: msg('To do'), in_progress: msg('In progress'), blocked: msg('Blocked'), done: msg('Done') }
 
 /** A document's text for reading: without the `---` block at the top, and without a
  *  first heading that only repeats the title shown above it. */
@@ -35,7 +36,7 @@ function documentBody(markdown: string, title: string): string {
 }
 
 const day = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  new Date(iso).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' })
 
 function Chip({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
@@ -110,9 +111,9 @@ function Row({ icon, children, aside, to, className }: { icon: ReactNode; childr
 const taskState = (task: SharedTask) => {
   const checklist = task.checklist ?? []
   return [
-    STATUS[task.status] ?? task.status,
-    task.due_date ? `due ${day(task.due_date)}` : '',
-    checklist.length ? `${checklist.filter((i) => i.done).length}/${checklist.length} checked` : '',
+    t(STATUS[task.status] ?? task.status),
+    task.due_date ? t('due {date}', { date: day(task.due_date) }) : '',
+    checklist.length ? t('{done}/{total} checked', { done: checklist.filter((i) => i.done).length, total: checklist.length }) : '',
   ].filter(Boolean).join(' · ')
 }
 
@@ -144,7 +145,7 @@ function TaskDetails({ tasks, index }: { tasks: SharedTask[]; index: number }) {
     <div className="flex flex-col gap-7">
       {task.description?.trim() && <Markdown text={task.description} />}
       {(task.checklist ?? []).length > 0 && (
-        <ul aria-label="Checklist" className="flex flex-col gap-1.5 text-[14px]">
+        <ul aria-label={t('Checklist')} className="flex flex-col gap-1.5 text-[14px]">
           {(task.checklist ?? []).map((item, i) => (
             <li key={i} className="flex items-start gap-2.5">
               {item.done ? <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <Square className="mt-0.5 h-4 w-4 shrink-0 text-muted" />}
@@ -154,12 +155,12 @@ function TaskDetails({ tasks, index }: { tasks: SharedTask[]; index: number }) {
         </ul>
       )}
       {subtasks.length > 0 && (
-        <Section title="Subtasks" empty="">
+        <Section title={t('Subtasks')} empty="">
           {subtasks.map(([, i]) => <TaskItem key={i} tasks={tasks} index={i} />)}
         </Section>
       )}
       {waitsOn.length > 0 && (
-        <Section title="Waits on" empty="">
+        <Section title={t('Waits on')} empty="">
           {waitsOn.map((i) => <TaskItem key={i} tasks={tasks} index={i} />)}
         </Section>
       )}
@@ -176,7 +177,7 @@ function ProjectOverview({ project }: { project: SharedProject }) {
   return (
     <div className="flex flex-col gap-7">
       {project.tasks && (
-        <Section title="Tasks" empty="No tasks.">
+        <Section title={t('Tasks')} empty={t('No tasks.')}>
           {/* Subtasks right under their task (those whose task is not in the copy, on their own). */}
           {project.tasks.flatMap((t, i) => t.subtask_of != null ? [] : [
             <TaskItem key={i} tasks={project.tasks!} index={i} />,
@@ -185,12 +186,12 @@ function ProjectOverview({ project }: { project: SharedProject }) {
         </Section>
       )}
       {project.events && (
-        <Section title="Upcoming events" empty="Nothing in the next 90 days.">
+        <Section title={t('Upcoming events')} empty={t('Nothing in the next 90 days.')}>
           {project.events.map((e, i) => <Row key={i} icon={<CalendarDays />} aside={eventWhen(e)}>{e.title}</Row>)}
         </Section>
       )}
       {project.documents && (
-        <Section title="Documents" empty="No documents.">
+        <Section title={t('Documents')} empty={t('No documents.')}>
           {project.documents.map((d, i) => <Row key={i} icon={<FileText />} to={`?doc=${i}`}>{d.title}</Row>)}
         </Section>
       )}
@@ -204,11 +205,11 @@ function Unavailable({ tooMany }: { tooMany: boolean }) {
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2 text-muted">
         <Link2Off className="h-5 w-5" />
       </div>
-      <h1 className="text-lg font-semibold">{tooMany ? 'Too many attempts' : 'This link is no longer available'}</h1>
+      <h1 className="text-lg font-semibold">{tooMany ? t('Too many attempts') : t('This link is no longer available')}</h1>
       <p className="max-w-sm text-[13.5px] text-muted">
         {tooMany
-          ? 'Please wait a minute and open the link again.'
-          : 'It may have expired or been withdrawn by the person who shared it. Ask them for a new one.'}
+          ? t('Please wait a minute and open the link again.')
+          : t('It may have expired or been withdrawn by the person who shared it. Ask them for a new one.')}
       </p>
     </div>
   )
@@ -246,7 +247,7 @@ export function SharedPage() {
           <div className="mb-3 flex items-center gap-2 text-[13px] text-muted">
             <Logo className="h-6 w-6 text-accent" />
             <span className="font-semibold text-text">Anemo</span>
-            <span>· shared {KIND[data.kind].toLowerCase()}, read-only</span>
+            <span>{t(KIND[data.kind])}</span>
           </div>
           {opened && (
             <Link to="." className="-ml-1 mb-1 inline-flex h-8 items-center gap-1 pr-2 text-[13px] text-muted hover:text-text pointer-coarse:h-10">
@@ -255,16 +256,16 @@ export function SharedPage() {
           )}
           <h1 className="break-words text-2xl font-semibold">{title}</h1>
           <p className="mt-1 text-[13px] text-muted">
-            {data.kind === 'chat' && data.started_at && <>Started {day(data.started_at)} · </>}
+            {data.kind === 'chat' && data.started_at && <>{t('Started {date}', { date: day(data.started_at) })} · </>}
             {task && <>{taskState(task)} · </>}
-            A copy from {day(data.shared_at)}. It does not change when the original does.
+            {t('A copy from {date}. It does not change when the original does.', { date: day(data.shared_at) })}
           </p>
         </header>
 
         {data.kind === 'chat' && (
           <div className="flex flex-col gap-6">
             {(data.messages ?? []).map((m, i) => <Message key={i} message={m} />)}
-            {(data.messages ?? []).length === 0 && <p className="text-[13.5px] text-subtle">This chat has no messages.</p>}
+            {(data.messages ?? []).length === 0 && <p className="text-[13.5px] text-subtle">{t('This chat has no messages.')}</p>}
           </div>
         )}
         {data.kind === 'document' && <Markdown text={documentBody(data.markdown ?? '', data.title)} />}

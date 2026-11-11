@@ -23,6 +23,7 @@ import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
 import { useProjects } from '@/features/tasks/api'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { useIslandVisible } from '@/features/island/islandStore'
 import {
   type ChatMessage,
@@ -58,7 +59,7 @@ function popOutBrowser(conversationId: string) {
 
 /** The chat's menu in its header: the same actions as in the sidebar and the overview. */
 function ChatMenu({ conversation }: { conversation: Conversation }) {
-  return <ActionMenu actions={useChatActions(conversation)} label="Chat actions" />
+  return <ActionMenu actions={useChatActions(conversation)} label={t('Chat actions')} />
 }
 
 /**
@@ -113,7 +114,7 @@ function Conversation() {
   const rename = async () => {
     const current = conversation.data
     if (!current) return
-    const title = await promptDialog({ title: 'Rename chat', label: 'Title', initial: current.title, confirmLabel: 'Rename' })
+    const title = await promptDialog({ title: t('Rename chat'), label: t('Title'), initial: current.title, confirmLabel: t('Rename') })
     if (title && title !== current.title) update.mutate({ id: current.id, body: { title } })
   }
   const [modelOverride, setModelOverride] = useState<string | null>(null)
@@ -193,7 +194,7 @@ function Conversation() {
       !stacked && 'island-clear-left [--island-gap:3rem] md:[--island-gap:2rem]', stacked && 'text-[14px]')}>
       {/* The title is a button: press it to rename the chat. */}
       {conversation.data ? (
-        <button type="button" title="Rename" aria-label={`Rename “${conversation.data.title}”`} onClick={() => void rename()}
+        <button type="button" title={t('Rename')} aria-label={t('Rename “{title}”', { title: conversation.data.title })} onClick={() => void rename()}
           className="-mx-1.5 min-w-0 truncate rounded-md px-1.5 py-1 font-semibold hover:bg-surface-hover">
           {conversation.data.title}
         </button>
@@ -212,15 +213,15 @@ function Conversation() {
   const tools = (
     <>
       {panelRunId && wide && (
-        <Button size="icon" variant={showRunPanel ? "secondary" : "ghost"} aria-label="Run details" aria-pressed={showRunPanel}
-          title="The run’s plan and changed files" onClick={() => { if (browserOpen) { setBrowserOpen(false); if (runPanel) return } toggleRunPanel() }}>
+        <Button size="icon" variant={showRunPanel ? "secondary" : "ghost"} aria-label={t('Run details')} aria-pressed={showRunPanel}
+          title={t('The run’s plan and changed files')} onClick={() => { if (browserOpen) { setBrowserOpen(false); if (runPanel) return } toggleRunPanel() }}>
           <PanelRight className="h-4 w-4" />
         </Button>
       )}
       {browser.data?.available && (
         // The agent's browser: beside the chat when there is room, else on its own page.
-        <Button size="icon" variant={browserOpen && wide ? 'secondary' : 'ghost'} aria-label="Browser" aria-pressed={browserOpen && wide}
-          title="The agent’s browser" onClick={() => (wide ? setBrowserOpen(!browserOpen) : void navigate(`/browser/${conversationId}`))}>
+        <Button size="icon" variant={browserOpen && wide ? 'secondary' : 'ghost'} aria-label={t('Browser')} aria-pressed={browserOpen && wide}
+          title={t('The agent’s browser')} onClick={() => (wide ? setBrowserOpen(!browserOpen) : void navigate(`/browser/${conversationId}`))}>
           <AppWindow className="h-4 w-4" />
         </Button>
       )}
@@ -228,7 +229,7 @@ function Conversation() {
         <Button
           size="icon"
           variant="ghost"
-          aria-label={conversation.data.pinned ? 'Remove from favorites' : 'Add to favorites'}
+          aria-label={conversation.data.pinned ? t('Remove from favorites') : t('Add to favorites')}
           aria-pressed={conversation.data.pinned}
           onClick={() => update.mutate({ id: conversationId, body: { pinned: !conversation.data?.pinned } })}
         >
@@ -268,7 +269,7 @@ function Conversation() {
           {conversation.data?.branched_from_id && (
             <Link to={`/c/${conversation.data.branched_from_id}`}
               className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-[12px] text-muted hover:text-text">
-              <GitBranch className="h-3.5 w-3.5" /> Branched from another chat
+              <GitBranch className="h-3.5 w-3.5" /> {t('Branched from another chat')}
             </Link>
           )}
           {list.map((m) => {
@@ -348,7 +349,7 @@ function Conversation() {
         <ApprovalDock runId={activeRunId} />
         <Composer
           running={Boolean(activeRunId) && !paused && !question}
-          placeholder={question ? 'Answer the agent’s question…' : paused ? 'Paused. Send a message to resume with it…' : undefined}
+          placeholder={question ? t('Answer the agent’s question…') : paused ? t('Paused. Send a message to resume with it…') : undefined}
           conversationId={conversationId}
           // Not when the message answers the agent's question or resumes a paused run.
           skills={!question && !paused}
@@ -374,24 +375,24 @@ function Conversation() {
       </div>
     </div>
     {showRunPanel && panelRunId && (
-      <aside aria-label="Run details" className="flex h-full w-80 shrink-0 flex-col border-l border-border">
+      <aside aria-label={t('Run details')} className="flex h-full w-80 shrink-0 flex-col border-l border-border">
         <div className="flex h-12 shrink-0 items-center border-b border-border pl-5 pr-2 md:h-14">
-          <h2 className="flex-1 text-[14px] font-semibold">This run</h2>
-          <Button size="icon" variant="ghost" aria-label="Hide run details" onClick={toggleRunPanel}><X className="h-4 w-4" /></Button>
+          <h2 className="flex-1 text-[14px] font-semibold">{t('This run')}</h2>
+          <Button size="icon" variant="ghost" aria-label={t('Hide run details')} onClick={toggleRunPanel}><X className="h-4 w-4" /></Button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto"><RunPanel runId={panelRunId} /></div>
       </aside>
     )}
     {browserOpen && wide && (
-      <aside aria-label="The agent’s browser" className="h-full w-[46%] min-w-[420px] max-w-[900px] shrink-0 border-l border-border">
+      <aside aria-label={t('The agent’s browser')} className="h-full w-[46%] min-w-[420px] max-w-[900px] shrink-0 border-l border-border">
         <BrowserView conversationId={conversationId}
           actions={
             <>
-              <Button size="icon" variant="ghost" aria-label="Open in a separate window" title="Open in a separate window"
+              <Button size="icon" variant="ghost" aria-label={t('Open in a separate window')} title={t('Open in a separate window')}
                 onClick={() => { popOutBrowser(conversationId); setBrowserOpen(false) }}>
                 <ExternalLink className="h-4 w-4" />
               </Button>
-              <Button size="icon" variant="ghost" aria-label="Hide browser" onClick={() => setBrowserOpen(false)}>
+              <Button size="icon" variant="ghost" aria-label={t('Hide browser')} onClick={() => setBrowserOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </>

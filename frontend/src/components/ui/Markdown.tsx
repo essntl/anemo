@@ -11,6 +11,7 @@ import { isDiagramLanguage } from '@/components/diagrams/languages'
 import { useMath } from '@/components/diagrams/useMath'
 import { isAppLink } from '@/lib/appLinks'
 import { stripCitationMarkup } from '@/lib/citations'
+import { t } from '@/lib/i18n'
 import { imageHost, loadsWithoutAsking } from '@/lib/remoteImages'
 
 /** The Markdown being shown, for code blocks that need their own source. */
@@ -53,7 +54,7 @@ function CodeBlock({ children, node, ...rest }: ComponentPropsWithoutRef<'pre'> 
         <span className="font-mono">{language}</span>
         <button type="button" onClick={copy} className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-surface-hover hover:text-text">
           {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('Copied') : t('Copy')}
         </button>
       </div>
       <pre ref={ref} className="overflow-x-auto p-3 font-mono text-[12.5px] leading-relaxed" {...rest}>
@@ -83,7 +84,7 @@ function MarkdownImage({ src, alt, title }: ComponentPropsWithoutRef<'img'>) {
       className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-muted hover:text-text"
     >
       <ImageIcon className="h-3.5 w-3.5" />
-      {alt ? `${alt}: ` : ''}show image from {imageHost(source ?? '')}
+      {alt ? t('{alt}: show image from {host}', { alt, host: imageHost(source ?? '') }) : t('show image from {host}', { host: imageHost(source ?? '') })}
     </button>
   )
 }

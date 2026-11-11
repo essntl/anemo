@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
+import { t } from '@/lib/i18n'
 
 export type Entry = Schemas['EntryOut']
 export type TrashItem = Schemas['TrashItemOut']
@@ -122,7 +123,7 @@ export function useUpload() {
       files.forEach((f) => form.append('files', f))
       const res = await fetch('/api/files/upload', { method: 'POST', body: form, credentials: 'same-origin' })
       const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }
-      if (!res.ok) throw new ApiError(res.status, body.error?.code ?? 'upload_failed', body.error?.message ?? 'Upload failed')
+      if (!res.ok) throw new ApiError(res.status, body.error?.code ?? 'upload_failed', body.error?.message ?? t('Upload failed'))
       return body as unknown as Entry[]
     },
     onSuccess: refresh,

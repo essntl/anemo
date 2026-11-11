@@ -6,6 +6,7 @@ import type { MenuAction } from '@/components/ui/ActionMenu'
 import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
 import { toast } from '@/components/ui/toast'
 import { useShareDialog } from '@/features/shares/shareStore'
+import { t } from '@/lib/i18n'
 import { type Conversation, useDeleteConversation, useSaveAsDocument, useUpdateConversation } from './api'
 
 /** "work, ideas" -> ["work", "ideas"]. The server tidies them further (lowercase, no #). */
@@ -42,26 +43,26 @@ export function useChatActions(conv: Conversation): MenuAction[] {
   const askShare = useShareDialog((s) => s.ask)
 
   const rename = async () => {
-    const title = await promptDialog({ title: 'Rename chat', label: 'Title', initial: conv.title, confirmLabel: 'Rename' })
+    const title = await promptDialog({ title: t('Rename chat'), label: t('Title'), initial: conv.title, confirmLabel: t('Rename') })
     if (title) update.mutate({ id: conv.id, body: { title } })
   }
   const editTags = async () => {
     const text = await promptDialog({
-      title: 'Tags', label: 'Tags, separated by commas', initial: conv.tags.join(', '),
-      placeholder: 'e.g. ideas, travel', confirmLabel: 'Save', allowEmpty: true,
+      title: t('Tags'), label: t('Tags, separated by commas'), initial: conv.tags.join(', '),
+      placeholder: t('e.g. ideas, travel'), confirmLabel: t('Save'), allowEmpty: true,
     })
     if (text !== null) update.mutate({ id: conv.id, body: { tags: parseTags(text) } })
   }
   const saveAsDocument = () =>
     saveDocument.mutate(conv.id, {
       onSuccess: (doc) =>
-        toast({ message: `Saved as ${doc.path}`, duration: 10_000, action: { label: 'Open', onClick: () => void navigate(`/documents/${doc.document_id}`) } }),
+        toast({ message: t('Saved as {path}', { path: doc.path }), duration: 10_000, action: { label: t('Open'), onClick: () => void navigate(`/documents/${doc.document_id}`) } }),
       onError: (err) => toast({ message: errorMessage(err) }),
     })
   const del = async () => {
     const ok = await confirmDialog({
-      title: `Delete “${conv.title}”?`, message: 'The chat and its attachments are deleted. This cannot be undone.',
-      confirmLabel: 'Delete', danger: true,
+      title: t('Delete “{title}”?', { title: conv.title }), message: t('The chat and its attachments are deleted. This cannot be undone.'),
+      confirmLabel: t('Delete'), danger: true,
     })
     if (!ok) return
     // mutateAsync: the row this was started from may be gone before the answer arrives.
@@ -74,20 +75,20 @@ export function useChatActions(conv: Conversation): MenuAction[] {
   return [
     // A temporary chat is deleted a few minutes after its last message unless kept.
     ...(conv.temporary
-      ? [{ label: 'Keep chat', icon: <Save />, onSelect: () => update.mutate({ id: conv.id, body: { temporary: false } }) }]
+      ? [{ label: t('Keep chat'), icon: <Save />, onSelect: () => update.mutate({ id: conv.id, body: { temporary: false } }) }]
       : []),
-    { label: 'Rename', icon: <Pencil />, onSelect: () => void rename() },
+    { label: t('Rename'), icon: <Pencil />, onSelect: () => void rename() },
     conv.pinned
-      ? { label: 'Remove from favorites', icon: <StarOff />, onSelect: () => update.mutate({ id: conv.id, body: { pinned: false } }) }
-      : { label: 'Add to favorites', icon: <Star />, onSelect: () => update.mutate({ id: conv.id, body: { pinned: true } }) },
-    { label: 'Move to project', icon: <FolderInput />, onSelect: () => askMove([conv.id], conv.project_id ?? null) },
-    { label: 'Tags', icon: <Tags />, onSelect: () => void editTags() },
+      ? { label: t('Remove from favorites'), icon: <StarOff />, onSelect: () => update.mutate({ id: conv.id, body: { pinned: false } }) }
+      : { label: t('Add to favorites'), icon: <Star />, onSelect: () => update.mutate({ id: conv.id, body: { pinned: true } }) },
+    { label: t('Move to project'), icon: <FolderInput />, onSelect: () => askMove([conv.id], conv.project_id ?? null) },
+    { label: t('Tags'), icon: <Tags />, onSelect: () => void editTags() },
     conv.archived
-      ? { label: 'Unarchive', icon: <ArchiveRestore />, onSelect: () => update.mutate({ id: conv.id, body: { archived: false } }) }
-      : { label: 'Archive', icon: <Archive />, onSelect: () => update.mutate({ id: conv.id, body: { archived: true } }) },
-    { label: 'Share', icon: <Link2 />, onSelect: () => askShare({ kind: 'chat', id: conv.id, title: conv.title }) },
-    { label: 'Download as Markdown', icon: <Download />, download: `/api/conversations/${conv.id}/export` },
-    { label: 'Save as document', icon: <FileText />, onSelect: saveAsDocument },
-    { label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => void del() },
+      ? { label: t('Unarchive'), icon: <ArchiveRestore />, onSelect: () => update.mutate({ id: conv.id, body: { archived: false } }) }
+      : { label: t('Archive'), icon: <Archive />, onSelect: () => update.mutate({ id: conv.id, body: { archived: true } }) },
+    { label: t('Share'), icon: <Link2 />, onSelect: () => askShare({ kind: 'chat', id: conv.id, title: conv.title }) },
+    { label: t('Download as Markdown'), icon: <Download />, download: `/api/conversations/${conv.id}/export` },
+    { label: t('Save as document'), icon: <FileText />, onSelect: saveAsDocument },
+    { label: t('Delete'), icon: <Trash2 />, danger: true, onSelect: () => void del() },
   ]
 }

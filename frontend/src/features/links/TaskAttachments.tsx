@@ -11,6 +11,7 @@ import { useProjects } from '@/features/tasks/api'
 import { useAttachFile, useDetachFile, useTaskFiles, useUploadToTask } from './api'
 import { FileFinder, FileIcon } from './FileFinder'
 import { formatSize } from '@/lib/format'
+import { t } from '@/lib/i18n'
 import { IMAGE } from './files'
 
 const parentOf = (p: string) => p.split('/').slice(0, -1).join('/')
@@ -32,17 +33,17 @@ export function TaskAttachments({ taskId, projectId }: { taskId: string | null; 
   const error = upload.error ?? attach.error ?? detach.error
 
   return (
-    <section aria-label="Attachments">
+    <section aria-label={t('Attachments')}>
       <div className="mb-1.5 flex items-center gap-1.5">
         <Paperclip className="h-3.5 w-3.5 text-muted" />
-        <h3 className="flex-1 text-[13px] font-medium">Attachments</h3>
+        <h3 className="flex-1 text-[13px] font-medium">{t('Attachments')}</h3>
         {taskId && (
           <>
-            <button type="button" aria-label="Upload files" title="Upload files" onClick={() => input.current?.click()}
+            <button type="button" aria-label={t('Upload files')} title={t('Upload files')} onClick={() => input.current?.click()}
               className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
               <Upload className="h-4 w-4" />
             </button>
-            <button type="button" aria-label="Attach a file from Files" title="Attach a file from Files" onClick={() => setPicking(true)}
+            <button type="button" aria-label={t('Attach a file from Files')} title={t('Attach a file from Files')} onClick={() => setPicking(true)}
               className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
               <Plus className="h-4 w-4" />
             </button>
@@ -56,18 +57,18 @@ export function TaskAttachments({ taskId, projectId }: { taskId: string | null; 
         )}
       </div>
       {!taskId ? (
-        <p className="text-[12.5px] text-muted">Add the task first, then attach files to it.</p>
+        <p className="text-[12.5px] text-muted">{t('Add the task first, then attach files to it.')}</p>
       ) : (
         <>
-          {upload.isPending && <p className="text-[12.5px] text-muted">Uploading…</p>}
+          {upload.isPending && <p className="text-[12.5px] text-muted">{t('Uploading…')}</p>}
           {files.data?.length === 0 && !upload.isPending && (
-            <p className="text-[12.5px] text-muted">Upload a file or pick one from Files. It stays in Files; this is a link.</p>
+            <p className="text-[12.5px] text-muted">{t('Upload a file or pick one from Files. It stays in Files; this is a link.')}</p>
           )}
           <ul className="flex flex-col gap-1">
             {(files.data ?? []).map((f) => (
               <li key={f.path} className={cn('group flex items-center gap-2 rounded-control border border-border p-1.5', !f.exists && 'opacity-60')}>
                 <a href={f.exists ? downloadUrl(f.path) : undefined} target={f.exists && IMAGE.test(f.name) ? '_blank' : undefined}
-                  rel="noreferrer" title={f.exists ? (IMAGE.test(f.name) ? 'Open' : 'Download') : 'This file is missing (moved to the trash?)'}
+                  rel="noreferrer" title={f.exists ? (IMAGE.test(f.name) ? t('Open') : t('Download')) : t('This file is missing (moved to the trash?)')}
                   className="flex min-w-0 flex-1 items-center gap-2">
                   {f.exists && IMAGE.test(f.name) ? (
                     <img src={downloadUrl(f.path)} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" loading="lazy" />
@@ -78,15 +79,15 @@ export function TaskAttachments({ taskId, projectId }: { taskId: string | null; 
                   )}
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium">{f.name}</span>
-                    <span className="block truncate text-[11.5px] text-muted">{f.exists ? formatSize(f.size) : 'Missing'}</span>
+                    <span className="block truncate text-[11.5px] text-muted">{f.exists ? formatSize(f.size) : t('Missing')}</span>
                   </span>
                 </a>
                 <Link to={`/files?path=${encodeURIComponent(parentOf(f.path) || '.')}&file=${encodeURIComponent(f.path)}`}
-                  aria-label={`Show ${f.name} in Files`} title="Show in Files"
+                  aria-label={t('Show {name} in Files', { name: f.name })} title={t('Show in Files')}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
                   <FolderOpen className="h-3.5 w-3.5" />
                 </Link>
-                <button type="button" aria-label={`Remove ${f.name} from the task`} title="Remove from the task (the file stays)"
+                <button type="button" aria-label={t('Remove {name} from the task', { name: f.name })} title={t('Remove from the task (the file stays)')}
                   onClick={() => detach.mutate(f.path)}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
                   <X className="h-3.5 w-3.5" />
@@ -99,11 +100,11 @@ export function TaskAttachments({ taskId, projectId }: { taskId: string | null; 
       {error && <p className="mt-1 text-[12.5px] text-error">{errorMessage(error)}</p>}
       <Lingering value={picking}>
         {() => (
-          <Dialog open={picking} onOpenChange={setPicking} title="Attach a file" description="The file stays where it is in Files.">
+          <Dialog open={picking} onOpenChange={setPicking} title={t('Attach a file')} description={t('The file stays where it is in Files.')}>
             <FileFinder start={project ? `projects/${project.slug}` : ''}
               onPick={(entry) => attach.mutate(entry.path, { onSuccess: () => setPicking(false) })} />
             <div className="mt-3 flex justify-end">
-              <Button variant="ghost" onClick={() => setPicking(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setPicking(false)}>{t('Cancel')}</Button>
             </div>
           </Dialog>
         )}

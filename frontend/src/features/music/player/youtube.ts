@@ -1,3 +1,4 @@
+import { msg, t } from '@/lib/i18n'
 import { playerHost } from './host'
 import type { Adapter, AdapterEvents, Track } from './types'
 
@@ -60,7 +61,7 @@ export function loadApi(): Promise<YTNamespace> {
       s.async = true
       s.onerror = () => {
         apiPromise = null
-        reject(new Error('YouTube could not be reached.'))
+        reject(new Error(t('YouTube could not be reached.')))
       }
       document.head.appendChild(s)
     })
@@ -81,7 +82,7 @@ export function mountIframe(host: string, extra: Record<string, string> = {}): H
   iframe.allow = 'autoplay; encrypted-media; picture-in-picture'
   iframe.width = '200'
   iframe.height = '200'
-  iframe.title = 'YouTube player'
+  iframe.title = t('YouTube player')
   const params = new URLSearchParams({
     enablejsapi: '1',
     playsinline: '1',
@@ -101,13 +102,13 @@ export function mountIframe(host: string, extra: Record<string, string> = {}): H
 export const EMBED_REFUSED = new Set([101, 150, 152, 153])
 
 const ERRORS: Record<number, string> = {
-  2: 'That YouTube link looks wrong.',
-  5: 'YouTube could not play this video here.',
-  100: 'This YouTube video was removed or is private.',
-  101: 'The owner does not allow this video to play outside YouTube.',
-  150: 'The owner does not allow this video to play outside YouTube.',
-  152: 'YouTube refused to play this video here.',
-  153: "YouTube refused to play because it couldn't tell which site it's on. Check that your proxy keeps the Referer header.",
+  2: msg('That YouTube link looks wrong.'),
+  5: msg('YouTube could not play this video here.'),
+  100: msg('This YouTube video was removed or is private.'),
+  101: msg('The owner does not allow this video to play outside YouTube.'),
+  150: msg('The owner does not allow this video to play outside YouTube.'),
+  152: msg('YouTube refused to play this video here.'),
+  153: msg("YouTube refused to play because it couldn't tell which site it's on. Check that your proxy keeps the Referer header."),
 }
 
 export class YouTubeAdapter implements Adapter {
@@ -181,7 +182,8 @@ export class YouTubeAdapter implements Adapter {
       return
     }
     const refused = EMBED_REFUSED.has(code)
-    this.events.onError(`${ERRORS[code] ?? 'YouTube could not play this.'}${refused ? ` (code ${code})` : ''}`, refused ? 'blocked' : undefined)
+    const message = code in ERRORS ? t(ERRORS[code]) : t('YouTube could not play this.')
+    this.events.onError(refused ? t('{message} (code {code})', { message, code }) : message, refused ? 'blocked' : undefined)
   }
 
   private handleState(code: number) {
@@ -252,7 +254,7 @@ export async function expandYouTubePlaylist(listId: string): Promise<string[]> {
     }
     const timeout = setTimeout(() => {
       cleanup()
-      reject(new Error('The YouTube playlist took too long to load.'))
+      reject(new Error(t('The YouTube playlist took too long to load.')))
     }, 15_000)
     new YT.Player(el, {
       events: {
@@ -272,7 +274,7 @@ export async function expandYouTubePlaylist(listId: string): Promise<string[]> {
         onError: () => {
           clearTimeout(timeout)
           cleanup()
-          reject(new Error('That YouTube playlist is private or unavailable.'))
+          reject(new Error(t('That YouTube playlist is private or unavailable.')))
         },
       },
     })

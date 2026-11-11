@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { formatMinutes } from '@/features/focus/api'
 
 export interface Bar {
@@ -29,11 +30,11 @@ export function BarChart({ data, height = 180, goal, format = formatMinutes, cla
   const step = minutes ? (raw > 120 ? 60 : 30) : raw > 20 ? 10 : raw > 8 ? 2 : 1
   const top = Math.ceil(raw / step) * step
   const ticks = height < 110 ? [0, top] : [0, top / 2, top]
-  const tick = (t: number) => (minutes ? (t >= 60 ? `${Math.round((t / 60) * 10) / 10}h` : `${t}m`) : String(Math.round(t)))
+  const tick = (v: number) => (minutes ? (v >= 60 ? t('{h}h', { h: Math.round((v / 60) * 10) / 10 }) : t('{m}m', { m: v })) : String(Math.round(v)))
   const total = data.reduce((s, d) => s + d.value, 0)
 
   return (
-    <div className={cn('relative', className)} role="img" aria-label={`${data.map((d) => `${d.label}: ${format(d.value)}`).join(', ')}. Total ${format(total)}.`}>
+    <div className={cn('relative', className)} role="img" aria-label={t('{bars}. Total {total}.', { bars: data.map((d) => `${d.label}: ${format(d.value)}`).join(', '), total: format(total) })}>
       <div className="flex gap-2" aria-hidden>
         <div className="relative w-8 shrink-0 text-right text-[10.5px] text-muted tabular-nums" style={{ height }}>
           {ticks.map((t) => (

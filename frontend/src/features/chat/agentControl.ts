@@ -8,6 +8,7 @@ import { timerActions, useTimerStore } from '@/features/focus/timerStore'
 import { buildTracks, fromLibrary, nextIndex, player, usePlayerRuntime, usePlayerStore } from '@/features/music/player/controller'
 import type { LibraryTrack } from '@/features/music/api'
 import type { Schemas } from '@/api/client'
+import { t } from '@/lib/i18n'
 import { tabId } from './tab'
 
 export interface FocusControl {
@@ -42,12 +43,12 @@ export function onFocusControl(e: FocusControl): boolean {
     if (e.action === 'pause' ? status !== 'running' : status === 'idle' && accumulated === 0) return true // nothing to do
     if (e.action === 'pause') timerActions.pause()
     else timerActions.reset()
-    islandAlert({ title: e.action === 'pause' ? 'An agent paused the focus timer' : 'An agent stopped the focus session', icon: 'bot', tone: 'accent', duration: 4000, link: '/focus' })
+    islandAlert({ title: e.action === 'pause' ? t('An agent paused the focus timer') : t('An agent stopped the focus session'), icon: 'bot', tone: 'accent', duration: 4000, link: '/focus' })
     return true
   }
   if (e.action !== 'start') return false
   timerActions.focusOn(e.task_id ?? null, e.minutes ?? undefined)
-  islandAlert({ title: 'An agent started a focus session', body: e.task_title ?? undefined, icon: 'bot', tone: 'accent', duration: 4000, link: '/focus' })
+  islandAlert({ title: t('An agent started a focus session'), body: e.task_title ?? undefined, icon: 'bot', tone: 'accent', duration: 4000, link: '/focus' })
   return true
 }
 
@@ -95,7 +96,7 @@ export async function onMusicControl(e: MusicControl): Promise<boolean> {
     if (e.replace) player.playTracks(tracks)
     else player.append(tracks, { label: e.playlist?.name })
   } catch (err) {
-    islandAlert({ title: "Couldn't queue the music", body: err instanceof Error ? err.message : undefined, icon: 'warning', tone: 'error' })
+    islandAlert({ title: t("Couldn't queue the music"), body: err instanceof Error ? err.message : undefined, icon: 'warning', tone: 'error' })
   }
   return true
 }

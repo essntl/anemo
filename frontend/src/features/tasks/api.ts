@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
+import { msg } from '@/lib/i18n'
 
 export type Task = Schemas['TaskOut']
 export type TaskInput = Schemas['TaskIn']
@@ -10,15 +11,16 @@ export type Project = Schemas['ProjectOut']
 export const tasksKey = ['tasks'] as const
 export const projectsKey = ['projects'] as const
 
+/** English texts, marked for translation: show them with `t(STATUS_LABELS[status])`. */
 export const STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: 'To do',
-  in_progress: 'In progress',
-  waiting: 'Waiting',
-  blocked: 'Blocked',
-  done: 'Done',
-  cancelled: 'Cancelled',
+  todo: msg('To do'),
+  in_progress: msg('In progress'),
+  waiting: msg('Waiting'),
+  blocked: msg('Blocked'),
+  done: msg('Done'),
+  cancelled: msg('Cancelled'),
 }
-export const PRIORITY_LABELS = ['No priority', 'Low', 'Medium', 'High']
+export const PRIORITY_LABELS = [msg('No priority'), msg('Low'), msg('Medium'), msg('High')]
 
 /** Every task (open and finished); the page filters and groups them. */
 export function useTasks() {

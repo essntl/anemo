@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/cn'
+import { msg, t } from '@/lib/i18n'
 import { EMBED_REFUSED, HOSTS, loadApi, mountIframe, type YTPlayer } from '../player/youtube'
 
 /*
@@ -14,13 +15,13 @@ import { EMBED_REFUSED, HOSTS, loadApi, mountIframe, type YTPlayer } from '../pl
  */
 
 /** "Me at the zoo": public and embeddable for nearly 20 years. */
-const REFERENCE = { id: 'jNQXAC9IVRw', label: 'Reference video (embedding allowed)' }
+const REFERENCE = { id: 'jNQXAC9IVRw', label: msg('Reference video (embedding allowed)') }
 
 type Setup = 'visible' | 'nocookie' | 'background'
 const SETUPS: { id: Setup; label: string }[] = [
-  { id: 'visible', label: 'Normal YouTube player' },
-  { id: 'nocookie', label: 'Privacy-enhanced player' },
-  { id: 'background', label: "Anemo's background player" },
+  { id: 'visible', label: msg('Normal YouTube player') },
+  { id: 'nocookie', label: msg('Privacy-enhanced player') },
+  { id: 'background', label: msg("Anemo's background player") },
 ]
 
 type Result = { state: 'running' } | { state: 'ok' } | { state: 'error'; code: number } | { state: 'timeout' }
@@ -74,22 +75,22 @@ function attempt(setup: Setup, videoId: string, stage: HTMLElement): Promise<Res
 
 function describe(r: Result | undefined): string {
   if (!r) return '—'
-  if (r.state === 'running') return 'Testing…'
-  if (r.state === 'ok') return 'Plays'
-  if (r.state === 'timeout') return 'No answer from YouTube'
-  return `Refused (code ${r.code})`
+  if (r.state === 'running') return t('Testing…')
+  if (r.state === 'ok') return t('Plays')
+  if (r.state === 'timeout') return t('No answer from YouTube')
+  return t('Refused (code {code})', { code: r.code })
 }
 
 function environment(): [string, string][] {
   const host = window.location.hostname
   const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':')
-  const meta = document.querySelector<HTMLMetaElement>('meta[name="referrer"]')?.content ?? 'browser default'
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="referrer"]')?.content ?? t('browser default')
   return [
-    ['Address', window.location.origin],
-    ['Kind', host === 'localhost' || host === '127.0.0.1' ? 'this computer' : isIp ? 'IP address' : 'domain name'],
-    ['Secure (HTTPS)', window.isSecureContext && window.location.protocol === 'https:' ? 'yes' : 'no'],
-    ['Referrer policy', meta],
-    ['Browser', navigator.userAgent],
+    [t('Address'), window.location.origin],
+    [t('Kind'), host === 'localhost' || host === '127.0.0.1' ? t('this computer') : isIp ? t('IP address') : t('domain name')],
+    [t('Secure (HTTPS)'), window.isSecureContext && window.location.protocol === 'https:' ? t('yes') : t('no')],
+    [t('Referrer policy'), meta],
+    [t('Browser'), navigator.userAgent],
   ]
 }
 
@@ -97,7 +98,7 @@ export function YouTubeCheck({ open, onClose, songId, songTitle }: { open: boole
   const stage = useRef<HTMLDivElement>(null)
   const [results, setResults] = useState<Record<string, Result>>({})
   const [running, setRunning] = useState(false)
-  const videos = [REFERENCE, ...(songId && songId !== REFERENCE.id ? [{ id: songId, label: songTitle ? `Your track: ${songTitle}` : 'Your track' }] : [])]
+  const videos = [{ id: REFERENCE.id, label: t(REFERENCE.label) }, ...(songId && songId !== REFERENCE.id ? [{ id: songId, label: songTitle ? t('Your track: {title}', { title: songTitle }) : t('Your track') }] : [])]
 
   async function run() {
     if (!stage.current) return
@@ -115,10 +116,10 @@ export function YouTubeCheck({ open, onClose, songId, songTitle }: { open: boole
   }
 
   function report(): string {
-    const lines = ['Anemo YouTube check', ...environment().map(([k, v]) => `${k}: ${v}`), '']
+    const lines = [t('Anemo YouTube check'), ...environment().map(([k, v]) => `${k}: ${v}`), '']
     for (const v of videos) {
       lines.push(`${v.label} (${v.id})`)
-      for (const s of SETUPS) lines.push(`  ${s.label}: ${describe(results[`${v.id}:${s.id}`])}`)
+      for (const s of SETUPS) lines.push(`  ${t(s.label)}: ${describe(results[`${v.id}:${s.id}`])}`)
     }
     return lines.join('\n')
   }
@@ -133,30 +134,30 @@ export function YouTubeCheck({ open, onClose, songId, songTitle }: { open: boole
   const verdict = !finished
     ? null
     : refOk('visible') && !refOk('background')
-      ? "YouTube plays in a normal player but not in Anemo's background player. That points to the hidden player; copy these results into a bug report."
+      ? t("YouTube plays in a normal player but not in Anemo's background player. That points to the hidden player; copy these results into a bug report.")
       : !refOk('visible') && refusedRef
-        ? 'YouTube refuses even the reference video on this address. That points to the address or the browser (a blocker, or a proxy dropping the Referer header), not to your tracks.'
+        ? t('YouTube refuses even the reference video on this address. That points to the address or the browser (a blocker, or a proxy dropping the Referer header), not to your tracks.')
         : refOk('visible') && songId && results[`${songId}:visible`]?.state === 'error'
-          ? "The reference video plays but your track doesn't, even in a normal player. Its owner doesn't allow playing it on other sites; nothing here can change that."
+          ? t("The reference video plays but your track doesn't, even in a normal player. Its owner doesn't allow playing it on other sites; nothing here can change that.")
           : refOk('visible') && refOk('background')
-            ? 'Everything plays here. If tracks still fail in the player, copy these results into a bug report.'
-            : 'Mixed results. Copy these results into a bug report.'
+            ? t('Everything plays here. If tracks still fail in the player, copy these results into a bug report.')
+            : t('Mixed results. Copy these results into a bug report.')
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && !running && onClose()} title="YouTube check" className="md:w-[min(92vw,520px)]"
-      description="Plays a few seconds of muted video in different kinds of player to find out why YouTube refuses to play."
+    <Dialog open={open} onOpenChange={(o) => !o && !running && onClose()} title={t('YouTube check')} className="md:w-[min(92vw,520px)]"
+      description={t('Plays a few seconds of muted video in different kinds of player to find out why YouTube refuses to play.')}
       footer={
         <>
           <Button variant="ghost" disabled={!finished} icon={<Copy className="h-4 w-4" />}
             onClick={async () => {
               await navigator.clipboard?.writeText(report()).catch(() => undefined)
-              toast({ message: 'Results copied' })
+              toast({ message: t('Results copied') })
             }}>
-            Copy results
+            {t('Copy results')}
           </Button>
           <Button variant="primary" onClick={() => void run()} disabled={running}
             icon={running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}>
-            {finished ? 'Run again' : 'Run check'}
+            {finished ? t('Run again') : t('Run check')}
           </Button>
         </>
       }>
@@ -169,7 +170,7 @@ export function YouTubeCheck({ open, onClose, songId, songTitle }: { open: boole
                 const r = results[`${v.id}:${s.id}`]
                 return (
                   <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                    <span>{s.label}</span>
+                    <span>{t(s.label)}</span>
                     <span className={cn('flex items-center gap-1.5 text-[13px] font-medium',
                       r?.state === 'ok' ? 'text-success' : r?.state === 'error' || r?.state === 'timeout' ? 'text-error' : 'text-muted')}>
                       {r?.state === 'ok' ? <CheckCircle2 className="h-4 w-4" /> : r?.state === 'running' ? <Loader2 className="h-4 w-4 animate-spin" /> : r ? <XCircle className="h-4 w-4" /> : null}

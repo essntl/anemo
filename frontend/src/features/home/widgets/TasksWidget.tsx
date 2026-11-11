@@ -4,6 +4,7 @@ import { inScope, useScope } from '@/app/projectStore'
 import { Select } from '@/components/ui/Select'
 import { useCreateTask, useProjects, useTasks } from '@/features/tasks/api'
 import { addDays, localDay, today as todayKey } from '@/features/tasks/dates'
+import { rich, t } from '@/lib/i18n'
 import type { WidgetLayout } from '../layout'
 import { ROWS } from './rows'
 import { MoreLink, QuickAdd, TaskLine, WidgetHeader } from './parts'
@@ -37,22 +38,22 @@ export function TasksWidget({ item }: { item: WidgetLayout }) {
   const rows = ROWS[item.h]
   return (
     <>
-      <WidgetHeader title="Tasks" icon={<SquareCheckBig />} to="/tasks">
+      <WidgetHeader title={t('Tasks')} icon={<SquareCheckBig />} to="/tasks">
         <span className="shrink-0 text-[12px] text-muted tabular-nums">
-          <span className="font-semibold text-text">{doneToday}</span> done · <span className="font-semibold text-text">{open.length}</span> open
+          {rich('<b>{done}</b> done · <b>{open}</b> open', { b: (c) => <span className="font-semibold text-text">{c}</span> }, { done: doneToday, open: open.length })}
         </span>
       </WidgetHeader>
       <div className="flex-1 px-2 pb-3">
         <div className="mb-1.5 flex flex-wrap gap-1.5 px-2">
-          <Select variant="pill" aria-label="Project" value={projectId} onValueChange={(v) => setProjectPick(v)}
-            options={[{ value: '', label: unfiled ? 'Uncategorized' : 'All projects' }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
-          <Select variant="pill" aria-label="Due" value={due} onValueChange={(v) => setDue(v as Due)}
-            options={[{ value: 'all', label: 'Any time' }, { value: 'today', label: 'Due today' }, { value: 'week', label: 'Due this week' }, { value: 'none', label: 'No date' }]} />
+          <Select variant="pill" aria-label={t('Project')} value={projectId} onValueChange={(v) => setProjectPick(v)}
+            options={[{ value: '', label: unfiled ? t('Uncategorized') : t('All projects') }, ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))]} />
+          <Select variant="pill" aria-label={t('Due')} value={due} onValueChange={(v) => setDue(v as Due)}
+            options={[{ value: 'all', label: t('Any time') }, { value: 'today', label: t('Due today') }, { value: 'week', label: t('Due this week') }, { value: 'none', label: t('No date') }]} />
         </div>
         <div className="px-2">
-          <QuickAdd placeholder="Add a task" busy={create.isPending} onAdd={(title) => create.mutateAsync({ title, project_id: projectId || null })} />
+          <QuickAdd placeholder={t('Add a task')} busy={create.isPending} onAdd={(title) => create.mutateAsync({ title, project_id: projectId || null })} />
         </div>
-        {tasks.isSuccess && open.length === 0 && <p className="px-2 py-2 text-[13px] text-muted">No open tasks here.</p>}
+        {tasks.isSuccess && open.length === 0 && <p className="px-2 py-2 text-[13px] text-muted">{t('No open tasks here.')}</p>}
         <ul className="flex flex-col">
           {open.slice(0, rows).map((t) => <TaskLine key={t.id} task={t} />)}
         </ul>

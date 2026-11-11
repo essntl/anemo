@@ -5,6 +5,7 @@ import { MoreHorizontal } from 'lucide-react'
 import { useCloseOnScroll } from '@/hooks/useCloseOnScroll'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 
 export interface MenuAction {
   label: string
@@ -25,7 +26,7 @@ export interface MenuAction {
  * low for it). On phones it is a sheet along the bottom edge instead, like the dialogs:
  * a popup next to a button low in a list had no room and ran off the screen.
  */
-export function ActionMenu({ actions, label = 'More actions', className }: { actions: MenuAction[]; label?: string; className?: string }) {
+export function ActionMenu({ actions, label = t('More actions'), className }: { actions: MenuAction[]; label?: string; className?: string }) {
   const [open, setOpen] = useState(false)
   const desktop = useMediaQuery(DESKTOP)
   useCloseOnScroll(open && desktop, useCallback(() => setOpen(false), []))

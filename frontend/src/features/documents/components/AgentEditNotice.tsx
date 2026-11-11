@@ -1,6 +1,7 @@
 import { Bot } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { formatWhen } from '@/lib/format'
+import { t } from '@/lib/i18n'
 import type { AgentEdit } from '../agentEdit'
 
 /**
@@ -13,14 +14,14 @@ export function AgentEditNotice({ edit, onReview }: { edit: AgentEdit; onReview:
       <div className="flex items-start gap-2 px-0.5">
         <Bot className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
         <div className="min-w-0 flex-1">
-          <div className="font-medium leading-snug">An agent edited this document</div>
+          <div className="font-medium leading-snug">{t('An agent edited this document')}</div>
           <div className="text-[12px] text-muted">{formatWhen(edit.at)}</div>
         </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
-        <Button size="sm" variant="secondary" onClick={onReview}>Review</Button>
-        <Button size="sm" variant="ghost" onClick={edit.keep}>Keep</Button>
-        {edit.undo && <Button size="sm" variant="ghost" loading={edit.undoing} onClick={edit.undo}>Undo</Button>}
+        <Button size="sm" variant="secondary" onClick={onReview}>{t('Review')}</Button>
+        <Button size="sm" variant="ghost" onClick={edit.keep}>{t('Keep')}</Button>
+        {edit.undo && <Button size="sm" variant="ghost" loading={edit.undoing} onClick={edit.undo}>{t('Undo')}</Button>}
       </div>
     </div>
   )

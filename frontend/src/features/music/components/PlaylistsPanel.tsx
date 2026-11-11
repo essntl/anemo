@@ -6,6 +6,7 @@ import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { promptDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { t } from '@/lib/i18n'
 import { spring } from '@/lib/motion'
 import {
   type LibraryTrack,
@@ -33,11 +34,11 @@ function usePlaylistMenu() {
   return (pl: Playlist, onDeleted?: () => void) => {
     const queue = usePlayerStore.getState().queue
     return [
-      { label: 'Shuffle play', icon: <Shuffle />, onSelect: () => play(pl, { shuffle: true }) },
-      { label: 'Add to queue', icon: <ListPlus />, onSelect: () => enqueue(pl) },
+      { label: t('Shuffle play'), icon: <Shuffle />, onSelect: () => play(pl, { shuffle: true }) },
+      { label: t('Add to queue'), icon: <ListPlus />, onSelect: () => enqueue(pl) },
       ...(queue.length
         ? [{
-            label: 'Replace with the queue',
+            label: t('Replace with the queue'),
             icon: <RefreshCw />,
             onSelect: async () => {
               const saved = await saveToLibrary(queue)
@@ -46,14 +47,14 @@ function usePlaylistMenu() {
           }]
         : []),
       {
-        label: 'Rename',
+        label: t('Rename'),
         icon: <Pencil />,
         onSelect: async () => {
-          const name = await promptDialog({ title: 'Rename playlist', label: 'Name', initial: pl.name, confirmLabel: 'Rename' })
+          const name = await promptDialog({ title: t('Rename playlist'), label: t('Name'), initial: pl.name, confirmLabel: t('Rename') })
           if (name?.trim() && name.trim() !== pl.name) rename.mutate({ id: pl.id, name: name.trim() })
         },
       },
-      { label: 'Delete playlist', icon: <Trash2 />, danger: true, onSelect: () => remove.mutate(pl, { onSuccess: onDeleted }) },
+      { label: t('Delete playlist'), icon: <Trash2 />, danger: true, onSelect: () => remove.mutate(pl, { onSuccess: onDeleted }) },
     ]
   }
 }
@@ -67,11 +68,11 @@ function PlaylistTrack({ pl, track, index }: { pl: Playlist; track: LibraryTrack
       transition={spring.smooth} whileDrag={{ scale: 1.02, boxShadow: 'var(--shadow-float)', zIndex: 10 }}
       className="relative list-none rounded-control bg-card">
       <div className="group flex items-center gap-2.5 rounded-control px-1.5 py-1.5 hover:bg-surface-hover">
-        <span onPointerDown={(e) => controls.start(e)} aria-hidden title="Drag to reorder"
+        <span onPointerDown={(e) => controls.start(e)} aria-hidden title={t('Drag to reorder')}
           className="flex h-9 w-5 shrink-0 cursor-grab touch-none items-center justify-center text-subtle opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100">
           <GripVertical className="h-4 w-4" />
         </span>
-        <button type="button" onClick={() => play(pl, { startAt: index })} className="relative shrink-0" aria-label={`Play ${track.title}`}>
+        <button type="button" onClick={() => play(pl, { startAt: index })} className="relative shrink-0" aria-label={t('Play {name}', { name: track.title })}>
           <Artwork track={track} className="h-10 w-10 rounded-lg" />
           <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-artwork-scrim text-on-artwork opacity-0 group-hover:opacity-100 pointer-coarse:hidden">
             <Play className="h-4 w-4" fill="currentColor" />
@@ -79,9 +80,9 @@ function PlaylistTrack({ pl, track, index }: { pl: Playlist; track: LibraryTrack
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-medium">{track.title}</div>
-          <div className="truncate text-[12px] text-muted">{SOURCE_LABEL[track.source]}{track.artist && ` · ${track.artist}`}</div>
+          <div className="truncate text-[12px] text-muted">{t(SOURCE_LABEL[track.source])}{track.artist && ` · ${track.artist}`}</div>
         </div>
-        <button type="button" aria-label={`Remove ${track.title} from ${pl.name}`}
+        <button type="button" aria-label={t('Remove {title} from {name}', { title: track.title, name: pl.name })}
           onClick={() => setTracks.mutate({ id: pl.id, trackIds: pl.tracks.filter((t) => t.id !== track.id).map((t) => t.id) })}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted opacity-0 hover:bg-surface-2 hover:text-text focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:opacity-100">
           <X className="h-4 w-4" />
@@ -119,7 +120,7 @@ function PlaylistDetail({ pl, onBack }: { pl: Playlist; onBack: () => void }) {
   return (
     <div>
       <button type="button" onClick={onBack} className="mb-3 flex items-center gap-1 rounded-lg px-1 text-[13px] font-medium text-muted hover:text-text">
-        <ChevronLeft className="h-4 w-4" /> All playlists
+        <ChevronLeft className="h-4 w-4" /> {t('All playlists')}
       </button>
       <div className="mb-4 flex items-center gap-4 px-1">
         <Mosaic tracks={pl.tracks} className="h-20 w-20 sm:h-24 sm:w-24" />
@@ -127,23 +128,23 @@ function PlaylistDetail({ pl, onBack }: { pl: Playlist; onBack: () => void }) {
           <h3 className="truncate text-xl font-semibold tracking-tight">{pl.name}</h3>
           <p className="text-[13px] text-muted">{trackCount(pl.tracks.length)}</p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <Button size="sm" variant="primary" disabled={!pl.tracks.length} icon={<Play className="h-3.5 w-3.5" fill="currentColor" />} onClick={() => play(pl)}>Play</Button>
-            <Button size="sm" disabled={!pl.tracks.length} icon={<Shuffle className="h-3.5 w-3.5" />} onClick={() => play(pl, { shuffle: true })}>Shuffle</Button>
-            <ActionMenu label="Playlist options" actions={menu(pl, onBack)} />
+            <Button size="sm" variant="primary" disabled={!pl.tracks.length} icon={<Play className="h-3.5 w-3.5" fill="currentColor" />} onClick={() => play(pl)}>{t('Play')}</Button>
+            <Button size="sm" disabled={!pl.tracks.length} icon={<Shuffle className="h-3.5 w-3.5" />} onClick={() => play(pl, { shuffle: true })}>{t('Shuffle')}</Button>
+            <ActionMenu label={t('Playlist options')} actions={menu(pl, onBack)} />
           </div>
         </div>
       </div>
-      <PasteLinkForm size="sm" label="Link to add to the playlist" placeholder={`Add a link to ${pl.name}`} className="mb-2"
+      <PasteLinkForm size="sm" label={t('Link to add to the playlist')} placeholder={t('Add a link to {name}', { name: pl.name })} className="mb-2"
         onAdd={async (link, choice) => {
           const saved = await saveToLibrary(await buildTracks(link, choice))
           await addTo.mutateAsync({ playlist: pl, tracks: saved })
         }} />
       {order.error && <p className="px-1 text-[12.5px] text-error">{errorMessage(order.error)}</p>}
       {pl.tracks.length === 0 ? (
-        <EmptyState icon={<ListMusic className="h-5 w-5" />} title="This playlist is empty"
-          description="Paste links above, or use “Add to …” in a track's menu in the queue." />
+        <EmptyState icon={<ListMusic className="h-5 w-5" />} title={t('This playlist is empty')}
+          description={t("Paste links above, or use “Add to …” in a track's menu in the queue.")} />
       ) : (
-        <Reorder.Group axis="y" values={order.tracks.map((t) => t.id)} className="flex flex-col gap-0.5" aria-label={`Tracks in ${pl.name}`}
+        <Reorder.Group axis="y" values={order.tracks.map((t) => t.id)} className="flex flex-col gap-0.5" aria-label={t('Tracks in {name}', { name: pl.name })}
           onReorder={order.reorder}>
           <AnimatePresence initial={false}>
             {order.tracks.map((t, i) => <PlaylistTrack key={t.id} pl={pl} track={t} index={i} />)}
@@ -164,7 +165,7 @@ export function PlaylistsPanel() {
   const open = playlists.data?.find((p) => p.id === openId) ?? null
 
   const ask = async (title: string, tracks = usePlayerStore.getState().queue) => {
-    const name = await promptDialog({ title, label: 'Name', placeholder: 'e.g. Deep focus, Lo-fi mornings', confirmLabel: 'Save' })
+    const name = await promptDialog({ title, label: t('Name'), placeholder: t('e.g. Deep focus, Lo-fi mornings'), confirmLabel: t('Save') })
     if (name?.trim()) create.mutate({ name: name.trim(), tracks }, { onSuccess: (pl) => setOpenId(pl.id) })
   }
 
@@ -172,17 +173,17 @@ export function PlaylistsPanel() {
   return (
     <div>
       <div className="mb-3 flex flex-wrap gap-1.5 px-1">
-        <Button size="sm" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => void ask('New playlist', [])}>New playlist</Button>
+        <Button size="sm" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => void ask(t('New playlist'), [])}>{t('New playlist')}</Button>
         {queueLength > 0 && (
-          <Button size="sm" variant="ghost" icon={<Save className="h-3.5 w-3.5" />} onClick={() => void ask('Save the queue as a playlist')}>
-            Save queue as playlist
+          <Button size="sm" variant="ghost" icon={<Save className="h-3.5 w-3.5" />} onClick={() => void ask(t('Save the queue as a playlist'))}>
+            {t('Save queue as playlist')}
           </Button>
         )}
       </div>
       {create.isError && <p className="mb-2 px-1 text-[12.5px] text-error">{errorMessage(create.error)}</p>}
       {playlists.isSuccess && playlists.data.length === 0 ? (
-        <EmptyState icon={<ListMusic className="h-5 w-5" />} title="No playlists yet"
-          description="Save your queue, or make a playlist and paste links into it. Playlists are the same on all your devices." />
+        <EmptyState icon={<ListMusic className="h-5 w-5" />} title={t('No playlists yet')}
+          description={t('Save your queue, or make a playlist and paste links into it. Playlists are the same on all your devices.')} />
       ) : (
         <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           {(playlists.data ?? []).map((pl) => (
@@ -194,11 +195,11 @@ export function PlaylistsPanel() {
                   <span className="block text-[12px] text-muted">{trackCount(pl.tracks.length)}</span>
                 </span>
               </button>
-              <button type="button" aria-label={`Play ${pl.name}`} disabled={!pl.tracks.length} onClick={() => play(pl)}
+              <button type="button" aria-label={t('Play {name}', { name: pl.name })} disabled={!pl.tracks.length} onClick={() => play(pl)}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-contrast opacity-0 shadow-soft transition-opacity focus-visible:opacity-100 group-hover:opacity-100 disabled:hidden pointer-coarse:opacity-100">
                 <Play className="h-4 w-4" fill="currentColor" />
               </button>
-              <ActionMenu label={`More for ${pl.name}`} actions={menu(pl)} />
+              <ActionMenu label={t('More for {name}', { name: pl.name })} actions={menu(pl)} />
             </li>
           ))}
         </ul>

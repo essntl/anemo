@@ -6,6 +6,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Check, Code2, Copy, Download, Expand, Image as ImageIcon, Wand2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { Chart } from './Chart'
 import { parseChart } from './chartSpec'
 import { usePalette, type Palette } from './colors'
@@ -39,7 +40,7 @@ function useMermaid(source: string, palette: Palette, enabled: boolean): Drawing
     loadMermaid()
       .then((m) => m.renderMermaid(source, palette))
       .then((value) => live && setResult({ key, value }))
-      .catch(() => live && setResult({ key, value: { error: 'The diagram renderer could not be loaded.' } }))
+      .catch(() => live && setResult({ key, value: { error: t('The diagram renderer could not be loaded.') } }))
     return () => {
       live = false
     }
@@ -72,7 +73,7 @@ export function DiagramBlock({ lang, source, editAction }: {
   const drawing: Drawing = chart
     ? chart.error !== undefined ? { state: 'error', error: chart.error } : { state: 'ok', title: chart.spec.title }
     : mermaid
-  const label = lang === 'chart' ? 'Chart' : 'Diagram'
+  const label = lang === 'chart' ? t('Chart') : t('Diagram')
   const title = (drawing.state === 'ok' && drawing.title) || label
 
   const copy = async () => {
@@ -108,27 +109,27 @@ export function DiagramBlock({ lang, source, editAction }: {
         <span className="mr-auto font-mono">{lang}</span>
         {!failed && (
           <button type="button" className={barButton} onClick={() => setShowSource((s) => !s)} aria-pressed={showSource}
-            title={showSource ? `Show the ${label.toLowerCase()}` : 'Show the source'}>
+            title={showSource ? (lang === 'chart' ? t('Show the chart') : t('Show the diagram')) : t('Show the source')}>
             {showSource ? <ImageIcon /> : <Code2 />}
-            {showSource ? label : 'Source'}
+            {showSource ? label : t('Source')}
           </button>
         )}
-        <button type="button" className={barButton} onClick={copy} title="Copy the source">
+        <button type="button" className={barButton} onClick={copy} title={t('Copy the source')}>
           {copied ? <Check /> : <Copy />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('Copied') : t('Copy')}
         </button>
         {!failed && !showSource && (
           <>
             <button type="button" className={barButton} disabled={drawing.state !== 'ok'} onClick={() => void save('svg')}
-              title="Download as SVG" aria-label="Download as SVG">
+              title={t('Download as SVG')} aria-label={t('Download as SVG')}>
               <Download />SVG
             </button>
             <button type="button" className={barButton} disabled={drawing.state !== 'ok' || busy} onClick={() => void save('png')}
-              title="Download as PNG" aria-label="Download as PNG">
+              title={t('Download as PNG')} aria-label={t('Download as PNG')}>
               <Download />PNG
             </button>
             <button type="button" className={barButton} disabled={drawing.state !== 'ok'} onClick={() => setFullScreen(true)}
-              title="Full screen" aria-label="Full screen">
+              title={t('Full screen')} aria-label={t('Full screen')}>
               <Expand />
             </button>
           </>
@@ -139,12 +140,12 @@ export function DiagramBlock({ lang, source, editAction }: {
       {failed && (
         <div className="flex flex-wrap items-start gap-2 border-b border-border bg-surface-2 px-3 py-2 text-[12.5px]">
           <p role="alert" className="min-w-0 flex-1 whitespace-pre-wrap text-error">
-            <span className="font-medium">This {label.toLowerCase()} can’t be drawn. </span>{drawing.error}
+            <span className="font-medium">{lang === 'chart' ? t('This chart can’t be drawn.') : t('This diagram can’t be drawn.')}{' '}</span>{drawing.error}
           </p>
           {fix && (
             <button type="button" onClick={() => fix({ kind: lang, source, error: drawing.error })}
               className="flex shrink-0 items-center gap-1 rounded-control border border-border bg-surface px-2 py-1 text-[12px] font-medium hover:bg-surface-hover [&_svg]:h-3.5 [&_svg]:w-3.5">
-              <Wand2 />Fix diagram
+              <Wand2 />{t('Fix diagram')}
             </button>
           )}
         </div>
@@ -155,7 +156,7 @@ export function DiagramBlock({ lang, source, editAction }: {
       ) : (
         <div ref={picture} role="figure" aria-label={title}
           className={cn('flex justify-center overflow-x-auto p-3 [&_svg]:h-auto [&_svg]:max-w-full', drawing.state === 'loading' && 'min-h-24 items-center')}>
-          {drawing.state === 'loading' ? <span className="text-[12px] text-muted">Drawing…</span> : art}
+          {drawing.state === 'loading' ? <span className="text-[12px] text-muted">{t('Drawing…')}</span> : art}
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { ActionMenu, type MenuAction } from '@/components/ui/ActionMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Equalizer } from '@/components/ui/Equalizer'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { spring } from '@/lib/motion'
 import { usePlaylistActions } from '../usePlaylistActions'
 import { player, usePlayer } from '../player/controller'
@@ -23,12 +24,12 @@ function QueueItem({ track, index, count, current, playing, playlistActions }: {
       className="relative list-none rounded-control bg-card" data-testid="queue-item">
       <div onDoubleClick={() => player.playIndex(index)}
         className={cn('group flex items-center gap-2.5 rounded-control px-1.5 py-1.5 transition-colors', current ? 'bg-accent-soft' : 'hover:bg-surface-hover')}>
-        <span onPointerDown={(e) => controls.start(e)} aria-hidden title="Drag to reorder"
+        <span onPointerDown={(e) => controls.start(e)} aria-hidden title={t('Drag to reorder')}
           className="flex h-10 w-5 shrink-0 cursor-grab touch-none items-center justify-center text-subtle opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing pointer-coarse:opacity-100">
           <GripVertical className="h-4 w-4" />
         </span>
         <button type="button" onClick={() => (current ? player.toggle() : player.playIndex(index))} className="relative shrink-0"
-          aria-label={current && playing ? `Pause ${track.title}` : `Play ${track.title}`}>
+          aria-label={current && playing ? t('Pause {name}', { name: track.title }) : t('Play {name}', { name: track.title })}>
           <Artwork track={track} className="h-11 w-11 rounded-control" />
           <span className={cn('absolute inset-0 flex items-center justify-center rounded-control bg-artwork-scrim text-on-artwork transition-opacity',
             current ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 pointer-coarse:hidden')}>
@@ -38,18 +39,18 @@ function QueueItem({ track, index, count, current, playing, playlistActions }: {
         <div className="min-w-0 flex-1">
           <div className={cn('truncate text-[14px] font-medium', current && 'text-accent')}>{track.title}</div>
           <div className="truncate text-[12px] text-muted">
-            {SOURCE_LABEL[track.source]}{track.artist && ` · ${track.artist}`}
+            {t(SOURCE_LABEL[track.source])}{track.artist && ` · ${track.artist}`}
           </div>
         </div>
-        <ActionMenu label={`More for ${track.title}`}
+        <ActionMenu label={t('More for {name}', { name: track.title })}
           className="h-9 w-9 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:opacity-100"
           actions={[
-            ...(current ? [] : [{ label: 'Play next', icon: <ListStart />, onSelect: () => player.playNext(track) }]),
-            ...(index > 0 ? [{ label: 'Move up', icon: <ArrowUp />, onSelect: () => player.move(track.id, -1) }] : []),
-            ...(index < count - 1 ? [{ label: 'Move down', icon: <ArrowDown />, onSelect: () => player.move(track.id, 1) }] : []),
+            ...(current ? [] : [{ label: t('Play next'), icon: <ListStart />, onSelect: () => player.playNext(track) }]),
+            ...(index > 0 ? [{ label: t('Move up'), icon: <ArrowUp />, onSelect: () => player.move(track.id, -1) }] : []),
+            ...(index < count - 1 ? [{ label: t('Move down'), icon: <ArrowDown />, onSelect: () => player.move(track.id, 1) }] : []),
             ...playlistActions,
-            { label: `Open on ${SOURCE_LABEL[track.source]}`, icon: <ExternalLink />, href: track.url },
-            { label: 'Remove from queue', icon: <X />, danger: true, onSelect: () => player.remove(track.id) },
+            { label: t('Open on {source}', { source: t(SOURCE_LABEL[track.source]) }), icon: <ExternalLink />, href: track.url },
+            { label: t('Remove from queue'), icon: <X />, danger: true, onSelect: () => player.remove(track.id) },
           ]} />
       </div>
     </Reorder.Item>
@@ -65,10 +66,10 @@ export function QueuePanel() {
       <PasteLinkForm onAdd={(link, choice) => player.add(link, { choice })} />
       <div className="mt-2" />
       {p.queue.length === 0 ? (
-        <EmptyState icon={<ListMusic className="h-5 w-5" />} title="Your queue is empty"
-          description="Paste a YouTube video or playlist, a SoundCloud track or set, or a direct audio or radio link." />
+        <EmptyState icon={<ListMusic className="h-5 w-5" />} title={t('Your queue is empty')}
+          description={t('Paste a YouTube video or playlist, a SoundCloud track or set, or a direct audio or radio link.')} />
       ) : (
-        <Reorder.Group axis="y" values={p.queue.map((t) => t.id)} onReorder={player.reorder} className="flex flex-col gap-0.5" aria-label="Queue">
+        <Reorder.Group axis="y" values={p.queue.map((t) => t.id)} onReorder={player.reorder} className="flex flex-col gap-0.5" aria-label={t('Queue')}>
           <AnimatePresence initial={false}>
             {p.queue.map((t, i) => (
               <QueueItem key={t.id} track={t} index={i} count={p.queue.length} current={i === p.index && p.loaded}

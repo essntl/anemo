@@ -4,6 +4,7 @@ import { api, errorMessage, unwrap } from '@/api/client'
 import { useCurrentProject } from '@/app/projectStore'
 import { Button } from '@/components/ui/Button'
 import { type Entry, useUpload } from '@/features/files/api'
+import { t } from '@/lib/i18n'
 import { FileFinder } from './FileFinder'
 import { IMAGE } from './files'
 
@@ -30,8 +31,8 @@ export function FilesTab({ onLink, onImage }: { onLink: (entry: Entry) => void; 
         <img src={`/api/files/download?path=${encodeURIComponent(image.path)}`} alt="" className="max-h-40 rounded-lg shadow-soft" />
         <p className="text-[13px] text-muted">{image.name}</p>
         <div className="flex flex-wrap justify-center gap-2">
-          <Button variant="primary" icon={<Image className="h-4 w-4" />} onClick={() => onImage?.(image)}>Show the image in the text</Button>
-          <Button icon={<Link2 className="h-4 w-4" />} onClick={() => onLink(image)}>Insert a link</Button>
+          <Button variant="primary" icon={<Image className="h-4 w-4" />} onClick={() => onImage?.(image)}>{t('Show the image in the text')}</Button>
+          <Button icon={<Link2 className="h-4 w-4" />} onClick={() => onLink(image)}>{t('Insert a link')}</Button>
         </div>
       </div>
     )
@@ -41,9 +42,9 @@ export function FilesTab({ onLink, onImage }: { onLink: (entry: Entry) => void; 
       <FileFinder start={project ? `projects/${project.slug}` : ''} onPick={choose} />
       <div className="mt-3 flex items-center gap-2">
         <Button size="sm" icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={() => input.current?.click()}>
-          Upload a file
+          {t('Upload a file')}
         </Button>
-        <span className="text-[12px] text-muted">Goes to {project ? `projects/${project.slug}` : 'files'}/</span>
+        <span className="text-[12px] text-muted">{t('Goes to {folder}/', { folder: project ? `projects/${project.slug}` : 'files' })}</span>
         <input ref={input} type="file" hidden onChange={(e) => {
           const files = Array.from(e.target.files ?? [])
           if (files.length) void uploadFiles(files).catch(() => undefined)

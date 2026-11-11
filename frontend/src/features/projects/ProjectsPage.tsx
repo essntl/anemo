@@ -23,6 +23,7 @@ import { useModels } from '@/features/providers/api'
 import { useShareDialog } from '@/features/shares/shareStore'
 import { type Project, useDeleteProject, useProjects, useSaveProject } from '@/features/tasks/api'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { plural, t } from '@/lib/i18n'
 
 const COLORS = ['#6b7280', '#ef4444', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
@@ -50,44 +51,44 @@ function ProjectDialog({ project, nextColor, onClose }: { project: Project | nul
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title={project ? 'Edit project' : 'New project'}
+      title={project ? t('Edit project') : t('New project')}
       description={project
-        ? `Files are in ${project.files_path}/ and documents in ${project.documents_path}/. Renaming keeps these folders.`
-        : 'A project gets its own folder for files and one for documents.'}
+        ? t('Files are in {files}/ and documents in {documents}/. Renaming keeps these folders.', { files: project.files_path, documents: project.documents_path })
+        : t('A project gets its own folder for files and one for documents.')}
       className="md:w-[min(92vw,520px)]"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={save.isPending} disabled={!name.trim()} onClick={submit}>
-            {project ? 'Save' : 'Create project'}
+            {project ? t('Save') : t('Create project')}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Name">
-          <Input value={name} maxLength={100} autoFocus={!project} placeholder="e.g. Thesis" onChange={(e) => setName(e.target.value)}
+        <Field label={t('Name')}>
+          <Input value={name} maxLength={100} autoFocus={!project} placeholder={t('e.g. Thesis')} onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && name.trim() && submit()} />
         </Field>
-        <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Colour">
+        <div className="flex items-center gap-1.5" role="radiogroup" aria-label={t('Colour')}>
           {COLORS.map((c) => (
             <button key={c} type="button" role="radio" aria-checked={color === c} aria-label={c} onClick={() => setColor(c)}
               style={{ backgroundColor: c }}
               className={`h-6 w-6 rounded-full pointer-coarse:h-8 pointer-coarse:w-8 ${color === c ? 'ring-2 ring-accent ring-offset-2 ring-offset-card' : ''}`} />
           ))}
         </div>
-        <Field label="Instructions for the assistant" hint="Added to every chat in this project, in Chat and Agent mode.">
-          <Textarea rows={4} value={instructions} maxLength={20000} placeholder="e.g. This is my thesis on river ecology. Write British English and cite sources."
+        <Field label={t('Instructions for the assistant')} hint={t('Added to every chat in this project, in Chat and Agent mode.')}>
+          <Textarea rows={4} value={instructions} maxLength={20000} placeholder={t('e.g. This is my thesis on river ecology. Write British English and cite sources.')}
             onChange={(e) => setInstructions(e.target.value)} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Default model" hint="For new chats here.">
+          <Field label={t('Default model')} hint={t('For new chats here.')}>
             <Select value={modelId} onValueChange={setModelId}
-              options={[{ value: '', label: 'Same as everywhere' }, ...chatModels.map((m) => ({ value: m.id, label: m.display_name }))]} />
+              options={[{ value: '', label: t('Same as everywhere') }, ...chatModels.map((m) => ({ value: m.id, label: m.display_name }))]} />
           </Field>
-          <Field label="Default agent profile" hint="For Agent mode here.">
+          <Field label={t('Default agent profile')} hint={t('For Agent mode here.')}>
             <Select value={profileId} onValueChange={setProfileId}
-              options={[{ value: '', label: 'Default agent' }, ...(profiles.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
+              options={[{ value: '', label: t('Default agent') }, ...(profiles.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
           </Field>
         </div>
       </div>
@@ -110,9 +111,9 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: () => void
 
   const confirmDelete = async () => {
     const ok = await confirmDialog({
-      title: `Delete “${project.name}”?`,
-      message: `Its chats, tasks and events are kept, without a project. The folders ${project.files_path}/ and ${project.documents_path}/ stay where they are.`,
-      confirmLabel: 'Delete project',
+      title: t('Delete “{name}”?', { name: project.name }),
+      message: t('Its chats, tasks and events are kept, without a project. The folders {files}/ and {documents}/ stay where they are.', { files: project.files_path, documents: project.documents_path }),
+      confirmLabel: t('Delete project'),
       danger: true,
     })
     // mutateAsync: this card is gone before the answer arrives.
@@ -130,28 +131,28 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: () => void
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-[15px] font-semibold">{project.name}</h3>
-            {current && <Badge tone="accent">Working in this</Badge>}
-            {project.archived && <Badge>Archived</Badge>}
+            {current && <Badge tone="accent">{t('Working in this')}</Badge>}
+            {project.archived && <Badge>{t('Archived')}</Badge>}
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px] text-muted">
-            <Count n={project.chats} label="chats" />
-            <Count n={project.open_tasks} label="open tasks" />
-            <Count n={project.events} label="events" />
-            <Count n={project.documents} label="documents" />
+            <Count n={project.chats} label={plural(project.chats, 'chats', 'chats')} />
+            <Count n={project.open_tasks} label={plural(project.open_tasks, 'open tasks', 'open tasks')} />
+            <Count n={project.events} label={plural(project.events, 'events', 'events')} />
+            <Count n={project.documents} label={plural(project.documents, 'documents', 'documents')} />
           </div>
           {project.instructions && <p className="mt-1.5 line-clamp-2 text-[12.5px] text-subtle">{project.instructions}</p>}
           {(save.error ?? remove.error) && <p className="mt-1 text-[12px] text-error">{errorMessage(save.error ?? remove.error)}</p>}
         </div>
-        {!project.archived && !current && <Button size="sm" variant="secondary" onClick={open}>Open</Button>}
+        {!project.archived && !current && <Button size="sm" variant="secondary" onClick={open}>{t('Open')}</Button>}
         <ActionMenu
-          label={`Actions for ${project.name}`}
+          label={t('Actions for {name}', { name: project.name })}
           actions={[
-            { label: 'Edit', icon: <Pencil />, onSelect: onEdit },
-            { label: 'Share', icon: <Link2 />, onSelect: () => askShare({ kind: 'project', id: project.id, title: project.name }) },
+            { label: t('Edit'), icon: <Pencil />, onSelect: onEdit },
+            { label: t('Share'), icon: <Link2 />, onSelect: () => askShare({ kind: 'project', id: project.id, title: project.name }) },
             project.archived
-              ? { label: 'Use again', icon: <ArchiveRestore />, onSelect: () => save.mutate({ ...project, archived: false }) }
-              : { label: 'Archive', icon: <Archive />, onSelect: () => save.mutate({ ...project, archived: true }, { onSuccess: () => current && setProjectId(null) }) },
-            { label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
+              ? { label: t('Use again'), icon: <ArchiveRestore />, onSelect: () => save.mutate({ ...project, archived: false }) }
+              : { label: t('Archive'), icon: <Archive />, onSelect: () => save.mutate({ ...project, archived: true }, { onSuccess: () => current && setProjectId(null) }) },
+            { label: t('Delete'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
           ]}
         />
       </div>
@@ -165,16 +166,16 @@ export function ProjectsPage() {
   const all = projects.data ?? []
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="Projects">
+      <PageHeader title={t('Projects')}>
         <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ project: null })}>
-          New project
+          {t('New project')}
         </Button>
       </PageHeader>
-      <p className="mb-4 max-w-2xl text-[13px] text-muted">Each project has its own chats, tasks, calendar, documents and files.</p>
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">{t('Each project has its own chats, tasks, calendar, documents and files.')}</p>
       {projects.error && <p className="mb-2 text-[13px] text-error">{errorMessage(projects.error)}</p>}
       {projects.isSuccess && all.length === 0 ? (
-        <EmptyState icon={<FolderKanban className="h-5 w-5" />} title="No projects yet"
-          description="Create one to keep the chats, tasks, events, documents and files of one piece of work together." />
+        <EmptyState icon={<FolderKanban className="h-5 w-5" />} title={t('No projects yet')}
+          description={t('Create one to keep the chats, tasks, events, documents and files of one piece of work together.')} />
       ) : (
         <div className="flex flex-col gap-3">
           {all.map((p) => <ProjectCard key={p.id} project={p} onEdit={() => setEditing({ project: p })} />)}

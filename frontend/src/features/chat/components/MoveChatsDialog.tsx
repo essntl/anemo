@@ -5,6 +5,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Lingering } from '@/components/ui/Lingering'
 import { Select } from '@/components/ui/Select'
 import { useProjects } from '@/features/tasks/api'
+import { plural, t } from '@/lib/i18n'
 import { useBulkChats } from '../api'
 import { useMoveChats } from '../chatActions'
 
@@ -14,7 +15,7 @@ function MoveDialog({ ids, current }: { ids: string[]; current: string | null })
   const bulk = useBulkChats()
   const [projectId, setProjectId] = useState(current ?? '')
   const options = [
-    { value: '', label: 'No project' },
+    { value: '', label: t('No project') },
     ...(projects.data ?? []).filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name })),
   ]
   const move = () =>
@@ -23,16 +24,16 @@ function MoveDialog({ ids, current }: { ids: string[]; current: string | null })
     <Dialog
       open
       onOpenChange={(open) => !open && close()}
-      title={ids.length === 1 ? 'Move chat to a project' : `Move ${ids.length} chats to a project`}
-      description="A chat belongs to one project at most. Its messages stay as they are."
+      title={ids.length === 1 ? t('Move chat to a project') : plural(ids.length, 'Move {n} chat to a project', 'Move {n} chats to a project')}
+      description={t('A chat belongs to one project at most. Its messages stay as they are.')}
       footer={
         <>
-          <Button variant="ghost" onClick={close}>Cancel</Button>
-          <Button variant="primary" loading={bulk.isPending} onClick={move}>Move</Button>
+          <Button variant="ghost" onClick={close}>{t('Cancel')}</Button>
+          <Button variant="primary" loading={bulk.isPending} onClick={move}>{t('Move')}</Button>
         </>
       }
     >
-      <Select aria-label="Project" value={projectId} onValueChange={setProjectId} options={options} />
+      <Select aria-label={t('Project')} value={projectId} onValueChange={setProjectId} options={options} />
       {bulk.isError && <p className="mt-2 text-[13px] text-error">{errorMessage(bulk.error)}</p>}
     </Dialog>
   )

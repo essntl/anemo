@@ -7,6 +7,7 @@ import { Segmented } from '@/components/ui/Segmented'
 import { FilesTab } from '@/features/links/FilesTab'
 import { STATUS_LABELS, useTasks } from '@/features/tasks/api'
 import { documentLink, fileLink, taskLink } from '@/lib/appLinks'
+import { t } from '@/lib/i18n'
 import { useDocuments } from '../api'
 
 const MAX_SHOWN = 40 // per kind; search narrows it down
@@ -65,28 +66,28 @@ export function LinkPickerDialog({ onPick, onPickImage, onClose }: {
   const loaded = documents.isSuccess && tasks.isSuccess
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} title="Link to a document, task or file" className="md:w-[min(92vw,520px)]"
-      description="Clicking the link opens it. Selected text becomes the link; otherwise its title is inserted.">
-      <Segmented label="Link to" kind="tabs" className="mb-3" value={tab} onChange={setTab}
-        options={[{ value: 'pages', label: 'Documents and tasks' }, { value: 'files', label: 'Files' }]} />
+    <Dialog open onOpenChange={(open) => !open && onClose()} title={t('Link to a document, task or file')} className="md:w-[min(92vw,520px)]"
+      description={t('Clicking the link opens it. Selected text becomes the link; otherwise its title is inserted.')}>
+      <Segmented label={t('Link to')} kind="tabs" className="mb-3" value={tab} onChange={setTab}
+        options={[{ value: 'pages', label: t('Documents and tasks') }, { value: 'files', label: t('Files') }]} />
       {tab === 'files' ? (
         <FilesTab onLink={(entry) => pick(fileLink(entry.path), entry.name)}
           onImage={onPickImage ? (entry) => { onPickImage(entry.path, entry.name.replace(/\.[^.]+$/, '')); onClose() } : undefined} />
       ) : (<>
-      <Input value={search} autoFocus placeholder="Search documents and tasks…" aria-label="Search documents and tasks"
+      <Input value={search} autoFocus placeholder={t('Search documents and tasks…')} aria-label={t('Search documents and tasks')}
         onChange={(e) => setSearch(e.target.value)} />
       <div className="mt-3 max-h-[45dvh] overflow-y-auto rounded-control border border-border">
-        {!loaded && !error && <p className="p-4 text-[13px] text-muted">Loading…</p>}
+        {!loaded && !error && <p className="p-4 text-[13px] text-muted">{t('Loading…')}</p>}
         {error && <p className="p-4 text-[13px] text-error">{errorMessage(error)}</p>}
-        {loaded && shownDocuments.length + shownTasks.length === 0 && <p className="p-4 text-[13px] text-muted">Nothing matches.</p>}
-        <Group title="Documents">
+        {loaded && shownDocuments.length + shownTasks.length === 0 && <p className="p-4 text-[13px] text-muted">{t('Nothing matches.')}</p>}
+        <Group title={t('Documents')}>
           {shownDocuments.map((d) => (
             <Choice key={d.id} icon={<FileText />} title={d.title} detail={d.path} onPick={() => pick(documentLink(d.id), d.title)} />
           ))}
         </Group>
-        <Group title="Tasks">
-          {shownTasks.map((t) => (
-            <Choice key={t.id} icon={<CheckSquare />} title={t.title} detail={STATUS_LABELS[t.status]} onPick={() => pick(taskLink(t.id), t.title)} />
+        <Group title={t('Tasks')}>
+          {shownTasks.map((task) => (
+            <Choice key={task.id} icon={<CheckSquare />} title={task.title} detail={t(STATUS_LABELS[task.status])} onPick={() => pick(taskLink(task.id), task.title)} />
           ))}
         </Group>
       </div>

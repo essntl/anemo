@@ -4,6 +4,7 @@ import { formatSize } from '@/lib/format'
 import { IMAGE } from './files'
 import { type Entry, useFileSearch, useFolder } from '@/features/files/api'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 
 export function FileIcon({ name, className }: { name: string; className?: string }) {
   return IMAGE.test(name) ? <FileImage className={className} /> : <File className={className} />
@@ -28,21 +29,21 @@ export function FileFinder({ start = '', onPick }: { start?: string; onPick: (en
     <div>
       <div className="flex items-center gap-2 rounded-control border border-border bg-surface px-3 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
         <Search className="h-4 w-4 shrink-0 text-muted" />
-        <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a file by name" aria-label="Find a file by name"
+        <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Find a file by name')} aria-label={t('Find a file by name')}
           className="h-10 min-w-0 flex-1 bg-transparent text-[14px] placeholder:text-subtle focus:outline-none" />
       </div>
       {!searching && (
         <div className="mt-2 flex items-center gap-1 text-[12.5px] text-muted">
           {folder && (
-            <button type="button" onClick={() => setFolder(parent(folder))} aria-label="Up one folder"
+            <button type="button" onClick={() => setFolder(parent(folder))} aria-label={t('Up one folder')}
               className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-surface-hover pointer-coarse:h-9 pointer-coarse:w-9">
               <ChevronLeft className="h-4 w-4" />
             </button>
           )}
-          <span className="truncate font-mono">{folder || 'Workspace'}</span>
+          <span className="truncate font-mono">{folder || t('Workspace')}</span>
         </div>
       )}
-      <ul className="mt-1 max-h-72 overflow-y-auto" aria-label={searching ? 'Files found' : `Files in ${folder || 'the workspace'}`}>
+      <ul className="mt-1 max-h-72 overflow-y-auto" aria-label={searching ? t('Files found') : folder ? t('Files in {folder}', { folder }) : t('Files in the workspace')}>
         {entries.map((e) => (
           <li key={e.path}>
             <button type="button" onClick={() => (e.is_dir ? setFolder(e.path) : onPick(e))}
@@ -54,7 +55,7 @@ export function FileFinder({ start = '', onPick }: { start?: string; onPick: (en
           </li>
         ))}
         {((searching && search.isSuccess) || (!searching && listing.isSuccess)) && entries.length === 0 && (
-          <li className="px-2 py-3 text-[13px] text-muted">{searching ? 'No file matches.' : 'This folder is empty.'}</li>
+          <li className="px-2 py-3 text-[13px] text-muted">{searching ? t('No file matches.') : t('This folder is empty.')}</li>
         )}
       </ul>
     </div>

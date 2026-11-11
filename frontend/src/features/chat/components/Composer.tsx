@@ -9,6 +9,7 @@ import { SkillIcon } from '@/features/skills/icons'
 import { matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { isTextField, pastedFiles } from '../pastedFiles'
 import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
@@ -249,10 +250,10 @@ export function Composer({
       {menuOpen && (
         <div className="pop absolute inset-x-0 bottom-full z-30 mb-2 overflow-hidden rounded-card border border-border bg-card shadow-float">
           <div className="flex items-center justify-between px-3 pb-1 pt-2.5 text-[11.5px] font-medium uppercase tracking-wide text-subtle">
-            Skills
-            <span className="hidden normal-case tracking-normal md:inline">↑↓ to choose · Enter to use · Esc to close</span>
+            {t('Skills')}
+            <span className="hidden normal-case tracking-normal md:inline">{t('↑↓ to choose · Enter to use · Esc to close')}</span>
           </div>
-          <div id={menuId} role="listbox" aria-label="Skills" className="max-h-72 overflow-y-auto p-1.5 pt-0">
+          <div id={menuId} role="listbox" aria-label={t('Skills')} className="max-h-72 overflow-y-auto p-1.5 pt-0">
             {matches.map((s, i) => (
               <div key={s.id} id={`${menuId}-${i}`} role="option" aria-selected={i === active}
                 onMouseDown={(e) => e.preventDefault()} // keep the focus in the text box
@@ -272,18 +273,18 @@ export function Composer({
                 </div>
               </div>
             ))}
-            {matches.length === 0 && <p className="px-2.5 py-2 text-[13px] text-muted">No skill matches “/{query}”.</p>}
+            {matches.length === 0 && <p className="px-2.5 py-2 text-[13px] text-muted">{t('No skill matches “/{query}”.', { query: query ?? '' })}</p>}
           </div>
           <Link to="/settings/skills" onMouseDown={(e) => e.preventDefault()}
             className="flex items-center gap-2 border-t border-border px-4 py-2 text-[12.5px] text-muted hover:bg-surface-hover hover:text-text">
-            <Settings2 className="h-3.5 w-3.5" /> Manage skills
+            <Settings2 className="h-3.5 w-3.5" /> {t('Manage skills')}
           </Link>
         </div>
       )}
       <div className="flex items-start">
         {chosen && (
-          <button type="button" onClick={() => chooseSkill(null, text)} title="Remove the skill (or Backspace in an empty box)"
-            aria-label={`Skill: ${chosen.name}. Remove it`}
+          <button type="button" onClick={() => chooseSkill(null, text)} title={t('Remove the skill (or Backspace in an empty box)')}
+            aria-label={t('Skill: {name}. Remove it', { name: chosen.name })}
             className="group/skill ml-1.5 mt-1.5 flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-accent-soft pl-2 pr-2.5 text-[13px] font-medium text-accent hover:bg-accent/15">
             <span className="relative flex h-4 w-4 items-center justify-center">
               <SkillIcon name={chosen.icon} className="transition-opacity group-hover/skill:opacity-0" />
@@ -299,9 +300,9 @@ export function Composer({
           value={text}
           disabled={disabled}
           placeholder={
-            dragging ? 'Drop files to attach'
+            dragging ? t('Drop files to attach')
               : chosen ? (chosen.hint || chosen.description)
-                : (placeholder ?? (slashSkills.length ? 'Message the assistant… (/ for skills)' : 'Message the assistant…'))
+                : (placeholder ?? (slashSkills.length ? t('Message the assistant… (/ for skills)') : t('Message the assistant…')))
           }
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
@@ -317,7 +318,7 @@ export function Composer({
           {/* One "+" for what can be added to a message: files, another chat, a skill. */}
           <Popover.Root open={adding} onOpenChange={setAdding}>
             <Popover.Trigger asChild>
-              <button type="button" aria-label="Add to the message" title="Attach files, reference a chat or use a skill" disabled={disabled}
+              <button type="button" aria-label={t('Add to the message')} title={t('Attach files, reference a chat or use a skill')} disabled={disabled}
                 className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 hover:bg-surface-hover disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10',
                   skill ? 'text-accent' : 'text-text')}>
                 <Plus className={cn('h-4 w-4 transition-transform', adding && 'rotate-45')} />
@@ -331,12 +332,12 @@ export function Composer({
                 <button type="button" className={ADD_ITEM} disabled={files.items.length >= MAX_ATTACHMENTS}
                   onClick={() => { setAdding(false); fileRef.current?.click() }}>
                   <Paperclip className="h-4 w-4 shrink-0 text-muted" />
-                  <span className="min-w-0 flex-1">Attach files<span className="block text-[12px] font-normal text-muted">Or drop or paste them</span></span>
+                  <span className="min-w-0 flex-1">{t('Attach files')}<span className="block text-[12px] font-normal text-muted">{t('Or drop or paste them')}</span></span>
                 </button>
                 <button type="button" className={ADD_ITEM} disabled={references.length >= MAX_REFERENCES}
                   onClick={() => { setAdding(false); setPicking(true) }}>
                   <MessagesSquare className="h-4 w-4 shrink-0 text-muted" />
-                  <span className="min-w-0 flex-1">Reference a chat<span className="block text-[12px] font-normal text-muted">Another chat as context</span></span>
+                  <span className="min-w-0 flex-1">{t('Reference a chat')}<span className="block text-[12px] font-normal text-muted">{t('Another chat as context')}</span></span>
                 </button>
                 {slashSkills.length > 0 && (
                   <button type="button" className={ADD_ITEM}
@@ -351,7 +352,7 @@ export function Composer({
                       }
                     }}>
                     <SquareSlash className={cn('h-4 w-4 shrink-0', skill ? 'text-accent' : 'text-muted')} />
-                    <span className="min-w-0 flex-1">{skill ? 'Remove the skill' : 'Use a skill'}<span className="block text-[12px] font-normal text-muted">Or type / at the start</span></span>
+                    <span className="min-w-0 flex-1">{skill ? t('Remove the skill') : t('Use a skill')}<span className="block text-[12px] font-normal text-muted">{t('Or type / at the start')}</span></span>
                   </button>
                 )}
               </Popover.Content>
@@ -373,7 +374,7 @@ export function Composer({
           <button
             type="button"
             onClick={onStop}
-            aria-label="Stop"
+            aria-label={t('Stop')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-bg transition-opacity hover:opacity-85 pointer-coarse:h-10 pointer-coarse:w-10"
           >
             <Square className="h-3.5 w-3.5 fill-current" />
@@ -382,7 +383,7 @@ export function Composer({
           <button
             type="button"
             onClick={send}
-            aria-label="Send"
+            aria-label={t('Send')}
             disabled={!canSend}
             className={cn(
               'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-contrast transition-all pointer-coarse:h-10 pointer-coarse:w-10',

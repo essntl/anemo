@@ -8,6 +8,7 @@
  * survives reloads (the state is saved on the device) and can finish a phase that
  * ended while the app was closed.
  */
+import { msg } from '@/lib/i18n'
 
 export type Phase = 'focus' | 'short_break' | 'long_break'
 export type TimerStatus = 'idle' | 'running' | 'paused'
@@ -241,9 +242,9 @@ export function formatClock(ms: number): string {
 }
 
 export const PHASE_LABEL: Record<Phase, string> = {
-  focus: 'Focus',
-  short_break: 'Short break',
-  long_break: 'Long break',
+  focus: msg('Focus'),
+  short_break: msg('Short break'),
+  long_break: msg('Long break'),
 }
 
 /** The phase's colour token (styles/tokens.css). */

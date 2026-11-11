@@ -1,3 +1,5 @@
+import { plural } from '@/lib/i18n'
+
 /** "3:07", or "1:02:03" past an hour. */
 export function formatSeconds(s: number): string {
   if (!Number.isFinite(s) || s <= 0) return '0:00'
@@ -8,5 +10,5 @@ export function formatSeconds(s: number): string {
 }
 
 export function trackCount(n: number): string {
-  return `${n} track${n === 1 ? '' : 's'}`
+  return plural(n, '{n} track', '{n} tracks')
 }

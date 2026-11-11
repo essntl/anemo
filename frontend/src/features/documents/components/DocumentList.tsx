@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { promptDialog } from '@/components/ui/dialogs'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
+import { plural, rich, t } from '@/lib/i18n'
 import { type DocumentSummary, useCreateDocument, useDocuments } from '../api'
 
 /**
@@ -37,21 +38,21 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
   const folders = [...groups.keys()].sort((a, b) => a.localeCompare(b))
 
   const newDocument = async () => {
-    const title = await promptDialog({ title: 'New document', label: 'Title', placeholder: 'e.g. Trip to Lisbon', confirmLabel: 'Create' })
+    const title = await promptDialog({ title: t('New document'), label: t('Title'), placeholder: t('e.g. Trip to Lisbon'), confirmLabel: t('Create') })
     if (!title) return
     create.mutate({ title, folder: currentFolder }, { onSuccess: (doc) => navigate(`/documents/${doc.id}`) })
   }
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Documents" detail={projectName ?? (outside ? 'Uncategorized' : undefined)}>
+      <PageHeader title={t('Documents')} detail={projectName ?? (outside ? t('Uncategorized') : undefined)}>
       <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} loading={create.isPending} onClick={() => void newDocument()}>
-        New
+        {t('New')}
       </Button>
       </PageHeader>
       <div className="relative px-3 pb-2 pt-3">
         <Search className="pointer-events-none absolute left-5.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find by title" aria-label="Find by title"
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Find by title')} aria-label={t('Find by title')}
           className="h-9 w-full rounded-control bg-surface-2 pl-8 pr-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
       </div>
       {(documents.error ?? create.error) && (
@@ -61,14 +62,14 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
         {documents.isSuccess && all.length === 0 && (
           <p className="px-2 py-6 text-center text-[13px] text-muted">
             {projectFolder
-              ? <>No documents in this project yet. They are Markdown files in <code className="font-mono">documents/{projectFolder}</code>.</>
+              ? rich('No documents in this project yet. They are Markdown files in <code>documents/{folder}</code>.', { code: (c) => <code className="font-mono">{c}</code> }, { folder: projectFolder })
               : outside && everything.length > 0
-                ? <>No documents outside a project yet.</>
-                : <>No documents yet. They are Markdown files in the <code className="font-mono">documents</code> folder of your workspace.</>}
+                ? t('No documents outside a project yet.')
+                : rich('No documents yet. They are Markdown files in the <code>documents</code> folder of your workspace.', { code: (c) => <code className="font-mono">{c}</code> })}
           </p>
         )}
         {documents.isSuccess && all.length > 0 && shown.length === 0 && (
-          <p className="px-2 py-6 text-center text-[13px] text-muted">No document matches.</p>
+          <p className="px-2 py-6 text-center text-[13px] text-muted">{t('No document matches.')}</p>
         )}
         {folders.map((folder) => (
           <div key={folder} className="mb-2">
@@ -86,9 +87,9 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{doc.title}</span>
                   <span className="block truncate text-[11.5px] text-muted">
-                    {formatWhen(doc.updated_at)} · {doc.word_count} words
-                    {doc.last_editor === 'agent' && ' · by an agent'}
-                    {doc.last_editor === 'extension' && ' · saved from the browser'}
+                    {formatWhen(doc.updated_at)} · {plural(doc.word_count, '{n} words', '{n} words')}
+                    {doc.last_editor === 'agent' && ` · ${t('by an agent')}`}
+                    {doc.last_editor === 'extension' && ` · ${t('saved from the browser')}`}
                   </span>
                 </span>
               </NavLink>

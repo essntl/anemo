@@ -3,6 +3,8 @@
  * (e.g. "FREQ=WEEKLY;INTERVAL=2;UNTIL=20261231T235959"). Rules that do not match
  * a preset (made by an agent, say) are kept as they are and shown as "Custom".
  */
+import { msg } from '@/lib/i18n'
+
 export type Repeat = 'none' | 'daily' | 'weekdays' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'custom'
 
 const PRESETS: Record<Exclude<Repeat, 'none' | 'custom'>, string> = {
@@ -15,13 +17,13 @@ const PRESETS: Record<Exclude<Repeat, 'none' | 'custom'>, string> = {
 }
 
 export const REPEAT_OPTIONS: { value: Repeat; label: string }[] = [
-  { value: 'none', label: 'Does not repeat' },
-  { value: 'daily', label: 'Every day' },
-  { value: 'weekdays', label: 'Every weekday (Mon–Fri)' },
-  { value: 'weekly', label: 'Every week' },
-  { value: 'biweekly', label: 'Every 2 weeks' },
-  { value: 'monthly', label: 'Every month' },
-  { value: 'yearly', label: 'Every year' },
+  { value: 'none', label: msg('Does not repeat') },
+  { value: 'daily', label: msg('Every day') },
+  { value: 'weekdays', label: msg('Every weekday (Mon–Fri)') },
+  { value: 'weekly', label: msg('Every week') },
+  { value: 'biweekly', label: msg('Every 2 weeks') },
+  { value: 'monthly', label: msg('Every month') },
+  { value: 'yearly', label: msg('Every year') },
 ]
 
 /** `until` is the last day ("YYYY-MM-DD") or "" for no end. */

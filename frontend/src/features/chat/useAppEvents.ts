@@ -8,6 +8,7 @@ import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
 import { isQuiet } from '@/features/island/alerts'
 import { showDesktopNotification } from '@/features/notifications/desktop'
+import { t } from '@/lib/i18n'
 import { alertApproval, alertRunStatus, type RunStatusEvent } from './agentAlerts'
 import { type FocusControl, type MusicControl, onFocusControl, onMusicControl } from './agentControl'
 import { receive as receiveTimer, type TimerOut } from '@/features/focus/timerSync'
@@ -60,7 +61,7 @@ export function useAppEvents() {
         qc.removeQueries({ queryKey: messagesKey(id) })
         if (window.location.pathname === `/c/${id}`) {
           void navigate('/')
-          toast({ message: 'The temporary chat was deleted.' })
+          toast({ message: t('The temporary chat was deleted.') })
         }
       }
     }) as EventListener)
@@ -103,7 +104,7 @@ export function useAppEvents() {
       if (showDesktopNotification(note, open)) return
       // About what is on screen already (e.g. the agent's question in the open chat).
       if (note.link && window.location.pathname === note.link) return
-      toast({ message: note.title, duration: 10_000, action: { label: 'Open', onClick: open } })
+      toast({ message: note.title, duration: 10_000, action: { label: t('Open'), onClick: open } })
     }) as EventListener)
     source.addEventListener('notifications.changed', () => void qc.invalidateQueries({ queryKey: notificationsKey }))
     return () => {

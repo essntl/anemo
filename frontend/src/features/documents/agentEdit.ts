@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { errorMessage } from '@/api/client'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { toast } from '@/components/ui/toast'
+import { t } from '@/lib/i18n'
 import { useRestoreRevision, useRevisions } from './api'
 
 /** Browser storage: per document, the agent's version that was already looked at. */
@@ -51,7 +52,7 @@ export function useAgentEdit(documentId: string): AgentEdit | null {
   const before = list[index + 1]
   const undo = async () => {
     const ok = await confirmDialog({
-      title: 'Go back to the version before?', message: 'The agent’s version stays in the history, so this can be undone there.', confirmLabel: 'Go back',
+      title: t('Go back to the version before?'), message: t('The agent’s version stays in the history, so this can be undone there.'), confirmLabel: t('Go back'),
     })
     if (ok && before) restore.mutate(before.id, { onError: (err) => toast({ message: errorMessage(err) }) })
   }

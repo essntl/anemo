@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import type { Adapter, AdapterEvents, Track } from './types'
 
 /** Direct audio files and internet radio streams, through a plain <audio> element. */
@@ -25,7 +26,7 @@ export class AudioAdapter implements Adapter {
     })
     this.el.addEventListener('error', () => {
       if (!this.el.getAttribute('src')) return
-      this.events.onError('This link is not a playable audio file or stream.')
+      this.events.onError(t('This link is not a playable audio file or stream.'))
     })
   }
 

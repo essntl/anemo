@@ -1,4 +1,5 @@
 import { toast } from '@/components/ui/toast'
+import { t } from '@/lib/i18n'
 import { router } from '@/app/router'
 import { timerActions } from './timerStore'
 
@@ -6,7 +7,7 @@ import { timerActions } from './timerStore'
 export function focusOnTask(task: { id: string; title: string }): void {
   timerActions.focusOn(task.id)
   toast({
-    message: `Focusing on “${task.title}”`,
-    action: { label: 'Open Focus', onClick: () => void router.navigate('/focus') },
+    message: t('Focusing on “{title}”', { title: task.title }),
+    action: { label: t('Open Focus'), onClick: () => void router.navigate('/focus') },
   })
 }

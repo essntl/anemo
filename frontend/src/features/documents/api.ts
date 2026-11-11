@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
+import { t } from '@/lib/i18n'
 
 export type DocumentSummary = Schemas['DocumentOut']
 export type DocumentContent = Schemas['DocumentContent']
@@ -118,7 +119,7 @@ export async function uploadAsset(file: File): Promise<string> {
   const res = await fetch('/api/documents/assets', { method: 'POST', body: form, credentials: 'same-origin' })
   const body = (await res.json().catch(() => ({}))) as { path?: string; error?: { code?: string; message?: string } }
   if (!res.ok || !body.path) {
-    throw new ApiError(res.status, body.error?.code ?? 'upload_failed', body.error?.message ?? 'Upload failed')
+    throw new ApiError(res.status, body.error?.code ?? 'upload_failed', body.error?.message ?? t('Upload failed'))
   }
   return body.path
 }

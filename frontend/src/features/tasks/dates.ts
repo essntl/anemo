@@ -2,6 +2,7 @@
  * Date helpers for tasks and the calendar. Days are "YYYY-MM-DD" strings in the
  * browser's time zone (what the user sees on their wall calendar).
  */
+import { dateLocale, msg, t } from '@/lib/i18n'
 import type { Task } from './api'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -21,11 +22,11 @@ export function addDays(day: string, days: number): string {
 
 /** "Today", "Tomorrow", "Mon 5 Oct" (with the year when it is not this year). */
 export function formatDay(day: string, now = today()): string {
-  if (day === now) return 'Today'
-  if (day === addDays(now, 1)) return 'Tomorrow'
-  if (day === addDays(now, -1)) return 'Yesterday'
+  if (day === now) return t('Today')
+  if (day === addDays(now, 1)) return t('Tomorrow')
+  if (day === addDays(now, -1)) return t('Yesterday')
   const d = new Date(`${day}T12:00:00`)
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(dateLocale(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -41,11 +42,11 @@ export function formatDue(task: Pick<Task, 'due_date' | 'due_time'>, now = today
 export type Bucket = 'overdue' | 'today' | 'upcoming' | 'later' | 'none'
 
 export const BUCKET_LABELS: Record<Bucket, string> = {
-  overdue: 'Overdue',
-  today: 'Today',
-  upcoming: 'Next 7 days',
-  later: 'Later',
-  none: 'No date',
+  overdue: msg('Overdue'),
+  today: msg('Today'),
+  upcoming: msg('Next 7 days'),
+  later: msg('Later'),
+  none: msg('No date'),
 }
 
 /** Which section of the task list an open task belongs to. */
@@ -56,13 +57,13 @@ export function bucketOf(task: Pick<Task, 'due_date'>, now = today()): Bucket {
   return task.due_date <= addDays(now, 7) ? 'upcoming' : 'later'
 }
 
-/** Reminder choices, in minutes before the due time / event start. */
+/** Reminder choices, in minutes before the due time / event start. Show a label with `t(option.label)`. */
 export const REMINDER_OPTIONS = [
-  { value: '', label: 'No reminder' },
-  { value: '0', label: 'At the time' },
-  { value: '10', label: '10 minutes before' },
-  { value: '30', label: '30 minutes before' },
-  { value: '60', label: '1 hour before' },
-  { value: '1440', label: '1 day before' },
-  { value: '10080', label: '1 week before' },
+  { value: '', label: msg('No reminder') },
+  { value: '0', label: msg('At the time') },
+  { value: '10', label: msg('10 minutes before') },
+  { value: '30', label: msg('30 minutes before') },
+  { value: '60', label: msg('1 hour before') },
+  { value: '1440', label: msg('1 day before') },
+  { value: '10080', label: msg('1 week before') },
 ]

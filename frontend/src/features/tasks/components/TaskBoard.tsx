@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { errorMessage } from '@/api/client'
 import { type Project, STATUS_LABELS, type Task, type TaskStatus, useReorderTasks } from '../api'
 import { askAboutSubtasks, openSubtasksLeft } from '../relations'
@@ -59,7 +60,7 @@ export function TaskBoard({ tasks, info, projects, onOpen, onAdd }: TaskBoardPro
         const items = column(status)
         const isTarget = target?.status === status
         return (
-          <section key={status} aria-label={STATUS_LABELS[status]}
+          <section key={status} aria-label={t(STATUS_LABELS[status])}
             onDragOver={(e) => {
               e.preventDefault()
               if (target?.status !== status) setTarget({ status, before: null })
@@ -68,9 +69,9 @@ export function TaskBoard({ tasks, info, projects, onOpen, onAdd }: TaskBoardPro
             className={cn('flex flex-col rounded-card md:w-72 md:shrink-0 border border-border bg-surface-2/50 p-2 transition-colors',
               isTarget && dragged && 'border-accent bg-accent-soft/40')}>
             <header className="flex items-center justify-between px-1.5 pb-2 pt-1 text-[12.5px] font-semibold text-muted">
-              <span>{STATUS_LABELS[status]} <span className="font-normal text-subtle">{items.length}</span></span>
+              <span>{t(STATUS_LABELS[status])} <span className="font-normal text-subtle">{items.length}</span></span>
               {status !== 'done' && (
-                <button type="button" aria-label={`Add a task to ${STATUS_LABELS[status]}`} onClick={() => onAdd(status)}
+                <button type="button" aria-label={t('Add a task to {status}', { status: t(STATUS_LABELS[status]) })} onClick={() => onAdd(status)}
                   className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-surface-hover hover:text-text pointer-coarse:h-9 pointer-coarse:w-9">
                   <Plus className="h-3.5 w-3.5" />
                 </button>

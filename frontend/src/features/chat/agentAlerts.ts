@@ -6,6 +6,7 @@
  */
 import type { QueryClient } from '@tanstack/react-query'
 import { islandAlert } from '@/features/island/alerts'
+import { t } from '@/lib/i18n'
 import { type Conversation, conversationKey, conversationsKey } from './api'
 
 export interface RunStatusEvent {
@@ -41,7 +42,7 @@ export function alertRunStatus(qc: QueryClient, e: RunStatusEvent): void {
   if (lookingAt(e.conversation_id)) return
   const failed = e.status === 'failed'
   islandAlert({
-    title: failed ? 'The agent stopped with an error' : 'The agent finished',
+    title: failed ? t('The agent stopped with an error') : t('The agent finished'),
     body: title(qc, e.conversation_id),
     icon: failed ? 'warning' : 'bot',
     tone: failed ? 'error' : 'success',
@@ -55,8 +56,8 @@ export function alertRunStatus(qc: QueryClient, e: RunStatusEvent): void {
 export function alertApproval(qc: QueryClient, e: { conversation_id?: string | null }): void {
   if (!e.conversation_id || lookingAt(e.conversation_id)) return
   islandAlert({
-    title: 'Approval needed',
-    body: title(qc, e.conversation_id) ?? 'An agent is waiting for you',
+    title: t('Approval needed'),
+    body: title(qc, e.conversation_id) ?? t('An agent is waiting for you'),
     icon: 'approval',
     tone: 'warning',
     duration: 8000,

@@ -17,6 +17,7 @@ import { Select } from '@/components/ui/Select'
 import { type Project, useProjects } from '@/features/tasks/api'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
+import { msg, plural, rich, t } from '@/lib/i18n'
 import { AGES, ageRange } from '../age'
 import { type BulkAction, type ChatFilters, type Conversation, useBulkChats, useChatTags, useConversations } from '../api'
 import { useChatActions, useMoveChats } from '../chatActions'
@@ -24,15 +25,17 @@ import { PageHeader } from '@/components/ui/PageHeader'
 
 const PAGE = 50
 const SORTS = [
-  { value: 'recent', label: 'Latest' },
-  { value: 'created', label: 'Newest' },
-  { value: 'oldest', label: 'Oldest' },
-  { value: 'title', label: 'Title A–Z' },
+  { value: 'recent', label: msg('Latest') },
+  { value: 'created', label: msg('Newest') },
+  { value: 'oldest', label: msg('Oldest') },
+  { value: 'title', label: msg('Title A–Z') },
 ]
+/** A list of choices with its labels in the current language. */
+const translated = (options: { value: string; label: string }[]) => options.map((o) => ({ ...o, label: t(o.label) }))
 const SHOW = [
-  { value: '', label: 'Active' },
-  { value: 'favorites', label: 'Favorites' },
-  { value: 'archived', label: 'Archived' },
+  { value: '', label: msg('Active') },
+  { value: 'favorites', label: msg('Favorites') },
+  { value: 'archived', label: msg('Archived') },
 ]
 /** A filter as a small pill that is only as wide as its text, so four fit on a phone. */
 /** One action for the selected chats: an outlined button; on a phone just its icon. */
@@ -50,10 +53,10 @@ function Row({ conv, project, selected, onToggle }: { conv: Conversation; projec
   const actions = useChatActions(conv)
   return (
     <div className={cn('flex items-center gap-2 border-b border-border px-2 py-1.5 last:border-0 md:px-3', selected && 'bg-accent-soft/50')}>
-      <Checkbox checked={selected} onChange={onToggle} aria-label={`Select ${conv.title}`} />
+      <Checkbox checked={selected} onChange={onToggle} aria-label={t('Select {title}', { title: conv.title })} />
       <Link to={`/c/${conv.id}`} className="min-w-0 flex-1 rounded-control px-1 py-1 hover:bg-surface-hover">
         <span className="flex items-center gap-1.5">
-          {conv.pinned && <Star className="h-3.5 w-3.5 shrink-0 fill-current text-warning" aria-label="Favorite" />}
+          {conv.pinned && <Star className="h-3.5 w-3.5 shrink-0 fill-current text-warning" aria-label={t('Favorite')} />}
           <span className="truncate text-[14px] font-medium">{conv.title}</span>
         </span>
         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted">
@@ -64,11 +67,11 @@ function Row({ conv, project, selected, onToggle }: { conv: Conversation; projec
             </span>
           )}
           {conv.tags.map((tag) => <span key={tag}>#{tag}</span>)}
-          {conv.archived && <Badge>Archived</Badge>}
+          {conv.archived && <Badge>{t('Archived')}</Badge>}
         </span>
         {conv.snippet && <span className="mt-0.5 block truncate text-[12px] text-subtle">{conv.snippet}</span>}
       </Link>
-      <ActionMenu actions={actions} label={`Actions for ${conv.title}`} />
+      <ActionMenu actions={actions} label={t('Actions for {title}', { title: conv.title })} />
     </div>
   )
 }
@@ -141,40 +144,40 @@ export function ChatsPage() {
     // (chats that leave the list, e.g. when archived, drop out of it by themselves).
     bulk.mutate({ ids, action, ...extra })
   const addTag = async () => {
-    const name = await promptDialog({ title: `Tag ${ids.length} chat${ids.length === 1 ? '' : 's'}`, label: 'Tag', placeholder: 'e.g. ideas', confirmLabel: 'Add tag' })
+    const name = await promptDialog({ title: plural(ids.length, 'Tag {n} chat', 'Tag {n} chats'), label: t('Tag'), placeholder: t('e.g. ideas'), confirmLabel: t('Add tag') })
     if (name) run('add_tag', { tag: name })
   }
   const deleteSelected = async () => {
     const ok = await confirmDialog({
-      title: `Delete ${ids.length} chat${ids.length === 1 ? '' : 's'}?`,
-      message: 'The chats and their attachments are deleted. This cannot be undone.',
-      confirmLabel: 'Delete', danger: true,
+      title: plural(ids.length, 'Delete {n} chat?', 'Delete {n} chats?'),
+      message: t('The chats and their attachments are deleted. This cannot be undone.'),
+      confirmLabel: t('Delete'), danger: true,
     })
     if (ok) bulk.mutate({ ids, action: 'delete' }, { onSuccess: () => setSelected(new Set()) })
   }
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title="All chats" />
+      <PageHeader title={t('All chats')} />
 
       {/* The search and the project share a row (the search gives way to a long project
           name); the other filters sit below it, in one row that scrolls sideways on a
           phone instead of wrapping onto a second. */}
       <div className="mb-2 flex items-center gap-1.5">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search in titles and messages" aria-label="Search chats"
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Search in titles and messages')} aria-label={t('Search chats')}
           className="h-10 min-w-[7rem] flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
-        <Select variant="pill" aria-label="Project" value={projectId} onValueChange={(v) => setParam('project', v)}
-          options={[{ value: '', label: 'All projects' }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))]}
+        <Select variant="pill" aria-label={t('Project')} value={projectId} onValueChange={(v) => setParam('project', v)}
+          options={[{ value: '', label: t('All projects') }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))]}
           className="h-10 pointer-coarse:h-10" />
       </div>
       <div className="no-scrollbar -mx-4 mb-3 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
-        <Select variant="pill" aria-label="Sort by" value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={SORTS} />
+        <Select variant="pill" aria-label={t('Sort by')} value={sort} onValueChange={(v) => setParam('sort', v === 'recent' ? '' : v)} options={translated(SORTS)} />
         {(tags.data?.length ?? 0) > 0 && (
-          <Select variant="pill" aria-label="Tag" value={tag} onValueChange={(v) => setParam('tag', v)}
-            options={[{ value: '', label: 'All tags' }, ...(tags.data ?? []).map((t) => ({ value: t.tag, label: `#${t.tag} (${t.count})` }))]} />
+          <Select variant="pill" aria-label={t('Tag')} value={tag} onValueChange={(v) => setParam('tag', v)}
+            options={[{ value: '', label: t('All tags') }, ...(tags.data ?? []).map((t) => ({ value: t.tag, label: `#${t.tag} (${t.count})` }))]} />
         )}
-        <Select variant="pill" aria-label="Show" value={show} onValueChange={(v) => setParam('show', v)} options={SHOW} />
-        <Select variant="pill" aria-label="Last active" value={age} onValueChange={(v) => setParam('age', v)} options={AGES} />
+        <Select variant="pill" aria-label={t('Show')} value={show} onValueChange={(v) => setParam('show', v)} options={translated(SHOW)} />
+        <Select variant="pill" aria-label={t('Last active')} value={age} onValueChange={(v) => setParam('age', v)} options={translated(AGES)} />
       </div>
 
       {(chats.error ?? bulk.error) && <p className="mb-2 text-[13px] text-error">{errorMessage(chats.error ?? bulk.error)}</p>}
@@ -183,33 +186,33 @@ export function ChatsPage() {
           (greyed out until something is selected), so the bar never changes size. */}
       <div className="mb-2 flex h-12 items-center gap-2 rounded-card border border-border bg-card px-2 shadow-soft md:px-3 pointer-coarse:h-14">
         <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] text-muted">
-          <Checkbox checked={allSelected} disabled={shown.length === 0} aria-label="Select all shown"
+          <Checkbox checked={allSelected} disabled={shown.length === 0} aria-label={t('Select all shown')}
             onChange={() => setSelected(allSelected ? new Set() : new Set(shown.map((c) => c.id)))} />
-          {ids.length === 0 && <span className="text-trim truncate py-[0.3em]">{shown.length}{hasMore ? '+' : ''} chat{shown.length === 1 ? '' : 's'}</span>}
+          {ids.length === 0 && <span className="text-trim truncate py-[0.3em]">{plural(shown.length, '{count} chat', '{count} chats', { count: `${shown.length}${hasMore ? '+' : ''}` })}</span>}
         </label>
         {ids.length > 0 && (
           // The count doubles as the way to let go of the selection.
-          <button type="button" aria-label="Clear selection" title="Clear selection" onClick={() => setSelected(new Set())}
+          <button type="button" aria-label={t('Clear selection')} title={t('Clear selection')} onClick={() => setSelected(new Set())}
             className="-ml-0.5 flex h-7 shrink-0 items-center gap-1 rounded-full bg-accent-soft pl-2.5 pr-1.5 text-[12.5px] font-medium text-accent hover:bg-accent-soft/70 pointer-coarse:h-8">
-            {ids.length}<span className="max-sm:hidden"> selected</span> <X className="h-3.5 w-3.5" />
+            {rich('{n}<s> selected</s>', { s: (c) => <span className="max-sm:hidden">{c}</span> }, { n: ids.length })} <X className="h-3.5 w-3.5" />
           </button>
         )}
-        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5" role="toolbar" aria-label="Actions for the selected chats">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5" role="toolbar" aria-label={t('Actions for the selected chats')}>
           {allArchived
-            ? <BulkButton label="Unarchive" icon={<ArchiveRestore />} disabled={!ids.length} onClick={() => run('unarchive')} />
-            : <BulkButton label="Archive" icon={<Archive />} disabled={!ids.length} onClick={() => run('archive')} />}
+            ? <BulkButton label={t('Unarchive')} icon={<ArchiveRestore />} disabled={!ids.length} onClick={() => run('unarchive')} />
+            : <BulkButton label={t('Archive')} icon={<Archive />} disabled={!ids.length} onClick={() => run('archive')} />}
           {allFavorites
-            ? <BulkButton label="Unfavorite" icon={<StarOff />} disabled={!ids.length} onClick={() => run('unfavorite')} />
-            : <BulkButton label="Favorite" icon={<Star />} disabled={!ids.length} onClick={() => run('favorite')} />}
-          <BulkButton label="Tag" icon={<Tags />} disabled={!ids.length} onClick={() => void addTag()} />
-          <BulkButton label="Move" icon={<FolderInput />} disabled={!ids.length} onClick={() => askMove(ids)} />
-          <BulkButton label="Delete" icon={<Trash2 />} disabled={!ids.length} onClick={() => void deleteSelected()} />
+            ? <BulkButton label={t('Unfavorite')} icon={<StarOff />} disabled={!ids.length} onClick={() => run('unfavorite')} />
+            : <BulkButton label={t('Favorite')} icon={<Star />} disabled={!ids.length} onClick={() => run('favorite')} />}
+          <BulkButton label={t('Tag')} icon={<Tags />} disabled={!ids.length} onClick={() => void addTag()} />
+          <BulkButton label={t('Move')} icon={<FolderInput />} disabled={!ids.length} onClick={() => askMove(ids)} />
+          <BulkButton label={t('Delete')} icon={<Trash2 />} disabled={!ids.length} onClick={() => void deleteSelected()} />
         </div>
       </div>
 
       {chats.isSuccess && shown.length === 0 ? (
-        <EmptyState icon={<MessagesSquare className="h-5 w-5" />} title="No chats here"
-          description={q || projectId || tag || show || age ? 'Nothing matches these filters.' : 'Start one with “New chat”.'} />
+        <EmptyState icon={<MessagesSquare className="h-5 w-5" />} title={t('No chats here')}
+          description={q || projectId || tag || show || age ? t('Nothing matches these filters.') : t('Start one with “New chat”.')} />
       ) : (
         <div className="overflow-hidden rounded-card border border-border bg-card shadow-soft">
           {shown.map((conv) => (
@@ -220,7 +223,7 @@ export function ChatsPage() {
       )}
       {hasMore && (
         <div className="mt-3 flex justify-center">
-          <Button variant="secondary" loading={chats.isFetching} onClick={() => setPages(pages + 1)}>Show more</Button>
+          <Button variant="secondary" loading={chats.isFetching} onClick={() => setPages(pages + 1)}>{t('Show more')}</Button>
         </div>
       )}
     </div>

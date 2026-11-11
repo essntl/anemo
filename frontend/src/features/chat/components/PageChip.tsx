@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { ExternalLink, FileText, Globe, PlaySquare, TextSelect } from 'lucide-react'
 import type { Schemas } from '@/api/client'
 import { Dialog } from '@/components/ui/Dialog'
+import { dateLocale, msg, plural, t } from '@/lib/i18n'
 import { usePageContent } from '../api'
 
 type PageSummary = Schemas['PageSummary']
 
 const ICONS = { page: Globe, selection: TextSelect, pdf: FileText, youtube: PlaySquare } as const
-const LABELS = { page: 'Web page', selection: 'Selection', pdf: 'PDF', youtube: 'Video transcript' } as const
+const LABELS = { page: msg('Web page'), selection: msg('Selection'), pdf: msg('PDF'), youtube: msg('Video transcript') } as const
 
 function host(url: string): string {
   try {
@@ -49,7 +50,7 @@ export function PageChip({ page, conversationId, messageId }: { page: PageSummar
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium">{page.title || host(page.url)}</span>
           <span className="block truncate text-[11.5px] text-muted">
-            {host(page.url)} · {page.word_count.toLocaleString()} words{page.truncated ? ' · shortened' : ''}
+            {host(page.url)} · {plural(page.word_count, '{count} words', '{count} words', { count: page.word_count.toLocaleString(dateLocale()) })}{page.truncated ? ` · ${t('shortened')}` : ''}
           </span>
         </span>
       </button>
@@ -57,16 +58,18 @@ export function PageChip({ page, conversationId, messageId }: { page: PageSummar
         open={open}
         onOpenChange={setOpen}
         title={page.title || host(page.url)}
-        description={`${LABELS[source]} from ${host(page.url)}, attached with Anemo Companion${page.truncated ? ' (the middle was left out to keep it short)' : ''}.`}
+        description={page.truncated
+          ? t('{kind} from {host}, attached with Anemo Companion (the middle was left out to keep it short).', { kind: t(LABELS[source]), host: host(page.url) })
+          : t('{kind} from {host}, attached with Anemo Companion.', { kind: t(LABELS[source]), host: host(page.url) })}
         className="md:w-[min(92vw,720px)]"
         footer={href ? (
           <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[13px] text-accent hover:underline">
-            Open the page <ExternalLink className="h-3.5 w-3.5" />
+            {t('Open the page')} <ExternalLink className="h-3.5 w-3.5" />
           </a>
         ) : undefined}
       >
-        {content.isPending && <p className="text-[13px] text-muted">Loading…</p>}
-        {content.isError && <p className="text-[13px] text-error">Couldn’t load the attached text.</p>}
+        {content.isPending && <p className="text-[13px] text-muted">{t('Loading…')}</p>}
+        {content.isError && <p className="text-[13px] text-error">{t('Couldn’t load the attached text.')}</p>}
         {content.data && (
           <div className="max-h-[60dvh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface-2 p-3 text-[13px] leading-relaxed">
             {content.data.content}

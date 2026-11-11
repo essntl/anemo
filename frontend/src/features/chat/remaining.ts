@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { t } from '@/lib/i18n'
 
 /** The current time, updated every `ms` milliseconds (for countdowns). */
 export function useNow(ms: number): number {
@@ -18,5 +19,5 @@ export function useNow(ms: number): number {
 export function formatRemaining(ms: number, style: 'clock' | 'short'): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000))
   if (style === 'clock') return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
-  return seconds < 60 ? '<1m' : `${Math.ceil(seconds / 60)}m`
+  return seconds < 60 ? t('<1m') : t('{n}m', { n: Math.ceil(seconds / 60) })
 }

@@ -73,3 +73,17 @@ describe('home layout', () => {
     expect(layoutFor(undefined, true).map((w) => w.id)).toEqual(DEFAULT_LAYOUT.map((w) => w.id))
   })
 })
+
+describe('widgetAvailable', () => {
+  it('drops the widgets of a page that is turned off', async () => {
+    const { widgetAvailable } = await import('./layout')
+    expect(widgetAvailable('music', ['music'])).toBe(false)
+    expect(widgetAvailable('week', ['focus'])).toBe(false)
+    expect(widgetAvailable('focus', ['music'])).toBe(true)
+    // Today shows tasks and events: it stays while one of the two is on.
+    expect(widgetAvailable('today', ['tasks'])).toBe(true)
+    expect(widgetAvailable('today', ['tasks', 'calendar'])).toBe(false)
+    // Not tied to a page that can be turned off.
+    expect(widgetAvailable('ask', ['tasks', 'calendar', 'music', 'focus'])).toBe(true)
+  })
+})

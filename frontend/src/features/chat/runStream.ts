@@ -7,6 +7,7 @@
  * sends Last-Event-ID, so nothing is received twice.
  */
 import { useEffect, useReducer, useRef } from 'react'
+import { t } from '@/lib/i18n'
 import type { QuestionMark } from './api'
 
 export const TERMINAL = ['completed', 'failed', 'cancelled']
@@ -61,7 +62,7 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
     case 'run.pause_cancelled':
       return { ...state, pauseRequested: false }
     case 'context.compacted':
-      return { ...state, notice: 'Older steps were summarized to keep the context small' }
+      return { ...state, notice: t('Older steps were summarized to keep the context small') }
     case 'message.delta':
       return { ...state, text: state.text + str(data.text) }
     case 'message.question':
@@ -78,10 +79,10 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
       return { ...state, modelLabel: str(data.label) || state.modelLabel }
     case 'run.fallback':
       // The reason is the provider's own error, e.g. a usage limit: say it, don't hide it.
-      return { ...state, notice: `${str(data.from)} was unavailable${fallbackReason(data.reason)}, switched to ${str(data.to)}` }
+      return { ...state, notice: t('{from} was unavailable{reason}, switched to {to}', { from: str(data.from), reason: fallbackReason(data.reason), to: str(data.to) }) }
     case 'run.restarted':
       // The worker restarted the run from scratch: drop what was streamed so far.
-      return { ...state, text: '', reasoning: '', notice: 'Resumed after an interruption' }
+      return { ...state, text: '', reasoning: '', notice: t('Resumed after an interruption') }
     default:
       return state
   }

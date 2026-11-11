@@ -13,9 +13,11 @@ import { useNow } from '@/hooks/useNow'
 import { Check, LayoutGrid, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useShortcut } from '@/hooks/useShortcut'
+import { dateLocale, t } from '@/lib/i18n'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { moveWidget, patchWidget, resetLayout, resizeWidget, type WidgetLayout } from './layout'
+import { useOffPages } from '@/features/settings/navigation'
+import { moveWidget, patchWidget, resetLayout, resizeWidget, widgetAvailable, type WidgetLayout } from './layout'
 import { useHomeLayout } from './useHomeLayout'
 import { useNeedsYou } from './useNeedsYou'
 import { type GridActions, WidgetGrid } from './WidgetGrid'
@@ -32,14 +34,15 @@ import { UpcomingWidget } from './widgets/UpcomingWidget'
 import { WeekWidget } from './widgets/WeekWidget'
 
 function greeting(hour: number): string {
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
+  if (hour < 12) return t('Good morning')
+  if (hour < 18) return t('Good afternoon')
+  return t('Good evening')
 }
 
 export function HomePage() {
   const { layout, update, ready, phone } = useHomeLayout()
   const needs = useNeedsYou()
+  const offPages = useOffPages()
   const [editing, setEditing] = useState(false)
   // "Edit home layout" from the search box opens /home?edit=1.
   const [params, setParams] = useSearchParams()
@@ -79,25 +82,25 @@ export function HomePage() {
   const Greeting = phone ? 'h2' : 'h1'
   const tools = editing ? (
     <div className="flex items-center gap-1.5">
-      <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => update(() => resetLayout())}>Reset layout</Button>
-      <Button size="sm" variant="primary" icon={<Check className="h-4 w-4" />} onClick={() => setEditing(false)}>Done</Button>
+      <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => update(() => resetLayout())}>{t('Reset layout')}</Button>
+      <Button size="sm" variant="primary" icon={<Check className="h-4 w-4" />} onClick={() => setEditing(false)}>{t('Done')}</Button>
     </div>
   ) : (
-    <Button size="icon" variant="ghost" aria-label="Edit layout" title="Edit layout (E)" onClick={() => setEditing(true)}>
+    <Button size="icon" variant="ghost" aria-label={t('Edit layout')} title={t('Edit layout (E)')} onClick={() => setEditing(true)}>
       <LayoutGrid className="h-4 w-4" />
     </Button>
   )
 
   return (
     <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
-      {phone && <PageHeader title="Home">{tools}</PageHeader>}
+      {phone && <PageHeader title={t('Home')}>{tools}</PageHeader>}
       <div className="mb-4 flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <Greeting className="text-[26px] font-bold leading-tight tracking-tight md:text-[30px]">
             {greeting(now.getHours())}<span className="text-accent">.</span>
           </Greeting>
           <span className="text-[13px] text-muted md:text-sm">
-            {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            {now.toLocaleDateString(dateLocale(), { weekday: 'long', month: 'long', day: 'numeric' })}
           </span>
         </div>
         {!phone && <div className="shrink-0">{tools}</div>}
@@ -106,13 +109,14 @@ export function HomePage() {
       {editing && (
         <p className="mb-3 text-[13px] text-muted">
           {phone
-            ? 'Drag a widget by its grip to move it. This is the phone layout: wider screens keep their own.'
-            : 'Drag a widget to move it and its corner to resize it. With the keyboard, focus a widget and use the arrow keys to move it, Shift and the arrows to resize it. This is the layout for wider screens: phones keep their own.'}
+            ? t('Drag a widget by its grip to move it. This is the phone layout: wider screens keep their own.')
+            : t('Drag a widget to move it and its corner to resize it. With the keyboard, focus a widget and use the arrow keys to move it, Shift and the arrows to resize it. This is the layout for wider screens: phones keep their own.')}
         </p>
       )}
 
       {ready && (
         <WidgetGrid layout={layout} editing={editing} actions={actions} render={render}
+          available={(item) => widgetAvailable(item.id, offPages)}
           shown={(item) => item.id !== 'needs' || !!item.pinned || (needs.ready && needs.rows.length > 0)} />
       )}
     </div>

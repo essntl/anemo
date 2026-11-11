@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { plural, t } from '@/lib/i18n'
 import { PRIORITY_LABELS, type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
 import { TaskBoard } from './components/TaskBoard'
 import { TaskDialog } from './components/TaskDialog'
@@ -144,20 +145,20 @@ export function TasksPage() {
     <div className="flex h-full">
     <div className="min-w-0 flex-1 overflow-y-auto">
     <div className={cn('mx-auto p-4 md:px-8 md:pb-8 md:pt-2', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
-      <PageHeader title="Tasks">
+      <PageHeader title={t('Tasks')}>
         {/* On a phone the Trash is beside the view switch below: up here it ran under the Dynamic Island. */}
-        {desktop && <Button size="sm" variant="ghost" className="shrink-0" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>Trash</Button>}
+        {desktop && <Button size="sm" variant="ghost" className="shrink-0" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>{t('Trash')}</Button>}
         <Button size="sm" variant="primary" className="shrink-0" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>
-          New task
+          {t('New task')}
         </Button>
       </PageHeader>
 
       {/* Search and the view switch share one line; the filters are small pills below. */}
       <div className="mb-2 flex items-center gap-2">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" aria-label="Search tasks"
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Search')} aria-label={t('Search tasks')}
           className="h-9 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft pointer-coarse:h-10" />
-        <div className="inline-flex shrink-0 rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label="View">
-          {([['list', 'List', List], ['board', 'Board', KanbanSquare]] as const).map(([id, label, Icon]) => (
+        <div className="inline-flex shrink-0 rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label={t('View')}>
+          {([['list', t('List'), List], ['board', t('Board'), KanbanSquare]] as const).map(([id, label, Icon]) => (
             <button key={id} type="button" role="radio" aria-checked={view === id} title={label} onClick={() => setParam('view', id === 'list' ? '' : id)}
               className={cn('relative flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium pointer-coarse:h-9 pointer-coarse:px-3',
                 view === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
@@ -167,15 +168,15 @@ export function TasksPage() {
           ))}
         </div>
         {!desktop && (
-          <Button size="icon" variant="ghost" className="-ml-1 shrink-0" aria-label="Trash" title="Deleted tasks" onClick={() => setTrashOpen(true)}>
+          <Button size="icon" variant="ghost" className="-ml-1 shrink-0" aria-label={t('Trash')} title={t('Deleted tasks')} onClick={() => setTrashOpen(true)}>
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
         {tags.length > 0 && (
-          <Select variant="pill" aria-label="Tag" value={tagFilter} onValueChange={(v) => setParam('tag', v)}
-            options={[{ value: '', label: 'All tags' }, ...tags.map((t) => ({ value: t, label: `#${t}` }))]} />
+          <Select variant="pill" aria-label={t('Tag')} value={tagFilter} onValueChange={(v) => setParam('tag', v)}
+            options={[{ value: '', label: t('All tags') }, ...tags.map((t) => ({ value: t, label: `#${t}` }))]} />
         )}
       </div>
 
@@ -189,18 +190,18 @@ export function TasksPage() {
           <div className="mb-4 flex items-center gap-2 rounded-card border border-border bg-card px-3 py-1.5 shadow-soft">
             <Plus className="h-4 w-4 shrink-0 text-muted" />
             <input value={quick} onChange={(e) => setQuick(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && quickAdd()}
-              placeholder="Add a task: “Call the bank fri !high #errands”" aria-label="Add a task"
+              placeholder={t('Add a task: “Call the bank fri !high #errands”')} aria-label={t('Add a task')}
               className="h-9 min-w-0 flex-1 bg-transparent text-[14px] placeholder:text-subtle focus:outline-none" />
             {/* What was understood from the end of the text, before it is added. */}
             {understood.due_date && <span className={QUICK_CHIP}>{formatDay(understood.due_date)}</span>}
-            {understood.priority > 0 && <span className={QUICK_CHIP}>{PRIORITY_LABELS[understood.priority]}</span>}
+            {understood.priority > 0 && <span className={QUICK_CHIP}>{t(PRIORITY_LABELS[understood.priority])}</span>}
             {understood.tags.map((t) => <span key={t} className={QUICK_CHIP}>#{t}</span>)}
-            {quick.trim() && <Button size="sm" variant="primary" loading={create.isPending} onClick={quickAdd}>Add</Button>}
+            {quick.trim() && <Button size="sm" variant="primary" loading={create.isPending} onClick={quickAdd}>{t('Add')}</Button>}
           </div>
 
           {tasks.isSuccess && all.length === 0 && (
-            <EmptyState icon={<CheckSquare className="h-5 w-5" />} title="No tasks yet"
-              description="Add one above, or ask an agent: “remind me to renew my passport next Friday”." />
+            <EmptyState icon={<CheckSquare className="h-5 w-5" />} title={t('No tasks yet')}
+              description={t('Add one above, or ask an agent: “remind me to renew my passport next Friday”.')} />
           )}
           {BUCKETS.map((bucket) => {
             const items = open.filter((t) => bucketOf(t) === bucket)
@@ -208,7 +209,7 @@ export function TasksPage() {
             return (
               <section key={bucket} className="mb-4">
                 <h2 className={cn('mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider', bucket === 'overdue' ? 'text-error' : 'text-subtle')}>
-                  {BUCKET_LABELS[bucket]} <span className="font-normal">{items.length}</span>
+                  {t(BUCKET_LABELS[bucket])} <span className="font-normal">{items.length}</span>
                 </h2>
                 {items.map((t) => (
                   <TaskRow key={t.id} task={t} projects={projectMap} info={info} onOpen={(task) => setEditing({ task })}
@@ -222,7 +223,7 @@ export function TasksPage() {
               <button type="button" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}
                 className="mb-1 flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-subtle hover:text-text">
                 <ChevronRight className={cn('h-3 w-3 transition-transform', showDone && 'rotate-90')} />
-                Finished <span className="font-normal">{finished.length}</span>
+                {t('Finished')} <span className="font-normal">{finished.length}</span>
               </button>
               {showDone && finished.slice(0, 100).map((t) => (
                 <TaskRow key={t.id} task={t} projects={projectMap} info={info} onOpen={(task) => setEditing({ task })}
@@ -236,10 +237,11 @@ export function TasksPage() {
       {elsewhere > 0 && (
         <p className="mt-2 flex items-center gap-2 rounded-control bg-surface-2 px-3 py-2 text-[12.5px] text-muted">
           <span className="min-w-0 flex-1">
-            {elsewhere === 1 ? '1 more open task is' : `${elsewhere} more open tasks are`}{' '}
-            {scope.kind !== 'uncategorized' ? 'outside this project' : elsewhere === 1 ? 'filed in a project' : 'filed in projects'}.
+            {scope.kind !== 'uncategorized'
+              ? plural(elsewhere, '1 more open task is outside this project.', '{n} more open tasks are outside this project.')
+              : plural(elsewhere, '1 more open task is filed in a project.', '{n} more open tasks are filed in projects.')}
           </span>
-          <button type="button" onClick={() => setView('all')} className="shrink-0 font-medium text-accent hover:underline">Show all</button>
+          <button type="button" onClick={() => setView('all')} className="shrink-0 font-medium text-accent hover:underline">{t('Show all')}</button>
         </p>
       )}
 

@@ -5,15 +5,16 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
+import { msg, t } from '@/lib/i18n'
 import { useSaveSection, useSettings } from '@/features/settings/api'
 import { playSound } from '../sounds'
 
 type Focus = Schemas['FocusSettings']
 
 const PRESETS = [
-  { name: 'Classic', focus: 25, short: 5, long: 15 },
-  { name: 'Deep', focus: 50, short: 10, long: 20 },
-  { name: 'Flow', focus: 90, short: 20, long: 30 },
+  { name: msg('Classic'), focus: 25, short: 5, long: 15 },
+  { name: msg('Deep'), focus: 50, short: 10, long: 20 },
+  { name: msg('Flow'), focus: 90, short: 20, long: 30 },
 ]
 
 /** A number with − and + buttons; the number can be typed too. */
@@ -29,7 +30,7 @@ function Stepper({ value, onChange, min, max, label, unit }: {
   const step = 'flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10'
   return (
     <div className="flex shrink-0 items-center gap-0.5 rounded-control bg-surface-2 p-0.5">
-      <button type="button" className={step} aria-label={`Less: ${label}`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
+      <button type="button" className={step} aria-label={t('Less: {label}', { label })} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
         <Minus className="h-4 w-4" />
       </button>
       <label className="flex w-16 items-baseline justify-center gap-0.5">
@@ -39,7 +40,7 @@ function Stepper({ value, onChange, min, max, label, unit }: {
           className="w-9 bg-transparent text-center text-[15px] font-semibold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
         {unit && <span className="text-[12px] text-muted">{unit}</span>}
       </label>
-      <button type="button" className={step} aria-label={`More: ${label}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+      <button type="button" className={step} aria-label={t('More: {label}', { label })} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
         <Plus className="h-4 w-4" />
       </button>
     </div>
@@ -69,59 +70,59 @@ export function TimerSettingsForm() {
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Presets">
+      <div className="grid grid-cols-3 gap-1.5" role="group" aria-label={t('Presets')}>
         {PRESETS.map((p) => (
           <button key={p.name} type="button" aria-pressed={preset === p.name}
             onClick={() => set({ focus_minutes: p.focus, short_break_minutes: p.short, long_break_minutes: p.long })}
             className={cn('rounded-control border px-2.5 py-1.5 text-left transition-colors',
               preset === p.name ? 'border-accent bg-accent-soft' : 'border-border bg-surface-2 hover:bg-surface-hover')}>
-            <div className={cn('text-[13px] font-semibold', preset === p.name && 'text-accent')}>{p.name}</div>
+            <div className={cn('text-[13px] font-semibold', preset === p.name && 'text-accent')}>{t(p.name)}</div>
             <div className="text-[11.5px] text-muted tabular-nums">{p.focus} / {p.short} / {p.long}</div>
           </button>
         ))}
       </div>
       <div className="mt-2 divide-y divide-border">
-        <Row label="Focus">
-          <Stepper label="Focus minutes" unit="min" min={1} max={240} value={s.focus_minutes} onChange={(v) => set({ focus_minutes: v })} />
+        <Row label={t('Focus')}>
+          <Stepper label={t('Focus minutes')} unit={t('min')} min={1} max={240} value={s.focus_minutes} onChange={(v) => set({ focus_minutes: v })} />
         </Row>
-        <Row label="Short break">
-          <Stepper label="Short break minutes" unit="min" min={1} max={60} value={s.short_break_minutes} onChange={(v) => set({ short_break_minutes: v })} />
+        <Row label={t('Short break')}>
+          <Stepper label={t('Short break minutes')} unit={t('min')} min={1} max={60} value={s.short_break_minutes} onChange={(v) => set({ short_break_minutes: v })} />
         </Row>
-        <Row label="Long break">
-          <Stepper label="Long break minutes" unit="min" min={1} max={120} value={s.long_break_minutes} onChange={(v) => set({ long_break_minutes: v })} />
+        <Row label={t('Long break')}>
+          <Stepper label={t('Long break minutes')} unit={t('min')} min={1} max={120} value={s.long_break_minutes} onChange={(v) => set({ long_break_minutes: v })} />
         </Row>
-        <Row label="Long break after" hint="Focus sessions in a cycle">
-          <Stepper label="Sessions before a long break" min={1} max={12} value={s.rounds_before_long_break} onChange={(v) => set({ rounds_before_long_break: v })} />
+        <Row label={t('Long break after')} hint={t('Focus sessions in a cycle')}>
+          <Stepper label={t('Sessions before a long break')} min={1} max={12} value={s.rounds_before_long_break} onChange={(v) => set({ rounds_before_long_break: v })} />
         </Row>
-        <Row label="Start breaks by themselves">
-          <Switch label="Start breaks by themselves" checked={s.auto_start_breaks} onChange={(v) => set({ auto_start_breaks: v })} />
+        <Row label={t('Start breaks by themselves')}>
+          <Switch label={t('Start breaks by themselves')} checked={s.auto_start_breaks} onChange={(v) => set({ auto_start_breaks: v })} />
         </Row>
-        <Row label="Start focus by itself" hint="When a break ends">
-          <Switch label="Start focus by itself" checked={s.auto_start_focus} onChange={(v) => set({ auto_start_focus: v })} />
+        <Row label={t('Start focus by itself')} hint={t('When a break ends')}>
+          <Switch label={t('Start focus by itself')} checked={s.auto_start_focus} onChange={(v) => set({ auto_start_focus: v })} />
         </Row>
-        <Row label="Sound">
-          <Select variant="pill" aria-label="Sound" value={s.chime}
+        <Row label={t('Sound')}>
+          <Select variant="pill" aria-label={t('Sound')} value={s.chime}
             onValueChange={(v) => { set({ chime: v as Focus['chime'] }); playSound('chime', v as Focus['chime'], s.chime_volume) }}
-            options={[{ value: 'bell', label: 'Bell' }, { value: 'soft', label: 'Soft' }, { value: 'none', label: 'None' }]} />
+            options={[{ value: 'bell', label: t('Bell') }, { value: 'soft', label: t('Soft') }, { value: 'none', label: t('None') }]} />
         </Row>
         {s.chime !== 'none' && (
-          <Row label="Volume">
-            <Slider label="Sound volume" className="w-36" value={s.chime_volume} commit="release"
+          <Row label={t('Volume')}>
+            <Slider label={t('Sound volume')} className="w-36" value={s.chime_volume} commit="release"
               valueText={(v) => `${Math.round(v * 100)}%`}
               onChange={(v) => { set({ chime_volume: v }); playSound('chime', s.chime, v) }} />
           </Row>
         )}
-        <Row label="Countdown in the tab title">
-          <Switch label="Countdown in the tab title" checked={s.title_countdown} onChange={(v) => set({ title_countdown: v })} />
+        <Row label={t('Countdown in the tab title')}>
+          <Switch label={t('Countdown in the tab title')} checked={s.title_countdown} onChange={(v) => set({ title_countdown: v })} />
         </Row>
-        <Row label="Daily goal" hint="Shown in This week">
-          <Stepper label="Daily goal in minutes" unit="min" min={0} max={1440} value={s.daily_goal_minutes} onChange={(v) => set({ daily_goal_minutes: v })} />
+        <Row label={t('Daily goal')} hint={t('Shown in This week')}>
+          <Stepper label={t('Daily goal in minutes')} unit={t('min')} min={0} max={1440} value={s.daily_goal_minutes} onChange={(v) => set({ daily_goal_minutes: v })} />
         </Row>
-        <Row label="Quiet while focusing" hint="Alerts wait for the break. Approvals still come through">
-          <Switch label="Hold alerts until the break" checked={s.quiet_while_focusing} onChange={(v) => set({ quiet_while_focusing: v })} />
+        <Row label={t('Quiet while focusing')} hint={t('Alerts wait for the break. Approvals still come through')}>
+          <Switch label={t('Hold alerts until the break')} checked={s.quiet_while_focusing} onChange={(v) => set({ quiet_while_focusing: v })} />
         </Row>
-        <Row label="Keep in Notifications" hint="Also list finished phases under Notifications">
-          <Switch label="Keep finished phases in Notifications" checked={s.save_to_notifications} onChange={(v) => set({ save_to_notifications: v })} />
+        <Row label={t('Keep in Notifications')} hint={t('Also list finished phases under Notifications')}>
+          <Switch label={t('Keep finished phases in Notifications')} checked={s.save_to_notifications} onChange={(v) => set({ save_to_notifications: v })} />
         </Row>
       </div>
       {save.isError && <p className="mt-2 text-[12.5px] text-error">{errorMessage(save.error)}</p>}

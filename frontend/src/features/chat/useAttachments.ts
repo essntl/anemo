@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, type Schemas } from '@/api/client'
+import { t } from '@/lib/i18n'
 
 export type UploadedAttachment = Schemas['AttachmentOut']
 
@@ -22,7 +23,7 @@ async function upload(file: File): Promise<UploadedAttachment> {
   const res = await fetch('/api/attachments', { method: 'POST', body: form, credentials: 'same-origin' })
   const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }
   if (!res.ok) {
-    throw new ApiError(res.status, body.error?.code ?? `http_${res.status}`, body.error?.message ?? 'Upload failed')
+    throw new ApiError(res.status, body.error?.code ?? `http_${res.status}`, body.error?.message ?? t('Upload failed'))
   }
   return body as UploadedAttachment
 }
@@ -56,7 +57,7 @@ export function useAttachments() {
           setItems((prev) =>
             prev.map((i) =>
               i.key === item.key
-                ? { ...i, status: 'error', error: err instanceof Error ? err.message : 'Upload failed' }
+                ? { ...i, status: 'error', error: err instanceof Error ? err.message : t('Upload failed') }
                 : i,
             ),
           ),

@@ -2,6 +2,7 @@ import * as RadixDialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { useClosing } from './closing'
 
 interface DialogProps {
@@ -51,7 +52,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
             </div>
             <RadixDialog.Close className="rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-text pointer-coarse:p-2.5">
               <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{t('Close')}</span>
             </RadixDialog.Close>
           </div>
           <div className="mt-5">{children}</div>

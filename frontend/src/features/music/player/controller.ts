@@ -26,6 +26,7 @@ import { persist } from 'zustand/middleware'
 import { api, errorMessage, unwrap } from '@/api/client'
 import { toast } from '@/components/ui/toast'
 import { islandAlert } from '@/features/island/alerts'
+import { msg, plural, t } from '@/lib/i18n'
 import { AudioAdapter } from './audio'
 import { artworkSrc, audioTitle, detectSource, fetchOEmbed, youtubeThumb } from './detect'
 import { SoundCloudAdapter } from './soundcloud'
@@ -113,7 +114,7 @@ function playable(t: Track): Track {
 async function tellServerProblem(videoId: string) {
   if (serverProblemTold) return
   serverProblemTold = true
-  let reason = 'Anemo’s server could not fetch the audio.'
+  let reason = t('Anemo’s server could not fetch the audio.')
   try {
     // Asked for one byte: all that is wanted is the error it answers with.
     const answer = await api.GET('/api/music/audio/youtube/{video_id}', {
@@ -126,7 +127,7 @@ async function tellServerProblem(videoId: string) {
   } catch (err) {
     reason = errorMessage(err)
   }
-  toast({ message: `Playing through YouTube’s own player, which stops when the app is out of sight. ${reason}`, duration: 10_000 })
+  toast({ message: t('Playing through YouTube’s own player, which stops when the app is out of sight. {reason}', { reason }), duration: 10_000 })
 }
 
 /** The server could not fetch this track: the same track again, through YouTube's own player. */
@@ -382,17 +383,17 @@ function eventsFor(source: SourceKind): AdapterEvents {
       // Like other players: skip a track that can't play instead of stopping the queue.
       const next = wanted && failedInARow < MAX_SKIPS ? nextIndex(1) : null
       if (next !== null && next !== usePlayerStore.getState().index) {
-        islandAlert({ title: "Skipped a track that can't play", body: failed?.title, icon: 'skip', tone: 'warning', duration: 2600 })
+        islandAlert({ title: t("Skipped a track that can't play"), body: failed?.title, icon: 'skip', tone: 'warning', duration: 2600 })
         loadIndex(next, true)
         return
       }
       wantsPlayback = false
       const diagnosis =
         blockedInARow >= 2
-          ? "YouTube refused several tracks in a row. That's usually an ad or privacy blocker hiding which site is playing them: allow this site in the blocker (or try a private window) and press play again."
+          ? t("YouTube refused several tracks in a row. That's usually an ad or privacy blocker hiding which site is playing them: allow this site in the blocker (or try a private window) and press play again.")
           : message
       setRuntime({ error: diagnosis, blocked: kind === 'blocked', status: 'paused' })
-      islandAlert({ title: "Can't play this", body: diagnosis, icon: 'warning', tone: 'error', duration: 5000 })
+      islandAlert({ title: t("Can't play this"), body: diagnosis, icon: 'warning', tone: 'error', duration: 5000 })
     },
   }
 }
@@ -528,7 +529,7 @@ export type PlaylistChoice = 'all' | 'video'
 
 export async function buildTracks(input: string, choice: PlaylistChoice = 'all'): Promise<Track[]> {
   const detected = detectSource(input)
-  if (!detected) throw new Error('Paste a YouTube, SoundCloud or audio link.')
+  if (!detected) throw new Error(t('Paste a YouTube, SoundCloud or audio link.'))
 
   if (detected.kind === 'youtube-playlist' || (detected.kind === 'youtube' && detected.listId && choice === 'all')) {
     const ids = await expandYouTubePlaylist(detected.listId!)
@@ -551,7 +552,7 @@ export async function buildTracks(input: string, choice: PlaylistChoice = 'all')
 
   if (detected.kind === 'soundcloud') {
     const meta = await fetchOEmbed('soundcloud', detected.url)
-    if (!meta) throw new Error("SoundCloud didn't recognise that link (is it private?).")
+    if (!meta) throw new Error(t("SoundCloud didn't recognise that link (is it private?)."))
     return [{
       id: uid(), source: 'soundcloud', ref: detected.url, url: detected.url,
       title: meta.title ?? 'SoundCloud track', artist: meta.artist ?? '', artwork: meta.artwork,
@@ -592,7 +593,7 @@ export const player = {
       void saveToLibrary(tracks).then((saved) => hydrateTitles(saved))
       return tracks
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Couldn't add that link."
+      const message = err instanceof Error ? err.message : t("Couldn't add that link.")
       throw new Error(message)
     } finally {
       setRuntime({ adding: false })
@@ -607,7 +608,7 @@ export const player = {
     usePlayerStore.setState((p) => ({ queue: [...p.queue, ...tracks.map((t) => (p.queue.some((q) => q.id === t.id) ? copyTrack(t) : t))] }))
     if (opts.announce !== false) {
       islandAlert({
-        title: tracks.length > 1 ? `Added ${tracks.length} tracks` : 'Added to the queue',
+        title: tracks.length > 1 ? plural(tracks.length, 'Added {n} track', 'Added {n} tracks') : t('Added to the queue'),
         body: opts.label ?? (tracks.length === 1 ? tracks[0].title : undefined),
         icon: 'plus',
         image: tracks.length === 1 ? artworkSrc(tracks[0].artwork) : null,
@@ -640,7 +641,7 @@ export const player = {
       queue.splice(at, 0, track)
       return { queue, index: current ? queue.findIndex((t) => t.id === current.id) : p.index }
     })
-    islandAlert({ title: 'Plays next', body: track.title, icon: 'plus', tone: 'info', duration: 1800 })
+    islandAlert({ title: t('Plays next'), body: track.title, icon: 'plus', tone: 'info', duration: 1800 })
   },
   playIndex(index: number) {
     bindMediaSession()
@@ -710,13 +711,13 @@ export const player = {
   toggleShuffle() {
     const shuffle = !usePlayerStore.getState().shuffle
     usePlayerStore.setState({ shuffle })
-    islandAlert({ title: shuffle ? 'Shuffle on' : 'Shuffle off', icon: 'shuffle', tone: 'info', duration: 1400, key: 'play-mode' })
+    islandAlert({ title: shuffle ? t('Shuffle on') : t('Shuffle off'), icon: 'shuffle', tone: 'info', duration: 1400, key: 'play-mode' })
   },
   cycleRepeat() {
     const order: Repeat[] = ['off', 'all', 'one']
     const repeat = order[(order.indexOf(usePlayerStore.getState().repeat) + 1) % 3]
     usePlayerStore.setState({ repeat })
-    islandAlert({ title: REPEAT_LABEL[repeat], icon: 'repeat', tone: 'info', duration: 1400, key: 'play-mode' })
+    islandAlert({ title: t(REPEAT_LABEL[repeat]), icon: 'repeat', tone: 'info', duration: 1400, key: 'play-mode' })
   },
   /** Remove from the queue, with Undo (puts it back where it was). */
   remove(id: string) {
@@ -741,9 +742,9 @@ export const player = {
       }
     }
     toast({
-      message: `Removed “${track.title}”`,
+      message: t('Removed “{title}”', { title: track.title }),
       action: {
-        label: 'Undo',
+        label: t('Undo'),
         onClick: () =>
           usePlayerStore.setState((p) => {
             if (p.queue.some((t) => t.id === track.id)) return p
@@ -783,14 +784,14 @@ export const player = {
     updateMediaSession()
     if (before.queue.length) {
       toast({
-        message: 'Queue cleared',
-        action: { label: 'Undo', onClick: () => usePlayerStore.setState({ queue: before.queue, index: before.index }) },
+        message: t('Queue cleared'),
+        action: { label: t('Undo'), onClick: () => usePlayerStore.setState({ queue: before.queue, index: before.index }) },
       })
     }
   },
 }
 
-export const REPEAT_LABEL: Record<Repeat, string> = { off: 'Repeat off', all: 'Repeat the queue', one: 'Repeat this track' }
+export const REPEAT_LABEL: Record<Repeat, string> = { off: msg('Repeat off'), all: msg('Repeat the queue'), one: msg('Repeat this track') }
 
 /** Everything a player display needs. */
 export function usePlayer() {

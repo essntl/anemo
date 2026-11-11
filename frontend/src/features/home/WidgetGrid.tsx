@@ -3,6 +3,7 @@ import { motion, useDragControls } from 'motion/react'
 import { EyeOff, GripVertical, Plus } from 'lucide-react'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { spring } from '@/lib/motion'
 import { MAX_SPAN, WIDGETS, type WidgetId, type WidgetLayout } from './layout'
 
@@ -46,7 +47,7 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
   const resize = useRef<{ x: number; y: number; w: number; h: number; cols: number; colStep: number; rowStep: number } | null>(null)
   const [lifted, setLifted] = useState(false)
   const [resizing, setResizing] = useState(false)
-  const name = WIDGETS[item.id].name
+  const name = t(WIDGETS[item.id].name)
 
   function startResize(e: PointerEvent<HTMLDivElement>) {
     const grid = gridRef.current
@@ -157,7 +158,7 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
       onKeyDown={onKeyDown}
       tabIndex={editing ? 0 : undefined}
       role={editing ? 'group' : undefined}
-      aria-label={editing ? `${name}, ${item.w} by ${item.h}. Arrow keys move it, Shift and arrows resize it.` : undefined}
+      aria-label={editing ? t('{name}, {w} by {h}. Arrow keys move it, Shift and arrows resize it.', { name, w: item.w, h: item.h }) : undefined}
       className={cn(
         'relative flex min-h-[9.5rem] min-w-0 flex-col rounded-card border border-border bg-card shadow-soft',
         COL_SPAN[item.w],
@@ -174,11 +175,11 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
       {editing && (
         <>
           <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-control border border-border bg-card p-0.5 shadow-soft">
-            <span data-grip title="Drag to move" aria-hidden
+            <span data-grip title={t('Drag to move')} aria-hidden
               className="flex h-7 w-7 cursor-grab touch-none items-center justify-center rounded-lg text-muted active:cursor-grabbing pointer-coarse:h-10 pointer-coarse:w-10">
               <GripVertical className="h-4 w-4" />
             </span>
-            <button type="button" data-no-drag aria-label={`Hide ${name}`} title="Hide" onClick={() => actions.setHidden(item.id, true)}
+            <button type="button" data-no-drag aria-label={t('Hide {name}', { name })} title={t('Hide')} onClick={() => actions.setHidden(item.id, true)}
               className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:w-10">
               <EyeOff className="h-4 w-4" />
             </button>
@@ -186,7 +187,7 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
           <span className="pointer-events-none absolute bottom-2 left-3 rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] font-semibold text-muted tabular-nums max-md:hidden">
             {item.w} × {item.h}
           </span>
-          <div data-no-drag role="presentation" title="Drag to resize"
+          <div data-no-drag role="presentation" title={t('Drag to resize')}
             onPointerDown={startResize} onPointerMove={onResizeMove} onPointerUp={endResize} onPointerCancel={endResize}
             className="absolute bottom-0 right-0 z-10 flex h-7 w-7 cursor-nwse-resize touch-none items-center justify-center max-md:hidden">
             <svg viewBox="0 0 10 10" className={cn('h-3 w-3', resizing ? 'text-accent' : 'text-muted')} aria-hidden>
@@ -204,17 +205,19 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
  * widgets are dragged into place (mouse anywhere on them, touch by the grip),
  * resized from their corner, or moved and resized with the keyboard.
  */
-export function WidgetGrid({ layout, editing, shown, actions, render }: {
+export function WidgetGrid({ layout, editing, shown, available = () => true, actions, render }: {
   layout: WidgetLayout[]
   editing: boolean
   /** Widgets that have something to show (e.g. "Needs you" hides itself when empty). */
   shown: (item: WidgetLayout) => boolean
+  /** Widgets of a page that is turned off are not offered at all, not even while editing. */
+  available?: (item: WidgetLayout) => boolean
   actions: GridActions
   render: (item: WidgetLayout) => ReactNode
 }) {
   const gridRef = useRef<HTMLDivElement>(null)
-  const hidden = layout.filter((w) => w.hidden)
-  const visible = layout.flatMap((w, i) => (!w.hidden && (editing || shown(w)) ? [i] : []))
+  const hidden = layout.filter((w) => w.hidden && available(w))
+  const visible = layout.flatMap((w, i) => (!w.hidden && available(w) && (editing || shown(w)) ? [i] : []))
 
   return (
     <>
@@ -231,15 +234,15 @@ export function WidgetGrid({ layout, editing, shown, actions, render }: {
       </div>
 
       {editing && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-card border border-dashed border-border-strong px-4 py-3" aria-label="Add a widget" role="group">
-          <span className="mr-1 text-[11.5px] font-semibold uppercase tracking-wider text-muted">Add a widget</span>
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-card border border-dashed border-border-strong px-4 py-3" aria-label={t('Add a widget')} role="group">
+          <span className="mr-1 text-[11.5px] font-semibold uppercase tracking-wider text-muted">{t('Add a widget')}</span>
           {hidden.length === 0 ? (
-            <span className="text-[13px] text-muted">Every widget is on the page. Hide one with its eye button.</span>
+            <span className="text-[13px] text-muted">{t('Every widget is on the page. Hide one with its eye button.')}</span>
           ) : (
             hidden.map((w) => (
               <button key={w.id} type="button" onClick={() => actions.setHidden(w.id, false)}
                 className="flex h-8 items-center gap-1 rounded-full bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10">
-                <Plus className="h-3.5 w-3.5" /> {WIDGETS[w.id].name}
+                <Plus className="h-3.5 w-3.5" /> {t(WIDGETS[w.id].name)}
               </button>
             ))
           )}

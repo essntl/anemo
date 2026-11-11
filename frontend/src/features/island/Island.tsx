@@ -7,6 +7,7 @@ import { Ring } from '@/components/ui/Ring'
 import { RollingText } from '@/components/ui/RollingText'
 import { Slider } from '@/components/ui/Slider'
 import { cn } from '@/lib/cn'
+import { t } from '@/lib/i18n'
 import { spring } from '@/lib/motion'
 import { formatClock, PHASE_COLOR, PHASE_LABEL } from '@/features/focus/timer'
 import { timerActions, useTimer } from '@/features/focus/timerStore'
@@ -151,8 +152,12 @@ export function Island() {
   const cycle = Math.max(1, timer.prefs.roundsBeforeLongBreak)
   const roundOf = timer.phase === 'focus' ? timer.cycleIndex + 1 : timer.cycleIndex || cycle
   const summary = [
-    showTimer ? `${PHASE_LABEL[timer.phase]} ${timer.status === 'paused' ? 'paused at' : ''} ${formatClock(timer.remaining)}` : '',
-    showMusic && p.track ? `${p.playing ? 'Playing' : 'Paused'}: ${p.track.title}` : '',
+    showTimer
+      ? timer.status === 'paused'
+        ? t('{phase} paused at {time}', { phase: t(PHASE_LABEL[timer.phase]), time: formatClock(timer.remaining) })
+        : `${t(PHASE_LABEL[timer.phase])}  ${formatClock(timer.remaining)}`
+      : '',
+    showMusic && p.track ? (p.playing ? t('Playing: {title}', { title: p.track.title }) : t('Paused: {title}', { title: p.track.title })) : '',
   ].filter(Boolean).join(', ')
 
   return (
@@ -178,7 +183,7 @@ export function Island() {
             <AnimatePresence mode="popLayout" initial={false}>
               {mode === 'alert' && alert && (
                 <motion.button key={`alert-${alert.id}`} {...content} type="button"
-                  aria-label={alert.link ? `${alert.title}. Open` : `${alert.title}. Dismiss`}
+                  aria-label={alert.link ? t('{title}. Open', { title: alert.title }) : t('{title}. Dismiss', { title: alert.title })}
                   onClick={() => {
                     dismissIslandAlert()
                     if (alert.link) void navigate(alert.link)
@@ -194,13 +199,13 @@ export function Island() {
 
               {mode === 'compact' && (
                 <motion.button key="compact" ref={toggleRef} {...content} type="button" aria-expanded={false}
-                  aria-label={`${summary}. Show controls`} onClick={() => setExpanded(true)}
+                  aria-label={t('{summary}. Show controls', { summary })} onClick={() => setExpanded(true)}
                   className={cn('flex h-9 items-center md:h-10', dropped ? 'gap-2 px-2.5' : 'gap-2.5 px-3')}>
                   {showTimer && (
                     <span className="flex items-center gap-2">
                       <Ring progress={timer.progress} size={20} stroke={3} color={phaseColor} track="var(--island-track)" />
                       <span className="hidden text-[12px] font-semibold text-island-muted sm:inline">
-                        {timer.phase === 'focus' ? 'Focus' : 'Break'}
+                        {timer.phase === 'focus' ? t('Focus') : t('Break')}
                       </span>
                       {/* Without the room for them, the circle alone tells how far the timer is. */}
                       {dropped < 1 && (
@@ -221,21 +226,21 @@ export function Island() {
               )}
 
               {mode === 'expanded' && (
-                <motion.div key="expanded" {...content} role="group" aria-label="Focus and music controls"
+                <motion.div key="expanded" {...content} role="group" aria-label={t('Focus and music controls')}
                   className="flex w-[min(380px,calc(100vw-1.5rem))] flex-col gap-3 p-3.5">
                   {showTimer && (
                     <div className="flex items-center gap-3">
                       <Ring progress={timer.progress} size={46} stroke={4} color={phaseColor} track="var(--island-track)" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[11px] font-semibold uppercase tracking-wider text-island-muted">
-                          {PHASE_LABEL[timer.phase]} · {roundOf}/{cycle}
+                          {t(PHASE_LABEL[timer.phase])} · {roundOf}/{cycle}
                         </div>
                         <RollingText value={formatClock(timer.remaining)} className="text-[26px] font-semibold leading-none" />
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <IslandButton label="Add a minute" onClick={timerActions.addMinute}><Plus /></IslandButton>
-                        <IslandButton label="Skip to the next phase" onClick={timerActions.skip}><StepForward /></IslandButton>
-                        <IslandButton big label={timer.running ? 'Pause timer' : 'Start timer'} onClick={timerActions.toggle}>
+                        <IslandButton label={t('Add a minute')} onClick={timerActions.addMinute}><Plus /></IslandButton>
+                        <IslandButton label={t('Skip to the next phase')} onClick={timerActions.skip}><StepForward /></IslandButton>
+                        <IslandButton big label={timer.running ? t('Pause timer') : t('Start timer')} onClick={timerActions.toggle}>
                           {timer.running ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}
                         </IslandButton>
                       </div>
@@ -251,18 +256,18 @@ export function Island() {
                           <div className="truncate text-[12px] text-island-muted">{p.track.artist || '—'}</div>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <IslandButton label="Previous track" onClick={player.prev}><SkipBack fill="currentColor" /></IslandButton>
-                          <IslandButton big label={p.playing ? 'Pause music' : 'Play music'} onClick={player.toggle}>
+                          <IslandButton label={t('Previous track')} onClick={player.prev}><SkipBack fill="currentColor" /></IslandButton>
+                          <IslandButton big label={p.playing ? t('Pause music') : t('Play music')} onClick={player.toggle}>
                             {p.playing ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}
                           </IslandButton>
-                          <IslandButton label="Next track" onClick={player.next}><SkipForward fill="currentColor" /></IslandButton>
+                          <IslandButton label={t('Next track')} onClick={player.next}><SkipForward fill="currentColor" /></IslandButton>
                         </div>
                       </div>
                       {!p.track.live && p.duration > 0 && (
                         <div className="flex items-center gap-2 text-[11px] font-medium text-island-muted tabular-nums">
                           <span>{formatSeconds(p.position)}</span>
-                          <Slider tone="island" label="Seek" className="flex-1" commit="release" value={p.position} max={p.duration} step={1}
-                            onChange={player.seek} valueText={(v) => `${formatSeconds(v)} of ${formatSeconds(p.duration)}`} />
+                          <Slider tone="island" label={t('Seek')} className="flex-1" commit="release" value={p.position} max={p.duration} step={1}
+                            onChange={player.seek} valueText={(v) => t('{position} of {duration}', { position: formatSeconds(v), duration: formatSeconds(p.duration) })} />
                           <span>{formatSeconds(p.duration)}</span>
                         </div>
                       )}
@@ -272,13 +277,13 @@ export function Island() {
                     {showTimer && (
                       <button type="button" onClick={() => open('/focus')}
                         className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full bg-island-control hover:bg-island-control-hover pointer-coarse:h-10">
-                        <Maximize2 className="h-3.5 w-3.5" /> Open Focus
+                        <Maximize2 className="h-3.5 w-3.5" /> {t('Open Focus')}
                       </button>
                     )}
                     {showMusic && (
                       <button type="button" onClick={() => open('/music')}
                         className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full bg-island-control hover:bg-island-control-hover pointer-coarse:h-10">
-                        <Maximize2 className="h-3.5 w-3.5" /> Open Music
+                        <Maximize2 className="h-3.5 w-3.5" /> {t('Open Music')}
                       </button>
                     )}
                   </div>

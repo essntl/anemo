@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
-import { Outlet, useLocation, useMatches } from 'react-router'
+import { Navigate, Outlet, useLocation, useMatches } from 'react-router'
 import { DialogHost } from '@/components/ui/DialogHost'
 import { ToastHost } from '@/components/ui/ToastHost'
 import { ReauthDialog } from '@/features/auth/ReauthDialog'
@@ -9,7 +9,9 @@ import { useAppEvents } from '@/features/chat/useAppEvents'
 import { useServiceWorkerLinks } from '@/features/notifications/useServiceWorkerLinks'
 import { Island } from '@/features/island/Island'
 import { CommandPalette } from '@/features/search/CommandPalette'
+import { isOffAddress, useOffPages } from '@/features/settings/navigation'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
+import { useLanguageSync } from '@/features/settings/useLanguageSync'
 import { ShareDialog } from '@/features/shares/ShareDialog'
 import { ShortcutSheet } from '@/features/shortcuts/ShortcutSheet'
 import { useHasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
@@ -23,6 +25,7 @@ import { useSidebar } from './sidebarStore'
 import { useBackToClose } from './useBackToClose'
 import { useSheetSwipe } from './useSheetSwipe'
 import { useSidebarSwipe } from './useSidebarSwipe'
+import { t } from '@/lib/i18n'
 
 /** On phones the sidebar slides in from the left (menu button, or swipe right); the
  *  scrim, Esc, navigating or a swipe left closes it. See useSidebarSwipe. */
@@ -46,7 +49,7 @@ function SidebarDrawer() {
           onPointerDownOutside={foldPagesFirst}
           className="drawer fixed inset-y-0 left-0 z-50 flex w-[min(85vw,20rem)] shadow-float focus:outline-none md:hidden"
         >
-          <RadixDialog.Title className="sr-only">Menu</RadixDialog.Title>
+          <RadixDialog.Title className="sr-only">{t('Menu')}</RadixDialog.Title>
           <Sidebar className="w-full pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]" onClose={() => setOpen(false)} />
         </RadixDialog.Content>
       </RadixDialog.Portal>
@@ -59,6 +62,7 @@ const SCOPED = ['/', '/home', '/tasks', '/calendar', '/documents', '/files', '/s
 
 export function AppLayout() {
   useAppearanceSync()
+  useLanguageSync()
   useAppEvents()
   useServiceWorkerLinks()
   useSidebarSwipe()
@@ -66,6 +70,8 @@ export function AppLayout() {
   useSheetSwipe()
   useBackToClose()
   const location = useLocation()
+  // A page that is turned off (Settings > Pages) is not part of the app: its address leads Home.
+  const off = isOffAddress(location.pathname, useOffPages())
   // Desktop: the sidebar can be folded to a strip of icons (its button, or Ctrl+\).
   const collapsed = useSidebar((s) => s.collapsed)
   useShortcut('app.sidebar', () => {
@@ -102,7 +108,7 @@ export function AppLayout() {
         {/* relative: anything absolutely placed inside a page is held (and clipped) here,
             so it can never make the whole window scroll. */}
         <main className="page relative min-h-0 flex-1 overflow-y-auto">
-          <Outlet />
+          {off ? <Navigate to="/home" replace /> : <Outlet />}
         </main>
         {/* Phones: the tabs along the bottom (a conversation keeps that edge for its message box). */}
         {!ownHeader && <MobileTabBar />}

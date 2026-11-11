@@ -5,6 +5,7 @@
  * lists them all for screen readers.
  */
 import { useId, useMemo, useState } from 'react'
+import { t } from '@/lib/i18n'
 import type { Palette } from './colors'
 import { describeChart, formatValue, niceTicks, type ChartSpec } from './chartSpec'
 
@@ -27,7 +28,7 @@ export function Chart({ spec, palette }: { spec: ChartSpec; palette: Palette }) 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-labelledby={`${titleId} ${descId}`}
       className="h-auto w-full max-w-[600px] select-none" style={font} onMouseLeave={() => setHover(null)}>
-      <title id={titleId}>{spec.title ?? 'Chart'}</title>
+      <title id={titleId}>{spec.title ?? t('Chart')}</title>
       <desc id={descId}>{describeChart(spec)}</desc>
       <rect width={W} height={H} fill={palette.surface} />
       {spec.title && (
@@ -208,7 +209,7 @@ function Pie({ spec, palette, top, hover, setHover }: PartProps) {
         {shown === null ? formatValue(total, spec.unit) : formatValue(values[shown], spec.unit)}
       </text>
       <text x={cxp} y={cyp + 14} textAnchor="middle" fontSize={12} fill={palette.muted}>
-        {shown === null ? 'Total' : `${spec.x[shown]} · ${Math.round((values[shown] / total) * 1000) / 10}%`}
+        {shown === null ? t('Total') : `${spec.x[shown]} · ${Math.round((values[shown] / total) * 1000) / 10}%`}
       </text>
     </g>
   )
