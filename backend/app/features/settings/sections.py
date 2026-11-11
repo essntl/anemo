@@ -87,6 +87,10 @@ class MusicSettings(BaseModel):
     # The music follows the focus timer: it plays while a focus session runs and
     # pauses for the breaks.
     play_while_focusing: bool = False
+    # YouTube tracks are fetched by this server and played as plain audio, so they keep
+    # playing while the app is out of sight (features/music/streams.py). Off, or when
+    # the server cannot fetch a track: YouTube's own embedded player.
+    server_audio: bool = True
 
 
 class WidgetLayout(BaseModel):

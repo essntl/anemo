@@ -28,6 +28,16 @@ function MusicSettingsCard() {
         </label>
         <label className="flex items-center justify-between gap-4 py-3">
           <span>
+            <span className="block text-[13.5px] font-medium">Keep playing in the background</span>
+            <span className="block text-[12px] text-muted">
+              YouTube tracks are fetched by your Anemo server and played as plain audio, so they go on when the app is out of sight
+              or the screen is off. Off, or when the server cannot fetch a track: YouTube’s own player, which stops then.
+            </span>
+          </span>
+          <Switch label="Keep playing in the background" checked={m.server_audio} onChange={(v) => save.mutate({ ...m, server_audio: v })} />
+        </label>
+        <label className="flex items-center justify-between gap-4 py-3">
+          <span>
             <span className="block text-[13.5px] font-medium">Play while focusing</span>
             <span className="block text-[12px] text-muted">The music starts with a focus session and pauses for the breaks.</span>
           </span>

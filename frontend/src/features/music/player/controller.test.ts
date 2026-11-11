@@ -38,7 +38,7 @@ vi.mock('@/api/client', () => ({
   unwrap: (x: unknown) => x,
 }))
 
-const { player, usePlayerStore, usePlayerRuntime, nextIndex, upNext, MAX_SKIPS } = await import('./controller')
+const { player, setPlayerPrefs, usePlayerStore, usePlayerRuntime, nextIndex, upNext, MAX_SKIPS } = await import('./controller')
 const { useIslandAlerts, dismissIslandAlert } = await import('@/features/island/alerts')
 
 function track(ref: string): Track {
@@ -48,11 +48,16 @@ function track(ref: string): Track {
 describe('music controller', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    // These are about the queue and YouTube's own player (the server's audio: serverAudio.test.ts).
+    setPlayerPrefs({ trackAlerts: true, serverAudio: false })
     fake.calls = []
     usePlayerStore.setState({ queue: ['a', 'b', 'c', 'd'].map(track), index: 0, shuffle: false, repeat: 'all', position: 0 })
     usePlayerRuntime.setState({ status: 'unstarted', loaded: false, error: null, blocked: false })
   })
   afterEach(() => {
+    // Nothing is left waiting to start the music again in the next test.
+    player.pause()
+    vi.advanceTimersByTime(120_000)
     while (useIslandAlerts.getState().current) dismissIslandAlert()
     vi.useRealTimers()
   })
@@ -106,19 +111,89 @@ describe('music controller', () => {
     expect(usePlayerStore.getState().index).toBe(3) // skipped again instead of stopping
   })
 
-  it('undoes a pause it did not ask for', () => {
+  /** The page goes out of sight (a phone switching apps) or comes back. */
+  function show(visible: boolean) {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (visible ? 'visible' : 'hidden') })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  it('undoes the pause that comes with the page going out of sight', () => {
     player.playIndex(0)
     fake.events!.onState('playing')
+    vi.advanceTimersByTime(10_000)
     fake.calls = []
-    fake.events!.onState('paused') // e.g. a phone hid the page
-    vi.advanceTimersByTime(400)
-    expect(fake.calls).toContain('play')
+    try {
+      show(false)
+      fake.events!.onState('paused') // the phone's browser stopped it
+      vi.advanceTimersByTime(400)
+      expect(fake.calls).toContain('play')
+      // Stopped again right after the try: it keeps trying, patiently.
+      fake.calls = []
+      fake.events!.onState('playing')
+      fake.events!.onState('paused')
+      vi.advanceTimersByTime(1200)
+      expect(fake.calls).toContain('play')
+    } finally {
+      show(true)
+    }
 
     fake.calls = []
     player.pause() // the user's own pause stays
     fake.events!.onState('paused')
     vi.advanceTimersByTime(60_000)
     expect(fake.calls).toEqual(['pause'])
+  })
+
+  it('leaves a pause from outside the app alone (a media key, the phone’s notification)', () => {
+    player.playIndex(0)
+    fake.events!.onState('playing')
+    vi.advanceTimersByTime(10_000)
+    fake.calls = []
+    // The key reaches the embedded player, not this app: it just reports that it stopped.
+    fake.events!.onState('paused')
+    vi.advanceTimersByTime(60_000)
+    expect(fake.calls).toEqual([])
+    expect(usePlayerRuntime.getState().status).toBe('paused')
+
+    // Also while the page has been out of sight for a while (music going on in another tab).
+    fake.events!.onState('playing') // the play key
+    vi.advanceTimersByTime(10_000)
+    try {
+      show(false)
+      vi.advanceTimersByTime(30_000)
+      fake.events!.onState('paused')
+      vi.advanceTimersByTime(60_000)
+      expect(fake.calls).toEqual([])
+    } finally {
+      show(true)
+    }
+  })
+
+  it('takes playing again after such a pause as wanted, so an interruption is undone again', () => {
+    player.playIndex(0)
+    fake.events!.onState('playing')
+    vi.advanceTimersByTime(10_000)
+    fake.events!.onState('paused') // the pause key
+    fake.events!.onState('playing') // the play key
+    vi.advanceTimersByTime(10_000)
+    fake.calls = []
+    try {
+      show(false)
+      fake.events!.onState('paused')
+      vi.advanceTimersByTime(400)
+      expect(fake.calls).toContain('play')
+    } finally {
+      show(true)
+    }
+  })
+
+  it('still nudges a player that stops while it is only just starting', () => {
+    player.playIndex(0)
+    fake.events!.onState('playing')
+    fake.calls = []
+    fake.events!.onState('paused') // within a moment of starting: a hiccup, not a key press
+    vi.advanceTimersByTime(400)
+    expect(fake.calls).toContain('play')
   })
 
   it('reorders, plays next and removes with undo', () => {

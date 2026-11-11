@@ -2700,6 +2700,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/music/audio/youtube/{video_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Youtube Audio
+         * @description A YouTube track as plain audio, for an <audio> element: fetched by this server and
+         *     passed on, byte ranges included (so the player can seek). See features/music/streams.py.
+         */
+        get: operations["youtube_audio_api_music_audio_youtube__video_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/music/audio/youtube/{video_id}/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare Youtube Audio
+         * @description Look up where a track's audio is ahead of time (the track that plays next), so it
+         *     starts without the wait.
+         */
+        post: operations["prepare_youtube_audio_api_music_audio_youtube__video_id__prepare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notifications": {
         parameters: {
             query?: never;
@@ -5565,6 +5607,11 @@ export interface components {
              * @default false
              */
             play_while_focusing: boolean;
+            /**
+             * Server Audio
+             * @default true
+             */
+            server_audio: boolean;
         };
         /** NewDocument */
         NewDocument: {
@@ -14518,6 +14565,83 @@ export interface operations {
                 "application/json": components["schemas"]["PlayerAnswer"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    youtube_audio_api_music_audio_youtube__video_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Range?: string | null;
+            };
+            path: {
+                /** @description A YouTube video id */
+                video_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mp4": unknown;
+                };
+            };
+            /** @description Partial Content */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mp4": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_youtube_audio_api_music_audio_youtube__video_id__prepare_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A YouTube video id */
+                video_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {

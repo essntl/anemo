@@ -8,15 +8,22 @@
  *  - the server: the music library (every track added) and playlists, so they are the
  *    same on every device. Tracks are saved there when they are added (`trackId`).
  *
+ * YouTube tracks have two ways to play. Through the server (Settings → Music, on by
+ * default): the Anemo server fetches the video's audio and it plays in the plain audio
+ * element, which keeps going while the app is out of sight and answers the media keys
+ * and the lock screen. Or through YouTube's own embedded player: when that setting is
+ * off, for live streams, and for any track the server could not fetch.
+ *
  * Kept from Pomidori on purpose:
  *  - resume-if-interrupted: some players (YouTube on phones) pause themselves when the
- *    page is hidden; a pause the user did not ask for is undone, patiently.
+ *    page is hidden; that pause is undone, patiently. A pause that comes at any other
+ *    time is somebody's doing (a media key, the phone's media notification) and stands.
  *  - skipping unplayable tracks: up to 3 in a row, then it stops and says why.
  *  - one hidden player host for the whole session (host.ts).
  */
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { api, unwrap } from '@/api/client'
+import { api, errorMessage, unwrap } from '@/api/client'
 import { toast } from '@/components/ui/toast'
 import { islandAlert } from '@/features/island/alerts'
 import { AudioAdapter } from './audio'
@@ -70,8 +77,77 @@ export const usePlayerRuntime = create<PlayerRuntime>(() => ({
 
 /** Settings → Music (copied in by <PlayerEngine>). */
 let trackAlerts = true
-export function setPlayerPrefs(prefs: { trackAlerts: boolean }): void {
+let serverAudio = true
+export function setPlayerPrefs(prefs: { trackAlerts: boolean; serverAudio: boolean }): void {
   trackAlerts = prefs.trackAlerts
+  serverAudio = prefs.serverAudio
+}
+
+/* ───────────── YouTube through the server ───────────── */
+
+/** Videos the server could not fetch in this session: they play through YouTube's own player. */
+const serverRefused = new Set<string>()
+/** That many in a row and the server is left alone for the rest of the session. */
+export const MAX_SERVER_FAILURES = 3
+let serverFailures = 0
+let serverGivenUp = false
+let serverProblemTold = false
+let preparedFor: string | null = null
+
+/** Whether this track's audio comes from the Anemo server (and plays in the audio element). */
+export function viaServer(t: Pick<Track, 'source' | 'ref' | 'live'>): boolean {
+  return serverAudio && !serverGivenUp && t.source === 'youtube' && !t.live && !serverRefused.has(t.ref)
+}
+
+/** Which player a track goes to. */
+function engineOf(t: Pick<Track, 'source' | 'ref' | 'live'>): SourceKind {
+  return viaServer(t) ? 'audio' : t.source
+}
+
+/** The track as its player needs it: with the server's address for its audio. */
+function playable(t: Track): Track {
+  return viaServer(t) ? { ...t, url: `/api/music/audio/youtube/${t.ref}` } : t
+}
+
+/** Says once, in the server's own words, why YouTube's player is used after all. */
+async function tellServerProblem(videoId: string) {
+  if (serverProblemTold) return
+  serverProblemTold = true
+  let reason = 'Anemo’s server could not fetch the audio.'
+  try {
+    // Asked for one byte: all that is wanted is the error it answers with.
+    const answer = await api.GET('/api/music/audio/youtube/{video_id}', {
+      params: { path: { video_id: videoId }, header: { Range: 'bytes=0-0' } },
+      parseAs: 'stream',
+    })
+    // (A body that was already read as the error cannot be cancelled: nothing to do then.)
+    void answer.response.body?.cancel().catch(() => undefined)
+    unwrap(answer)
+  } catch (err) {
+    reason = errorMessage(err)
+  }
+  toast({ message: `Playing through YouTube’s own player, which stops when the app is out of sight. ${reason}`, duration: 10_000 })
+}
+
+/** The server could not fetch this track: the same track again, through YouTube's own player. */
+function fallBackToEmbed(track: Track) {
+  serverRefused.add(track.ref)
+  serverFailures++
+  if (serverFailures >= MAX_SERVER_FAILURES) serverGivenUp = true
+  void tellServerProblem(track.ref)
+  const wanted = wantsPlayback
+  const { index, position } = usePlayerStore.getState()
+  loadIndex(index, wanted, usePlayerRuntime.getState().position || position)
+}
+
+/** Has the server look up the next track's audio now, so it starts without the wait. */
+function prepareNext() {
+  const next = upNext(usePlayerStore.getState())?.track
+  if (!next || !viaServer(next) || preparedFor === next.ref) return
+  preparedFor = next.ref
+  void api
+    .POST('/api/music/audio/youtube/{video_id}/prepare', { params: { path: { video_id: next.ref } } })
+    .catch(() => undefined) // it is looked up when it plays, then
 }
 
 const adapters: Partial<Record<SourceKind, Adapter>> = {}
@@ -79,8 +155,31 @@ let activeSource: SourceKind | null = null
 let poll: ReturnType<typeof setInterval> | null = null
 let lastAnnounced: string | null = null
 
-/* Whether the user wants music playing; a pause they did not ask for is undone. */
+/* Whether the user wants music playing; a pause that merely happened to it is undone. */
 let wantsPlayback = false
+
+/*
+ * Whose pause is it, when a player stops without this app having asked?
+ *  - The page went out of sight: some players stop right then, and stop again right after
+ *    each try to start them while it stays out of sight. That is an interruption.
+ *  - Otherwise, after it had been playing for a moment, it is somebody's doing: a media
+ *    key, a headset button, the pause button of the phone's media notification. Those
+ *    reach the embedded player directly, not this app, and they stand.
+ */
+const INTERRUPTION_WINDOW_MS = 1500
+/** How long it must have been playing for a pause to count as somebody's (not a hiccup while starting). */
+const STEADY_MS = 1500
+let hiddenAt = -Infinity
+let triedAt = -Infinity
+let playingSince = 0
+/** The music was paused from outside the app: when it plays again, that was asked for too. */
+let pausedOutside = false
+
+function interrupted(): boolean {
+  if (typeof document === 'undefined' || document.visibilityState === 'visible') return false
+  const now = Date.now()
+  return now - hiddenAt < INTERRUPTION_WINDOW_MS || now - triedAt < INTERRUPTION_WINDOW_MS
+}
 let resumeTries = 0
 let resumeTimer: ReturnType<typeof setTimeout> | null = null
 /** Gaps between tries: quick at first, then patient, so a background tab doesn't use them all at once. */
@@ -96,7 +195,8 @@ function resumeIfInterrupted() {
     const s = usePlayerRuntime.getState().status
     if (!wantsPlayback || !t || s === 'playing' || s === 'buffering') return
     resumeTries++
-    adapterFor(t.source).play()
+    triedAt = Date.now()
+    adapterFor(engineOf(t)).play()
     // If the player stays paused without saying so again, keep trying.
     setTimeout(() => {
       if (usePlayerRuntime.getState().status === 'paused') resumeIfInterrupted()
@@ -118,7 +218,10 @@ function userStarted() {
 if (typeof document !== 'undefined') {
   // Back to the tab: pick up again if something paused us while we were away.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return
+    if (document.visibilityState !== 'visible') {
+      hiddenAt = Date.now()
+      return
+    }
     resumeTries = 0
     if (wantsPlayback && usePlayerRuntime.getState().status === 'paused') resumeIfInterrupted()
   })
@@ -213,13 +316,24 @@ function eventsFor(source: SourceKind): AdapterEvents {
   return {
     onState(state) {
       if (activeSource !== source) return
+      const before = usePlayerRuntime.getState().status
       setRuntime({ status: state, ...(state === 'playing' ? { error: null, blocked: false } : {}) })
       if (state === 'playing') {
+        if (before !== 'playing') playingSince = Date.now()
+        // Started again from where it was paused: outside the app (the play key).
+        if (pausedOutside) {
+          pausedOutside = false
+          wantsPlayback = true
+        }
         resumeTries = 0
         failedInARow = 0
         blockedInARow = 0
         startPolling()
         const t = currentTrack()
+        if (t && source === 'audio' && viaServer(t)) {
+          serverFailures = 0
+          prepareNext()
+        }
         if (t && lastAnnounced !== t.id) {
           lastAnnounced = t.id
           if (trackAlerts) {
@@ -231,7 +345,14 @@ function eventsFor(source: SourceKind): AdapterEvents {
         handleEnded()
       } else if (state === 'paused') {
         sample()
-        resumeIfInterrupted()
+        const steady = before === 'playing' && Date.now() - playingSince >= STEADY_MS
+        if (wantsPlayback && steady && !interrupted()) {
+          // Somebody paused it where this app does not see the press: it stays paused.
+          wantsPlayback = false
+          pausedOutside = true
+        } else {
+          resumeIfInterrupted()
+        }
       }
       updateMediaSession()
     },
@@ -254,6 +375,8 @@ function eventsFor(source: SourceKind): AdapterEvents {
       if (activeSource !== source) return
       const wanted = wantsPlayback
       const failed = currentTrack()
+      // Not the track's fault: the server could not fetch it. YouTube's own player can try.
+      if (source === 'audio' && failed && viaServer(failed)) return fallBackToEmbed(failed)
       failedInARow++
       blockedInARow = kind === 'blocked' ? blockedInARow + 1 : 0
       // Like other players: skip a track that can't play instead of stopping the queue.
@@ -313,12 +436,14 @@ function loadIndex(index: number, autoplay: boolean, startAt = 0) {
   if (!track) return
   usePlayerStore.setState({ index, position: startAt })
   lastSaved = startAt
-  if (activeSource && activeSource !== track.source) adapters[activeSource]?.stop()
-  activeSource = track.source
+  const engine = engineOf(track)
+  if (activeSource && activeSource !== engine) adapters[activeSource]?.stop()
+  activeSource = engine
   wantsPlayback = autoplay
+  pausedOutside = false
   resumeTries = 0
   setRuntime({ position: startAt, duration: 0, loaded: true, error: null, blocked: false, status: autoplay ? 'buffering' : 'paused' })
-  adapterFor(track.source).load(track, autoplay, track.live ? 0 : startAt)
+  adapterFor(engine).load(playable(track), autoplay, track.live ? 0 : startAt)
   updateMediaSession()
 }
 
@@ -529,16 +654,18 @@ export const player = {
     userStarted()
     const rt = usePlayerRuntime.getState()
     // Nothing loaded yet (a reload), or the player holds nothing playable after an error.
-    if (!rt.loaded || activeSource !== t.source || rt.error) {
+    if (!rt.loaded || activeSource !== engineOf(t) || rt.error) {
       loadIndex(usePlayerStore.getState().index, true, rt.loaded ? 0 : usePlayerStore.getState().position)
       return
     }
     wantsPlayback = true
+    pausedOutside = false
     resumeTries = 0
-    adapterFor(t.source).play()
+    adapterFor(engineOf(t)).play()
   },
   pause() {
     wantsPlayback = false
+    pausedOutside = false
     if (activeSource) adapters[activeSource]?.pause()
     sample()
   },
