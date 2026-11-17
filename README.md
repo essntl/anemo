@@ -731,15 +731,19 @@ Update with `docker compose pull && docker compose up -d` in the same folder
 
 Installing through the ZimaOS screen (App Store → **+** → *Install a customized
 app* → *Import*) is possible, but ZimaOS rewrites the file and keeps only one
-network per service, which cuts the worker off from the sandbox, the browser and
-the MCP host. The terminal keeps the file as written.
+network per service, which cuts the worker off from the sandbox, the browser, the
+MCP host and the Claude runner. The terminal keeps the file as written.
 
 Data is kept in `/DATA/AppData/anemo` (workspace, uploads, database).
 
+Anemo has one user. For another person, run a second copy next to the first:
+[docs/deployment.md](docs/deployment.md#more-than-one-copy-on-a-server).
+
 ### Behind Nginx Proxy Manager
 
-Create a proxy host pointing at `http://<docker-host>:8080` (or at `app:8080` if
-you attach the `app` service to NPM's Docker network). Recommended custom config,
+Create a proxy host pointing at `http://<docker-host>:8080` (port `8484` with the
+ZimaOS file; or at `app:8080` if you attach the `app` service to NPM's Docker
+network). Recommended custom config,
 so live agent streams are not buffered or cut off:
 
 ```nginx

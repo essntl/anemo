@@ -42,14 +42,31 @@ To run it every night, add a line to the host's crontab:
 
 Old backups are not removed for you. Each one is a full copy.
 
-### Installs without a compose file in reach (ZimaOS / CasaOS)
+### ZimaOS / CasaOS (prebuilt images)
 
-Tell the scripts the project name instead. ZimaOS picks the name itself; find it with
-`docker compose ls` (it looks like `compose-4d75…` or `anemo`):
+There is no checkout on the server, so fetch the two scripts once into the folder
+with your `docker-compose.yml`, and run them from there:
+
+```bash
+cd /DATA/AppData/anemo
+curl -fsSLO https://raw.githubusercontent.com/essntl/anemo/main/scripts/backup.sh
+curl -fsSLO https://raw.githubusercontent.com/essntl/anemo/main/scripts/restore.sh
+sh backup.sh /DATA/Backups
+```
+
+Restore the same way: `sh restore.sh /DATA/Backups/anemo-<date>-<time>`. Where this
+page says `.env`, your settings are in `docker-compose.yml` itself: keep a copy of it.
+
+If you installed through the ZimaOS screen, there is no compose file in a folder of
+yours. For a backup, the project name is enough; ZimaOS picks it itself, find it with
+`docker compose ls` (it looks like `compose-4d75…`):
 
 ```bash
 COMPOSE="docker compose -p <name>" sh backup.sh /DATA/Backups
 ```
+
+A restore also needs the file (it starts containers): export it from ZimaOS and name
+both, `COMPOSE="docker compose -p <name> -f <exported file>" sh restore.sh <folder>`.
 
 ## Restore
 

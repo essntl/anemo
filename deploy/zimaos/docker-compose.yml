@@ -27,10 +27,11 @@
 #
 # The ZimaOS screen (App Store > "+" > Install a customized app > Import) also
 # works for a first start, BUT ZimaOS rewrites the file and keeps only ONE network
-# per service. The worker, the app, the internet sandbox, the browser and the MCP
-# host each need two or more (see `networks:` on each service). Without them
-# agents cannot run commands, use the browser or start MCP servers. If you install
-# that way, export the file afterwards and compare the `networks:` lines.
+# per service. The worker, the app, the internet sandbox, the browser, the MCP host
+# and the claude-runner each need two or more (see `networks:` on each service).
+# Without them agents cannot run commands, use the browser, start MCP servers or
+# use your Claude subscription. If you install that way, export the file afterwards
+# and compare the `networks:` lines.
 #
 # BEFORE YOU START, replace every CHANGE_ME (there are four):
 #   APP_SECRET_KEY     at least 32 random characters (letters and digits)
@@ -48,6 +49,11 @@
 # provider keys cannot be read again). The Claude Code login is kept apart, in the
 # claude-config volume, so it is not in that folder: it is a credential for your
 # Claude account; if you back it up, protect the copy like a password.
+# Backup and restore scripts: docs/backup.md.
+#
+# A SECOND COPY on the same server (for someone else): give it another `name:`,
+# port and /DATA/AppData folder, its own passwords and secret key, and its own
+# network addresses. See "More than one copy on a server" in docs/deployment.md.
 
 name: anemo
 

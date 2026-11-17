@@ -7,7 +7,8 @@
 # Use it on an install of the same (or a newer) version, started at least once, and
 # with the same APP_SECRET_KEY as the install the backup came from: otherwise
 # saved API keys cannot be decrypted and have to be entered again.
-# For an install without a compose file: COMPOSE="docker compose -p <name>" sh restore.sh <folder>
+# For an install made by a tool such as ZimaOS, name the project and its exported compose
+# file: COMPOSE="docker compose -p <name> -f <file>" sh restore.sh <folder>
 set -eu
 # Git Bash on Windows would otherwise rewrite container paths like /data.
 export MSYS_NO_PATHCONV=1
