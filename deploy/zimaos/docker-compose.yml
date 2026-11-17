@@ -1,5 +1,5 @@
-# Anemo on ZimaOS (or CasaOS), using the prebuilt x86-64 images from GitHub's
-# registry (built from the main branch by .github/workflows/images.yml):
+# Anemo on ZimaOS (or CasaOS), using the prebuilt images from GitHub's registry
+# (x86-64 and ARM64, built from the main branch by .github/workflows/images.yml):
 #   ghcr.io/essntl/anemo                the app and its background worker
 #   ghcr.io/essntl/anemo-sandbox        the isolated shell that agents run commands in
 #   ghcr.io/essntl/anemo-browser        a browser that agents can drive (about 1.3 GB)
@@ -320,7 +320,7 @@ services:
   # CLI. Claude Code acts only as the model: every tool call comes back to the
   # worker and goes through Settings > Agent Permissions. Only the worker can reach
   # it; it has no workspace, no database and none of the app's secrets. The login
-  # stays in the claude-config volume, mounted here only. x86-64 image.
+  # stays in the claude-config volume, mounted here only.
   claude-runner:
     image: ghcr.io/essntl/anemo-claude-runner:latest
     restart: unless-stopped
@@ -386,6 +386,7 @@ networks:
 x-casaos:
   architectures:
     - amd64
+    - arm64
   main: app
   author: essntl
   category: Utilities
