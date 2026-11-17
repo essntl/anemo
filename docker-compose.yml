@@ -4,10 +4,10 @@
 #
 # Only the `app` service publishes a port. Point Nginx Proxy Manager at it.
 
-name: ai-workspace
+name: anemo
 
 x-backend: &backend
-  image: ai-workspace-backend:${APP_VERSION:-latest}
+  image: anemo-backend:${APP_VERSION:-latest}
   build:
     context: .
     dockerfile: backend/Dockerfile
@@ -48,7 +48,7 @@ x-backend: &backend
 # the workspace mounted. Each sandbox sits on its own internal network shared only
 # with the worker, so it can't reach the database, Valkey, the app or the other sandbox.
 x-sandbox: &sandbox
-  image: ai-workspace-sandbox:${APP_VERSION:-latest}
+  image: anemo-sandbox:${APP_VERSION:-latest}
   build:
     context: ./sandbox
     args:
@@ -188,7 +188,7 @@ services:
   # no workspace and none of the app's secrets.
   mcp-host:
     profiles: ["mcp"]
-    image: ai-workspace-mcp-host:${APP_VERSION:-latest}
+    image: anemo-mcp-host:${APP_VERSION:-latest}
     build:
       context: ./mcp-host
       args:
@@ -220,7 +220,7 @@ services:
   # you allowed them in Settings > Web & Search. No workspace, no database, no secrets.
   browser:
     profiles: ["browser"]
-    image: ai-workspace-browser:${APP_VERSION:-latest}
+    image: anemo-browser:${APP_VERSION:-latest}
     build:
       context: ./browser
       args:
@@ -258,7 +258,7 @@ services:
     # Built here by default. To pull the prebuilt x86-64 image instead, set
     # CLAUDE_RUNNER_IMAGE=ghcr.io/essntl/anemo-claude-runner:latest in .env and run
     # `docker compose --profile claude pull claude-runner`.
-    image: ${CLAUDE_RUNNER_IMAGE:-ai-workspace-claude-runner:${APP_VERSION:-latest}}
+    image: ${CLAUDE_RUNNER_IMAGE:-anemo-claude-runner:${APP_VERSION:-latest}}
     build:
       context: ./claude-runner
       args:

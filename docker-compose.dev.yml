@@ -4,7 +4,7 @@
 
 services:
   migrate:
-    image: ai-workspace-backend:dev
+    image: anemo-backend:dev
     build:
       args:
         INSTALL_DEV: "true"
@@ -12,7 +12,7 @@ services:
       - ./backend:/app
 
   app:
-    image: ai-workspace-backend:dev
+    image: anemo-backend:dev
     build:
       args:
         INSTALL_DEV: "true"
@@ -35,7 +35,7 @@ services:
       - browser-token:/run/browser-token:ro
 
   worker:
-    image: ai-workspace-backend:dev
+    image: anemo-backend:dev
     build:
       args:
         INSTALL_DEV: "true"
