@@ -35,8 +35,8 @@ Then:
 docker compose up -d
 ```
 
-Open `http://<server>:8080` and log in. Go to **Settings → Providers & Models**, add a
-provider, add models, and pick a default chat model. Until a default is chosen the
+Open `http://<server>:8080` and log in. The first time, a short setup opens (see
+[First-time setup](#first-time-setup) below). Until a default chat model is chosen the
 message box stays disabled and tells you so.
 
 ### Optional parts
@@ -53,13 +53,79 @@ in `.env` (add `claude` for the Claude runner).
 Web search needs a SearXNG instance of your own with the JSON format enabled; set
 its address in **Settings → Web & Search**.
 
+## First-time setup
+
+The first time you log in, a short **setup** opens:
+
+1. **Model provider**: add one (OpenAI, Anthropic, OpenRouter, any OpenAI-compatible
+   server such as Ollama, or your Claude subscription), use **Add models** to pick its
+   models, and choose the model for chats.
+2. **Helper models** (optional): Summaries, Memory and Embeddings, with suggestions
+   from the models you added (a small model for the first two).
+3. **You**: your time zone, and whether Anemo opens on Home or a new chat.
+4. **Optional parts**: whether the sandboxes, the browser, the MCP host, the Claude
+   runner and SearXNG are running, and for each one that isn't, the command that
+   starts it.
+5. **Notifications** (optional): push on this device, or a Discord channel.
+
+Every step can be skipped, and **Not now** leaves it for later: it then waits in
+**Settings → Advanced** (*Continue setup*), and the step you left off at is kept, also
+for another device. You can go through it again there after finishing. It sets
+nothing you couldn't set in Settings yourself; an install that already has a
+provider never sees it on its own.
+
+Each model shows what it can do (tools, vision, reasoning, …). OpenRouter reports
+this per model. Other providers do not, so Anemo assumes a chat model can use tools
+(which Agent mode needs) and guesses the rest from its name. If a provider then
+refuses tools, Anemo switches that off for the model by itself. Press a model's
+tags to correct any of them by hand.
+
+Provider changes are security-sensitive: if you logged in more than 15 minutes ago
+you will be asked to confirm your password.
+
+## Prebuilt images
+
+Images for 64-bit Intel/AMD and ARM machines (x86-64 and ARM64: Apple Silicon,
+Raspberry Pi 4/5, ARM servers) are built from `main` on every change and published to
+GitHub's registry: `ghcr.io/essntl/anemo:latest` (app and worker),
+`ghcr.io/essntl/anemo-sandbox` (the shell sandbox), `-browser` (the agents' browser),
+`-mcp-host` (local MCP servers) and `-claude-runner` (the Claude subscription
+provider). Older builds are also on Docker Hub (`essntl/anemo`).
+
+### Prebuilt images, no build
+
+[`docker-compose.prebuilt.yml`](../docker-compose.prebuilt.yml) runs Anemo from the
+images on GitHub's registry (x86-64 and ARM64) with no checkout, no build and no
+`.env`. Save it in a folder of its own as `docker-compose.yml`, replace every
+`CHANGE_ME` (the comments at the top say what goes where), then run
+`docker compose pull && docker compose up -d` there and open `http://<server>:8484`.
+Your data is kept next to the file (`workspace/`, `data/`, `postgres/`).
+
 ## ZimaOS / CasaOS
 
-See the README section *ZimaOS / CasaOS* and
-[`deploy/zimaos/docker-compose.yml`](../deploy/zimaos/docker-compose.yml): one file
-with prebuilt images, no `.env` needed. That file has no profiles: the browser, the
-MCP host and the Claude runner are always started, so where the app suggests a
-command with `--profile …`, plain `docker compose up -d` does the same.
+[`deploy/zimaos/docker-compose.yml`](../deploy/zimaos/docker-compose.yml) uses the
+prebuilt images and needs no `.env` file:
+
+1. Open the file and replace every `CHANGE_ME` (the comments at the top say what
+   goes where), and set `PUBLIC_URL` to your ZimaOS address with port `8484`.
+2. From a terminal on the server, save it as `/DATA/AppData/anemo/docker-compose.yml`
+   and run `docker compose up -d` in that folder.
+3. Open `http://<your-zimaos-address>:8484` and log in.
+
+Update with `docker compose pull && docker compose up -d` in the same folder
+(Settings → Advanced tells you when there is something new; see
+[Updating](#updating)).
+
+Installing through the ZimaOS screen (App Store → **+** → *Install a customized
+app* → *Import*) is possible, but ZimaOS rewrites the file and keeps only one
+network per service, which cuts the worker off from the sandbox, the browser, the
+MCP host and the Claude runner. The terminal keeps the file as written.
+
+Data is kept in `/DATA/AppData/anemo` (workspace, uploads, database).
+
+That file has no profiles: the browser, the MCP host and the Claude runner are always
+started, so where the app suggests a command with `--profile …`, plain
+`docker compose up -d` does the same.
 
 ## More than one copy on a server
 
@@ -124,8 +190,9 @@ A copy that already runs keeps the addresses it has and needs no change.
 
 ## Behind Nginx Proxy Manager
 
-Create a proxy host for `http://<docker-host>:8080` (port `8484` with the ZimaOS
-file) with this custom configuration,
+Create a proxy host for `http://<docker-host>:8080` (port `8484` with the prebuilt or
+ZimaOS file; or `app:8080` if you attach the `app` service to NPM's Docker network)
+with this custom configuration,
 so live answers are not buffered or cut off:
 
 ```nginx
@@ -169,10 +236,19 @@ update notice; without it everything works, but Settings → Advanced can't tell
 whether there is something newer. With the prebuilt images (ZimaOS):
 `docker compose pull && docker compose up -d`. The images carry their commit.
 
-About once a day the worker asks GitHub's API how many commits `main` has that this
-build doesn't (`compare/<commit>...main`) and Settings → Advanced shows them. Switch
-it off there, or with `UPDATE_CHECK=false` in `.env`; `UPDATE_REPO` (default
-`essntl/anemo`) points it at another repository. Nothing is ever installed by itself.
+Anemo has no numbered releases: the images are rebuilt from `main` on every change,
+and each build records the commit it was made from. About once a day the worker asks
+GitHub's API how many commits `main` has that this build doesn't
+(`compare/<commit>...main`). When there are some, **Settings → Advanced** lists them
+(newest first) with the command that updates your kind of install, and Home's **Needs
+you** shows *An Anemo update is available* until you put it away (*Not now*; it comes
+back a week later if there are newer changes). After you update, a **What's new** card
+lists what changed since the version you had, once.
+
+The check is one request to GitHub's API that carries nothing about you (no cookies,
+no ids, a fixed User-Agent). Switch it off in Settings → Advanced, or for good with
+`UPDATE_CHECK=false` in `.env`; `UPDATE_REPO` (default `essntl/anemo`) points it at
+another repository, such as your fork. Nothing is ever installed by itself.
 
 **Installed from a checkout before the project was renamed?** The compose project
 used to be called `ai-workspace`, and Docker names the volumes after it
@@ -198,6 +274,21 @@ version after the database was upgraded means restoring that backup.
 | Model provider | The call is retried, then fallback models are tried, then the run fails with a clear message and a retry button. |
 | Browser / MCP host / SearXNG | Only the tools that need them fail, with a message that says why. |
 | Nobody answers an approval | It expires after 24 hours and counts as denied; the agent carries on without that action. |
+
+## Services
+
+| Service    | Purpose                                              |
+|------------|------------------------------------------------------|
+| `app`      | FastAPI API + the built web UI (only published port) |
+| `worker`   | Runs chat/agent jobs, automations and indexing       |
+| `postgres` | PostgreSQL 17 + pgvector — all durable state         |
+| `valkey`   | Live event streams and control signals (ephemeral)   |
+| `migrate`  | Applies database migrations, then exits              |
+| `sandbox`  | Runs agent shell commands, with no network           |
+| `sandbox-net` | Runs agent shell commands that need the internet  |
+| `browser`  | Optional (`--profile browser`): a browser agents can drive |
+| `mcp-host` | Optional (`--profile mcp`): runs local MCP servers   |
+| `claude-runner` | Optional (`--profile claude`): Claude Code sessions for the Claude subscription provider |
 
 ## Where the data lives
 

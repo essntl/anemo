@@ -1,679 +1,98 @@
-# Anemo
-
-[![Docker Hub](https://img.shields.io/docker/pulls/essntl/anemo?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/essntl/anemo)
-
-**Anemo** is a self-hosted, single-user AI workspace and agent operating environment: chat,
-autonomous agents with a granular permission system, persistent memory,
-documents, files, tasks, calendar and scheduled automations — deployed with
-Docker Compose on a homelab.
-
-> Status: **1.0**. All phases in `docs/architecture.md` are built: streaming chat run by a
-> background worker (survives reloads and restarts), **Agent mode** with a
-> server-enforced permission system and approvals, a **file manager**, **documents**,
-> **tasks** and a **calendar**, a **memory** you control, a sandboxed **shell**, **web
-> search**, a **browser** for agents, **MCP servers**, **sub-agents**, scheduled
-> **automations** with **notifications**, **search** across everything and **usage**
-> numbers, plus a **Home** page of widgets, a **focus timer**, a **music** player, the
-> **Dynamic Island** and **stats**. Works on phones and can be installed to your home screen.
-
-Not built yet: the OpenAI *Responses* API (OpenAI works through the chat completions
-adapter), and searching inside workspace files that are not documents.
-
-Guides: [deployment](docs/deployment.md) · [backup and restore](docs/backup.md) ·
-[security and permissions](docs/security.md) · [architecture](docs/architecture.md) ·
-[Claude subscription](docs/claude-code.md) · [roadmap](docs/roadmap.md)
-
-### Chat vs. Agent mode
-
-**Chat** answers directly and never uses tools. **Agent** may use tools (today:
-planning; listing, reading, writing, editing, moving and deleting workspace
-files; running shell commands), but every tool call is checked on
-the server against **Settings → Agent Permissions**: per category you choose
-*Never*, *Always ask*, *Ask for dangerous actions*, *Allowed in workspace* or
-*Fully autonomous*. When an action needs approval the run pauses (no worker is held)
-and an approval card appears in the chat: *Allow once*, *Allow for this run* (same
-kind of action, same folder) or *Deny*. Paths outside the workspace and anything
-touching settings or secrets are always refused, whatever the settings say.
-
-### Projects and organising chats
-
-A **project** keeps one piece of work together: its chats, tasks, calendar events,
-documents and files. Pick one in the switcher at the top of the sidebar and every
-screen narrows to it; **All projects** shows everything again.
-
-- New chats, tasks and events are created in the chosen project. A project's files live
-  in `projects/<name>/` and its documents in `documents/<name>/`; renaming a project
-  keeps those folders, and deleting it leaves them (and its chats, tasks and events)
-  in place, without a project.
-- A project can have **instructions** for the assistant (added to every chat in it, in
-  Chat and Agent mode) and a default model and agent profile.
-- It is a way to look at your data, not a wall: what an agent may touch is still decided
-  by Settings → Agent Permissions and the folder access under Settings → Workspace.
-
-Chats can be filed in a project, given **tags**, marked as **favorites** and
-**archived**. **All chats** lists every chat with search, filters, sorting, and actions
-on several at once. In the sidebar the chats take the free room and scroll on
-their own; the pages (Files, Tasks, Runs, …) are pinned in a grid under them. On a
-desktop the whole sidebar can be folded to a strip of icons (the button next to the
-name, or Ctrl+\), which leaves more room for the page.
-
-A **temporary chat** (the switch on the new-chat page) is listed under *Temporary* in
-the sidebar with the time it has left, and is deleted 5 minutes after its last message
-(never while an answer is still being written). Nothing is remembered from it.
-**Keep chat** turns it into an ordinary chat.
-
-To clear out several chats quickly, hold **Shift** with the mouse over the chat list
-in the sidebar: every chat gets a delete button that deletes it at once, without
-asking.
-
-In a chat you can:
-
-- **reference another chat** (the button next to the paperclip): the assistant gets that
-  chat as background, in full when it is short and as a summary when it is long. The
-  summary is written once by the summarization model and reused;
-- **edit** your last message and have it answered again;
-- **branch** from any answer into a new chat that starts as a copy up to that point;
-- **download** the chat as Markdown or **save it as a document** in the workspace;
-- **share** it by link (below).
-
-### Files in chats
-
-**Attach any file** with the paperclip, by dropping it on the composer or by pasting it
-(up to 10 per message, 25 MB each). A paste works anywhere on the chat page, not only in
-the message box; a pasted screenshot is named "Pasted image" with the time. A message
-can be just files: **Send** works without writing anything. What the assistant gets
-depends on the file:
-
-| File | What the model gets |
-|---|---|
-| Images (PNG, JPEG, GIF, WebP) | the image itself, for models that can see images |
-| PDF | its text (no OCR for scanned pages) |
-| Word (`.docx`) | paragraphs, headings and tables |
-| Excel (`.xlsx`, `.xlsm`) | every sheet as CSV (the last calculated values; first 2,000 rows) |
-| PowerPoint (`.pptx`) | the text and speaker notes of each slide |
-| Zip | the list of files, and the text of small text files in it |
-| Text, Markdown, code, CSV, JSON, ... | the text |
-| Anything else (`.xls`, `.sqlite`, audio, ...) | its name, type and size only |
-
-In **Agent mode** the agent can work on the file itself, not just read it:
-`save_attachment` copies an attachment into the workspace (it needs *Create and edit
-files*), where it can change it with Python in the shell, unpack a zip with
-`extract_zip`, and so on.
-
-**The agent can give you files**, of any kind: spreadsheets, PDFs, Word and PowerPoint
-files, zip bundles, standalone scripts, charts. It creates them in the workspace (the
-shell sandbox has pandas, openpyxl, XlsxWriter, python-docx, python-pptx, reportlab,
-pypdf and matplotlib, and `zip`), packs several into one with `create_zip`, and hands
-them over with `attach_file`: they appear as downloads under its answer (up to 100 MB
-each, 20 per answer). An attached file is a copy of the workspace file as it was then.
-Each version of a regenerated answer keeps its own files, and a branched chat gets a
-copy of them.
-
-### Share links
-
-Anemo is for one person, but you can let someone read a single chat, document or
-project: **Share** in its menu creates a link that works without logging in.
-
-- The link shows a **copy made at that moment**. It does not follow later changes
-  unless you press **Update copy**, and it never includes attached files, the model's
-  reasoning or agent activity.
-- A shared **project** shows what you tick: its tasks with their notes, checklists and
-  subtasks, its upcoming events, and its documents, which the visitor can open and read in full. Links
-  between its tasks and documents work inside the copy; links to anything that is
-  not part of it are shown as plain text. Its chats, files and instructions are
-  never part of a link.
-- A visitor can read, nothing else. No model, agent or tool is reachable from a link.
-- Links expire (7 days by default) and can be revoked at any time. **Settings →
-  Shared links** lists them all.
-- A link only works for people who can reach your server.
-
-Details in [docs/security.md](docs/security.md#share-links).
-
-### Profiles, skills, plans and runs
-
-**Profiles & Skills** (sidebar) holds reusable agent setups:
-
-- A **profile** has a name, instructions (added to the agent's system prompt), an
-  optional model, and optional overrides of the permission levels and limits. Pick
-  it in the chat next to the mode switch (Agent mode). A profile can be given more
-  autonomy than the global settings, but never more than the global *ceiling*, and
-  changing its permissions asks for your password like the settings do.
-- A **skill** is a set of instructions for one kind of task. Agents only see its
-  name and description until a task needs it; then they load it with a tool. Import
-  `SKILL.md`-style files (front matter with `name` and `description`, then Markdown)
-  or write your own; export turns them back into such files.
-
-### Skills as slash commands
-
-Type **/** at the start of a message (or use the **/** button) and pick a skill: the
-message is answered with that skill's instructions, in Chat and in Agent mode. The
-skill is shown on your message and keeps applying to your replies that continue it,
-for example your answers to a practice task. A complete command typed or pasted, such
-as `/study what are objects in javascript`, works too.
-
-Anemo comes with these skills:
-
-| Command | What it does |
-| --- | --- |
-| `/study` | Teaches a concept in small steps: a short explanation and example, then one practice task at a time, checked and corrected, each a little harder |
-| `/plan` | Turns a project, task or idea into a plan: goal, scope, steps, risks, timeline, first next action |
-| `/review` | Honest, balanced feedback on an idea, plan or draft: strengths, weaknesses, nuances, blind spots |
-| `/fact-check` | Checks claims and numbers and rates each one, with sources (switches to Agent mode to use web search) |
-| `/brainstorm` | Lots of varied ideas, grouped, with the most promising ones picked out |
-| `/decide` | Compares options against what matters to you and recommends one |
-| `/rewrite` | Makes a text clearer and tighter, keeps your meaning and voice, and explains the changes |
-| `/diagram` | Shows an explanation, process, plan or numbers as a picture: a flowchart, mind map, timeline, sequence diagram or chart |
-
-**Settings → Skills** is where you create, edit, import and switch skills on and off.
-For each skill you choose its command, icon, the hint shown in the message box,
-whether it is offered as a /command, whether agents may load it on their own, and
-whether choosing it switches to Agent mode (for skills that need tools). Built-in
-skills can be edited or switched off; once you edit one, updates of Anemo no longer
-change it, and **Reset to original** brings the shipped text back.
-
-**Plan review** (Settings → Agent Permissions, or per profile): the agent proposes
-a plan and waits before taking any action. You can approve it, edit the steps first,
-or send it back with feedback. If the agent later changes the steps, it asks again.
-
-**Pause** stops an agent run at the next safe point (the current step finishes,
-nothing new starts); no worker is held while it is paused. **Resume** it from the
-chat or the run's page, optionally with a message the agent reads first; while a
-run is paused you can also edit its plan. Stop cancels it for good.
-
-**Limits** end a run gracefully: steps, tool calls, working time (paused time does
-not count), cost (for models with known prices) and failed actions in a row. The
-agent then writes a short summary of where it got to. Long conversations are
-**compacted**: older steps are summarized by the *Summaries* model (Settings → Providers &
-Models) so the agent keeps working within the model's context window. Very long
-tool results are shortened for the model; the full text is saved, the agent can
-page through it, and you can download it from the run.
-
-**Runs** lists every agent run with its status, profile, time, tokens and cost, and
-opens each one with its plan, tool calls, approvals, file changes and answer.
-
-### Diagrams, charts and math
-
-Answers, documents, shared pages and automation results show **diagrams, charts and
-formulas** drawn instead of as code. They are ordinary Markdown, so the text stays
-readable in any other tool:
-
-- **Diagrams**: a ```` ```mermaid ```` block ([Mermaid](https://mermaid.js.org/)):
-  flowcharts, mind maps, sequence diagrams, timelines, Gantt charts, state diagrams,
-  pie charts.
-- **Charts**: a ```` ```chart ```` block with a little JSON: `type` (line, bar, area or
-  pie), `title`, the `x` labels and one or more `series` with a `name` and a value per
-  label, optionally a `unit`. Charts use the app's colors and show values on hover.
-- **Math**: `$…$` in a sentence, `$$…$$` on its own line (LaTeX, drawn with KaTeX).
-  Prices like "\$5 and \$10" stay text.
-
-Each diagram and chart has a bar to see its **source**, **copy** it, **download** it
-as SVG or PNG, and open it **full screen** (zoom with the wheel or + and −, drag to
-move). While an answer is being written, a block shows as code until it is complete.
-One that can't be drawn shows its source and the error; in a chat, **Fix diagram**
-asks the model to send a corrected one.
-
-The models are told these blocks exist, and the built-in **/diagram** skill asks for
-one directly ("show this as a mind map"). In a document, a diagram shows drawn with
-an **Edit** button that opens its source. Mermaid is only downloaded by a page that
-shows a diagram. Diagrams can't run scripts or load anything from other sites (see
-[security](docs/security.md#diagrams-charts-and-math)).
-
-### Sub-agents
-
-An agent can hand a self-contained part of a task to a sub-agent and continue
-with its result; several can work at the same time. This is **off by default**:
-set *Start sub-agents* in Settings → Agent Permissions to allow it (or to ask
-first).
-
-- A sub-agent only gets the task it was given, and may use another agent profile.
-- It can never do more than the agent that started it: every action is checked
-  against its own permissions and those of every agent above it, and the
-  strictest answer wins. If it needs your approval, the request appears inside the
-  parent's activity in the chat.
-- It works within what the parent had left of its limits (steps, tool calls,
-  time, cost), and what it uses is counted against the parent.
-- At most 3 sub-agents of one agent work at once, at most 10 per task, and
-  sub-agents cannot start their own unless you raise *Sub-agent levels* in the
-  limits (up to 3).
-- Stopping a run stops its sub-agents.
-
-### Documents
-
-**Documents** are plain Markdown files in the `documents/` folder of your
-workspace, so the app, agents, the file manager and any other Markdown tool work
-on the same files. Sub-folders are groups; images you drop in go to
-`documents/_assets/`.
-
-- **Editor:** rich text (headings, lists, checklists, tables, code blocks, links,
-  images) that reads and writes Markdown, or the Markdown source itself. Documents
-  using raw HTML or footnotes open as source, because the rich editor would lose
-  those; so do documents with formulas the rich editor would change (LaTeX such as
-  `\,` or `\{`). Diagram and chart blocks are shown drawn, with an *Edit* button for
-  their source (see below).
-- **Autosave** about a second after you stop typing. If the file was changed
-  somewhere else in the meantime (an agent, another tab), nothing is overwritten:
-  you choose which version to keep. With no unsaved changes, outside changes just
-  appear.
-- **History:** every document keeps its last 50 versions (your autosaves within
-  10 minutes count as one), marked as yours, an agent's, or made outside the app.
-  Restoring one keeps the current text in the history.
-- **Agents** can list, read, search, create and edit documents. Reading follows the
-  file-read permission and the folder access for `documents`; writing has its own
-  category, *Edit documents* (asks by default). Their changes are in the history
-  and can be reverted from the run.
-- **Links to tasks, files and other documents:** the toolbar button *Link to a
-  document, task or file* inserts a link to one of them, shown as a small labelled
-  chip. Clicking a link in the editor opens it: a document here, a task in the task
-  list, a file in Files, another site in a new tab. They are ordinary Markdown links
-  (`/documents/<id>`, `/tasks?task=<id>`, `/files?path=<path>`), and links to a file
-  are updated when it is renamed or moved in Files. A document lists what links to it.
-- **Links to a part of a document:** add `#text=<a few words from it>` to point at a
-  passage, or `#<heading>` for a section (`/documents/<id>#scams-to-watch-for`).
-  Opening the link scrolls there and highlights it until you click or type in the
-  document. Agents get each document's link from their document tools, so answers can
-  quote a passage and link straight to it; a link written with the document's file
-  (`/documents/<folder>/<name>.md`) opens that document too.
-- **Delete** moves the file to the workspace trash (Files → Trash).
-
-### Tasks and calendar
-
-**Tasks** have a status (to do, in progress, waiting, blocked, done), priority, due
-date (with an optional time), project and tags. A task with a due date can
-**repeat** (every day, weekday, week, 2 weeks, month or year): finishing it adds the
-next one. The list groups them by when they are due (overdue, today, next 7 days,
-later, no date); the board shows one column per status and lets you drag cards
-between them (on a phone the columns are stacked).
-
-A task opens in a wide editor laid out like a document: the title, status and
-**notes** take most of it, and a side panel holds the schedule, project, priority and
-tags. Notes are written in the same rich text editor as documents and saved as
-Markdown; they can link to a document or another task, and a document can link to a
-task. In the list, a task with notes has an arrow that shows the start of them. A
-link to a task (from a document, other notes or search) shows it in the list, marked
-and with its notes open, rather than opening the editor.
-
-**Checklists, subtasks and *waits on*.** Three ways to break up and order work:
-
-- A **checklist** holds quick steps inside one task: add, tick, edit and remove them in
-  the editor (Enter adds the next one). The list and the board show how far it is
-  ("3/5"). A repeating task's next one gets the same checklist, unticked.
-- **Subtasks** are tasks of their own (status, due date, notes, attachments) that belong
-  to another task, one level deep. Add them in the task's side panel, where they get the
-  task's project and tags, or make an existing task one with *Subtask of*. In the list
-  they are folded in under their task (the arrow shows them); on the board they are
-  cards of their own that name their task. Finishing a task with open subtasks asks
-  whether to finish them too or keep them open. Deleting a task keeps its subtasks, as
-  ordinary tasks.
-- **Waits on** (*blocked by*): pick the tasks that have to be done first. While any of
-  them is open the task shows *Waits on* and moves from *to do* to *blocked*; when the
-  last one is done it moves back to *to do* and you get a notification. The other task
-  lists it under *Blocks*. Loops (A waits on B, B waits on A) are refused, and deleting a
-  task removes it from what it blocked.
-
-Search finds checklist items too.
-
- Upload them in the task (they go to
-the project's folder, or `files/` without a project) or pick existing ones from Files.
-The file stays in Files; the task links to it, and the link keeps working when you
-rename or move the file there. Removing an attachment leaves the file alone. Notes
-and documents can link to files the same way (*Link* → *Files*), and a file's details
-in Files show which tasks and documents use it; deleting it says so first ("Linked
-from 2 tasks and 1 document."). Agents can attach files too (*Manage tasks*, plus
-read access to the file's folder).
-
-**Calendar** has month, week, day and agenda views. Events can be timed or
-all-day and can repeat (daily, weekdays, weekly, every 2 weeks, monthly, yearly,
-optionally until a date). For a repeating event you choose whether a change
-applies to that one occurrence or the whole series. Tasks with a due date appear
-on the calendar too (dashed outline). Click a day to add an event; drag entries to
-move them.
-
-Times follow the time zone of your browser. A repeating event keeps its local
-time when the clocks change. Tasks without a time, and times given by agents
-without a zone, use the time zone from **Settings → General**.
-
-**Reminders** (on events and tasks) arrive as notifications; see below.
-
-**Agents** can list, add, change and delete tasks and events, including checklists,
-subtasks and what a task waits on. Changes follow the
-*Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
-action, so the default level asks you first.
-
-### Home
-
-**Home** is a page of widgets: the focus timer, the music player, today (what is due
-and what you have focused), the daily note, open tasks, this week, recent documents, a box to ask
-Anemo something, **Needs you** (approvals, memory suggestions, failed automations,
-overdue tasks; hidden while empty), the latest result of an automation (**Briefing**) and what is coming up.
-Every widget follows the project switcher.
-
-The **Daily note** is for today's important short notes: a number to call back, a
-thought to pick up later, the three things that must not slip. Type a line and press
-Enter; tick notes off, click one to edit it, drag it by its grip (or focus the grip and
-use the arrow keys) to move it, and delete it with ×. Nothing to open or save. The
-arrows go back to earlier days, *Today* comes back. The day turns over at midnight in
-the time zone from **Settings → General**, where you can also have unticked notes
-carried over to the next day. Each day is an ordinary document,
-`documents/daily/<date>.md` (with a project chosen, that project's own daily note in
-`documents/<project>/daily/`), so it has a history, is found by search, can be
-linked to, and agents can read it. The ↗ button opens it in Documents.
-
-**Edit layout** (or E) lets you drag widgets around, make them wider or taller, hide
-them and add them back; **Reset** goes back to the default. The layout is saved on the
-server, so every device shows the same one (a phone shows it as one column). Under
-**Settings → General** you choose what opens when you open Anemo: Home or a new chat.
-
-### Focus
-
-**Focus** is a pomodoro timer: focus, a short break, and after a few rounds a long
-break. Link it to a task (or start it from a task's menu with *Focus on this*), and
-the time counts for that task and its project. Space starts and pauses, R resets, S
-skips to the next phase and + adds a minute.
-
-The timer runs on timestamps, not by counting ticks, so it stays right in a background
-tab, after a reload, or with the laptop asleep. While it runs it lives on that device;
-each finished focus session is saved on the server (also when you were offline: it
-is sent when the connection comes back). Lengths, rounds, auto-start, the chime and a
-daily goal are under **Settings → Focus**, the same for every device.
-
-### Music
-
-**Music** plays what you paste: a YouTube video or playlist, a SoundCloud track or
-set, or a link to an audio file or internet radio stream. There are also ambient
-sounds (rain, ocean, brown, pink and white noise) to play on their own or under the
-music, each with its own volume.
-
-Tracks you add are kept in your **library** and can be put in **playlists**; both are
-stored on the server. The queue, what is playing, shuffle, repeat and the volume are
-per device, like a phone's own player. A track that won't play (removed, or blocked
-from playing on other sites) is skipped, up to three in a row; after an interruption
-the player picks up where it was. Music keeps playing while you move between pages.
-
-### Dynamic Island
-
-The **Dynamic Island** is the small dark pill at the top of the page while the timer
-or music is going. It shows the time left or what is playing; click it (or tap it on
-a phone) to open the controls: pause, skip, the next track, volume. It also shows
-short alerts: a focus phase ending, a new track, an agent that finished or is waiting
-for your approval (click to open that chat). With *reduce motion* turned on in your
-system, it fades instead of morphing.
-
-### Stats
-
-**Stats** counts your focus time per day, week, month or a range you pick: the total,
-daily average, streaks, a heatmap of the last six months, when in the day you focus,
-your top tasks and projects by focus time, tasks finished, and what agents did (runs
-and their cost). Days follow the time zone from Settings → General. It narrows to the
-project in the switcher.
-
-**Agents** can read your focus stats and sessions (*Focus & music*, allowed by
-default), and start the timer or queue music on the device you used last (*Control
-the timer and music*, asks first). With no Anemo tab open anywhere they say so. A
-ready-made **Daily summary** automation (Automations → *Start from a template*)
-sums up your focus and tasks each evening; it does nothing until you save it.
-
-### Notifications
-
-Reminders, the results of automations and messages from agents are listed under
-**Notifications** (the bell in the sidebar shows how many are unread). While the
-app is open they also pop up as a notice.
-
-In **Settings → Notifications** you choose where else they go:
-
-- **Push notifications**: arrive on your phone or computer even while Anemo is closed.
-  Turn them on in each browser or phone you want them on (*Push notifications on this
-  device*); every device is listed with when it last received something, and for each
-  you pick which kinds it gets, or remove it. Tapping a notification opens what it is
-  about. Works in Chrome, Edge and Firefox, and on an iPhone or iPad (iOS 16.4 or
-  later) once Anemo is on the Home Screen: open it from there to turn push on. Needs
-  HTTPS.
-- **Approve from the notification**: when an automation is waiting for a plain yes or
-  no, its push notification has **Allow once** and **Deny** buttons. Each works one
-  time, only for that request, and only while it is still waiting; anything else (for
-  example *Allow for this run*) is answered in the app. iPhones and iPads don't show
-  buttons on web notifications: tap it to answer in the app.
-- **Desktop notifications**: shown by your browser while Anemo is open in a tab
-  you are not looking at. This is a per-browser choice and needs HTTPS. A browser with
-  push on shows push notifications instead.
-- **Discord**: add a channel's webhook URL (channel settings → Integrations →
-  Webhooks) to get notifications there. The URL is stored encrypted and never shown
-  again; for each channel you pick which kinds of notification it receives. Sending is
-  retried when Discord is unreachable.
-
-A notification sent to a device says only a line or two, encrypted so the browser's
-push service can't read it. Details in [docs/security.md](docs/security.md#push-notifications).
-
-Agents can send you a notification themselves (the *Send notifications*
-permission); they cannot choose or change where notifications go.
-
-### Automations
-
-An automation is a prompt that an agent runs by itself on a schedule: every
-morning, every weekday, every few hours, once, or any cron expression. Times are
-wall-clock times in your time zone and stay put when the clocks change.
-
-Each run is a normal agent run in its own conversation (open it from the
-automation's **History**), with the permissions of the agent profile you pick.
-Because nobody is watching, you choose what happens **when an action would need
-your approval**: wait and notify you (default), skip that action and carry on,
-or stop the run. It is never approved automatically.
-
-The final answer is sent to you as a notification, and can also be saved as a
-document (for example `briefings/{date}`). An automation can keep short notes
-between its runs, so "tell me when this page changes" works. Failed runs can be
-retried. If the app was off when a run was due, that run is skipped rather than
-caught up later, and a run still going when the next one is due is not stacked.
-
-### MCP servers
-
-MCP servers give agents extra tools (GitHub, a database, your smart home, …).
-Add them in **Settings → MCP**:
-
-- **Remote servers** are reached by URL (Streamable HTTP, or the older SSE type),
-  with optional headers such as an API key.
-- **Local servers** are programs (`npx …`, `uvx …`). They run in a separate
-  container, the MCP host, which has internet access but no route to the database,
-  no workspace and none of the app's secrets. It is off by default; start it with
-  `docker compose --profile mcp up -d`.
-
-Headers and environment variables are stored encrypted and never shown again.
-
-Each MCP tool goes through the same permission system as built-in tools. The
-*MCP tools* level in Agent Permissions is **Always ask** by default; per tool you
-can turn it off, let it run without asking, or never allow it. Servers describe
-their tools as read-only or destructive; those are only hints, which you can
-correct. If a server later changes a tool, or adds one, it asks every time until
-you have looked at it, and runs already in progress do not get the changed tool.
-
-Only add servers you trust: a server sees what agents send to its tools, and its
-answers can try to steer the agent.
-
-### Search
-
-Press **Ctrl+K** (⌘K on a Mac) anywhere, or the search button next to *New chat*,
-to search everything: chats, documents, memories, tasks, calendar events, files
-(by name) and automations. Typing a page name ("calendar", "settings mcp") jumps
-there. Arrow keys move, Enter opens. It also does things: *Start focus*, *Pause or
-resume the timer*, *Play or pause music*, *Next track*, *Paste a music link…*,
-*Edit home layout* and *Keyboard shortcuts*.
-
-*All results* opens the search page, where you can filter by kind. Every word you
-type has to match. On that page documents and memories are also found by meaning
-when an embedding model is set (Settings → Providers & Models); the quick box
-matches words only, so typing never calls a model.
-
-### Keyboard shortcuts
-
-Press **?** anywhere (outside a text field) to see every keyboard shortcut: the ones
-for the page you are on first, then those that work everywhere, then the rest. Esc
-closes it. *Keyboard shortcuts* in the search box and **Settings → General** open the
-same list. On a Mac it shows ⌘ and ⌥ instead of Ctrl and Alt. Phones and tablets
-without a mouse or trackpad don't get it.
-
-### Usage
-
-**Settings → Usage** shows model calls, tokens and cost for a period: totals, a
-chart per day, a breakdown by model, kind of work, provider, agent profile or
-automation, and every single call. A cost is what the provider reported, or is
-worked out from the prices you set for a model; without either it is shown as
-*unknown*, never as $0.
-
-### Memory
-
-The assistant remembers things about you across conversations, and everything it
-remembers is on the **Memory** page, where you can add, edit, archive and delete it.
-
-- **Say it:** "remember that I prefer TypeScript", "forget where I used to live".
-  This works in Chat and Agent mode (the model needs tool support) and is saved at
-  once, with a notice and *Undo*.
-- **Noticed in conversations:** a few minutes after a chat goes quiet, the *Memory*
-  model reads it for lasting facts and preferences. By default these are
-  **suggestions** you approve on the Memory page (sidebar badge); in **Settings →
-  Memory** you can have them saved automatically, or switch this off.
-- **Used when relevant:** for each message, memories that fit it are put into the
-  model's context, plus those marked *Always in context* and all *Instructions*.
-  A run's page lists which memories it was given.
-- **Search by meaning** needs an embedding model (Settings → Providers & Models →
-  Embeddings, e.g. `text-embedding-3-small` or a local model in Ollama). Without
-  one, memories are found by their words. After changing the model, use *Index all
-  memories again* in Settings → Memory.
-- Things that look like passwords, keys or tokens are never stored as memories.
-
-Memories are sent to the model provider as part of your messages, like the rest
-of the conversation.
-
-### Web search and web pages
-
-Agents can **search the web** through your own [SearXNG](https://docs.searxng.org/)
-instance, **read web pages** (main content as Markdown; also PDFs, text and JSON)
-and **call HTTP APIs**. Set it up in **Settings → Web & Search**: the SearXNG URL
-(or `SEARXNG_URL` in `.env`) with a *Test search* button. SearXNG must allow JSON
-output: in its `settings.yml`, `search: formats: [html, json]`.
-
-Whether agents may use these is set per category in Agent Permissions (*Web
-search*, *Read web pages*, *External API calls*). Calls other than GET, such as
-POST or DELETE, count as moderate risk.
-
-Web pages can't send agents into your network: every connection agents make
-(including redirects) is checked against the address it really goes to, and
-private, loopback, link-local, CGNAT and cloud-metadata addresses are refused,
-as are this server's own containers. To let agents use a service at home (say
-Home Assistant), add its host name, IP address or range under **Allowed hosts**.
-Page contents are marked as untrusted for the model, but a page can still try to
-mislead it, so keep approvals on for anything that changes things.
-
-### Browser
-
-For pages that need JavaScript, clicking or forms, agents can drive a real
-headless browser (Chromium): open a page, click, type, scroll and take
-screenshots. After each step the agent gets the page as text with a numbered
-list of what it can click or type into, and a screenshot of every step is kept
-in the run's timeline for you.
-
-The browser runs in its own container, which is off by default. Start it with
-`docker compose --profile browser up -d` (about 1.3 GB); agents only get the
-browser tools while it is running (Settings → Agent Permissions shows "browser
-not running" otherwise). To have it start with everything else, add
-`COMPOSE_PROFILES=browser` to your `.env` (or `browser,mcp` for both).
-
-- Each chat has its own private browser, kept open between the agent's turns and
-  closed after 30 idle minutes (or with the bin button). Nothing is shared between
-  chats, and downloads are refused.
-- **You can use that browser too.** The window button in a chat's header shows the
-  agent's browser live next to the chat (or in a separate window; on a phone, on its
-  own page). Click, type and scroll in it, or enter an address. This is how you log
-  in somewhere for the agent, or answer an "are you human" check yourself: the agent
-  never tries to get past those, and continues in the same browser afterwards.
-- All of the browser's traffic passes a guard inside that container that refuses
-  addresses on your own network (your router, NAS, other containers) unless you
-  allowed the host in **Settings → Web & Search**. This also holds for redirects,
-  embedded content and DNS tricks.
-- The *Browser automation* permission is **Always ask** by default. Choosing
-  "allow for this run" on the first request covers the rest of that run's
-  browsing.
-
-What a page shows is untrusted: it can try to steer the agent, which is why
-actions with consequences stay behind your permissions.
-
-### Your Claude subscription as a model
-
-Anemo can use your own Claude subscription (Pro or Max) instead of API credits, by
-driving the official Claude Code CLI in an optional container. Claude Code acts only
-as the model: every tool call goes through Agent Permissions as usual, and it has no
-tools, connectors or memory of its own. Start it with
-`docker compose --profile claude up -d`, sign in once with
-`docker compose exec -it claude-runner claude auth login`, then add a provider of type
-*Claude subscription (Claude Code)* in Settings → Providers & Models (no key needed).
-Chats, agent runs and automations on these models count against your subscription's
-usage limits; prompt caching is set up so each request after the first reads the
-conversation from the cache. Details: [docs/claude-code.md](docs/claude-code.md).
-
-### Shell commands
-
-Agents run commands in a separate **sandbox** container (Debian with git, Python,
-Node/npm, curl, jq, ripgrep, sqlite3, make), never in the app itself:
-
-- no root and no Linux capabilities, read-only system files, CPU/memory/process
-  limits; only the workspace (`/workspace`) and a scratch home folder are mounted;
-- **no network at all** by default. A command that needs the internet (package
-  installs, `git clone`) runs in a second container, `sandbox-net`, and needs the
-  *Shell with network* permission. Note that "internet" includes your LAN;
-- neither sandbox can reach the database, Valkey, the app or each other.
-
-Every command is rated *safe*, *moderate* or *dangerous* before it runs (e.g.
-`ls` is safe, `npm install` moderate, `rm -rf`, `git push --force` or
-`curl … | sh` dangerous), so *Ask for dangerous actions* lets ordinary commands
-run and asks you first for the risky ones. Commands stop after 2 minutes by
-default (the agent can ask for up to 10). Output streams live into the chat.
-
-**SSH to your servers.** Agents can use `ssh`, `scp` and `rsync` from commands
-that have network access. They use their own key, created by the `sandbox-net`
-container on first start. Its public half is under **Settings → Agent
-Permissions → SSH from agent commands**: add it to `~/.ssh/authorized_keys` on
-the server (ideally for a dedicated account, prefixed with
-`from="<Docker host IP>"`). Password logins are not possible. For
-`ssh host 'command'`, the command that runs on the server is rated too.
-`host.docker.internal` is the Docker host itself.
-
-Shell commands can only *start* in folders agents may change, but a running
-command can reach every folder in the workspace, and its file changes can't be
-reverted with one click like the file tools' changes. Keep private data outside
-the workspace, or set *Run shell commands* to *Never*.
-
-### Files
-
-**Files** browses the workspace folder (`WORKSPACE_PATH`): upload, edit text and
-code, move, and delete to a trash you can restore from. Saving is refused if the
-file changed since you opened it (for example, an agent edited it); you can then
-load the other version or overwrite it.
-
-Documents live in `documents/` but are shown under **Documents**, so Files hides that
-folder (turn it back on under Settings → Workspace).
-
-**Settings → Workspace** sets what agents may do in each top-level folder: *Hidden*,
-*Read only* or *Read and change*. This applies on top of Agent Permissions.
-
-Every file an agent creates, edits, moves or deletes is listed under **Files
-changed** in its answer, with a **Revert** button. Agent deletes go to the trash.
-
-Agents can also look at images in the workspace (PNG, JPEG, GIF, WebP, BMP, TIFF)
-when the model supports images. Large images are scaled down first, and the answer
-shows a thumbnail of what the agent saw.
-
-### On your phone
-
-The whole app works at phone size: the sidebar becomes a menu (top-left button),
-dialogs slide up from the bottom, and on touch screens Enter adds a new line
-(send with the arrow button).
-
-To install it like an app, open Anemo in your phone's browser over **HTTPS**
-(for example through Nginx Proxy Manager) and choose *Add to Home Screen*
-(Safari: Share menu; Chrome: ⋮ menu → *Install app*). It then opens full-screen.
-Only the app's own files are cached on the phone, never your chats, files or
-settings. If your server can't be reached you get a short offline page. Over
-plain HTTP on your LAN it still works, as a normal website.
-
-## Quick start (homelab)
+<p align="center">
+  <img src="frontend/public/icons/icon-192.png" width="88" height="88" alt="">
+</p>
+
+<h1 align="center">Anemo</h1>
+
+<p align="center">
+  <b>A self-hosted AI workspace for one person: chat, agents that ask before they act,
+  and your own documents, files, tasks and calendar for them to work on.</b>
+</p>
+
+<p align="center">
+  <a href="https://hub.docker.com/r/essntl/anemo"><img alt="Docker Hub" src="https://img.shields.io/docker/pulls/essntl/anemo?logo=docker&label=Docker%20Hub"></a>
+  <a href="LICENSE"><img alt="License: GPL-2.0" src="https://img.shields.io/github/license/essntl/anemo"></a>
+  <a href="https://github.com/essntl/anemo/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/essntl/anemo"></a>
+</p>
+
+Anemo runs on your own server (a homelab box, a NAS, ZimaOS) with Docker Compose. You
+bring the models: an API key for OpenAI, Anthropic or OpenRouter, a local model in
+Ollama, or your Claude Pro or Max subscription. Anemo gives them a place to work: a chat,
+an Agent mode with tools, and a workspace of Markdown documents, files, tasks and a
+calendar that you use too. Every tool call an agent makes is checked on the server
+against permissions you set, so it can do real work in your workspace without getting
+the run of your machine.
+
+It is built for one person who wants their assistant, notes and planning in one place
+they control: one login, and your data in your own database and folders. For a second
+person, run a second copy.
+
+## What it does
+
+**Chat and agents**
+
+- **Chat and Agent mode.** Answers stream from a background worker, so they keep going
+  through reloads and restarts. Agent mode adds tools: files, shell, web, a browser,
+  documents, tasks, calendar and MCP.
+- **Permissions you set.** Per category: *Never*, *Always ask*, *Ask for dangerous
+  actions*, *Allowed in workspace* or *Fully autonomous*. A run waiting for approval
+  holds no worker; paths outside the workspace, settings and secrets are always refused.
+- **Plans, limits and runs.** Review the agent's plan before it acts, pause and resume
+  runs, cap steps, time and cost, and see every run's tool calls and file changes, with
+  one-click revert.
+- **Profiles, skills and sub-agents.** Reusable agent setups, `SKILL.md`-style skills as
+  slash commands (`/study`, `/plan`, `/fact-check`, `/diagram`, …), and sub-agents that
+  never get more permissions than the agent that started them.
+- **Memory you can see.** It remembers what you tell it and suggests what it noticed;
+  every memory is on one page to edit or delete.
+- **Your choice of model.** OpenAI, Anthropic, OpenRouter, any OpenAI-compatible server
+  (Ollama, …), or **your Claude subscription** through the official Claude Code CLI.
+  Fallback models, and usage and cost for every call.
+
+**Your workspace**
+
+- **Documents.** Plain Markdown files in your workspace with a rich editor, autosave,
+  version history and links between documents, tasks and files.
+- **Files.** A file manager for the workspace. Attach PDFs, Word, Excel, PowerPoint, zips
+  or images to a chat; agents can hand files back to you.
+- **Tasks and calendar.** List and board, checklists, subtasks, *waits on*, repeating
+  tasks and reminders; a month, week, day and agenda calendar.
+- **Projects** group chats, tasks, events, documents and files, with their own
+  instructions for the assistant.
+- **Home** with widgets and a daily note, a **focus timer**, a **music** player, **stats**
+  and the **Dynamic Island**.
+- **Diagrams, charts and math** drawn in answers and documents (Mermaid, charts, LaTeX).
+- **Search everything** with Ctrl+K, and **share links**: read-only copies of a chat,
+  document or project.
+
+**Automation and reach**
+
+- **Automations.** Prompts an agent runs on a schedule (cron), with results as
+  notifications or documents. Approvals are never given automatically.
+- **Notifications** in the app, as push on your phone or computer (with Allow / Deny
+  buttons), on the desktop, or in Discord.
+- **MCP servers**, remote by URL or local (`npx`, `uvx`) in an isolated container; every
+  MCP tool goes through the same permissions.
+- **Web search** through your own SearXNG, reading pages and calling APIs, with addresses
+  on your own network refused unless you allow them.
+- **A browser for agents.** A headless Chromium in its own container, which you can watch
+  and take over live, for example to log in.
+- **Shell sandboxes.** Commands run in a separate container with no network by default,
+  each rated safe, moderate or dangerous before it runs; a second one for commands that
+  need the internet.
+- **Browser extension** (Anemo Companion): Anemo in Chrome's side panel, with page
+  context, capture, translate and research.
+- **On your phone**: installable to the home screen, with push notifications. In English,
+  Ukrainian and Russian.
+
+All the details, area by area: **[docs/features.md](docs/features.md)**.
+
+## Install
+
+You need a Linux machine (or ZimaOS / CasaOS) with Docker and the Compose plugin, and
+about 2 GB of free memory.
+
+**From source**
 
 ```bash
 git clone https://github.com/essntl/anemo.git && cd anemo
@@ -682,178 +101,53 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Open `http://<server>:8080` and log in. The first time, a short **setup** opens:
+Open `http://<server>:8080` and log in. A short setup walks you through adding a model
+provider. The agents' browser, the MCP host and the Claude runner are optional:
+`docker compose --profile browser up -d` (or `mcp`, `claude`).
 
-1. **Model provider**: add one (OpenAI, Anthropic, OpenRouter, any OpenAI-compatible
-   server such as Ollama, or your Claude subscription), use **Add models** to pick its
-   models, and choose the model for chats.
-2. **Helper models** (optional): Summaries, Memory and Embeddings, with suggestions
-   from the models you added (a small model for the first two).
-3. **You**: your time zone, and whether Anemo opens on Home or a new chat.
-4. **Optional parts**: whether the sandboxes, the browser, the MCP host, the Claude
-   runner and SearXNG are running, and for each one that isn't, the command that
-   starts it.
-5. **Notifications** (optional): push on this device, or a Discord channel.
+**Prebuilt images, no build**
 
-Every step can be skipped, and **Not now** leaves it for later: it then waits in
-**Settings → Advanced** (*Continue setup*), and the step you left off at is kept, also
-for another device. You can go through it again there after finishing. It sets
-nothing you couldn't set in Settings yourself; an install that already has a
-provider never sees it on its own.
+Images for x86-64 and ARM64 are built from `main` on every change. Save
+[`docker-compose.prebuilt.yml`](docker-compose.prebuilt.yml) in a folder of its own
+as `docker-compose.yml`, replace every `CHANGE_ME` (the comments at the top say what goes
+where), then run `docker compose pull && docker compose up -d` there and open
+`http://<server>:8484`. No checkout, no build, no `.env`.
 
-Each model shows what it can do (tools, vision, reasoning, …). OpenRouter reports
-this per model. Other providers do not, so Anemo assumes a chat model can use tools
-(which Agent mode needs) and guesses the rest from its name. If a provider then
-refuses tools, Anemo switches that off for the model by itself. Press a model's
-tags to correct any of them by hand.
+**ZimaOS / CasaOS**
 
-Provider changes are security-sensitive: if you logged in more than 15 minutes ago
-you will be asked to confirm your password.
+Fill in the `CHANGE_ME`s in
+[`deploy/zimaos/docker-compose.yml`](deploy/zimaos/docker-compose.yml), save it as
+`/DATA/AppData/anemo/docker-compose.yml` from a terminal on the server, run
+`docker compose up -d` in that folder and open `http://<your-zimaos-address>:8484`.
+Use the terminal rather than the ZimaOS app import, which rewrites the file:
+[why](docs/deployment.md#zimaos--casaos).
 
-### Prebuilt images, no build
+Then: [HTTPS behind Nginx Proxy Manager](docs/deployment.md#behind-nginx-proxy-manager) ·
+[backups](docs/backup.md) · [updates](docs/deployment.md#updating) ·
+[more than one copy](docs/deployment.md#more-than-one-copy-on-a-server).
 
-[`docker-compose.prebuilt.yml`](docker-compose.prebuilt.yml) runs Anemo from the
-images on GitHub's registry (x86-64 and ARM64) with no checkout, no build and no
-`.env`. Save it in a folder of its own as `docker-compose.yml`, replace every
-`CHANGE_ME` (the comments at the top say what goes where), then run
-`docker compose pull && docker compose up -d` there and open `http://<server>:8484`.
-Your data is kept next to the file (`workspace/`, `data/`, `postgres/`).
+## Documentation
 
-### ZimaOS / CasaOS (prebuilt images)
+- [Features](docs/features.md): everything Anemo does, area by area
+- [Deployment](docs/deployment.md): install, first-time setup, proxy, updates, services
+- [Backup and restore](docs/backup.md)
+- [Security and permissions](docs/security.md)
+- [Claude subscription](docs/claude-code.md)
+- [Browser extension](extension/README.md)
+- [Architecture](docs/architecture.md) · [Development](docs/development.md) ·
+  [Roadmap](docs/roadmap.md)
 
-Images for 64-bit Intel/AMD and ARM machines (Apple Silicon, Raspberry Pi 4/5, ARM
-servers) are built from `main` on every change and published to GitHub's registry:
-`ghcr.io/essntl/anemo:latest` (app and worker),
-`ghcr.io/essntl/anemo-sandbox` (the shell sandbox), `-browser` (the agents' browser),
-`-mcp-host` (local MCP servers) and `-claude-runner` (the Claude subscription
-provider). Older builds are also on Docker Hub (`essntl/anemo`).
-[`deploy/zimaos/docker-compose.yml`](deploy/zimaos/docker-compose.yml) uses them
-and needs no `.env` file:
+## Star history
 
-1. Open the file and replace every `CHANGE_ME` (the comments at the top say what
-   goes where), and set `PUBLIC_URL` to your ZimaOS address with port `8484`.
-2. From a terminal on the server, save it as `/DATA/AppData/anemo/docker-compose.yml`
-   and run `docker compose up -d` in that folder.
-3. Open `http://<your-zimaos-address>:8484` and log in.
+<a href="https://star-history.com/#essntl/anemo&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=essntl/anemo&type=Date&theme=dark">
+    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=essntl/anemo&type=Date">
+  </picture>
+</a>
 
-Update with `docker compose pull && docker compose up -d` in the same folder
-(Settings → Advanced tells you when there is something new; see *Updates* below).
+## Author
 
-Installing through the ZimaOS screen (App Store → **+** → *Install a customized
-app* → *Import*) is possible, but ZimaOS rewrites the file and keeps only one
-network per service, which cuts the worker off from the sandbox, the browser, the
-MCP host and the Claude runner. The terminal keeps the file as written.
+Made by **essntl** · [X (@artemkdev)](https://x.com/artemkdev) · [artemk.dev](https://artemk.dev)
 
-Data is kept in `/DATA/AppData/anemo` (workspace, uploads, database).
-
-Anemo has one user. For another person, run a second copy next to the first:
-[docs/deployment.md](docs/deployment.md#more-than-one-copy-on-a-server).
-
-### Behind Nginx Proxy Manager
-
-Create a proxy host pointing at `http://<docker-host>:8080` (port `8484` with the
-ZimaOS file; or at `app:8080` if you attach the `app` service to NPM's Docker
-network). Recommended custom config,
-so live agent streams are not buffered or cut off:
-
-```nginx
-proxy_buffering off;
-proxy_read_timeout 1h;
-```
-
-Set `PUBLIC_URL` to your public address and `TRUSTED_PROXIES` to NPM's address.
-
-### Backups
-
-```bash
-sh scripts/backup.sh            # database, uploads and workspace into ./backups/
-sh scripts/restore.sh backups/anemo-<date>-<time>
-```
-
-Keep a copy of `.env` as well: saved API keys are encrypted with `APP_SECRET_KEY`.
-Details, nightly backups and moving to another machine: [docs/backup.md](docs/backup.md).
-
-### Is everything running?
-
-**Settings → Advanced** shows the version and the commit it was built from, a check
-of every part (database, live events, worker, folders, the sandboxes, browser, MCP
-host, Claude runner, SearXNG) and the security log. What happens when a part is down
-is listed in [docs/deployment.md](docs/deployment.md).
-
-### Updates
-
-Anemo has no numbered releases: the images are rebuilt from `main` on every change,
-and each build records the commit it was made from. About once a day Anemo asks
-GitHub how many changes `main` has that your version doesn't. When there are some,
-**Settings → Advanced** lists them (newest first) with the command that updates your
-kind of install, and Home's **Needs you** shows *An Anemo update is available* until
-you put it away (*Not now*; it comes back a week later if there are newer changes).
-After you update, a **What's new** card lists what changed since the version you had,
-once.
-
-- Prebuilt images: `docker compose pull && docker compose up -d`.
-- From a checkout: `git pull && APP_COMMIT=$(git rev-parse HEAD) docker compose up -d --build`
-  (or `make up`). A build without `APP_COMMIT` can't be compared, and Advanced says so.
-
-Anemo never updates itself. The check is one request to GitHub's API that carries
-nothing about you (no cookies, no ids, a fixed User-Agent). Switch it off in
-Settings → Advanced, or for good with `UPDATE_CHECK=false` in `.env`;
-`UPDATE_REPO` (default `essntl/anemo`) compares with another repository, such as your
-fork.
-
-## Services
-
-| Service    | Purpose                                              |
-|------------|------------------------------------------------------|
-| `app`      | FastAPI API + the built web UI (only published port) |
-| `worker`   | Runs chat/agent jobs, automations and indexing       |
-| `postgres` | PostgreSQL 17 + pgvector — all durable state         |
-| `valkey`   | Live event streams and control signals (ephemeral)   |
-| `migrate`  | Applies database migrations, then exits              |
-| `sandbox`  | Runs agent shell commands, with no network            |
-| `sandbox-net` | Runs agent shell commands that need the internet   |
-| `browser`  | Optional (`--profile browser`): a browser agents can drive |
-| `mcp-host` | Optional (`--profile mcp`): runs local MCP servers    |
-| `claude-runner` | Optional (`--profile claude`): Claude Code sessions for the Claude subscription provider |
-
-## Development
-
-Requires Docker and Node 22. On Windows, a WSL2 checkout is strongly recommended
-(the Makefile needs `make`, which Git Bash does not include).
-
-```bash
-make dev            # hot reload; UI at http://localhost:5173
-make test           # backend (in container) + frontend checks
-make lint
-make revision m="describe change"   # new Alembic migration
-make gen-api        # regenerate frontend API types after backend changes
-```
-
-End-to-end tests run against a throwaway copy of the app (its own containers,
-port 8090, volumes and passwords) with a scripted "fake" model, so nothing real
-is touched and no model is called:
-
-```bash
-cd e2e && npm install && npx playwright install chromium && cd ..
-sh e2e/run-isolated.sh              # start, test, remove
-KEEP=1 sh e2e/run-isolated.sh       # leave it running to look around
-E2E_BROWSER=1 sh e2e/run-isolated.sh  # also test the agents' browser
-```
-
-You can also point the tests at a running install
-(`cd e2e && E2E_PASSWORD=<password> npx playwright test`). Tests that need a model
-only run if the fake provider (`ENABLE_FAKE_PROVIDER=true`) is added there, and skip
-themselves otherwise; they never fall back to a real model.
-
-The `mobile` project repeats the key flows on a phone-sized touch screen
-(`npx playwright test --project mobile`). App icons are generated from one SVG by
-`e2e/scripts/make-icons.cjs`.
-
-How a chat turn flows: the API stores the message and queues a job → the worker
-streams the model's answer into a Redis stream → the browser follows it over SSE
-(`/api/runs/{id}/events`) and can reconnect at any time. Stopping a run cancels
-it inside the worker. See `docs/architecture.md` sections F, K and L.
-
-Frontend: React + TypeScript + Vite + Tailwind v4. Colors are semantic tokens
-(`bg-surface`, `text-muted`, `bg-accent`) defined in
-`frontend/src/styles/tokens.css`; never use raw colors in components.
+Licensed under the [GNU GPL v2](LICENSE).
