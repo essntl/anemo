@@ -71,5 +71,10 @@ const messages: Messages = {
   "Delete forever": "Видалити назавжди",
   "Delete \"{name}\" forever?": "Видалити «{name}» назавжди?",
   "This cannot be undone.": "Цю дію не можна скасувати.",
+  "Upload a folder": "Вивантажити теку",
+  "Uploading {done} of {n} file… | Uploading {done} of {n} files…": "Вивантаження: {done} з {n} файлу… | Вивантаження: {done} з {n} файлів… | Вивантаження: {done} з {n} файлів…",
+  "The connection failed": "Не вдалося з’єднатися",
+  "Too large for the server (or a proxy in front of it)": "Завеликий для сервера (або проксі перед ним)",
+  "{failed} of {n} file was not uploaded. {detail} | {failed} of {n} files were not uploaded. {detail}": "Не вивантажено {failed} з {n} файлу. {detail} | Не вивантажено {failed} з {n} файлів. {detail} | Не вивантажено {failed} з {n} файлів. {detail}",
 }
 export default messages

@@ -5945,6 +5945,7 @@
           "files"
         ],
         "summary": "Upload",
+        "description": "Upload files into `folder`. The app sends one file per request so a big batch\nnever hits a proxy's size limit and one bad file doesn't fail the others.",
         "operationId": "upload_api_files_upload_post",
         "parameters": [
           {
@@ -16314,8 +16315,24 @@
           },
           "folder": {
             "type": "string",
+            "maxLength": 1000,
             "title": "Folder",
             "default": ""
+          },
+          "paths": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paths",
+            "description": "For a folder upload: each file's path inside the uploaded folder (`photos/2024/beach.jpg`), in the order of `files`. Missing folders are made."
           }
         },
         "type": "object",

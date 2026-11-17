@@ -156,21 +156,31 @@ async def download(path: str = Query(min_length=1, max_length=1000)) -> FileResp
 @router.post("/upload", response_model=list[EntryOut], status_code=201)
 async def upload(
     uploads: Annotated[list[UploadFile], File(alias="files")],
-    folder: Annotated[str, Form()] = "",
+    folder: Annotated[str, Form(max_length=1000)] = "",
+    paths: Annotated[
+        list[str] | None,
+        Form(
+            description="For a folder upload: each file's path inside the uploaded folder "
+            "(`photos/2024/beach.jpg`), in the order of `files`. Missing folders are made."
+        ),
+    ] = None,
 ) -> list[EntryOut]:
+    """Upload files into `folder`. The app sends one file per request so a big batch
+    never hits a proxy's size limit and one bad file doesn't fail the others."""
+    if paths is not None and len(paths) != len(uploads):
+        raise AppError("Give one path for each file", code="invalid_paths")
     target_dir = files.resolve(folder or ".")
     if not target_dir.is_dir():
         raise AppError("Folder not found", code="not_found")
     saved = []
-    for up in uploads:
-        name = Path(up.filename or "upload").name
-        if not name or name in (".", "..") or name in files.HIDDEN_NAMES:
-            raise AppError(f"Invalid file name: {up.filename}", code="invalid_name")
+    for i, up in enumerate(uploads):
+        name = paths[i] if paths is not None else Path(up.filename or "upload").name
+        if len(name) > 1000:
+            raise AppError("The file path is too long", code="invalid_name")
         data = await up.read(MAX_UPLOAD_BYTES + 1)
         if len(data) > MAX_UPLOAD_BYTES:
             raise AppError(f"{name} is larger than 200 MB", code="file_too_large")
-        dest = files.unique_name(target_dir, name)
-        await asyncio.to_thread(files.write_bytes, files.rel(dest), data, must_not_exist=True)
+        dest = await asyncio.to_thread(files.save_upload, folder, name, data)
         saved.append(_out(files.entry(dest)))
     return saved
 

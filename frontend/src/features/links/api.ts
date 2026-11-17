@@ -35,20 +35,26 @@ export function useUploadToTask(taskId: string) {
   const qc = useQueryClient()
   const set = useSetFiles(taskId)
   return useMutation({
+    // One request per file, so a large batch stays under a proxy's size limit and a file
+    // that fails doesn't keep the others out. The first failure is reported at the end.
     mutationFn: async (files: File[]) => {
-      const form = new FormData()
-      for (const f of files) form.append('files', f)
-      const res = await fetch(`/api/tasks/${taskId}/files/upload`, { method: 'POST', body: form, credentials: 'same-origin' })
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }
-        throw new ApiError(res.status, body.error?.code ?? `http_${res.status}`, body.error?.message ?? t('Upload failed'))
+      let failure: ApiError | null = null
+      for (const f of files) {
+        const form = new FormData()
+        form.append('files', f)
+        const res = await fetch(`/api/tasks/${taskId}/files/upload`, { method: 'POST', body: form, credentials: 'same-origin' })
+          .catch(() => null)
+        if (res?.ok) {
+          set((await res.json()) as TaskFile[])
+          continue
+        }
+        const body = (await res?.json().catch(() => ({}))) as { error?: { code?: string; message?: string } } | undefined
+        failure ??= new ApiError(res?.status ?? 0, body?.error?.code ?? `http_${res?.status ?? 0}`,
+          `${f.name}: ${body?.error?.message ?? (res?.status === 413 ? t('Too large for the server (or a proxy in front of it)') : t('Upload failed'))}`)
       }
-      return (await res.json()) as TaskFile[]
+      if (failure) throw failure
     },
-    onSuccess: (files) => {
-      set(files)
-      void qc.invalidateQueries({ queryKey: ['files'] })
-    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['files'] }),
   })
 }
 

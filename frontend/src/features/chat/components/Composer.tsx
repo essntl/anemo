@@ -1,8 +1,9 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
-import { ArrowUp, MessagesSquare, Paperclip, Plus, Settings2, Square, SquareSlash, X } from 'lucide-react'
+import { ArrowUp, ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
+import { toast } from '@/components/ui/toast'
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { SkillIcon } from '@/features/skills/icons'
@@ -10,7 +11,7 @@ import { localSkills, matchSkills, slashQuery, typedCommand } from '@/features/s
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
-import { isTextField, pastedFiles } from '../pastedFiles'
+import { canReadClipboard, clipboardImages, isTextField, pastedFiles } from '../pastedFiles'
 import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
 import { type ChatRef, ChatPickerDialog, MAX_REFERENCES, ReferenceChip } from './ChatReference'
@@ -206,6 +207,35 @@ export function Composer({
     return () => window.removeEventListener('paste', onPaste)
   }, [disabled, addFiles])
 
+  // Chrome on Android can skip the files in the paste event and hand an image from the
+  // keyboard's clipboard to the box as an input instead ("insertFromPaste" with the
+  // image in `dataTransfer`). A paste handled above never gets here.
+  useEffect(() => {
+    const box = textRef.current
+    if (disabled || !box) return
+    const onBeforeInput = (e: InputEvent) => {
+      if (e.inputType !== 'insertFromPaste') return
+      const pasted = pastedFiles(e.dataTransfer)
+      if (!pasted.length) return
+      e.preventDefault()
+      addFiles(pasted)
+    }
+    box.addEventListener('beforeinput', onBeforeInput)
+    return () => box.removeEventListener('beforeinput', onBeforeInput)
+  }, [disabled, addFiles])
+
+  // Where the browser offers no "Paste" for an image (a text box in Chrome on Android),
+  // the + menu reads it from the clipboard.
+  const pasteImage = async () => {
+    try {
+      const images = await clipboardImages()
+      if (images.length) addFiles(images)
+      else toast({ message: t('There is no image on the clipboard.') })
+    } catch {
+      toast({ message: t("The browser didn't allow reading the clipboard.") })
+    }
+  }
+
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
     setDragging(false)
@@ -335,6 +365,13 @@ export function Composer({
                   <Paperclip className="h-4 w-4 shrink-0 text-muted" />
                   <span className="min-w-0 flex-1">{t('Attach files')}<span className="block text-[12px] font-normal text-muted">{t('Or drop or paste them')}</span></span>
                 </button>
+                {touch && canReadClipboard() && (
+                  <button type="button" className={ADD_ITEM} disabled={files.items.length >= MAX_ATTACHMENTS}
+                    onClick={() => { setAdding(false); void pasteImage() }}>
+                    <ClipboardPaste className="h-4 w-4 shrink-0 text-muted" />
+                    <span className="min-w-0 flex-1">{t('Paste an image')}<span className="block text-[12px] font-normal text-muted">{t('From the clipboard')}</span></span>
+                  </button>
+                )}
                 <button type="button" className={ADD_ITEM} disabled={references.length >= MAX_REFERENCES}
                   onClick={() => { setAdding(false); setPicking(true) }}>
                   <MessagesSquare className="h-4 w-4 shrink-0 text-muted" />

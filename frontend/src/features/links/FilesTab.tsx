@@ -21,7 +21,7 @@ export function FilesTab({ onLink, onImage }: { onLink: (entry: Entry) => void; 
 
   const uploadFiles = async (files: File[]) => {
     const folder = unwrap(await api.GET('/api/files/upload-folder', { params: { query: project ? { project_id: project.id } : {} } }))
-    const saved = await upload.mutateAsync({ folder, files })
+    const { saved } = await upload.mutateAsync({ folder, files })
     if (saved[0]) choose(saved[0])
   }
 

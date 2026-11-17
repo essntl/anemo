@@ -191,6 +191,40 @@ def copy(src: str, dst: str, keep_both: bool = False) -> tuple[Path, Path]:
     return source, target
 
 
+MAX_UPLOAD_DEPTH = 32
+
+
+def save_upload(folder: str, name: str, data: bytes) -> Path:
+    """Save an uploaded file in `folder` and return where it went.
+
+    `name` is a file name, or for a folder upload the path inside the folder that was
+    uploaded ("photos/2024/beach.jpg"). Missing folders on the way are made and folders
+    that exist are reused, so uploading a folder twice merges it; a file whose name is
+    taken gets a number ("beach (1).jpg") rather than replacing anything.
+    """
+    base = resolve(folder or ".")
+    if not base.is_dir():
+        raise AppError("Folder not found", code="not_found")
+    parts = name.replace("\\", "/").split("/")
+    if (
+        len(parts) > MAX_UPLOAD_DEPTH
+        or any(p.strip() in ("", ".", "..") or p in HIDDEN_NAMES for p in parts)
+        or "\x00" in name
+    ):
+        raise AppError(f"Invalid file name: {name}", code="invalid_name")
+    # Through resolve() again: a folder on the way may be a link out of the workspace.
+    target_dir = resolve("/".join([rel(base), *parts[:-1]]).lstrip("/") or ".")
+    if target_dir.exists() and not target_dir.is_dir():
+        raise Conflict(f"A file is in the way of the folder {rel(target_dir)}", code="exists")
+    try:
+        safe_fs.make_dirs(target_dir)
+    except (FileExistsError, NotADirectoryError) as exc:
+        raise Conflict(f"A file is in the way of the folder for {name}", code="exists") from exc
+    dest = unique_name(target_dir, parts[-1])
+    write_bytes(rel(dest), data, must_not_exist=True)
+    return dest
+
+
 def unique_name(folder: Path, name: str) -> Path:
     """`name`, or `name (1)`, `name (2)`, ... if taken."""
     candidate = folder / name

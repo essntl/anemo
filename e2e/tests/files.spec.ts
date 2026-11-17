@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, type APIRequestContext, type Page, test } from '@playwright/test'
 import { login, signOutAfterEach } from './helpers'
 
@@ -113,5 +116,40 @@ test('files and documents go into a project without typing a path', async ({ pag
     if (docId) await page.request.delete(`/api/documents/${docId}`)
     await page.request.delete(`/api/projects/${project.id}`)
     await cleanUp(page.request, [base, project.files_path, project.documents_path])
+  }
+})
+
+test('upload many files at once, and a whole folder with the folders inside it', async ({ page }) => {
+  await login(page)
+  const base = `e2e-upload-${mark()}`
+  const disk = mkdtempSync(join(tmpdir(), 'anemo-e2e-'))
+  mkdirSync(join(disk, 'album', '2024'), { recursive: true })
+  writeFileSync(join(disk, 'album', 'cover.txt'), 'cover')
+  writeFileSync(join(disk, 'album', '2024', 'a.txt'), 'a')
+  writeFileSync(join(disk, 'album', '2024', 'b.txt'), 'b')
+  const names = async (path: string) =>
+    ((await (await page.request.get('/api/files', { params: { path } })).json()) as { entries: { name: string }[] }).entries.map((e) => e.name)
+  try {
+    await page.request.post('/api/files/folder', { data: { path: base } })
+    await page.goto(`/files?path=${base}`)
+
+    // Forty files in one go: each goes up in its own request, with progress.
+    const many = Array.from({ length: 40 }, (_, i) => ({ name: `n${String(i).padStart(2, '0')}.txt`, mimeType: 'text/plain', buffer: Buffer.from(`file ${i}`) }))
+    const files = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: 'Upload', exact: true }).click()
+    await (await files).setFiles(many)
+    await expect(row(page, 'n39.txt')).toBeVisible()
+    await expect.poll(async () => (await names(base)).length).toBe(40)
+
+    // A folder keeps its structure.
+    const folder = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: 'Upload a folder' }).click()
+    await (await folder).setFiles(join(disk, 'album'))
+    await expect(row(page, 'album')).toBeVisible()
+    await expect.poll(() => names(`${base}/album`)).toEqual(['2024', 'cover.txt'])
+    expect(await names(`${base}/album/2024`)).toEqual(['a.txt', 'b.txt'])
+  } finally {
+    await cleanUp(page.request, [base])
+    rmSync(disk, { recursive: true, force: true })
   }
 })

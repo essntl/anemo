@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pastedFiles } from './pastedFiles'
+import { canReadClipboard, clipboardImages, pastedFiles } from './pastedFiles'
 
 const at = new Date(2026, 10, 7, 9, 5, 3)
 
@@ -27,5 +27,26 @@ describe('pastedFiles', () => {
   it('finds nothing in a text paste', () => {
     expect(pastedFiles({ files: [], items: [{ kind: 'string', getAsFile: () => null }] } as unknown as DataTransfer)).toEqual([])
     expect(pastedFiles(null)).toEqual([])
+  })
+})
+
+describe('clipboardImages', () => {
+  it('reads the images on the clipboard and names them, skipping text', async () => {
+    const png = new Blob(['x'], { type: 'image/png' })
+    const clipboard = {
+      read: async () => [
+        { types: ['text/plain'], getType: async () => new Blob(['hi']) },
+        { types: ['text/html', 'image/png'], getType: async (type: string) => (type === 'image/png' ? png : new Blob()) },
+      ],
+    } as unknown as Clipboard
+    expect(canReadClipboard(clipboard)).toBe(true)
+    const [image, ...rest] = await clipboardImages(clipboard, at)
+    expect(rest).toEqual([])
+    expect([image.name, image.type, image.size]).toEqual(['Pasted image 09.05.03.png', 'image/png', 1])
+  })
+
+  it('is not offered without the Clipboard API', () => {
+    expect(canReadClipboard(undefined)).toBe(false)
+    expect(canReadClipboard({ writeText: async () => undefined } as unknown as Clipboard)).toBe(false)
   })
 })

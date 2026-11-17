@@ -61,3 +61,21 @@ test('paste a screenshot or a file and send it without writing anything', async 
     if (conversationId) await page.request.delete(`/api/conversations/${conversationId}`).catch(() => undefined)
   }
 })
+
+test('an image handed to the message box as an input (Chrome on Android) is attached', async ({ page }) => {
+  await login(page)
+  const models = await fakeModels(page.request)
+  await newChat(page, 'Chat', models.echo)
+  // Chrome on Android can give a pasted image to the box as "insertFromPaste" input with
+  // the image in dataTransfer, and no files in a paste event.
+  const prevented = await page.evaluate((base64) => {
+    const data = new DataTransfer()
+    data.items.add(new File([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], 'image.png', { type: 'image/png' }))
+    const event = new InputEvent('beforeinput', { inputType: 'insertFromPaste', dataTransfer: data, bubbles: true, cancelable: true })
+    document.querySelector('textarea')!.dispatchEvent(event)
+    return event.defaultPrevented
+  }, PNG)
+  expect(prevented).toBe(true)
+  await expect(page.getByText(/^Pasted image \d\d\.\d\d\.\d\d\.png$/)).toBeVisible()
+  await expect(page.locator('textarea')).toHaveValue('')
+})
