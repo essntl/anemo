@@ -43,11 +43,12 @@ message box stays disabled and tells you so.
 
 | Part | Start it with | What it adds |
 |---|---|---|
-| Browser | `docker compose --profile browser up -d` | Agents can open pages, click and type in a real browser. About 1.5 GB image. |
+| Browser | `docker compose --profile browser up -d` | Agents can open pages, click and type in a real browser. About 1.3 GB image. |
 | MCP host | `docker compose --profile mcp up -d` | Runs local MCP servers (`npx …`, `uvx …`). Remote MCP servers by URL do not need it. |
+| Claude runner | `docker compose --profile claude up -d` | Your Claude subscription (Pro or Max) as a model provider. See [claude-code.md](claude-code.md). |
 
 To keep them on after every `docker compose up -d`, put `COMPOSE_PROFILES=browser,mcp`
-in `.env`.
+in `.env` (add `claude` for the Claude runner).
 
 Web search needs a SearXNG instance of your own with the JSON format enabled; set
 its address in **Settings → Web & Search**.
@@ -56,11 +57,75 @@ its address in **Settings → Web & Search**.
 
 See the README section *ZimaOS / CasaOS* and
 [`deploy/zimaos/docker-compose.yml`](../deploy/zimaos/docker-compose.yml): one file
-with prebuilt images, no `.env` needed.
+with prebuilt images, no `.env` needed. That file has no profiles: the browser, the
+MCP host and the Claude runner are always started, so where the app suggests a
+command with `--profile …`, plain `docker compose up -d` does the same.
+
+## More than one copy on a server
+
+Anemo has one user, so each person gets their own copy. Copy the ZimaOS file into a
+new folder (for example `/DATA/AppData/anemo-2`) and change, so nothing clashes:
+
+- `name:` at the top (for example `anemo-2`): container, volume and network names
+  start with it;
+- the published port (`"8485:8080"`, and `port_map` at the bottom);
+- every `/DATA/AppData/anemo/` path to the new folder;
+- `APP_SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, the database password and
+  `PUBLIC_URL`: each copy has its own.
+
+Each copy makes seven Docker networks, and Docker only has room for about 30 with
+automatic addresses, shared with every other app on the server. When they run out,
+`docker compose up -d` stops with *all predefined address pools have been fully
+subnetted*. Give the copy its own small address ranges instead: replace the
+`networks:` block at the bottom of its file with the one below, using a different
+third number for each copy (`10.84.2.x`, `10.84.3.x`, …; pick another prefix if your
+home network itself uses `10.84`).
+
+```yaml
+networks:
+  core:
+    ipam:
+      config:
+        - subnet: 10.84.2.0/28
+  sandbox_int:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.84.2.16/28
+  sandbox_net_int:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.84.2.32/28
+  mcp_int:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.84.2.48/28
+  browser_int:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.84.2.64/28
+  claude_int:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.84.2.80/28
+  egress:
+    ipam:
+      config:
+        - subnet: 10.84.2.96/28
+```
+
+If a start already failed with that error, run `docker compose down` in the copy's
+folder first (it removes the networks that were made), then `docker compose up -d`.
+A copy that already runs keeps the addresses it has and needs no change.
 
 ## Behind Nginx Proxy Manager
 
-Create a proxy host for `http://<docker-host>:8080` with this custom configuration,
+Create a proxy host for `http://<docker-host>:8080` (port `8484` with the ZimaOS
+file) with this custom configuration,
 so live answers are not buffered or cut off:
 
 ```nginx
