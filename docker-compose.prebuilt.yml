@@ -1,0 +1,359 @@
+# Anemo from the prebuilt images on GitHub's registry (x86-64 and ARM64), with no
+# build and no .env file: everything is set in this file.
+#   ghcr.io/essntl/anemo                the app and its background worker
+#   ghcr.io/essntl/anemo-sandbox        the isolated shells agents run commands in
+#   ghcr.io/essntl/anemo-browser        a browser agents can drive
+#   ghcr.io/essntl/anemo-mcp-host       runs local MCP servers (`npx ...`, `uvx ...`)
+#   ghcr.io/essntl/anemo-claude-runner  your Claude subscription as a model
+#
+# HOW TO USE IT
+#  1. Make a folder for Anemo (on ZimaOS: /DATA/AppData/anemo) and save this file
+#     in it as docker-compose.yml. Your data is kept next to it, in workspace/,
+#     data/ and postgres/.
+#  2. Replace every CHANGE_ME below:
+#       APP_SECRET_KEY   at least 32 random letters and digits (the app refuses to
+#                        start while it is CHANGE_ME). Keep a copy: without it,
+#                        saved provider keys cannot be read again.
+#       ADMIN_PASSWORD   the password you log in with
+#       the database password, twice, the same both times: inside DATABASE_URL and
+#                        as POSTGRES_PASSWORD (letters and digits only)
+#     and set PUBLIC_URL to the address you open in the browser (port 8484).
+#     The filled-in file contains your passwords: keep it private.
+#  3. In that folder run:
+#       docker compose pull
+#       docker compose up -d
+#  4. Open http://<server>:8484 and log in. For your Claude subscription (optional):
+#       docker exec -it anemo-claude-runner claude auth login
+#     then add a provider of type "Claude subscription (Claude Code)" in
+#     Settings > Providers & Models.
+#
+# Update later:  docker compose pull && docker compose up -d
+# Logs:          docker logs anemo-worker   (or anemo-app, anemo-claude-runner, ...)
+
+name: anemo
+
+x-settings: &settings
+  # --- CHANGE THESE -----------------------------------------------------------
+  APP_SECRET_KEY: "CHANGE_ME"
+  ADMIN_USERNAME: admin
+  ADMIN_PASSWORD: "CHANGE_ME"
+  # The same password as POSTGRES_PASSWORD further down goes in this address.
+  DATABASE_URL: "postgresql+asyncpg://aiw:CHANGE_ME@postgres:5432/aiw"
+  # The address you open in the browser (used for links in notifications).
+  PUBLIC_URL: "http://CHANGE_ME:8484"
+  TZ: UTC
+  # ---------------------------------------------------------------------------
+  # "false" for plain http:// on your home network; "true" behind https://.
+  COOKIE_SECURE: "false"
+  ENV: production
+  FORWARDED_ALLOW_IPS: 172.16.0.0/12
+  LOG_LEVEL: INFO
+  REDIS_URL: redis://valkey:6379/0
+  # Optional: your SearXNG address for web search (can also be set in Settings).
+  SEARXNG_URL: ""
+  TRUSTED_PROXIES: 172.16.0.0/12
+  WORKER_CONCURRENCY: "4"
+
+x-icon: &icon
+  icon: https://raw.githubusercontent.com/essntl/anemo/main/frontend/public/icons/icon-192.png
+
+services:
+  # Makes the folders and volumes the other containers write to belong to them.
+  init:
+    container_name: anemo-init
+    image: busybox:1.37
+    restart: "no"
+    labels: *icon
+    command:
+      - sh
+      - -c
+      - mkdir -p /workspace /data && chown 1000:1000 /workspace /data /own/* && chmod 700 /own/sandbox-ssh
+    volumes:
+      - ./workspace:/workspace
+      - ./data:/data
+      - sandbox-home:/own/sandbox-home
+      - sandbox-net-home:/own/sandbox-net-home
+      - sandbox-token:/own/sandbox-token
+      - sandbox-net-token:/own/sandbox-net-token
+      - sandbox-ssh:/own/sandbox-ssh
+      - mcp-host-home:/own/mcp-host-home
+      - mcp-host-token:/own/mcp-host-token
+      - browser-token:/own/browser-token
+      - claude-config:/own/claude-config
+      - claude-runner-token:/own/claude-runner-token
+    network_mode: none
+
+  postgres:
+    container_name: anemo-postgres
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    labels: *icon
+    environment:
+      POSTGRES_DB: aiw
+      POSTGRES_PASSWORD: "CHANGE_ME"
+      POSTGRES_USER: aiw
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiw -d aiw -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [core]
+
+  valkey:
+    container_name: anemo-valkey
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    labels: *icon
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [core]
+
+  migrate:
+    container_name: anemo-migrate
+    image: ghcr.io/essntl/anemo:latest
+    restart: "no"
+    labels: *icon
+    command: ["alembic", "upgrade", "head"]
+    environment: *settings
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [core]
+
+  app:
+    container_name: anemo-app
+    image: ghcr.io/essntl/anemo:latest
+    restart: unless-stopped
+    labels: *icon
+    environment: *settings
+    ports:
+      - "8484:8080"
+    volumes:
+      - ./data:/data
+      - ./workspace:/workspace
+      - sandbox-ssh:/run/sandbox-ssh:ro
+      - browser-token:/run/browser-token:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [core, browser_int]
+
+  worker:
+    container_name: anemo-worker
+    image: ghcr.io/essntl/anemo:latest
+    restart: unless-stopped
+    labels: *icon
+    command: ["python", "-m", "app.main_worker"]
+    environment: *settings
+    volumes:
+      - ./data:/data
+      - ./workspace:/workspace
+      - sandbox-token:/run/sandbox-token/sandbox:ro
+      - sandbox-net-token:/run/sandbox-token/sandbox-net:ro
+      - mcp-host-token:/run/mcp-host-token:ro
+      - browser-token:/run/browser-token:ro
+      - claude-runner-token:/run/claude-runner-token:ro
+    stop_grace_period: 30s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.cli", "worker-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks: [core, sandbox_int, sandbox_net_int, mcp_int, browser_int, claude_int]
+
+  sandbox:
+    container_name: anemo-sandbox
+    image: ghcr.io/essntl/anemo-sandbox:latest
+    restart: unless-stopped
+    labels: *icon
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      - ./workspace:/workspace
+      - sandbox-home:/home/agent
+      - sandbox-token:/run/execd
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7070/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [sandbox_int]
+
+  sandbox-net:
+    container_name: anemo-sandbox-net
+    image: ghcr.io/essntl/anemo-sandbox:latest
+    restart: unless-stopped
+    labels: *icon
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    environment:
+      EXECD_SSH: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./workspace:/workspace
+      - sandbox-net-home:/home/agent
+      - sandbox-ssh:/home/agent/.ssh
+      - sandbox-net-token:/run/execd
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7070/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [sandbox_net_int, egress]
+
+  mcp-host:
+    container_name: anemo-mcp-host
+    image: ghcr.io/essntl/anemo-mcp-host:latest
+    restart: unless-stopped
+    labels: *icon
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 1024
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      - mcp-host-home:/home/mcp
+      - mcp-host-token:/run/hostd
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [mcp_int, egress]
+
+  browser:
+    container_name: anemo-browser
+    image: ghcr.io/essntl/anemo-browser:latest
+    restart: unless-stopped
+    labels: *icon
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 1024
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+      - /home/browser:size=256m,mode=1777
+    volumes:
+      - browser-token:/run/browserd
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/opt/browserd/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7090/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [browser_int, egress]
+
+  # Your Claude subscription as a model, through the official Claude Code CLI.
+  # Only the worker can reach it; no workspace, no database, none of the app's
+  # secrets. The Claude login stays in the claude-config volume (mounted here only).
+  claude-runner:
+    container_name: anemo-claude-runner
+    image: ghcr.io/essntl/anemo-claude-runner:latest
+    restart: unless-stopped
+    labels: *icon
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: 2
+    stop_grace_period: 30s
+    environment:
+      LOG_LEVEL: INFO
+      RUNNER_IDLE_S: "900"
+      RUNNER_MAX_PROCESSES: "6"
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      - claude-config:/home/claude/.claude-config
+      - claude-runner-token:/run/claude-runner
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/opt/runnerd/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7100/health', timeout=25)"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 20s
+    networks: [claude_int, egress]
+
+volumes:
+  browser-token:
+  mcp-host-home:
+  mcp-host-token:
+  sandbox-home:
+  sandbox-net-home:
+  sandbox-net-token:
+  sandbox-ssh:
+  sandbox-token:
+  # The Claude Code login (a credential; keep it out of shared backups).
+  claude-config:
+  claude-runner-token:
+
+networks:
+  core:
+  sandbox_int:
+    internal: true
+  sandbox_net_int:
+    internal: true
+  mcp_int:
+    internal: true
+  browser_int:
+    internal: true
+  claude_int:
+    internal: true
+  egress:

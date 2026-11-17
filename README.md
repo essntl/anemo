@@ -710,6 +710,15 @@ tags to correct any of them by hand.
 Provider changes are security-sensitive: if you logged in more than 15 minutes ago
 you will be asked to confirm your password.
 
+### Prebuilt images, no build
+
+[`docker-compose.prebuilt.yml`](docker-compose.prebuilt.yml) runs Anemo from the
+images on GitHub's registry (x86-64 and ARM64) with no checkout, no build and no
+`.env`. Save it in a folder of its own as `docker-compose.yml`, replace every
+`CHANGE_ME` (the comments at the top say what goes where), then run
+`docker compose pull && docker compose up -d` there and open `http://<server>:8484`.
+Your data is kept next to the file (`workspace/`, `data/`, `postgres/`).
+
 ### ZimaOS / CasaOS (prebuilt images)
 
 Images for 64-bit Intel/AMD and ARM machines (Apple Silicon, Raspberry Pi 4/5, ARM
