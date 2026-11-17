@@ -111,7 +111,9 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          # <image>-digest-<arch>: the merge job's pattern for `anemo` must not also
+          # match `anemo-sandbox` and the others.
+          name: ${{ matrix.image }}-digest-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -142,7 +144,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-${{ matrix.image }}-*
+          pattern: ${{ matrix.image }}-digest-*
           merge-multiple: true
 
       # Never publish a tag that is missing one of the CPU types.
