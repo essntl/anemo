@@ -20,17 +20,26 @@ export default defineConfig({
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: [/mobile\.spec\.ts/, /automations\.spec\.ts/],
+      testIgnore: [/mobile\.spec\.ts/, /automations\.spec\.ts/, /pages-and-language\.spec\.ts/],
     },
     // Phone size with touch (pointer: coarse), Chromium-based so no extra browser is needed.
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /mobile\.spec\.ts/ },
-    // Runs after the others: its notification pops up in every open tab of the app,
+    // Runs after the others, with nothing beside it: it switches the app's language and
+    // turns pages off for everyone, so a test logging in at the same time on the other
+    // worker would see Ukrainian menus or a page missing.
+    {
+      name: 'app-wide',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /pages-and-language\.spec\.ts/,
+      dependencies: ['desktop', 'mobile'],
+    },
+    // Runs last: its notification pops up in every open tab of the app,
     // where it could get in the way of another test's clicks.
     {
       name: 'notifications',
       use: { ...devices['Desktop Chrome'] },
       testMatch: /automations\.spec\.ts/,
-      dependencies: ['desktop', 'mobile'],
+      dependencies: ['app-wide'],
     },
   ],
 })
