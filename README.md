@@ -712,8 +712,9 @@ you will be asked to confirm your password.
 
 ### ZimaOS / CasaOS (prebuilt images)
 
-Images for 64-bit Intel/AMD machines are built from `main` on every change and
-published to GitHub's registry: `ghcr.io/essntl/anemo:latest` (app and worker),
+Images for 64-bit Intel/AMD and ARM machines (Apple Silicon, Raspberry Pi 4/5, ARM
+servers) are built from `main` on every change and published to GitHub's registry:
+`ghcr.io/essntl/anemo:latest` (app and worker),
 `ghcr.io/essntl/anemo-sandbox` (the shell sandbox), `-browser` (the agents' browser),
 `-mcp-host` (local MCP servers) and `-claude-runner` (the Claude subscription
 provider). Older builds are also on Docker Hub (`essntl/anemo`).

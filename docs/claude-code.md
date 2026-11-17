@@ -20,9 +20,9 @@ as before.
    docker compose --profile claude up -d
    ```
 
-   This builds the image on your machine. On x86-64 you can pull a prebuilt one
-   instead: add `CLAUDE_RUNNER_IMAGE=ghcr.io/essntl/anemo-claude-runner:latest` to
-   `.env`, then run `docker compose --profile claude pull claude-runner` before the
+   This builds the image on your machine. You can pull a prebuilt one (x86-64 or
+   ARM64) instead: add
+   `CLAUDE_RUNNER_IMAGE=ghcr.io/essntl/anemo-claude-runner:latest` to `.env`, then run `docker compose --profile claude pull claude-runner` before the
    command above. The prebuilt image runs as user id 1000; if your `PUID` is
    different, build it yourself so the worker can read the runner's token. It is
    published by `.github/workflows/images.yml`; each runner image is also
