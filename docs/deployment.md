@@ -174,6 +174,16 @@ build doesn't (`compare/<commit>...main`) and Settings → Advanced shows them. 
 it off there, or with `UPDATE_CHECK=false` in `.env`; `UPDATE_REPO` (default
 `essntl/anemo`) points it at another repository. Nothing is ever installed by itself.
 
+**Installed from a checkout before the project was renamed?** The compose project
+used to be called `ai-workspace`, and Docker names the volumes after it
+(`ai-workspace_pgdata`, …). It is now `anemo`, so an update would start with new,
+empty volumes. To keep using your existing ones, add this line to `.env` before
+you update (your data is untouched either way):
+
+```
+COMPOSE_PROJECT_NAME=ai-workspace
+```
+
 Database changes are applied automatically by the `migrate` service before the app
 starts. Make a backup first (see [backup.md](backup.md)); going back to an older
 version after the database was upgraded means restoring that backup.
