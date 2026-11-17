@@ -26,8 +26,8 @@ wave starts once everything before it is merged.
 | 3 | **5** First-run setup and update notice | Last, because it uses the others: its notifications step turns on push (4), and it can point to the shortcut sheet (1) and the Home widgets (2). |
 
 Every pull request: backend and frontend tests, an end-to-end test with the fake
-provider, `make test`, `make lint` and `make gen-api` passing, the README section for
-the feature written or updated, and the feature marked done here.
+provider, `make test`, `make lint` and `make gen-api` passing, the section for the
+feature in `docs/features.md` written or updated, and the feature marked done here.
 
 ---
 
