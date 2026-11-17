@@ -23,6 +23,9 @@ frontend/src/api/schema.d.ts.bak
 *.rdb
 /data/
 /workspace-dev/
+# docker-compose.prebuilt.yml, if started from a checkout
+/workspace/
+/postgres/
 *.log
 
 # e2e artifacts
