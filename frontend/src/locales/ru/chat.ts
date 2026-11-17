@@ -187,5 +187,9 @@ const messages: Messages = {
   "Temporary chat, {time} left": "Временный чат, осталось {time}",
   "The temporary chat was deleted.": "Временный чат удалён.",
   "Upload failed": "Не удалось загрузить",
+  "There is no image on the clipboard.": "В буфере обмена нет изображения.",
+  "The browser didn't allow reading the clipboard.": "Браузер не разрешил прочитать буфер обмена.",
+  "Paste an image": "Вставить изображение",
+  "From the clipboard": "Из буфера обмена",
 }
 export default messages

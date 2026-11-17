@@ -1570,7 +1570,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload */
+        /**
+         * Upload
+         * @description Upload files into `folder`. The app sends one file per request so a big batch
+         *     never hits a proxy's size limit and one bad file doesn't fail the others.
+         */
         post: operations["upload_api_files_upload_post"];
         delete?: never;
         options?: never;
@@ -3958,6 +3962,11 @@ export interface components {
              * @default
              */
             folder: string;
+            /**
+             * Paths
+             * @description For a folder upload: each file's path inside the uploaded folder (`photos/2024/beach.jpg`), in the order of `files`. Missing folders are made.
+             */
+            paths?: string[] | null;
         };
         /** Body_upload_asset_api_documents_assets_post */
         Body_upload_asset_api_documents_assets_post: {

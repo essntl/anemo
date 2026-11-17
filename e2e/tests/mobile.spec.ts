@@ -360,7 +360,7 @@ test('files: open a file full screen, go back, and use the row menu', async ({ p
     await answerPrompt(page, 'note.md')
     // The editor takes the whole screen; the list is hidden until you go back.
     await expect(page.locator('.cm-content')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Upload' })).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeHidden()
     await page.getByRole('button', { name: 'Close' }).click()
     await expect(page.getByRole('button', { name: 'note.md', exact: true })).toBeVisible()
 
@@ -497,6 +497,28 @@ test('chat on a phone: send with the button, Enter adds a new line', async ({ pa
   }
   await expect(page.getByRole('button', { name: 'Regenerate' })).toBeVisible()
   expect(await page.evaluate(() => document.scrollingElement!.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(0)
+})
+
+test('chat on a phone: "Paste an image" in the + menu attaches the image on the clipboard', async ({ page, context, baseURL }) => {
+  // Chrome on Android offers no "Paste" for an image in a text box; the menu reads it.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(baseURL!).origin })
+  await login(page)
+  const models = await fakeModels(page.request)
+  await page.goto('/')
+  await page.getByRole('radio', { name: 'Chat' }).click()
+  await pickModel(page, models.echo)
+  await page.bringToFront() // the clipboard is only for a focused page
+  await page.evaluate(async () => {
+    // A 1x1 PNG drawn on a canvas: the clipboard takes only images the browser can decode.
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const blob = await new Promise<Blob>((ok) => canvas.toBlob((b) => ok(b!), 'image/png'))
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+  })
+  await page.getByRole('button', { name: 'Add to the message' }).click()
+  await page.getByRole('button', { name: /Paste an image/ }).click()
+  await expect(page.getByText(/^Pasted image \d\d\.\d\d\.\d\d\.png$/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Send' })).toBeEnabled()
 })
 
 test('installable: manifest, icons and a service worker that never caches /api', async ({ page, context }) => {

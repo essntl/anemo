@@ -64,6 +64,61 @@ async def test_upload_folder_move_and_names(authed, clean_workspace):
     assert [h["path"] for h in hits] == ["docs/sub/b.txt"]
 
 
+async def test_folder_upload_keeps_the_structure(authed, clean_workspace):
+    files = [
+        ("files", ("beach.jpg", b"one")),
+        ("files", ("notes.md", b"two")),
+        ("files", ("top.txt", b"three")),
+    ]
+    paths = ["photos/2024/beach.jpg", "photos/notes.md", "photos/top.txt"]
+    r = await authed.post("/api/files/upload", files=files, data={"folder": "docs", "paths": paths})
+    assert r.status_code == 201
+    assert [e["path"] for e in r.json()] == [
+        "docs/photos/2024/beach.jpg",
+        "docs/photos/notes.md",
+        "docs/photos/top.txt",
+    ]
+    assert (clean_workspace / "docs" / "photos" / "2024" / "beach.jpg").read_bytes() == b"one"
+    # The app sends one file per request: the folder made by the first is reused, and
+    # a name that is taken gets a number instead of replacing the file.
+    r = await authed.post(
+        "/api/files/upload",
+        files=[("files", ("beach.jpg", b"again"))],
+        data={"folder": "docs", "paths": ["photos/2024/beach.jpg"]},
+    )
+    assert r.status_code == 201 and r.json()[0]["path"] == "docs/photos/2024/beach (1).jpg"
+    assert (clean_workspace / "docs" / "photos" / "2024" / "beach.jpg").read_bytes() == b"one"
+    # Into the workspace root as well.
+    r = await authed.post(
+        "/api/files/upload", files=[("files", ("a.txt", b"x"))], data={"paths": ["new/a.txt"]}
+    )
+    assert r.status_code == 201 and r.json()[0]["path"] == "new/a.txt"
+
+
+@pytest.mark.parametrize(
+    "path", ["../escape.txt", "photos/../../escape.txt", "/abs.txt", "a//b.txt", ".trash/x.txt"]
+)
+async def test_folder_upload_refuses_bad_paths(authed, clean_workspace, path):
+    r = await authed.post(
+        "/api/files/upload", files=[("files", ("x.txt", b"x"))], data={"paths": [path]}
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_name"
+    assert not (clean_workspace.parent / "escape.txt").exists()
+
+
+async def test_folder_upload_needs_a_path_for_each_file(authed, clean_workspace):
+    files = [("files", ("a.txt", b"a")), ("files", ("b.txt", b"b"))]
+    r = await authed.post("/api/files/upload", files=files, data={"paths": ["a.txt"]})
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_paths"
+    # A file where a folder of the upload should go is a conflict, not a server error.
+    r = await authed.post(
+        "/api/files/upload",
+        files=[("files", ("x.txt", b"x"))],
+        data={"paths": ["readme.md/x.txt"], "folder": "docs"},
+    )
+    assert r.status_code == 409 and r.json()["error"]["code"] == "exists"
+
+
 async def test_copy_and_paste_keeping_both(authed, clean_workspace):
     (clean_workspace / "docs" / "sub").mkdir()
     (clean_workspace / "docs" / "sub" / "note.txt").write_text("hi")

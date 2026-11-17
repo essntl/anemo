@@ -15,6 +15,7 @@ import {
   Folder,
   FolderKanban,
   FolderPlus,
+  FolderUp,
   HardDrive,
   Pencil,
   Scissors,
@@ -37,7 +38,7 @@ import { api } from '@/api/client'
 import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
 import { formatSize } from '@/lib/format'
-import { dateLocale, rich, t } from '@/lib/i18n'
+import { dateLocale, plural, rich, t } from '@/lib/i18n'
 import {
   downloadUrl,
   type Entry,
@@ -55,6 +56,7 @@ import {
 import { cannotPaste, useClipboard } from './clipboard'
 import { FilePreview } from './components/FilePreview'
 import { TrashDialog } from './components/TrashDialog'
+import { canPickFolders, failureSummary, itemsFromDrop, itemsFromFiles, type UploadItem } from './upload'
 
 function Breadcrumbs({ path, onOpen }: { path: string; onOpen: (path: string) => void }) {
   const parts = path ? path.split('/') : []
@@ -258,6 +260,7 @@ export function FilesPage() {
   const makeFolder = useMakeFolder()
   const saveFile = useSaveFile()
   const upload = useUpload()
+  const [foldersPickable] = useState(canPickFolders)
 
   const go = (next: { path?: string; file?: string | null }) => {
     const p = new URLSearchParams()
@@ -293,17 +296,27 @@ export function FilesPage() {
       toast({ message: errorMessage(err) }) // e.g. a file with that name exists
     }
   }
-  const pickFiles = () => {
+  const uploadItems = (items: UploadItem[]) => {
+    if (!items.length) return
+    upload.mutate({ folder: path, files: items }, {
+      onSuccess: (result) => {
+        if (result.failed.length) toast({ message: failureSummary(result), duration: 10000 })
+      },
+    })
+  }
+  const pick = (folders: boolean) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.multiple = true
-    input.onchange = () => input.files && upload.mutate({ folder: path, files: Array.from(input.files) })
+    input.webkitdirectory = folders
+    input.onchange = () => input.files && uploadItems(itemsFromFiles(input.files))
     input.click()
   }
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
     setDragging(false)
-    if (e.dataTransfer.files.length) upload.mutate({ folder: path, files: Array.from(e.dataTransfer.files) })
+    // Folders are walked: their files go up with the folder structure.
+    itemsFromDrop(e.dataTransfer).then(uploadItems, (err: unknown) => toast({ message: errorMessage(err) }))
   }
 
   // A link to a file (/files?path=<file>, from a document or task) opens its folder with
@@ -357,10 +370,19 @@ export function FilesPage() {
           {/* With a file open beside the list the buttons are icons only (they keep their names for screen readers, with a tooltip). */}
           <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label={t('File')} title={t('New file')} icon={<FilePlus className="h-3.5 w-3.5" />} onClick={() => void newFile()}>{!compact && t('File')}</Button>
           <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label={t('Folder')} title={t('New folder')} icon={<FolderPlus className="h-3.5 w-3.5" />} onClick={() => void newFolder()}>{!compact && t('Folder')}</Button>
-          <Button size="sm" variant="secondary" className={cn(compact && 'px-2')} aria-label={t('Upload')} title={t('Upload files')} icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={pickFiles}>{!compact && t('Upload')}</Button>
+          <Button size="sm" variant="secondary" className={cn(compact && 'px-2')} aria-label={t('Upload')} title={t('Upload files')} icon={<Upload className="h-3.5 w-3.5" />} loading={upload.isPending} onClick={() => pick(false)}>{!compact && t('Upload')}</Button>
+          {foldersPickable && <Button size="sm" variant="ghost" className="px-2" aria-label={t('Upload a folder')} title={t('Upload a folder')} icon={<FolderUp className="h-3.5 w-3.5" />} disabled={upload.isPending} onClick={() => pick(true)} />}
           <Button size="sm" variant="ghost" className={cn(compact && 'px-2')} aria-label={t('Trash')} title={t('Deleted files')} icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>{!compact && t('Trash')}</Button>
         </header>
         {error && <div className="border-b border-border bg-error/8 px-4 py-2 text-[12.5px] text-error">{errorMessage(error)}</div>}
+        {upload.progress && upload.progress.total > 1 && (
+          <div role="status" className="border-b border-border px-4 py-2 text-[12.5px] text-muted">
+            {plural(upload.progress.total, 'Uploading {done} of {n} file…', 'Uploading {done} of {n} files…', { done: upload.progress.done })}
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-2">
+              <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${(upload.progress.done / upload.progress.total) * 100}%` }} />
+            </div>
+          </div>
+        )}
         {!searching && <PasteBar folder={path} />}
         <div
           className={cn('min-h-0 flex-1 overflow-y-auto', dragging && 'bg-accent-soft')}

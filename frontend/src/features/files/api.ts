@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
 import { t } from '@/lib/i18n'
+import { failureSummary, type UploadItem, type UploadProgress, type UploadResult, uploadAll } from './upload'
 
 export type Entry = Schemas['EntryOut']
 export type TrashItem = Schemas['TrashItemOut']
@@ -114,20 +116,29 @@ export function usePurge() {
   })
 }
 
+/**
+ * Upload files (or the files of folders, with their paths) into a folder, one request per
+ * file. Resolves with what was saved and what wasn't; fails only if nothing could be
+ * uploaded. `progress` counts the files done while it runs.
+ */
 export function useUpload() {
   const refresh = useRefresh()
-  return useMutation({
-    mutationFn: async ({ folder, files }: { folder: string; files: File[] }) => {
-      const form = new FormData()
-      form.append('folder', folder)
-      files.forEach((f) => form.append('files', f))
-      const res = await fetch('/api/files/upload', { method: 'POST', body: form, credentials: 'same-origin' })
-      const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }
-      if (!res.ok) throw new ApiError(res.status, body.error?.code ?? 'upload_failed', body.error?.message ?? t('Upload failed'))
-      return body as unknown as Entry[]
+  const [progress, setProgress] = useState<UploadProgress | null>(null)
+  const mutation = useMutation({
+    mutationFn: async ({ folder, files }: { folder: string; files: (File | UploadItem)[] }): Promise<UploadResult> => {
+      const items = files.map((f) => (f instanceof File ? { file: f, path: f.name } : f))
+      try {
+        const result = await uploadAll(folder, items, { onProgress: setProgress })
+        if (items.length && !result.saved.length) throw new ApiError(0, 'upload_failed', failureSummary(result) || t('Upload failed'))
+        return result
+      } finally {
+        setProgress(null)
+      }
     },
-    onSuccess: refresh,
+    // Some files may be in even when the rest failed.
+    onSettled: refresh,
   })
+  return { ...mutation, progress }
 }
 
 export function downloadUrl(path: string): string {
