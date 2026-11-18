@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 from app.features.tasks.schemas import clean_tags
+from app.providers.base import ReasoningEffort
 
 Tags = Annotated[list[str], AfterValidator(clean_tags)]
 
@@ -160,6 +161,9 @@ class TurnIn(BaseModel):
     # May be empty when files are attached: a message can be just a screenshot.
     text: str = Field("", max_length=200_000)
     model_id: uuid.UUID | None = None
+    # How hard a model that can reason thinks about this answer (None: the default in
+    # Settings > Models).
+    reasoning_effort: ReasoningEffort | None = None
     attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=10)
     # Other chats to give the model as context for this message.
     reference_ids: list[uuid.UUID] = Field(default_factory=list, max_length=5)
@@ -220,6 +224,7 @@ class EditLastIn(BaseModel):
 
     text: str = Field(min_length=1, max_length=200_000)
     model_id: uuid.UUID | None = None
+    reasoning_effort: ReasoningEffort | None = None
 
 
 class BranchIn(BaseModel):

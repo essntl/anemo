@@ -37,6 +37,7 @@ from app.features.runs.models import ACTIVE_STATUSES, Run
 from app.features.skills import service as skills
 from app.features.tasks.schemas import clean_tags
 from app.jobs import queue
+from app.providers.base import ReasoningEffort
 from app.runtime import outputs
 
 # What a message shows of its run: the run's kind ("chat" or "agent") and the
@@ -456,7 +457,10 @@ async def _start_run(
     model_id: uuid.UUID | None,
     user_message_id: uuid.UUID | None,
     mode: str = "chat",
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> Run:
+    """Queue the run that answers `assistant`. A reasoning effort given here is kept in
+    the run's options; without one the worker uses the default in Settings > Models."""
     run = Run(
         kind=mode,
         status="queued",
@@ -466,6 +470,7 @@ async def _start_run(
         assistant_message_id=assistant.id,
         requested_model_id=model_id,
         request=request[:2000],
+        options={"reasoning_effort": reasoning_effort} if reasoning_effort else {},
     )
     db.add(run)
     await db.flush()
@@ -548,6 +553,7 @@ async def send_turn(
     reference_ids: list[uuid.UUID] | None = None,
     skill_id: uuid.UUID | None = None,
     page: PageIn | None = None,
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     conv = await _lock_idle_conversation(db, conversation_id)
     references = await _reference_blocks(db, conv.id, reference_ids or [])
@@ -597,7 +603,9 @@ async def send_turn(
         user.content = [{"type": "research", "session_id": str(research_id)}, *user.content]
     conv.default_mode = mode
     request = text if text.strip() or page is None else f"About the page: {page.title or page.url}"
-    run = await _start_run(db, conv, assistant, request, conv.model_id, user.id, mode)
+    run = await _start_run(
+        db, conv, assistant, request, conv.model_id, user.id, mode, reasoning_effort
+    )
     conv.last_message_at = func.now()
     await db.commit()
     await db.refresh(user)
@@ -606,7 +614,10 @@ async def send_turn(
 
 
 async def regenerate(
-    db: AsyncSession, conversation_id: uuid.UUID, model_id: uuid.UUID | None
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    model_id: uuid.UUID | None,
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> tuple[Run, ChatMessage]:
     """Re-answer the last user message, replacing the last assistant message."""
     conv = await _lock_idle_conversation(db, conversation_id)
@@ -626,7 +637,9 @@ async def regenerate(
         everything = _all_versions(last)
         last.versions, last.version = everything, len(everything)
     last.content, last.text_plain, last.status, last.error = [], "", "streaming", None
-    run = await _start_run(db, conv, last, "(regenerate)", conv.model_id, None, conv.default_mode)
+    run = await _start_run(
+        db, conv, last, "(regenerate)", conv.model_id, None, conv.default_mode, reasoning_effort
+    )
     await db.commit()
     await db.refresh(last)
     return run, last
@@ -682,7 +695,11 @@ async def _last_exchange(
 
 
 async def edit_last(
-    db: AsyncSession, conversation_id: uuid.UUID, text: str, model_id: uuid.UUID | None
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    text: str,
+    model_id: uuid.UUID | None,
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     """Change the text of the last user message and answer it again. Its attachments
     and referenced chats stay."""
@@ -702,7 +719,9 @@ async def edit_last(
     # The earlier answers were to the text as it was before, and so were their files.
     assistant.versions, assistant.version = [], 0
     await attachments.delete_for_message(db, assistant.id)
-    run = await _start_run(db, conv, assistant, text, conv.model_id, user.id, conv.default_mode)
+    run = await _start_run(
+        db, conv, assistant, text, conv.model_id, user.id, conv.default_mode, reasoning_effort
+    )
     conv.last_message_at = func.now()
     files = list(await db.scalars(select(Attachment).where(Attachment.message_id == user.id)))
     await db.commit()

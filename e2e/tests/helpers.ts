@@ -24,12 +24,12 @@ export async function login(page: Page) {
 }
 
 /**
- * Returns the ids of the fake provider's echo/slow/agent models, importing any that
- * are missing. Skips the test when no enabled fake provider exists: the tests must
+ * Returns the ids of the fake provider's echo/slow/agent models (and the `extra` ones
+ * asked for), importing any that are missing. Skips the test when no enabled fake provider exists: the tests must
  * never create or enable providers, or run against a real (paid) model.
  */
-export async function fakeModels(request: APIRequestContext): Promise<Record<string, string>> {
-  const wanted = ['echo', 'slow', 'agent']
+export async function fakeModels(request: APIRequestContext, extra: string[] = []): Promise<Record<string, string>> {
+  const wanted = ['echo', 'slow', 'agent', ...extra]
   type P = { id: string; type: string; enabled: boolean }
   const providers = (await (await request.get('/api/providers')).json()) as P[]
   const fake = providers.find((p) => p.type === 'fake' && p.enabled)

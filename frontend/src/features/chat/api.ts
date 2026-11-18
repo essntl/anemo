@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
+import { type AllSettings, settingsKey, useSettings } from '@/features/settings/api'
 
 export type Conversation = Schemas['ConversationOut']
 export type ChatMessage = Schemas['MessageOut']
@@ -101,8 +102,50 @@ function useApplyTurn() {
   }
 }
 
+export type ReasoningEffort = Schemas['ModelDefaults']['reasoning_effort']
+
+/** The level on the reasoning slider: the saved default (Settings > Models). Sent with
+ *  every message, so an answer thinks as hard as the slider says even while the change
+ *  is still being saved. Undefined until the settings are loaded (the server's default). */
+function chosenEffort(qc: QueryClient): ReasoningEffort | undefined {
+  return qc.getQueryData<AllSettings>(settingsKey)?.models.reasoning_effort
+}
+
+/**
+ * The reasoning effort for chats and its setter. A change shows at once (optimistic)
+ * and is saved as the default in Settings > Models; a failed save puts it back.
+ */
+export function useReasoningEffort() {
+  const qc = useQueryClient()
+  const settings = useSettings()
+  const save = useMutation({
+    mutationFn: async (body: Schemas['ModelDefaults']) =>
+      unwrap(await api.PUT('/api/settings/models', { body })),
+    onMutate: async (body) => {
+      await qc.cancelQueries({ queryKey: settingsKey })
+      const before = qc.getQueryData<AllSettings>(settingsKey)
+      qc.setQueryData<AllSettings>(settingsKey, (old) => (old ? { ...old, models: body } : old))
+      return { before }
+    },
+    onError: (_err, _body, context) => {
+      if (context?.before) qc.setQueryData(settingsKey, context.before)
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: settingsKey }),
+  })
+  const models = settings.data?.models
+  return {
+    value: models?.reasoning_effort ?? 'medium',
+    ready: models !== undefined,
+    error: save.error,
+    set: (level: ReasoningEffort) => {
+      if (models && level !== models.reasoning_effort) save.mutate({ ...models, reasoning_effort: level })
+    },
+  }
+}
+
 export function useSendTurn() {
   const apply = useApplyTurn()
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: async (v: {
       conversationId: string
@@ -127,6 +170,7 @@ export function useSendTurn() {
             mode: v.mode ?? 'chat',
             profile_id: v.profileId ?? null,
             skill_id: v.skillId ?? null,
+            reasoning_effort: chosenEffort(qc),
           },
         }),
       ),
@@ -136,11 +180,15 @@ export function useSendTurn() {
 
 export function useRegenerate() {
   const apply = useApplyTurn()
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: async (v: { conversationId: string; modelId: string | null }) =>
       unwrap(
         await api.POST('/api/conversations/{conversation_id}/regenerate', {
-          params: { path: { conversation_id: v.conversationId }, query: v.modelId ? { model_id: v.modelId } : {} },
+          params: {
+            path: { conversation_id: v.conversationId },
+            query: { ...(v.modelId ? { model_id: v.modelId } : {}), reasoning_effort: chosenEffort(qc) },
+          },
         }),
       ),
     onSuccess: (turn, v) => apply(v.conversationId, turn),
@@ -207,7 +255,7 @@ export function useEditLast() {
       unwrap(
         await api.POST('/api/conversations/{conversation_id}/edit-last', {
           params: { path: { conversation_id: v.conversationId } },
-          body: { text: v.text, model_id: v.modelId },
+          body: { text: v.text, model_id: v.modelId, reasoning_effort: chosenEffort(qc) },
         }),
       ),
     onSuccess: (turn, v) => {

@@ -1,5 +1,9 @@
 """Adapter for the OpenAI Chat Completions API and everything compatible with it:
 OpenAI, OpenRouter, Ollama, vLLM, LM Studio, llama.cpp server, ...
+
+Reasoning effort goes to OpenAI (`reasoning_effort`) and OpenRouter (`reasoning.effort`)
+only; other servers differ too much to guess. Low, medium and high are the levels every
+reasoning model there accepts, so "off" is sent as low and "max" as high.
 """
 
 import json
@@ -23,6 +27,7 @@ from app.providers.base import (
     ReasoningBlock,
     ReasoningComplete,
     ReasoningDelta,
+    ReasoningEffort,
     StopReason,
     TextBlock,
     TextDelta,
@@ -34,6 +39,14 @@ from app.providers.base import (
 from app.providers.catalog import guess_capabilities
 
 log = logging.getLogger(__name__)
+
+OPENAI_EFFORT: dict[ReasoningEffort, str] = {
+    "off": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "max": "high",
+}
 
 _FINISH: dict[str, StopReason] = {
     "stop": "end",
@@ -151,9 +164,9 @@ class OpenAIChatAdapter:
         if self.is_openrouter:
             extra["usage"] = {"include": True}  # OpenRouter then reports cost
             if req.reasoning:
-                extra["reasoning"] = {"effort": req.reasoning_effort or "medium"}
+                extra["reasoning"] = {"effort": OPENAI_EFFORT[req.reasoning_effort or "medium"]}
         elif self.is_openai and req.reasoning and req.reasoning_effort:
-            params["reasoning_effort"] = req.reasoning_effort
+            params["reasoning_effort"] = OPENAI_EFFORT[req.reasoning_effort]
         if extra:
             params["extra_body"] = extra
         return params

@@ -3,7 +3,8 @@
 Enabled only when ENABLE_FAKE_PROVIDER=true (or ENV=test). Behaviour by model:
 
   echo       streams "You said: <last user message>" word by word
-  reasoning  streams a short reasoning section, then echoes
+  reasoning  streams a short reasoning section (naming the reasoning effort asked for),
+             then echoes
   slow       like echo but slower (for testing cancel / reconnect)
   agent      a tiny tool-using agent: plans, lists the workspace, then summarizes
              (asked to "ask me" something: asks the user a question, then repeats
@@ -136,7 +137,9 @@ class FakeAdapter:
 
         delay = 0.25 if req.model == "slow" else 0.02
         if req.model == "reasoning":
-            for word in "Considering the question and planning a short answer.".split():
+            # Says which reasoning effort it was asked for, so tests can see it arrived.
+            effort = f" at {req.reasoning_effort} effort" if req.reasoning_effort else ""
+            for word in f"Considering the question{effort} and planning a short answer.".split():
                 yield ReasoningDelta(word + " ")
                 await asyncio.sleep(delay)
         if prompt.startswith("Write a short, specific title"):

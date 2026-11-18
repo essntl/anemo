@@ -43,6 +43,7 @@ from app.providers.base import (
     ProviderError,
     ProviderEvent,
     ReasoningDelta,
+    ReasoningEffort,
     StopReason,
     TextBlock,
     TextDelta,
@@ -58,6 +59,13 @@ log = logging.getLogger(__name__)
 STATE_VERSION = 1
 CACHE_TTL_S = 3600  # CLAUDE_CODE_PROMPT_CACHE_TTL=1h in the runner
 MAX_CATCHUP_CHARS = 400_000  # rendered history for a new session; older parts are cut
+
+
+def runner_effort(effort: ReasoningEffort | None) -> str | None:
+    """Claude Code's --effort for a level: it has no "off", so that is its lowest, low.
+    A different effort restarts the runner's session (resumed, so it costs a cache miss)."""
+    return "low" if effort == "off" else effort
+
 
 _STOP: dict[str, StopReason] = {
     "end_turn": "end",
@@ -458,7 +466,7 @@ class ClaudeCodeAdapter:
         content.extend(to_api_blocks(req.messages[-1].content) if req.messages else [])
         body = {
             "model": req.model,
-            "effort": req.reasoning_effort,
+            "effort": runner_effort(req.reasoning_effort),
             "system": req.system or "",
             "content": content or [{"type": "text", "text": "."}],
         }
@@ -506,7 +514,7 @@ class ClaudeCodeAdapter:
                 "model": state.get("model")
                 if not p.new_session and state.get("model")
                 else req.model,
-                "effort": req.reasoning_effort,
+                "effort": runner_effort(req.reasoning_effort),
                 "system": req.system or "",
                 "tools": tools,
                 "claude_session_id": None if p.new_session else state.get("claude_session_id"),

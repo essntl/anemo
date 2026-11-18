@@ -12,7 +12,7 @@ from app.features.runs.models import Run
 from app.features.usage.models import UsageRecord
 from app.jobs.models import Job
 from app.providers.adapters.fake import FakeAdapter
-from app.providers.base import ProviderError
+from app.providers.base import ChatRequest, ProviderError
 from app.runtime.chat import execute_chat_run, generate_title
 from tests.conftest import requires_db
 
@@ -188,6 +188,52 @@ async def test_provider_error_fails_run_with_message(authed):
     FakeAdapter.scripts.clear()
     r = await authed.post(f"/api/conversations/{cid}/regenerate")
     assert r.status_code == 202
+
+
+async def test_reasoning_effort_reaches_the_model(authed):
+    ids = await _setup_models(authed, ("reasoning",))
+    cid = await _new_conversation(authed)
+    url = f"/api/conversations/{cid}"
+
+    def sent() -> ChatRequest:
+        # The answer's request (a title request would carry no session).
+        return next(r for r in reversed(FakeAdapter.requests) if r.session_key)
+
+    async def answer(r) -> None:
+        assert r.status_code == 202, r.text
+        await execute_chat_run(uuid.UUID(r.json()["run_id"]))
+
+    # No level with the message: the default in Settings > Models.
+    await answer(await authed.post(f"{url}/turns", json={"text": "one"}))
+    assert sent().reasoning_effort == "medium"
+    r = await authed.put(
+        "/api/settings/models", json={"chat": ids["reasoning"], "reasoning_effort": "high"}
+    )
+    assert r.status_code == 200 and r.json()["reasoning_effort"] == "high"
+    await answer(await authed.post(f"{url}/turns", json={"text": "two"}))
+    assert sent().reasoning_effort == "high"
+
+    # A level chosen with the message wins, for a new message, an answer again and an edit.
+    await answer(
+        await authed.post(f"{url}/turns", json={"text": "three", "reasoning_effort": "max"})
+    )
+    assert sent().reasoning_effort == "max"
+    await answer(await authed.post(f"{url}/regenerate", params={"reasoning_effort": "off"}))
+    assert sent().reasoning_effort == "off"
+    await answer(
+        await authed.post(f"{url}/edit-last", json={"text": "four", "reasoning_effort": "low"})
+    )
+    assert sent().reasoning_effort == "low"
+    # The default itself did not change.
+    assert (await authed.get("/api/settings")).json()["models"]["reasoning_effort"] == "high"
+
+    # Only the five levels exist.
+    r = await authed.post(f"{url}/turns", json={"text": "x", "reasoning_effort": "extreme"})
+    assert r.status_code == 422
+    r = await authed.post(f"{url}/regenerate", params={"reasoning_effort": "xhigh"})
+    assert r.status_code == 422
+    r = await authed.put("/api/settings/models", json={"reasoning_effort": "ultra"})
+    assert r.status_code == 422
 
 
 async def test_regenerate_keeps_the_earlier_answers_as_versions(authed):

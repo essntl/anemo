@@ -290,7 +290,10 @@ test('adding models: capability tags are behind one button per model', async ({ 
   // The tags are not in the row; the name has the room.
   await expect(dialog.getByText('Reasoning', { exact: true })).toBeHidden()
   await dialog.getByRole('button', { name: 'What Echo with reasoning can do' }).click()
-  await expect(page.getByText('Reasoning', { exact: true }).filter({ visible: true })).toHaveCount(1)
+  // Counted in the tags' popover only: the page behind the dialog may list a model with
+  // the same tag (another test imports the fake reasoning model).
+  const tags = page.locator('[data-radix-popper-content-wrapper]').getByText('Reasoning', { exact: true }).filter({ visible: true })
+  await expect(tags).toHaveCount(1)
   // Looking at the tags does not tick the model.
   expect(await model.isChecked()).toBe(wasChecked)
   // Scrolling the list puts the tags away instead of dragging them along.
@@ -298,7 +301,7 @@ test('adding models: capability tags are behind one button per model', async ({ 
     list.style.maxHeight = '120px' // short enough to scroll with only a few models
     list.scrollTop = 40
   })
-  await expect(page.getByText('Reasoning', { exact: true }).filter({ visible: true })).toHaveCount(0)
+  await expect(tags).toHaveCount(0)
 })
 
 test('model dropdowns fit the screen, also with a long model name', async ({ page }) => {

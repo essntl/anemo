@@ -132,7 +132,11 @@ class ToolSpec(BaseModel):
     input_schema: dict[str, Any]
 
 
-ReasoningEffort = Literal["low", "medium", "high"]
+# How hard a model should think before it answers, from "off" (as little as the model
+# allows) to "max". Each adapter translates it into what its API accepts and clamps it
+# to the levels that API has (the table is in docs/features.md, "Reasoning effort").
+ReasoningEffort = Literal["off", "low", "medium", "high", "max"]
+REASONING_EFFORTS: tuple[ReasoningEffort, ...] = ("off", "low", "medium", "high", "max")
 
 
 class ChatRequest(BaseModel):
@@ -145,6 +149,7 @@ class ChatRequest(BaseModel):
     # adapters that must always send a limit use it (Anthropic), to stay within it.
     output_limit: int | None = None
     reasoning: bool = False  # request provider-exposed reasoning when supported
+    # None: the provider's own default.
     reasoning_effort: ReasoningEffort | None = None
     # Per-model provider settings stored on the model row (e.g. {"thinking": "adaptive"}).
     provider_options: dict[str, Any] = {}

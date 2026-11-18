@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.features.memory.schemas import MemorySettings
 from app.policy.presets import PermissionSettings
+from app.providers.base import ReasoningEffort
 from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
 
@@ -206,6 +207,9 @@ class ModelDefaults(BaseModel):
     inline: uuid.UUID | None = None
     # Ordered backup models per task, tried when the primary fails or lacks a capability.
     fallbacks: dict[TaskType, list[uuid.UUID]] = Field(default_factory=dict)
+    # How hard models that can reason think, unless a message asks for another level
+    # (the slider next to the model in the message box saves it here).
+    reasoning_effort: ReasoningEffort = "medium"
 
 
 @dataclass(frozen=True)

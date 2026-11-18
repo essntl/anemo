@@ -26,6 +26,7 @@ from app.features.conversations.schemas import (
 from app.features.documents import service as documents
 from app.features.profiles import service as profiles
 from app.features.projects import service as projects
+from app.providers.base import ReasoningEffort
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -149,6 +150,7 @@ async def send_turn(conversation_id: uuid.UUID, body: TurnIn, db: Db) -> TurnOut
         reference_ids=body.reference_ids,
         skill_id=body.skill_id,
         page=body.page,
+        reasoning_effort=body.reasoning_effort,
     )
     return TurnOut(
         run_id=run.id,
@@ -165,9 +167,12 @@ async def message_page(conversation_id: uuid.UUID, message_id: uuid.UUID, db: Db
 
 @router.post("/{conversation_id}/regenerate", response_model=TurnOut, status_code=202)
 async def regenerate(
-    conversation_id: uuid.UUID, db: Db, model_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID,
+    db: Db,
+    model_id: uuid.UUID | None = None,
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> TurnOut:
-    run, assistant = await service.regenerate(db, conversation_id, model_id)
+    run, assistant = await service.regenerate(db, conversation_id, model_id, reasoning_effort)
     return TurnOut(
         run_id=run.id,
         user_message=None,
@@ -187,7 +192,7 @@ async def select_version(
 async def edit_last(conversation_id: uuid.UUID, body: EditLastIn, db: Db) -> TurnOut:
     """Change the last message you sent and have it answered again."""
     run, user, assistant, files = await service.edit_last(
-        db, conversation_id, body.text, body.model_id
+        db, conversation_id, body.text, body.model_id, body.reasoning_effort
     )
     return TurnOut(
         run_id=run.id,
