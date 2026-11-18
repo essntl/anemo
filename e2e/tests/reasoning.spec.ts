@@ -5,6 +5,8 @@ signOutAfterEach()
 
 test('the reasoning slider sets how hard a model thinks, and the answer gets it', async ({ page }) => {
   await login(page)
+  type M = { id: string; model_key: string }
+  const before = ((await (await page.request.get('/api/models')).json()) as M[]).map((m) => m.id)
   const models = await fakeModels(page.request, ['reasoning'])
   const settings = await (await page.request.get('/api/settings')).json()
 
@@ -35,7 +37,9 @@ test('the reasoning slider sets how hard a model thinks, and the answer gets it'
       .poll(async () => (await (await page.request.get(`/api/conversations/${id}/messages`)).json()).at(-1).reasoning)
       .toContain('at max effort')
   } finally {
-    // Leave the default as it was for the other tests.
+    // Leave the stack as it was for the other tests: the default, and no extra model
+    // (Settings > Providers would show its tags).
     await page.request.put('/api/settings/models', { data: settings.models })
+    if (!before.includes(models.reasoning)) await page.request.delete(`/api/models/${models.reasoning}`)
   }
 })
