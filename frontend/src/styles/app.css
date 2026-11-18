@@ -333,6 +333,120 @@
 .wave > span:nth-child(3) { animation-delay: 0.3s; }
 
 /*
+ * Chat: the reasoning effort slider (features/chat/components/EffortSlider.tsx). Its fill
+ * is one gradient over the whole track, from the accent to a warmer mix of it, and only
+ * the part up to the thumb shows (clip-path), so the colour heats up as it rises. The
+ * effects build with the level: a glow under the fill from medium; at high a light sweeps
+ * along it; at max the sweep quickens, a halo breathes round the thumb and sparks rise.
+ * Only transform, opacity and clip-path move. Reduced motion keeps the colours and glow.
+ */
+.effort {
+  --effort-heat: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--accent) 50%, var(--surface-2)) 0%,
+    var(--accent) 42%,
+    color-mix(in oklch, var(--accent), var(--error) 45%) 78%,
+    color-mix(in oklch, var(--accent), var(--warning) 70%) 100%
+  );
+  --effort-tip: var(--accent);
+}
+.effort[data-level='high'] { --effort-tip: color-mix(in oklch, var(--accent), var(--error) 45%); }
+.effort[data-level='max'] { --effort-tip: color-mix(in oklch, var(--accent), var(--warning) 70%); }
+.effort-fill,
+.effort-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--effort-heat);
+  transition: clip-path 220ms var(--ease-out), opacity 300ms ease;
+}
+.effort-fill { overflow: hidden; }
+.effort-glow { filter: blur(7px); opacity: 0; }
+.effort[data-level='medium'] .effort-glow { opacity: 0.3; }
+.effort[data-level='high'] .effort-glow { opacity: 0.55; }
+.effort[data-level='max'] .effort-glow { opacity: 0.85; }
+
+.effort-sheen { position: absolute; inset: 0; opacity: 0; transition: opacity 300ms ease; }
+.effort-sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--accent-contrast) 60%, transparent), transparent);
+  animation: effort-sweep 2.4s linear infinite;
+}
+.effort:is([data-level='high'], [data-level='max']) .effort-sheen { opacity: 1; }
+.effort[data-level='max'] .effort-sheen::before { animation-duration: 1.3s; }
+/* Only sweeps while it can be seen. */
+.effort:not(:is([data-level='high'], [data-level='max'])) .effort-sheen::before { animation-play-state: paused; }
+
+/* The rail spans the track; the thumb sits on its left edge, centred on the stop. */
+.effort-rail {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: transform 220ms var(--ease-out);
+}
+.effort-thumb {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1.375rem;
+  height: 1.375rem;
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-float), 0 0 0 1px var(--border-strong);
+  transition: scale 160ms var(--ease-out), box-shadow 300ms ease;
+}
+@media (pointer: coarse) { .effort-thumb { width: 1.625rem; height: 1.625rem; } }
+.effort[data-dragging] .effort-thumb { scale: 1.12; }
+.effort:is([data-level='high'], [data-level='max']) .effort-thumb {
+  box-shadow: var(--shadow-float), 0 0 0 1px var(--border-strong), 0 0 14px -2px var(--effort-tip);
+}
+.effort-core {
+  position: absolute;
+  inset: 0.375rem;
+  border-radius: 9999px;
+  background: var(--effort-tip);
+  transition: background-color 300ms ease, opacity 200ms ease;
+}
+@media (pointer: coarse) { .effort-core { inset: 0.4375rem; } }
+.effort[data-level='off'] .effort-core { opacity: 0.25; background: var(--text-muted); }
+
+.effort-halo {
+  position: absolute;
+  inset: -0.25rem;
+  border-radius: 9999px;
+  background: color-mix(in oklch, var(--effort-tip) 40%, transparent);
+  opacity: 0;
+}
+.effort[data-level='max'] .effort-halo { animation: effort-halo 1.6s var(--ease-out) infinite; }
+
+.effort-sparks { position: absolute; left: 50%; top: 50%; display: none; }
+.effort[data-level='max'] .effort-sparks { display: block; }
+.effort-sparks > span {
+  position: absolute;
+  left: -1.5px;
+  top: -1.5px;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: var(--effort-tip);
+  box-shadow: 0 0 6px var(--effort-tip);
+  opacity: 0;
+  animation: effort-spark 1.5s var(--ease-out) infinite;
+}
+
+@keyframes effort-sweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+@keyframes effort-halo { from { opacity: 0.8; transform: scale(0.85); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes effort-spark {
+  0% { opacity: 0; transform: translate(0, 0) scale(1); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), -22px) scale(0.4); }
+}
+
+/*
  * The Dynamic Island floats at the top centre of the page column (#main-column), which
  * carries its width as --island-w (0px while hidden) and data-island="on|off".
  *  .island-clear-left  a part of the top bar stops short of the Island while it shows; set
@@ -372,6 +486,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .drawer, .drawer-right, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span, .eq-bar { animation: none !important; }
+  /* The reasoning slider keeps its colours and glow; nothing sweeps, breathes or flies. */
+  .effort-sheen::before, .effort-halo { animation: none !important; }
+  .effort-sheen, .effort-sparks { display: none !important; }
+  .effort-rail, .effort-fill, .effort-glow { transition-property: opacity; }
   .shimmer { color: var(--text-muted); background: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

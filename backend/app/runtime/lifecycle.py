@@ -23,8 +23,10 @@ from app.events import bus
 from app.features.conversations.models import Conversation
 from app.features.memory import extraction
 from app.features.runs.models import Run
+from app.features.settings import service as settings_service
+from app.features.settings.sections import ModelDefaults
 from app.jobs import queue
-from app.providers.base import ProviderError
+from app.providers.base import REASONING_EFFORTS, ProviderError, ReasoningEffort
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +84,16 @@ async def _watch_for_cancel(
             await pubsub.aclose()
         except Exception:  # noqa: BLE001, S110 - closing a dead connection may fail too
             pass
+
+
+async def effort_for(db: AsyncSession, run: Run) -> ReasoningEffort:
+    """How hard the models of this run think: the level chosen with its message, else the
+    default in Settings > Models (automations, sub-agents, runs from before the choice)."""
+    chosen = run.options.get("reasoning_effort")
+    for level in REASONING_EFFORTS:
+        if chosen == level:
+            return level
+    return (await settings_service.get_section(db, ModelDefaults, "models")).reasoning_effort
 
 
 async def maybe_enqueue_title(

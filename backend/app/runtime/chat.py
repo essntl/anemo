@@ -31,6 +31,7 @@ from app.providers.base import (
     ChatRequest,
     Message,
     ReasoningBlock,
+    ReasoningEffort,
     TextBlock,
     TextDelta,
     Usage,
@@ -44,7 +45,7 @@ from app.runtime.history import (
     resolve_attachments,
     trim_to_budget,
 )
-from app.runtime.lifecycle import drive_until_stopped, follow_up_answer
+from app.runtime.lifecycle import drive_until_stopped, effort_for, follow_up_answer
 from app.runtime.streaming import StreamProgress, StreamResult, stream_with_fallback
 
 log = logging.getLogger(__name__)
@@ -83,6 +84,7 @@ def build_request(
     *,
     session_key: str | None = None,
     turn_context: str | None = None,
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> ChatRequest:
     context = model.context_window or DEFAULT_CONTEXT_TOKENS
     reserve = min(model.max_output or 8_000, context // 4)
@@ -94,6 +96,7 @@ def build_request(
         if model.provider_type == "claude_code"
         else trim_to_budget(history, max_tokens=int((context - reserve) * 0.9)),
         reasoning=bool(model.capabilities.get("reasoning")),
+        reasoning_effort=reasoning_effort,
         output_limit=model.max_output,
         provider_options=model.provider_options,
         session_key=session_key,
@@ -245,6 +248,7 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
             await projects.for_conversation(db, run.conversation_id)
         )
         session_key = f"conv:{run.conversation_id}:chat"
+        effort = await effort_for(db, run)
         await db.commit()
     progress = StreamProgress()
     driven = await drive_until_stopped(
@@ -258,6 +262,7 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
                 system,
                 session_key=session_key,
                 turn_context=context_text,
+                reasoning_effort=effort,
             ),
             progress,
         ),

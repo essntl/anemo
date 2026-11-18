@@ -50,6 +50,7 @@ from app.providers.base import (
     ContentBlock,
     Message,
     ProviderError,
+    ReasoningEffort,
     TextBlock,
     ToolResultBlock,
     ToolUseBlock,
@@ -68,7 +69,7 @@ from app.runtime.history import (
     resolve_attachments,
     trim_to_budget,
 )
-from app.runtime.lifecycle import drive_until_stopped
+from app.runtime.lifecycle import drive_until_stopped, effort_for
 from app.runtime.streaming import (
     RequestBuilder,
     StreamProgress,
@@ -144,6 +145,7 @@ class AgentRun:
         project_id: uuid.UUID | None = None,
         session_key: str | None = None,
         turn_context: str | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
         conversation_id: uuid.UUID | None = None,
         answer: tuple[uuid.UUID, uuid.UUID] | None = None,
     ) -> None:
@@ -151,6 +153,7 @@ class AgentRun:
         # of its user message (see runtime/turn_context.py).
         self.session_key = session_key
         self.turn_context = turn_context
+        self.reasoning_effort = reasoning_effort
         # For a sub-agent: the policies of the agents above it (it may do no more).
         self.ancestors = ancestors or []
         self.run_id = run_id
@@ -409,6 +412,7 @@ class AgentRun:
                 else trim_to_budget(history, _budget(model)),
                 tools=specs,
                 reasoning=bool(model.capabilities.get("reasoning")),
+                reasoning_effort=self.reasoning_effort,
                 output_limit=model.max_output,
                 provider_options=model.provider_options,
                 session_key=self.session_key,
@@ -1214,6 +1218,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
                     tools.append(tool)
         automation_id = run.automation_id
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
+        effort = await effort_for(db, run)
         await runs.set_status(db, run, "running")  # commits
 
     return AgentRun(
@@ -1237,6 +1242,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         project_id=project_id,
         session_key=session_key_for(run),
         turn_context=run.options.get("turn_context"),
+        reasoning_effort=effort,
         conversation_id=run.conversation_id,
         answer=answer_message,
     )

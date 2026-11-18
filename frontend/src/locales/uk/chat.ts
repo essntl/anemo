@@ -191,5 +191,16 @@ const messages: Messages = {
   "The browser didn't allow reading the clipboard.": "Браузер не дозволив прочитати буфер обміну.",
   "Paste an image": "Вставити зображення",
   "From the clipboard": "З буфера обміну",
+  // The reasoning effort slider
+  "Max": "Макс.",
+  "Reasoning effort": "Глибина міркувань",
+  "Reasoning: {level}": "Міркування: {level}",
+  "Answers straight away": "Відповідає одразу",
+  "Takes a quick think first": "Спершу коротко обмірковує",
+  "Thinks it through": "Обмірковує як слід",
+  "Thinks long and carefully": "Довго й ретельно обмірковує",
+  "Takes as long as it needs": "Думає стільки, скільки потрібно",
+  "Higher levels answer better on hard questions, but take longer and use more tokens. Saved for all chats.": "Вищі рівні краще відповідають на складні питання, але думають довше й витрачають більше токенів. Зберігається для всіх чатів.",
+  "Could not save the reasoning level.": "Не вдалося зберегти рівень міркувань.",
 }
 export default messages

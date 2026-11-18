@@ -4567,6 +4567,8 @@ export interface components {
             text: string;
             /** Model Id */
             model_id?: string | null;
+            /** Reasoning Effort */
+            reasoning_effort?: ("off" | "low" | "medium" | "high" | "max") | null;
         };
         /** EntryOut */
         EntryOut: {
@@ -5533,6 +5535,12 @@ export interface components {
             fallbacks?: {
                 [key: string]: string[];
             };
+            /**
+             * Reasoning Effort
+             * @default medium
+             * @enum {string}
+             */
+            reasoning_effort: "off" | "low" | "medium" | "high" | "max";
         };
         /** ModelIn */
         ModelIn: {
@@ -8117,6 +8125,8 @@ export interface components {
             text: string;
             /** Model Id */
             model_id?: string | null;
+            /** Reasoning Effort */
+            reasoning_effort?: ("off" | "low" | "medium" | "high" | "max") | null;
             /** Attachment Ids */
             attachment_ids?: string[];
             /** Reference Ids */
@@ -10323,6 +10333,7 @@ export interface operations {
         parameters: {
             query?: {
                 model_id?: string | null;
+                reasoning_effort?: ("off" | "low" | "medium" | "high" | "max") | null;
             };
             header?: never;
             path: {

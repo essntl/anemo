@@ -11,6 +11,11 @@ carry a signature and must be sent back unchanged within a tool loop, so they ar
 surfaced as ReasoningComplete events for the runtime to store. Which mode a model
 uses comes from `provider_options["thinking"]` ("adaptive" | "budget" | "none"),
 filled from the Models API at discovery time.
+
+Reasoning effort: adaptive models take `output_config.effort` (low, medium, high and
+max are accepted by every one of them). "off" leaves `thinking` out: models that can
+think less then don't think at all, and the newest ones, which always think, think as
+little as they can at effort low. Budget models get a thinking token budget per level.
 """
 
 import json
@@ -33,6 +38,7 @@ from app.providers.base import (
     ReasoningBlock,
     ReasoningComplete,
     ReasoningDelta,
+    ReasoningEffort,
     StopReason,
     TextBlock,
     TextDelta,
@@ -50,7 +56,14 @@ CACHE = {"type": "ephemeral"}
 _CACHEABLE = ("text", "image", "tool_use", "tool_result")
 
 DEFAULT_MAX_TOKENS = 64_000  # streaming, so large output limits do not risk HTTP timeouts
-BUDGET_THINKING_TOKENS = 8_000
+# Thinking tokens per effort level for models that take a budget (None: no level asked).
+BUDGET_THINKING_TOKENS: dict[ReasoningEffort | None, int] = {
+    None: 8_000,
+    "low": 2_048,
+    "medium": 8_000,
+    "high": 16_000,
+    "max": 32_000,
+}
 
 _STOP: dict[str, StopReason] = {
     "end_turn": "end",
@@ -150,13 +163,19 @@ class AnthropicAdapter:
         mode = req.provider_options.get("thinking") or (
             "adaptive" if anthropic_uses_adaptive_thinking(req.model) else "none"
         )
+        effort = req.reasoning_effort
         if mode == "adaptive":
-            # Show a readable summary instead of the default empty thinking text.
-            params["thinking"] = {"type": "adaptive", "display": "summarized"}
-            if req.reasoning_effort:
-                params["output_config"] = {"effort": req.reasoning_effort}
-        elif mode == "budget" and req.reasoning:
-            budget = min(BUDGET_THINKING_TOKENS, params["max_tokens"] - 1024)
+            if effort == "off":
+                # Explicitly disabling thinking is refused by the newest models: leaving
+                # it out works on all of them, and low effort keeps the rest short.
+                params["output_config"] = {"effort": "low"}
+            else:
+                # Show a readable summary instead of the default empty thinking text.
+                params["thinking"] = {"type": "adaptive", "display": "summarized"}
+                if effort:
+                    params["output_config"] = {"effort": effort}
+        elif mode == "budget" and req.reasoning and effort != "off":
+            budget = min(BUDGET_THINKING_TOKENS[effort], params["max_tokens"] - 1024)
             if budget >= 1024:
                 params["thinking"] = {"type": "enabled", "budget_tokens": budget}
         return params

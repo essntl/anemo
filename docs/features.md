@@ -49,6 +49,26 @@ and an approval card appears in the chat: *Allow once*, *Allow for this run* (sa
 kind of action, same folder) or *Deny*. Paths outside the workspace and anything
 touching settings or secrets are always refused, whatever the settings say.
 
+## Reasoning effort
+
+A model that can reason gets a **Reasoning** button next to it in the message box. It
+opens a slider with five levels: *Off*, *Low*, *Medium* (the default), *High* and *Max*.
+The level is kept as the default for every chat (`reasoning_effort` in Settings →
+Models) and sent with each message, a new answer and an edit; automations and
+sub-agents use the default. Each provider gets the nearest level it accepts:
+
+| Level | Claude API (adaptive thinking) | Claude API (older, thinking budget) | OpenAI, OpenRouter | Claude subscription |
+|---|---|---|---|---|
+| Off | no `thinking`, effort `low` (the newest models always think a little) | no thinking | `low` | `low` |
+| Low | effort `low` | 2,048 tokens | `low` | `low` |
+| Medium | effort `medium` | 8,000 tokens | `medium` | `medium` |
+| High | effort `high` | 16,000 tokens | `high` | `high` |
+| Max | effort `max` | 32,000 tokens | `high` | `max` |
+
+Other OpenAI-compatible servers (Ollama, vLLM, …) get no level, so the button is not
+shown for their models. On the Claude subscription a new level starts its Claude Code
+session again (resumed, so the next answer misses the prompt cache once).
+
 ## Projects and organising chats
 
 A **project** keeps one piece of work together: its chats, tasks, calendar events,

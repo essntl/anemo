@@ -3309,6 +3309,29 @@
             }
           },
           {
+            "name": "reasoning_effort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "off",
+                    "low",
+                    "medium",
+                    "high",
+                    "max"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reasoning Effort"
+            }
+          },
+          {
             "name": "aiw_session",
             "in": "cookie",
             "required": false,
@@ -17991,6 +18014,24 @@
               }
             ],
             "title": "Model Id"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
           }
         },
         "type": "object",
@@ -20510,6 +20551,18 @@
             },
             "type": "object",
             "title": "Fallbacks"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "off",
+              "low",
+              "medium",
+              "high",
+              "max"
+            ],
+            "title": "Reasoning Effort",
+            "default": "medium"
           }
         },
         "type": "object",
@@ -27347,6 +27400,24 @@
               }
             ],
             "title": "Model Id"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
           },
           "attachment_ids": {
             "items": {
