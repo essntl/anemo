@@ -99,6 +99,17 @@ const messages: Messages = {
   "Every document": "Все документы",
   "No document matches this view yet": "Пока ни один документ не подходит под это представление",
   "Give documents the properties it looks for, or change what it shows.": "Добавьте документам нужные свойства или измените, что показывает представление.",
+  "none": "нет",
+  "Suggested properties": "Предложенные свойства",
+  "The assistant suggested these for existing documents. Applying one writes it into the document, with a revision.": "Ассистент предложил это для существующих документов. Применение записывает свойства в документ, с ревизией.",
+  "Dismiss selected": "Отклонить выбранные",
+  "Apply selected": "Применить выбранные",
+  "Select all": "Выбрать все",
+  "Now": "Сейчас",
+  "Suggested": "Предложено",
+  "Apply to {title}": "Применить к {title}",
+  "{n} suggested property change to review | {n} suggested property changes to review": "{n} предложенное изменение свойств на проверку | {n} предложенных изменения свойств на проверку | {n} предложенных изменений свойств на проверку",
+  "{n} document changed. | {n} documents changed.": "Изменён {n} документ. | Изменено {n} документа. | Изменено {n} документов.",
 }
 
 export default messages

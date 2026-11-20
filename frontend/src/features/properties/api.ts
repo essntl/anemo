@@ -153,3 +153,30 @@ export function useReindexDocuments() {
     onSuccess: done,
   })
 }
+
+export type PropertySuggestion = Schemas['SuggestionOut']
+export const suggestionsKey = ['properties', 'suggestions'] as const
+
+/** Properties the assistant suggested for documents, waiting for the user. */
+export function useSuggestions() {
+  return useQuery({
+    queryKey: suggestionsKey,
+    queryFn: async () => unwrap(await api.GET('/api/properties/suggestions')),
+  })
+}
+
+export function useApplySuggestions() {
+  const done = useInvalidate()
+  return useMutation({
+    mutationFn: async (ids: string[]) => unwrap(await api.POST('/api/properties/suggestions/apply', { body: { ids } })),
+    onSuccess: done,
+  })
+}
+
+export function useDismissSuggestions() {
+  const done = useInvalidate()
+  return useMutation({
+    mutationFn: async (ids: string[]) => unwrap(await api.POST('/api/properties/suggestions/dismiss', { body: { ids } })),
+    onSuccess: done,
+  })
+}
