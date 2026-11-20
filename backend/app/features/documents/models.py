@@ -5,10 +5,11 @@ from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, TimestampMixin
+from app.core.actor import ACTOR_REF_LENGTH
+from app.db.base import Base, IdMixin, ProvenanceMixin, TimestampMixin
 
 
-class Document(Base, IdMixin, TimestampMixin):
+class Document(Base, IdMixin, TimestampMixin, ProvenanceMixin):
     """Index entry for a Markdown file under the workspace's documents/ folder.
 
     The file is the source of truth (agents, the file manager and other programs
@@ -42,5 +43,7 @@ class DocumentRevision(Base, IdMixin):
     content_hash: Mapped[str] = mapped_column(String(64))
     author: Mapped[str] = mapped_column(String(10))  # user | agent | external
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Who saved it, as an actor reference (app/core/actor.py); None on older revisions.
+    actor_ref: Mapped[str | None] = mapped_column(String(ACTOR_REF_LENGTH))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

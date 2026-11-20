@@ -84,6 +84,16 @@ export function useUpdateTask() {
   })
 }
 
+/** Make a synced task an ordinary one (its source fields are cleared). */
+export function useDetachTaskSource() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.POST('/api/tasks/{task_id}/detach-source', { params: { path: { task_id: id } } })),
+    onSuccess: refresh,
+  })
+}
+
 export function useDeleteTask() {
   const refresh = useRefresh()
   return useMutation({

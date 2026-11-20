@@ -13,6 +13,7 @@ import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask 
 import { bucketOf, formatDue } from '../dates'
 import { checklistProgress, isOpen, openBlockers, subtasksOf } from '../relations'
 import { describeRepeat } from '../repeat'
+import { SourceBadge } from '@/features/provenance/Provenance'
 import { useToggleDone } from '../useToggleDone'
 
 const PRIORITY_TONE = ['', 'text-muted', 'text-warning', 'text-error']
@@ -67,6 +68,7 @@ export function TaskMeta({ task, project, info, nested = false }: { task: Task; 
         </span>
       )}
       {task.tags.map((tag) => <span key={tag}>#{tag}</span>)}
+      <SourceBadge item={task} />
       {checklist && (
         <span className="flex items-center gap-1" aria-label={t('Checklist: {done} of {total} done', { done: checklist.done, total: checklist.total })}>
           <ListChecks className="h-3 w-3" /> {checklist.done}/{checklist.total}

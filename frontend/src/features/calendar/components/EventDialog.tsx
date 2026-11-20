@@ -17,12 +17,15 @@ import { useProjects } from '@/features/tasks/api'
 import { Switch } from '@/components/ui/Switch'
 import { plural, t } from '@/lib/i18n'
 import { addDays, dayOf, REMINDER_OPTIONS, today } from '@/features/tasks/dates'
+import { type Synced } from '@/features/provenance/labels'
+import { ActorLine, SourceDetails } from '@/features/provenance/Provenance'
 import {
   browserTimeZone,
   type CalendarEvent,
   type Occurrence,
   useChangeOccurrence,
   useDeleteEvent,
+  useDetachEventSource,
   useEvent,
   useSaveEvent,
 } from '../api'
@@ -53,6 +56,10 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
   const save = useSaveEvent()
   const remove = useDeleteEvent()
   const changeOne = useChangeOccurrence()
+  const detach = useDetachEventSource()
+  // The source fields as they are now (detaching clears them while the dialog is open).
+  const [synced, setSynced] = useState<Synced>(source ?? {})
+  const eventId = mode === 'occurrence' ? occurrence?.event_id : source?.id
   const start = source && !source.all_day ? new Date(source.start_at) : null
   const end = source && !source.all_day ? new Date(source.end_at) : null
   const firstDay = source?.start_date ?? (start ? dayOf(start) : (defaults?.date ?? today()))
@@ -78,7 +85,7 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
   const endInstant = allDay ? new Date(`${addDays(endDate, 1)}T00:00`) : new Date(`${endDate}T${endTime}`)
   const invalid = !title.trim() || Number.isNaN(startInstant.getTime()) || Number.isNaN(endInstant.getTime()) || endInstant < startInstant
   const pending = save.isPending || changeOne.isPending
-  const error = save.error ?? changeOne.error ?? remove.error
+  const error = save.error ?? changeOne.error ?? remove.error ?? detach.error
 
   // Moving the start keeps the event's length.
   const changeStartDate = (next: string) => {
@@ -213,7 +220,13 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
         <Field label={t('Notes')}>
           <Textarea rows={3} value={description} maxLength={20_000} onChange={(e) => setDescription(e.target.value)} />
         </Field>
-        {source?.created_by === 'agent' && <p className="text-[12px] text-muted">{t('Added by an agent.')}</p>}
+        {mode !== 'new' && eventId && (
+          <SourceDetails item={synced} detaching={detach.isPending}
+            onDetach={() => detach.mutate(eventId, { onSuccess: (detached) => setSynced(detached) })} />
+        )}
+        {source?.created_by_actor
+          ? <ActorLine created={source.created_by_actor} updated={source.updated_by_actor} />
+          : source?.created_by === 'agent' && <p className="text-[12px] text-muted">{t('Added by an agent.')}</p>}
         {error && <p className="text-[12.5px] text-error">{errorMessage(error)}</p>}
       </div>
     </Dialog>
@@ -225,6 +238,11 @@ function SeriesForm({ eventId, onClose }: { eventId: string; onClose: () => void
   const event = useEvent(eventId)
   if (!event.data) return null
   return <EventForm mode="event" source={event.data} onClose={onClose} />
+}
+
+/** An event opened by its link: the stored event (a repeating one as its whole series). */
+export function StoredEventDialog({ event, onClose }: { event: CalendarEvent; onClose: () => void }) {
+  return <EventForm mode="event" source={event} onClose={onClose} />
 }
 
 interface EventDialogProps {

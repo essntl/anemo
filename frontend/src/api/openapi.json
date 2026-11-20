@@ -9288,6 +9288,66 @@
         }
       }
     },
+    "/api/tasks/{task_id}/detach-source": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Detach Source",
+        "description": "Make a synced task an ordinary one: its source fields are cleared.",
+        "operationId": "detach_source_api_tasks__task_id__detach_source_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/trash": {
       "get": {
         "tags": [
@@ -10339,6 +10399,66 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendar/events/{event_id}/detach-source": {
+      "post": {
+        "tags": [
+          "calendar"
+        ],
+        "summary": "Detach Source",
+        "description": "Make a synced event an ordinary one: its source fields are cleared.",
+        "operationId": "detach_source_api_calendar_events__event_id__detach_source_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -15318,6 +15438,51 @@
   },
   "components": {
     "schemas": {
+      "ActorOut": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "The stored actor reference, e.g. chat:<id>"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "external",
+              "chat",
+              "automation"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Where it leads: the chat, or the automation's run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ref",
+          "kind",
+          "label",
+          "url"
+        ],
+        "title": "ActorOut",
+        "description": "Who made or changed something, ready to show: \"the assistant in <chat title>\"."
+      },
       "AgentStats": {
         "properties": {
           "runs_by_day": {
@@ -17903,6 +18068,28 @@
             "format": "date-time",
             "title": "Updated At"
           },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it last"
+          },
           "content": {
             "type": "string",
             "title": "Content"
@@ -17981,6 +18168,28 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it last"
           }
         },
         "type": "object",
@@ -18358,6 +18567,86 @@
           "created_by": {
             "type": "string",
             "title": "Created By"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "external_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Key"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "edited_by_user_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By User At",
+            "description": "When the user last changed this synced event by hand"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who changed it last"
           }
         },
         "type": "object",
@@ -21345,6 +21634,86 @@
             "type": "string",
             "title": "Created By"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "external_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Key"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "edited_by_user_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By User At",
+            "description": "When the user last changed this synced event by hand"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who changed it last"
+          },
           "event_id": {
             "type": "string",
             "format": "uuid",
@@ -22980,6 +23349,28 @@
             "format": "date-time",
             "title": "Updated At"
           },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it last"
+          },
           "excerpt": {
             "type": "string",
             "title": "Excerpt"
@@ -23644,6 +24035,17 @@
             "type": "boolean",
             "title": "Current"
           },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it (None on older revisions)"
+          },
           "content": {
             "type": "string",
             "title": "Content"
@@ -23689,6 +24091,17 @@
           "current": {
             "type": "boolean",
             "title": "Current"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it (None on older revisions)"
           }
         },
         "type": "object",
@@ -26387,6 +26800,86 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "external_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Key"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "edited_by_user_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By User At",
+            "description": "When the user last changed this synced task by hand"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who changed it last"
           }
         },
         "type": "object",

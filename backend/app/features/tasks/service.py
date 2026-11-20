@@ -8,14 +8,18 @@ from zoneinfo import ZoneInfo
 from dateutil.rrule import rrulestr
 from sqlalchemy import Text, cast, delete, func, literal_column, select, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import current_actor
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.calendar.models import CalendarEvent
 from app.features.focus.models import FocusSession
 from app.features.links.models import TaskFile
 from app.features.notifications import service as notifications
+from app.features.provenance import sources
+from app.features.provenance.schemas import SourceIn
 from app.features.settings.service import user_timezone
 from app.features.tasks.models import Project, Task, TaskDependency
 from app.features.tasks.schemas import OPEN_STATUSES, ChecklistItem, clean_checklist
@@ -52,9 +56,15 @@ async def list_tasks(
     due_from: date | None = None,
     due_to: date | None = None,
     parent_id: uuid.UUID | None = None,
+    source: str | None = None,
+    external_key: str | None = None,
     limit: int = 500,
 ) -> list[Task]:
     stmt = select(Task)
+    if source:
+        stmt = stmt.where(Task.source == source.strip().lower())
+    if external_key:
+        stmt = stmt.where(Task.external_key == external_key.strip())
     if parent_id:
         stmt = stmt.where(Task.parent_id == parent_id)
     if status == "open":
@@ -162,21 +172,33 @@ async def create_task(
     *,
     created_by: str = "user",
     run_id: uuid.UUID | None = None,
+    source: SourceIn | None = None,
 ) -> Task:
+    """`source`: where a synced task comes from. A key that is taken (by a task, or one
+    in the trash) creates nothing: ExternalKeyTaken."""
     fields = dict(fields)
     blocked_by = fields.pop("blocked_by", None) or []
     fields.pop("subtasks", None)
     fields["checklist"] = _checklist(fields.get("checklist"))
     if fields.get("project_id"):
         await get_project(db, fields["project_id"])
+    key = source.external_key if source else None
+    await sources.check_key(db, "task", Task, key)
     task = Task(**fields, created_by=created_by, run_id=run_id)
+    sources.record_created(task, source)
     await _check_parent(db, task, task.parent_id, new=True)
     task.sort_order = await _next_order(db, task.status)
     if task.status == "done":
         task.completed_at = datetime.now(UTC)
     _check(task)
     db.add(task)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Another request made a task with this key at the same moment.
+        await db.rollback()
+        await sources.check_key(db, "task", Task, key)
+        raise
     if blocked_by:
         await _set_blockers(db, task, blocked_by)
     await db.commit()
@@ -185,17 +207,27 @@ async def create_task(
     return task
 
 
-async def update_task(db: AsyncSession, task: Task, changes: dict[str, Any]) -> Task:
+async def update_task(
+    db: AsyncSession, task: Task, changes: dict[str, Any], *, source_url: str | None = None
+) -> Task:
     """`changes` holds only the fields to change (None clears a field).
 
     `blocked_by` replaces what the task waits on; `subtasks` ("finish" or "keep") says
     what happens to open subtasks when the task is finished (without it that is refused).
+    `source_url`: a new link to the original of a synced task (its key can't change).
     """
     changes = dict(changes)
     choice = changes.pop("subtasks", None)
     blocked_by = changes.pop("blocked_by", None)
     if "checklist" in changes:
         changes["checklist"] = _checklist(changes["checklist"])
+    changed = any(getattr(task, key) != value for key, value in changes.items())
+    if blocked_by is not None:
+        current = (await blocked_by_map(db, [task.id])).get(task.id, [])
+        changed = changed or set(blocked_by) != set(current)  # the order is not a change
+    changed = sources.set_source_url(task, source_url) or changed
+    if changed:
+        sources.record_changed(task, synced=source_url is not None)
     if changes.get("project_id"):
         await get_project(db, changes["project_id"])
     if "parent_id" in changes:
@@ -275,6 +307,7 @@ async def _set_status(db: AsyncSession, task: Task, status: str) -> None:
 async def _finish(db: AsyncSession, task: Task) -> list[Task]:
     """Finish a task (a subtask, along with its parent). Returns tasks now ready."""
     old_status = task.status
+    sources.record_changed(task)
     await _set_status(db, task, "done")
     await _repeat(db, task)
     return await _status_changed(db, task, old_status)
@@ -403,6 +436,9 @@ async def _repeat(db: AsyncSession, done: Task) -> None:
                 status="todo",
                 sort_order=await _next_order(db, "todo"),
                 created_by=done.created_by,
+                # The same series, made now: a synced task's key stays with the one done.
+                created_by_ref=done.created_by_ref,
+                updated_by_ref=current_actor().ref,
             )
         )
     # The finished one no longer repeats, so reopening and finishing it again does not
@@ -415,7 +451,15 @@ async def delete_task(db: AsyncSession, task: Task, *, deleted_by: str = "user")
     ordinary tasks; what waited on it no longer does (and a blocked task with nothing
     left to wait on moves back to "to do")."""
     waiting = await dependents(db, task.id)
-    item = trash.put(db, "task", task.id, task.title, await _snapshot(db, task), deleted_by)
+    item = trash.put(
+        db,
+        "task",
+        task.id,
+        task.title,
+        await _snapshot(db, task),
+        deleted_by,
+        external_key=task.external_key,
+    )
     await db.delete(task)
     await db.flush()
     for other in waiting:
@@ -481,6 +525,7 @@ async def restore_task(db: AsyncSession, item: TrashedItem) -> Task:
         if parent is None or parent.parent_id is not None:
             values["parent_id"] = None
     task = Task(**values)
+    task.updated_by_ref = current_actor().ref  # putting it back is a change
     task.sort_order = await _next_order(db, task.status)
     db.add(task)
     await db.flush()
@@ -585,6 +630,7 @@ async def reorder(
         task = found
         if task.status != status:
             old_status = task.status
+            sources.record_changed(task)
             task.status = status
             task.completed_at = now if status == "done" else None
             if status == "done":
@@ -597,6 +643,15 @@ async def reorder(
     await db.commit()
     await _tell_ready(db, ready)
     await notify()
+
+
+async def detach_source(db: AsyncSession, task: Task) -> Task:
+    """Make a synced task an ordinary one (see provenance.sources.detach)."""
+    sources.detach(task)
+    await db.commit()
+    await db.refresh(task)
+    await notify()
+    return task
 
 
 async def all_tags(db: AsyncSession) -> list[str]:

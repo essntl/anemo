@@ -17,6 +17,8 @@ from app.core.errors import AppError, NotFound
 from app.features.documents import service
 from app.features.documents.models import Document, DocumentRevision
 from app.features.links import service as links
+from app.features.provenance import service as provenance
+from app.features.provenance.schemas import ActorOut
 from app.workspace import files
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -30,6 +32,8 @@ class DocumentOut(BaseModel):
     word_count: int
     last_editor: str
     updated_at: datetime
+    created_by_actor: ActorOut | None = Field(None, description="Who made it (None: unknown)")
+    updated_by_actor: ActorOut | None = Field(None, description="Who saved it last")
 
 
 class DocumentContent(DocumentOut):
@@ -42,8 +46,16 @@ class DocumentList(BaseModel):
     folders: list[str]
 
 
-def _out(d: Document) -> DocumentOut:
+async def _actors(db: Db, docs: list[Document]) -> dict[str, ActorOut]:
+    """Who made and last saved these documents (provenance.describe)."""
+    return await provenance.describe(
+        db, [ref for d in docs for ref in (d.created_by_ref, d.updated_by_ref)]
+    )
+
+
+def _out(d: Document, actors: dict[str, ActorOut] | None = None) -> DocumentOut:
     folder = posixpath.dirname(d.path)[len(service.DOCS_DIR) :].strip("/")
+    actors = actors or {}
     return DocumentOut(
         id=d.id,
         path=d.path,
@@ -52,11 +64,16 @@ def _out(d: Document) -> DocumentOut:
         word_count=d.word_count,
         last_editor=d.last_editor,
         updated_at=d.updated_at,
+        created_by_actor=actors.get(d.created_by_ref or ""),
+        updated_by_actor=actors.get(d.updated_by_ref or ""),
     )
 
 
-def _content(d: Document, content: str) -> DocumentContent:
-    return DocumentContent(**_out(d).model_dump(), content=content, hash=d.content_hash)
+def _content(
+    d: Document, content: str, actors: dict[str, ActorOut] | None = None
+) -> DocumentContent:
+    out = _out(d, actors)
+    return DocumentContent(**out.model_dump(), content=content, hash=d.content_hash)
 
 
 class RecentDocument(DocumentOut):
@@ -90,12 +107,17 @@ async def recent_documents(
         stmt = stmt.where(Document.path.startswith(f"{service.DOCS_DIR}/{folder.strip('/')}/"))
     docs = list(await db.scalars(stmt.limit(max(1, min(limit, 30)))))
     out: list[RecentDocument] = []
+    texts: dict[uuid.UUID, str] = {}
     for d in docs:
         try:
-            text = await service.read(db, d)
+            texts[d.id] = await service.read(db, d)
         except (NotFound, OSError):
             continue
-        out.append(RecentDocument(**_out(d).model_dump(), excerpt=excerpt_of(text, d.title)))
+    actors = await _actors(db, [d for d in docs if d.id in texts])
+    for d in docs:
+        if d.id in texts:
+            excerpt = excerpt_of(texts[d.id], d.title)
+            out.append(RecentDocument(**_out(d, actors).model_dump(), excerpt=excerpt))
     return out
 
 
@@ -107,14 +129,15 @@ async def document_by_path(db: Db, path: str) -> DocumentOut:
     doc = await service.by_path(db, path.strip("/"))
     if doc is None:
         raise NotFound("Not a document")
-    return _out(doc)
+    return _out(doc, await _actors(db, [doc]))
 
 
 @router.get("", response_model=DocumentList)
 async def list_documents(db: Db) -> DocumentList:
     folders = await service.reconcile(db)
-    docs = await db.scalars(select(Document).order_by(Document.path))
-    return DocumentList(documents=[_out(d) for d in docs], folders=folders)
+    docs = list(await db.scalars(select(Document).order_by(Document.path)))
+    actors = await _actors(db, docs)
+    return DocumentList(documents=[_out(d, actors) for d in docs], folders=folders)
 
 
 class AssetOut(BaseModel):
@@ -153,13 +176,13 @@ async def create_document(body: CreateIn, db: Db) -> DocumentContent:
     path = service.unique_path(body.folder, title)
     content = body.content if body.content is not None else f"# {title}\n\n"
     doc = await service.create(db, path, content, author="user")
-    return _content(doc, content)
+    return _content(doc, content, await _actors(db, [doc]))
 
 
 @router.get("/{document_id}", response_model=DocumentContent)
 async def get_document(document_id: uuid.UUID, db: Db) -> DocumentContent:
     doc = await service.get(db, document_id)
-    return _content(doc, await service.read(db, doc))
+    return _content(doc, await service.read(db, doc), await _actors(db, [doc]))
 
 
 class SaveIn(BaseModel):
@@ -171,7 +194,7 @@ class SaveIn(BaseModel):
 async def save_document(document_id: uuid.UUID, body: SaveIn, db: Db) -> DocumentContent:
     doc = await service.get(db, document_id)
     doc = await service.save(db, doc, body.content, base_hash=body.base_hash, author="user")
-    return _content(doc, body.content)
+    return _content(doc, body.content, await _actors(db, [doc]))
 
 
 class MoveIn(BaseModel):
@@ -194,7 +217,7 @@ async def move_document(document_id: uuid.UUID, body: MoveIn, db: Db) -> Documen
     if moved.path != old_path:
         # Task attachments and links to it follow, as when it is moved in Files.
         await links.on_moved(db, old_path, moved.path, author="user")
-    return _out(moved)
+    return _out(moved, await _actors(db, [moved]))
 
 
 @router.delete("/{document_id}", status_code=204)
@@ -210,13 +233,16 @@ class RevisionOut(BaseModel):
     updated_at: datetime
     chars: int
     current: bool  # the same content as the document has now
+    actor: ActorOut | None = Field(None, description="Who saved it (None on older revisions)")
 
 
 class RevisionContent(RevisionOut):
     content: str
 
 
-def _revision(r: DocumentRevision, doc: Document) -> RevisionOut:
+def _revision(
+    r: DocumentRevision, doc: Document, actors: dict[str, ActorOut] | None = None
+) -> RevisionOut:
     return RevisionOut(
         id=r.id,
         author=r.author,
@@ -224,18 +250,22 @@ def _revision(r: DocumentRevision, doc: Document) -> RevisionOut:
         updated_at=r.updated_at,
         chars=len(r.content),
         current=r.content_hash == doc.content_hash,
+        actor=(actors or {}).get(r.actor_ref or ""),
     )
 
 
 @router.get("/{document_id}/revisions", response_model=list[RevisionOut])
 async def list_revisions(document_id: uuid.UUID, db: Db) -> list[RevisionOut]:
     doc = await service.get(db, document_id)
-    rows = await db.scalars(
-        select(DocumentRevision)
-        .where(DocumentRevision.document_id == doc.id)
-        .order_by(DocumentRevision.updated_at.desc())
+    rows = list(
+        await db.scalars(
+            select(DocumentRevision)
+            .where(DocumentRevision.document_id == doc.id)
+            .order_by(DocumentRevision.updated_at.desc())
+        )
     )
-    return [_revision(r, doc) for r in rows]
+    actors = await provenance.describe(db, [r.actor_ref for r in rows])
+    return [_revision(r, doc, actors) for r in rows]
 
 
 async def _get_revision(db: Db, doc: Document, revision_id: uuid.UUID) -> DocumentRevision:
@@ -249,7 +279,9 @@ async def _get_revision(db: Db, doc: Document, revision_id: uuid.UUID) -> Docume
 async def get_revision(document_id: uuid.UUID, revision_id: uuid.UUID, db: Db) -> RevisionContent:
     doc = await service.get(db, document_id)
     revision = await _get_revision(db, doc, revision_id)
-    return RevisionContent(**_revision(revision, doc).model_dump(), content=revision.content)
+    actors = await provenance.describe(db, [revision.actor_ref])
+    out = _revision(revision, doc, actors)
+    return RevisionContent(**out.model_dump(), content=revision.content)
 
 
 @router.post("/{document_id}/revisions/{revision_id}/restore", response_model=DocumentContent)
@@ -263,4 +295,4 @@ async def restore_revision(
     doc = await service.save(
         db, doc, revision.content, base_hash=doc.content_hash, author="user", new_revision=True
     )
-    return _content(doc, revision.content)
+    return _content(doc, revision.content, await _actors(db, [doc]))

@@ -30,12 +30,16 @@ import { addDays, dayOf, today } from '@/features/tasks/dates'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { currentLocale, dateLocale, type Locale, msg, t } from '@/lib/i18n'
-import { browserTimeZone, type Occurrence, useChangeOccurrence, useOccurrencesIn, useSaveEvent } from './api'
+import { browserTimeZone, type CalendarEvent, type Occurrence, useChangeOccurrence, useEvent, useOccurrencesIn, useSaveEvent } from './api'
 import { DayList } from './components/DayList'
 import { MiniMonth } from './components/MiniMonth'
 import { UnscheduledTasks } from './components/UnscheduledTasks'
 import { colorOf, daysOf } from './entries'
-import { EventDialog, type NewEventDefaults } from './components/EventDialog'
+import { EventDialog, type NewEventDefaults, StoredEventDialog } from './components/EventDialog'
+import { linkedEventDay } from './linkedEvent'
+import { MissingEventNotice } from './components/MissingEventNotice'
+import { SyncedEventContent } from './components/SyncedEventContent'
+import { isSynced, onSourceLink } from '@/features/provenance/labels'
 import { Lingering } from '@/components/ui/Lingering'
 
 type View = 'month' | 'week' | 'day' | 'agenda'
@@ -63,13 +67,16 @@ const HOUR_FORMAT = { hour: '2-digit', hour12: false } as const
 
 type Open =
   | { kind: 'event'; occurrence: Occurrence | null; defaults?: NewEventDefaults }
+  // An event opened by its link (/calendar?event=<id>): the stored event, a series as a whole.
+  | { kind: 'stored'; event: CalendarEvent }
   | { kind: 'task'; task: Task }
   | null
 
 export function CalendarPage() {
   const calendar = useRef<FullCalendar>(null)
-  // /calendar?date=2026-10-10 (e.g. from search) starts on that day.
-  const [params] = useSearchParams()
+  // /calendar?date=2026-10-10 starts on that day; /calendar?event=<id> (an event's link, e.g.
+  // from search or a document) goes to the event's day and opens it.
+  const [params, setParams] = useSearchParams()
   const startDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') ? params.get('date')! : undefined
   const desktop = useMediaQuery(DESKTOP)
   const device = desktop ? 'desktop' : 'phone'
@@ -90,6 +97,10 @@ export function CalendarPage() {
   const saveEvent = useSaveEvent()
   const changeOccurrence = useChangeOccurrence()
   const updateTask = useUpdateTask()
+  const linkedId = params.get('event')
+  const linked = useEvent(linkedId)
+  // A link to an event that isn't there (deleted, or in the trash): a note until you move on.
+  const [missing, setMissing] = useState<string | null>(null)
   const error = occurrences.error ?? saveEvent.error ?? changeOccurrence.error ?? updateTask.error
 
   // In All, an event without a colour of its own takes its project's, so the projects can be told apart.
@@ -121,6 +132,29 @@ export function CalendarPage() {
   }, [occurrences.data, tasks.data, scope, legend])
 
   const api = () => calendar.current?.getApi()
+  const shownLink = useRef<string | null>(null)
+  useEffect(() => {
+    const event = linked.data
+    if (!event || shownLink.current === event.id) return
+    shownLink.current = event.id
+    const day = linkedEventDay(event, today())
+    api()?.gotoDate(day)
+    setSelected(day)
+    setOpen({ kind: 'stored', event })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked.data])
+  useEffect(() => {
+    if (!linkedId || !linked.isError) return
+    setMissing(linkedId)
+    setParams((p) => { p.delete('event'); return p }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked.isError, linkedId])
+  /** Closing an event opened by its link: the address no longer names it. */
+  const closeLinked = () => {
+    setOpen(null)
+    shownLink.current = null
+    setParams((p) => { p.delete('event'); return p }, { replace: true })
+  }
   const changeView = (next: View) => {
     setView(next)
     api()?.changeView(FC_VIEW[next][device])
@@ -250,6 +284,7 @@ export function CalendarPage() {
         <Button size="icon" variant="ghost" className="shrink-0" aria-label={t('Trash')} title={t('Deleted events')} onClick={() => setTrashOpen(true)}><Trash2 className="h-4 w-4" /></Button>
       </div>
       {error && <p className="mb-2 text-[13px] text-error">{errorMessage(error)}</p>}
+      {missing && <MissingEventNotice eventId={missing} onOpenTrash={() => setTrashOpen(true)} onClose={() => setMissing(null)} />}
 
       <div className={desktop ? 'flex min-h-0 flex-1 gap-3' : 'contents'}>
       {/* Wide screens: a column with a small month, the projects' colours (in All) and the tasks without a date. */}
@@ -308,12 +343,21 @@ export function CalendarPage() {
           scrollTime="07:00:00"
           events={entries}
           datesSet={(arg) => {
+            // Moving on to other days: the note about a missing event has had its turn.
+            setMissing((id) => (id && shown ? null : id))
             setRange({ start: arg.start.toISOString(), end: arg.end.toISOString() })
             setTitle(arg.view.title)
             setShown({ start: dayOf(arg.view.currentStart), end: dayOf(arg.view.currentEnd) })
           }}
           dateClick={onDateClick}
-          eventClick={(arg) => openEntry({ extendedProps: arg.event.extendedProps })}
+          eventClick={(arg) => {
+            // A click on a synced event's source badge opens the original instead.
+            if (!onSourceLink(arg.jsEvent.target)) openEntry({ extendedProps: arg.event.extendedProps })
+          }}
+          eventContent={(arg) => {
+            const occurrence = arg.event.extendedProps.occurrence as Occurrence | undefined
+            return occurrence && isSynced(occurrence) ? <SyncedEventContent arg={arg} occurrence={occurrence} /> : true
+          }}
           eventDrop={onMoved}
           eventResize={onMoved}
           noEventsContent={t('Nothing planned')}
@@ -332,6 +376,9 @@ export function CalendarPage() {
 
       <Lingering value={open?.kind === 'event' && open}>
         {(shown) => <EventDialog occurrence={shown.occurrence} defaults={shown.defaults} onClose={() => setOpen(null)} />}
+      </Lingering>
+      <Lingering value={open?.kind === 'stored' && open}>
+        {(shown) => <StoredEventDialog event={shown.event} onClose={closeLinked} />}
       </Lingering>
       <Lingering value={open?.kind === 'task' && open}>{(shown) => <TaskDialog task={shown.task} onClose={() => setOpen(null)} />}</Lingering>
       <ItemTrashDialog kind="event" open={trashOpen} onOpenChange={setTrashOpen} />

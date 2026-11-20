@@ -3,6 +3,9 @@ import { CalendarDays } from 'lucide-react'
 import { formatDay } from '@/features/tasks/dates'
 import { cn } from '@/lib/cn'
 import { dateLocale, t } from '@/lib/i18n'
+import { isSynced } from '@/features/provenance/labels'
+import { SourceBadge } from '@/features/provenance/Provenance'
+import type { Occurrence } from '../api'
 import { colorOf, daysOf } from '../entries'
 
 const TIME = { hour: '2-digit', minute: '2-digit', hour12: false } as const
@@ -28,10 +31,13 @@ export function DayList({ day, entries, onOpen }: { day: string; entries: EventI
             const color = colorOf(e)
             const task = e.extendedProps?.task as { status: string } | undefined
             const done = task && (task.status === 'done' || task.status === 'cancelled')
+            const occurrence = e.extendedProps?.occurrence as Occurrence | undefined
+            const synced = occurrence && isSynced(occurrence) ? occurrence : null
             return (
-              <li key={String(e.id)}>
+              // A synced event's badge sits beside the button, not in it: it is a link of its own.
+              <li key={String(e.id)} className="relative">
                 <button type="button" onClick={() => onOpen(e)}
-                  className="flex min-h-12 w-full items-center gap-3 rounded-card border border-border bg-card px-3 py-2 text-left hover:bg-surface-hover">
+                  className={cn('flex min-h-12 w-full items-center gap-3 rounded-card border border-border bg-card px-3 py-2 text-left hover:bg-surface-hover', synced && 'pr-28')}>
                   <span aria-hidden className={cn('h-8 w-1 shrink-0 rounded-full', !color && 'border border-dashed border-border-strong')}
                     style={color ? { backgroundColor: color } : undefined} />
                   <span className="w-12 shrink-0 text-[12.5px] tabular-nums text-muted">
@@ -42,6 +48,7 @@ export function DayList({ day, entries, onOpen }: { day: string; entries: EventI
                     {e.title}
                   </span>
                 </button>
+                {synced && <SourceBadge item={synced} className="absolute right-3 top-1/2 -translate-y-1/2" />}
               </li>
             )
           })}

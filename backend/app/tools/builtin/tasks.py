@@ -18,6 +18,8 @@ from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.features.links import service as links
 from app.features.projects import service as projects
+from app.features.provenance import service as provenance
+from app.features.provenance.sources import ExternalKeyTaken
 from app.features.tasks import service
 from app.features.tasks.models import Project, Task
 from app.features.tasks.schemas import (
@@ -32,6 +34,7 @@ from app.features.tasks.schemas import (
 )
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin import sources as src
 from app.tools.builtin.workspace import path_action
 
 PRIORITY = {0: "", 1: "low", 2: "medium", 3: "high"}
@@ -62,6 +65,7 @@ def task_line(task: Task, projects: dict[uuid.UUID, str], waits_on: int = 0) -> 
         facts.append(f"checklist {ticked}/{len(task.checklist)}")
     if waits_on:
         facts.append(f"waits on {waits_on} open task{'s' if waits_on != 1 else ''}")
+    facts += src.facts(task)
     return f"[{task.id}] {task.title} ({'; '.join(facts)})"
 
 
@@ -117,6 +121,12 @@ class ListTasksInput(BaseModel):
     query: str | None = Field(None, max_length=200, description="Words in the title or notes")
     due_before: date | None = Field(None, description="Only tasks due on or before this day")
     parent_id: str | None = Field(None, description="Only the subtasks of this task")
+    source: str | None = Field(None, max_length=40, description=src.LIST_SOURCE)
+    external_key: str | None = Field(
+        None,
+        max_length=200,
+        description=src.LIST_EXTERNAL_KEY + " (whatever its status, unless status is given)",
+    )
 
 
 class ListTasks(Tool):
@@ -145,18 +155,23 @@ class ListTasks(Tool):
             parent_id = _id(args.parent_id) if args.parent_id else None
             if args.parent_id and parent_id is None:
                 return ToolResult(content=f"No task with id {args.parent_id}.", is_error=True)
+            # A lookup by key finds the task whether it is open or not.
+            key = args.external_key.strip() if args.external_key else None
             tasks = await service.list_tasks(
                 db,
-                status=args.status or "open",
+                status=args.status or ("all" if key else "open"),
                 project_id=project_id,
                 q=args.query,
                 due_to=args.due_before,
                 parent_id=parent_id,
+                source=args.source,
+                external_key=key,
                 limit=200,
             )
             waits = await _waits_on(db, tasks)
+            trashed = await src.in_trash(db, "task", key) if key and not tasks else ""
         if not tasks:
-            return ToolResult(content="No tasks match.")
+            return ToolResult(content=f"No tasks match.{trashed}")
         tasks.sort(key=lambda t: (t.due_date is None, t.due_date or date.max, -t.priority))
         return ToolResult(
             content="\n".join(task_line(t, projects, waits.get(t.id, 0)) for t in tasks)
@@ -171,7 +186,8 @@ class GetTask(Tool):
     name = "get_task"
     description = (
         "One task in full: its notes, checklist (with item ids), subtasks, the tasks it "
-        "waits on (blocked by) and the tasks that wait on it."
+        "waits on (blocked by) and the tasks that wait on it, where a synced task came from "
+        "and who created and last changed it."
     )
     capability = "tasks.read"
     Input = GetTaskInput
@@ -209,6 +225,10 @@ class GetTask(Tool):
                     lines.append(
                         f"{title}:\n" + "\n".join("- " + task_line(t, projects) for t in group)
                     )
+            if details := src.details(task):
+                lines.append(details)
+            if made := await provenance.summary(db, task.created_by_ref, task.updated_by_ref):
+                lines.append(made)
         return ToolResult(content="\n\n".join(lines))
 
 
@@ -243,6 +263,9 @@ class CreateTaskInput(BaseModel):
         max_length=MAX_BLOCKERS,
         description="Ids of tasks this one waits on; while any is open it is blocked",
     )
+    source: str | None = Field(None, max_length=40, description=src.SOURCE)
+    external_key: str | None = Field(None, max_length=200, description=src.EXTERNAL_KEY)
+    source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
 
     @field_validator("rrule")
     @classmethod
@@ -261,10 +284,22 @@ class CreateTask(Tool):
         return [Action(capability=self.capability, summary=f"Add task: {args.title[:150]}")]
 
     async def run(self, args: CreateTaskInput, ctx: ToolContext) -> ToolResult:
+        source = src.source_in(args.source, args.external_key, args.source_url)
+        if isinstance(source, str):
+            return ToolResult(content=source, is_error=True)
         async with get_sessionmaker()() as db:
             try:
                 fields = args.model_dump(
-                    exclude={"project", "tags", "parent_id", "checklist", "blocked_by"}
+                    exclude={
+                        "project",
+                        "tags",
+                        "parent_id",
+                        "checklist",
+                        "blocked_by",
+                        "source",
+                        "external_key",
+                        "source_url",
+                    }
                 )
                 fields["tags"] = clean_tags(args.tags)
                 parent = None
@@ -288,7 +323,18 @@ class CreateTask(Tool):
                 if isinstance(blocked_by, str):
                     return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
                 fields["blocked_by"] = blocked_by
-                task = await service.create_task(db, fields, created_by="agent", run_id=ctx.run_id)
+                task = await service.create_task(
+                    db, fields, created_by="agent", run_id=ctx.run_id, source=source
+                )
+            except ExternalKeyTaken as exc:
+                existing = None
+                if exc.item is not None:
+                    waits = (await _waits_on(db, [exc.item])).get(exc.item.id, 0)
+                    existing = task_line(exc.item, await _projects(db), waits)
+                text = src.taken(
+                    exc, line=existing, update_tool="update_task", trash_place="Tasks > Trash"
+                )
+                return ToolResult(content=text, data={"existing": exc.details})
             except (AppError, ValueError) as exc:
                 return ToolResult(content=getattr(exc, "message", str(exc)), is_error=True)
             line = task_line(
@@ -330,6 +376,7 @@ class UpdateTaskInput(BaseModel):
         description="Completing a task that has open subtasks: 'finish' them too or 'keep' "
         "them open. Ask the user if unsure.",
     )
+    source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
 
     @field_validator("rrule")
     @classmethod
@@ -339,7 +386,10 @@ class UpdateTaskInput(BaseModel):
 
 class UpdateTask(Tool):
     name = "update_task"
-    description = "Change a task: complete it, rename it, move its due date, and so on."
+    description = (
+        "Change a task: complete it, rename it, move its due date, and so on. A synced "
+        "task's source and external_key can't be changed."
+    )
     capability = "tasks.write"
     Input = UpdateTaskInput
     idempotent = False
@@ -364,6 +414,7 @@ class UpdateTask(Tool):
                     "parent_id",
                     "clear_parent",
                     "blocked_by",
+                    "source_url",
                 },
             )
             changes = {k: v for k, v in changes.items() if v is not None}
@@ -387,9 +438,12 @@ class UpdateTask(Tool):
                 if isinstance(blocked_by, str):
                     return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
                 changes["blocked_by"] = blocked_by
+            source = src.source_in(None, None, args.source_url)
+            if isinstance(source, str):
+                return ToolResult(content=source, is_error=True)
             repeats = task.rrule is not None and task.status != "done"
             try:
-                task = await service.update_task(db, task, changes)
+                task = await service.update_task(db, task, changes, source_url=source.source_url)
             except AppError as exc:
                 hint = (
                     " Call update_task again with subtasks='finish' or 'keep'."

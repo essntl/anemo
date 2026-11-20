@@ -12,11 +12,13 @@ from datetime import date, datetime, time
 from typing import Any, Literal
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
+from app.core.actor import current_actor
 from app.core.errors import NotFound
-from app.features.trash.models import TrashedItem
+from app.features.trash.models import ExternalKeyTombstone, TrashedItem
 
 Kind = Literal["task", "event"]
 _PARSERS: dict[type, Any] = {
@@ -65,11 +67,19 @@ def put(
     title: str,
     payload: dict[str, Any],
     deleted_by: str = "user",
+    *,
+    external_key: str | None = None,
 ) -> TrashedItem:
     """Keep a copy of something that is being deleted. Does not commit: it is part of
-    the caller's delete."""
+    the caller's delete. `external_key`: the item's key in the system it is synced from,
+    which stays taken while the copy is here (features/provenance/sources.py)."""
     item = TrashedItem(
-        kind=kind, item_id=item_id, title=title[:300], payload=payload, deleted_by=deleted_by[:10]
+        kind=kind,
+        item_id=item_id,
+        title=title[:300],
+        payload=payload,
+        deleted_by=deleted_by[:10],
+        external_key=external_key,
     )
     db.add(item)
     return item
@@ -90,6 +100,18 @@ async def get(db: AsyncSession, trash_id: uuid.UUID) -> TrashedItem:
 
 
 async def purge(db: AsyncSession, item: TrashedItem) -> None:
-    """Delete a copy for good."""
+    """Delete a copy for good. A synced item's key is kept as a tombstone, so a sync
+    doesn't make the item again (features/provenance/sources.py)."""
+    if item.external_key is not None:
+        await db.execute(
+            insert(ExternalKeyTombstone)
+            .values(
+                kind=item.kind,
+                external_key=item.external_key,
+                title=item.title,
+                actor_ref=current_actor().ref,
+            )
+            .on_conflict_do_nothing(index_elements=["kind", "external_key"])
+        )
     await db.delete(item)
     await db.commit()
