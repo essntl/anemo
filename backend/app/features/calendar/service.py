@@ -146,12 +146,13 @@ async def update_event(
     links_add: list[str] | None = None,
     links_remove: list[str] | None = None,
     create_values: bool = False,
+    dropped: list[str] | None = None,
 ) -> CalendarEvent:
     """Replace the event's fields with `body`. `source_url`: a new link to the original of
     a synced event (its key can't change). `body.properties`: the values to change (None
-    removes one; left out, they stay), validated as on create; a move to another project
-    keeps only values allowed there. `links_add` / `links_remove`: references of items to
-    link it to, or no longer."""
+    removes one; left out, they stay), validated as on create. Moving it to another
+    project drops the values not allowed there; their keys are added to `dropped`.
+    `links_add` / `links_remove`: references of items to link it to, or no longer."""
     before = (event.start_at, event.rrule, event.all_day, event.tz)
     fields = _fields(event)
     old_project = event.project_id
@@ -167,6 +168,7 @@ async def update_event(
             create_values=create_values,
             merge=True,
             project_changed=event.project_id != old_project,
+            dropped=dropped,
         )
         or changed
     )

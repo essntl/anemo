@@ -298,6 +298,8 @@ class CreateEvent(Tool):
             tz = await _user_tz(db)
             try:
                 # Filed under the project of the chat this run belongs to.
+                if hidden := await linking.hidden_document(db, ctx, args.links):
+                    return ToolResult(content=hidden, is_error=True)
                 body = _event_in(args, tz).model_copy(
                     update={"project_id": ctx.project_id, "properties": args.properties}
                 )
@@ -417,6 +419,9 @@ class UpdateEvent(Tool):
                 source = src.source_in(None, None, args.source_url)
                 if isinstance(source, str):
                     return ToolResult(content=f"Invalid event: {source}", is_error=True)
+                if hidden := await linking.hidden_document(db, ctx, args.links_add):
+                    return ToolResult(content=hidden, is_error=True)
+                dropped: list[str] = []
                 event = await service.update_event(
                     db,
                     event,
@@ -425,12 +430,14 @@ class UpdateEvent(Tool):
                     links_add=args.links_add,
                     links_remove=args.links_remove,
                     create_values=args.create_value,
+                    dropped=dropped,
                 )
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)
             line = _describe(service.base_occurrence(event, event.start_at), tz)
+            line += linking.dropped_note(dropped)
         return ToolResult(
             content=f"Updated: {line}", data={"event": {"id": str(event.id), "title": event.title}}
         )

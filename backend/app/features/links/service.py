@@ -8,6 +8,7 @@
 """
 
 import asyncio
+import time
 import uuid
 from typing import Any
 
@@ -47,6 +48,10 @@ from app.features.tasks.models import Project, Task
 from app.workspace import files
 
 DEFAULT_FOLDER = "files"
+# Reading links looks at the documents folder first (files changed outside the app), but
+# at most this often: a look reads the folder, and the links panels ask often.
+RECONCILE_EVERY_S = 10.0
+_reconciled_at = 0.0  # time.monotonic() of the last look
 MEETING_NOTES = "meeting-notes"  # the built-in type of a meeting's notes
 
 
@@ -163,7 +168,7 @@ async def _incoming(db: AsyncSession, to_type: str, to_id: uuid.UUID) -> dict[st
 
 async def _backlinks(db: AsyncSession, to_type: str, to_id: uuid.UUID) -> Backlinks:
     """Documents, tasks and events that link to an item (from the link index)."""
-    await documents.reconcile(db)  # files changed outside the app: their links too
+    await _fresh(db)  # files changed outside the app: their links too
     found = await _incoming(db, to_type, to_id)
     task_ids = found.get("task", [])
     doc_ids = found.get("document", [])
@@ -200,6 +205,17 @@ async def task_backlinks(db: AsyncSession, task_id: uuid.UUID) -> Backlinks:
 # -- the link index: links and backlinks of any item ------------------------------------
 
 
+async def _fresh(db: AsyncSession) -> None:
+    """Pick up documents changed outside the app (their links too), at most every
+    RECONCILE_EVERY_S seconds per process."""
+    global _reconciled_at
+    now = time.monotonic()
+    if now - _reconciled_at < RECONCILE_EVERY_S:
+        return
+    _reconciled_at = now
+    await documents.reconcile(db)
+
+
 def _item(target: targets.Target) -> LinkItem:
     return LinkItem(
         type=target.ref.type,
@@ -233,7 +249,7 @@ async def check_item(db: AsyncSession, ref: ObjectRef) -> None:
 async def links_of(db: AsyncSession, ref: ObjectRef) -> LinksOut:
     """What an item links to and what links to it, grouped by type. A link that is both
     in the text and set explicitly shows once, as explicit (so it can be removed)."""
-    await documents.reconcile(db)  # files changed outside the app: their links too
+    await _fresh(db)  # files changed outside the app: their links too
     out_rows = list(
         await db.scalars(
             select(ObjectLink)
@@ -306,14 +322,15 @@ async def change_links(db: AsyncSession, ref: ObjectRef, add: list[str], remove:
 async def broken_links(db: AsyncSession, limit: int = 500) -> list[BrokenLinkOut]:
     """Links to items deleted for good (or never there), with the item each is in,
     newest first. A link to an item in the trash is not broken: it can come back."""
-    await documents.reconcile(db)
-    rows = list(
+    await _fresh(db)
+    dead = list(
         await db.scalars(
-            select(ObjectLink).order_by(ObjectLink.created_at.desc(), ObjectLink.id.desc())
+            select(ObjectLink)
+            .where(targets.gone_for_good(ObjectLink.to_type, ObjectLink.to_id))
+            .order_by(ObjectLink.created_at.desc(), ObjectLink.id.desc())
         )
     )
-    found = await targets.describe(db, [_far(r, "to") for r in rows])
-    dead = [r for r in rows if found[_far(r, "to")].state == "deleted"]
+    found = await targets.describe(db, [_far(r, "to") for r in dead])
     owners = await targets.describe(db, [_far(r, "from") for r in dead])
     out: list[BrokenLinkOut] = []
     seen: set[tuple[ObjectRef, ObjectRef]] = set()

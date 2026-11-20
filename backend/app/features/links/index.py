@@ -37,15 +37,30 @@ EXPLICIT_FROM: tuple[ObjectType, ...] = ("task", "event")
 MAX_EXPLICIT = 200  # per item
 MAX_INLINE = 1000  # per item; a text with more links indexes the first ones
 
-# `[text](target)` and `![alt](target)` (with an optional "title"), and `<target>`.
-_LINK = re.compile(r"\]\(\s*<?([^()\s<>]+)>?(?:\s+\"[^\"]*\")?\s*\)|<((?:https?://|/)[^<>\s]+)>")
+# `[text](target)` and `![alt](target)`, with an optional "title", 'title' or (title);
+# and `<target>`.
+_TITLE = r"(?:\"[^\"]*\"|'[^']*'|\([^)]*\))"
+_LINK = re.compile(rf"\]\(\s*<?([^()\s<>]+)>?(?:\s+{_TITLE})?\s*\)|<((?:https?://|/)[^<>\s]+)>")
+# A reference-style definition: `[1]: /tasks?task=<id> "title"`.
+_DEFINITION = re.compile(
+    rf"^[ \t]{{0,3}}\[[^\]\n]+\]:[ \t]*<?([^\s<>]+)>?(?:[ \t]+{_TITLE})?[ \t]*$", re.M
+)
+# Code is not text: fenced blocks (``` or ~~~) and inline code spans.
+_FENCE = re.compile(
+    r"^[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n.*?(?:^[ \t]{0,3}\1[`~]*[ \t]*$|\Z)", re.M | re.S
+)
+_CODE_SPAN = re.compile(r"(`+)(?!`).+?(?<!`)\1(?!`)", re.S)
 
 
 def refs_in(text: str) -> list[ObjectRef]:
-    """The items the Markdown links in `text` point to, in order, each once."""
+    """The items the Markdown links in `text` point to, in order, each once. Links in
+    code (fenced blocks, inline code) don't count."""
+    prose = _CODE_SPAN.sub("", _FENCE.sub("", text or ""))
+    targets_found = [m.group(1) or m.group(2) for m in _LINK.finditer(prose)]
+    targets_found += [m.group(1) for m in _DEFINITION.finditer(prose)]
     found: dict[ObjectRef, None] = {}
-    for m in _LINK.finditer(text or ""):
-        ref = parse_ref(m.group(1) or m.group(2))
+    for target in targets_found:
+        ref = parse_ref(target)
         if ref is not None:
             found[ref] = None
             if len(found) >= MAX_INLINE:
@@ -55,10 +70,11 @@ def refs_in(text: str) -> list[ObjectRef]:
 
 async def refresh_inline(
     db: AsyncSession, from_type: ObjectType, from_id: uuid.UUID, text: str
-) -> None:
+) -> bool:
     """Rebuild the inline links of an item from its text. Never raises: the text is
-    derived work after the write, and a save must not fail because of it (the links
-    are left as they were, and rebuilt on the next save). Doesn't commit."""
+    derived work after the write, and a save must not fail because of it. Returns
+    whether it worked; when not, the links are left as they were (a document is tried
+    again by documents.reconcile, which sees it isn't indexed). Doesn't commit."""
     try:
         async with db.begin_nested():
             wanted = {r for r in refs_in(text) if (r.type, r.id) != (from_type, from_id)}
@@ -80,11 +96,13 @@ async def refresh_inline(
                 await _insert(db, from_type, from_id, new, "inline")
             await db.flush()
     except Exception:  # noqa: BLE001 - links are derived: never stop the save
-        log.warning(
+        log.error(
             "inline links not indexed",
             extra={"ctx": {"type": from_type, "id": str(from_id)}},
             exc_info=True,
         )
+        return False
+    return True
 
 
 async def _insert(

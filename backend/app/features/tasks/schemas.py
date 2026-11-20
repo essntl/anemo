@@ -174,7 +174,11 @@ class TaskOut(BaseModel):
     created_by_actor: ActorOut | None = Field(None, description="Who made it (None: unknown)")
     updated_by_actor: ActorOut | None = Field(None, description="Who changed it last")
     properties: dict[str, Any] = Field(
-        default_factory=dict, description="Property values; `tags` is the same list as tags"
+        default_factory=dict, description="Property values; `tags`: the slugs the tags name"
+    )
+    dropped_properties: list[str] = Field(
+        default_factory=list,
+        description="Property keys this change dropped: not allowed in the project it moved to",
     )
 
 

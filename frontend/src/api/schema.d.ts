@@ -3928,7 +3928,8 @@ export interface paths {
         post?: never;
         /**
          * Delete Property
-         * @description Files keep what they say about it; it is no longer indexed or offered.
+         * @description Files keep what they say about it; it is no longer indexed or offered. Tasks and
+         *     events lose their values of it.
          */
         delete: operations["delete_property_api_properties__definition_id__delete"];
         options?: never;
@@ -5611,6 +5612,11 @@ export interface components {
             properties?: {
                 [key: string]: unknown;
             };
+            /**
+             * Dropped Properties
+             * @description Property keys this change dropped: not allowed in the project it moved to
+             */
+            dropped_properties?: string[];
         };
         /** ExplainIn */
         ExplainIn: {
@@ -7010,6 +7016,11 @@ export interface components {
             properties?: {
                 [key: string]: unknown;
             };
+            /**
+             * Dropped Properties
+             * @description Property keys this change dropped: not allowed in the project it moved to
+             */
+            dropped_properties?: string[];
             /**
              * Event Id
              * Format: uuid
@@ -9269,11 +9280,16 @@ export interface components {
             updated_by_actor?: components["schemas"]["ActorOut"] | null;
             /**
              * Properties
-             * @description Property values; `tags` is the same list as tags
+             * @description Property values; `tags`: the slugs the tags name
              */
             properties?: {
                 [key: string]: unknown;
             };
+            /**
+             * Dropped Properties
+             * @description Property keys this change dropped: not allowed in the project it moved to
+             */
+            dropped_properties?: string[];
         };
         /** TaskPatch */
         TaskPatch: {
@@ -9970,6 +9986,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Created At */
+            created_at?: string | null;
         };
         /** WebSettings */
         WebSettings: {

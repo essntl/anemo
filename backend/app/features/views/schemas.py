@@ -42,6 +42,7 @@ class ViewRow(BaseModel):
     url: str  # the item's canonical reference
     properties: dict[str, Any]
     updated_at: datetime
+    created_at: datetime | None = None  # to sort rows of several types by it
 
 
 class ViewIn(BaseModel):

@@ -20,7 +20,7 @@ from app.features.tasks.schemas import (
 router = APIRouter(tags=["tasks"])
 
 
-_DERIVED = {"blocked_by", "created_by_actor", "updated_by_actor"}
+_DERIVED = {"blocked_by", "created_by_actor", "updated_by_actor", "dropped_properties"}
 
 
 def _out(
@@ -92,7 +92,9 @@ async def reorder_tasks(body: ReorderIn, db: Db) -> None:
 async def update_task(task_id: uuid.UUID, body: TaskPatch, db: Db) -> TaskOut:
     task = await service.get_task(db, task_id)
     changes = body.model_dump(exclude_unset=True)
-    return await _task(db, await service.update_task(db, task, changes))
+    dropped: list[str] = []
+    out = await _task(db, await service.update_task(db, task, changes, dropped=dropped))
+    return out.model_copy(update={"dropped_properties": dropped})
 
 
 @router.post("/tasks/{task_id}/detach-source", response_model=TaskOut)

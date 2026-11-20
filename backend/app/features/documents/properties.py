@@ -263,7 +263,9 @@ async def rename_value(
     renamed = await db.get(PropertyOption, option_id)
     if renamed is not None:
         renamed.slug = new
-    out.items = await item_properties.rewrite_value(db, definition.key, old[0], new)
+    out.items = await item_properties.rewrite_value(
+        db, definition.key, old[0], new, old_label=old[1]
+    )
     await _rewrite_settings(db, definition, old[0], new, out)
     await db.commit()
     # Rewritten documents were indexed while the new slug wasn't a value yet.
@@ -290,7 +292,9 @@ async def merge_values(
         if target is not None and target.hub_document_id is None:
             target.hub_document_id = gone.hub_document_id
         await db.delete(gone)
-    out.items = await item_properties.rewrite_value(db, definition.key, old[0], new)
+    out.items = await item_properties.rewrite_value(
+        db, definition.key, old[0], new, old_label=old[1]
+    )
     await _rewrite_settings(db, definition, old[0], new, out)
     await db.commit()
     return out

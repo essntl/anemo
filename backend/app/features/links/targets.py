@@ -11,9 +11,9 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
@@ -124,3 +124,25 @@ async def check_linkable(db: AsyncSession, refs: list[ObjectRef]) -> None:
             raise NotFound(
                 f"There is no {TYPE_NAMES[ref.type]} {ref.url}", code="link_target_missing"
             )
+
+
+def gone_for_good(to_type: Any, to_id: Any) -> ColumnElement[bool]:
+    """SQL: the item a link points to (`to_type`, `to_id` columns) is neither there nor in
+    the trash: the link is broken (the same rule as describe(), in the database)."""
+
+    def missing(model: Any) -> ColumnElement[bool]:
+        return ~exists().where(model.id == to_id)
+
+    def not_in_trash(kind: str) -> ColumnElement[bool]:
+        return ~exists().where(
+            TrashedItem.kind == kind,
+            TrashedItem.item_id == to_id,
+            TrashedItem.payload.has_key(kind),  # not one cancelled occurrence
+        )
+
+    return or_(
+        and_(to_type == "document", missing(Document)),
+        and_(to_type == "task", missing(Task), not_in_trash("task")),
+        and_(to_type == "event", missing(CalendarEvent), not_in_trash("event")),
+        and_(to_type == "chat", missing(Conversation)),
+    )

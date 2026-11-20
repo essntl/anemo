@@ -16611,7 +16611,7 @@
           "properties"
         ],
         "summary": "Delete Property",
-        "description": "Files keep what they say about it; it is no longer indexed or offered.",
+        "description": "Files keep what they say about it; it is no longer indexed or offered. Tasks and\nevents lose their values of it.",
         "operationId": "delete_property_api_properties__definition_id__delete",
         "parameters": [
           {
@@ -21951,6 +21951,14 @@
             "type": "object",
             "title": "Properties",
             "description": "Property values"
+          },
+          "dropped_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped Properties",
+            "description": "Property keys this change dropped: not allowed in the project it moved to"
           }
         },
         "type": "object",
@@ -25449,6 +25457,14 @@
             "type": "object",
             "title": "Properties",
             "description": "Property values"
+          },
+          "dropped_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped Properties",
+            "description": "Property keys this change dropped: not allowed in the project it moved to"
           },
           "event_id": {
             "type": "string",
@@ -31257,7 +31273,15 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Properties",
-            "description": "Property values; `tags` is the same list as tags"
+            "description": "Property values; `tags`: the slugs the tags name"
+          },
+          "dropped_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped Properties",
+            "description": "Property keys this change dropped: not allowed in the project it moved to"
           }
         },
         "type": "object",
@@ -33265,6 +33289,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",

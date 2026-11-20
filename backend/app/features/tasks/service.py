@@ -205,7 +205,7 @@ async def create_task(
     await sources.check_key(db, "task", Task, key)
     task = Task(**fields, created_by=created_by, run_id=run_id)
     sources.record_created(task, source)
-    await properties.register_open(db, "tags", list(task.tags or []))
+    await item_properties.store_tags(db, task, list(task.tags or []))
     await item_properties.set_properties(db, task, "task", values, create_values=create_values)
     await _check_parent(db, task, task.parent_id, new=True)
     task.sort_order = await _next_order(db, task.status)
@@ -241,6 +241,7 @@ async def update_task(
     links_add: list[str] | None = None,
     links_remove: list[str] | None = None,
     create_values: bool = False,
+    dropped: list[str] | None = None,
 ) -> Task:
     """`changes` holds only the fields to change (None clears a field).
 
@@ -249,6 +250,8 @@ async def update_task(
     `source_url`: a new link to the original of a synced task (its key can't change).
     `properties`: values to set (None removes one), validated as on create.
     `links_add` / `links_remove`: references of items to link it to, or no longer.
+    Moving it to another project drops the values not allowed there; their keys are
+    added to `dropped`.
     """
     changes = dict(changes)
     choice = changes.pop("subtasks", None)
@@ -257,16 +260,14 @@ async def update_task(
     if "checklist" in changes:
         changes["checklist"] = _checklist(changes["checklist"])
     changed = any(getattr(task, key) != value for key, value in changes.items())
+    before = task.project_id, list(task.tags or []), dict(task.properties or {})
     if "tags" in changes:
-        await properties.register_open(db, "tags", list(changes["tags"] or []))
+        await item_properties.store_tags(db, task, list(changes.pop("tags") or []))
     moved = "project_id" in changes and changes["project_id"] != task.project_id
     if values is not None or moved:
         if changes.get("project_id"):
             await get_project(db, changes["project_id"])
-        before = task.project_id, list(task.tags or []), dict(task.properties or {})
         task.project_id = changes.get("project_id", task.project_id)
-        if "tags" in changes:
-            task.tags = changes["tags"]
         try:
             changed = (
                 await item_properties.set_properties(
@@ -277,13 +278,13 @@ async def update_task(
                     create_values=create_values,
                     merge=True,
                     project_changed=moved,
+                    dropped=dropped,
                 )
                 or changed
             )
         except AppError:
             task.project_id, task.tags, task.properties = before
             raise
-        changes["tags"] = list(task.tags or [])
     if links_add or links_remove:
         changed = (
             await links_index.change_explicit(
@@ -606,6 +607,8 @@ async def restore_task(db: AsyncSession, item: TrashedItem) -> Task:
     task = Task(**values)
     task.updated_by_ref = current_actor().ref  # putting it back is a change
     task.sort_order = await _next_order(db, task.status)
+    # Its tags property follows its tags (a copy from before properties has none).
+    await item_properties.store_tags(db, task, list(task.tags or []))
     db.add(task)
     await db.flush()
     await links_index.restore_explicit(db, "task", task.id, data.get("links"))

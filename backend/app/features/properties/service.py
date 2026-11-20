@@ -509,26 +509,48 @@ async def validate(
     return out
 
 
-async def register_open(db: AsyncSession, key: str, values: list[str]) -> None:
-    """Make each of these a value of an open-vocabulary property, spelled as given and
-    without the near-duplicate check (a task's `tags` parameter: tags work exactly as
-    they always did, and the shared `tags` property knows them). Values it has already
-    (by slug or label, in any case) are left alone. Flushes, doesn't commit."""
+def names(value: str, slug: str, label: str) -> bool:
+    """Whether `value` names the option (slug, label): its slug, its slug or label in
+    any case, or a spelling whose normal form is the slug ("Ludmyla Doula", "ludmyla
+    doula" and "ludmyla-doula" all name `ludmyla-doula`)."""
+    folded = value.strip().casefold()
+    return (
+        value == slug
+        or folded in (slug.casefold(), label.strip().casefold())
+        or (normalise(value) == slug)
+    )
+
+
+async def resolve_open(db: AsyncSession, key: str, values: list[str]) -> list[str]:
+    """The slugs of these values of an open-vocabulary property, as a task's `tags`
+    parameter gives them: an existing value they name (Prop.option, or its normal form
+    as the slug), else a new value with the normal form as its slug and the text as its
+    label. No near-duplicate check: the tags parameter works as it always did. Values
+    with no usable normal form are left out. Flushes, doesn't commit."""
     prop = (await load(db)).get(key)
     if prop is None or not prop.definition.open_vocabulary or prop.type not in SELECT_TYPES:
-        return
+        return []
+    out: list[str] = []
     for value in values:
-        if not value or len(value) > 80 or prop.option(value) is not None:
-            continue
-        option = PropertyOption(
-            definition_id=prop.definition.id,
-            slug=value,
-            label=value[:120],
-            sort_order=len(prop.options),
-        )
-        db.add(option)
-        prop.options.append(option)
+        found = prop.option(value) if value else None
+        if found is None:
+            slug = normalise(value or "")
+            if not slug:
+                continue
+            found = next((o for o in prop.options if o.slug == slug), None)
+            if found is None:
+                found = PropertyOption(
+                    definition_id=prop.definition.id,
+                    slug=slug,
+                    label=value.strip()[:120],
+                    sort_order=len(prop.options),
+                )
+                db.add(found)
+                prop.options.append(found)
+        if found.slug not in out:
+            out.append(found.slug)
     await db.flush()
+    return out
 
 
 async def check_written(

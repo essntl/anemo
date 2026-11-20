@@ -6,19 +6,25 @@ Create Date: 2026-11-21 10:00:00.000000
 
 Data, all safe to run again and invisible in the app:
 
-- Task tags become the shared `tags` property. `tasks.tags` stays the truth (the API,
-  the tools and the UI read it as before); the same list is copied into
-  `tasks.properties["tags"]`, and every tag becomes a value of the `tags` property
-  (made here if the app hasn't made it yet), spelled exactly as the task has it.
+- Task tags become the shared `tags` property. `tasks.tags` stays as it is (the API,
+  the tools and the UI read it as before). Each tag is resolved to a value of the
+  `tags` property the way the app resolves the tags parameter
+  (properties/service.resolve_open): an existing value it names (its slug, or its slug
+  or label in any case, or its normal form as the slug), else a new value with the
+  normal form as its slug and the tag as its label. The slugs go into
+  `tasks.properties["tags"]`. The `tags` property is made here if the app hasn't made
+  it yet.
 - The links already in task notes and event descriptions go into the link index.
   Documents are indexed from their files by the app (documents.reconcile), since their
   text is not in the database.
 
 The downgrade drops the new tables and columns. Values added to `tags` stay (they are
-the tags documents can use too).
+the tags documents can use too). Task tags are kept (`tasks.tags`), but property values
+of tasks and events are lost, events' tags included: events had no tags before.
 """
 
 import re
+import unicodedata
 import uuid
 from collections.abc import Sequence
 
@@ -41,18 +47,37 @@ _PATTERNS = (
     ("chat", re.compile(rf"^/c/{_UUID}$")),
 )
 _ORIGIN = re.compile(r"^https?://[^/?#]+(?=[/?#])")
-_LINK = re.compile(r"\]\(\s*<?([^()\s<>]+)>?(?:\s+\"[^\"]*\")?\s*\)|<((?:https?://|/)[^<>\s]+)>")
+_TITLE = r"(?:\"[^\"]*\"|'[^']*'|\([^)]*\))"
+_LINK = re.compile(rf"\]\(\s*<?([^()\s<>]+)>?(?:\s+{_TITLE})?\s*\)|<((?:https?://|/)[^<>\s]+)>")
+_DEFINITION = re.compile(
+    rf"^[ \t]{{0,3}}\[[^\]\n]+\]:[ \t]*<?([^\s<>]+)>?(?:[ \t]+{_TITLE})?[ \t]*$", re.M
+)
+_FENCE = re.compile(
+    r"^[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n.*?(?:^[ \t]{0,3}\1[`~]*[ \t]*$|\Z)", re.M | re.S
+)
+_CODE_SPAN = re.compile(r"(`+)(?!`).+?(?<!`)\1(?!`)", re.S)
 
 
 def _refs(text: str) -> list[tuple[str, uuid.UUID]]:
+    prose = _CODE_SPAN.sub("", _FENCE.sub("", text or ""))
+    targets = [m.group(1) or m.group(2) for m in _LINK.finditer(prose)]
+    targets += [m.group(1) for m in _DEFINITION.finditer(prose)]
     found: list[tuple[str, uuid.UUID]] = []
-    for m in _LINK.finditer(text or ""):
-        target = _ORIGIN.sub("", (m.group(1) or m.group(2)).strip())
+    for value in targets:
+        target = _ORIGIN.sub("", value.strip())
         for kind, pattern in _PATTERNS:
             hit = pattern.match(target)
             if hit and (kind, uuid.UUID(hit.group(1))) not in found:
                 found.append((kind, uuid.UUID(hit.group(1))))
     return found
+
+
+def _normalise(value: str) -> str:
+    """A frozen copy of properties/service.normalise."""
+    text = unicodedata.normalize("NFC", value).strip().lower()
+    text = re.sub(r"[\s_]+", "-", text)
+    text = re.sub(r"[^\w-]+", "", text)
+    return re.sub(r"-{2,}", "-", text).strip("-")[:80]
 
 
 def _properties_column() -> sa.Column:
@@ -142,22 +167,33 @@ def _migrate_tags() -> None:
     definition_id = bind.scalar(
         sa.text("SELECT id FROM property_definitions WHERE key = 'tags' AND type = 'multi_select'")
     )
-    if definition_id is not None:
-        count = bind.scalar(
-            sa.text("SELECT count(*) FROM property_options WHERE definition_id = :d"),
-            {"d": definition_id},
-        )
-        tags = bind.scalars(
+    if definition_id is None:
+        return
+    options: list[tuple[str, str]] = [
+        (slug, label)
+        for slug, label in bind.execute(
             sa.text(
-                "SELECT DISTINCT tag FROM tasks, jsonb_array_elements_text(tasks.tags) AS tag"
-                " WHERE jsonb_typeof(tasks.tags) = 'array' ORDER BY tag"
-            )
+                "SELECT slug, label FROM property_options WHERE definition_id = :d"
+                " ORDER BY sort_order, label"
+            ),
+            {"d": definition_id},
         ).all()
-        order = int(count or 0)
-        for tag in tags:
-            if not tag or len(tag) > 80:
-                continue
-            inserted = bind.execute(
+    ]
+
+    def resolve(tag: str) -> str | None:
+        """As properties/service.resolve_open (a frozen copy), adding a new value."""
+        for slug, _ in options:
+            if slug == tag:
+                return slug
+        folded = tag.strip().casefold()
+        for slug, label in options:
+            if folded in (slug.casefold(), label.strip().casefold()):
+                return slug
+        normal = _normalise(tag)
+        if not normal:
+            return None
+        if all(slug != normal for slug, _ in options):
+            bind.execute(
                 sa.text(
                     "INSERT INTO property_options (id, definition_id, slug, label, sort_order,"
                     " created_at, updated_at) VALUES (:id, :d, :slug, :label, :order, now(), now())"
@@ -166,20 +202,38 @@ def _migrate_tags() -> None:
                 {
                     "id": uuid.uuid4(),
                     "d": definition_id,
-                    "slug": tag,
-                    "label": tag[:120],
-                    "order": order,
+                    "slug": normal,
+                    "label": tag.strip()[:120],
+                    "order": len(options),
                 },
             )
-            order += inserted.rowcount or 0
-    # The copy the app keeps in step (tasks/models.py, _mirror_tags). updated_at stays.
-    bind.execute(
+            options.append((normal, tag.strip()[:120]))
+        return normal
+
+    rows = bind.execute(
         sa.text(
-            "UPDATE tasks SET properties = properties || jsonb_build_object('tags', tags)"
+            "SELECT id, tags, properties FROM tasks"
             " WHERE jsonb_typeof(tags) = 'array' AND jsonb_array_length(tags) > 0"
-            " AND properties -> 'tags' IS DISTINCT FROM tags"
+            " ORDER BY created_at, id"
         )
-    )
+    ).all()
+    for task_id, tags, values in rows:
+        slugs: list[str] = []
+        for tag in tags:
+            slug = resolve(tag) if isinstance(tag, str) and tag else None
+            if slug is not None and slug not in slugs:
+                slugs.append(slug)
+        if (values or {}).get("tags") == slugs:
+            continue
+        # updated_at stays: nothing about the task changed.
+        bind.execute(
+            sa.text(
+                "UPDATE tasks SET properties = (properties - 'tags')"
+                " || CASE WHEN :n > 0 THEN jsonb_build_object('tags', CAST(:slugs AS jsonb))"
+                " ELSE '{}'::jsonb END WHERE id = :id"
+            ).bindparams(sa.bindparam("slugs", type_=postgresql.JSONB)),
+            {"id": task_id, "slugs": slugs, "n": len(slugs)},
+        )
 
 
 def _index_links() -> None:

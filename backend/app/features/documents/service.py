@@ -552,24 +552,30 @@ async def _reindex_moved(db: AsyncSession, doc: Document) -> None:
     await schedule_reindex(db, doc)
 
 
-async def _index_links(db: AsyncSession, doc: Document, content: str) -> None:
+async def _index_links(db: AsyncSession, doc: Document, content: str | None) -> bool:
     """Rebuild the link index from the document's text (never fails the save:
-    links/index.refresh_inline). Keeps updated_at. Doesn't commit."""
+    links/index.refresh_inline) and record which content it was built from. When that
+    fails, nothing is recorded, so the next reconcile tries again. `content` None: the
+    file can't be read as text, so it has no links. Keeps updated_at. Doesn't commit.
+    Whether it worked."""
     await db.flush()
-    await links_index.refresh_inline(db, "document", doc.id, content)
+    ok = await links_index.refresh_inline(db, "document", doc.id, content or "")
+    done = doc.content_hash if ok else None
     await db.execute(
         update(Document)
         .where(Document.id == doc.id)
-        .values(links_hash=doc.content_hash, updated_at=Document.updated_at)
+        .values(links_hash=done, updated_at=Document.updated_at)
         .execution_options(synchronize_session=False)
     )
-    set_committed_value(doc, "links_hash", doc.content_hash)
+    set_committed_value(doc, "links_hash", done)
+    return ok
 
 
 async def _links_stale(db: AsyncSession) -> bool:
     """Index the links of documents whose links were indexed from other content, or
-    never (documents from before the link index). Doesn't commit. Whether there were
-    any."""
+    never (documents from before the link index), or whose indexing failed. A file
+    that can't be read counts as having no links (until its content changes). Doesn't
+    commit. Whether anything was written."""
     stale = list(
         await db.scalars(
             select(Document).where(
@@ -577,11 +583,13 @@ async def _links_stale(db: AsyncSession) -> bool:
             )
         )
     )
+    wrote = False
     for doc in stale:
         try:
-            content = await asyncio.to_thread(_read, doc.path)
+            content: str | None = await asyncio.to_thread(_read, doc.path)
         except AppError:
-            continue  # gone or unreadable: the next look sorts it out
-        if sha(content) == doc.content_hash:  # else the next look re-reads it as a change
-            await _index_links(db, doc, content)
-    return bool(stale)
+            content = None  # unreadable: nothing to index, and not tried again and again
+        if content is not None and sha(content) != doc.content_hash:
+            continue  # changed: reconcile reads it as a change, links included
+        wrote = await _index_links(db, doc, content) or wrote
+    return wrote

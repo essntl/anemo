@@ -61,7 +61,9 @@ async def get_event(event_id: uuid.UUID, db: Db) -> EventOut:
 async def update_event(event_id: uuid.UUID, body: EventIn, db: Db) -> EventOut:
     """Change the event (for a repeating event: the whole series)."""
     event = await service.get_event(db, event_id)
-    return await _event(db, await service.update_event(db, event, body))
+    dropped: list[str] = []
+    out = await _event(db, await service.update_event(db, event, body, dropped=dropped))
+    return out.model_copy(update={"dropped_properties": dropped})
 
 
 @router.put("/events/{event_id}/properties", response_model=EventOut)

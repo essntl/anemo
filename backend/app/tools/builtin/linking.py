@@ -6,9 +6,10 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.refs import ObjectRef
+from app.core.refs import ObjectRef, parse_ref
 from app.features.links import service as links
-from app.features.links.lookup import describe_refs
+from app.features.links import targets
+from app.features.links.lookup import names_of
 from app.features.links.schemas import LinkGroups, LinkOut
 from app.features.properties import service as properties
 from app.policy.models import Action
@@ -42,18 +43,37 @@ PROPERTY_FILTER = (
 SHOWN = 5  # backlinks named in read_document
 
 
+def dropped_note(keys: list[str]) -> str:
+    """Said after a change that moved an item to a project where some of its property
+    values aren't allowed (they were dropped)."""
+    if not keys:
+        return ""
+    return f" Dropped properties not allowed in its new project: {', '.join(keys)}."
+
+
 def values_text(values: dict[str, Any], *, without: tuple[str, ...] = ()) -> str:
     """Property values as the model reads them: `client: ludmyla-doula · tags: a, b`."""
     return properties.summary({}, {k: v for k, v in (values or {}).items() if k not in without})
 
 
-def link_actions(add: list[str] | None, remove: list[str] | None = None) -> str:
-    """The links part of an approval summary, naming what they point to."""
+def link_actions(add: list[str] | None, remove: list[str] | None = None, limit: int = 5) -> str:
+    """The links part of an approval summary, naming what they point to (looked up in
+    one go; a reference that can't be looked up is shown as given)."""
+    add, remove = list(add or []), list(remove or [])
+    if not add and not remove:
+        return ""
+    names = names_of(add[:limit] + remove[:limit])
+
+    def listed(values: list[str]) -> str:
+        shown = [names.get(v, v[:120]) for v in values[:limit]]
+        more = len(values) - limit
+        return ", ".join(shown) + (f" and {more} more" if more > 0 else "")
+
     parts = []
     if add:
-        parts.append("link it to " + describe_refs(add))
+        parts.append("link it to " + listed(add))
     if remove:
-        parts.append("unlink " + describe_refs(remove))
+        parts.append("unlink " + listed(remove))
     return "; ".join(parts)
 
 
@@ -80,12 +100,38 @@ def _visible(ctx: ToolContext, link: LinkOut) -> bool:
     )
 
 
+async def hidden_document(db: AsyncSession, ctx: ToolContext, values: list[str]) -> str | None:
+    """Why a link can't be made: it points to a document in a folder the agent can't see
+    (Settings > Workspace). None when every reference may be linked."""
+    refs = [r for v in values if (r := parse_ref(v)) is not None and r.type == "document"]
+    if not refs:
+        return None
+    found = await targets.describe(db, refs)
+    for ref in refs:
+        path = found[ref].path
+        if path is not None and not allows(ctx.workspace, path, "read"):
+            return (
+                f"{ref.url} is a document in a folder you have no access to (Settings > "
+                "Workspace), so you can't link to it."
+            )
+    return None
+
+
+def _gone(link: LinkOut) -> str:
+    if link.state == "in_trash":
+        return " (in the trash)"
+    if link.state == "deleted":
+        # Tasks and events are deleted for good from the trash; documents and chats are removed.
+        what = "deleted for good" if link.type in ("task", "event") else "removed"
+        return f" ({what}: a broken link)"
+    return ""
+
+
 def _line(link: LinkOut) -> str:
-    state = {"in_trash": " (in the trash)", "deleted": " (deleted for good: a broken link)"}
     title = f"“{link.title}”" if link.title else "(no title)"
     detail = f", {link.detail}" if link.detail and link.state == "live" else ""
     origin = "" if link.origin == "explicit" else ", in its text"
-    return f"- {link.type} {title} {link.ref}{detail}{origin}{state.get(link.state, '')}"
+    return f"- {link.type} {title} {link.ref}{detail}{origin}{_gone(link)}"
 
 
 def _lines(ctx: ToolContext, groups: LinkGroups) -> list[str]:

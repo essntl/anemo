@@ -120,8 +120,12 @@ async def update_property(definition_id: uuid.UUID, body: DefinitionPatch, db: D
 
 @router.delete("/{definition_id}", status_code=204)
 async def delete_property(definition_id: uuid.UUID, db: Db) -> None:
-    """Files keep what they say about it; it is no longer indexed or offered."""
-    await service.delete_definition(db, await service.get_definition(db, definition_id))
+    """Files keep what they say about it; it is no longer indexed or offered. Tasks and
+    events lose their values of it."""
+    definition = await service.get_definition(db, definition_id)
+    if not definition.builtin:
+        await item_properties.forget_key(db, definition.key)
+    await service.delete_definition(db, definition)
 
 
 @router.post("/{definition_id}/options", response_model=OptionOut, status_code=201)

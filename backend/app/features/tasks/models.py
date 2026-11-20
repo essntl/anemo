@@ -15,9 +15,8 @@ from sqlalchemy import (
     Text,
     Time,
 )
-from sqlalchemy import event as orm_event
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, Mapper, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 
 from app.db.base import Base, IdMixin, ProvenanceMixin, SourceMixin, TimestampMixin
@@ -96,18 +95,6 @@ class Task(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin):
     checklist: Mapped[list[dict[str, object]]] = mapped_column(
         JSONB, default=list, server_default="[]"
     )
-
-
-@orm_event.listens_for(Task, "before_insert")
-@orm_event.listens_for(Task, "before_update")
-def _mirror_tags(mapper: Mapper[Task], connection: Any, task: Task) -> None:
-    """`properties["tags"]` is always the task's tags (the column is the truth), whoever
-    wrote the row: the services, a restore from the trash, a repeat."""
-    values = {k: v for k, v in (task.properties or {}).items() if k != "tags"}
-    if task.tags:
-        values["tags"] = list(task.tags)
-    if values != (task.properties or {}):
-        task.properties = values
 
 
 class TaskDependency(Base):

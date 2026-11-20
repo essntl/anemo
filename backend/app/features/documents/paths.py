@@ -8,14 +8,12 @@ now always means that document, even if another one lived there before.
 
 import asyncio
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
+from app.core.db import read_sync
 from app.core.errors import NotFound
 from app.core.refs import parse_ref
 from app.features.documents import service
@@ -98,35 +96,24 @@ def current_path_sync(value: str) -> str | None:
     """The current path of the document an id, a link or an old path names, or None.
 
     For Tool.actions(), which can't wait for the database: the approval card and its
-    "always allow" must name the document itself, never the whole folder. Read-only,
-    on a short connection of its own in another thread (a few milliseconds)."""
+    "always allow" must name the document itself, never the whole folder. Read-only
+    (core/db.read_sync)."""
 
-    async def lookup() -> str | None:
-        engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
-        try:
-            async with AsyncSession(engine) as db:
-                doc_id = as_id(value)
-                if doc_id is None:
-                    path = service.check_path(value)
-                    if await db.scalar(select(Document.id).where(Document.path == path)):
-                        return path
-                    doc_id = await db.scalar(
-                        select(DocumentPath.document_id)
-                        .where(DocumentPath.old_path == path)
-                        .order_by(DocumentPath.moved_at.desc(), DocumentPath.id.desc())
-                        .limit(1)
-                    )
-                if doc_id is None:
-                    return None
-                found: str | None = await db.scalar(
-                    select(Document.path).where(Document.id == doc_id)
-                )
-                return found
-        finally:
-            await engine.dispose()
+    async def lookup(db: AsyncSession) -> str | None:
+        doc_id = as_id(value)
+        if doc_id is None:
+            path = service.check_path(value)
+            if await db.scalar(select(Document.id).where(Document.path == path)):
+                return path
+            doc_id = await db.scalar(
+                select(DocumentPath.document_id)
+                .where(DocumentPath.old_path == path)
+                .order_by(DocumentPath.moved_at.desc(), DocumentPath.id.desc())
+                .limit(1)
+            )
+        if doc_id is None:
+            return None
+        found: str | None = await db.scalar(select(Document.path).where(Document.id == doc_id))
+        return found
 
-    try:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, lookup()).result(timeout=5)
-    except Exception:  # noqa: BLE001 - unknown: the caller names one unknown document
-        return None
+    return read_sync(lookup)

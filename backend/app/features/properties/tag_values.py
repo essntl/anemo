@@ -170,6 +170,8 @@ async def apply(db: AsyncSession, tag: str, key: str, value: str) -> Applied:
             await db.rollback()
             properties.forget(db)
             out.failed.append(f"{title}: {getattr(exc, 'message', str(exc))}")
+    tag_option = (await properties.load(db))[TAGS].option(tag)
+    label = tag_option.label if tag_option is not None else tag
     models: tuple[tuple[str, Any], ...] = (("task", Task), ("event", CalendarEvent))
     for kind, model in models:
         ids: list[uuid.UUID] = list(await db.scalars(select(model.id).where(_has_tag(model, tag))))
@@ -183,7 +185,21 @@ async def apply(db: AsyncSession, tag: str, key: str, value: str) -> Applied:
                 out.failed.append(f"{title}: {changes}")
                 continue
             try:
-                if await item_properties.set_properties(db, item, kind, changes, merge=True):
+                if kind == "task":
+                    # Its tags keep their spelling; those that name this one go.
+                    changes.pop(TAGS, None)
+                    before = list(item.tags or [])
+                    changed = await item_properties.set_properties(
+                        db, item, kind, changes, merge=True
+                    )
+                    kept = [t for t in item.tags or [] if not properties.names(t, tag, label)]
+                    await item_properties.store_tags(db, item, kept)
+                    changed = changed or kept != before
+                else:
+                    changed = await item_properties.set_properties(
+                        db, item, kind, changes, merge=True
+                    )
+                if changed:
                     sources.record_changed(item)
                 await db.commit()
             except AppError as exc:

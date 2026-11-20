@@ -353,6 +353,8 @@ class CreateTask(Tool):
                 if isinstance(blocked_by, str):
                     return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
                 fields["blocked_by"] = blocked_by
+                if hidden := await linking.hidden_document(db, ctx, args.links):
+                    return ToolResult(content=hidden, is_error=True)
                 task = await service.create_task(
                     db,
                     fields,
@@ -502,7 +504,10 @@ class UpdateTask(Tool):
             source = src.source_in(None, None, args.source_url)
             if isinstance(source, str):
                 return ToolResult(content=source, is_error=True)
+            if hidden := await linking.hidden_document(db, ctx, args.links_add):
+                return ToolResult(content=hidden, is_error=True)
             repeats = task.rrule is not None and task.status != "done"
+            dropped: list[str] = []
             try:
                 task = await service.update_task(
                     db,
@@ -512,6 +517,7 @@ class UpdateTask(Tool):
                     links_add=args.links_add,
                     links_remove=args.links_remove,
                     create_values=args.create_value,
+                    dropped=dropped,
                 )
             except AppError as exc:
                 hint = (
@@ -525,6 +531,7 @@ class UpdateTask(Tool):
             )
             if repeats and task.status == "done":
                 line += " It repeats, so the next one was added."
+            line += linking.dropped_note(dropped)
         return ToolResult(
             content=f"Updated: {line}", data={"task": {"id": str(task.id), "title": task.title}}
         )

@@ -54,6 +54,7 @@ async def _documents(db: AsyncSession, q: ViewQuery, limit: int) -> list[ViewRow
             url=ref_url("document", d.id),
             properties=d.properties or {},
             updated_at=d.updated_at,
+            created_at=d.created_at,
         )
         for d in docs
     ]
@@ -101,6 +102,7 @@ async def _rows(
             url=ref_url(object_type, item.id),
             properties=item.properties or {},
             updated_at=item.updated_at,
+            created_at=item.created_at,
         )
         for item in found
     ]
@@ -124,12 +126,15 @@ SOURCES: dict[ObjectType, Callable[[AsyncSession, ViewQuery, int], Awaitable[lis
 
 
 def _sort(rows: list[ViewRow], q: ViewQuery) -> list[ViewRow]:
-    """Rows of several types in one order (one type keeps its own)."""
-    for s in reversed(q.sort):
+    """Rows of several types in one order (one type keeps its own). Without a sort, the
+    latest changed first (as each type lists them), so no type is cut off first."""
+    for s in reversed(q.sort or [SortKey(key="updated_at", desc=True)]):
         if s.key == "title":
             rows.sort(key=lambda r: r.title.lower(), reverse=s.desc)
         elif s.key == "updated_at":
             rows.sort(key=lambda r: r.updated_at, reverse=s.desc)
+        elif s.key == "created_at":
+            rows.sort(key=lambda r: r.created_at or r.updated_at, reverse=s.desc)
         else:
             present = [r for r in rows if r.properties.get(s.key) is not None]
             absent = [r for r in rows if r.properties.get(s.key) is None]
