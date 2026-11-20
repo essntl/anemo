@@ -12,11 +12,13 @@ from datetime import date, datetime, time
 from typing import Any, Literal
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
+from app.core.actor import current_actor
 from app.core.errors import NotFound
-from app.features.trash.models import TrashedItem
+from app.features.trash.models import ExternalKeyTombstone, TrashedItem
 
 Kind = Literal["task", "event"]
 _PARSERS: dict[type, Any] = {
@@ -98,6 +100,18 @@ async def get(db: AsyncSession, trash_id: uuid.UUID) -> TrashedItem:
 
 
 async def purge(db: AsyncSession, item: TrashedItem) -> None:
-    """Delete a copy for good."""
+    """Delete a copy for good. A synced item's key is kept as a tombstone, so a sync
+    doesn't make the item again (features/provenance/sources.py)."""
+    if item.external_key is not None:
+        await db.execute(
+            insert(ExternalKeyTombstone)
+            .values(
+                kind=item.kind,
+                external_key=item.external_key,
+                title=item.title,
+                actor_ref=current_actor().ref,
+            )
+            .on_conflict_do_nothing(index_elements=["kind", "external_key"])
+        )
     await db.delete(item)
     await db.commit()

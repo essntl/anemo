@@ -74,6 +74,10 @@ def _problems(exc: ValidationError) -> str:
     return "; ".join(e["msg"].removeprefix("Value error, ") for e in exc.errors()[:3])
 
 
+# list_events without a range of days lists at most this many events.
+FIND_LIMIT = 200
+
+
 class ListEventsInput(BaseModel):
     start: date | None = Field(
         None, description="First day (needed unless source, external_key or query is given)"
@@ -105,11 +109,17 @@ class ListEvents(Tool):
             )
         async with get_sessionmaker()() as db:
             tz = await _user_tz(db)
+            cut = False
             if args.start is None:
                 events = await service.find_events(
-                    db, source=args.source, external_key=args.external_key, query=args.query
+                    db,
+                    source=args.source,
+                    external_key=args.external_key,
+                    query=args.query,
+                    limit=FIND_LIMIT + 1,
                 )
-                found = [service.base_occurrence(e, e.start_at) for e in events]
+                cut = len(events) > FIND_LIMIT
+                found = [service.base_occurrence(e, e.start_at) for e in events[:FIND_LIMIT]]
                 span = ""
             else:
                 last = args.end or args.start + timedelta(days=7)
@@ -135,7 +145,13 @@ class ListEvents(Tool):
         head = f"Times are in {tz}."
         if args.start is None:
             head += " Matching events, the latest first (a repeating one as its first):"
-        return ToolResult(content=head + "\n" + "\n".join(_describe(o, tz) for o in found))
+        text = head + "\n" + "\n".join(_describe(o, tz) for o in found)
+        if cut:
+            text += (
+                f"\nThe list was cut at the latest {FIND_LIMIT}. To see the others, narrow it: "
+                "give a range of days (start, end), a source, an external_key or more words."
+            )
+        return ToolResult(content=text)
 
 
 class GetEventInput(BaseModel):
@@ -354,6 +370,8 @@ class UpdateEvent(Tool):
                 event = await service.update_event(db, event, body, source_url=source.source_url)
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
+            except AppError as exc:
+                return ToolResult(content=exc.message, is_error=True)
             line = _describe(service.base_occurrence(event, event.start_at), tz)
         return ToolResult(
             content=f"Updated: {line}", data={"event": {"id": str(event.id), "title": event.title}}

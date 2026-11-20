@@ -1,5 +1,6 @@
 """Calendar events: storing them, and listing the occurrences in a date range."""
 
+import re
 import uuid
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -9,6 +10,7 @@ from sqlalchemy import ColumnElement, delete, or_, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import current_actor
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.calendar import recurrence
@@ -123,8 +125,9 @@ async def update_event(
     a synced event (its key can't change)."""
     before = (event.start_at, event.rrule, event.all_day, event.tz)
     fields = _fields(event)
+    url_changed = sources.set_source_url(event, source_url)  # refused on an ordinary event
     _apply(event, body)
-    changed = sources.set_source_url(event, source_url) or fields != _fields(event)
+    changed = url_changed or fields != _fields(event)
     if changed:
         sources.record_changed(event, synced=source_url is not None)
     if before != (event.start_at, event.rrule, event.all_day, event.tz):
@@ -169,6 +172,7 @@ async def restore_event(db: AsyncSession, item: TrashedItem) -> CalendarEvent:
     if values.get("project_id") and await db.get(Project, values["project_id"]) is None:
         values["project_id"] = None
     event = CalendarEvent(**values)
+    event.updated_by_ref = current_actor().ref  # putting it back is a change
     db.add(event)
     await db.flush()
     for row in item.payload.get("exceptions") or []:
@@ -195,6 +199,7 @@ async def _restore_occurrence(db: AsyncSession, item: TrashedItem) -> CalendarEv
     # No row: the event's schedule changed since, and cancelled occurrences went with it.
     if row is not None:
         row.is_cancelled = False
+        event.updated_by_ref = current_actor().ref  # putting it back is a change
         if not row.override:
             await db.delete(row)
     await db.delete(item)
@@ -319,11 +324,13 @@ def _matching(
     if external_key:
         found.append(CalendarEvent.external_key == external_key.strip())
     if query and query.strip():
-        like = f"%{query.strip()}%"
+        # The words as they are: % and _ match only themselves.
+        words = re.sub(r"([\\%_])", r"\\\1", query.strip())
+        like = f"%{words}%"
         found.append(
-            CalendarEvent.title.ilike(like)
-            | CalendarEvent.description.ilike(like)
-            | CalendarEvent.location.ilike(like)
+            CalendarEvent.title.ilike(like, escape="\\")
+            | CalendarEvent.description.ilike(like, escape="\\")
+            | CalendarEvent.location.ilike(like, escape="\\")
         )
     return found
 
@@ -435,7 +442,7 @@ async def set_occurrence(
     if row is None:
         row = EventException(event_id=event.id, original_start=original_start, override={})
         db.add(row)
-    sources.record_changed(event)
+    before = (bool(row.is_cancelled), dict(row.override or {}))
     if body.cancelled and not row.is_cancelled:
         when = original_start.astimezone(recurrence.zone(event.tz))
         trash.put(
@@ -456,5 +463,7 @@ async def set_occurrence(
                 value.astimezone(UTC).isoformat() if isinstance(value, datetime) else value
             )
     row.override = override
+    if (bool(row.is_cancelled), override) != before:
+        sources.record_changed(event)
     await db.commit()
     await notify()

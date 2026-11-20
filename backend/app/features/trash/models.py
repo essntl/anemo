@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, Index, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.actor import ACTOR_REF_LENGTH
 from app.db.base import Base, IdMixin
 
 
@@ -41,3 +42,23 @@ class TrashedItem(Base, IdMixin):
     deleted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ExternalKeyTombstone(Base, IdMixin):
+    """The key of a synced task or event that was deleted for good (purged from the
+    trash). It stays taken, so an automation that syncs from that system doesn't make
+    the item again (features/provenance/sources.py). Not shown in the trash; detaching an
+    item from its source leaves none."""
+
+    __tablename__ = "external_key_tombstones"
+    __table_args__ = (
+        Index("ix_external_key_tombstones_kind_external_key", "kind", "external_key", unique=True),
+    )
+
+    kind: Mapped[str] = mapped_column(String(10))  # task | event
+    external_key: Mapped[str] = mapped_column(String(200))
+    title: Mapped[str] = mapped_column(String(300))  # the item's, for the tool message
+    deleted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    actor_ref: Mapped[str] = mapped_column(String(ACTOR_REF_LENGTH))  # who deleted it

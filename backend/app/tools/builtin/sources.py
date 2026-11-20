@@ -9,15 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.provenance.schemas import SourceIn
-from app.features.provenance.sources import ExternalKeyTaken
-from app.features.trash.models import TrashedItem
+from app.features.provenance.sources import ExternalKeyTaken, deleted_by
+from app.features.trash.models import ExternalKeyTombstone, TrashedItem
 from app.features.trash.service import Kind
 
 SOURCE = "For an item synced from an outside system: that system's short name, e.g. artemk"
 EXTERNAL_KEY = (
     "For a synced item: its id in that system, e.g. artemk:booking:123. Unique: if an item "
-    "with this key exists, or is in the trash, nothing is created and you get that item "
-    "instead. Can't be changed later."
+    "with this key exists, is in the trash or was deleted for good, nothing is created and "
+    "you get that item instead. Can't be changed later."
 )
 SOURCE_URL = "For a synced item: a link to the original in that system (http/https)"
 LIST_SOURCE = "Only items synced from this system (its short name, e.g. artemk)"
@@ -66,12 +66,19 @@ def details(item: Any) -> str:
 
 async def in_trash(db: AsyncSession, kind: Kind, key: str) -> str:
     """For a lookup by key that found nothing: whether the item with that key is in the
-    trash ("" if not)."""
+    trash or was deleted for good ("" if neither)."""
     item = await db.scalar(
         select(TrashedItem).where(TrashedItem.kind == kind, TrashedItem.external_key == key)
     )
     if item is None:
-        return ""
+        tombstone = await db.scalar(
+            select(ExternalKeyTombstone).where(
+                ExternalKeyTombstone.kind == kind, ExternalKeyTombstone.external_key == key
+            )
+        )
+        if tombstone is None:
+            return ""
+        return f" The one with external_key {key} {_gone(tombstone)}."
     by = "the user" if item.deleted_by == "user" else "the assistant"
     return (
         f" The one with external_key {key} (“{item.title}”) was moved to the trash by {by} on "
@@ -79,9 +86,20 @@ async def in_trash(db: AsyncSession, kind: Kind, key: str) -> str:
     )
 
 
+def _gone(tombstone: ExternalKeyTombstone) -> str:
+    return (
+        f"(“{tombstone.title}”) was deleted for good by {deleted_by(tombstone.actor_ref)} on "
+        f"{tombstone.deleted_at:%Y-%m-%d}; don't recreate it unless the user asks"
+    )
+
+
 def taken(exc: ExternalKeyTaken, *, line: str | None, update_tool: str, trash_place: str) -> str:
     """The answer to a create call whose key is taken. `line`: the existing item."""
     what = "task" if exc.kind == "task" else "event"
+    if exc.tombstone is not None:
+        return (
+            f"Nothing was created: the {what} with external_key {exc.key} {_gone(exc.tombstone)}."
+        )
     if exc.trashed is not None:
         by = "the user" if exc.trashed.deleted_by == "user" else "the assistant"
         return (

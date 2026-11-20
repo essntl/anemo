@@ -224,7 +224,7 @@ async def update_task(
     changed = any(getattr(task, key) != value for key, value in changes.items())
     if blocked_by is not None:
         current = (await blocked_by_map(db, [task.id])).get(task.id, [])
-        changed = changed or list(dict.fromkeys(blocked_by)) != current
+        changed = changed or set(blocked_by) != set(current)  # the order is not a change
     changed = sources.set_source_url(task, source_url) or changed
     if changed:
         sources.record_changed(task, synced=source_url is not None)
@@ -525,6 +525,7 @@ async def restore_task(db: AsyncSession, item: TrashedItem) -> Task:
         if parent is None or parent.parent_id is not None:
             values["parent_id"] = None
     task = Task(**values)
+    task.updated_by_ref = current_actor().ref  # putting it back is a change
     task.sort_order = await _next_order(db, task.status)
     db.add(task)
     await db.flush()

@@ -4,8 +4,10 @@
   input (app/core/actor.py).
 - An `external_key` (the item's id in the outside system an automation syncs from) is
   unique per type, items in the trash included: creating an item with a key that is
-  taken creates nothing and raises ExternalKeyTaken, which carries the existing item or
-  its trash entry. A key is never changed once set; detach() clears all source fields.
+  taken creates nothing and raises ExternalKeyTaken, which carries the existing item,
+  its trash entry, or the tombstone left when it was deleted for good (purged from the
+  trash). A key is never changed once set; detach() clears all source fields and frees
+  the key (no tombstone).
 - `synced_at` is set when a non-user actor writes source fields; `edited_by_user_at` when
   the user changes an item that has a key (so an automation can leave the change alone).
 
@@ -18,28 +20,55 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.actor import current_actor
-from app.core.errors import Conflict
+from app.core.actor import Actor, current_actor
+from app.core.errors import AppError, Conflict
 from app.db.base import ProvenanceMixin, SourceMixin
 from app.features.provenance.schemas import SourceIn
-from app.features.trash.models import TrashedItem
+from app.features.trash.models import ExternalKeyTombstone, TrashedItem
 from app.features.trash.service import Kind
 
 
+def deleted_by(actor_ref: str) -> str:
+    """Who deleted something, for tool results: "the user", "the assistant", ..."""
+    try:
+        kind = Actor.parse(actor_ref).kind
+    except ValueError:
+        return "someone"
+    return {"user": "the user", "chat": "the assistant", "automation": "an automation"}.get(
+        kind, "someone"
+    )
+
+
 class ExternalKeyTaken(Conflict):
-    """An item with this external key exists already (`item`), or is in the trash
-    (`trashed`). Nothing was created."""
+    """An item with this external key exists already (`item`), is in the trash
+    (`trashed`), or was deleted for good (`tombstone`). Nothing was created."""
 
     def __init__(
-        self, kind: Kind, key: str, *, item: Any = None, trashed: TrashedItem | None = None
+        self,
+        kind: Kind,
+        key: str,
+        *,
+        item: Any = None,
+        trashed: TrashedItem | None = None,
+        tombstone: ExternalKeyTombstone | None = None,
     ) -> None:
         what = "task" if kind == "task" else "event"
         details: dict[str, Any] = {
             "kind": kind,
             "external_key": key,
             "in_trash": trashed is not None,
+            "deleted_for_good": tombstone is not None,
         }
-        if trashed is not None:
+        if tombstone is not None:
+            details |= {
+                "deleted_at": tombstone.deleted_at.isoformat(),
+                "deleted_by": tombstone.actor_ref,
+            }
+            message = (
+                f"The {what} with this external key was deleted for good "
+                f"{tombstone.deleted_at:%Y-%m-%d}; it was not created again"
+            )
+        elif trashed is not None:
             details |= {
                 "id": str(trashed.item_id),
                 "deleted_at": trashed.deleted_at.isoformat(),
@@ -57,10 +86,12 @@ class ExternalKeyTaken(Conflict):
         self.key = key
         self.item = item
         self.trashed = trashed
+        self.tombstone = tombstone
 
 
 async def check_key(db: AsyncSession, kind: Kind, model: Any, key: str | None) -> None:
-    """Raise ExternalKeyTaken if a live item of this type, or one in the trash, has `key`."""
+    """Raise ExternalKeyTaken if a live item of this type, one in the trash, or one deleted
+    for good has `key`."""
     if key is None:
         return
     item = await db.scalar(select(model).where(model.external_key == key))
@@ -71,6 +102,13 @@ async def check_key(db: AsyncSession, kind: Kind, model: Any, key: str | None) -
     )
     if trashed is not None:
         raise ExternalKeyTaken(kind, key, trashed=trashed)
+    tombstone = await db.scalar(
+        select(ExternalKeyTombstone).where(
+            ExternalKeyTombstone.kind == kind, ExternalKeyTombstone.external_key == key
+        )
+    )
+    if tombstone is not None:
+        raise ExternalKeyTaken(kind, key, tombstone=tombstone)
 
 
 def record_created(row: Any, source: SourceIn | None = None) -> None:
@@ -102,8 +140,17 @@ def record_changed(row: ProvenanceMixin, *, synced: bool = False) -> None:
 
 
 def set_source_url(row: SourceMixin, url: str | None) -> bool:
-    """Point the item at its original (the key stays as it is). True if it changed."""
-    if url is None or url == row.source_url:
+    """Point a synced item at its original (the key stays as it is). True if it changed.
+    An ordinary item (no source, no key) has no original: AppError `not_synced`."""
+    if url is None:
+        return False
+    if row.source is None and row.external_key is None:
+        raise AppError(
+            "This item isn't synced from an outside system (it has no source or "
+            "external_key), so it can't have a source_url",
+            code="not_synced",
+        )
+    if url == row.source_url:
         return False
     row.source_url = url
     return True
