@@ -212,18 +212,30 @@ async def merge_values(
     return changed
 
 
-async def _reindex_with(db: AsyncSession, definition: PropertyDefinition, slug: str) -> None:
-    """Rebuild the index of the documents that have the value (its label or slug
-    changed: their keyword index and search chunks name it)."""
-    for doc in list(await db.scalars(select(Document).where(_uses(definition, slug)))):
+async def _reindex(db: AsyncSession, where: Any) -> None:
+    """Rebuild the index of these documents (a label or a property's scope changed:
+    their keyword index and search chunks name it, their values may now be valid)."""
+    for doc in list(await db.scalars(select(Document).where(where))):
         try:
             content = await service.read(db, doc)
         except NotFound:
             continue
         await meta.index(db, doc, content)
-        doc.indexed_hash = None  # the chunks carry the label in their header
-        await service.schedule_index(db, doc)
+        await service.schedule_reindex(db, doc)  # the chunks carry the labels in their header
     await db.commit()
+
+
+async def _reindex_with(db: AsyncSession, definition: PropertyDefinition, slug: str) -> None:
+    await _reindex(db, _uses(definition, slug))
+
+
+async def redefined(db: AsyncSession, definition: PropertyDefinition) -> None:
+    """A property's label or scope changed: re-index the documents that have it, and
+    those whose properties couldn't be read (a value outside the old scope). Commits."""
+    await _reindex(
+        db,
+        or_(Document.properties.has_key(definition.key), Document.properties_error.is_not(None)),
+    )
 
 
 async def relabel(db: AsyncSession, option: PropertyOption) -> None:

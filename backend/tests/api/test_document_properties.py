@@ -262,10 +262,25 @@ async def test_a_project_chat_searches_its_own_project(authed, docs):
     # Outside a project chat nothing is narrowed.
     anywhere = await run(doc_tools.SearchDocuments, query="invoice")
     assert len(anywhere.data["paths"]) == 3
-    # Naming another project is asking for it.
+    # Naming another project isn't enough: it needs scope "all" too.
     named = await run(doc_tools.SearchDocuments, in_ts, query="invoice", project="Nicole")
+    assert named.is_error and 'scope: "all"' in named.content and "Private" not in named.content
+    named = await run(
+        doc_tools.SearchDocuments, in_ts, query="invoice", project="Nicole", scope="all"
+    )
     assert named.data["paths"] == ["documents/nicole/private-invoice.md"]
+    own = await run(doc_tools.SearchDocuments, in_ts, query="invoice", project="Tech Services")
+    assert own.data["paths"] == ["documents/tech-services/invoice-template.md"]
     assert nicole["slug"] == "nicole"
+
+    # Listing in a project chat keeps to the project the same way.
+    listed = await run(doc_tools.ListDocuments, in_ts)
+    assert listed.data["count"] == 1 and "Private invoice" not in listed.content
+    assert "2 more matches outside this project" in listed.content
+    everything = await run(doc_tools.ListDocuments, in_ts, scope="all")
+    assert everything.data["count"] == 3
+    other = await run(doc_tools.ListDocuments, in_ts, project="Nicole")
+    assert other.is_error and 'scope: "all"' in other.content
 
 
 async def test_moving_a_document_keeps_its_old_path_working(authed, docs):
@@ -875,4 +890,49 @@ async def test_searches_without_filters_find_what_they_found_before(authed, docs
     assert (
         f"link /documents/{meeting['id']}" in tool.content
         and "meeting about otters" in tool.content
+    )
+
+
+async def test_a_new_label_reaches_the_search_chunks(authed, docs):
+    from app.jobs.models import Job
+    from app.knowledge.models import KnowledgeChunk
+
+    ts = await project(authed, "Tech Services")
+    client = await client_property(authed, ts["id"], "Ludmyla Doula")
+    doc = await new_doc(authed, "Brief", "tech-services", "The price.", client="ludmyla-doula")
+    doc_id = uuid.UUID(doc["id"])
+
+    async def chunk_after_the_job() -> str:
+        async with get_sessionmaker()() as db:
+            jobs = list(await db.scalars(select(Job).where(Job.type == "document.index")))
+            assert jobs and all(j.payload == {"document_id": doc["id"]} for j in jobs)
+            await service.index_document(db, doc_id)  # what the queued job does
+            return str(
+                await db.scalar(
+                    select(KnowledgeChunk.content).where(KnowledgeChunk.source_id == doc_id)
+                )
+            )
+
+    assert (await chunk_after_the_job()).startswith(
+        "Brief | tech-services | Client: Ludmyla Doula\n"
+    )
+    option = client["options"][0]
+    async with get_sessionmaker()() as db:
+        before = len(list(await db.scalars(select(Job.id).where(Job.type == "document.index"))))
+    r = await authed.patch(
+        f"/api/properties/{client['id']}/options/{option['id']}", json={"label": "Ludmyla Doula AS"}
+    )
+    assert r.status_code == 200
+    async with get_sessionmaker()() as db:  # a new job, though the text is the same
+        assert (
+            len(list(await db.scalars(select(Job.id).where(Job.type == "document.index"))))
+            == before + 1
+        )
+    assert (await chunk_after_the_job()).startswith(
+        "Brief | tech-services | Client: Ludmyla Doula AS\n"
+    )
+    r = await authed.patch(f"/api/properties/{client['id']}", json={"label": "Customer"})
+    assert r.status_code == 200
+    assert (await chunk_after_the_job()).startswith(
+        "Brief | tech-services | Customer: Ludmyla Doula AS\n"
     )

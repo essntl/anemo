@@ -102,6 +102,8 @@ async def update_property(definition_id: uuid.UUID, body: DefinitionPatch, db: D
         project_ids=body.project_ids if "project_ids" in body.model_fields_set else "keep",
         sort_order=body.sort_order,
     )
+    if body.model_fields_set & {"label", "applies_to", "project_ids"}:
+        await doc_properties.redefined(db, definition)  # search and chunks name it
     return await _one(db, definition_id)
 
 

@@ -469,9 +469,17 @@ def read_file(path: str) -> str:
     return _read(path)
 
 
-async def schedule_index(db: AsyncSession, doc: Document) -> None:
-    """(Re)build the document's search chunks a little later (doesn't commit)."""
-    await _schedule_index(db, doc)
+async def schedule_reindex(db: AsyncSession, doc: Document) -> None:
+    """Rebuild the document's search chunks a little later although its text didn't
+    change (a property label changed: the chunk header names it). Doesn't commit."""
+    doc.indexed_hash = None
+    await queue.enqueue(
+        db,
+        "document.index",
+        {"document_id": str(doc.id)},
+        run_at=datetime.now(UTC) + INDEX_DELAY,
+        dedupe_key=f"document.index:{doc.id}:{doc.content_hash}:{uuid.uuid4().hex}",
+    )
 
 
 def file_exists(path: str) -> bool:

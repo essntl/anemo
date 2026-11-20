@@ -12,6 +12,7 @@ finds a document that was moved, with a note to update the reference.
 """
 
 import asyncio
+import uuid
 from collections import Counter
 from datetime import UTC, date, datetime
 from typing import Any, Literal
@@ -106,6 +107,14 @@ class FilterInput(BaseModel):
     updated_after: date | datetime | None = Field(None, description="Changed on or after (ISO)")
     updated_before: date | datetime | None = Field(None, description="Changed before (ISO)")
     include_archived: bool = Field(False, description="Also documents with status: archived")
+    scope: Literal["project", "all"] | None = Field(
+        None,
+        description=(
+            'In a project chat only that project\'s documents are used (default "project"); '
+            '"all" also looks outside it. Only widen it when the request needs documents '
+            "from elsewhere."
+        ),
+    )
 
 
 def _when(value: date | datetime | None) -> datetime | None:
@@ -132,6 +141,50 @@ async def _filter(db: AsyncSession, args: FilterInput) -> doc_search.DocFilter:
         updated_before=_when(args.updated_before),
         include_archived=args.include_archived,
     )
+
+
+async def _chat_scope(
+    db: AsyncSession, ctx: ToolContext, args: FilterInput, f: doc_search.DocFilter
+) -> bool:
+    """In a project chat, keep to its project unless `scope: "all"`: the documents of
+    other projects stay out of its context. Naming another project needs `scope: "all"`
+    too. Whether the filter was narrowed to the chat's project."""
+    if ctx.project_id is None or args.scope == "all":
+        return False
+    project = await db.get(Project, ctx.project_id)
+    if project is None:
+        return False
+    if f.project_id is not None and f.project_id != project.id:
+        raise AppError(
+            f"This chat belongs to the project {project.name}. To use another project's "
+            'documents, set scope: "all" (only if the request needs them).'
+        )
+    f.project_id = project.id
+    return True
+
+
+def _elsewhere(outside: int) -> str:
+    if not outside:
+        return ""
+    return (
+        f"\n\n{outside} more match{'es' if outside != 1 else ''} outside this project. "
+        'Ask again with scope: "all" only if the request needs them.'
+    )
+
+
+async def _count(db: AsyncSession, f: doc_search.DocFilter) -> int:
+    return len(await doc_search.listing(db, f))
+
+
+async def _outside(
+    db: AsyncSession, f: doc_search.DocFilter, project_id: uuid.UUID, count: Any
+) -> int:
+    """How many matches there are outside the chat's project (the same filter)."""
+    f.project_id, f.outside_project_id = None, project_id
+    try:
+        return int(await count(f))
+    finally:
+        f.project_id, f.outside_project_id = project_id, None
 
 
 def _has_filters(args: FilterInput) -> bool:
@@ -182,13 +235,21 @@ class ListDocuments(Tool):
                 props = await properties.load(db)
                 if args.group_by and args.group_by not in props:
                     raise AppError(f"There is no property '{args.group_by}' (see list_properties).")
+                in_project = await _chat_scope(db, ctx, args, f)
                 docs = await doc_search.listing(db, f)
+                outside = 0
+                if in_project and ctx.project_id is not None:
+                    outside = await _outside(db, f, ctx.project_id, lambda g: _count(db, g))
                 await db.commit()  # built-in properties on first use
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
+        elsewhere = _elsewhere(outside)
         if not docs:
-            if _has_filters(args):
-                return ToolResult(content="No documents match.", data={"count": 0})
+            if _has_filters(args) or outside:
+                return ToolResult(
+                    content="No documents match." + elsewhere,
+                    data={"count": 0, "outside_project": outside},
+                )
             return ToolResult(content="There are no documents yet.")
 
         def line(d: Document) -> str:
@@ -214,7 +275,10 @@ class ListDocuments(Tool):
         more = (
             f"\n({len(docs) - 300} more not shown: narrow the filters.)" if len(docs) > 300 else ""
         )
-        return ToolResult(content="\n".join(lines).rstrip() + more, data={"count": len(docs)})
+        return ToolResult(
+            content="\n".join(lines).rstrip() + more + elsewhere,
+            data={"count": len(docs), "outside_project": outside},
+        )
 
 
 class ReadDocumentInput(BaseModel):
@@ -268,14 +332,6 @@ class ReadDocument(Tool):
 class SearchDocumentsInput(FilterInput):
     query: str = Field(min_length=1, max_length=500)
     limit: int = Field(8, ge=1, le=20)
-    scope: Literal["project", "all"] | None = Field(
-        None,
-        description=(
-            "In a project chat the search covers that project's documents (default "
-            '"project"); "all" also searches outside it. Only widen it when the request '
-            "needs documents from elsewhere."
-        ),
-    )
 
 
 class SearchDocuments(Tool):
@@ -300,16 +356,7 @@ class SearchDocuments(Tool):
             async with get_sessionmaker()() as db:
                 await service.reconcile(db)
                 f = await _filter(db, args)
-                # A project chat searches its own project unless told otherwise: the
-                # documents of other projects stay out of its context.
-                in_project = (
-                    ctx.project_id is not None
-                    and args.scope != "all"
-                    and not args.project
-                    and await db.get(Project, ctx.project_id) is not None
-                )
-                if in_project:
-                    f.project_id = ctx.project_id
+                in_project = await _chat_scope(db, ctx, args, f)
                 vector = await index.embed_query(db, args.query)
                 hits = await doc_search.search(
                     db,
@@ -320,22 +367,21 @@ class SearchDocuments(Tool):
                     min_similarity=min_similarity,
                 )
                 outside = 0
-                if in_project:
-                    f.project_id, f.outside_project_id = None, ctx.project_id
-                    outside = await doc_search.count_matches(
-                        db, args.query, f, query_vector=vector, min_similarity=min_similarity
+                if in_project and ctx.project_id is not None:
+                    outside = await _outside(
+                        db,
+                        f,
+                        ctx.project_id,
+                        lambda g: doc_search.count_matches(
+                            db, args.query, g, query_vector=vector, min_similarity=min_similarity
+                        ),
                     )
                 props = await properties.load(db)
                 await db.commit()  # usage of the query embedding
             texts = await doc_search.passages(hits, args.query)
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
-        more = (
-            f"\n\n{outside} more match{'es' if outside != 1 else ''} outside this project. "
-            'Search again with scope: "all" only if the request needs them.'
-            if outside
-            else ""
-        )
+        more = _elsewhere(outside)
         if not hits:
             return ToolResult(
                 content="No documents match. (New documents take a moment to index.)" + more,
