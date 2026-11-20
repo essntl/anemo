@@ -41,7 +41,7 @@ import { useProperties, valueLabel } from '@/features/properties/api'
 import { HubList } from './HubList'
 import { NewTaskDialog } from '@/features/links/NewTaskDialog'
 import { documentLink } from '@/lib/appLinks'
-import { PropertiesBar } from './PropertiesBar'
+import { PropertiesBar, showsProperties } from './PropertiesBar'
 
 const STATUS: Record<SaveState, string> = {
   saved: msg('Saved'),
@@ -314,7 +314,11 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
         </div>
       )}
 
-      <PropertiesBar doc={server} projectId={project?.id ?? null} baseHash={autosave.baseHash} flush={autosave.flush} />
+      {/* A phone keeps the text high on the screen: a document without properties offers
+          "+ Property" below its text instead of in a bar above it. */}
+      {(desktop || showsProperties(server)) && (
+        <PropertiesBar doc={server} projectId={project?.id ?? null} baseHash={autosave.baseHash} flush={autosave.flush} />
+      )}
       {mode === 'rich' ? (
         <RichEditor initial={imagesToEditor(splitFrontMatter(autosave.text).body, server.path)} onChange={onRichChange}
           onError={(message) => toast({ message })} />
@@ -322,6 +326,9 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
         <div className="min-h-0 flex-1">
           <CodeEditor path={server.path} value={autosave.text} onChange={autosave.setText} />
         </div>
+      )}
+      {!desktop && !showsProperties(server) && (
+        <PropertiesBar doc={server} projectId={project?.id ?? null} baseHash={autosave.baseHash} flush={autosave.flush} edge="bottom" />
       )}
       <HubList documentId={doc.id} />
       {!(showInfo && wide) && <DocumentBacklinks documentId={doc.id} />}

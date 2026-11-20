@@ -12,6 +12,7 @@ import { errorMessage } from '@/api/client'
 import { toast } from '@/components/ui/toast'
 import { type PropertyValue, propertiesFor, suggestionsOf, useProperties } from '@/features/properties/api'
 import { PropertyChips } from '@/features/properties/PropertyChips'
+import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { type DocumentContent, useSetProperties } from '../api'
 
@@ -22,9 +23,15 @@ interface Props {
   baseHash: () => string
   /** Saves what is typed first. */
   flush: () => Promise<boolean>
+  /** Above the text (the default), or below it (a phone, while the document has none). */
+  edge?: 'top' | 'bottom'
 }
 
-export function PropertiesBar({ doc, projectId, baseHash, flush }: Props) {
+/** The document has properties (or front matter that can't be read) to show above its text. */
+export const showsProperties = (doc: DocumentContent) =>
+  Object.keys(doc.properties ?? {}).length > 0 || !!doc.properties_error
+
+export function PropertiesBar({ doc, projectId, baseHash, flush, edge = 'top' }: Props) {
   const properties = useProperties()
   const set = useSetProperties(doc.id)
   const available = propertiesFor(properties.data ?? [], projectId)
@@ -55,7 +62,7 @@ export function PropertiesBar({ doc, projectId, baseHash, flush }: Props) {
   }
   if (!properties.data) return null
   return (
-    <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-1.5" aria-label={t('Properties')}>
+    <div className={cn('flex flex-wrap items-center gap-1.5 border-border px-4 py-1.5', edge === 'top' ? 'border-b' : 'border-t')} aria-label={t('Properties')}>
       <PropertyChips available={available} values={values} busy={set.isPending} onChange={change} />
     </div>
   )

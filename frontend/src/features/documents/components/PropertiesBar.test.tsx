@@ -15,13 +15,26 @@ vi.mock('@/features/properties/api', async (importOriginal) => ({
 }))
 vi.mock('../api', () => ({ useSetProperties: () => ({ mutateAsync, isPending: false }) }))
 
-const { PropertiesBar } = await import('./PropertiesBar')
+const { PropertiesBar, showsProperties } = await import('./PropertiesBar')
 const doc = (over: object) => ({
   id: 'doc', path: 'documents/a.md', folder: '', title: 'A', word_count: 1, last_editor: 'user', updated_at: '2026-11-01T00:00:00Z',
   content: '---\ntype: brief\n---\n# A\n', hash: 'h1', properties: { type: 'brief' }, properties_error: null, ...over,
 })
 
 describe('the properties above a document', () => {
+  it('belong above the text only when there is something to show (a phone offers "+ Property" below it)', () => {
+    expect(showsProperties(doc({}) as never)).toBe(true)
+    expect(showsProperties(doc({ properties: {} }) as never)).toBe(false)
+    expect(showsProperties(doc({ properties: {}, properties_error: 'broken YAML' }) as never)).toBe(true)
+  })
+
+  it('draws its line on the side that faces the text', () => {
+    const { container, rerender } = render(<PropertiesBar doc={doc({})} projectId={null} baseHash={() => 'h1'} flush={async () => true} />)
+    expect(container.firstElementChild).toHaveClass('border-b')
+    rerender(<PropertiesBar doc={doc({})} projectId={null} baseHash={() => 'h1'} flush={async () => true} edge="bottom" />)
+    expect(container.firstElementChild).toHaveClass('border-t')
+  })
+
   it('shows each value by its label and changes it through the server', async () => {
     const flush = vi.fn(async () => true)
     render(<PropertiesBar doc={doc({})} projectId={null} baseHash={() => 'h1'} flush={flush} />)

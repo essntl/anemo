@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 import { login, signOutAfterEach } from './helpers'
 
 /*
@@ -10,6 +10,18 @@ import { login, signOutAfterEach } from './helpers'
 signOutAfterEach()
 
 const suffix = () => Math.random().toString(36).slice(2, 8)
+
+/** "Linked from" of the open document. On a wide screen the panel beside the text is
+ * open (with its outline first), so it is under Details there; narrower, it is the bar
+ * under the text. */
+async function linkedFrom(page: Page) {
+  const about = page.getByRole('complementary', { name: 'About this document' })
+  if (await about.isVisible()) {
+    await about.getByRole('tab', { name: 'Details' }).click()
+    return about.getByRole('region', { name: 'Linked from' })
+  }
+  return page.getByLabel('Linked from')
+}
 
 test('an event linked to a brief shows on the brief, and gets meeting notes', async ({ page }) => {
   const mark = suffix()
@@ -32,7 +44,8 @@ test('an event linked to a brief shows on the brief, and gets meeting notes', as
     expect(linked.ok()).toBe(true)
 
     await page.goto(`/documents/${brief.id}`)
-    await expect(page.getByLabel('Linked from').getByRole('link', { name: `E2E meeting ${mark}` }).first()).toBeVisible()
+    await expect(page.getByLabel('Document text')).toBeVisible()
+    await expect((await linkedFrom(page)).getByRole('link', { name: `E2E meeting ${mark}` })).toBeVisible()
 
     await page.goto(`/calendar?event=${event.id}`)
     const dialog = page.getByRole('dialog')
@@ -40,7 +53,8 @@ test('an event linked to a brief shows on the brief, and gets meeting notes', as
     await dialog.getByRole('button', { name: 'Create meeting notes' }).click()
     await expect(page).toHaveURL(/\/documents\//)
     notesId = page.url().split('/documents/')[1].split(/[?#]/)[0]
-    await expect(page.getByLabel('Linked from').getByRole('link', { name: `E2E meeting ${mark}` }).first()).toBeVisible()
+    await expect(page.getByLabel('Document text')).toBeVisible()
+    await expect((await linkedFrom(page)).getByRole('link', { name: `E2E meeting ${mark}` })).toBeVisible()
   } finally {
     await page.request.delete(`/api/calendar/events/${event.id}`)
     await page.request.delete(`/api/documents/${brief.id}`)
