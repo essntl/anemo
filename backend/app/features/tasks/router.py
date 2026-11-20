@@ -5,6 +5,8 @@ from typing import Literal
 from fastapi import APIRouter, Query
 
 from app.api.deps import Db
+from app.features.provenance import service as provenance
+from app.features.provenance.schemas import ActorOut
 from app.features.tasks import service
 from app.features.tasks.models import Task
 from app.features.tasks.schemas import (
@@ -18,14 +20,29 @@ from app.features.tasks.schemas import (
 router = APIRouter(tags=["tasks"])
 
 
-def _out(t: Task, blocked_by: dict[uuid.UUID, list[uuid.UUID]]) -> TaskOut:
-    fields = {name: getattr(t, name) for name in TaskOut.model_fields if name != "blocked_by"}
-    return TaskOut.model_validate({**fields, "blocked_by": blocked_by.get(t.id, [])})
+_DERIVED = {"blocked_by", "created_by_actor", "updated_by_actor"}
+
+
+def _out(
+    t: Task, blocked_by: dict[uuid.UUID, list[uuid.UUID]], actors: dict[str, ActorOut]
+) -> TaskOut:
+    fields = {name: getattr(t, name) for name in TaskOut.model_fields if name not in _DERIVED}
+    return TaskOut.model_validate(
+        {
+            **fields,
+            "blocked_by": blocked_by.get(t.id, []),
+            "created_by_actor": actors.get(t.created_by_ref or ""),
+            "updated_by_actor": actors.get(t.updated_by_ref or ""),
+        }
+    )
 
 
 async def _outs(db: Db, tasks: list[Task]) -> list[TaskOut]:
     blocked_by = await service.blocked_by_map(db, [t.id for t in tasks])
-    return [_out(t, blocked_by) for t in tasks]
+    actors = await provenance.describe(
+        db, [ref for t in tasks for ref in (t.created_by_ref, t.updated_by_ref)]
+    )
+    return [_out(t, blocked_by, actors) for t in tasks]
 
 
 async def _task(db: Db, t: Task) -> TaskOut:
@@ -76,6 +93,13 @@ async def update_task(task_id: uuid.UUID, body: TaskPatch, db: Db) -> TaskOut:
     task = await service.get_task(db, task_id)
     changes = body.model_dump(exclude_unset=True)
     return await _task(db, await service.update_task(db, task, changes))
+
+
+@router.post("/tasks/{task_id}/detach-source", response_model=TaskOut)
+async def detach_source(task_id: uuid.UUID, db: Db) -> TaskOut:
+    """Make a synced task an ordinary one: its source fields are cleared."""
+    task = await service.get_task(db, task_id)
+    return await _task(db, await service.detach_source(db, task))
 
 
 @router.delete("/tasks/{task_id}", status_code=204)

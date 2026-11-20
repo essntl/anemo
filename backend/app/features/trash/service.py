@@ -65,11 +65,19 @@ def put(
     title: str,
     payload: dict[str, Any],
     deleted_by: str = "user",
+    *,
+    external_key: str | None = None,
 ) -> TrashedItem:
     """Keep a copy of something that is being deleted. Does not commit: it is part of
-    the caller's delete."""
+    the caller's delete. `external_key`: the item's key in the system it is synced from,
+    which stays taken while the copy is here (features/provenance/sources.py)."""
     item = TrashedItem(
-        kind=kind, item_id=item_id, title=title[:300], payload=payload, deleted_by=deleted_by[:10]
+        kind=kind,
+        item_id=item_id,
+        title=title[:300],
+        payload=payload,
+        deleted_by=deleted_by[:10],
+        external_key=external_key,
     )
     db.add(item)
     return item

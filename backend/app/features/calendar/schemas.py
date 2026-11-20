@@ -5,6 +5,7 @@ from typing import Self
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.features.calendar import recurrence
+from app.features.provenance.schemas import ActorOut
 
 COLOR = r"^#[0-9a-fA-F]{6}$"
 
@@ -77,6 +78,16 @@ class EventOut(BaseModel):
     task_id: uuid.UUID | None
     project_id: uuid.UUID | None = None
     created_by: str
+    # Where a synced event came from (all None for ordinary ones); see db.base.SourceMixin.
+    source: str | None = None
+    external_key: str | None = None
+    source_url: str | None = None
+    synced_at: datetime | None = None
+    edited_by_user_at: datetime | None = Field(
+        None, description="When the user last changed this synced event by hand"
+    )
+    created_by_actor: ActorOut | None = Field(None, description="Who made it (None: unknown)")
+    updated_by_actor: ActorOut | None = Field(None, description="Who changed it last")
 
 
 class OccurrenceOut(EventOut):

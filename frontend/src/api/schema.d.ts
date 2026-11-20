@@ -2279,6 +2279,26 @@ export interface paths {
         patch: operations["update_task_api_tasks__task_id__patch"];
         trace?: never;
     };
+    "/api/tasks/{task_id}/detach-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detach Source
+         * @description Make a synced task an ordinary one: its source fields are cleared.
+         */
+        post: operations["detach_source_api_tasks__task_id__detach_source_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/trash": {
         parameters: {
             query?: never;
@@ -2470,6 +2490,26 @@ export interface paths {
         post?: never;
         /** Delete Event */
         delete: operations["delete_event_api_calendar_events__event_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/events/{event_id}/detach-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detach Source
+         * @description Make a synced event an ordinary one: its source fields are cleared.
+         */
+        post: operations["detach_source_api_calendar_events__event_id__detach_source_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3621,6 +3661,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActorOut
+         * @description Who made or changed something, ready to show: "the assistant in <chat title>".
+         */
+        ActorOut: {
+            /**
+             * Ref
+             * @description The stored actor reference, e.g. chat:<id>
+             */
+            ref: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "external" | "chat" | "automation";
+            /**
+             * Label
+             * @description The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone
+             */
+            label: string;
+            /**
+             * Url
+             * @description Where it leads: the chat, or the automation's run
+             */
+            url: string | null;
+        };
         /** AgentStats */
         AgentStats: {
             /** Runs By Day */
@@ -4523,6 +4589,10 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** @description Who made it (None: unknown) */
+            created_by_actor?: components["schemas"]["ActorOut"] | null;
+            /** @description Who saved it last */
+            updated_by_actor?: components["schemas"]["ActorOut"] | null;
             /** Content */
             content: string;
             /** Hash */
@@ -4557,6 +4627,10 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** @description Who made it (None: unknown) */
+            created_by_actor?: components["schemas"]["ActorOut"] | null;
+            /** @description Who saved it last */
+            updated_by_actor?: components["schemas"]["ActorOut"] | null;
         };
         /**
          * EditLastIn
@@ -4685,6 +4759,23 @@ export interface components {
             project_id?: string | null;
             /** Created By */
             created_by: string;
+            /** Source */
+            source?: string | null;
+            /** External Key */
+            external_key?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Synced At */
+            synced_at?: string | null;
+            /**
+             * Edited By User At
+             * @description When the user last changed this synced event by hand
+             */
+            edited_by_user_at?: string | null;
+            /** @description Who made it (None: unknown) */
+            created_by_actor?: components["schemas"]["ActorOut"] | null;
+            /** @description Who changed it last */
+            updated_by_actor?: components["schemas"]["ActorOut"] | null;
         };
         /** ExplainIn */
         ExplainIn: {
@@ -5840,6 +5931,23 @@ export interface components {
             project_id?: string | null;
             /** Created By */
             created_by: string;
+            /** Source */
+            source?: string | null;
+            /** External Key */
+            external_key?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Synced At */
+            synced_at?: string | null;
+            /**
+             * Edited By User At
+             * @description When the user last changed this synced event by hand
+             */
+            edited_by_user_at?: string | null;
+            /** @description Who made it (None: unknown) */
+            created_by_actor?: components["schemas"]["ActorOut"] | null;
+            /** @description Who changed it last */
+            updated_by_actor?: components["schemas"]["ActorOut"] | null;
             /**
              * Event Id
              * Format: uuid
@@ -6503,6 +6611,10 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** @description Who made it (None: unknown) */
+            created_by_actor?: components["schemas"]["ActorOut"] | null;
+            /** @description Who saved it last */
+            updated_by_actor?: components["schemas"]["ActorOut"] | null;
             /** Excerpt */
             excerpt: string;
         };
@@ -6760,6 +6872,8 @@ export interface components {
             chars: number;
             /** Current */
             current: boolean;
+            /** @description Who saved it (None on older revisions) */
+            actor?: components["schemas"]["ActorOut"] | null;
             /** Content */
             content: string;
         };
@@ -6786,6 +6900,8 @@ export interface components {
             chars: number;
             /** Current */
             current: boolean;
+            /** @description Who saved it (None on older revisions) */
+            actor?: components["schemas"]["ActorOut"] | null;
         };
         /** RevokedOut */
         RevokedOut: {
@@ -7793,6 +7909,23 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Source */
+            source?: string | null;
+            /** External Key */
+            external_key?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Synced At */
+            synced_at?: string | null;
+            /**
+             * Edited By User At
+             * @description When the user last changed this synced task by hand
+             */
+            edited_by_user_at?: string | null;
+            /** @description Who made it (None: unknown) */
+            created_by_actor?: components["schemas"]["ActorOut"] | null;
+            /** @description Who changed it last */
+            updated_by_actor?: components["schemas"]["ActorOut"] | null;
         };
         /** TaskPatch */
         TaskPatch: {
@@ -13486,6 +13619,39 @@ export interface operations {
             };
         };
     };
+    detach_source_api_tasks__task_id__detach_source_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_trash_api_trash_get: {
         parameters: {
             query?: {
@@ -14043,6 +14209,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_source_api_calendar_events__event_id__detach_source_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
             };
             /** @description Validation Error */
             422: {

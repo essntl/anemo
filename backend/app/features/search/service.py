@@ -21,6 +21,7 @@ from sqlalchemy import ColumnElement, Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
+from app.core.refs import ref_url
 from app.features.automations.models import Automation
 from app.features.calendar.models import CalendarEvent
 from app.features.conversations.models import ChatMessage, Conversation
@@ -262,7 +263,7 @@ async def _events(db: AsyncSession, q: Query) -> list[SearchHit]:
             id=str(e.id),
             title=e.title,
             snippet=snippet(" · ".join(x for x in (e.location, e.description) if x), q.words),
-            url=f"/calendar?date={e.start_at.date().isoformat()}",
+            url=ref_url("event", e.id),
             when=e.start_at,
         )
         for e in await db.scalars(stmt)

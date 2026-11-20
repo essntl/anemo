@@ -21,6 +21,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import EXTERNAL, current_actor
 from app.core.errors import AppError, NotFound
 from app.events import bus
 from app.features.documents.models import Document, DocumentRevision
@@ -191,7 +192,9 @@ async def reconcile(db: AsyncSession) -> list[str]:
                 moved.path, moved.title = info.path, title_of(content, info.path)
                 moved.size, moved.mtime = info.size, info.mtime
             else:
-                doc = Document(path=info.path, title="", content_hash="")
+                doc = Document(
+                    path=info.path, title="", content_hash="", created_by_ref=EXTERNAL.ref
+                )
                 try:
                     async with db.begin_nested():
                         db.add(doc)
@@ -239,8 +242,19 @@ async def _apply(
     doc.word_count = word_count(content)
     doc.size, doc.mtime = info.size, info.mtime
     doc.last_editor = author
+    # Who did it (app/core/actor.py): a change picked up from the folder was made outside.
+    actor_ref = EXTERNAL.ref if author == "external" else current_actor().ref
+    doc.updated_by_ref = actor_ref
     # Outside changes are only seen now and then, so each one keeps its own revision.
-    await _add_revision(db, doc, content, author, run_id, new_revision or author == "external")
+    await _add_revision(
+        db,
+        doc,
+        content,
+        author,
+        run_id,
+        new_revision or author == "external",
+        actor_ref=actor_ref,
+    )
     await _schedule_index(db, doc)
 
 
@@ -251,6 +265,8 @@ async def _add_revision(
     author: str,
     run_id: uuid.UUID | None,
     force_new: bool = False,
+    *,
+    actor_ref: str | None = None,
 ) -> None:
     latest = await db.scalar(
         select(DocumentRevision)
@@ -266,6 +282,7 @@ async def _add_revision(
         and latest is not None
         and latest.author == author
         and latest.run_id == run_id
+        and latest.actor_ref == actor_ref
         and now - latest.created_at < REVISION_WINDOW
     )
     if same_session and latest is not None:
@@ -278,6 +295,7 @@ async def _add_revision(
             content_hash=sha(content),
             author=author,
             run_id=run_id,
+            actor_ref=actor_ref,
             created_at=now,
             updated_at=now,
         )
@@ -392,7 +410,7 @@ async def create(
 ) -> Document:
     path = check_path(path)
     await asyncio.to_thread(files.write_bytes, path, content.encode(), must_not_exist=True)
-    doc = Document(path=path, title="", content_hash="")
+    doc = Document(path=path, title="", content_hash="", created_by_ref=current_actor().ref)
     db.add(doc)
     await db.flush()
     info = await asyncio.to_thread(_info, path)

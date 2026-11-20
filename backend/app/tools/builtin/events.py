@@ -12,15 +12,22 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
+from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
+from app.core.refs import ref_url
 from app.features.calendar import recurrence, service
 from app.features.calendar.models import CalendarEvent
 from app.features.calendar.schemas import EventIn, OccurrenceIn
+from app.features.provenance import service as provenance
+from app.features.provenance.sources import ExternalKeyTaken
 from app.features.settings import service as settings_service
+from app.features.tasks.models import Project, Task
+from app.features.trash.models import TrashedItem
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin import sources as src
 
 
 async def _user_tz(db: Any) -> str:
@@ -51,6 +58,7 @@ def _describe(occ: service.Occurrence, tz: str) -> str:
         extras.append(
             f"repeats: {occ.event.rrule}; this occurrence: {occ.original_start.isoformat()}"
         )
+    extras += src.facts(occ.event)
     tail = f" ({'; '.join(extras)})" if extras else ""
     return f"[{occ.event.id}] {when}  {occ.title}{tail}"
 
@@ -67,33 +75,124 @@ def _problems(exc: ValidationError) -> str:
 
 
 class ListEventsInput(BaseModel):
-    start: date = Field(description="First day")
+    start: date | None = Field(
+        None, description="First day (needed unless source, external_key or query is given)"
+    )
     end: date | None = Field(None, description="Last day (default: 7 days after start)")
+    source: str | None = Field(None, max_length=40, description=src.LIST_SOURCE)
+    external_key: str | None = Field(None, max_length=200, description=src.LIST_EXTERNAL_KEY)
+    query: str | None = Field(
+        None, max_length=200, description="Words in the title, notes or location"
+    )
 
 
 class ListEvents(Tool):
     name = "list_events"
-    description = "List the user's calendar events in a range of days (repeating events included)."
+    description = (
+        "List the user's calendar events in a range of days (repeating events included). "
+        "With source, external_key or query the range is optional: without one, matching "
+        "events are listed whenever they are. get_event shows one in full."
+    )
     capability = "calendar.read"
     Input = ListEventsInput
 
     async def run(self, args: ListEventsInput, ctx: ToolContext) -> ToolResult:
-        last = args.end or args.start + timedelta(days=7)
+        filtered = any(v and v.strip() for v in (args.source, args.external_key, args.query))
+        if args.start is None and not filtered:
+            return ToolResult(
+                content="Give a start day, or filter by source, external_key or query.",
+                is_error=True,
+            )
         async with get_sessionmaker()() as db:
             tz = await _user_tz(db)
-            try:
-                found = await service.occurrences(
-                    db,
-                    recurrence.local_midnight(args.start, tz),
-                    recurrence.local_midnight(last + timedelta(days=1), tz),
+            if args.start is None:
+                events = await service.find_events(
+                    db, source=args.source, external_key=args.external_key, query=args.query
                 )
-            except AppError as exc:
-                return ToolResult(content=exc.message, is_error=True)
+                found = [service._base(e, e.start_at) for e in events]  # noqa: SLF001
+                span = ""
+            else:
+                last = args.end or args.start + timedelta(days=7)
+                span = f" from {args.start} to {last}"
+                try:
+                    found = await service.occurrences(
+                        db,
+                        recurrence.local_midnight(args.start, tz),
+                        recurrence.local_midnight(last + timedelta(days=1), tz),
+                        source=args.source,
+                        external_key=args.external_key,
+                        query=args.query,
+                    )
+                except AppError as exc:
+                    return ToolResult(content=exc.message, is_error=True)
+            trashed = (
+                await src.in_trash(db, "event", args.external_key.strip())
+                if not found and args.external_key
+                else ""
+            )
         if not found:
-            return ToolResult(content=f"No events from {args.start} to {last}.")
-        return ToolResult(
-            content=f"Times are in {tz}.\n" + "\n".join(_describe(o, tz) for o in found)
-        )
+            return ToolResult(content=f"No events{' match' if filtered else ''}{span}.{trashed}")
+        head = f"Times are in {tz}."
+        if args.start is None:
+            head += " Matching events, the latest first (a repeating one as its first):"
+        return ToolResult(content=head + "\n" + "\n".join(_describe(o, tz) for o in found))
+
+
+class GetEventInput(BaseModel):
+    id: str = Field(description="The event's id (from list_events)")
+
+
+class GetEvent(Tool):
+    name = "get_event"
+    description = (
+        "One event in full: its notes, reminder, project and task, where a synced event "
+        "came from (source, external_key, link, last sync, whether the user changed it by "
+        "hand) and who created and last changed it."
+    )
+    capability = "calendar.read"
+    Input = GetEventInput
+
+    async def run(self, args: GetEventInput, ctx: ToolContext) -> ToolResult:
+        event_id = _id(args.id)
+        async with get_sessionmaker()() as db:
+            event = await db.get(CalendarEvent, event_id) if event_id else None
+            if event is None:
+                trashed = (
+                    await db.scalar(
+                        select(TrashedItem)
+                        .where(TrashedItem.kind == "event", TrashedItem.item_id == event_id)
+                        .order_by(TrashedItem.deleted_at.desc())
+                        .limit(1)
+                    )
+                    if event_id
+                    else None
+                )
+                if trashed is not None and "event" in trashed.payload:
+                    return ToolResult(
+                        content=f"The event “{trashed.title}” was moved to the trash on "
+                        f"{trashed.deleted_at:%Y-%m-%d}; only the user can restore it "
+                        "(Calendar > Trash).",
+                        is_error=True,
+                    )
+                return ToolResult(content=f"No event with id {args.id}.", is_error=True)
+            tz = await _user_tz(db)
+            lines = [_describe(service._base(event, event.start_at), tz)]  # noqa: SLF001
+            lines.append("Notes:\n" + (event.description.strip() or "(none)"))
+            facts = [f"Times are in {tz}", f"reference {ref_url('event', event.id)}"]
+            if event.remind_minutes is not None:
+                facts.append(f"reminder {event.remind_minutes} minutes before")
+            project = await db.get(Project, event.project_id) if event.project_id else None
+            if project is not None:
+                facts.append(f"project {project.name}")
+            task = await db.get(Task, event.task_id) if event.task_id else None
+            if task is not None:
+                facts.append(f"for the task [{task.id}] {task.title}")
+            lines.append("; ".join(facts) + ".")
+            if details := src.details(event):
+                lines.append(details)
+            if made := await provenance.summary(db, event.created_by_ref, event.updated_by_ref):
+                lines.append(made)
+        return ToolResult(content="\n\n".join(lines))
 
 
 class CreateEventInput(BaseModel):
@@ -109,6 +208,9 @@ class CreateEventInput(BaseModel):
         None, description="To repeat, e.g. FREQ=WEEKLY;BYDAY=MO or FREQ=DAILY;COUNT=5"
     )
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    source: str | None = Field(None, max_length=40, description=src.SOURCE)
+    external_key: str | None = Field(None, max_length=200, description=src.EXTERNAL_KEY)
+    source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
 
 
 def _event_in(args: Any, tz: str) -> EventIn:
@@ -145,14 +247,29 @@ class CreateEvent(Tool):
         ]
 
     async def run(self, args: CreateEventInput, ctx: ToolContext) -> ToolResult:
+        source = src.source_in(args.source, args.external_key, args.source_url)
+        if isinstance(source, str):
+            return ToolResult(content=f"Invalid event: {source}", is_error=True)
         async with get_sessionmaker()() as db:
             tz = await _user_tz(db)
             try:
                 # Filed under the project of the chat this run belongs to.
                 body = _event_in(args, tz).model_copy(update={"project_id": ctx.project_id})
-                event = await service.create_event(db, body, created_by="agent", run_id=ctx.run_id)
+                event = await service.create_event(
+                    db, body, created_by="agent", run_id=ctx.run_id, source=source
+                )
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
+            except ExternalKeyTaken as exc:
+                existing = (
+                    _describe(service._base(exc.item, exc.item.start_at), tz)  # noqa: SLF001
+                    if exc.item is not None
+                    else None
+                )
+                text = src.taken(
+                    exc, line=existing, update_tool="update_event", trash_place="Calendar > Trash"
+                )
+                return ToolResult(content=text, data={"existing": exc.details})
             line = _describe(service._base(event, event.start_at), tz)  # noqa: SLF001
         return ToolResult(
             content=f"Added: {line}", data={"event": {"id": str(event.id), "title": event.title}}
@@ -171,11 +288,15 @@ class UpdateEventInput(BaseModel):
         None, description="New repeat rule; an empty text stops the repeating"
     )
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
 
 
 class UpdateEvent(Tool):
     name = "update_event"
-    description = "Change an event. For a repeating event this changes the whole series."
+    description = (
+        "Change an event. For a repeating event this changes the whole series. A synced "
+        "event's source and external_key can't be changed."
+    )
     capability = "calendar.write"
     Input = UpdateEventInput
     idempotent = False
@@ -227,7 +348,10 @@ class UpdateEvent(Tool):
                         "project_id": event.project_id,
                     }
                 )
-                event = await service.update_event(db, event, body)
+                source = src.source_in(None, None, args.source_url)
+                if isinstance(source, str):
+                    return ToolResult(content=f"Invalid event: {source}", is_error=True)
+                event = await service.update_event(db, event, body, source_url=source.source_url)
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
             line = _describe(service._base(event, event.start_at), tz)  # noqa: SLF001
@@ -295,4 +419,4 @@ class DeleteEvent(Tool):
         )
 
 
-EVENT_TOOLS: list[Tool] = [ListEvents(), CreateEvent(), UpdateEvent(), DeleteEvent()]
+EVENT_TOOLS: list[Tool] = [ListEvents(), GetEvent(), CreateEvent(), UpdateEvent(), DeleteEvent()]

@@ -144,6 +144,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_project",
             "update_project",
             "list_events",
+            "get_event",
             "create_event",
             "update_event",
             "delete_event",
