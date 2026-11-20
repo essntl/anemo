@@ -13,7 +13,7 @@ Whoever resumes this work continues from this log.
 | 1 | T Response timer | `feat/t` | `../anemo-t` | **merged** (230371b; 0040 re-chained onto 0036); after the merge: backend `all` and the frontend checks (474 tests) green |
 | 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | **merged** (956a65f; 0045 re-chained onto 0040); after the merge: backend `all` and the frontend checks (482 tests) green |
 | 2 | A3 Tasks and events join in | `feat/a3` | `../anemo-a3` | building (started 2026-11-20) |
-| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | built (5 commits, suite green); in review |
+| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | reviewed; builder fixing the review findings |
 
 - **Merge order:** A1, T, B1, A2; then A3, B2.
 - **Progress notes:** `C:\Users\user\Documents\Projects\anemo-progress\<id>.md` (outside the repo).
@@ -117,6 +117,23 @@ the machine responsive: at most 3 agents at a time, and frontend tests with
 `--maxWorkers=2`. A builder runs the backend suite and the frontend tests one after the
 other, not at the same time.
 
+## Wave 2 reviews
+
+- **B2** (first review): no blockers. Sent back:
+  - a refused create must not count as a change (`ToolResult.changed`)
+  - the cancellation path tested on a `create_schedule`-made automation, with an
+    optional `profile`
+  - `{today}` documented in the tool, and the check arguments shown in the approval
+  - an approved old run must not roll back the snapshot
+  - resolved check arguments stored
+  - server-built notification texts without customer content
+  - minors: the catalog key, resume events, the `tick` wording, a11y
+
+  **Ownership grants for these fixes (orchestrator):** `runtime/agent.py`
+  (`_note_change`), `tools/base.py` (`ToolResult`), `tools/builtin/schedules.py`, and one
+  line each in the `ExternalKeyTaken` branches of `events.py`/`tasks.py`. Those are A3's
+  files in wave 2; I resolve the merge.
+
 ## Open questions for the user
 
 1. **A server-side guard against customer contact details** in events and notifications
@@ -126,6 +143,9 @@ other, not at the same time.
    from untrusted tool results word for word. It misses paraphrases, and it can match by
    mistake when a customer's name is the user's own. This is a design addition, so the
    user decides.
+2. **Residual risk, accepted:** the contact rule trusts an MCP server's
+   `readOnlyHint`. A server that marks a contacting tool as read-only, and that the
+   user has set to "allow", could run without asking. MCP tools ask by default.
 
 ## Decisions during wave 1
 
