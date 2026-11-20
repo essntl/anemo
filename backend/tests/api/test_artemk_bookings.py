@@ -397,7 +397,8 @@ async def test_an_event_the_user_trashed_or_deleted_is_not_recreated(authed):
 
         # The user doesn't want it in the calendar: they move it to the trash.
         assert (await authed.delete(f"/api/calendar/events/{event.id}")).status_code == 204
-        # The booking changes; the run looks it up, finds nothing, and adds it again.
+        # The booking changes; the run looks it up, finds nothing, and a careless model
+        # adds it again.
         request.status = "confirmed"
         plays(
             checks_the_site(day),
