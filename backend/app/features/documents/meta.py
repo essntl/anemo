@@ -80,6 +80,7 @@ async def _properties_of(
             project_id = await project_for_path(db, doc.path)
             return await properties.from_front_matter(db, "document", project_id, meta.meta)
     except Exception:  # noqa: BLE001 - reading properties never stops a save
+        properties.forget(db)  # values made in the undone savepoint are gone
         log.warning(
             "properties not indexed", extra={"ctx": {"document_id": str(doc.id)}}, exc_info=True
         )

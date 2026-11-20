@@ -30,6 +30,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from app.core.errors import AppError, Conflict, NotFound
 from app.core.ids import uuid7
 from app.core.refs import ObjectType
+from app.features.documents.models import Document
 from app.features.properties.models import PropertyDefinition, PropertyOption
 from app.features.tasks.models import Project
 
@@ -211,7 +212,12 @@ async def ensure_builtins(db: AsyncSession) -> None:
 
 
 async def load(db: AsyncSession) -> dict[str, Prop]:
-    """Every definition with its options, by key."""
+    """Every definition with its options, by key. Loaded once per transaction (a save
+    validates and indexes with the same ones); values made meanwhile are added to it."""
+    transaction = db.get_transaction()
+    cached = db.info.get(_LOADED)
+    if transaction is not None and cached is not None and cached[0] is transaction:
+        return cached[1]  # type: ignore[no-any-return]
     await ensure_builtins(db)
     definitions = list(
         await db.scalars(
@@ -227,7 +233,16 @@ async def load(db: AsyncSession) -> dict[str, Prop]:
     ):
         if o.definition_id in by_id:
             by_id[o.definition_id].options.append(o)
+    db.info[_LOADED] = (db.get_transaction(), props)
     return props
+
+
+_LOADED = "properties.loaded"  # db.info key of load()'s result
+
+
+def forget(db: AsyncSession) -> None:
+    """Drop what load() keeps for this transaction (after a savepoint was rolled back)."""
+    db.info.pop(_LOADED, None)
 
 
 def in_scope(prop: Prop, object_type: str, project_id: uuid.UUID | None) -> bool:
@@ -755,6 +770,8 @@ async def update_option(
     if label is not None:
         option.label = label.strip()[:120] or option.slug
     if hub_document_id != "keep":
+        if hub_document_id is not None and await db.get(Document, hub_document_id) is None:
+            raise NotFound("That document doesn't exist")
         option.hub_document_id = hub_document_id
     if sort_order is not None:
         option.sort_order = sort_order

@@ -428,6 +428,7 @@ async def move(db: AsyncSession, doc: Document, new_path: str) -> Document:
         doc.path = new_path
         info = await asyncio.to_thread(_info, new_path)
         doc.size, doc.mtime = info.size, info.mtime
+        await _reindex_moved(db, doc)
         await db.commit()
         await db.refresh(doc)
     return doc
@@ -462,6 +463,7 @@ async def follow_move(db: AsyncSession, old: str, new: str) -> None:
             continue  # left documents/ or isn't where we expect: reconcile sorts it out
         meta.record_move(db, doc.id, doc.path)
         doc.path = target
+        await _reindex_moved(db, doc)
 
 
 def read_file(path: str) -> str:
@@ -513,3 +515,14 @@ async def _index_stale(db: AsyncSession) -> bool:
         else:
             await meta.index(db, doc, content)
     return bool(stale)
+
+
+async def _reindex_moved(db: AsyncSession, doc: Document) -> None:
+    """A document at a new path: its project-scoped properties may (not) apply there,
+    and its search chunks name the folder. Doesn't commit."""
+    try:
+        content = await asyncio.to_thread(_read, doc.path)
+    except AppError:
+        return
+    await meta.index(db, doc, content)
+    await schedule_reindex(db, doc)

@@ -1101,3 +1101,31 @@ async def test_an_agent_move_offers_to_update_instructions_and_memories(authed, 
     )
     history = (await authed.get(f"/api/documents/{doc['id']}/paths")).json()
     assert [h["old_path"] for h in history] == ["documents/nicole/rules.md"]
+
+
+async def test_a_moved_document_is_indexed_for_its_new_place(authed, docs):
+    ts = await project(authed, "Tech Services")
+    client = await client_property(authed, ts["id"], "Acme")
+    doc = await new_doc(authed, "Offer", "tech-services", client="acme")
+    await authed.post(f"/api/documents/{doc['id']}/move", json={"folder": "elsewhere"})
+    moved = await doc_row(doc["id"])
+    assert moved.properties == {} and "only for the projects Tech Services" in (
+        moved.properties_error or ""
+    )
+    # Moved back with Files: valid again.
+    r = await authed.post(
+        "/api/files/move",
+        json={
+            "source": "documents/elsewhere/offer.md",
+            "destination": "documents/tech-services/offer.md",
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert (await doc_row(doc["id"])).properties == {"client": "acme"}
+    # A hub page that doesn't exist is refused, not a server error.
+    option = client["options"][0]
+    r = await authed.patch(
+        f"/api/properties/{client['id']}/options/{option['id']}",
+        json={"hub_document_id": str(uuid.uuid4())},
+    )
+    assert r.status_code == 404
