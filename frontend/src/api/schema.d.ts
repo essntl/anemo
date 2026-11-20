@@ -3252,6 +3252,27 @@ export interface paths {
         patch: operations["update_automation_api_automations__automation_id__patch"];
         trace?: never;
     };
+    "/api/automations/{automation_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Log
+         * @description The automation's runs, newest first, with the model's outcome line and the changes
+         *     the server recorded. Page with `before` = the last item's created_at.
+         */
+        get: operations["run_log_api_automations__automation_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automations/{automation_id}/run": {
         parameters: {
             query?: never;
@@ -3817,19 +3838,41 @@ export interface components {
             on_ask: "pause" | "deny" | "fail";
             /**
              * Notify
-             * @default always
+             * @default agent_decides
              * @enum {string}
              */
-            notify: "always" | "on_failure" | "never";
+            notify: "agent_decides" | "always" | "on_failure" | "never";
             /** Destination Ids */
             destination_ids?: string[] | null;
             /** Document Path */
             document_path?: string | null;
             /**
              * Max Retries
-             * @default 0
+             * @default 1
              */
             max_retries: number;
+            /** State Note */
+            state_note?: string | null;
+            /** Tool Allowlist */
+            tool_allowlist?: string[] | null;
+            /**
+             * Max Tool Calls
+             * @default 30
+             */
+            max_tool_calls: number | null;
+            /**
+             * Max Runtime S
+             * @default 300
+             */
+            max_runtime_s: number | null;
+            /** Chat Retention Days */
+            chat_retention_days?: number | null;
+            /** Contact Tools Allowed */
+            contact_tools_allowed?: string[];
+            /** Change Check */
+            change_check?: components["schemas"]["ChangeCheck"][] | null;
+            /** Run Anyway Hours */
+            run_anyway_hours?: number | null;
         };
         /** AutomationOut */
         AutomationOut: {
@@ -3867,17 +3910,44 @@ export interface components {
              * Notify
              * @enum {string}
              */
-            notify: "always" | "on_failure" | "never";
+            notify: "agent_decides" | "always" | "on_failure" | "never";
             /** Destination Ids */
             destination_ids: string[] | null;
             /** Document Path */
             document_path: string | null;
             /** Max Retries */
             max_retries: number;
-            /** State */
-            state: {
-                [key: string]: string;
-            };
+            /** State Note */
+            state_note?: string | null;
+            /** Tool Allowlist */
+            tool_allowlist?: string[] | null;
+            /** Max Tool Calls */
+            max_tool_calls?: number | null;
+            /** Max Runtime S */
+            max_runtime_s?: number | null;
+            /** Chat Retention Days */
+            chat_retention_days?: number | null;
+            /**
+             * Contact Tools Allowed
+             * @default []
+             */
+            contact_tools_allowed: string[];
+            /** Change Check */
+            change_check?: components["schemas"]["ChangeCheck"][] | null;
+            /** Run Anyway Hours */
+            run_anyway_hours?: number | null;
+            /**
+             * Failure Streak
+             * @default 0
+             */
+            failure_streak: number;
+            /** Last Error */
+            last_error?: string | null;
+            /**
+             * Pending Approvals
+             * @default []
+             */
+            pending_approvals: components["schemas"]["PendingApproval"][];
             /** Next Run At */
             next_run_at: string | null;
             /** Last Run At */
@@ -3912,13 +3982,64 @@ export interface components {
             /** On Ask */
             on_ask?: ("pause" | "deny" | "fail") | null;
             /** Notify */
-            notify?: ("always" | "on_failure" | "never") | null;
+            notify?: ("agent_decides" | "always" | "on_failure" | "never") | null;
             /** Destination Ids */
             destination_ids?: string[] | null;
             /** Document Path */
             document_path?: string | null;
             /** Max Retries */
             max_retries?: number | null;
+            /** State Note */
+            state_note?: string | null;
+            /** Tool Allowlist */
+            tool_allowlist?: string[] | null;
+            /** Max Tool Calls */
+            max_tool_calls?: number | null;
+            /** Max Runtime S */
+            max_runtime_s?: number | null;
+            /** Chat Retention Days */
+            chat_retention_days?: number | null;
+            /** Contact Tools Allowed */
+            contact_tools_allowed?: string[] | null;
+            /** Change Check */
+            change_check?: components["schemas"]["ChangeCheck"][] | null;
+            /** Run Anyway Hours */
+            run_anyway_hours?: number | null;
+        };
+        /**
+         * AutomationRunOut
+         * @description One run in an automation's run log.
+         */
+        AutomationRunOut: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Status */
+            status: string;
+            /** Trigger */
+            trigger?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Outcome Line */
+            outcome_line: string | null;
+            /** Nothing To Do */
+            nothing_to_do: boolean;
+            /**
+             * Changes
+             * @default []
+             */
+            changes: components["schemas"]["RunChange"][];
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Error */
+            error: string | null;
         };
         /**
          * AutomationSettings
@@ -4173,6 +4294,18 @@ export interface components {
             title: string;
             /** Date */
             date?: string | null;
+        };
+        /**
+         * ChangeCheck
+         * @description A read-only tool call the server makes before each scheduled run.
+         */
+        ChangeCheck: {
+            /** Tool */
+            tool: string;
+            /** Args */
+            args?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * ChatBulkIn
@@ -5942,6 +6075,31 @@ export interface components {
             /** Has Text */
             has_text: boolean;
         };
+        /**
+         * PendingApproval
+         * @description An approval one of the automation's runs is waiting for.
+         */
+        PendingApproval: {
+            /**
+             * Approval Id
+             * Format: uuid
+             */
+            approval_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Summary */
+            summary: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** PendingApprovalOut */
         PendingApprovalOut: {
             /**
@@ -6813,6 +6971,18 @@ export interface components {
              * @enum {string}
              */
             else: "allow" | "ask" | "deny";
+        };
+        /**
+         * RunChange
+         * @description Something a run changed, recorded by the server from its tool calls.
+         */
+        RunChange: {
+            /** Tool */
+            tool: string;
+            /** Summary */
+            summary: string;
+            /** Ref */
+            ref?: string | null;
         };
         /** RunCounts */
         RunCounts: {
@@ -16008,6 +16178,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_log_api_automations__automation_id__runs_get: {
+        parameters: {
+            query?: {
+                /** @description Only runs started before this time */
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunOut"][];
                 };
             };
             /** @description Validation Error */

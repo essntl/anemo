@@ -62,7 +62,13 @@ async def test_every_weekday_at_seven_runs_and_notifies_by_itself(authed):
     script(
         "every weekday at 07:00, give me my day",
         [
-            use("create_schedule", name="Morning briefing", prompt=BRIEFING, rrule=WEEKDAYS_7),
+            use(
+                "create_schedule",
+                name="Morning briefing",
+                prompt=BRIEFING,
+                rrule=WEEKDAYS_7,
+                notify="always",
+            ),
             Done("tool_use"),
         ],
         [TextDelta("Done: every weekday at 07:00."), Done("end")],
@@ -72,7 +78,8 @@ async def test_every_weekday_at_seven_runs_and_notifies_by_itself(authed):
     assert await listed(authed) == []
     (approval,) = await approve_all(authed, run_id)
     assert approval["summary"] == (
-        f"Schedule “Morning briefing”, repeating ({WEEKDAYS_7}): {BRIEFING}"
+        f"Schedule “Morning briefing”, repeating ({WEEKDAYS_7}) (notify: every result): "
+        f"{BRIEFING}"
     )
     assert await run_status(authed, run_id) == "completed"
 
@@ -80,8 +87,8 @@ async def test_every_weekday_at_seven_runs_and_notifies_by_itself(authed):
     assert (a["name"], a["prompt"], a["created_by"]) == ("Morning briefing", BRIEFING, "agent")
     assert a["schedule"]["kind"] == "rrule" and a["schedule"]["tz"] == OSLO
     assert a["schedule_text"] == "Every weekday at 07:00"
-    # Approvals wait for the user (never refused or skipped for them), and the answer
-    # is always sent as a notification.
+    # Approvals wait for the user (never refused or skipped for them), and with
+    # notify="always" the answer is sent as a notification.
     assert (a["on_ask"], a["notify"], a["enabled"]) == ("pause", "always", True)
     next_run = datetime.fromisoformat(a["next_run_at"]).astimezone(ZoneInfo(OSLO))
     assert (next_run.hour, next_run.minute) == (7, 0) and next_run.weekday() < 5

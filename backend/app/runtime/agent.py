@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import USER, Actor, acting_as
 from app.core.db import get_sessionmaker
+from app.core.refs import ObjectType, ref_url
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.images import PreparedImage
@@ -150,7 +151,12 @@ class AgentRun:
         conversation_id: uuid.UUID | None = None,
         answer: tuple[uuid.UUID, uuid.UUID] | None = None,
         actor: Actor = USER,
+        automation: dict[str, Any] | None = None,
     ) -> None:
+        # The automation this run (or the run it is a sub-agent of) belongs to, as in its
+        # policy snapshot: which tools reach other people without asking, whether a limit
+        # fails the run. None for other runs.
+        self.automation = automation
         # Which model session this run continues (claude_code), and the turn context
         # of its user message (see runtime/turn_context.py).
         self.session_key = session_key
@@ -756,6 +762,7 @@ class AgentRun:
                     ceiling=self.ceiling,
                     ancestors=self.ancestors,
                     grants=grants,
+                    ask_contacts=self._asks_contacts(tool),
                 )
                 for a in actions
             ]
@@ -781,6 +788,8 @@ class AgentRun:
             return None
         if verdict.decision == "ask":
             summary = "; ".join(a.summary for a in actions if a.summary) or tool.name
+            if self.on_ask == "pause" and await self._asked_before(db, run, row):
+                return None
             if self.on_ask == "pause":
                 return await self._ask(db, run, row, tool, "action", summary)
             # Unattended and set not to wait: the answer is no, never a silent yes.
@@ -966,7 +975,65 @@ class AgentRun:
             run.plan = new_plan
             run.plan_version += 1
         self._checkpoint_time(run)
+        await self._note_change(db, run, row, tool, args, result)  # committed with the row
         await self._finish_row(db, row, "failed" if result.is_error else "succeeded", result)
+
+    # -- automation runs -----------------------------------------------------------
+
+    def _asks_contacts(self, tool: Tool) -> bool:
+        """Automation runs ask before a tool reaches other people, whatever the policy
+        says, unless the automation allows that tool (policy/engine.py)."""
+        if self.automation is None:
+            return False
+        return tool.name not in (self.automation.get("contacts_allowed") or [])
+
+    def _root_run_id(self, run: Run) -> uuid.UUID:
+        return run.root_run_id or run.id
+
+    async def _asked_before(self, db: AsyncSession, run: Run, row: ToolCall) -> bool:
+        """An earlier run of the automation already waits for the user's approval of the
+        same call: say so instead of asking again (the user would see it twice)."""
+        if self.automation is None or not self.automation.get("id"):
+            return False
+        pending = await automations.pending_duplicate(
+            db,
+            uuid.UUID(self.automation["id"]),
+            self._root_run_id(run),
+            row.tool_name,
+            row.args,
+        )
+        if pending is None:
+            return False
+        row.decision_reason = "an earlier run already asks the user for this"
+        await self._finish_row(
+            db,
+            row,
+            "denied",
+            ToolResult(
+                content="An earlier run of this automation already waits for the user's "
+                "approval of exactly this action; it happens if they approve it. Do not ask "
+                "again: carry on without it.",
+                is_error=True,
+            ),
+        )
+        return True
+
+    async def _note_change(
+        self, db: AsyncSession, run: Run, row: ToolCall, tool: Tool, args: Any, result: ToolResult
+    ) -> None:
+        """Automation runs: a call that changed something goes into the run's list of
+        changes (a sub-agent's into the automation run it works for)."""
+        if self.automation is None or result.is_error or not tool.changes(args):
+            return
+        summary = "; ".join(a.get("summary") or "" for a in row.actions if a.get("summary"))
+        change: dict[str, Any] = {"tool": tool.name, "summary": (summary or tool.name)[:300]}
+        data = result.data or {}
+        kinds: tuple[ObjectType, ...] = ("task", "event")
+        for kind in kinds:
+            item = data.get(kind)
+            if isinstance(item, dict) and item.get("id"):
+                change["ref"] = ref_url(kind, uuid.UUID(str(item["id"])))
+        await automations.record_change(db, self._root_run_id(run), change)
 
     # -- sub-agents ----------------------------------------------------------------
 
@@ -1159,6 +1226,9 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         run = await db.get(Run, run_id)
         if run is None or not await _pick_up(db, run):
             return None
+        # Two runs of one automation never work at once: this one may have to wait.
+        if not await automations.may_start(db, run):
+            return None
 
         if not run.transcript:
             assert run.conversation_id is not None
@@ -1220,6 +1290,8 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
                 verdict = evaluate(probe, policy, ceiling=ceiling, ancestors=ancestors)
                 if verdict.decision != "deny":
                     tools.append(tool)
+        unattended_by = run.policy.get("automation")  # the automation's settings, if any
+        tools = registry.allowed(tools, (unattended_by or {}).get("tools"))
         automation_id = run.automation_id
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         effort = await effort_for(db, run)
@@ -1250,7 +1322,12 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         conversation_id=run.conversation_id,
         answer=answer_message,
         actor=runs.actor_for(run),
+        automation=unattended_by,
     )
+
+
+def _limit_fails(run: Run, agent: AgentRun) -> bool:
+    return run.automation_id is not None and bool((agent.automation or {}).get("limit_fails"))
 
 
 async def _record_outcome(
@@ -1298,6 +1375,11 @@ async def _record_outcome(
                 error=f"Stopped because an action needed your approval: {agent.blocked_by}. "
                 "(This automation is set to stop when approval is needed.)",
             )
+        elif outcome.startswith("limit:") and _limit_fails(run, agent):
+            # An automation with limits of its own: reaching one is a failure (a cheap model
+            # looping). What it changed until then stays recorded.
+            note = limit_message(outcome.removeprefix("limit:"), agent.policy.limits)
+            await finalize(db, run, "failed", error=note, note=f"\n\n_{note}_")
         elif outcome.startswith("limit:"):
             note = limit_message(outcome.removeprefix("limit:"), agent.policy.limits)
             await finalize(db, run, "completed", note=f"\n\n_{note}_")

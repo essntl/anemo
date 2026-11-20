@@ -13848,6 +13848,101 @@
         }
       }
     },
+    "/api/automations/{automation_id}/runs": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Run Log",
+        "description": "The automation's runs, newest first, with the model's outcome line and the changes\nthe server recorded. Page with `before` = the last item's created_at.",
+        "operationId": "run_log_api_automations__automation_id__runs_get",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs started before this time",
+              "title": "Before"
+            },
+            "description": "Only runs started before this time"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationRunOut"
+                  },
+                  "title": "Response Run Log Api Automations  Automation Id  Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/automations/{automation_id}/run": {
       "post": {
         "tags": [
@@ -15831,12 +15926,13 @@
           "notify": {
             "type": "string",
             "enum": [
+              "agent_decides",
               "always",
               "on_failure",
               "never"
             ],
             "title": "Notify",
-            "default": "always"
+            "default": "agent_decides"
           },
           "destination_ids": {
             "anyOf": [
@@ -15871,7 +15967,117 @@
             "maximum": 5.0,
             "minimum": 0.0,
             "title": "Max Retries",
-            "default": 0
+            "default": 1
+          },
+          "state_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Note"
+          },
+          "tool_allowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Allowlist"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls",
+            "default": 30
+          },
+          "max_runtime_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 30.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime S",
+            "default": 300
+          },
+          "chat_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Retention Days"
+          },
+          "contact_tools_allowed": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_.-]+$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Contact Tools Allowed"
+          },
+          "change_check": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChangeCheck"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Check"
+          },
+          "run_anyway_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 720.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Anyway Hours"
           }
         },
         "type": "object",
@@ -15961,6 +16167,7 @@
           "notify": {
             "type": "string",
             "enum": [
+              "agent_decides",
               "always",
               "on_failure",
               "never"
@@ -15997,12 +16204,120 @@
             "type": "integer",
             "title": "Max Retries"
           },
-          "state": {
-            "additionalProperties": {
+          "state_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Note"
+          },
+          "tool_allowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Allowlist"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls"
+          },
+          "max_runtime_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime S"
+          },
+          "chat_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Retention Days"
+          },
+          "contact_tools_allowed": {
+            "items": {
               "type": "string"
             },
-            "type": "object",
-            "title": "State"
+            "type": "array",
+            "title": "Contact Tools Allowed",
+            "default": []
+          },
+          "change_check": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChangeCheck"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Check"
+          },
+          "run_anyway_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Anyway Hours"
+          },
+          "failure_streak": {
+            "type": "integer",
+            "title": "Failure Streak",
+            "default": 0
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "pending_approvals": {
+            "items": {
+              "$ref": "#/components/schemas/PendingApproval"
+            },
+            "type": "array",
+            "title": "Pending Approvals",
+            "default": []
           },
           "next_run_at": {
             "anyOf": [
@@ -16084,7 +16399,6 @@
           "destination_ids",
           "document_path",
           "max_retries",
-          "state",
           "next_run_at",
           "last_run_at",
           "last_status",
@@ -16199,6 +16513,7 @@
               {
                 "type": "string",
                 "enum": [
+                  "agent_decides",
                   "always",
                   "on_failure",
                   "never"
@@ -16250,10 +16565,225 @@
               }
             ],
             "title": "Max Retries"
+          },
+          "state_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Note"
+          },
+          "tool_allowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Allowlist"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls"
+          },
+          "max_runtime_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 30.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime S"
+          },
+          "chat_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Retention Days"
+          },
+          "contact_tools_allowed": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Tools Allowed"
+          },
+          "change_check": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChangeCheck"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Check"
+          },
+          "run_anyway_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 720.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Anyway Hours"
           }
         },
         "type": "object",
         "title": "AutomationPatch"
+      },
+      "AutomationRunOut": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "outcome_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Line"
+          },
+          "nothing_to_do": {
+            "type": "boolean",
+            "title": "Nothing To Do"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/RunChange"
+            },
+            "type": "array",
+            "title": "Changes",
+            "default": []
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "created_at",
+          "ended_at",
+          "outcome_line",
+          "nothing_to_do",
+          "conversation_id",
+          "error"
+        ],
+        "title": "AutomationRunOut",
+        "description": "One run in an automation's run log."
       },
       "AutomationSettings": {
         "properties": {
@@ -16900,6 +17430,28 @@
           "title"
         ],
         "title": "Change"
+      },
+      "ChangeCheck": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_.-]+$",
+            "title": "Tool"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool"
+        ],
+        "title": "ChangeCheck",
+        "description": "A read-only tool call the server makes before each scheduled run."
       },
       "ChatBulkIn": {
         "properties": {
@@ -21584,6 +22136,51 @@
         ],
         "title": "PdfTextOut"
       },
+      "PendingApproval": {
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approval_id",
+          "run_id",
+          "conversation_id",
+          "summary",
+          "created_at"
+        ],
+        "title": "PendingApproval",
+        "description": "An approval one of the automation's runs is waiting for."
+      },
       "PendingApprovalOut": {
         "properties": {
           "id": {
@@ -23770,6 +24367,36 @@
           "decision"
         ],
         "title": "Rule"
+      },
+      "RunChange": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool",
+          "summary"
+        ],
+        "title": "RunChange",
+        "description": "Something a run changed, recorded by the server from its tool calls."
       },
       "RunCounts": {
         "properties": {

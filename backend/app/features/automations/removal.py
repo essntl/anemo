@@ -1,5 +1,7 @@
 """Deleting an automation together with the chats of its past runs (their files and
-saved tool outputs go too).
+saved tool outputs go too), and deleting run chats once they are no longer kept: those
+of runs that had nothing to do after a week, all of them after the automation's
+retention period (`chat_retention_days`).
 
 Its own module because it needs conversations.service, which the agent tools must not
 import (it reaches into the runtime): delete_schedule enqueues the `automation.delete`
@@ -7,14 +9,19 @@ job instead, and the worker runs this.
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 
 from app.core.db import get_sessionmaker
 from app.features.automations import service
 from app.features.automations.models import Automation
 from app.features.conversations import service as conversations
 from app.features.conversations.models import Conversation
+from app.features.runs.models import TERMINAL_STATUSES, Run
+
+NOTHING_TO_DO_KEPT = timedelta(days=7)  # a run that did nothing stays in the log this long
+PRUNE_BATCH = 50  # chats deleted per pass (the next pass, half a minute later, goes on)
 
 
 async def delete_with_runs(automation_id: uuid.UUID) -> None:
@@ -35,3 +42,38 @@ async def delete_with_runs(automation_id: uuid.UUID) -> None:
         await db.delete(automation)
         await db.commit()
     await service.notify_changed()
+
+
+async def prune_run_chats(now: datetime | None = None) -> int:
+    """Periodic: delete the chats (and with them the runs, tool calls and outputs) of
+    finished automation runs that are no longer kept. Returns how many."""
+    now = now or datetime.now(UTC)
+    retention = func.make_interval(0, 0, 0, Automation.chat_retention_days)
+    async with get_sessionmaker()() as db:
+        ids = list(
+            await db.scalars(
+                select(Run.conversation_id)
+                .join(Automation, Automation.id == Run.automation_id)
+                .where(
+                    Run.status.in_(TERMINAL_STATUSES),
+                    Run.conversation_id.is_not(None),
+                    Run.ended_at.is_not(None),
+                    or_(
+                        and_(Run.nothing_to_do, Run.ended_at < now - NOTHING_TO_DO_KEPT),
+                        and_(
+                            Automation.chat_retention_days.is_not(None),
+                            Run.ended_at + retention < now,
+                        ),
+                    ),
+                )
+                .order_by(Run.ended_at)
+                .limit(PRUNE_BATCH)
+            )
+        )
+        chats = [c for c in ids if c is not None]
+        if not chats:
+            return 0
+        await conversations.delete_conversations(db, chats)
+        await db.commit()
+    await service.notify_changed()
+    return len(chats)

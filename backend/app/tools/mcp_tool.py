@@ -85,10 +85,16 @@ class McpToolBase(Tool):
     remote_name: str
     risk: Risk
     schema: dict[str, Any]
+    # The server says the tool talks to the world outside it (MCP's openWorldHint,
+    # true unless the server says otherwise).
+    open_world: bool = True
     timeout_s = CALL_TIMEOUT_S + client.CONNECT_TIMEOUT_S + 10
 
     def spec(self) -> ToolSpec:
         return ToolSpec(name=self.name, description=self.description, input_schema=self.schema)
+
+    def changes(self, args: Any) -> bool:
+        return self.risk != "safe"  # only tools known to be read-only change nothing
 
     def actions(self, args: Any, ctx: ToolContext) -> list[Action]:
         return [
@@ -96,6 +102,9 @@ class McpToolBase(Tool):
                 capability=self.capability,
                 risk=self.risk,
                 summary=f"{self.server_name}: {self.remote_name} {_brief(args.root)}",
+                # A tool that may write to another system can reach other people
+                # (send a mail, post a message): automation runs ask.
+                contacts_people=self.changes(args) and self.open_world,
             )
         ]
 
@@ -133,6 +142,10 @@ def build(server: McpServer, tool: McpTool) -> Tool:
         "server_name": server.name,
         "remote_name": tool.name,
         "risk": risk,
+        "open_world": (tool.annotations or {}).get(
+            "openWorldHint", (tool.annotations or {}).get("open_world_hint", True)
+        )
+        is not False,
         "schema": provider_schema(tool.input_schema),
     }
     return type("McpTool", (McpToolBase,), attributes)()  # type: ignore[no-any-return]

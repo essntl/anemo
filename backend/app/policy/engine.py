@@ -11,7 +11,8 @@ Evaluation order:
   4. An `ask` may become `allow` through a run grant, but only if the ceiling
      itself allows the action. Grants never override deny.
   5. An action marked `always_ask` is asked about even when allowed, every time (no run
-     grant skips it).
+     grant skips it). So is one that reaches other people (`contacts_people`) when the
+     caller says so (`ask_contacts`: an automation run that does not allow the tool).
 """
 
 from collections.abc import Iterable
@@ -22,6 +23,8 @@ from app.policy.models import Action, Decision, Evaluation, Grant, Policy, Rule
 HARD_DENY_PREFIXES = ("settings.", "secrets.", "auth.")
 
 _RANK: dict[Decision, int] = {"allow": 0, "ask": 1, "deny": 2}
+
+CONTACTS_REASON = "it reaches other people, which an automation run always asks about"
 
 
 def cap_matches(pattern: str, capability: str) -> bool:
@@ -90,6 +93,7 @@ def evaluate(
     parent: Policy | None = None,
     ancestors: Iterable[Policy] = (),
     grants: Iterable[Grant] = (),
+    ask_contacts: bool = False,
 ) -> Evaluation:
     # 1. Hard floor.
     if action.capability.startswith(HARD_DENY_PREFIXES):
@@ -115,6 +119,10 @@ def evaluate(
     worst = max(results, key=lambda e: _RANK[e.decision])
 
     # 5. Asked about every time, whatever the policy and earlier approvals say.
+    if ask_contacts and action.contacts_people:
+        if worst.decision == "deny":
+            return worst
+        return Evaluation(decision="ask", reason=CONTACTS_REASON, rule="contacts-people")
     if action.always_ask:
         if worst.decision == "deny":
             return worst

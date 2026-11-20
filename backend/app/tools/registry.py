@@ -84,6 +84,19 @@ FEATURE_TOOLS: dict[str, frozenset[str]] = {
 }
 
 
+# Offered even when an automation lists its tools: it reads the rest of a long result of
+# the tools it has, nothing more.
+ALWAYS_OFFERED = frozenset({"read_tool_output"})
+
+
+def allowed(tools: list[Tool], allowlist: Iterable[str] | None) -> list[Tool]:
+    """The tools an automation's runs see: those on its list (None: no list, all)."""
+    if allowlist is None:
+        return tools
+    names = {*allowlist, *ALWAYS_OFFERED}
+    return [t for t in tools if t.name in names]
+
+
 def tools_of(features: Iterable[str]) -> set[str]:
     """The names of the tools that belong to these parts of the app."""
     return {name for f in features for name in FEATURE_TOOLS.get(f, ())}

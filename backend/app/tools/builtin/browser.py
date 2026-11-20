@@ -219,6 +219,7 @@ class BrowserOpen(Tool):
         "page's text and a numbered list of what can be clicked or typed into."
     )
     capability = CAPABILITY
+    changes_state = False  # looking, not acting
     Input = OpenInput
     timeout_s = browser_client.ACTION_TIMEOUT_S + 10
 
@@ -259,6 +260,7 @@ class BrowserRead(Tool):
         "returns the page as it is, with a note; it cannot wait for something to disappear."
     )
     capability = CAPABILITY
+    changes_state = False  # looking, not acting
     Input = ReadInput
     timeout_s = browser_client.ACTION_TIMEOUT_S + 10
 
@@ -460,6 +462,7 @@ class BrowserScreenshot(Tool):
         "text is not enough: layout, charts, images, or to check how something looks."
     )
     capability = CAPABILITY
+    changes_state = False  # looking, not acting
     Input = ScreenshotInput
     timeout_s = browser_client.ACTION_TIMEOUT_S + 10
 

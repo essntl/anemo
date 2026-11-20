@@ -9,6 +9,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import browser_client
+from app.features.automations import context as automation_context
 from app.features.automations import service as automations
 from app.features.automations.models import Automation
 from app.features.conversations.models import ChatMessage
@@ -38,6 +39,8 @@ from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, 
 from app.runtime import subagents, turn_context
 from app.runtime.agent_prompt import (
     AUTOMATION_ON_ASK,
+    AUTOMATION_RESULT,
+    AUTOMATION_RESULT_DEFAULT,
     AUTOMATION_SECTION,
     BROWSER_HINT,
     MY_BROWSER_HINT,
@@ -78,9 +81,11 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         # Nobody is there to review a plan; each action is still checked on its own.
         # And nobody watches the clock: the user's cap for scheduled runs applies.
         cap = (await automations.protections(db)).max_run_minutes * 60
-        limits = settings.limits.model_copy(
-            update={"max_runtime_s": min(settings.limits.max_runtime_s, cap)}
-        )
+        runtime = automation.max_runtime_s or settings.limits.max_runtime_s
+        own: dict[str, int] = {"max_runtime_s": min(runtime, cap)}
+        if automation.max_tool_calls is not None:
+            own["max_tool_calls"] = automation.max_tool_calls  # its own limit, not the agent's
+        limits = settings.limits.model_copy(update=own)
         settings = settings.model_copy(update={"plan_review": "off", "limits": limits})
     sub = run.options.get("subagent")
     if sub is not None:
@@ -114,7 +119,8 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     if has_sandbox:
         system += BROWSER_HINT
     if automation is not None:
-        system += AUTOMATION_SECTION.format(name=automation.name)
+        result = AUTOMATION_RESULT.get(automation.notify, AUTOMATION_RESULT_DEFAULT)
+        system += AUTOMATION_SECTION.format(name=automation.name, result=result)
         system += AUTOMATION_ON_ASK[automation.on_ask] + "\n"
     # A sub-agent of an unattended run is unattended too.
     inherited = (sub or {}).get("automation")
@@ -135,7 +141,12 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         if inherited:
             system += AUTOMATION_ON_ASK[inherited["on_ask"]] + "\n"
     general = await settings_service.get_section(db, GeneralSettings, "general")
-    used = await _add_turn_context(db, run, transcript, general.timezone, memory_settings)
+    # An automation run also learns its state note, what earlier runs wait for, and what
+    # the change check found.
+    extra = await automation_context.run_context(db, run, general.timezone)
+    used = await _add_turn_context(
+        db, run, transcript, general.timezone, memory_settings, extra=extra
+    )
     navigation = await settings_service.get_section(db, NavigationSettings, "navigation")
     run.options = {**run.options, "memory_context": used}
     run.policy = {
@@ -155,10 +166,18 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         # Browser tools are only offered when the browser container is running.
         "browser": has_browser,
         "my_browser": my_browser,
+        # Sub-agents inherit this (runtime/subagents.py): the same tools, the same rule
+        # for tools that reach other people.
         "automation": {
             "id": str(automation.id),
             "name": automation.name,
             "on_ask": automation.on_ask,
+            "notify": automation.notify,
+            "tools": automation.tool_allowlist,  # None: the usual toolset
+            "contacts_allowed": list(automation.contact_tools_allowed or []),
+            # With limits of its own, a run that reaches one fails.
+            "limit_fails": automation.max_tool_calls is not None
+            or automation.max_runtime_s is not None,
         }
         if automation
         else inherited,
@@ -185,6 +204,8 @@ async def _add_turn_context(
     transcript: list[Message],
     tz: str,
     memory_settings: MemorySettings,
+    *,
+    extra: str = "",
 ) -> list[dict[str, str]]:
     """Render the turn context for the run's user message, save it with that message
     (so later runs replay the same bytes) and put it at the end of the message in the
@@ -200,7 +221,7 @@ async def _add_turn_context(
     section, used = await memory.build_context(db, _last_user_text(transcript), memory_settings)
     # A message started with a /skill carries the skill's instructions too.
     skill = skill_prompt_section(message.skill if message else None)
-    text = turn_context.render(tz, section, skill)
+    text = turn_context.render(tz, section, skill, extra)
     if message is not None:
         message.turn_context = text
     if transcript and transcript[-1].role == "user":
