@@ -16,8 +16,10 @@ import { useProfiles } from '@/features/profiles/api'
 import { useModels } from '@/features/providers/api'
 import { msg, rich, t } from '@/lib/i18n'
 import { type Automation, type NotifyWhen, type OnAsk, useSaveAutomation, useSchedulePreview } from '../api'
+import { checksValid, runSettingsBody, runSettingsFrom } from '../runSettings'
 import { defaultForm, fromSchedule, toSchedule } from '../scheduleForm'
 import type { AutomationTemplate } from '../templates'
+import { RunSettings } from './RunSettings'
 import { ScheduleFields } from './ScheduleFields'
 
 const ON_ASK_OPTIONS: { value: OnAsk; label: string }[] = [
@@ -26,6 +28,7 @@ const ON_ASK_OPTIONS: { value: OnAsk; label: string }[] = [
   { value: 'fail', label: msg('Stop the run') },
 ]
 const NOTIFY_OPTIONS: { value: NotifyWhen; label: string }[] = [
+  { value: 'agent_decides', label: msg('When the agent has something to tell me') },
   { value: 'always', label: msg('Every result') },
   { value: 'on_failure', label: msg('Only when it fails') },
   { value: 'never', label: msg('Never') },
@@ -53,11 +56,12 @@ export function AutomationDialog({ automation, template, onClose }: { automation
   const [profileId, setProfileId] = useState(automation?.profile_id ?? '')
   const [modelId, setModelId] = useState(automation?.model_id ?? '')
   const [onAsk, setOnAsk] = useState<OnAsk>(automation?.on_ask ?? 'pause')
-  const [notify, setNotify] = useState<NotifyWhen>(automation?.notify ?? 'always')
+  const [notify, setNotify] = useState<NotifyWhen>(automation?.notify ?? 'agent_decides')
   // null: wherever the channels themselves are set to receive automation results.
   const [destinationIds, setDestinationIds] = useState<string[] | null>(automation?.destination_ids ?? null)
   const [documentPath, setDocumentPath] = useState(automation?.document_path ?? '')
-  const [retries, setRetries] = useState(String(automation?.max_retries ?? 0))
+  const [retries, setRetries] = useState(String(automation?.max_retries ?? 1))
+  const [runSettings, setRunSettings] = useState(() => runSettingsFrom(automation))
 
   // Repeating schedules keep the time zone they were made in. A one-time run is
   // entered in this browser's time zone, so it is also described in it.
@@ -65,7 +69,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
   const preview = useSchedulePreview(toSchedule(schedule, tz))
   const usableModels = (models.data ?? []).filter((m) => m.enabled && m.provider_enabled && m.capabilities.tools)
   const channels = destinations.data ?? []
-  const valid = name.trim() !== '' && prompt.trim() !== '' && preview.valid
+  const valid = name.trim() !== '' && prompt.trim() !== '' && preview.valid && checksValid(runSettings.checks)
 
   const submit = () =>
     save.mutate(
@@ -84,6 +88,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
           destination_ids: destinationIds,
           document_path: documentPath.trim() || null,
           max_retries: Number(retries),
+          ...runSettingsBody(runSettings),
         },
       },
       { onSuccess: onClose },
@@ -139,6 +144,11 @@ export function AutomationDialog({ automation, template, onClose }: { automation
               ]} />
           </Field>
         </div>
+      </Section>
+
+      <Section title={t('Runs##settings')}
+        hint={t('Limits keep a looping model from doing damage: a run that reaches one stops and counts as failed. What it changed until then stays recorded.')}>
+        <RunSettings form={runSettings} onChange={setRunSettings} editing={automation !== null} />
       </Section>
 
       <Section title={t('Result')} hint={t('The agent’s final answer. Every run can also be opened from the automation’s history.')}>

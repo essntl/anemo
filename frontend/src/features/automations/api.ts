@@ -8,6 +8,10 @@ export type Automation = Schemas['AutomationOut']
 export type AutomationInput = Required<Schemas['AutomationIn']>
 export type OnAsk = Automation['on_ask']
 export type NotifyWhen = Automation['notify']
+/** One line of an automation's run log: its outcome and what it changed. */
+export type AutomationRun = Schemas['AutomationRunOut']
+export type ChangeCheck = Schemas['ChangeCheck']
+export type ToolInfo = Schemas['ToolOut']
 
 export const automationsKey = ['automations'] as const
 
@@ -22,6 +26,7 @@ export const STATUS_LABELS: Record<string, string> = {
   retrying: msg('Failed, will retry'),
   missed: msg('Missed (the app was off)'),
   skipped: msg('Skipped (still running)'),
+  no_change: msg('Skipped (no change)'),
 }
 
 export function useAutomations() {
@@ -31,12 +36,21 @@ export function useAutomations() {
   })
 }
 
-/** The last runs of one automation, newest first. */
+/** The run log of one automation, newest first. */
 export function useAutomationRuns(id: string) {
   return useQuery({
     queryKey: [...runsKey, 'automation', id],
     queryFn: async () =>
-      unwrap(await api.GET('/api/runs', { params: { query: { automation_id: id, kind: 'all', limit: 20 } } })),
+      unwrap(await api.GET('/api/automations/{automation_id}/runs', { params: { path: { automation_id: id }, query: { limit: 30 } } })),
+  })
+}
+
+/** The built-in tools (for an automation's tool list and change check). */
+export function useToolCatalog() {
+  return useQuery({
+    queryKey: ['tools'],
+    queryFn: async () => unwrap(await api.GET('/api/tools')),
+    staleTime: 5 * 60_000,
   })
 }
 
