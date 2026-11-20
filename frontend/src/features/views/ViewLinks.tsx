@@ -1,19 +1,20 @@
 /**
- * The pinned views in the sidebar: a project's own while a project is shown, the
- * global ones otherwise ("virtual folders": a document shows in every view it matches).
+ * The views in the sidebar: every view of the project shown (or the global ones when
+ * no project is), pinned ones first. A document shows in every view it matches;
+ * unpinning only moves a view down, it never hides it.
  */
 import { NavLink } from 'react-router'
-import { Rows3 } from 'lucide-react'
+import { Pin, Rows3 } from 'lucide-react'
 import { useScope } from '@/app/projectStore'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { useViews } from './api'
+import { viewsOf } from './query'
 
 export function ViewLinks({ onNavigate }: { onNavigate?: () => void }) {
   const views = useViews()
   const scope = useScope()
-  const projectId = scope.kind === 'project' ? scope.project.id : null
-  const shown = (views.data ?? []).filter((v) => v.pinned && v.project_id === projectId)
+  const shown = viewsOf(views.data ?? [], scope.kind === 'project' ? scope.project.id : null)
   if (shown.length === 0) return null
   return (
     <nav aria-label={t('Views')} className="mt-1 flex shrink-0 flex-col gap-0.5">
@@ -24,6 +25,7 @@ export function ViewLinks({ onNavigate }: { onNavigate?: () => void }) {
               isActive ? 'bg-surface-2 font-semibold text-text [&>svg]:text-accent' : 'text-text hover:bg-surface-hover [&>svg]:text-muted')}>
           <Rows3 className="h-[17px] w-[17px] shrink-0" />
           <span className="min-w-0 flex-1 truncate">{v.name}</span>
+          {v.pinned && <Pin aria-label={t('Pinned')} className="h-3 w-3 shrink-0" />}
         </NavLink>
       ))}
     </nav>

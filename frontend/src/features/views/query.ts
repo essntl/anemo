@@ -71,3 +71,13 @@ export function groupRows<T extends Sortable>(rows: T[], key: string, values: st
   }
   return [...groups.entries()].filter(([name, list]) => name !== '' || list.length > 0)
 }
+
+/** The views of a project (null: the global ones), pinned first, then in their order. */
+export function viewsOf<T extends { project_id: string | null; pinned: boolean; sort_order: number; name: string }>(
+  views: T[],
+  projectId: string | null,
+): T[] {
+  return views
+    .filter((v) => v.project_id === projectId)
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+}

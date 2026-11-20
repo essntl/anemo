@@ -20,7 +20,7 @@ import { useProjects } from '@/features/tasks/api'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { msg, plural, t } from '@/lib/i18n'
-import { type SavedView, type ViewLayout, type ViewRow, useDeleteView, useUpdateView, useView, useViewRows, viewRowsKey } from './api'
+import { type SavedView, type ViewLayout, type ViewRow, useDeleteView, useSetRowProperty, useUpdateView, useView, useViewRows, viewRowsKey } from './api'
 import { groupRows, queryText, sortRows, tableColumns } from './query'
 
 const LAYOUTS: { value: ViewLayout; label: string }[] = [
@@ -28,25 +28,6 @@ const LAYOUTS: { value: ViewLayout; label: string }[] = [
   { value: 'table', label: msg('Table') },
   { value: 'board', label: msg('Board') },
 ]
-
-/** Changes one property of one document (the server rewrites its front matter, with a revision). */
-function useSetRowProperty(viewId: string) {
-  const qc = useQueryClient()
-  return async (row: ViewRow, key: string, value: unknown) => {
-    try {
-      unwrap(
-        await api.PUT('/api/documents/{document_id}/properties', {
-          params: { path: { document_id: row.id } },
-          body: { set: { [key]: value === '' ? null : value }, base_hash: null, create_values: false },
-        }),
-      )
-      void qc.invalidateQueries({ queryKey: viewRowsKey(viewId) })
-      void qc.invalidateQueries({ queryKey: ['document', row.id] })
-    } catch (err) {
-      toast({ message: errorMessage(err) })
-    }
-  }
-}
 
 function Chips({ row, definitions }: { row: ViewRow; definitions: Map<string, PropertyDefinition> }) {
   const entries = Object.entries(row.properties)
@@ -91,11 +72,16 @@ function Cell({ row, definition, onChange }: { row: ViewRow; definition: Propert
   return <span className="text-[13px]">{valueLabel(definition, value)}</span>
 }
 
-function TableLayout({ view, rows, definitions, onChange }: { view: SavedView; rows: ViewRow[]; definitions: Map<string, PropertyDefinition>; onChange: (row: ViewRow, key: string, value: unknown) => void }) {
+export function TableLayout({ view, rows, definitions, onChange }: { view: SavedView; rows: ViewRow[]; definitions: Map<string, PropertyDefinition>; onChange: (row: ViewRow, key: string, value: unknown) => void }) {
   const first = view.query.sort?.[0]
   const [sort, setSort] = useState<{ key: string; desc: boolean }>(first ? { key: first.key, desc: first.desc ?? false } : { key: 'title', desc: false })
   const columns = tableColumns(view.query, rows, [...definitions.keys()])
   const sorted = sortRows(rows, sort.key, sort.desc)
+  // Grouped by a select property ("Clients", table grouped by client): a section per value.
+  const groupBy = view.query.group_by ? definitions.get(view.query.group_by) : undefined
+  const groups: [string, ViewRow[]][] = groupBy
+    ? groupRows(sorted, groupBy.key, groupBy.options.map((o) => o.slug))
+    : [['', sorted]]
   const header = (key: string, label: string) => (
     <th key={key} scope="col" className="px-3 py-2 text-left font-medium" aria-sort={sort.key === key ? (sort.desc ? 'descending' : 'ascending') : 'none'}>
       <button type="button" className="inline-flex items-center gap-1 hover:text-text" onClick={() => setSort({ key, desc: sort.key === key ? !sort.desc : false })}>
@@ -114,9 +100,17 @@ function TableLayout({ view, rows, definitions, onChange }: { view: SavedView; r
             {header('updated_at', t('Changed'))}
           </tr>
         </thead>
-        <tbody>
-          {sorted.map((row) => (
-            <tr key={row.id} className="border-t border-border first:border-t-0 hover:bg-surface-hover">
+        {groups.map(([value, items]) => (
+          <tbody key={value || '-'}>
+            {groupBy && (
+              <tr className="border-t border-border bg-surface-2">
+                <th scope="rowgroup" colSpan={columns.length + 2} className="px-3 py-1.5 text-left text-[12px] font-semibold text-muted">
+                  {value ? valueLabel(groupBy, value) : t('No {property}', { property: groupBy.label })} <span className="text-subtle">{items.length}</span>
+                </th>
+              </tr>
+            )}
+            {items.map((row) => (
+            <tr key={row.id} className="border-t border-border hover:bg-surface-hover">
               <td className="px-3 py-1.5"><Link to={row.url} className="font-medium hover:underline">{row.title}</Link></td>
               {columns.map((key) => (
                 <td key={key} className="px-1.5 py-1">
@@ -125,8 +119,9 @@ function TableLayout({ view, rows, definitions, onChange }: { view: SavedView; r
               ))}
               <td className="whitespace-nowrap px-3 py-1.5 text-[12px] text-subtle">{formatWhen(row.updated_at)}</td>
             </tr>
-          ))}
-        </tbody>
+            ))}
+          </tbody>
+        ))}
       </table>
     </div>
   )
@@ -213,7 +208,7 @@ export function ViewPage() {
     }
   }
   const list = rows.data?.rows ?? []
-  const onChange = (row: ViewRow, key: string, value: unknown) => void setProperty(row, key, value)
+  const onChange = (row: ViewRow, key: string, value: unknown) => setProperty.mutate({ row, key, value }, { onError: fail })
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4 md:px-8 md:pb-8 md:pt-2">
@@ -231,6 +226,11 @@ export function ViewPage() {
         } />
       <div className="flex flex-wrap items-center gap-2">
         <Segmented label={t('Layout')} size="sm" value={v.layout} onChange={setLayout} options={LAYOUTS.map((l) => ({ value: l.value, label: t(l.label) }))} />
+        {v.layout !== 'list' && (
+          <Select variant="pill" aria-label={t('Group by')} value={v.query.group_by ?? ''}
+            onValueChange={(key) => update.mutate({ id: v.id, body: { query: { ...v.query, group_by: key || null } } }, { onError: fail, onSuccess: () => void view.refetch() })}
+            options={[{ value: '', label: t('Not grouped') }, ...[...definitions.values()].filter((d) => d.type === 'select' || d.type === 'multi_select').map((d) => ({ value: d.key, label: t('Grouped by {property}', { property: d.label }) }))]} />
+        )}
         <button type="button" onClick={() => void editFilters()} className={cn('min-w-0 flex-1 truncate rounded-control px-2 py-1 text-left text-[12.5px] text-muted hover:bg-surface-hover')}>
           {text ? <code>{text}</code> : t('Every document')}
         </button>

@@ -55,3 +55,21 @@ export function useDeleteView() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: viewsKey }),
   })
 }
+
+/** Changes one property of a row's document (the server rewrites its front matter, with a revision). */
+export function useSetRowProperty(viewId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { row: ViewRow; key: string; value: unknown }) =>
+      unwrap(
+        await api.PUT('/api/documents/{document_id}/properties', {
+          params: { path: { document_id: v.row.id } },
+          body: { set: { [v.key]: v.value === '' ? null : v.value }, base_hash: null, create_values: false },
+        }),
+      ),
+    onSuccess: (_doc, v) => {
+      void qc.invalidateQueries({ queryKey: viewRowsKey(viewId) })
+      void qc.invalidateQueries({ queryKey: ['document', v.row.id] })
+    },
+  })
+}
