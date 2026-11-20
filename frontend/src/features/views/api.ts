@@ -56,20 +56,33 @@ export function useDeleteView() {
   })
 }
 
-/** Changes one property of a row's document (the server rewrites its front matter, with a revision). */
+/**
+ * Changes one property of a row's item: a document's front matter (rewritten by the
+ * server, with a revision), or a task's or event's values.
+ */
 export function useSetRowProperty(viewId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (v: { row: ViewRow; key: string; value: unknown }) =>
-      unwrap(
-        await api.PUT('/api/documents/{document_id}/properties', {
-          params: { path: { document_id: v.row.id } },
-          body: { set: { [v.key]: v.value === '' ? null : v.value }, base_hash: null, create_values: false },
-        }),
-      ),
-    onSuccess: (_doc, v) => {
+    mutationFn: async (v: { row: ViewRow; key: string; value: unknown }) => {
+      const set = { [v.key]: v.value === '' ? null : v.value }
+      if (v.row.type === 'task') {
+        unwrap(await api.PATCH('/api/tasks/{task_id}', { params: { path: { task_id: v.row.id } }, body: { properties: set } }))
+      } else if (v.row.type === 'event') {
+        unwrap(await api.PUT('/api/calendar/events/{event_id}/properties', { params: { path: { event_id: v.row.id } }, body: { set } }))
+      } else {
+        unwrap(
+          await api.PUT('/api/documents/{document_id}/properties', {
+            params: { path: { document_id: v.row.id } },
+            body: { set, base_hash: null, create_values: false },
+          }),
+        )
+      }
+    },
+    onSuccess: (_done, v) => {
       void qc.invalidateQueries({ queryKey: viewRowsKey(viewId) })
-      void qc.invalidateQueries({ queryKey: ['document', v.row.id] })
+      if (v.row.type === 'document') void qc.invalidateQueries({ queryKey: ['document', v.row.id] })
+      if (v.row.type === 'task') void qc.invalidateQueries({ queryKey: ['tasks'] })
+      if (v.row.type === 'event') void qc.invalidateQueries({ queryKey: ['calendar'] })
     },
   })
 }

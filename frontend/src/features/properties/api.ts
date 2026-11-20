@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
+import { plural } from '@/lib/i18n'
 
 export type PropertyDefinition = Schemas['DefinitionOut']
 export type PropertyOption = Schemas['OptionOut']
@@ -18,10 +19,17 @@ export function useProperties() {
   })
 }
 
-/** The properties that can be used on a document in this project (global ones and the project's own). */
-export function propertiesFor(all: PropertyDefinition[], projectId: string | null): PropertyDefinition[] {
+/**
+ * The properties that can be used on a document (or a task, an event) in this project:
+ * global ones and the project's own.
+ */
+export function propertiesFor(
+  all: PropertyDefinition[],
+  projectId: string | null,
+  objectType: 'document' | 'task' | 'event' = 'document',
+): PropertyDefinition[] {
   return all.filter(
-    (p) => p.applies_to.includes('document') && (p.project_ids === null || (projectId !== null && p.project_ids.includes(projectId))),
+    (p) => p.applies_to.includes(objectType) && (p.project_ids === null || (projectId !== null && p.project_ids.includes(projectId))),
   )
 }
 
@@ -179,4 +187,80 @@ export function useDismissSuggestions() {
     mutationFn: async (ids: string[]) => unwrap(await api.POST('/api/properties/suggestions/dismiss', { body: { ids } })),
     onSuccess: done,
   })
+}
+
+/** What to send for a task or event: the values set, and null for each one taken away. */
+export function propertyChanges(before: Record<string, unknown>, after: Record<string, unknown>): Record<string, unknown> {
+  const changes: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(after)) {
+    if (JSON.stringify(before[key]) !== JSON.stringify(value)) changes[key] = value
+  }
+  for (const key of Object.keys(before)) if (!(key in after)) changes[key] = null
+  return changes
+}
+
+/**
+ * The values an item of `objectType` in this project can have, out of `values` (a new
+ * task from a document gets the document's properties that tasks can have).
+ */
+export function valuesFor(
+  all: PropertyDefinition[],
+  values: Record<string, unknown>,
+  projectId: string | null,
+  objectType: 'document' | 'task' | 'event',
+): Record<string, unknown> {
+  const allowed = new Set(propertiesFor(all, projectId, objectType).map((p) => p.key))
+  return Object.fromEntries(Object.entries(values).filter(([key]) => allowed.has(key)))
+}
+
+// -- tags that name a value of another property (a client's tag) -------------------------------
+
+export type TagSuggestion = Schemas['TagValueOut']
+export const tagSuggestionsKey = ['properties', 'tag-suggestions'] as const
+
+/** Tags that name a value of another property, offered to be turned into that value. */
+export function useTagSuggestions() {
+  return useQuery({
+    queryKey: tagSuggestionsKey,
+    staleTime: 60_000,
+    queryFn: async () => unwrap(await api.GET('/api/properties/tag-suggestions')),
+  })
+}
+
+function useTagsChanged() {
+  const qc = useQueryClient()
+  const done = useInvalidate()
+  return () => {
+    done()
+    void qc.invalidateQueries({ queryKey: tagSuggestionsKey })
+    void qc.invalidateQueries({ queryKey: ['tasks'] })
+    void qc.invalidateQueries({ queryKey: ['calendar'] })
+  }
+}
+
+export function useApplyTagSuggestion() {
+  const changed = useTagsChanged()
+  return useMutation({
+    mutationFn: async (s: Pick<TagSuggestion, 'tag' | 'key' | 'value'>) =>
+      unwrap(await api.POST('/api/properties/tag-suggestions/apply', { body: { tag: s.tag, key: s.key, value: s.value } })),
+    onSuccess: changed,
+  })
+}
+
+export function useDismissTagSuggestion() {
+  const changed = useTagsChanged()
+  return useMutation({
+    mutationFn: async (s: Pick<TagSuggestion, 'tag' | 'key' | 'value'>) =>
+      unwrap(await api.POST('/api/properties/tag-suggestions/dismiss', { body: { tag: s.tag, key: s.key, value: s.value } })),
+    onSuccess: changed,
+  })
+}
+
+/** "2 documents, 3 tasks" */
+export function itemsText(s: { documents: number; tasks: number; events: number }): string {
+  return [
+    s.documents ? plural(s.documents, '{n} document', '{n} documents') : '',
+    s.tasks ? plural(s.tasks, '{n} task', '{n} tasks') : '',
+    s.events ? plural(s.events, '{n} event', '{n} events') : '',
+  ].filter(Boolean).join(', ')
 }

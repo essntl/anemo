@@ -13,11 +13,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import current_actor
 from app.core.errors import AppError, Conflict, NotFound
+from app.core.ids import uuid7
 from app.events import bus
 from app.features.calendar.models import CalendarEvent
 from app.features.focus.models import FocusSession
+from app.features.links import index as links_index
+from app.features.links import targets
 from app.features.links.models import TaskFile
 from app.features.notifications import service as notifications
+from app.features.properties import items as item_properties
+from app.features.properties import service as properties
+from app.features.properties.filters import property_conditions
 from app.features.provenance import sources
 from app.features.provenance.schemas import SourceIn
 from app.features.settings.service import user_timezone
@@ -58,9 +64,15 @@ async def list_tasks(
     parent_id: uuid.UUID | None = None,
     source: str | None = None,
     external_key: str | None = None,
+    property_filter: dict[str, Any] | None = None,
     limit: int = 500,
 ) -> list[Task]:
+    """`property_filter`: the shape of properties/filters.py (labels are turned into
+    slugs; an unknown key or value is AppError code property_invalid)."""
     stmt = select(Task)
+    if property_filter:
+        checked = await properties.check_filter(db, property_filter)
+        stmt = stmt.where(*property_conditions(Task.properties, checked))
     if source:
         stmt = stmt.where(Task.source == source.strip().lower())
     if external_key:
@@ -173,12 +185,19 @@ async def create_task(
     created_by: str = "user",
     run_id: uuid.UUID | None = None,
     source: SourceIn | None = None,
+    create_values: bool = False,
 ) -> Task:
     """`source`: where a synced task comes from. A key that is taken (by a task, or one
-    in the trash) creates nothing: ExternalKeyTaken."""
+    in the trash) creates nothing: ExternalKeyTaken.
+
+    `properties` are validated (AppError code property_invalid; `create_values` allows
+    new values of a closed list); a `tags` property joins the `tags`. `links`:
+    references of items to link it to (each must exist)."""
     fields = dict(fields)
     blocked_by = fields.pop("blocked_by", None) or []
     fields.pop("subtasks", None)
+    values = fields.pop("properties", None) or {}
+    links = [targets.as_ref(r) for r in fields.pop("links", None) or []]
     fields["checklist"] = _checklist(fields.get("checklist"))
     if fields.get("project_id"):
         await get_project(db, fields["project_id"])
@@ -186,6 +205,8 @@ async def create_task(
     await sources.check_key(db, "task", Task, key)
     task = Task(**fields, created_by=created_by, run_id=run_id)
     sources.record_created(task, source)
+    await item_properties.store_tags(db, task, list(task.tags or []))
+    await item_properties.set_properties(db, task, "task", values, create_values=create_values)
     await _check_parent(db, task, task.parent_id, new=True)
     task.sort_order = await _next_order(db, task.status)
     if task.status == "done":
@@ -201,6 +222,10 @@ async def create_task(
         raise
     if blocked_by:
         await _set_blockers(db, task, blocked_by)
+    if links:
+        await targets.check_linkable(db, links)
+        await links_index.add_explicit(db, "task", task.id, links)
+    await links_index.refresh_inline(db, "task", task.id, task.description)
     await db.commit()
     await db.refresh(task)
     await notify()
@@ -208,20 +233,65 @@ async def create_task(
 
 
 async def update_task(
-    db: AsyncSession, task: Task, changes: dict[str, Any], *, source_url: str | None = None
+    db: AsyncSession,
+    task: Task,
+    changes: dict[str, Any],
+    *,
+    source_url: str | None = None,
+    links_add: list[str] | None = None,
+    links_remove: list[str] | None = None,
+    create_values: bool = False,
+    dropped: list[str] | None = None,
 ) -> Task:
     """`changes` holds only the fields to change (None clears a field).
 
     `blocked_by` replaces what the task waits on; `subtasks` ("finish" or "keep") says
     what happens to open subtasks when the task is finished (without it that is refused).
     `source_url`: a new link to the original of a synced task (its key can't change).
+    `properties`: values to set (None removes one), validated as on create.
+    `links_add` / `links_remove`: references of items to link it to, or no longer.
+    Moving it to another project drops the values not allowed there; their keys are
+    added to `dropped`.
     """
     changes = dict(changes)
     choice = changes.pop("subtasks", None)
     blocked_by = changes.pop("blocked_by", None)
+    values = changes.pop("properties", None)
     if "checklist" in changes:
         changes["checklist"] = _checklist(changes["checklist"])
     changed = any(getattr(task, key) != value for key, value in changes.items())
+    before = task.project_id, list(task.tags or []), dict(task.properties or {})
+    if "tags" in changes:
+        await item_properties.store_tags(db, task, list(changes.pop("tags") or []))
+    moved = "project_id" in changes and changes["project_id"] != task.project_id
+    if values is not None or moved:
+        if changes.get("project_id"):
+            await get_project(db, changes["project_id"])
+        task.project_id = changes.get("project_id", task.project_id)
+        try:
+            changed = (
+                await item_properties.set_properties(
+                    db,
+                    task,
+                    "task",
+                    values or {},
+                    create_values=create_values,
+                    merge=True,
+                    project_changed=moved,
+                    dropped=dropped,
+                )
+                or changed
+            )
+        except AppError:
+            task.project_id, task.tags, task.properties = before
+            raise
+    if links_add or links_remove:
+        changed = (
+            await links_index.change_explicit(
+                db, "task", task.id, links_add or [], links_remove or []
+            )
+            or changed
+        )
     if blocked_by is not None:
         current = (await blocked_by_map(db, [task.id])).get(task.id, [])
         changed = changed or set(blocked_by) != set(current)  # the order is not a change
@@ -253,6 +323,8 @@ async def update_task(
             ready += await _finish(db, sub)
     if blocked_by is not None:
         await _set_blockers(db, task, blocked_by)
+    if "description" in changes:
+        await links_index.refresh_inline(db, "task", task.id, task.description)
     await db.commit()
     await db.refresh(task)
     await _tell_ready(db, ready)
@@ -419,28 +491,33 @@ async def _repeat(db: AsyncSession, done: Task) -> None:
     today = datetime.now(ZoneInfo(await user_timezone(db))).date()
     due = next_due(done.rrule, done.due_date, today)
     if due is not None:
-        db.add(
-            Task(
-                title=done.title,
-                description=done.description,
-                priority=done.priority,
-                due_date=due,
-                due_time=done.due_time,
-                remind_minutes=done.remind_minutes,
-                rrule=done.rrule,
-                tags=list(done.tags),
-                project_id=done.project_id,
-                parent_id=done.parent_id,
-                # The same steps, all to do again.
-                checklist=[{**item, "done": False} for item in done.checklist],
-                status="todo",
-                sort_order=await _next_order(db, "todo"),
-                created_by=done.created_by,
-                # The same series, made now: a synced task's key stays with the one done.
-                created_by_ref=done.created_by_ref,
-                updated_by_ref=current_actor().ref,
-            )
+        following = Task(
+            id=uuid7(),
+            title=done.title,
+            description=done.description,
+            priority=done.priority,
+            due_date=due,
+            due_time=done.due_time,
+            remind_minutes=done.remind_minutes,
+            rrule=done.rrule,
+            tags=list(done.tags),
+            properties=dict(done.properties or {}),
+            project_id=done.project_id,
+            parent_id=done.parent_id,
+            # The same steps, all to do again.
+            checklist=[{**item, "done": False} for item in done.checklist],
+            status="todo",
+            sort_order=await _next_order(db, "todo"),
+            created_by=done.created_by,
+            # The same series, made now: a synced task's key stays with the one done.
+            created_by_ref=done.created_by_ref,
+            updated_by_ref=current_actor().ref,
         )
+        db.add(following)
+        await db.flush()
+        # It links to what the finished one links to.
+        await links_index.copy_explicit(db, "task", done.id, following.id)
+        await links_index.refresh_inline(db, "task", following.id, following.description)
     # The finished one no longer repeats, so reopening and finishing it again does not
     # make a second copy.
     done.rrule = None
@@ -451,12 +528,15 @@ async def delete_task(db: AsyncSession, task: Task, *, deleted_by: str = "user")
     ordinary tasks; what waited on it no longer does (and a blocked task with nothing
     left to wait on moves back to "to do")."""
     waiting = await dependents(db, task.id)
+    payload = await _snapshot(db, task)
+    # Its own links go with it (and come back on restore); links to it stay.
+    payload["links"] = await links_index.drop_outgoing(db, "task", task.id)
     item = trash.put(
         db,
         "task",
         task.id,
         task.title,
-        await _snapshot(db, task),
+        payload,
         deleted_by,
         external_key=task.external_key,
     )
@@ -527,8 +607,12 @@ async def restore_task(db: AsyncSession, item: TrashedItem) -> Task:
     task = Task(**values)
     task.updated_by_ref = current_actor().ref  # putting it back is a change
     task.sort_order = await _next_order(db, task.status)
+    # Its tags property follows its tags (a copy from before properties has none).
+    await item_properties.store_tags(db, task, list(task.tags or []))
     db.add(task)
     await db.flush()
+    await links_index.restore_explicit(db, "task", task.id, data.get("links"))
+    await links_index.refresh_inline(db, "task", task.id, task.description)
 
     children = _uuids(data.get("subtasks"))
     if children and task.parent_id is None:

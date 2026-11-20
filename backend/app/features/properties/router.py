@@ -1,13 +1,15 @@
 """Property definitions and their values (Settings > Properties)."""
 
 import uuid
+from collections import Counter
 
 from fastapi import APIRouter
 
 from app.api.deps import Db
 from app.features.documents import properties as doc_properties
 from app.features.documents.models import Document
-from app.features.properties import service
+from app.features.properties import items as item_properties
+from app.features.properties import service, tag_values
 from app.features.properties.models import PropertyOption
 from app.features.properties.schemas import (
     AppliedOut,
@@ -23,6 +25,9 @@ from app.features.properties.schemas import (
     RewriteOut,
     SuggestionIds,
     SuggestionOut,
+    TagValueAppliedOut,
+    TagValueIn,
+    TagValueOut,
     ValidateIn,
     ValidateOut,
 )
@@ -59,9 +64,14 @@ def _out(prop: service.Prop, counts: dict[str, int], items: int) -> DefinitionOu
 
 
 async def _all(db: Db) -> list[DefinitionOut]:
+    """Every property; the counts are of documents, tasks and events together."""
     props = await service.load(db)
     counts = await service.value_counts(db, Document.properties)
+    for key, counter in (await item_properties.value_counts(db)).items():
+        counts.setdefault(key, Counter()).update(counter)
     items = await service.key_counts(db, Document.properties)
+    for key, n in (await item_properties.key_counts(db)).items():
+        items[key] = items.get(key, 0) + n
     out = [_out(p, dict(counts.get(key, {})), items.get(key, 0)) for key, p in props.items()]
     await db.commit()  # the built-in definitions, on first use
     return out
@@ -73,7 +83,8 @@ async def _one(db: Db, definition_id: uuid.UUID) -> DefinitionOut:
 
 @router.get("", response_model=list[DefinitionOut])
 async def list_properties(db: Db) -> list[DefinitionOut]:
-    """Every property with its values and how many documents use each."""
+    """Every property with its values and how many documents, tasks and events use
+    each."""
     return await _all(db)
 
 
@@ -109,8 +120,12 @@ async def update_property(definition_id: uuid.UUID, body: DefinitionPatch, db: D
 
 @router.delete("/{definition_id}", status_code=204)
 async def delete_property(definition_id: uuid.UUID, db: Db) -> None:
-    """Files keep what they say about it; it is no longer indexed or offered."""
-    await service.delete_definition(db, await service.get_definition(db, definition_id))
+    """Files keep what they say about it; it is no longer indexed or offered. Tasks and
+    events lose their values of it."""
+    definition = await service.get_definition(db, definition_id)
+    if not definition.builtin:
+        await item_properties.forget_key(db, definition.key)
+    await service.delete_definition(db, definition)
 
 
 @router.post("/{definition_id}/options", response_model=OptionOut, status_code=201)
@@ -176,7 +191,11 @@ async def merge_option(
 
 def _rewritten(r: doc_properties.Rewritten) -> RewriteOut:
     return RewriteOut(
-        documents=r.documents, views=r.views, folder_defaults=r.folder_defaults, failed=r.failed
+        documents=r.documents,
+        views=r.views,
+        folder_defaults=r.folder_defaults,
+        failed=r.failed,
+        items=r.items,
     )
 
 
@@ -222,3 +241,25 @@ async def apply_suggestions(body: SuggestionIds, db: Db) -> AppliedOut:
 @router.post("/suggestions/dismiss", status_code=204)
 async def dismiss_suggestions(body: SuggestionIds, db: Db) -> None:
     await doc_properties.dismiss_suggestions(db, body.ids)
+
+
+@router.get("/tag-suggestions", response_model=list[TagValueOut])
+async def tag_suggestions(db: Db) -> list[TagValueOut]:
+    """Tags that name a value of another property (a client's tag), offered to be turned
+    into that value. Worked out from the data; dismissed ones are left out."""
+    found = await tag_values.suggestions(db)
+    await db.commit()  # the built-in properties, on first use
+    return [TagValueOut(**vars(s)) for s in found]
+
+
+@router.post("/tag-suggestions/apply", response_model=TagValueAppliedOut)
+async def apply_tag_suggestion(body: TagValueIn, db: Db) -> TagValueAppliedOut:
+    """Give every item with the tag the value, and remove the tag (documents get a
+    revision). Items that can't take it are left alone and listed."""
+    done = await tag_values.apply(db, body.tag, body.key, body.value)
+    return TagValueAppliedOut(**vars(done))
+
+
+@router.post("/tag-suggestions/dismiss", status_code=204)
+async def dismiss_tag_suggestion(body: TagValueIn, db: Db) -> None:
+    await tag_values.dismiss(db, body.tag, body.key, body.value)

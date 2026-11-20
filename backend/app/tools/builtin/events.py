@@ -4,7 +4,8 @@ Looking is always allowed; changes need the "Manage calendar" permission
 (calendar.write). Deleting a whole event (or series) counts as dangerous.
 
 Times without a UTC offset are taken as local time in the user's time zone
-(Settings > General).
+(Settings > General). Events have properties (client, tags, ...; the same ones as
+documents and tasks) and links to documents, tasks, other events and chats.
 """
 
 import uuid
@@ -16,7 +17,7 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
-from app.core.refs import ref_url
+from app.core.refs import ObjectRef, ref_url
 from app.features.calendar import recurrence, service
 from app.features.calendar.models import CalendarEvent
 from app.features.calendar.schemas import EventIn, OccurrenceIn
@@ -27,6 +28,7 @@ from app.features.tasks.models import Project, Task
 from app.features.trash.models import TrashedItem
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin import linking
 from app.tools.builtin import sources as src
 
 
@@ -58,6 +60,8 @@ def _describe(occ: service.Occurrence, tz: str) -> str:
         extras.append(
             f"repeats: {occ.event.rrule}; this occurrence: {occ.original_start.isoformat()}"
         )
+    if props := linking.values_text(occ.event.properties):
+        extras.append(props)
     extras += src.facts(occ.event)
     tail = f" ({'; '.join(extras)})" if extras else ""
     return f"[{occ.event.id}] {when}  {occ.title}{tail}"
@@ -88,20 +92,25 @@ class ListEventsInput(BaseModel):
     query: str | None = Field(
         None, max_length=200, description="Words in the title, notes or location"
     )
+    properties: dict[str, Any] | None = Field(
+        None, max_length=30, description=linking.PROPERTY_FILTER
+    )
 
 
 class ListEvents(Tool):
     name = "list_events"
     description = (
         "List the user's calendar events in a range of days (repeating events included). "
-        "With source, external_key or query the range is optional: without one, matching "
-        "events are listed whenever they are. get_event shows one in full."
+        "With source, external_key, query or properties the range is optional: without one, "
+        "matching events are listed whenever they are. get_event shows one in full."
     )
     capability = "calendar.read"
     Input = ListEventsInput
 
     async def run(self, args: ListEventsInput, ctx: ToolContext) -> ToolResult:
-        filtered = any(v and v.strip() for v in (args.source, args.external_key, args.query))
+        filtered = bool(args.properties) or any(
+            v and v.strip() for v in (args.source, args.external_key, args.query)
+        )
         if args.start is None and not filtered:
             return ToolResult(
                 content="Give a start day, or filter by source, external_key or query.",
@@ -111,13 +120,17 @@ class ListEvents(Tool):
             tz = await _user_tz(db)
             cut = False
             if args.start is None:
-                events = await service.find_events(
-                    db,
-                    source=args.source,
-                    external_key=args.external_key,
-                    query=args.query,
-                    limit=FIND_LIMIT + 1,
-                )
+                try:
+                    events = await service.find_events(
+                        db,
+                        source=args.source,
+                        external_key=args.external_key,
+                        query=args.query,
+                        property_filter=args.properties,
+                        limit=FIND_LIMIT + 1,
+                    )
+                except AppError as exc:
+                    return ToolResult(content=exc.message, is_error=True)
                 cut = len(events) > FIND_LIMIT
                 found = [service.base_occurrence(e, e.start_at) for e in events[:FIND_LIMIT]]
                 span = ""
@@ -132,6 +145,7 @@ class ListEvents(Tool):
                         source=args.source,
                         external_key=args.external_key,
                         query=args.query,
+                        property_filter=args.properties,
                     )
                 except AppError as exc:
                     return ToolResult(content=exc.message, is_error=True)
@@ -161,9 +175,10 @@ class GetEventInput(BaseModel):
 class GetEvent(Tool):
     name = "get_event"
     description = (
-        "One event in full: its notes, reminder, project and task, where a synced event "
-        "came from (source, external_key, link, last sync, whether the user changed it by "
-        "hand) and who created and last changed it."
+        "One event in full: its notes, reminder, project and task, its properties, its "
+        "links and what links to it, where a synced event came from (source, external_key, "
+        "link, last sync, whether the user changed it by hand) and who created and last "
+        "changed it."
     )
     capability = "calendar.read"
     Input = GetEventInput
@@ -203,7 +218,11 @@ class GetEvent(Tool):
             task = await db.get(Task, event.task_id) if event.task_id else None
             if task is not None:
                 facts.append(f"for the task [{task.id}] {task.title}")
+            if props := linking.values_text(event.properties):
+                facts.append(f"properties: {props}")
             lines.append("; ".join(facts) + ".")
+            if linked := await linking.links_text(db, ObjectRef("event", event.id), ctx):
+                lines.append(linked)
             if details := src.details(event):
                 lines.append(details)
             if made := await provenance.summary(db, event.created_by_ref, event.updated_by_ref):
@@ -227,6 +246,11 @@ class CreateEventInput(BaseModel):
     source: str | None = Field(None, max_length=40, description=src.SOURCE)
     external_key: str | None = Field(None, max_length=200, description=src.EXTERNAL_KEY)
     source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
+    properties: dict[str, Any] = Field(
+        default_factory=dict, max_length=30, description=linking.PROPERTIES
+    )
+    links: list[str] = Field(default_factory=list, max_length=50, description=linking.LINKS)
+    create_value: bool = Field(False, description=linking.CREATE_VALUE)
 
 
 def _event_in(args: Any, tz: str) -> EventIn:
@@ -251,16 +275,20 @@ def _event_in(args: Any, tz: str) -> EventIn:
 
 class CreateEvent(Tool):
     name = "create_event"
-    description = "Add an event to the user's calendar."
+    description = (
+        "Add an event to the user's calendar. Properties (client, tags, ...) say what it is about."
+    )
     capability = "calendar.write"
     Input = CreateEventInput
     idempotent = False
 
     def actions(self, args: CreateEventInput, ctx: ToolContext) -> list[Action]:
         when = args.start.strftime("%Y-%m-%d" if args.all_day else "%Y-%m-%d %H:%M")
-        return [
-            Action(capability=self.capability, summary=f"Add event: {args.title[:120]} ({when})")
-        ]
+        action = Action(
+            capability=self.capability, summary=f"Add event: {args.title[:120]} ({when})"
+        )
+        action = linking.with_links(action, args.links)
+        return [linking.create_value_note(action, args.create_value)]
 
     async def run(self, args: CreateEventInput, ctx: ToolContext) -> ToolResult:
         source = src.source_in(args.source, args.external_key, args.source_url)
@@ -270,9 +298,19 @@ class CreateEvent(Tool):
             tz = await _user_tz(db)
             try:
                 # Filed under the project of the chat this run belongs to.
-                body = _event_in(args, tz).model_copy(update={"project_id": ctx.project_id})
+                if hidden := await linking.hidden_document(db, ctx, args.links):
+                    return ToolResult(content=hidden, is_error=True)
+                body = _event_in(args, tz).model_copy(
+                    update={"project_id": ctx.project_id, "properties": args.properties}
+                )
                 event = await service.create_event(
-                    db, body, created_by="agent", run_id=ctx.run_id, source=source
+                    db,
+                    body,
+                    created_by="agent",
+                    run_id=ctx.run_id,
+                    source=source,
+                    links=args.links,
+                    create_values=args.create_value,
                 )
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
@@ -286,9 +324,12 @@ class CreateEvent(Tool):
                     exc, line=existing, update_tool="update_event", trash_place="Calendar > Trash"
                 )
                 return ToolResult(content=text, data={"existing": exc.details})
+            except AppError as exc:
+                return ToolResult(content=exc.message, is_error=True)
             line = _describe(service.base_occurrence(event, event.start_at), tz)
         return ToolResult(
-            content=f"Added: {line}", data={"event": {"id": str(event.id), "title": event.title}}
+            content=f"Added: {line} (reference {ref_url('event', event.id)})",
+            data={"event": {"id": str(event.id), "title": event.title}},
         )
 
 
@@ -305,6 +346,14 @@ class UpdateEventInput(BaseModel):
     )
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
     source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
+    properties: dict[str, Any] | None = Field(
+        None, max_length=30, description=linking.PROPERTIES_CHANGE
+    )
+    links_add: list[str] = Field(default_factory=list, max_length=50, description=linking.LINKS_ADD)
+    links_remove: list[str] = Field(
+        default_factory=list, max_length=50, description=linking.LINKS_REMOVE
+    )
+    create_value: bool = Field(False, description=linking.CREATE_VALUE)
 
 
 class UpdateEvent(Tool):
@@ -318,9 +367,11 @@ class UpdateEvent(Tool):
     idempotent = False
 
     def actions(self, args: UpdateEventInput, ctx: ToolContext) -> list[Action]:
-        return [
-            Action(capability=self.capability, risk="moderate", summary="Change a calendar event")
-        ]
+        action = Action(
+            capability=self.capability, risk="moderate", summary="Change a calendar event"
+        )
+        action = linking.with_links(action, args.links_add, args.links_remove)
+        return [linking.create_value_note(action, args.create_value)]
 
     async def run(self, args: UpdateEventInput, ctx: ToolContext) -> ToolResult:
         event_id = _id(args.id)
@@ -362,17 +413,31 @@ class UpdateEvent(Tool):
                         "color": event.color,
                         "task_id": event.task_id,
                         "project_id": event.project_id,
+                        "properties": args.properties,
                     }
                 )
                 source = src.source_in(None, None, args.source_url)
                 if isinstance(source, str):
                     return ToolResult(content=f"Invalid event: {source}", is_error=True)
-                event = await service.update_event(db, event, body, source_url=source.source_url)
+                if hidden := await linking.hidden_document(db, ctx, args.links_add):
+                    return ToolResult(content=hidden, is_error=True)
+                dropped: list[str] = []
+                event = await service.update_event(
+                    db,
+                    event,
+                    body,
+                    source_url=source.source_url,
+                    links_add=args.links_add,
+                    links_remove=args.links_remove,
+                    create_values=args.create_value,
+                    dropped=dropped,
+                )
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)
             line = _describe(service.base_occurrence(event, event.start_at), tz)
+            line += linking.dropped_note(dropped)
         return ToolResult(
             content=f"Updated: {line}", data={"event": {"id": str(event.id), "title": event.title}}
         )

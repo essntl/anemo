@@ -10,7 +10,13 @@ from app.api.deps import Db
 from app.core.errors import AppError
 from app.features.calendar import service
 from app.features.calendar.models import CalendarEvent
-from app.features.calendar.schemas import EventIn, EventOut, OccurrenceIn, OccurrenceOut
+from app.features.calendar.schemas import (
+    EventIn,
+    EventOut,
+    OccurrenceIn,
+    OccurrenceOut,
+    PropertiesIn,
+)
 from app.features.provenance import service as provenance
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -55,7 +61,16 @@ async def get_event(event_id: uuid.UUID, db: Db) -> EventOut:
 async def update_event(event_id: uuid.UUID, body: EventIn, db: Db) -> EventOut:
     """Change the event (for a repeating event: the whole series)."""
     event = await service.get_event(db, event_id)
-    return await _event(db, await service.update_event(db, event, body))
+    dropped: list[str] = []
+    out = await _event(db, await service.update_event(db, event, body, dropped=dropped))
+    return out.model_copy(update={"dropped_properties": dropped})
+
+
+@router.put("/events/{event_id}/properties", response_model=EventOut)
+async def set_properties(event_id: uuid.UUID, body: PropertiesIn, db: Db) -> EventOut:
+    """Change some property values of an event (for a repeating event: of the series)."""
+    event = await service.get_event(db, event_id)
+    return await _event(db, await service.set_properties(db, event, body.set))
 
 
 @router.post("/events/{event_id}/detach-source", response_model=EventOut)

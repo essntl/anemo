@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { AlertTriangle, ArrowLeft, Check, Code2, Download, Folder, FolderInput, FolderPlus, History, Link2, Loader2, MessageSquare, PanelLeft, PanelRight, Pencil, Trash2, Type } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, Code2, Download, Folder, FolderInput, FolderPlus, History, Link2, ListPlus, Loader2, MessageSquare, PanelLeft, PanelRight, Pencil, Trash2, Type } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
@@ -39,6 +39,8 @@ import { Lingering } from '@/components/ui/Lingering'
 import { DocumentBacklinks } from '@/features/links/DocumentBacklinks'
 import { useProperties, valueLabel } from '@/features/properties/api'
 import { HubList } from './HubList'
+import { NewTaskDialog } from '@/features/links/NewTaskDialog'
+import { documentLink } from '@/lib/appLinks'
 import { PropertiesBar } from './PropertiesBar'
 
 const STATUS: Record<SaveState, string> = {
@@ -231,6 +233,8 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
   const actionError = move.error ?? remove.error
   // A document in a project's folder: its chat is made in that project.
   const project = (projects.data ?? []).find((p) => !p.archived && (server.folder === p.slug || server.folder.startsWith(`${p.slug}/`)))
+  // "New task": a task with the document's properties and a link back.
+  const [newTask, setNewTask] = useState(false)
 
   const heading = (
     <>
@@ -279,6 +283,7 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
         </Button>
         <ActionMenu actions={[
           { label: t('History'), icon: <History />, onSelect: () => setHistoryOpen(true) },
+          { label: t('New task'), icon: <ListPlus />, onSelect: () => setNewTask(true) },
           { label: t('Ask the assistant'), icon: <MessageSquare />, onSelect: askAi },
           { label: mode === 'rich' ? t('Edit as Markdown') : t('Edit as rich text'), icon: mode === 'rich' ? <Code2 /> : <Type />,
             onSelect: () => (mode === 'rich' ? switchMode('source') : richIsLossy ? toast({ message: t('This document uses HTML or footnotes, which only the Markdown editor keeps.') }) : switchMode('rich')) },
@@ -338,6 +343,12 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
 
       <Lingering value={historyOpen}>
         {() => <RevisionsDialog documentId={doc.id} unsaved={busy} onClose={() => setHistoryOpen(false)} />}
+      </Lingering>
+      <Lingering value={newTask}>
+        {() => (
+          <NewTaskDialog from={{ ref: documentLink(doc.id), title: server.title }} projectId={project?.id ?? null}
+            properties={server.properties ?? {}} onClose={() => setNewTask(false)} />
+        )}
       </Lingering>
     </div>
   )

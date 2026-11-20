@@ -373,12 +373,18 @@ class HubSection(BaseModel):
 @router.get("/{document_id}/hub", response_model=list[HubSection])
 async def hub(document_id: uuid.UUID, db: Db) -> list[HubSection]:
     """When the document is the hub page of property values (a client's page): every
-    item with each value."""
+    document, task and event with each value (the UI groups them by type; what links to
+    the hub itself comes from its backlinks)."""
     doc = await service.get(db, document_id)
     out = []
     for prop, option in await properties.hub_values(db, doc.id):
         rows, truncated = await views.rows(
-            db, ViewQuery(properties={prop.key: option.slug}, include_archived=True)
+            db,
+            ViewQuery(
+                types=["document", "task", "event"],
+                properties={prop.key: option.slug},
+                include_archived=True,
+            ),
         )
         out.append(
             HubSection(

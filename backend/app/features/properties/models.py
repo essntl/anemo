@@ -64,3 +64,18 @@ class PropertySuggestion(Base, IdMixin):
     properties: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # key -> value
     actor_ref: Mapped[str] = mapped_column(String(ACTOR_REF_LENGTH))  # who suggested it
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TagValueDismissal(Base, IdMixin):
+    """A suggestion the user dismissed: turning the tag `tag` into the value `value` of
+    the property `key` (a tag that names a client, `ludmyla-doula` -> client). Such
+    suggestions are worked out from the data when asked for (properties/tag_values.py);
+    only the dismissed ones are stored, so they aren't offered again."""
+
+    __tablename__ = "tag_value_dismissals"
+    __table_args__ = (UniqueConstraint("tag", "key", "value"),)
+
+    tag: Mapped[str] = mapped_column(String(80))
+    key: Mapped[str] = mapped_column(String(60))
+    value: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

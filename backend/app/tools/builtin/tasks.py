@@ -4,7 +4,8 @@ Looking is always allowed; changes need the "Manage tasks" permission
 (tasks.write). Deleting counts as dangerous, so the default level asks first; a
 deleted task goes to the trash (features/trash), where only the user can restore it.
 Tasks can have a checklist, subtasks (one level deep) and tasks they wait on
-("blocked by").
+("blocked by"), properties (client, tags, ...; features/properties: the same ones as
+documents) and links to documents, events, other tasks and chats (features/links).
 """
 
 import uuid
@@ -16,6 +17,7 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
+from app.core.refs import ObjectRef
 from app.features.links import service as links
 from app.features.projects import service as projects
 from app.features.provenance import service as provenance
@@ -34,6 +36,7 @@ from app.features.tasks.schemas import (
 )
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin import linking
 from app.tools.builtin import sources as src
 from app.tools.builtin.workspace import path_action
 
@@ -58,6 +61,8 @@ def task_line(task: Task, projects: dict[uuid.UUID, str], waits_on: int = 0) -> 
         facts.append(f"repeats {task.rrule}")
     if task.tags:
         facts.append("tags " + ", ".join(task.tags))
+    if props := linking.values_text(task.properties, without=("tags",)):
+        facts.append(props)
     if task.parent_id:
         facts.append(f"subtask of [{task.parent_id}]")
     if task.checklist:
@@ -127,6 +132,9 @@ class ListTasksInput(BaseModel):
         max_length=200,
         description=src.LIST_EXTERNAL_KEY + " (whatever its status, unless status is given)",
     )
+    properties: dict[str, Any] | None = Field(
+        None, max_length=30, description=linking.PROPERTY_FILTER
+    )
 
 
 class ListTasks(Tool):
@@ -157,17 +165,21 @@ class ListTasks(Tool):
                 return ToolResult(content=f"No task with id {args.parent_id}.", is_error=True)
             # A lookup by key finds the task whether it is open or not.
             key = args.external_key.strip() if args.external_key else None
-            tasks = await service.list_tasks(
-                db,
-                status=args.status or ("all" if key else "open"),
-                project_id=project_id,
-                q=args.query,
-                due_to=args.due_before,
-                parent_id=parent_id,
-                source=args.source,
-                external_key=key,
-                limit=200,
-            )
+            try:
+                tasks = await service.list_tasks(
+                    db,
+                    status=args.status or ("all" if key else "open"),
+                    project_id=project_id,
+                    q=args.query,
+                    due_to=args.due_before,
+                    parent_id=parent_id,
+                    source=args.source,
+                    external_key=key,
+                    property_filter=args.properties,
+                    limit=200,
+                )
+            except AppError as exc:
+                return ToolResult(content=exc.message, is_error=True)
             waits = await _waits_on(db, tasks)
             trashed = await src.in_trash(db, "task", key) if key and not tasks else ""
         if not tasks:
@@ -186,8 +198,8 @@ class GetTask(Tool):
     name = "get_task"
     description = (
         "One task in full: its notes, checklist (with item ids), subtasks, the tasks it "
-        "waits on (blocked by) and the tasks that wait on it, where a synced task came from "
-        "and who created and last changed it."
+        "waits on (blocked by) and the tasks that wait on it, its properties, its links and "
+        "what links to it, where a synced task came from and who created and last changed it."
     )
     capability = "tasks.read"
     Input = GetTaskInput
@@ -225,6 +237,13 @@ class GetTask(Tool):
                     lines.append(
                         f"{title}:\n" + "\n".join("- " + task_line(t, projects) for t in group)
                     )
+            ref = ObjectRef("task", task.id)
+            facts = [f"reference {ref.url}"]
+            if props := linking.values_text(task.properties):
+                facts.append(f"properties: {props}")
+            lines.append("; ".join(facts) + ".")
+            if linked := await linking.links_text(db, ref, ctx):
+                lines.append(linked)
             if details := src.details(task):
                 lines.append(details)
             if made := await provenance.summary(db, task.created_by_ref, task.updated_by_ref):
@@ -266,6 +285,11 @@ class CreateTaskInput(BaseModel):
     source: str | None = Field(None, max_length=40, description=src.SOURCE)
     external_key: str | None = Field(None, max_length=200, description=src.EXTERNAL_KEY)
     source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
+    properties: dict[str, Any] = Field(
+        default_factory=dict, max_length=30, description=linking.PROPERTIES
+    )
+    links: list[str] = Field(default_factory=list, max_length=50, description=linking.LINKS)
+    create_value: bool = Field(False, description=linking.CREATE_VALUE)
 
     @field_validator("rrule")
     @classmethod
@@ -275,13 +299,18 @@ class CreateTaskInput(BaseModel):
 
 class CreateTask(Tool):
     name = "create_task"
-    description = "Add a task to the user's to-do list."
+    description = (
+        "Add a task to the user's to-do list. Projects say whose work it is; properties "
+        "(client, tags, ...) say what it is about."
+    )
     capability = "tasks.write"
     Input = CreateTaskInput
     idempotent = False
 
     def actions(self, args: CreateTaskInput, ctx: ToolContext) -> list[Action]:
-        return [Action(capability=self.capability, summary=f"Add task: {args.title[:150]}")]
+        action = Action(capability=self.capability, summary=f"Add task: {args.title[:150]}")
+        action = linking.with_links(action, args.links)
+        return [linking.create_value_note(action, args.create_value)]
 
     async def run(self, args: CreateTaskInput, ctx: ToolContext) -> ToolResult:
         source = src.source_in(args.source, args.external_key, args.source_url)
@@ -299,6 +328,7 @@ class CreateTask(Tool):
                         "source",
                         "external_key",
                         "source_url",
+                        "create_value",
                     }
                 )
                 fields["tags"] = clean_tags(args.tags)
@@ -323,8 +353,15 @@ class CreateTask(Tool):
                 if isinstance(blocked_by, str):
                     return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
                 fields["blocked_by"] = blocked_by
+                if hidden := await linking.hidden_document(db, ctx, args.links):
+                    return ToolResult(content=hidden, is_error=True)
                 task = await service.create_task(
-                    db, fields, created_by="agent", run_id=ctx.run_id, source=source
+                    db,
+                    fields,
+                    created_by="agent",
+                    run_id=ctx.run_id,
+                    source=source,
+                    create_values=args.create_value,
                 )
             except ExternalKeyTaken as exc:
                 existing = None
@@ -336,12 +373,22 @@ class CreateTask(Tool):
                 )
                 return ToolResult(content=text, data={"existing": exc.details})
             except (AppError, ValueError) as exc:
-                return ToolResult(content=getattr(exc, "message", str(exc)), is_error=True)
+                return ToolResult(
+                    content=getattr(exc, "message", str(exc)),
+                    is_error=True,
+                    data=_problems(exc),
+                )
             line = task_line(
                 task, await _projects(db), (await _waits_on(db, [task])).get(task.id, 0)
             )
+            linked = (
+                f" Linked to {len(args.links)} item{'s' if len(args.links) != 1 else ''}."
+                if args.links
+                else ""
+            )
         return ToolResult(
-            content=f"Added: {line}", data={"task": {"id": str(task.id), "title": task.title}}
+            content=f"Added: {line} (reference /tasks?task={task.id}).{linked}",
+            data={"task": {"id": str(task.id), "title": task.title}},
         )
 
 
@@ -377,6 +424,14 @@ class UpdateTaskInput(BaseModel):
         "them open. Ask the user if unsure.",
     )
     source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
+    properties: dict[str, Any] | None = Field(
+        None, max_length=30, description=linking.PROPERTIES_CHANGE
+    )
+    links_add: list[str] = Field(default_factory=list, max_length=50, description=linking.LINKS_ADD)
+    links_remove: list[str] = Field(
+        default_factory=list, max_length=50, description=linking.LINKS_REMOVE
+    )
+    create_value: bool = Field(False, description=linking.CREATE_VALUE)
 
     @field_validator("rrule")
     @classmethod
@@ -396,7 +451,9 @@ class UpdateTask(Tool):
 
     def actions(self, args: UpdateTaskInput, ctx: ToolContext) -> list[Action]:
         what = "Complete a task" if args.status == "done" else "Change a task"
-        return [Action(capability=self.capability, summary=what)]
+        action = Action(capability=self.capability, summary=what)
+        action = linking.with_links(action, args.links_add, args.links_remove)
+        return [linking.create_value_note(action, args.create_value)]
 
     async def run(self, args: UpdateTaskInput, ctx: ToolContext) -> ToolResult:
         task_id = _id(args.id)
@@ -415,6 +472,10 @@ class UpdateTask(Tool):
                     "clear_parent",
                     "blocked_by",
                     "source_url",
+                    "properties",
+                    "links_add",
+                    "links_remove",
+                    "create_value",
                 },
             )
             changes = {k: v for k, v in changes.items() if v is not None}
@@ -438,27 +499,50 @@ class UpdateTask(Tool):
                 if isinstance(blocked_by, str):
                     return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
                 changes["blocked_by"] = blocked_by
+            if args.properties is not None:
+                changes["properties"] = args.properties
             source = src.source_in(None, None, args.source_url)
             if isinstance(source, str):
                 return ToolResult(content=source, is_error=True)
+            if hidden := await linking.hidden_document(db, ctx, args.links_add):
+                return ToolResult(content=hidden, is_error=True)
             repeats = task.rrule is not None and task.status != "done"
+            dropped: list[str] = []
             try:
-                task = await service.update_task(db, task, changes, source_url=source.source_url)
+                task = await service.update_task(
+                    db,
+                    task,
+                    changes,
+                    source_url=source.source_url,
+                    links_add=args.links_add,
+                    links_remove=args.links_remove,
+                    create_values=args.create_value,
+                    dropped=dropped,
+                )
             except AppError as exc:
                 hint = (
                     " Call update_task again with subtasks='finish' or 'keep'."
                     if exc.code == "open_subtasks"
                     else ""
                 )
-                return ToolResult(content=exc.message + hint, is_error=True)
+                return ToolResult(content=exc.message + hint, is_error=True, data=_problems(exc))
             line = task_line(
                 task, await _projects(db), (await _waits_on(db, [task])).get(task.id, 0)
             )
             if repeats and task.status == "done":
                 line += " It repeats, so the next one was added."
+            line += linking.dropped_note(dropped)
         return ToolResult(
             content=f"Updated: {line}", data={"task": {"id": str(task.id), "title": task.title}}
         )
+
+
+def _problems(exc: Exception) -> dict[str, Any] | None:
+    """The property errors, for the UI (as set_document_properties gives them)."""
+    if not isinstance(exc, AppError) or exc.code != "property_invalid":
+        return None
+    details = exc.details if isinstance(exc.details, dict) else {}
+    return {"errors": details.get("errors", [])}
 
 
 class DeleteTaskInput(BaseModel):

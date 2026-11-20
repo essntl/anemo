@@ -35,6 +35,8 @@ class Document(Base, IdMixin, TimestampMixin, ProvenanceMixin):
     )
     properties_hash: Mapped[str | None] = mapped_column(String(64))
     properties_error: Mapped[str | None] = mapped_column(Text)  # unreadable front matter
+    # The content the link index (features/links/index.py) was built from.
+    links_hash: Mapped[str | None] = mapped_column(String(64))
     # Keyword search over title, property labels and text ('simple': any language).
     search_tsv: Mapped[str | None] = mapped_column(TSVECTOR)
 

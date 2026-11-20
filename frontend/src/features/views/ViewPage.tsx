@@ -1,12 +1,13 @@
 /**
- * One saved view: every document its query matches, as a list, a table (properties as
- * columns, sortable, editable in place) or a board (grouped by a select property).
- * A document shows in every view it matches; nothing is moved or copied.
+ * One saved view: every document, task and event its query matches (`types`), as a
+ * list, a table (properties as columns, sortable, editable in place) or a board
+ * (grouped by a select property). An item shows in every view it matches; nothing is
+ * moved or copied.
  */
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, FileText, Filter, Pencil, Pin, PinOff, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Filter, Pencil, Pin, PinOff, Trash2 } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { confirmDialog, promptDialog } from '@/components/ui/dialogs'
@@ -15,6 +16,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Segmented } from '@/components/ui/Segmented'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/toast'
+import { TYPE_ICONS } from '@/features/links/linkTypes'
 import { type PropertyDefinition, useProperties, valueLabel } from '@/features/properties/api'
 import { useProjects } from '@/features/tasks/api'
 import { cn } from '@/lib/cn'
@@ -22,6 +24,20 @@ import { formatWhen } from '@/lib/format'
 import { msg, plural, t } from '@/lib/i18n'
 import { type SavedView, type ViewLayout, type ViewRow, useDeleteView, useSetRowProperty, useUpdateView, useView, useViewRows, viewRowsKey } from './api'
 import { groupRows, queryText, sortRows, tableColumns } from './query'
+
+type Shows = 'document' | 'task' | 'event' | 'all'
+const SHOWS: { value: Shows; label: string }[] = [
+  { value: 'document', label: msg('Documents') },
+  { value: 'task', label: msg('Tasks') },
+  { value: 'event', label: msg('Events') },
+  { value: 'all', label: msg('Documents, tasks and events') },
+]
+/** What a view shows, from its types. */
+function showsOf(types: string[] | undefined): Shows {
+  const list = types?.length ? types : ['document']
+  if (list.length === 1) return list[0] as Shows
+  return 'all'
+}
 
 const LAYOUTS: { value: ViewLayout; label: string }[] = [
   { value: 'list', label: msg('List') },
@@ -48,8 +64,8 @@ function ListLayout({ rows, definitions }: { rows: ViewRow[]; definitions: Map<s
     <ul className="overflow-hidden rounded-card border border-border bg-card shadow-soft">
       {rows.map((row) => (
         <li key={row.id} className="border-t border-border first:border-t-0">
-          <Link to={row.url} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-surface-hover">
-            <FileText className="h-4 w-4 shrink-0 text-muted" />
+          <Link to={row.url} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-surface-hover [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-muted">
+            {TYPE_ICONS[row.type]}
             <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{row.title}</span>
             <Chips row={row} definitions={definitions} />
             <span className="shrink-0 text-[12px] text-subtle">{formatWhen(row.updated_at)}</span>
@@ -213,7 +229,7 @@ export function ViewPage() {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4 md:px-8 md:pb-8 md:pt-2">
       <PageHeader title={v.name}
-        detail={rows.data ? plural(list.length, '{n} document', '{n} documents') + (rows.data.truncated ? '+' : '') : undefined}
+        detail={rows.data ? plural(list.length, '{n} item', '{n} items') + (rows.data.truncated ? '+' : '') : undefined}
         after={
           <ActionMenu actions={[
             { label: t('Rename'), icon: <Pencil />, onSelect: () => void rename() },
@@ -226,6 +242,12 @@ export function ViewPage() {
         } />
       <div className="flex flex-wrap items-center gap-2">
         <Segmented label={t('Layout')} size="sm" value={v.layout} onChange={setLayout} options={LAYOUTS.map((l) => ({ value: l.value, label: t(l.label) }))} />
+        <Select variant="pill" aria-label={t('Shows')} value={showsOf(v.query.types)}
+          onValueChange={(shows) => update.mutate(
+            { id: v.id, body: { query: { ...v.query, types: shows === 'all' ? ['document', 'task', 'event'] : [shows as 'document' | 'task' | 'event'] } } },
+            { onError: fail, onSuccess: () => { void view.refetch(); refresh() } },
+          )}
+          options={SHOWS.map((o) => ({ value: o.value, label: t(o.label) }))} />
         {v.layout !== 'list' && (
           <Select variant="pill" aria-label={t('Group by')} value={v.query.group_by ?? ''}
             onValueChange={(key) => update.mutate({ id: v.id, body: { query: { ...v.query, group_by: key || null } } }, { onError: fail, onSuccess: () => void view.refetch() })}
@@ -237,8 +259,8 @@ export function ViewPage() {
       </div>
       {rows.isError && <p className="text-[13px] text-error">{errorMessage(rows.error)}</p>}
       {rows.data && list.length === 0 && (
-        <EmptyState icon={<Filter className="h-5 w-5" />} title={t('No document matches this view yet')}
-          description={t('Give documents the properties it looks for, or change what it shows.')} />
+        <EmptyState icon={<Filter className="h-5 w-5" />} title={t('Nothing matches this view yet')}
+          description={t('Give documents, tasks or events the properties it looks for, or change what it shows.')} />
       )}
       {list.length > 0 && v.layout === 'list' && <ListLayout rows={list} definitions={definitions} />}
       {list.length > 0 && v.layout === 'table' && <TableLayout view={v} rows={list} definitions={definitions} onChange={onChange} />}

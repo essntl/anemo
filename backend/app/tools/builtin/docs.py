@@ -23,17 +23,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
+from app.core.refs import ObjectRef
 from app.features.documents import meta, paths, service
 from app.features.documents import properties as doc_properties
 from app.features.documents import search as doc_search
 from app.features.documents.models import Document
 from app.features.projects import service as projects
 from app.features.properties import frontmatter
+from app.features.properties import items as item_properties
 from app.features.properties import service as properties
 from app.features.tasks.models import Project
 from app.knowledge import index
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin import linking
 from app.tools.builtin.workspace import _backup, path_action
 from app.workspace import files
 
@@ -304,7 +307,8 @@ class ReadDocumentInput(BaseModel):
 class ReadDocument(Tool):
     name = "read_document"
     description = (
-        "Read one of the user's documents as Markdown, with its properties above it." + LINKING
+        "Read one of the user's documents as Markdown, with its properties and what links "
+        "to it above it." + LINKING
     )
     capability = "fs.read"
     Input = ReadDocumentInput
@@ -318,6 +322,9 @@ class ReadDocument(Tool):
                 found = await paths.resolve(db, args.path)
                 props = await properties.load(db)
                 await db.commit()
+                backlinks = await linking.backlinks_text(
+                    db, ObjectRef("document", found.doc.id), ctx
+                )
             path = found.doc.path
             content, _ = await asyncio.to_thread(files.read_text, path, service.MAX_DOC_BYTES)
         except AppError as exc:
@@ -337,6 +344,8 @@ class ReadDocument(Tool):
             lines.append(f"Properties: {summary}")
         if found.doc.properties_error:
             lines.append(f"[The properties can't be read: {found.doc.properties_error}]")
+        if backlinks and args.start == 0:
+            lines.append(backlinks)
         top = "".join(f"{line}\n" for line in lines)
         return ToolResult(
             content=f"{header}:\n{top}{text}{note}", data={"path": path, "chars": len(content)}
@@ -738,10 +747,10 @@ class ListPropertiesInput(BaseModel):
 class ListProperties(Tool):
     name = "list_properties"
     description = (
-        "The properties documents can have (type, status, tags, client, ...): their keys, "
-        "types, allowed values (slugs) and how many documents use each value. Call this "
-        "before setting or filtering by properties, and reuse existing values."
-        + FOLDERS_AND_PROPERTIES
+        "The properties documents, tasks and events can have (type, status, tags, client, "
+        "...): their keys, types, what they are for, allowed values (slugs) and how many "
+        "items use each value. Call this before setting or filtering by properties, and "
+        "reuse existing values." + FOLDERS_AND_PROPERTIES
     )
     capability = "fs.read"
     Input = ListPropertiesInput
@@ -754,6 +763,8 @@ class ListProperties(Tool):
             await service.reconcile(db)
             props = await properties.load(db)
             counts = await properties.value_counts(db, Document.properties)
+            for key, counter in (await item_properties.value_counts(db)).items():
+                counts.setdefault(key, Counter()).update(counter)
             names = {str(p.id): p.name for p in await projects_all(db)}
             await db.commit()
         lines = []
@@ -768,6 +779,8 @@ class ListProperties(Tool):
             ):
                 continue  # another project's property
             notes = [d.type]
+            if set(d.applies_to) != set(properties.APPLIES_TO):
+                notes.append("for " + ", ".join(f"{t}s" for t in d.applies_to))
             if d.label.lower() != key:
                 notes.append(f'"{d.label}"')
             if d.project_ids is not None:
@@ -787,7 +800,7 @@ class ListProperties(Tool):
                 ]
                 head += ": " + (", ".join(values) if values else "no values yet")
             elif used:
-                head += f": used by {sum(used.values())} documents"
+                head += f": used by {sum(used.values())} items"
             lines.append(head)
         if not lines:
             return ToolResult(

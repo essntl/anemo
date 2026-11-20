@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime, time
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -55,6 +56,7 @@ class Task(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin):
             unique=True,
             postgresql_where=text("external_key IS NOT NULL"),
         ),
+        Index("ix_tasks_properties", "properties", postgresql_using="gin"),
     )
 
     title: Mapped[str] = mapped_column(String(300))
@@ -70,7 +72,14 @@ class Task(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin):
     # due on the rule's next day, and the rule moves to that one.
     rrule: Mapped[str | None] = mapped_column(String(500))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The task's tags, as they always were. They are also its `tags` property: the
+    # same list is kept in `properties["tags"]` (see _mirror_tags), so property filters,
+    # views and counts see them. Write the tags here, never into `properties`.
     tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    # Property values (features/properties), validated by properties.service.validate.
+    properties: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL")
     )

@@ -105,3 +105,83 @@ export function linkedFromText(b: Backlinks): string | null {
   if (tasks && documents) return t('Linked from {tasks} and {documents}.', { tasks, documents })
   return tasks || documents ? t('Linked from {items}.', { items: tasks || documents }) : null
 }
+
+// -- the link index: links and backlinks of documents, tasks, events and chats ----------------
+
+export type LinkType = 'document' | 'task' | 'event' | 'chat'
+export type LinksOut = Schemas['LinksOut']
+export type LinkGroups = Schemas['LinkGroups']
+export type LinkOut = Schemas['LinkOut']
+export type LinkItem = Schemas['LinkItem']
+export type BrokenLink = Schemas['BrokenLinkOut']
+
+export const LINK_TYPES: LinkType[] = ['document', 'task', 'event', 'chat']
+export const linksKey = (type: LinkType, id: string) => ['links', type, id] as const
+export const brokenLinksKey = ['links', 'broken'] as const
+
+/** What an item links to and what links to it ("Linked from"), grouped by type. */
+export function useLinks(type: LinkType, id: string | null) {
+  return useQuery({
+    queryKey: linksKey(type, id ?? 'none'),
+    enabled: !!id,
+    queryFn: async () =>
+      unwrap(await api.GET('/api/links/{object_type}/{object_id}', { params: { path: { object_type: type, object_id: id! } } })),
+  })
+}
+
+function useLinkChanged() {
+  const qc = useQueryClient()
+  return () => {
+    void qc.invalidateQueries({ queryKey: ['links'] })
+    void qc.invalidateQueries({ queryKey: ['tasks', 'backlinks'] })
+    void qc.invalidateQueries({ queryKey: ['documents', 'backlinks'] })
+  }
+}
+
+/** Link a task or event to other items (their references). */
+export function useAddLinks(type: 'task' | 'event', id: string) {
+  const changed = useLinkChanged()
+  return useMutation({
+    mutationFn: async (to: string[]) =>
+      unwrap(await api.POST('/api/links/{object_type}/{object_id}', { params: { path: { object_type: type, object_id: id } }, body: { to } })),
+    onSuccess: changed,
+  })
+}
+
+/** Remove a link set on a task or event (one written in its text goes with the text). */
+export function useRemoveLink(type: 'task' | 'event', id: string) {
+  const changed = useLinkChanged()
+  return useMutation({
+    mutationFn: async (to: string) =>
+      unwrap(await api.DELETE('/api/links/{object_type}/{object_id}', { params: { path: { object_type: type, object_id: id }, query: { to } } })),
+    onSuccess: changed,
+  })
+}
+
+/** Links to items deleted for good, and the items they are in. */
+export function useBrokenLinks() {
+  return useQuery({
+    queryKey: brokenLinksKey,
+    staleTime: 60_000,
+    queryFn: async () => unwrap(await api.GET('/api/links/broken')),
+  })
+}
+
+/** Make a document for an event's meeting notes, linked both ways. */
+export function useCreateMeetingNotes() {
+  const changed = useLinkChanged()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (eventId: string) =>
+      unwrap(await api.POST('/api/calendar/events/{event_id}/meeting-notes', { params: { path: { event_id: eventId } } })),
+    onSuccess: () => {
+      changed()
+      void qc.invalidateQueries({ queryKey: ['documents'] })
+    },
+  })
+}
+
+/** Every link in the groups, in type order. */
+export function allLinks(groups: LinkGroups | undefined): LinkOut[] {
+  return groups ? LINK_TYPES.flatMap((type) => groups[type] ?? []) : []
+}

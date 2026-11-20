@@ -39,6 +39,7 @@ class CalendarEvent(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin)
             unique=True,
             postgresql_where=text("external_key IS NOT NULL"),
         ),
+        Index("ix_calendar_events_properties", "properties", postgresql_using="gin"),
     )
 
     title: Mapped[str] = mapped_column(String(300))
@@ -62,6 +63,11 @@ class CalendarEvent(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin)
     )
     created_by: Mapped[str] = mapped_column(String(10), default="user")  # user | agent
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Property values (features/properties), validated by properties.service.validate;
+    # the same for every occurrence of a repeating event.
+    properties: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
 
 
 class EventException(Base, IdMixin):

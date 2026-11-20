@@ -17,15 +17,17 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.actor import EXTERNAL, current_actor
 from app.core.errors import AppError, NotFound
 from app.events import bus
 from app.features.documents import meta
 from app.features.documents.models import Document, DocumentRevision
+from app.features.links import index as links_index
 from app.jobs import queue
 from app.knowledge import index
 from app.workspace import files, safe_fs
@@ -221,10 +223,12 @@ async def reconcile(db: AsyncSession) -> list[str]:
         if await asyncio.to_thread(_exists, doc.path):
             continue
         await index.delete_source(db, SOURCE_TYPE, [doc.id])
+        await links_index.drop_outgoing(db, "document", doc.id)
         await db.delete(doc)
         changed = True
     # Indexed from other content, or never (before properties, a new index format).
     changed = await _index_stale(db) or changed
+    changed = await _links_stale(db) or changed
     if changed or db.dirty:
         await db.commit()
     return folders
@@ -261,6 +265,7 @@ async def _apply(
     )
     await _schedule_index(db, doc)
     await meta.index(db, doc, content)  # properties and keyword search, from the text
+    await _index_links(db, doc, content)  # the links in it
 
 
 async def _add_revision(
@@ -456,6 +461,7 @@ async def remove(db: AsyncSession, doc: Document, deleted_by: str = "user") -> N
     """Move the file to the workspace trash and drop the index entry."""
     await asyncio.to_thread(files.trash, doc.path, deleted_by)
     await index.delete_source(db, SOURCE_TYPE, [doc.id])
+    await links_index.drop_outgoing(db, "document", doc.id)  # links to it stay (broken)
     await db.delete(doc)
     await db.commit()
 
@@ -544,3 +550,46 @@ async def _reindex_moved(db: AsyncSession, doc: Document) -> None:
         return
     await meta.index(db, doc, content)
     await schedule_reindex(db, doc)
+
+
+async def _index_links(db: AsyncSession, doc: Document, content: str | None) -> bool:
+    """Rebuild the link index from the document's text (never fails the save:
+    links/index.refresh_inline) and record which content it was built from. When that
+    fails, nothing is recorded, so the next reconcile tries again. `content` None: the
+    file can't be read as text, so it has no links. Keeps updated_at. Doesn't commit.
+    Whether it worked."""
+    await db.flush()
+    ok = await links_index.refresh_inline(db, "document", doc.id, content or "")
+    done = doc.content_hash if ok else None
+    await db.execute(
+        update(Document)
+        .where(Document.id == doc.id)
+        .values(links_hash=done, updated_at=Document.updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    set_committed_value(doc, "links_hash", done)
+    return ok
+
+
+async def _links_stale(db: AsyncSession) -> bool:
+    """Index the links of documents whose links were indexed from other content, or
+    never (documents from before the link index), or whose indexing failed. A file
+    that can't be read counts as having no links (until its content changes). Doesn't
+    commit. Whether anything was written."""
+    stale = list(
+        await db.scalars(
+            select(Document).where(
+                or_(Document.links_hash.is_(None), Document.links_hash != Document.content_hash)
+            )
+        )
+    )
+    wrote = False
+    for doc in stale:
+        try:
+            content: str | None = await asyncio.to_thread(_read, doc.path)
+        except AppError:
+            content = None  # unreadable: nothing to index, and not tried again and again
+        if content is not None and sha(content) != doc.content_hash:
+            continue  # changed: reconcile reads it as a change, links included
+        wrote = await _index_links(db, doc, content) or wrote
+    return wrote
