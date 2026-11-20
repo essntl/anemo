@@ -12,14 +12,15 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, TimestampMixin
+from app.db.base import Base, IdMixin, ProvenanceMixin, SourceMixin, TimestampMixin
 
 
-class CalendarEvent(Base, IdMixin, TimestampMixin):
+class CalendarEvent(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin):
     """An event, or the first occurrence and rule of a repeating one.
 
     start_at/end_at are instants. For all-day events they are midnight at the start of
@@ -32,6 +33,12 @@ class CalendarEvent(Base, IdMixin, TimestampMixin):
     __table_args__ = (
         Index("ix_calendar_events_range", "start_at", "end_at"),
         Index("ix_calendar_events_project", "project_id"),
+        Index(
+            "ix_calendar_events_external_key",
+            "external_key",
+            unique=True,
+            postgresql_where=text("external_key IS NOT NULL"),
+        ),
     )
 
     title: Mapped[str] = mapped_column(String(300))

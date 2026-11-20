@@ -16,9 +16,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
-from app.db.base import Base, IdMixin, TimestampMixin
+from app.db.base import Base, IdMixin, ProvenanceMixin, SourceMixin, TimestampMixin
 
 
 class Project(Base, IdMixin, TimestampMixin):
@@ -43,12 +43,18 @@ class Project(Base, IdMixin, TimestampMixin):
     )
 
 
-class Task(Base, IdMixin, TimestampMixin):
+class Task(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin):
     __tablename__ = "tasks"
     __table_args__ = (
         Index("ix_tasks_status_due", "status", "due_date"),
         Index("ix_tasks_project", "project_id"),
         Index("ix_tasks_parent", "parent_id"),
+        Index(
+            "ix_tasks_external_key",
+            "external_key",
+            unique=True,
+            postgresql_where=text("external_key IS NOT NULL"),
+        ),
     )
 
     title: Mapped[str] = mapped_column(String(300))
