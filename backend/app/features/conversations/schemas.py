@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 
+from app.features.runs.schemas import RunTiming
 from app.features.tasks.schemas import clean_tags
 from app.providers.base import ReasoningEffort
 
@@ -90,6 +91,7 @@ class MessageVersion(BaseModel):
     questions: list[QuestionMark] = []
     # Files the agent attached to this answer (attach_file).
     attachments: list[AttachmentSummary] = []
+    timing: RunTiming | None = None  # how long this answer took (None: not known)
 
 
 class SkillSummary(BaseModel):
@@ -151,6 +153,9 @@ class MessageOut(BaseModel):
     # one above among them, at `version`). Empty when there is only the one.
     versions: list[MessageVersion] = []
     version: int = 0
+    # Assistant messages: how long the answer took, from its run. None for user
+    # messages and answers without a run (e.g. copied into a branched chat).
+    timing: RunTiming | None = None
 
 
 class VersionIn(BaseModel):

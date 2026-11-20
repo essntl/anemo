@@ -17,6 +17,7 @@ from starlette.types import Scope
 from app import __version__
 from app.api.router import api_router
 from app.api.security import OriginCheckMiddleware
+from app.api.server_time import ServerTimeMiddleware
 from app.core.config import get_settings
 from app.core.db import dispose_engine
 from app.core.errors import install_error_handlers
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     # Compress the app's JavaScript and JSON answers (about a third of the size on the
     # wire). Event streams are left alone by this middleware, so they stay live.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
+    app.add_middleware(ServerTimeMiddleware)  # X-Server-Time on every API response
     app.include_router(api_router)
     _mount_spa(app, Path(settings.static_dir))
     return app
