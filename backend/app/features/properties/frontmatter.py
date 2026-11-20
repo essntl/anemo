@@ -13,6 +13,7 @@ untouched. Writing changes only the keys it is given, keeps every other key (`ti
 keys of other programs) in its place and the body byte for byte.
 """
 
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -34,8 +35,36 @@ class FrontMatter:
     body: str = ""  # the text after it
 
 
+MAX_BLOCK_BYTES = 64 * 1024  # a properties block larger than this isn't read
+MAX_DEPTH = 8  # nesting of lists and mappings in it
+_NO_ALIASES = "aliases (*name) are not allowed"
+_TOO_DEEP = "it is nested too deeply"
+
+
+class _Loader(yaml.SafeLoader):
+    """SafeLoader without aliases (`*a`: a self-referencing or fanned-out alias can
+    exhaust the stack or the memory) and with a nesting limit."""
+
+    _depth = 0
+
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        if self.check_event(yaml.events.AliasEvent):
+            event = self.peek_event()
+            raise yaml.composer.ComposerError(None, None, _NO_ALIASES, event.start_mark)
+        self._depth += 1
+        try:
+            if self._depth > MAX_DEPTH:
+                raise yaml.composer.ComposerError(
+                    None, None, _TOO_DEEP, self.peek_event().start_mark
+                )
+            return super().compose_node(parent, index)
+        finally:
+            self._depth -= 1
+
+
 def _plain(value: Any) -> Any:
-    """YAML values as JSON: dates as "YYYY-MM-DD", lists and dicts recursively."""
+    """YAML values as JSON: dates as "YYYY-MM-DD", lists and dicts recursively, and
+    anything JSON can't hold (binary, .inf, .nan) as text."""
     if isinstance(value, datetime):
         return (
             value.date().isoformat() if value.time() == datetime.min.time() else value.isoformat()
@@ -46,31 +75,44 @@ def _plain(value: Any) -> Any:
         return [_plain(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _plain(v) for k, v in value.items()}
-    return value
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    return str(value)
+
+
+def _error(message: str, body: str) -> FrontMatter:
+    return FrontMatter(error=message, present=True, body=body)
 
 
 def parse(content: str) -> FrontMatter:
+    """The front matter of `content`. Never raises: whatever can't be read comes back
+    as `error` (the document then has no properties, its text is untouched)."""
     match = FRONT_MATTER.match(content)
     if match is None:
         return FrontMatter(body=content)
     body = content[match.end() :]
+    block = match.group(2)
+    if len(block.encode()) > MAX_BLOCK_BYTES:
+        return _error("The properties block is too large (more than 64 KB).", body)
     try:
-        meta = yaml.safe_load(match.group(2))
+        meta = yaml.load(block, Loader=_Loader)  # noqa: S506 - a SafeLoader without aliases
+        if meta is None:
+            return FrontMatter(present=True, body=body)
+        if not isinstance(meta, dict):
+            return _error("The properties block must be a list of `key: value` lines.", body)
+        return FrontMatter(
+            meta={str(k): _plain(v) for k, v in meta.items()}, present=True, body=body
+        )
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
         where = f" (line {mark.line + 2})" if mark is not None else ""
-        return FrontMatter(
-            error=f"The properties block is not valid YAML{where}.", present=True, body=body
-        )
-    if meta is None:
-        return FrontMatter(present=True, body=body)
-    if not isinstance(meta, dict):
-        return FrontMatter(
-            error="The properties block must be a list of `key: value` lines.",
-            present=True,
-            body=body,
-        )
-    return FrontMatter(meta={str(k): _plain(v) for k, v in meta.items()}, present=True, body=body)
+        problem = getattr(exc, "problem", None)
+        why = f": {problem}" if problem in (_NO_ALIASES, _TOO_DEEP) else ""
+        return _error(f"The properties block is not valid YAML{where}{why}.", body)
+    except Exception:  # noqa: BLE001 - reading front matter must never stop a save
+        return _error("The properties block can't be read.", body)
 
 
 def _yaml_value(value: Any) -> Any:

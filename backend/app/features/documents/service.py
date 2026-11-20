@@ -220,6 +220,8 @@ async def reconcile(db: AsyncSession) -> list[str]:
         await index.delete_source(db, SOURCE_TYPE, [doc.id])
         await db.delete(doc)
         changed = True
+    # Indexed from other content, or never (before properties, a new index format).
+    changed = await _index_stale(db) or changed
     if changed or db.dirty:
         await db.commit()
     return folders
@@ -475,3 +477,31 @@ async def schedule_index(db: AsyncSession, doc: Document) -> None:
 def file_exists(path: str) -> bool:
     """Whether the document file is there (on disk, now)."""
     return _exists(path)
+
+
+async def _index_stale(db: AsyncSession) -> bool:
+    """Rebuild the properties and keyword index of documents whose index was built
+    from other content, or never (documents from before properties, or after the index
+    changed). Doesn't commit. Whether there were any."""
+    stale = list(
+        await db.scalars(
+            select(Document).where(
+                or_(
+                    Document.properties_hash.is_(None),
+                    Document.properties_hash != Document.content_hash,
+                )
+            )
+        )
+    )
+    for doc in stale:
+        try:
+            content = await asyncio.to_thread(_read, doc.path)
+        except AppError:
+            continue  # gone or unreadable: the next look sorts it out
+        if sha(content) != doc.content_hash:
+            await _apply(
+                db, doc, content, await asyncio.to_thread(_info, doc.path), author="external"
+            )
+        else:
+            await meta.index(db, doc, content)
+    return bool(stale)

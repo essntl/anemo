@@ -13,6 +13,7 @@ the existing one suggested. Every other select property has a closed list.
 """
 
 import difflib
+import math
 import re
 import unicodedata
 import uuid
@@ -328,14 +329,17 @@ class _Check:
             if isinstance(value, bool):
                 self.fail(key, value, "must be a number")
                 return None
-            if isinstance(value, int | float):
+            if isinstance(value, int):
                 return value
             try:
-                number = float(str(value).strip())
+                number = value if isinstance(value, float) else float(str(value).strip())
             except ValueError:
                 self.fail(key, value, "must be a number")
                 return None
-            return int(number) if number.is_integer() else number
+            if not math.isfinite(number):
+                self.fail(key, value, "must be a finite number")
+                return None
+            return int(number) if number.is_integer() and not isinstance(value, float) else number
         if kind == "checkbox":
             if isinstance(value, bool):
                 return value

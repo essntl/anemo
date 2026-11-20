@@ -6,7 +6,7 @@ the index follows from the file. Nothing writes properties to the database only.
 import uuid
 from typing import Any
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import current_actor
@@ -243,26 +243,19 @@ async def option_in_use(db: AsyncSession, definition: PropertyDefinition, slug: 
 async def reindex_stale(db: AsyncSession) -> int:
     """Re-index every document whose index was built from other content (changed
     outside the app, or indexed before properties existed). Commits. Returns how many."""
-    await service.reconcile(db)  # files changed, added or removed outside the app
-    stale = list(
-        await db.scalars(
-            select(Document).where(
-                or_(
-                    Document.properties_hash.is_(None),
-                    Document.properties_hash != Document.content_hash,
-                )
+    stale = await db.scalar(
+        select(func.count())
+        .select_from(Document)
+        .where(
+            or_(
+                Document.properties_hash.is_(None),
+                Document.properties_hash != Document.content_hash,
             )
         )
     )
-    for doc in stale:
-        try:
-            content = await service.read(db, doc)  # an outside change becomes a revision
-        except NotFound:
-            continue
-        if doc.properties_hash != doc.content_hash:
-            await meta.index(db, doc, content)
-    await db.commit()
-    return len(stale)
+    # Reconcile re-reads files changed outside the app and indexes the stale ones.
+    await service.reconcile(db)
+    return int(stale or 0)
 
 
 async def reconcile_on_start() -> None:
@@ -271,9 +264,11 @@ async def reconcile_on_start() -> None:
     global _started
     if _started:
         return
-    async with get_sessionmaker()() as db:
-        await reindex_stale(db)
-    _started = True
+    try:
+        async with get_sessionmaker()() as db:
+            await reindex_stale(db)
+    finally:
+        _started = True  # once, even if it failed: a bad file must not make it retry forever
 
 
 async def delete_option(

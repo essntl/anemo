@@ -22,11 +22,12 @@ from datetime import datetime
 from typing import Any, Literal
 
 from sqlalchemy import ColumnElement, case, func, not_, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
 from app.features.documents import service
-from app.features.documents.meta import TS_CONFIG
+from app.features.documents.meta import STEM_CONFIG, TS_CONFIG
 from app.features.documents.models import Document
 from app.features.properties import frontmatter
 from app.features.properties.filters import property_conditions
@@ -37,6 +38,7 @@ from app.knowledge.models import KnowledgeChunk
 
 RRF_K = index.RRF_K
 MAX_QUERY_WORDS = 24
+MIN_WORD = 2  # one-letter words find too much
 TITLE_BOOST = 1.0  # more than any fused score: an exact title match comes first
 
 
@@ -89,14 +91,58 @@ async def conditions(db: AsyncSession, f: DocFilter) -> list[ColumnElement[bool]
 
 
 def query_words(text: str) -> list[str]:
-    return list(dict.fromkeys(re.findall(r"[^\W_]+", text.lower())))[:MAX_QUERY_WORDS]
+    """The words of a query (letters and digits), without one-letter ones."""
+    words = [w for w in re.findall(r"[^\W_]+", text.lower()) if len(w) >= MIN_WORD]
+    return list(dict.fromkeys(words))[:MAX_QUERY_WORDS]
 
 
-def tsquery(text: str, *, all_words: bool) -> str | None:
-    """`word:*` for each word (a prefix matches: `meet` finds `meetings`), joined by
-    & (every word) or | (any word). Words are letters and digits only."""
+async def keyword_query(db: AsyncSession, text: str, *, all_words: bool) -> Any | None:
+    """The tsquery for `text`, or None. Each word matches as written or as the start of
+    a word (`simple`, any language: `meet` finds `meetings`), or by its English stem
+    (`meetings` finds `meeting`). English stop words ("the") are left out, as the
+    stemmed search did; words are joined by AND (`all_words`) or OR."""
     words = query_words(text)
-    return (" & " if all_words else " | ").join(f"{w}:*" for w in words) if words else None
+    if not words:
+        return None
+    counts = (
+        await db.execute(
+            select(*[func.numnode(func.plainto_tsquery(STEM_CONFIG, w)) for w in words])
+        )
+    ).one()
+    kept = [w for w, n in zip(words, counts, strict=True) if n] or words
+    parts = [
+        func.to_tsquery(TS_CONFIG, f"{w}:*").op("||")(func.plainto_tsquery(STEM_CONFIG, w))
+        for w in kept
+    ]
+    query = parts[0]
+    for part in parts[1:]:
+        query = query.op("&&" if all_words else "||")(part)
+    return query
+
+
+def _best_chunks(
+    key: str, vector: list[float], min_similarity: float, where: list[ColumnElement[bool]]
+) -> Any:
+    """Each document's best chunk by meaning within the filter (one per document, so a
+    long document can't crowd out the others)."""
+    # CASE keeps Postgres from comparing vectors of another model (another size).
+    distance = case(
+        (KnowledgeChunk.model_key == key, KnowledgeChunk.embedding.cosine_distance(vector)),
+        else_=None,
+    )
+    return (
+        select(KnowledgeChunk.source_id, KnowledgeChunk.content, distance.label("d"))
+        .join(Document, Document.id == KnowledgeChunk.source_id)
+        .where(
+            KnowledgeChunk.source_type == service.SOURCE_TYPE,
+            KnowledgeChunk.model_key == key,
+            distance <= 1 - min_similarity,
+            *where,
+        )
+        .ext(distinct_on(KnowledgeChunk.source_id))
+        .order_by(KnowledgeChunk.source_id, distance)
+        .subquery()
+    )
 
 
 @dataclass
@@ -128,9 +174,8 @@ async def search(
     ranks: dict[uuid.UUID, float] = {}
     passages: dict[uuid.UUID, tuple[str, float]] = {}
 
-    tsq_text = tsquery(text, all_words=all_words)
-    if tsq_text:
-        tsq = func.to_tsquery(TS_CONFIG, tsq_text)
+    tsq = await keyword_query(db, text, all_words=all_words)
+    if tsq is not None:
         rows = await db.scalars(
             select(Document.id)
             .where(Document.search_tsv.op("@@")(tsq), *where)
@@ -143,31 +188,11 @@ async def search(
     if query_vector == "auto":
         query_vector = await index.embed_query(db, text)
     if query_vector is not None:
-        key, vector = query_vector
-        # CASE keeps Postgres from comparing vectors of another model (another size).
-        distance = case(
-            (KnowledgeChunk.model_key == key, KnowledgeChunk.embedding.cosine_distance(vector)),
-            else_=None,
-        )
-        rows2 = await db.execute(
-            select(KnowledgeChunk.source_id, KnowledgeChunk.content, distance.label("d"))
-            .join(Document, Document.id == KnowledgeChunk.source_id)
-            .where(
-                KnowledgeChunk.source_type == service.SOURCE_TYPE,
-                KnowledgeChunk.model_key == key,
-                distance <= 1 - min_similarity,
-                *where,
-            )
-            .order_by("d")
-            .limit(limit * 4)
-        )
-        rank = 0
-        for doc_id, content, d in rows2.all():
-            if doc_id in passages:
-                continue
+        best_chunks = _best_chunks(*query_vector, min_similarity, where)
+        rows2 = await db.execute(select(best_chunks).order_by(best_chunks.c.d).limit(limit * 2))
+        for rank, (doc_id, content, d) in enumerate(rows2.all()):
             passages[doc_id] = (_chunk_text(content), 1 - float(d))
             ranks[doc_id] = ranks.get(doc_id, 0.0) + 1 / (RRF_K + rank)
-            rank += 1
 
     if text.strip():
         exact = await db.scalars(
@@ -202,31 +227,14 @@ async def count_matches(
     """How many documents within the filter match `text` at all (by words or meaning)."""
     where = await conditions(db, f)
     ids: set[uuid.UUID] = set()
-    tsq_text = tsquery(text, all_words=all_words)
-    if tsq_text:
-        tsq = func.to_tsquery(TS_CONFIG, tsq_text)
+    tsq = await keyword_query(db, text, all_words=all_words)
+    if tsq is not None:
         ids |= set(
             await db.scalars(select(Document.id).where(Document.search_tsv.op("@@")(tsq), *where))
         )
     if query_vector is not None:
-        key, vector = query_vector
-        distance = case(
-            (KnowledgeChunk.model_key == key, KnowledgeChunk.embedding.cosine_distance(vector)),
-            else_=None,
-        )
-        ids |= set(
-            await db.scalars(
-                select(KnowledgeChunk.source_id)
-                .join(Document, Document.id == KnowledgeChunk.source_id)
-                .where(
-                    KnowledgeChunk.source_type == service.SOURCE_TYPE,
-                    KnowledgeChunk.model_key == key,
-                    distance <= 1 - min_similarity,
-                    *where,
-                )
-                .distinct()
-            )
-        )
+        best_chunks = _best_chunks(*query_vector, min_similarity, where)
+        ids |= set(await db.scalars(select(best_chunks.c.source_id)))
     return len(ids)
 
 

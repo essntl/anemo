@@ -1,5 +1,6 @@
 """Document properties, filtered search, views and stable paths (spec 01, phase 2)."""
 
+import shutil
 import uuid
 from typing import Any
 
@@ -27,13 +28,14 @@ pytestmark = requires_db
 
 @pytest.fixture
 def docs(workspace):  # noqa: F811
+    """An empty documents/ folder, removed again afterwards (the workspace is shared
+    by the test files)."""
     folder = workspace / "documents"
     if folder.exists():
-        import shutil
-
         shutil.rmtree(folder)
     folder.mkdir()
-    return folder
+    yield folder
+    shutil.rmtree(folder, ignore_errors=True)
 
 
 async def _no_emit(*_: Any, **__: Any) -> None:
@@ -783,3 +785,94 @@ async def test_suggested_properties_wait_for_the_user(authed, docs):
     assert r.status_code == 204
     assert (await authed.get("/api/properties/suggestions")).json() == []
     assert "type" not in (docs / "old-plan.md").read_text()
+
+
+ALIAS_BOMB = (
+    "---\na: &a [x, x, x, x, x, x, x, x, x]\nb: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a]\n"
+    "c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b]\nd: [*c, *c, *c, *c, *c, *c, *c, *c, *c]\n---\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("front", "why"),
+    [
+        (ALIAS_BOMB, "aliases (*name) are not allowed"),
+        ("---\na: &a [*a]\n---\n", "aliases (*name) are not allowed"),
+        ("---\na: " + "[" * 30 + "1" + "]" * 30 + "\n---\n", "it is nested too deeply"),
+        ("---\nscore: .inf\n---\n", "score: must be a finite number"),
+        ("---\nscore: .nan\n---\n", "score: must be a finite number"),
+    ],
+)
+async def test_front_matter_that_could_break_the_reader_never_blocks_a_save(
+    authed, docs, front, why
+):
+    r = await authed.post("/api/properties", json={"key": "score", "type": "number"})
+    assert r.status_code == 201, r.text
+    doc = await new_doc(authed, "Hostile", "", "Keep me.")
+    content = front + "# Hostile\n\nKeep me.\n"
+    r = await authed.put(
+        f"/api/documents/{doc['id']}", json={"content": content, "base_hash": doc["hash"]}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["properties"] == {} and why in r.json()["properties_error"]
+    assert (docs / "hostile.md").read_text() == content
+    # Written outside the app, it is read on every look without breaking the tools.
+    (docs / "outside.md").write_text(content)
+    for _ in range(2):
+        assert (await authed.get("/api/documents")).status_code == 200
+    listed = await run(doc_tools.ListDocuments)
+    assert not listed.is_error and "Hostile" in listed.content
+    found = await run(doc_tools.SearchDocuments, query="keep")
+    assert not found.is_error and len(found.data["paths"]) == 2
+    doc_properties._started = False
+    await doc_properties.reconcile_on_start()
+    assert doc_properties._started
+
+
+async def test_a_large_cyrillic_document_saves_and_stays_findable(authed, docs):
+    doc = await new_doc(authed, "Великий текст", "", "")
+    words = " ".join(f"слово{i}та" for i in range(100_000))  # about 2 MB of UTF-8
+    content = f"# Великий текст\n\n{words}\n"
+    assert len(content.encode()) < 2 * 1024 * 1024
+    r = await authed.put(
+        f"/api/documents/{doc['id']}", json={"content": content, "base_hash": doc["hash"]}
+    )
+    assert r.status_code == 200, r.text
+    assert (await authed.get(f"/api/documents/{doc['id']}")).json()["content"] == content
+    async with get_sessionmaker()() as db:
+        hits = await doc_search.search(db, "великий", doc_search.DocFilter(), query_vector=None)
+        assert [h.doc.title for h in hits] == ["Великий текст"]
+        hits = await doc_search.search(db, "слово5та", doc_search.DocFilter(), query_vector=None)
+        assert [h.doc.title for h in hits] == ["Великий текст"]  # from the start of the text
+
+
+async def test_searches_without_filters_find_what_they_found_before(authed, docs):
+    """The stemmed (english) search found plural and singular forms and ignored stop
+    words; the multilingual (simple) one keeps finding them."""
+    meeting = await new_doc(authed, "Weekly sync", "", "We had a meeting about otters.")
+    await new_doc(authed, "Otter facts", "", "Otters hold hands while sleeping.")
+    await new_doc(authed, "Unrelated", "", "Rent and bills.")
+
+    async def titles(query: str, *, all_words: bool = True) -> list[str]:
+        async with get_sessionmaker()() as db:
+            hits = await doc_search.search(
+                db, query, doc_search.DocFilter(), query_vector=None, all_words=all_words
+            )
+            return sorted(h.doc.title for h in hits)
+
+    assert await titles("meetings") == ["Weekly sync"]  # plural finds singular
+    assert await titles("otter") == ["Otter facts", "Weekly sync"]  # and the other way round
+    assert await titles("sleep") == ["Otter facts"]  # a stem
+    assert await titles("the otters") == ["Otter facts", "Weekly sync"]  # a stop word is left out
+    assert await titles("a otters") == ["Otter facts", "Weekly sync"]  # one letter is left out
+    assert await titles("meetings zeppelin") == []  # every word must match
+    assert await titles("meetings zeppelin", all_words=False) == ["Weekly sync"]
+    # The search box: plain-text snippets with the words, and the document's link.
+    r = await authed.get("/api/search", params={"q": "meetings", "kinds": "document"})
+    [hit] = r.json()["groups"][0]["hits"]
+    assert hit["url"] == f"/documents/{meeting['id']}" and "meeting about otters" in hit["snippet"]
+    tool = await run(doc_tools.SearchDocuments, query="meetings")
+    assert (
+        f"link /documents/{meeting['id']}" in tool.content
+        and "meeting about otters" in tool.content
+    )

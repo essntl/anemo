@@ -85,3 +85,17 @@ def test_property_filter_sql():
     for bad in ({"x": {"like": "a"}}, {"x": {"in": [], "has": 1}}, {"x": {"missing": "yes"}}):
         with pytest.raises(AppError):
             property_conditions(Document.properties, bad)
+
+
+def test_front_matter_refuses_aliases_deep_nesting_and_huge_blocks():
+    for text, why in [
+        ("---\na: &a [*a]\n---\nbody", "aliases"),
+        ("---\nbase: &b {x: 1}\nother:\n  <<: *b\n---\nbody", "aliases"),
+        ("---\na: " + "[" * 20 + "]" * 20 + "\n---\nbody", "nested too deeply"),
+        ("---\nbig: " + "x" * 70_000 + "\n---\nbody", "too large"),
+    ]:
+        fm = frontmatter.parse(text)
+        assert fm.meta == {} and fm.error and why in fm.error and fm.body == "body"
+    # An anchor without an alias is fine; values JSON can't hold come back as text.
+    fm = frontmatter.parse("---\na: &x 1\nb: .inf\nc: !!binary aGk=\n---\nbody")
+    assert fm.error is None and fm.meta == {"a": 1, "b": "inf", "c": "b'hi'"}
