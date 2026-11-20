@@ -282,7 +282,9 @@ class Occurrence:
         )
 
 
-def _base(event: CalendarEvent, start: datetime) -> Occurrence:
+def base_occurrence(event: CalendarEvent, start: datetime) -> Occurrence:
+    """The occurrence of `event` that starts at `start`, as the series has it (no changes
+    to single occurrences applied)."""
     return Occurrence(
         event=event,
         original_start=start,
@@ -385,7 +387,7 @@ async def occurrences(
     found: list[Occurrence] = []
     for event in events:
         if not event.rrule:
-            found.append(_base(event, event.start_at))
+            found.append(base_occurrence(event, event.start_at))
             continue
         duration = event.end_at - event.start_at
         changed = exceptions.get(event.id, {})
@@ -399,7 +401,7 @@ async def occurrences(
             if start in seen:
                 continue
             seen.add(start)
-            occ = _base(event, start)
+            occ = base_occurrence(event, start)
             exception = changed.get(start)
             if exception is not None:
                 if exception.is_cancelled:

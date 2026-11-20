@@ -109,7 +109,7 @@ class ListEvents(Tool):
                 events = await service.find_events(
                     db, source=args.source, external_key=args.external_key, query=args.query
                 )
-                found = [service._base(e, e.start_at) for e in events]  # noqa: SLF001
+                found = [service.base_occurrence(e, e.start_at) for e in events]
                 span = ""
             else:
                 last = args.end or args.start + timedelta(days=7)
@@ -176,7 +176,7 @@ class GetEvent(Tool):
                     )
                 return ToolResult(content=f"No event with id {args.id}.", is_error=True)
             tz = await _user_tz(db)
-            lines = [_describe(service._base(event, event.start_at), tz)]  # noqa: SLF001
+            lines = [_describe(service.base_occurrence(event, event.start_at), tz)]
             lines.append("Notes:\n" + (event.description.strip() or "(none)"))
             facts = [f"Times are in {tz}", f"reference {ref_url('event', event.id)}"]
             if event.remind_minutes is not None:
@@ -262,7 +262,7 @@ class CreateEvent(Tool):
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
             except ExternalKeyTaken as exc:
                 existing = (
-                    _describe(service._base(exc.item, exc.item.start_at), tz)  # noqa: SLF001
+                    _describe(service.base_occurrence(exc.item, exc.item.start_at), tz)
                     if exc.item is not None
                     else None
                 )
@@ -270,7 +270,7 @@ class CreateEvent(Tool):
                     exc, line=existing, update_tool="update_event", trash_place="Calendar > Trash"
                 )
                 return ToolResult(content=text, data={"existing": exc.details})
-            line = _describe(service._base(event, event.start_at), tz)  # noqa: SLF001
+            line = _describe(service.base_occurrence(event, event.start_at), tz)
         return ToolResult(
             content=f"Added: {line}", data={"event": {"id": str(event.id), "title": event.title}}
         )
@@ -354,7 +354,7 @@ class UpdateEvent(Tool):
                 event = await service.update_event(db, event, body, source_url=source.source_url)
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
-            line = _describe(service._base(event, event.start_at), tz)  # noqa: SLF001
+            line = _describe(service.base_occurrence(event, event.start_at), tz)
         return ToolResult(
             content=f"Updated: {line}", data={"event": {"id": str(event.id), "title": event.title}}
         )
