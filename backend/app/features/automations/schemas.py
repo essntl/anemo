@@ -169,6 +169,15 @@ class RunStarted(BaseModel):
     conversation_id: uuid.UUID
 
 
+class AutomationToolOut(BaseModel):
+    """A tool an automation's runs can be given (catalog.tools)."""
+
+    name: str  # what runs call it; for an MCP tool mcp__<server>__<tool>
+    description: str
+    capability: str
+    server: str | None = None  # the MCP server's name; None for a built-in tool
+
+
 class RunChange(BaseModel):
     """Something a run changed, recorded by the server from its tool calls."""
 
