@@ -8,9 +8,9 @@ Whoever resumes this work continues from this log.
 | Wave | Package | Branch | Worktree | Status |
 |---|---|---|---|---|
 | 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done |
-| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | built (4 commits, suite green); in review |
+| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | reviewed; builder fixing the review findings |
 | 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | building (started 2026-11-20) |
-| 1 | T Response timer | `feat/t` | `../anemo-t` | building (started 2026-11-20) |
+| 1 | T Response timer | `feat/t` | `../anemo-t` | built (3 commits, suite green); in review |
 | 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | building (started 2026-11-20) |
 | 2 | A3 Tasks and events join in | `feat/a3` | — | after A1, T, B1, A2 are merged |
 | 2 | B2 Automations with sources | `feat/b2` | — | after A1, T, B1, A2 are merged |
@@ -99,6 +99,14 @@ fill-ins in `packages.md`).
 | # | When | Change | Why | Affected |
 |---|---|---|---|---|
 | 1 | W1, A1 review | `external_key_tombstones`: purging a synced item from the trash keeps its key | Spec 01 1.2: "If I deleted a synced event, an automation must not recreate it"; the purge freed the key | A1 only |
+
+## Decisions during wave 1
+
+- **T:** a `paused` run counts as waiting for the user (it waits for the user to resume
+  it); accepted. `MessageVersion.timing` is accepted as an extra field. The browser
+  learns the server's clock from an `X-Server-Time` header on every `/api` response.
+- **Flaky test:** `test_notifications_automations.py::test_failed_runs_are_retried`
+  failed once. WSL's clock steps can reorder `created_at`. Watch for it at merge.
 
 ## Reviews
 
