@@ -6,6 +6,7 @@ import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { msg, t } from '@/lib/i18n'
+import { actorLabel } from '@/features/provenance/labels'
 import { useRestoreRevision, useRevision, useRevisions } from '../api'
 import { splitFrontMatter } from '../markdown'
 
@@ -35,7 +36,7 @@ export function RevisionsDialog({ documentId, unsaved, onClose }: { documentId: 
                 selected === r.id && 'bg-accent-soft text-accent')}>
               <div className="font-medium">{formatWhen(r.updated_at)}</div>
               <div className="text-[12px] text-muted">
-                {t(AUTHORS[r.author] ?? r.author)}
+                {r.actor ? actorLabel(r.actor) : t(AUTHORS[r.author] ?? r.author)}
                 {r.current && ` · ${t('current')}`}
               </div>
             </button>

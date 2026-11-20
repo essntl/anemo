@@ -6,23 +6,37 @@
  * stored (its first occurrence), so its start date is not moved by accident.
  */
 import { useState } from 'react'
-import { Repeat as RepeatIcon, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { FilePlus2, ListPlus, Repeat as RepeatIcon, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { Field, Input, Textarea } from '@/components/ui/Input'
+import { Field, Input } from '@/components/ui/Input'
+import { Lingering } from '@/components/ui/Lingering'
+import { toast } from '@/components/ui/toast'
 import { Select } from '@/components/ui/Select'
 import { useCurrentProject } from '@/app/projectStore'
 import { useProjects } from '@/features/tasks/api'
 import { Switch } from '@/components/ui/Switch'
 import { plural, t } from '@/lib/i18n'
 import { addDays, dayOf, REMINDER_OPTIONS, today } from '@/features/tasks/dates'
+import { type Synced } from '@/features/provenance/labels'
+import { ActorLine, SourceDetails } from '@/features/provenance/Provenance'
+import { useCreateMeetingNotes } from '@/features/links/api'
+import { LinksPanel } from '@/features/links/LinksPanel'
+import { NotesWithLinks } from '@/features/links/NotesWithLinks'
+import { droppedLabels } from '@/features/links/linkTypes'
+import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/features/properties/api'
+import { PropertyChips } from '@/features/properties/PropertyChips'
+import { NewTaskDialog } from '@/features/links/NewTaskDialog'
+import { eventLink } from '@/lib/appLinks'
 import {
   browserTimeZone,
   type CalendarEvent,
   type Occurrence,
   useChangeOccurrence,
   useDeleteEvent,
+  useDetachEventSource,
   useEvent,
   useSaveEvent,
 } from '../api'
@@ -53,6 +67,10 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
   const save = useSaveEvent()
   const remove = useDeleteEvent()
   const changeOne = useChangeOccurrence()
+  const detach = useDetachEventSource()
+  // The source fields as they are now (detaching clears them while the dialog is open).
+  const [synced, setSynced] = useState<Synced>(source ?? {})
+  const eventId = mode === 'occurrence' ? occurrence?.event_id : source?.id
   const start = source && !source.all_day ? new Date(source.start_at) : null
   const end = source && !source.all_day ? new Date(source.end_at) : null
   const firstDay = source?.start_date ?? (start ? dayOf(start) : (defaults?.date ?? today()))
@@ -73,12 +91,20 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
   const projects = useProjects()
   const currentProject = useCurrentProject()
   const [projectId, setProjectId] = useState(source ? (source.project_id ?? '') : (currentProject?.id ?? ''))
+  const startValues = source?.properties ?? {}
+  const [values, setValues] = useState<Record<string, unknown>>(startValues)
+  const definitions = useProperties().data ?? []
+  const available = propertiesFor(definitions, projectId || null, 'event')
+  const dropping = droppedLabels(values, available, definitions)
+  const navigate = useNavigate()
+  const meetingNotes = useCreateMeetingNotes()
+  const [newTask, setNewTask] = useState(false)
 
   const startInstant = new Date(`${startDate}T${allDay ? '00:00' : startTime}`)
   const endInstant = allDay ? new Date(`${addDays(endDate, 1)}T00:00`) : new Date(`${endDate}T${endTime}`)
   const invalid = !title.trim() || Number.isNaN(startInstant.getTime()) || Number.isNaN(endInstant.getTime()) || endInstant < startInstant
   const pending = save.isPending || changeOne.isPending
-  const error = save.error ?? changeOne.error ?? remove.error
+  const error = save.error ?? changeOne.error ?? remove.error ?? detach.error
 
   // Moving the start keeps the event's length.
   const changeStartDate = (next: string) => {
@@ -118,6 +144,7 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
       color: source?.color ?? null,
       task_id: source?.task_id ?? null,
       project_id: projectId || null,
+      properties: mode === 'event' ? propertyChanges(startValues, values) : valuesFor(definitions, values, projectId || null, 'event'),
     }
     save.mutate({ id: mode === 'event' ? source?.id : undefined, body }, { onSuccess: onClose })
   }
@@ -210,12 +237,59 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
               options={[{ value: '', label: t('No project') }, ...(projects.data ?? []).filter((p) => !p.archived || p.id === projectId).map((p) => ({ value: p.id, label: p.name }))]} />
           </Field>
         )}
-        <Field label={t('Notes')}>
-          <Textarea rows={3} value={description} maxLength={20_000} onChange={(e) => setDescription(e.target.value)} />
+        {mode !== 'occurrence' && dropping.length > 0 && (
+          <p role="status" className="text-[12.5px] text-warning">
+            {t('Not allowed in this project, so they go when you save: {properties}', { properties: dropping.join(', ') })}
+          </p>
+        )}
+        {mode !== 'occurrence' && available.length > 0 && (
+          <section aria-label={t('Properties')} className="flex flex-wrap items-center gap-1.5">
+            <PropertyChips available={available} values={values}
+              onChange={(key, value) => {
+                setValues((current) => {
+                  const next = { ...current }
+                  if (value === null) delete next[key]
+                  else next[key] = value
+                  return next
+                })
+              }} />
+          </section>
+        )}
+        <Field label={t('Notes')} hint={t('Type [[ to link to a document, task, event or chat.')}>
+          <NotesWithLinks rows={3} value={description} maxLength={20_000} onChange={setDescription} />
         </Field>
-        {source?.created_by === 'agent' && <p className="text-[12px] text-muted">{t('Added by an agent.')}</p>}
+        {mode === 'event' && eventId && (
+          <LinksPanel type="event" id={eventId} editable onOpen={(path) => { onClose(); void navigate(path) }} />
+        )}
+        {mode !== 'new' && eventId && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" icon={<FilePlus2 className="h-3.5 w-3.5" />} loading={meetingNotes.isPending}
+              onClick={() => meetingNotes.mutate(eventId, {
+                onSuccess: (doc) => { onClose(); void navigate(doc.ref) },
+                onError: (err) => toast({ message: errorMessage(err) }),
+              })}>
+              {t('Create meeting notes')}
+            </Button>
+            <Button size="sm" variant="secondary" icon={<ListPlus className="h-3.5 w-3.5" />} onClick={() => setNewTask(true)}>
+              {t('New task')}
+            </Button>
+          </div>
+        )}
+        {mode !== 'new' && eventId && (
+          <SourceDetails item={synced} detaching={detach.isPending}
+            onDetach={() => detach.mutate(eventId, { onSuccess: (detached) => setSynced(detached) })} />
+        )}
+        {source?.created_by_actor
+          ? <ActorLine created={source.created_by_actor} updated={source.updated_by_actor} />
+          : source?.created_by === 'agent' && <p className="text-[12px] text-muted">{t('Added by an agent.')}</p>}
         {error && <p className="text-[12.5px] text-error">{errorMessage(error)}</p>}
       </div>
+      <Lingering value={newTask && eventId ? eventId : null}>
+        {(id) => (
+          <NewTaskDialog from={{ ref: eventLink(id), title: source?.title ?? title }} projectId={source?.project_id ?? null}
+            properties={source?.properties ?? {}} onClose={() => setNewTask(false)} />
+        )}
+      </Lingering>
     </Dialog>
   )
 }
@@ -225,6 +299,11 @@ function SeriesForm({ eventId, onClose }: { eventId: string; onClose: () => void
   const event = useEvent(eventId)
   if (!event.data) return null
   return <EventForm mode="event" source={event.data} onClose={onClose} />
+}
+
+/** An event opened by its link: the stored event (a repeating one as its whole series). */
+export function StoredEventDialog({ event, onClose }: { event: CalendarEvent; onClose: () => void }) {
+  return <EventForm mode="event" source={event} onClose={onClose} />
 }
 
 interface EventDialogProps {

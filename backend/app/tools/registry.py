@@ -10,7 +10,7 @@ from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.ask import AskUser
-from app.tools.builtin.automation import AUTOMATION_TOOLS
+from app.tools.builtin.automation import AUTOMATION_TOOLS, STATE_ALIASES
 from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
@@ -82,6 +82,21 @@ FEATURE_TOOLS: dict[str, frozenset[str]] = {
     "music": MUSIC_TOOL_NAMES,
     "automations": frozenset(t.name for t in SCHEDULE_TOOLS),
 }
+
+
+# Offered even when an automation lists its tools: it reads the rest of a long result of
+# the tools it has, nothing more.
+ALWAYS_OFFERED = frozenset({"read_tool_output"})
+
+
+def allowed(tools: list[Tool], allowlist: Iterable[str] | None) -> list[Tool]:
+    """The tools an automation's runs see: those on its list (None: no list, all)."""
+    if allowlist is None:
+        return tools
+    names = {*allowlist, *ALWAYS_OFFERED}
+    if "update_automation_state" in names:
+        names |= STATE_ALIASES  # its old names, which existing prompts may still use
+    return [t for t in tools if t.name in names]
 
 
 def tools_of(features: Iterable[str]) -> set[str]:

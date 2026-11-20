@@ -51,6 +51,7 @@ export const router = createBrowserRouter([
           { path: 'documents/:documentId', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage'), handle: { ownPhoneHeader: true } satisfies RouteHandle },
           // A document addressed by its file: /documents/<folder>/<name>.md
           { path: 'documents/*', ...page(() => import('@/features/documents/DocumentsPage'), 'DocumentsPage'), handle: { ownPhoneHeader: true } satisfies RouteHandle },
+          { path: 'views/:viewId', ...page(() => import('@/features/views/ViewPage'), 'ViewPage') },
           { path: 'tasks', ...page(() => import('@/features/tasks/TasksPage'), 'TasksPage') },
           { path: 'calendar', ...page(() => import('@/features/calendar/CalendarPage'), 'CalendarPage') },
           { path: 'focus', ...page(() => import('@/features/focus/FocusPage'), 'FocusPage') },
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
               { path: 'mcp', ...page(() => import('@/features/mcp/McpSettingsPage'), 'McpSettingsPage') },
               { path: 'notifications', ...page(() => import('@/features/notifications/NotificationSettingsPage'), 'NotificationSettingsPage') },
               { path: 'memory', ...page(() => import('@/features/memory/MemorySettingsPage'), 'MemorySettingsPage') },
+              { path: 'properties', ...page(() => import('@/features/properties/PropertiesSettingsPage'), 'PropertiesSettingsPage') },
               { path: 'sharing', ...page(() => import('@/features/shares/SharedLinksPage'), 'SharedLinksPage') },
               { path: 'usage', ...page(() => import('@/features/usage/UsagePage'), 'UsagePage') },
               { path: 'advanced', ...page(() => import('@/features/settings/pages/AdvancedPage'), 'AdvancedPage') },

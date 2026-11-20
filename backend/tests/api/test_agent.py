@@ -128,6 +128,8 @@ async def test_agent_uses_tools_and_plan(authed):
             "search_documents",
             "write_document",
             "edit_document",
+            "set_document_properties",
+            "list_properties",
             "run_shell",
             "read_web_page",  # web_search only appears once SearXNG is set up
             "video_transcript",
@@ -144,6 +146,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_project",
             "update_project",
             "list_events",
+            "get_event",
             "create_event",
             "update_event",
             "delete_event",

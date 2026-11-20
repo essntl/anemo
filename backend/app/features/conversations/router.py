@@ -155,7 +155,9 @@ async def send_turn(conversation_id: uuid.UUID, body: TurnIn, db: Db) -> TurnOut
     return TurnOut(
         run_id=run.id,
         user_message=service.message_out(user, files),
-        assistant_message=service.message_out(assistant, mode=run.kind),
+        assistant_message=service.message_out(
+            assistant, mode=run.kind, timings=await service.message_timings(db, [assistant])
+        ),
     )
 
 
@@ -176,7 +178,9 @@ async def regenerate(
     return TurnOut(
         run_id=run.id,
         user_message=None,
-        assistant_message=service.message_out(assistant, mode=run.kind),
+        assistant_message=service.message_out(
+            assistant, mode=run.kind, timings=await service.message_timings(db, [assistant])
+        ),
     )
 
 
@@ -197,7 +201,9 @@ async def edit_last(conversation_id: uuid.UUID, body: EditLastIn, db: Db) -> Tur
     return TurnOut(
         run_id=run.id,
         user_message=service.message_out(user, files),
-        assistant_message=service.message_out(assistant, mode=run.kind),
+        assistant_message=service.message_out(
+            assistant, mode=run.kind, timings=await service.message_timings(db, [assistant])
+        ),
     )
 
 

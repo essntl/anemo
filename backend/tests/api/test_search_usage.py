@@ -110,7 +110,7 @@ async def test_search_finds_every_kind(authed):
     assert titles(result, "task")[-1] == "Old otter task"
     assert sorted(titles(result, "task")) == ["Buy food", "Feed the otter", "Old otter task"]
     event = next(g for g in result["groups"] if g["kind"] == "event")["hits"][0]
-    assert event["title"] == "Zoo visit" and event["url"] == "/calendar?date=2026-10-10"
+    assert event["title"] == "Zoo visit" and event["url"] == f"/calendar?event={event['id']}"
     files = {
         h["title"]: h["url"] for g in result["groups"] if g["kind"] == "file" for h in g["hits"]
     }

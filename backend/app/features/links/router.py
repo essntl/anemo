@@ -4,15 +4,24 @@ tasks and files. Moving files keeps them valid (see files/router.py and service.
 import asyncio
 import uuid
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Query, UploadFile
 
 from app.api.deps import Db
 from app.core.errors import AppError
+from app.core.refs import ObjectRef
 from app.features.documents import service as documents
 from app.features.links import service
-from app.features.links.schemas import AttachIn, Backlinks, TaskFileOut
+from app.features.links.schemas import (
+    AttachIn,
+    Backlinks,
+    BrokenLinkOut,
+    LinkItem,
+    LinksOut,
+    LinkTo,
+    TaskFileOut,
+)
 from app.features.tasks import service as tasks
 from app.workspace import files
 
@@ -86,3 +95,63 @@ async def file_backlinks(db: Db, path: str = Query(min_length=1, max_length=1000
 async def upload_folder(db: Db, project_id: uuid.UUID | None = None) -> str:
     """Where files added from a document or task go (created if missing)."""
     return await service.upload_folder(db, project_id)
+
+
+# -- the link index ---------------------------------------------------------------------
+
+LinkableType = Literal["document", "task", "event", "chat"]
+
+
+def _ref(object_type: str, object_id: uuid.UUID) -> ObjectRef:
+    return ObjectRef(object_type, object_id)  # type: ignore[arg-type]
+
+
+@router.get("/links/broken", response_model=list[BrokenLinkOut])
+async def broken_links(db: Db) -> list[BrokenLinkOut]:
+    """Links to items deleted for good, and where each is, so they can be fixed."""
+    return await service.broken_links(db)
+
+
+@router.get("/links/{object_type}/{object_id}", response_model=LinksOut)
+async def links_of(object_type: LinkableType, object_id: uuid.UUID, db: Db) -> LinksOut:
+    """What the item links to and what links to it ("Linked from"), grouped by type.
+    Links to items in the trash or deleted for good say so (`state`)."""
+    ref = _ref(object_type, object_id)
+    await service.check_item(db, ref)
+    return await service.links_of(db, ref)
+
+
+@router.post("/links/{object_type}/{object_id}", response_model=LinksOut)
+async def add_links(
+    object_type: Literal["task", "event"], object_id: uuid.UUID, body: LinkTo, db: Db
+) -> LinksOut:
+    """Link a task or event to other items (explicit links; each must exist)."""
+    ref = _ref(object_type, object_id)
+    await service.change_links(db, ref, body.to, [])
+    return await service.links_of(db, ref)
+
+
+@router.delete("/links/{object_type}/{object_id}", status_code=204)
+async def remove_link(
+    object_type: Literal["task", "event"],
+    object_id: uuid.UUID,
+    db: Db,
+    to: str = Query(min_length=1, max_length=300, description="The linked item's reference"),
+) -> None:
+    """Remove an explicit link (a link in the text goes when the text no longer has it)."""
+    await service.change_links(db, _ref(object_type, object_id), [], [to])
+
+
+@router.post("/calendar/events/{event_id}/meeting-notes", response_model=LinkItem, status_code=201)
+async def create_meeting_notes(event_id: uuid.UUID, db: Db) -> LinkItem:
+    """Make a document for the event's meeting notes, with the event's properties, linked
+    both ways (the notes link to the event, the event to the notes)."""
+    doc = await service.create_meeting_notes(db, event_id)
+    return LinkItem(
+        type="document",
+        id=doc.id,
+        ref=f"/documents/{doc.id}",
+        title=doc.title,
+        detail=doc.path,
+        state="live",
+    )

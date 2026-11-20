@@ -94,6 +94,7 @@ async def finalize(
         )
     ):
         row.status = "cancelled"
+        row.ended_at = datetime.now(UTC)  # its duration ends with the run
     for approval in await db.scalars(
         select(Approval).where(Approval.run_id == run.id, Approval.status == "pending")
     ):

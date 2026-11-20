@@ -37,6 +37,7 @@ from app.features.notifications.router import router as notifications_router
 from app.features.permissions_router import router as permissions_router
 from app.features.profiles.router import router as profiles_router
 from app.features.projects.router import router as projects_router
+from app.features.properties.router import router as properties_router
 from app.features.providers.router import router as providers_router
 from app.features.research.router import router as research_router
 from app.features.runs.agent_router import router as agent_router
@@ -53,6 +54,7 @@ from app.features.tasks.router import router as tasks_router
 from app.features.trash.router import router as trash_router
 from app.features.updates.router import router as updates_router
 from app.features.usage.router import router as usage_router
+from app.features.views.router import router as views_router
 from app.web.router import router as web_router
 
 api_router = APIRouter(prefix="/api")
@@ -101,4 +103,6 @@ protected.include_router(usage_router)
 protected.include_router(stats_router)
 protected.include_router(system_router)
 protected.include_router(updates_router)
+protected.include_router(properties_router)
+protected.include_router(views_router)
 api_router.include_router(protected)

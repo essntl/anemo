@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime, time
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -16,9 +17,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
-from app.db.base import Base, IdMixin, TimestampMixin
+from app.db.base import Base, IdMixin, ProvenanceMixin, SourceMixin, TimestampMixin
 
 
 class Project(Base, IdMixin, TimestampMixin):
@@ -43,12 +44,19 @@ class Project(Base, IdMixin, TimestampMixin):
     )
 
 
-class Task(Base, IdMixin, TimestampMixin):
+class Task(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin):
     __tablename__ = "tasks"
     __table_args__ = (
         Index("ix_tasks_status_due", "status", "due_date"),
         Index("ix_tasks_project", "project_id"),
         Index("ix_tasks_parent", "parent_id"),
+        Index(
+            "ix_tasks_external_key",
+            "external_key",
+            unique=True,
+            postgresql_where=text("external_key IS NOT NULL"),
+        ),
+        Index("ix_tasks_properties", "properties", postgresql_using="gin"),
     )
 
     title: Mapped[str] = mapped_column(String(300))
@@ -64,7 +72,14 @@ class Task(Base, IdMixin, TimestampMixin):
     # due on the rule's next day, and the rule moves to that one.
     rrule: Mapped[str | None] = mapped_column(String(500))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The task's tags, as they always were. They are also its `tags` property: the
+    # same list is kept in `properties["tags"]` (see _mirror_tags), so property filters,
+    # views and counts see them. Write the tags here, never into `properties`.
     tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    # Property values (features/properties), validated by properties.service.validate.
+    properties: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL")
     )

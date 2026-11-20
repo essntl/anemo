@@ -102,6 +102,8 @@ class RunShell(Tool):
                     summary=f"Use the internet for `{_short(args.command, 60)}`",
                     outside_workspace=run.outside_workspace,
                     blocked=run.blocked,
+                    # SSH, mail, curl -X POST ...: automation runs always ask.
+                    contacts_people=True,
                 )
             )
         return actions

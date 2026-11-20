@@ -386,7 +386,13 @@ class HttpRequest(Tool):
 
     def actions(self, args: HttpInput, ctx: ToolContext) -> list[Action]:
         risk: Risk = "safe" if args.method in ("GET", "HEAD", "OPTIONS") else "moderate"
-        return [url_action(ctx, self.capability, args.url, args.method, risk)]
+        action = url_action(ctx, self.capability, args.url, args.method, risk)
+        # Anything but a read may send something to someone (automation runs ask).
+        action.contacts_people = self.changes(args)
+        return [action]
+
+    def changes(self, args: HttpInput) -> bool:
+        return args.method not in ("GET", "HEAD", "OPTIONS")
 
     async def run(self, args: HttpInput, ctx: ToolContext) -> ToolResult:
         allow = safe_http.parse_allowlist(ctx.web.allowed_private_hosts)

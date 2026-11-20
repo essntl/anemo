@@ -16,6 +16,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
+from app.core.actor import USER, Actor
 from app.features.attachments.images import PreparedImage
 from app.policy.models import Action, Limits
 from app.providers.base import ToolSpec
@@ -25,6 +26,20 @@ from app.workspace.access import WorkspaceSettings
 EmitFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 RecordChangeFn = Callable[..., Awaitable[None]]
 AddImageFn = Callable[[str, PreparedImage], Awaitable[str]]
+
+
+# Capabilities whose calls change nothing outside the run, besides the "*.read" ones.
+# ("agent.spawn": a sub-agent's own calls are what count.)
+READ_ONLY_CAPABILITIES = ("net.search", "net.fetch", "automation.state")
+READ_ONLY_PREFIXES = ("util.", "agent.")
+
+
+def reads_only(capability: str) -> bool:
+    return (
+        capability.endswith(".read")
+        or capability in READ_ONLY_CAPABILITIES
+        or capability.startswith(READ_ONLY_PREFIXES)
+    )
 
 
 async def _no_record(**_: Any) -> None:
@@ -65,6 +80,9 @@ class ToolContext:
     conversation_id: uuid.UUID | None = None
     message_id: uuid.UUID | None = None
     answer_run_id: uuid.UUID | None = None  # the run of that answer
+    # Who the run acts for (provenance). Set by the runtime, never from model input;
+    # it is also the current actor while run() executes (app/core/actor.py).
+    actor: Actor = USER
 
 
 class ToolResult(BaseModel):
@@ -72,6 +90,9 @@ class ToolResult(BaseModel):
     is_error: bool = False
     data: dict[str, Any] | None = None  # structured extras for the UI (never sent to the model)
     images: list[str] = []  # attachment ids shown to the model right after this result
+    # Whether this call changed something; None: as `Tool.changes(args)` says. False for a
+    # write that was refused without an error (e.g. a create whose external key is taken).
+    changed: bool | None = None
 
 
 class Tool(ABC):
@@ -84,6 +105,20 @@ class Tool(ABC):
     # Safe to run again if a worker crashed mid-call (reads: yes; writes: no).
     idempotent: ClassVar[bool] = True
     timeout_s: ClassVar[float] = 30.0
+    # Whether a successful call changes something (a file, a task, an event, a page in
+    # another system): an automation run's changes are recorded from these calls, and a
+    # run without any (that notified nobody) did "nothing". None: decided by the
+    # capability (reads, searches and the agent's own helpers change nothing).
+    changes_state: ClassVar[bool | None] = None
+    # Executed when the model calls it, but never offered (left out of the tool list):
+    # old names that existing prompts may still use.
+    hidden: ClassVar[bool] = False
+
+    def changes(self, args: Any) -> bool:
+        """Whether this call changes something. Override when it depends on the call."""
+        if self.changes_state is not None:
+            return self.changes_state
+        return not reads_only(self.capability)
 
     def actions(self, args: Any, ctx: ToolContext) -> list[Action]:
         """What this call would do. Override to add resources and risk."""

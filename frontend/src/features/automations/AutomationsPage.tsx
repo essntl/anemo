@@ -1,9 +1,12 @@
 /**
  * Automations: prompts an agent runs by itself on a schedule. Each card shows
- * when it runs next and how the last run went; its history lists past runs.
+ * when it runs next and how the last run went; its history (the run log) lists past
+ * runs with their outcome, what they changed and how long they took (shown as the chat
+ * shows an answer's duration). `?automation=<id>&run=<run id>` opens
+ * that automation's run log at that run (links to what an automation did).
  */
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { ChevronDown, Clock, History, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
@@ -12,14 +15,17 @@ import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Switch } from '@/components/ui/Switch'
+import { AnswerDuration, LiveTiming } from '@/features/chat/components/AnswerTiming'
 import { RunStatusBadge } from '@/features/runs/components/RunStatusBadge'
 import { useSaveSection, useSettings } from '@/features/settings/api'
 import { cn } from '@/lib/cn'
-import { formatDuration, formatUpcoming, formatWhen } from '@/lib/format'
+import { formatUpcoming, formatWhen } from '@/lib/format'
 import { plural, rich, t } from '@/lib/i18n'
 import {
   type Automation,
+  type AutomationRun,
   STATUS_LABELS,
+  useAutomationRun,
   useAutomationRuns,
   useAutomations,
   useDeleteAutomation,
@@ -41,36 +47,84 @@ const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' 
   missed: 'warning',
 }
 
-/** The past runs of one automation; each opens its conversation. */
-function RunHistory({ automation }: { automation: Automation }) {
-  const runs = useAutomationRuns(automation.id)
+/** How long a run took, quietly, with the details on hover or click (as in the chat);
+ * counting up while it works, standing still while it waits for you. */
+function RunDuration({ run }: { run: AutomationRun }) {
+  const { timing } = run
+  return (
+    <span className="shrink-0 text-[12px] text-muted">
+      {timing.finished_at ? <AnswerDuration timing={timing} label={t('How long the run took:')} /> : <LiveTiming timing={timing} paused={run.status === 'paused'} />}
+    </span>
+  )
+}
+
+/** One run in the log: when, how it went, how long it took, the model's outcome line
+ * and the changes the server recorded from its tool calls. */
+function RunLogEntry({ run, highlighted }: { run: AutomationRun; highlighted: boolean }) {
+  const ref = useRef<HTMLLIElement>(null)
+  const [open, setOpen] = useState(highlighted)
+  useEffect(() => {
+    if (highlighted) ref.current?.scrollIntoView?.({ block: 'center' })
+  }, [highlighted])
+  const changes = run.changes ?? []
+  const summary = run.error ?? run.outcome_line
+  return (
+    <li ref={ref} className={cn('rounded-control', highlighted && 'bg-surface-2')}>
+      <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 text-[13px] pointer-coarse:py-2.5">
+        <Link to={run.conversation_id ? `/c/${run.conversation_id}` : `/runs/${run.run_id}`}
+          className="w-32 shrink-0 text-muted hover:underline">{formatWhen(run.created_at)}</Link>
+        <RunStatusBadge status={run.status} />
+        <RunDuration run={run} />
+        {run.nothing_to_do && <Badge tone="neutral">{t('Nothing to do')}</Badge>}
+        <span className={cn('min-w-0 flex-1 truncate text-[12.5px]', run.error ? 'text-error' : 'text-subtle')} title={summary ?? undefined}>
+          {summary}
+        </span>
+        {changes.length > 0 && (
+          <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}
+            className="text-[12px] text-accent hover:underline">
+            {plural(changes.length, '{n} change', '{n} changes')}
+          </button>
+        )}
+      </div>
+      {open && changes.length > 0 && (
+        <ul className="mb-1.5 ml-36 flex flex-col gap-0.5 text-[12.5px] text-muted max-md:ml-4">
+          {changes.map((c, i) => (
+            <li key={i} className="min-w-0 truncate">
+              <span className="font-mono text-[11.5px] text-subtle">{c.tool}</span>{' '}
+              {c.ref ? <Link to={c.ref} className="text-accent hover:underline">{c.summary}</Link> : c.summary}
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  )
+}
+
+/** The run log of one automation; each run opens its conversation. A run a link points
+ * to that is older than the log shows is fetched on its own and shown first. */
+function RunHistory({ automation, highlight }: { automation: Automation; highlight: string | null }) {
+  const runs = useAutomationRuns(automation.id, [automation.active_run_id, automation.last_status, automation.last_run_at].join('|'))
+  const listed = runs.data?.some((run) => run.run_id === highlight) ?? true
+  const linked = useAutomationRun(automation.id, highlight && !listed ? highlight : null)
   if (runs.isError) return <p className="text-[12.5px] text-error">{errorMessage(runs.error)}</p>
   if (!runs.data) return <p className="text-[12.5px] text-muted">{t('Loading…')}</p>
-  if (runs.data.length === 0) return <p className="text-[12.5px] text-muted">{t('It has not run yet.')}</p>
+  const older = listed ? [] : (linked.data ?? [])
+  if (runs.data.length === 0 && older.length === 0) return <p className="text-[12.5px] text-muted">{t('It has not run yet.')}</p>
   return (
     <ul className="flex flex-col">
-      {runs.data.map((run) => (
-        <li key={run.id}>
-          <Link to={run.conversation_id ? `/c/${run.conversation_id}` : `/runs/${run.id}`}
-            className="flex items-center gap-2 rounded-control px-2 py-1.5 text-[13px] hover:bg-surface-hover pointer-coarse:py-2.5">
-            <span className="w-32 shrink-0 text-muted">{formatWhen(run.created_at)}</span>
-            <RunStatusBadge status={run.status} />
-            <span className="min-w-0 flex-1 truncate text-right text-[12px] text-subtle">
-              {plural(run.totals.tool_calls, '{n} action', '{n} actions')}
-              {run.totals.active_s > 0 && <> · {formatDuration(run.totals.active_s)}</>}
-            </span>
-          </Link>
-        </li>
-      ))}
+      {older.map((run) => <RunLogEntry key={run.run_id} run={run} highlighted />)}
+      {runs.data.map((run) => <RunLogEntry key={run.run_id} run={run} highlighted={run.run_id === highlight} />)}
     </ul>
   )
 }
 
-function AutomationCard({ automation, onEdit }: { automation: Automation; onEdit: () => void }) {
+function AutomationCard({ automation, onEdit, highlight }: { automation: Automation; onEdit: () => void; highlight?: string | null }) {
   const setEnabled = useSetAutomationEnabled()
   const runNow = useRunAutomation()
   const remove = useDeleteAutomation()
-  const [showHistory, setShowHistory] = useState(false)
+  // `highlight` is set when a link pointed here (undefined: none did).
+  const [showHistory, setShowHistory] = useState(highlight !== undefined)
+  const pending = automation.pending_approvals ?? []
   const running = automation.active_run_id !== null
   const status = automation.last_status
   const error = setEnabled.error ?? runNow.error ?? remove.error
@@ -105,6 +159,11 @@ function AutomationCard({ automation, onEdit }: { automation: Automation; onEdit
             {automation.last_run_at && <> · {t('last ran {when}', { when: formatWhen(automation.last_run_at) })}</>}
           </p>
           <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap break-words text-[13px] text-subtle">{automation.prompt}</p>
+          {(automation.failure_streak ?? 0) > 0 && automation.last_error && (
+            <p className="mt-1.5 break-words text-[12.5px] text-error">
+              {plural(automation.failure_streak ?? 0, 'Failed {n} time in a row: {error}', 'Failed {n} times in a row: {error}', { error: automation.last_error })}
+            </p>
+          )}
         </div>
         <ActionMenu actions={[
           { label: t('Edit'), icon: <Pencil />, onSelect: onEdit },
@@ -121,14 +180,20 @@ function AutomationCard({ automation, onEdit }: { automation: Automation; onEdit
           {t('History')}
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showHistory && 'rotate-180')} />
         </Button>
-        {running && automation.active_run_id && (
+        {running && automation.active_run_id && status !== 'waiting' && (
           <Link to={`/runs/${automation.active_run_id}`} className="text-[13px] text-accent hover:underline">
-            {status === 'waiting' ? t('Review and approve') : t('Watch it work')}
+            {t('Watch it work')}
+          </Link>
+        )}
+        {pending.length > 0 && (
+          <Link to={pending[0].conversation_id ? `/c/${pending[0].conversation_id}` : `/runs/${pending[0].run_id}`}
+            className="text-[13px] text-accent hover:underline">
+            {pending.length === 1 ? t('Review and approve') : plural(pending.length, '{n} approval waiting', '{n} approvals waiting')}
           </Link>
         )}
       </div>
       {error && <p className="mt-2 pl-12 text-[12.5px] text-error">{errorMessage(error)}</p>}
-      {showHistory && <div className="mt-2 border-t border-border pt-2 md:pl-10"><RunHistory automation={automation} /></div>}
+      {showHistory && <div className="mt-2 border-t border-border pt-2 md:pl-10"><RunHistory automation={automation} highlight={highlight ?? null} /></div>}
     </div>
   )
 }
@@ -139,6 +204,8 @@ export function AutomationsPage() {
   const [editing, setEditing] = useState<{ automation: Automation | null; template?: AutomationTemplate } | null>(null)
   const settings = useSettings()
   const saveProtections = useSaveSection('automations')
+  const [params] = useSearchParams()
+  const linked = params.get('automation')
   const protections = settings.data?.automations
   const paused = protections?.paused ?? false
   const items = automations.data ?? []
@@ -179,7 +246,10 @@ export function AutomationsPage() {
           action={<Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>{t('New automation')}</Button>} />
       )}
       <div className="flex flex-col gap-2">
-        {items.map((a) => <AutomationCard key={a.id} automation={a} onEdit={() => setEditing({ automation: a })} />)}
+        {items.map((a) => (
+          <AutomationCard key={a.id} automation={a} onEdit={() => setEditing({ automation: a })}
+            highlight={a.id === linked ? params.get('run') : undefined} />
+        ))}
       </div>
 
       {automations.isSuccess && templates.length > 0 && (

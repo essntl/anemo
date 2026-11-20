@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { documentLink, isAppLink, taskLink } from './appLinks'
+import { chatLink, documentLink, eventLink, isAppLink, taskLink } from './appLinks'
 
 describe('links inside the app', () => {
-  it('point to the page of a document or a task', () => {
+  it('point to the page of a document, task, event or chat', () => {
     expect(documentLink('abc')).toBe('/documents/abc')
     expect(taskLink('abc')).toBe('/tasks?task=abc')
+    expect(eventLink('abc')).toBe('/calendar?event=abc')
+    expect(chatLink('abc')).toBe('/c/abc')
   })
 
   it('are told apart from links to other sites', () => {

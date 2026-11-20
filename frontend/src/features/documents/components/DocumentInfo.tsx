@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { FileText, History, SquareCheckBig, X } from 'lucide-react'
-import { useDocumentBacklinks } from '@/features/links/api'
+import { History, X } from 'lucide-react'
+import { allLinks, useLinks } from '@/features/links/api'
+import { TYPE_ICONS } from '@/features/links/linkTypes'
+import { ActorLine } from '@/features/provenance/Provenance'
+import { actorLabel } from '@/features/provenance/labels'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { dateLocale, msg, plural, t } from '@/lib/i18n'
-import { useRevisions } from '../api'
+import { useDocuments, useRevisions } from '../api'
 import type { OutlineItem } from '../outline'
 
 type Tab = 'outline' | 'details' | 'chat'
@@ -61,8 +64,11 @@ function Outline({ outline, active, onJump }: { outline: OutlineItem[]; active: 
 
 /** What the document is, what links to it and its latest versions. */
 function Details({ documentId, path, words, onHistory }: { documentId: string; path: string; words: number; onHistory: () => void }) {
-  const links = useDocumentBacklinks(documentId).data
+  const links = useLinks('document', documentId).data
+  const back = allLinks(links?.backlinks)
   const revisions = useRevisions(documentId, true)
+  // Who made it (who saved each version is in the history below).
+  const created = useDocuments().data?.documents.find((d) => d.id === documentId)?.created_by_actor
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3">
       <section aria-label={t('File')}>
@@ -72,19 +78,15 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
           {plural(words, '{count} word', '{count} words', { count: words.toLocaleString(dateLocale()) })}
           <span className="text-muted"> · {t('about {minutes} min to read', { minutes: Math.max(1, Math.round(words / 220)) })}</span>
         </p>
+        <ActorLine created={created} className="px-2 pt-1" />
       </section>
 
       <section aria-label={t('Linked from')}>
         <div className={LABEL}>{t('Linked from')}</div>
-        {links && links.documents.length === 0 && links.tasks.length === 0 && <p className="px-2 text-[13px] text-muted">{t('No document or task links here yet.')}</p>}
-        {links?.documents.map((d) => (
-          <Link key={d.id} to={`/documents/${d.id}`} className={ROW}>
-            <FileText className="h-3.5 w-3.5 shrink-0 text-muted" /><span className="min-w-0 truncate">{d.title}</span>
-          </Link>
-        ))}
-        {links?.tasks.map((t) => (
-          <Link key={t.id} to={`/tasks?task=${t.id}`} className={ROW}>
-            <SquareCheckBig className="h-3.5 w-3.5 shrink-0 text-muted" /><span className="min-w-0 truncate">{t.title}</span>
+        {links && back.length === 0 && <p className="px-2 text-[13px] text-muted">{t('Nothing links here yet.')}</p>}
+        {back.map((l) => (
+          <Link key={`${l.type}:${l.id}`} to={l.ref} title={l.detail || undefined} className={cn(ROW, '[&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:text-muted')}>
+            {TYPE_ICONS[l.type]}<span className="min-w-0 truncate">{l.title}</span>
           </Link>
         ))}
       </section>
@@ -95,7 +97,7 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
           <button key={r.id} type="button" onClick={onHistory} className={cn(ROW, 'min-h-11 items-start py-1.5')}>
             <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
             <span className="min-w-0">
-              <span className="block truncate">{t(AUTHORS[r.author] ?? r.author)}{r.current && ` · ${t('current')}`}</span>
+              <span className="block truncate">{r.actor ? actorLabel(r.actor) : t(AUTHORS[r.author] ?? r.author)}{r.current && ` · ${t('current')}`}</span>
               <span className="block text-[12px] text-muted">{formatWhen(r.updated_at)}</span>
             </span>
           </button>

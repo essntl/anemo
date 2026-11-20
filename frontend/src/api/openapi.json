@@ -1573,6 +1573,65 @@
         }
       }
     },
+    "/api/settings/properties": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Properties Settings",
+        "operationId": "put_properties_settings_api_settings_properties_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertySettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertySettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -5668,6 +5727,353 @@
         }
       }
     },
+    "/api/links/broken": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Broken Links",
+        "description": "Links to items deleted for good, and where each is, so they can be fixed.",
+        "operationId": "broken_links_api_links_broken_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BrokenLinkOut"
+                  },
+                  "title": "Response Broken Links Api Links Broken Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/links/{object_type}/{object_id}": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Links Of",
+        "description": "What the item links to and what links to it (\"Linked from\"), grouped by type.\nLinks to items in the trash or deleted for good say so (`state`).",
+        "operationId": "links_of_api_links__object_type___object_id__get",
+        "parameters": [
+          {
+            "name": "object_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "document",
+                "task",
+                "event",
+                "chat"
+              ],
+              "type": "string",
+              "title": "Object Type"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinksOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Add Links",
+        "description": "Link a task or event to other items (explicit links; each must exist).",
+        "operationId": "add_links_api_links__object_type___object_id__post",
+        "parameters": [
+          {
+            "name": "object_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "task",
+                "event"
+              ],
+              "type": "string",
+              "title": "Object Type"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkTo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinksOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Remove Link",
+        "description": "Remove an explicit link (a link in the text goes when the text no longer has it).",
+        "operationId": "remove_link_api_links__object_type___object_id__delete",
+        "parameters": [
+          {
+            "name": "object_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "task",
+                "event"
+              ],
+              "type": "string",
+              "title": "Object Type"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "description": "The linked item's reference",
+              "title": "To"
+            },
+            "description": "The linked item's reference"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendar/events/{event_id}/meeting-notes": {
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Create Meeting Notes",
+        "description": "Make a document for the event's meeting notes, with the event's properties, linked\nboth ways (the notes link to the event, the event to the notes).",
+        "operationId": "create_meeting_notes_api_calendar_events__event_id__meeting_notes_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files": {
       "get": {
         "tags": [
@@ -7637,7 +8043,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReindexOut"
+                  "$ref": "#/components/schemas/app__features__memory__router__ReindexOut"
                 }
               }
             }
@@ -8664,6 +9070,408 @@
         }
       }
     },
+    "/api/documents/{document_id}/properties": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Properties",
+        "description": "Change properties: the front matter is rewritten through the normal save, so the\nchange gets a revision. 400 property_invalid (with the closest existing values) and\n409 conflict_base_hash write nothing.",
+        "operationId": "set_properties_api_documents__document_id__properties_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__features__documents__router__PropertiesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentContent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/folder-defaults": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Folder Defaults",
+        "description": "The default properties of the document's folder it doesn't have (offered after a\nmove; never applied without asking).",
+        "operationId": "folder_defaults_api_documents__document_id__folder_defaults_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Folder Defaults Api Documents  Document Id  Folder Defaults Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/paths": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Path History",
+        "description": "Where the document was before (old paths keep leading to it).",
+        "operationId": "path_history_api_documents__document_id__paths_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PathOut"
+                  },
+                  "title": "Response Path History Api Documents  Document Id  Paths Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/hub": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Hub",
+        "description": "When the document is the hub page of property values (a client's page): every\ndocument, task and event with each value (the UI groups them by type; what links to\nthe hub itself comes from its backlinks).",
+        "operationId": "hub_api_documents__document_id__hub_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HubSection"
+                  },
+                  "title": "Response Hub Api Documents  Document Id  Hub Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/mentions": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Old Path Mentions",
+        "description": "After a move: project instructions and memories that still name the old path.",
+        "operationId": "old_path_mentions_api_documents__document_id__mentions_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "old_path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1000,
+              "title": "Old Path"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentionOut"
+                  },
+                  "title": "Response Old Path Mentions Api Documents  Document Id  Mentions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Update Mentions",
+        "description": "Point the chosen instructions and memories at the document's path now.",
+        "operationId": "update_mentions_api_documents__document_id__mentions_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMentionsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/daily-notes/{day}": {
       "get": {
         "tags": [
@@ -9274,6 +10082,66 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/detach-source": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Detach Source",
+        "description": "Make a synced task an ordinary one: its source fields are cleared.",
+        "operationId": "detach_source_api_tasks__task_id__detach_source_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -10339,6 +11207,136 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendar/events/{event_id}/properties": {
+      "put": {
+        "tags": [
+          "calendar"
+        ],
+        "summary": "Set Properties",
+        "description": "Change some property values of an event (for a repeating event: of the series).",
+        "operationId": "set_properties_api_calendar_events__event_id__properties_put",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__features__calendar__schemas__PropertiesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendar/events/{event_id}/detach-source": {
+      "post": {
+        "tags": [
+          "calendar"
+        ],
+        "summary": "Detach Source",
+        "description": "Make a synced event an ordinary one: its source fields are cleared.",
+        "operationId": "detach_source_api_calendar_events__event_id__detach_source_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -13671,6 +14669,60 @@
         }
       }
     },
+    "/api/automations/tools": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Tool Catalog",
+        "description": "The tools its runs can be given: the built-in ones and those of the connected MCP\nservers (by the names runs call them).",
+        "operationId": "tool_catalog_api_automations_tools_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationToolOut"
+                  },
+                  "title": "Response Tool Catalog Api Automations Tools Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/automations/{automation_id}": {
       "get": {
         "tags": [
@@ -13834,6 +14886,120 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/{automation_id}/runs": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Run Log",
+        "description": "The automation's runs, newest first, with the model's outcome line and the changes\nthe server recorded. Page with `before` = the last item's created_at.",
+        "operationId": "run_log_api_automations__automation_id__runs_get",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs started before this time",
+              "title": "Before"
+            },
+            "description": "Only runs started before this time"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this run (a link to one)",
+              "title": "Run Id"
+            },
+            "description": "Only this run (a link to one)"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationRunOut"
+                  },
+                  "title": "Response Run Log Api Automations  Automation Id  Runs Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -15314,10 +16480,1544 @@
           }
         }
       }
+    },
+    "/api/properties": {
+      "get": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "List Properties",
+        "description": "Every property with its values and how many documents, tasks and events use\neach.",
+        "operationId": "list_properties_api_properties_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DefinitionOut"
+                  },
+                  "title": "Response List Properties Api Properties Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Create Property",
+        "operationId": "create_property_api_properties_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefinitionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefinitionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/{definition_id}": {
+      "patch": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Update Property",
+        "operationId": "update_property_api_properties__definition_id__patch",
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefinitionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefinitionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Delete Property",
+        "description": "Files keep what they say about it; it is no longer indexed or offered. Tasks and\nevents lose their values of it.",
+        "operationId": "delete_property_api_properties__definition_id__delete",
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/{definition_id}/options": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Add Option",
+        "operationId": "add_option_api_properties__definition_id__options_post",
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/{definition_id}/options/{option_id}": {
+      "patch": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Update Option",
+        "description": "A new label touches no files (the index and search follow); the hub document is\nthe value's own page.",
+        "operationId": "update_option_api_properties__definition_id__options__option_id__patch",
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "option_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Option Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Delete Option",
+        "description": "Only a value nothing uses; merge it into another to replace it everywhere.",
+        "operationId": "delete_option_api_properties__definition_id__options__option_id__delete",
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "option_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Option Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/{definition_id}/options/{option_id}/rename": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Rename Option",
+        "description": "Give a value a new slug: every document with it is rewritten (a revision each).",
+        "operationId": "rename_option_api_properties__definition_id__options__option_id__rename_post",
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "option_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Option Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewriteOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/{definition_id}/options/{option_id}/merge": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Merge Option",
+        "description": "Replace this value by another everywhere (a revision each) and remove it.",
+        "operationId": "merge_option_api_properties__definition_id__options__option_id__merge_post",
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "option_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Option Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewriteOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/validate": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Validate",
+        "description": "Check values without saving anything (the UI asks before adding a tag). Errors\ncome back as 400 property_invalid with the closest existing values.",
+        "operationId": "validate_api_properties_validate_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/reindex": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Reindex",
+        "description": "Re-read every document whose index is out of date (changed outside Anemo).",
+        "operationId": "reindex_api_properties_reindex_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__features__properties__schemas__ReindexOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/suggestions": {
+      "get": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "List Suggestions",
+        "description": "Properties the assistant suggested for documents, waiting to be applied or dismissed.",
+        "operationId": "list_suggestions_api_properties_suggestions_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SuggestionOut"
+                  },
+                  "title": "Response List Suggestions Api Properties Suggestions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/suggestions/apply": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Apply Suggestions",
+        "description": "Write the chosen suggestions into their documents (a revision each).",
+        "operationId": "apply_suggestions_api_properties_suggestions_apply_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionIds"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppliedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/suggestions/dismiss": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Dismiss Suggestions",
+        "operationId": "dismiss_suggestions_api_properties_suggestions_dismiss_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionIds"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/tag-suggestions": {
+      "get": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Tag Suggestions",
+        "description": "Tags that name a value of another property (a client's tag), offered to be turned\ninto that value. Worked out from the data; dismissed ones are left out.",
+        "operationId": "tag_suggestions_api_properties_tag_suggestions_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagValueOut"
+                  },
+                  "title": "Response Tag Suggestions Api Properties Tag Suggestions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/tag-suggestions/apply": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Apply Tag Suggestion",
+        "description": "Give every item with the tag the value, and remove the tag (documents get a\nrevision). Items that can't take it are left alone and listed.",
+        "operationId": "apply_tag_suggestion_api_properties_tag_suggestions_apply_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagValueIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagValueAppliedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/tag-suggestions/dismiss": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Dismiss Tag Suggestion",
+        "operationId": "dismiss_tag_suggestion_api_properties_tag_suggestions_dismiss_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagValueIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/views": {
+      "get": {
+        "tags": [
+          "views"
+        ],
+        "summary": "List Views",
+        "operationId": "list_views_api_views_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewOut"
+                  },
+                  "title": "Response List Views Api Views Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "views"
+        ],
+        "summary": "Create View",
+        "operationId": "create_view_api_views_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/views/query": {
+      "post": {
+        "tags": [
+          "views"
+        ],
+        "summary": "Run Query",
+        "description": "The rows of a query that isn't saved (a view being edited, a hub page).",
+        "operationId": "run_query_api_views_query_post",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/views/{view_id}": {
+      "get": {
+        "tags": [
+          "views"
+        ],
+        "summary": "Get View",
+        "operationId": "get_view_api_views__view_id__get",
+        "parameters": [
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "View Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "views"
+        ],
+        "summary": "Update View",
+        "operationId": "update_view_api_views__view_id__patch",
+        "parameters": [
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "View Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "views"
+        ],
+        "summary": "Delete View",
+        "operationId": "delete_view_api_views__view_id__delete",
+        "parameters": [
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "View Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/views/{view_id}/rows": {
+      "get": {
+        "tags": [
+          "views"
+        ],
+        "summary": "View Rows",
+        "operationId": "view_rows_api_views__view_id__rows_get",
+        "parameters": [
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "View Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActorOut": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "The stored actor reference, e.g. chat:<id>"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "external",
+              "chat",
+              "automation"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Where it leads: the chat, or the automation's run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ref",
+          "kind",
+          "label",
+          "url"
+        ],
+        "title": "ActorOut",
+        "description": "Who made or changed something, ready to show: \"the assistant in <chat title>\"."
+      },
       "AgentStats": {
         "properties": {
           "runs_by_day": {
@@ -15395,6 +18095,9 @@
           },
           "updates": {
             "$ref": "#/components/schemas/UpdateSettings"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/PropertySettings"
           }
         },
         "type": "object",
@@ -15413,7 +18116,8 @@
           "navigation",
           "files",
           "setup",
-          "updates"
+          "updates",
+          "properties"
         ],
         "title": "AllSettings"
       },
@@ -15471,6 +18175,27 @@
         },
         "type": "object",
         "title": "AppendTo"
+      },
+      "AppliedOut": {
+        "properties": {
+          "applied": {
+            "type": "integer",
+            "title": "Applied"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applied",
+          "problems"
+        ],
+        "title": "AppliedOut"
       },
       "ApprovalOut": {
         "properties": {
@@ -15831,12 +18556,13 @@
           "notify": {
             "type": "string",
             "enum": [
+              "agent_decides",
               "always",
               "on_failure",
               "never"
             ],
             "title": "Notify",
-            "default": "always"
+            "default": "agent_decides"
           },
           "destination_ids": {
             "anyOf": [
@@ -15871,7 +18597,117 @@
             "maximum": 5.0,
             "minimum": 0.0,
             "title": "Max Retries",
-            "default": 0
+            "default": 1
+          },
+          "state_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Note"
+          },
+          "tool_allowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Allowlist"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls",
+            "default": 30
+          },
+          "max_runtime_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 30.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime S",
+            "default": 300
+          },
+          "chat_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Retention Days"
+          },
+          "contact_tools_allowed": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_.-]+$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Contact Tools Allowed"
+          },
+          "change_check": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChangeCheck"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Check"
+          },
+          "run_anyway_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 720.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Anyway Hours"
           }
         },
         "type": "object",
@@ -15961,6 +18797,7 @@
           "notify": {
             "type": "string",
             "enum": [
+              "agent_decides",
               "always",
               "on_failure",
               "never"
@@ -15997,12 +18834,120 @@
             "type": "integer",
             "title": "Max Retries"
           },
-          "state": {
-            "additionalProperties": {
+          "state_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Note"
+          },
+          "tool_allowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Allowlist"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls"
+          },
+          "max_runtime_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime S"
+          },
+          "chat_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Retention Days"
+          },
+          "contact_tools_allowed": {
+            "items": {
               "type": "string"
             },
-            "type": "object",
-            "title": "State"
+            "type": "array",
+            "title": "Contact Tools Allowed",
+            "default": []
+          },
+          "change_check": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChangeCheck"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Check"
+          },
+          "run_anyway_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Anyway Hours"
+          },
+          "failure_streak": {
+            "type": "integer",
+            "title": "Failure Streak",
+            "default": 0
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "pending_approvals": {
+            "items": {
+              "$ref": "#/components/schemas/PendingApproval"
+            },
+            "type": "array",
+            "title": "Pending Approvals",
+            "default": []
           },
           "next_run_at": {
             "anyOf": [
@@ -16084,7 +19029,6 @@
           "destination_ids",
           "document_path",
           "max_retries",
-          "state",
           "next_run_at",
           "last_run_at",
           "last_status",
@@ -16199,6 +19143,7 @@
               {
                 "type": "string",
                 "enum": [
+                  "agent_decides",
                   "always",
                   "on_failure",
                   "never"
@@ -16250,10 +19195,229 @@
               }
             ],
             "title": "Max Retries"
+          },
+          "state_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Note"
+          },
+          "tool_allowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Allowlist"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls"
+          },
+          "max_runtime_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 30.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime S"
+          },
+          "chat_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Retention Days"
+          },
+          "contact_tools_allowed": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Tools Allowed"
+          },
+          "change_check": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChangeCheck"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Check"
+          },
+          "run_anyway_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 720.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Anyway Hours"
           }
         },
         "type": "object",
         "title": "AutomationPatch"
+      },
+      "AutomationRunOut": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "outcome_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Line"
+          },
+          "nothing_to_do": {
+            "type": "boolean",
+            "title": "Nothing To Do"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/RunChange"
+            },
+            "type": "array",
+            "title": "Changes",
+            "default": []
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/RunTiming"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "created_at",
+          "ended_at",
+          "outcome_line",
+          "nothing_to_do",
+          "conversation_id",
+          "error",
+          "timing"
+        ],
+        "title": "AutomationRunOut",
+        "description": "One run in an automation's run log."
       },
       "AutomationSettings": {
         "properties": {
@@ -16274,6 +19438,41 @@
         "title": "AutomationSettings",
         "description": "Protections for runs that start by themselves (Automations, the schedule tools)."
       },
+      "AutomationToolOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "capability"
+        ],
+        "title": "AutomationToolOut",
+        "description": "A tool an automation's runs can be given (catalog.tools)."
+      },
       "Backlinks": {
         "properties": {
           "tasks": {
@@ -16289,6 +19488,13 @@
             },
             "type": "array",
             "title": "Documents"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedEvent"
+            },
+            "type": "array",
+            "title": "Events"
           }
         },
         "type": "object",
@@ -16409,6 +19615,38 @@
           "upto_seq"
         ],
         "title": "BranchIn"
+      },
+      "BrokenLinkOut": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/LinkItem"
+          },
+          "target": {
+            "$ref": "#/components/schemas/LinkItem"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "explicit"
+            ],
+            "title": "Origin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "origin",
+          "created_at"
+        ],
+        "title": "BrokenLinkOut",
+        "description": "A link to something deleted for good, and the item it is in."
       },
       "BrowserInput": {
         "properties": {
@@ -16900,6 +20138,28 @@
           "title"
         ],
         "title": "Change"
+      },
+      "ChangeCheck": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_.-]+$",
+            "title": "Tool"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool"
+        ],
+        "title": "ChangeCheck",
+        "description": "A read-only tool call the server makes before each scheduled run."
       },
       "ChatBulkIn": {
         "properties": {
@@ -17460,6 +20720,19 @@
               }
             ],
             "title": "Content"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object",
+                "maxProperties": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties"
           }
         },
         "type": "object",
@@ -17613,6 +20886,241 @@
           "decision"
         ],
         "title": "DecisionIn"
+      },
+      "DefinitionIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 60,
+            "pattern": "^[a-z][a-z0-9_-]{0,59}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Label",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "select",
+              "multi_select",
+              "text",
+              "date",
+              "number",
+              "checkbox"
+            ],
+            "title": "Type"
+          },
+          "applies_to": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "document",
+                "task",
+                "event"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Applies To"
+          },
+          "project_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Ids"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "type"
+        ],
+        "title": "DefinitionIn"
+      },
+      "DefinitionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "select",
+              "multi_select",
+              "text",
+              "date",
+              "number",
+              "checkbox"
+            ],
+            "title": "Type"
+          },
+          "applies_to": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "document",
+                "task",
+                "event"
+              ]
+            },
+            "type": "array",
+            "title": "Applies To"
+          },
+          "project_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Ids"
+          },
+          "open_vocabulary": {
+            "type": "boolean",
+            "title": "Open Vocabulary"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/OptionOut"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "label",
+          "type",
+          "applies_to",
+          "project_ids",
+          "open_vocabulary",
+          "builtin",
+          "sort_order",
+          "options",
+          "count"
+        ],
+        "title": "DefinitionOut"
+      },
+      "DefinitionPatch": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "applies_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "document",
+                    "task",
+                    "event"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 3,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applies To"
+          },
+          "project_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Ids"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "title": "DefinitionPatch",
+        "description": "Only the fields that are sent change; `project_ids: null` makes it global."
       },
       "DestinationIn": {
         "properties": {
@@ -17903,6 +21411,45 @@
             "format": "date-time",
             "title": "Updated At"
           },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "default": {}
+          },
+          "properties_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties Error"
+          },
           "content": {
             "type": "string",
             "title": "Content"
@@ -17981,6 +21528,45 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "default": {}
+          },
+          "properties_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties Error"
           }
         },
         "type": "object",
@@ -18228,6 +21814,20 @@
               }
             ],
             "title": "Project Id"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object",
+                "maxProperties": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties",
+            "description": "Property values, e.g. {\"client\": \"ludmyla-doula\", \"tags\": [\"website\"]}. On a change only the keys given change (null removes one); leave it out to keep them."
           }
         },
         "type": "object",
@@ -18358,6 +21958,100 @@
           "created_by": {
             "type": "string",
             "title": "Created By"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "external_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Key"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "edited_by_user_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By User At",
+            "description": "When the user last changed this synced event by hand"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who changed it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "description": "Property values"
+          },
+          "dropped_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped Properties",
+            "description": "Property keys this change dropped: not allowed in the project it moved to"
           }
         },
         "type": "object",
@@ -18506,6 +22200,48 @@
         "type": "object",
         "title": "FilesSettings",
         "description": "The Files page."
+      },
+      "FilterChip": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggestions",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "value",
+          "label",
+          "ok"
+        ],
+        "title": "FilterChip",
+        "description": "A filter typed into the query (`client:ludmyla-doula`, `in:tech-services`)."
       },
       "FocusSessionIn": {
         "properties": {
@@ -18998,6 +22734,27 @@
         "title": "FocusTimerState",
         "description": "The focus timer's state (frontend `features/focus/timer.ts`), times in epoch ms."
       },
+      "FolderDefaults": {
+        "properties": {
+          "folder": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Folder"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 30,
+            "title": "Properties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "folder"
+        ],
+        "title": "FolderDefaults",
+        "description": "Properties a new document in `folder` (or below it) starts with."
+      },
       "GeneralSettings": {
         "properties": {
           "timezone": {
@@ -19084,6 +22841,47 @@
         "type": "object",
         "title": "HomeSettings",
         "description": "The Home page layouts: one for wider screens, one for phones (one column)."
+      },
+      "HubSection": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "property_label": {
+            "type": "string",
+            "title": "Property Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ViewRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "property_label",
+          "value",
+          "label",
+          "rows",
+          "truncated"
+        ],
+        "title": "HubSection"
       },
       "ImportIn": {
         "properties": {
@@ -19209,6 +23007,195 @@
         "type": "object",
         "title": "Limits"
       },
+      "LinkGroups": {
+        "properties": {
+          "document": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Document"
+          },
+          "task": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Task"
+          },
+          "event": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Event"
+          },
+          "chat": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Chat"
+          }
+        },
+        "type": "object",
+        "title": "LinkGroups",
+        "description": "Links grouped by the type of the item at the other end."
+      },
+      "LinkItem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "document",
+              "task",
+              "event",
+              "chat"
+            ],
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its canonical reference (= app URL, the Markdown link)"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Empty when it is gone for good"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "A document's path, a task's status, an event's start",
+            "default": ""
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "in_trash",
+              "deleted"
+            ],
+            "title": "State",
+            "description": "live; in_trash (a task or event in the trash); deleted (gone for good)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "ref",
+          "title",
+          "state"
+        ],
+        "title": "LinkItem",
+        "description": "An item at one end of a link, as it is now."
+      },
+      "LinkOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "document",
+              "task",
+              "event",
+              "chat"
+            ],
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its canonical reference (= app URL, the Markdown link)"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Empty when it is gone for good"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "A document's path, a task's status, an event's start",
+            "default": ""
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "in_trash",
+              "deleted"
+            ],
+            "title": "State",
+            "description": "live; in_trash (a task or event in the trash); deleted (gone for good)"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "explicit"
+            ],
+            "title": "Origin",
+            "description": "explicit: set on the task or event (can be removed); inline: a link in its text (edit the text to change it)"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "ref",
+          "title",
+          "state",
+          "origin",
+          "created_at"
+        ],
+        "title": "LinkOut"
+      },
+      "LinkTo": {
+        "properties": {
+          "to": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "To",
+            "description": "References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to"
+        ],
+        "title": "LinkTo"
+      },
       "LinkedDocument": {
         "properties": {
           "id": {
@@ -19233,6 +23220,31 @@
         ],
         "title": "LinkedDocument"
       },
+      "LinkedEvent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "start_at"
+        ],
+        "title": "LinkedEvent"
+      },
       "LinkedTask": {
         "properties": {
           "id": {
@@ -19256,6 +23268,24 @@
           "status"
         ],
         "title": "LinkedTask"
+      },
+      "LinksOut": {
+        "properties": {
+          "links": {
+            "$ref": "#/components/schemas/LinkGroups",
+            "description": "What the item links to"
+          },
+          "backlinks": {
+            "$ref": "#/components/schemas/LinkGroups",
+            "description": "What links to it (\"Linked from\")"
+          }
+        },
+        "type": "object",
+        "required": [
+          "links",
+          "backlinks"
+        ],
+        "title": "LinksOut"
       },
       "ListingOut": {
         "properties": {
@@ -20166,6 +24196,76 @@
         ],
         "title": "MemoryUsed"
       },
+      "MentionOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "project",
+              "memory"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "title",
+          "text"
+        ],
+        "title": "MentionOut"
+      },
+      "MentionRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "project",
+              "memory"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "MentionRef"
+      },
+      "MergeIn": {
+        "properties": {
+          "into_option_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Into Option Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "into_option_id"
+        ],
+        "title": "MergeIn"
+      },
       "MessageOut": {
         "properties": {
           "id": {
@@ -20306,6 +24406,16 @@
             "type": "integer",
             "title": "Version",
             "default": 0
+          },
+          "timing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunTiming"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -20404,6 +24514,16 @@
             "type": "array",
             "title": "Attachments",
             "default": []
+          },
+          "timing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunTiming"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -21345,6 +25465,100 @@
             "type": "string",
             "title": "Created By"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "external_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Key"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "edited_by_user_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By User At",
+            "description": "When the user last changed this synced event by hand"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who changed it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "description": "Property values"
+          },
+          "dropped_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped Properties",
+            "description": "Property keys this change dropped: not allowed in the project it moved to"
+          },
           "event_id": {
             "type": "string",
             "format": "uuid",
@@ -21388,6 +25602,125 @@
         ],
         "title": "OccurrenceOut",
         "description": "One occurrence in a calendar range. For repeating events `original_start`\nidentifies it (used to change or cancel just this one)."
+      },
+      "OptionIn": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "OptionIn"
+      },
+      "OptionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "hub_document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hub Document Id"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "label",
+          "hub_document_id",
+          "sort_order",
+          "count"
+        ],
+        "title": "OptionOut"
+      },
+      "OptionPatch": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "hub_document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hub Document Id"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "title": "OptionPatch",
+        "description": "Only the fields that are sent change; `hub_document_id: null` removes the hub."
       },
       "PageContentOut": {
         "properties": {
@@ -21535,6 +25868,30 @@
         ],
         "title": "PathIn"
       },
+      "PathOut": {
+        "properties": {
+          "old_path": {
+            "type": "string",
+            "title": "Old Path"
+          },
+          "moved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Moved At"
+          },
+          "actor_ref": {
+            "type": "string",
+            "title": "Actor Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_path",
+          "moved_at",
+          "actor_ref"
+        ],
+        "title": "PathOut"
+      },
       "PdfPage": {
         "properties": {
           "number": {
@@ -21583,6 +25940,51 @@
           "has_text"
         ],
         "title": "PdfTextOut"
+      },
+      "PendingApproval": {
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approval_id",
+          "run_id",
+          "conversation_id",
+          "summary",
+          "created_at"
+        ],
+        "title": "PendingApproval",
+        "description": "An approval one of the automation's runs is waiting for."
       },
       "PendingApprovalOut": {
         "properties": {
@@ -22530,6 +26932,21 @@
         ],
         "title": "ProjectStats"
       },
+      "PropertySettings": {
+        "properties": {
+          "folder_defaults": {
+            "items": {
+              "$ref": "#/components/schemas/FolderDefaults"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Folder Defaults"
+          }
+        },
+        "type": "object",
+        "title": "PropertySettings",
+        "description": "Document properties (Settings > Properties). The definitions themselves are rows\nof their own (features/properties); this holds the folder defaults."
+      },
       "ProviderIn": {
         "properties": {
           "name": {
@@ -22980,6 +27397,45 @@
             "format": "date-time",
             "title": "Updated At"
           },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "default": {}
+          },
+          "properties_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties Error"
+          },
           "excerpt": {
             "type": "string",
             "title": "Excerpt"
@@ -23018,18 +27474,20 @@
         "title": "ReferenceSummary",
         "description": "Another chat that was attached to a message as context."
       },
-      "ReindexOut": {
+      "RenameIn": {
         "properties": {
-          "queued": {
-            "type": "boolean",
-            "title": "Queued"
+          "slug": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Slug"
           }
         },
         "type": "object",
         "required": [
-          "queued"
+          "slug"
         ],
-        "title": "ReindexOut"
+        "title": "RenameIn"
       },
       "ReorderIn": {
         "properties": {
@@ -23644,6 +28102,17 @@
             "type": "boolean",
             "title": "Current"
           },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it (None on older revisions)"
+          },
           "content": {
             "type": "string",
             "title": "Content"
@@ -23689,6 +28158,17 @@
           "current": {
             "type": "boolean",
             "title": "Current"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who saved it (None on older revisions)"
           }
         },
         "type": "object",
@@ -23714,6 +28194,63 @@
           "revoked"
         ],
         "title": "RevokedOut"
+      },
+      "RewriteOut": {
+        "properties": {
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "views": {
+            "type": "integer",
+            "title": "Views",
+            "default": 0
+          },
+          "folder_defaults": {
+            "type": "integer",
+            "title": "Folder Defaults",
+            "default": 0
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed",
+            "default": []
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents"
+        ],
+        "title": "RewriteOut"
+      },
+      "RowsOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ViewRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "truncated"
+        ],
+        "title": "RowsOut"
       },
       "Rule": {
         "properties": {
@@ -23770,6 +28307,36 @@
           "decision"
         ],
         "title": "Rule"
+      },
+      "RunChange": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool",
+          "summary"
+        ],
+        "title": "RunChange",
+        "description": "Something a run changed, recorded by the server from its tool calls."
       },
       "RunCounts": {
         "properties": {
@@ -24496,6 +29063,92 @@
         ],
         "title": "RunStarted"
       },
+      "RunTiming": {
+        "properties": {
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "stopped",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "first_text_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Text At"
+          },
+          "first_text_waiting_ms": {
+            "type": "integer",
+            "title": "First Text Waiting Ms",
+            "default": 0
+          },
+          "waiting_ms": {
+            "type": "integer",
+            "title": "Waiting Ms"
+          },
+          "waiting_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Since"
+          },
+          "tool_calls": {
+            "type": "integer",
+            "title": "Tool Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "started_at",
+          "finished_at",
+          "outcome",
+          "first_text_at",
+          "waiting_ms",
+          "waiting_since",
+          "tool_calls"
+        ],
+        "title": "RunTiming",
+        "description": "How long an answer took, from the server's records (service.run_timing).\n\nThe duration is `finished_at - started_at - waiting_ms`. While the run waits for\nthe user, `waiting_since` says since when; that time isn't part of the duration\neither. Compare the times with the server's clock, not the browser's: every API\nresponse has it in its `X-Server-Time` header (milliseconds since the epoch)."
+      },
       "RunTotals": {
         "properties": {
           "input_tokens": {
@@ -24604,7 +29257,7 @@
               {
                 "type": "integer",
                 "maximum": 44640.0,
-                "minimum": 5.0
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -24653,6 +29306,11 @@
         "properties": {
           "schedule": {
             "$ref": "#/components/schemas/Schedule"
+          },
+          "change_check": {
+            "type": "boolean",
+            "title": "Change Check",
+            "default": false
           }
         },
         "type": "object",
@@ -24802,6 +29460,24 @@
             },
             "type": "array",
             "title": "Groups"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterChip"
+            },
+            "type": "array",
+            "title": "Filters",
+            "default": []
+          },
+          "view": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -25826,6 +30502,25 @@
         "title": "SkillSummary",
         "description": "The skill a user message was started with (shown as a chip before its text)."
       },
+      "SortKey": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Key"
+          },
+          "desc": {
+            "type": "boolean",
+            "title": "Desc",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "SortKey"
+      },
       "SshKeyOut": {
         "properties": {
           "available": {
@@ -25905,6 +30600,72 @@
           "agents"
         ],
         "title": "StatsOut"
+      },
+      "SuggestionIds": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "SuggestionIds"
+      },
+      "SuggestionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "current": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Current"
+          },
+          "suggested": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Suggested"
+          },
+          "actor_ref": {
+            "type": "string",
+            "title": "Actor Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "title",
+          "path",
+          "current",
+          "suggested",
+          "actor_ref"
+        ],
+        "title": "SuggestionOut"
       },
       "SummaryItem": {
         "properties": {
@@ -26038,6 +30799,123 @@
           "count"
         ],
         "title": "TagCount"
+      },
+      "TagValueAppliedOut": {
+        "properties": {
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "tasks": {
+            "type": "integer",
+            "title": "Tasks"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "tasks",
+          "events",
+          "failed"
+        ],
+        "title": "TagValueAppliedOut"
+      },
+      "TagValueIn": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Tag"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "key",
+          "value"
+        ],
+        "title": "TagValueIn"
+      },
+      "TagValueOut": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "title": "Tag"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "value_label": {
+            "type": "string",
+            "title": "Value Label"
+          },
+          "property_label": {
+            "type": "string",
+            "title": "Property Label"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "tasks": {
+            "type": "integer",
+            "title": "Tasks"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "titles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Titles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "key",
+          "value",
+          "value_label",
+          "property_label",
+          "documents",
+          "tasks",
+          "events",
+          "titles"
+        ],
+        "title": "TagValueOut",
+        "description": "A tag that names a value of another property (`ludmyla-doula` -> client), with the\nitems that have the tag: turning it into the value is offered, never done unasked."
       },
       "TaskFileOut": {
         "properties": {
@@ -26226,6 +31104,22 @@
             "maxItems": 50,
             "title": "Blocked By",
             "description": "Tasks this one waits on"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 30,
+            "title": "Properties",
+            "description": "Property values (features/properties), e.g. {\"client\": \"ludmyla-doula\"}: select values are slugs, a multi_select a list, dates YYYY-MM-DD. tags is the same list as `tags`. On a change: the keys given are set, null removes one."
+          },
+          "links": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Links",
+            "description": "References of items to link it to: /documents/<id>, /calendar?event=<id>, /tasks?task=<id>, /c/<id>"
           }
         },
         "type": "object",
@@ -26387,6 +31281,100 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "external_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Key"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "edited_by_user_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By User At",
+            "description": "When the user last changed this synced task by hand"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who made it (None: unknown)"
+          },
+          "updated_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who changed it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "description": "Property values; `tags`: the slugs the tags name"
+          },
+          "dropped_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped Properties",
+            "description": "Property keys this change dropped: not allowed in the project it moved to"
           }
         },
         "type": "object",
@@ -26590,6 +31578,20 @@
               }
             ],
             "title": "Blocked By"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object",
+                "maxProperties": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties",
+            "description": "Property values (features/properties), e.g. {\"client\": \"ludmyla-doula\"}: select values are slugs, a multi_select a list, dates YYYY-MM-DD. tags is the same list as `tags`. On a change: the keys given are set, null removes one."
           },
           "subtasks": {
             "anyOf": [
@@ -27548,6 +32550,30 @@
         ],
         "title": "Undo"
       },
+      "UpdateMentionsIn": {
+        "properties": {
+          "old_path": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Old Path"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MentionRef"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_path",
+          "items"
+        ],
+        "title": "UpdateMentionsIn"
+      },
       "UpdateSettings": {
         "properties": {
           "check": {
@@ -27559,6 +32585,19 @@
         "type": "object",
         "title": "UpdateSettings",
         "description": "The update notice (Settings > Advanced). UPDATE_CHECK=false in .env wins."
+      },
+      "UpdatedOut": {
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated"
+        ],
+        "title": "UpdatedOut"
       },
       "UpdatesOut": {
         "properties": {
@@ -27895,6 +32934,57 @@
         "type": "object",
         "title": "UsageTotals"
       },
+      "ValidateIn": {
+        "properties": {
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "document",
+              "task",
+              "event"
+            ],
+            "title": "Object Type",
+            "default": "document"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 50,
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "ValidateIn"
+      },
+      "ValidateOut": {
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "ValidateOut"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -27948,6 +33038,374 @@
           "version"
         ],
         "title": "VersionIn"
+      },
+      "ViewIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned",
+            "default": false
+          },
+          "query": {
+            "$ref": "#/components/schemas/ViewQuery"
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "list",
+              "table",
+              "board"
+            ],
+            "title": "Layout",
+            "default": "list"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ViewIn"
+      },
+      "ViewOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "query": {
+            "$ref": "#/components/schemas/ViewQuery"
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "list",
+              "table",
+              "board"
+            ],
+            "title": "Layout"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "project_id",
+          "pinned",
+          "sort_order",
+          "query",
+          "layout",
+          "updated_at"
+        ],
+        "title": "ViewOut"
+      },
+      "ViewPatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "list",
+                  "table",
+                  "board"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layout"
+          }
+        },
+        "type": "object",
+        "title": "ViewPatch",
+        "description": "Only the fields that are sent change; `project_id: null` makes it global."
+      },
+      "ViewQuery": {
+        "properties": {
+          "types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "document",
+                "task",
+                "event",
+                "chat"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Types"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 30,
+            "title": "Properties"
+          },
+          "updated_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated After"
+          },
+          "updated_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated Before"
+          },
+          "include_archived": {
+            "type": "boolean",
+            "title": "Include Archived",
+            "default": false
+          },
+          "sort": {
+            "items": {
+              "$ref": "#/components/schemas/SortKey"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Sort"
+          },
+          "group_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group By"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "title": "ViewQuery",
+        "description": "What a view shows. The same shape for every object type (`types`: documents,\ntasks, events, or a mix of them)."
+      },
+      "ViewRow": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "document",
+              "task",
+              "event",
+              "chat"
+            ],
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "title",
+          "url",
+          "properties",
+          "updated_at"
+        ],
+        "title": "ViewRow"
       },
       "WebSettings": {
         "properties": {
@@ -28132,6 +33590,22 @@
         "title": "WorkspaceSettings",
         "description": "Stored in app_settings[\"workspace\"]."
       },
+      "app__features__calendar__schemas__PropertiesIn": {
+        "properties": {
+          "set": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 30,
+            "title": "Set"
+          }
+        },
+        "type": "object",
+        "required": [
+          "set"
+        ],
+        "title": "PropertiesIn",
+        "description": "Property values to set; null removes one. The others stay as they are."
+      },
       "app__features__documents__router__MoveIn": {
         "properties": {
           "name": {
@@ -28162,6 +33636,38 @@
         },
         "type": "object",
         "title": "MoveIn"
+      },
+      "app__features__documents__router__PropertiesIn": {
+        "properties": {
+          "set": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 50,
+            "title": "Set"
+          },
+          "base_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Hash",
+            "description": "Hash of the version being edited"
+          },
+          "create_values": {
+            "type": "boolean",
+            "title": "Create Values",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "set"
+        ],
+        "title": "PropertiesIn"
       },
       "app__features__documents__router__SaveIn": {
         "properties": {
@@ -28247,6 +33753,32 @@
           "content"
         ],
         "title": "SaveIn"
+      },
+      "app__features__memory__router__ReindexOut": {
+        "properties": {
+          "queued": {
+            "type": "boolean",
+            "title": "Queued"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queued"
+        ],
+        "title": "ReindexOut"
+      },
+      "app__features__properties__schemas__ReindexOut": {
+        "properties": {
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents"
+        ],
+        "title": "ReindexOut"
       }
     }
   }

@@ -1,21 +1,24 @@
-"""Automations API. An automation's run history is GET /api/runs?automation_id=..."""
+"""Automations API. An automation's run log is GET /api/automations/{id}/runs (its runs
+with their outcome and changes); GET /api/runs?automation_id=... lists them as runs."""
 
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from sqlalchemy import select
 
 from app.api.deps import Db, client_ip
 from app.core.errors import Conflict
 from app.features.audit import service as audit
-from app.features.automations import service
+from app.features.automations import catalog, service
 from app.features.automations.models import Automation
 from app.features.automations.schedule import describe, upcoming
 from app.features.automations.schemas import (
     AutomationIn,
     AutomationOut,
     AutomationPatch,
+    AutomationRunOut,
+    AutomationToolOut,
     RunStarted,
     SchedulePreviewIn,
     SchedulePreviewOut,
@@ -38,6 +41,13 @@ async def schedule_preview(body: SchedulePreviewIn) -> SchedulePreviewOut:
     return SchedulePreviewOut(
         text=describe(body.schedule), next_runs=upcoming(body.schedule, datetime.now(UTC), 5)
     )
+
+
+@router.get("/tools", response_model=list[AutomationToolOut])
+async def tool_catalog(db: Db) -> list[AutomationToolOut]:
+    """The tools its runs can be given: the built-in ones and those of the connected MCP
+    servers (by the names runs call them)."""
+    return await catalog.tools(db)
 
 
 @router.post("", response_model=AutomationOut, status_code=201)
@@ -101,6 +111,20 @@ async def delete_automation(automation_id: uuid.UUID, request: Request, db: Db) 
     await db.delete(automation)
     await db.commit()
     await service.notify_changed()
+
+
+@router.get("/{automation_id}/runs", response_model=list[AutomationRunOut])
+async def run_log(
+    automation_id: uuid.UUID,
+    db: Db,
+    before: datetime | None = Query(None, description="Only runs started before this time"),
+    limit: int = Query(50, ge=1, le=200),
+    run_id: uuid.UUID | None = Query(None, description="Only this run (a link to one)"),
+) -> list[AutomationRunOut]:
+    """The automation's runs, newest first, with the model's outcome line and the changes
+    the server recorded. Page with `before` = the last item's created_at."""
+    automation = await service.get(db, automation_id)
+    return await service.run_log(db, automation, before=before, limit=limit, run_id=run_id)
 
 
 @router.post("/{automation_id}/run", response_model=RunStarted, status_code=202)

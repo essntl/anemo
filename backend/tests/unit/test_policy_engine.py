@@ -193,3 +193,19 @@ def test_always_ask_overrides_allow_and_run_grants_but_not_deny():
     assert evaluate(act, deny).decision == "deny"
     # Without the mark, the policy decides as before.
     assert evaluate(Action(capability="browser.mine"), allow_all, grants=grants).decision == "allow"
+
+
+def test_actions_that_reach_people_ask_when_the_caller_says_so():
+    allow_all = Policy(name="p", default="allow")
+    act = Action(capability="http.request", summary="POST", contacts_people=True)
+    # Outside automation runs (or allowed by the automation): the policy decides.
+    assert evaluate(act, allow_all).decision == "allow"
+    e = evaluate(act, allow_all, ask_contacts=True)
+    assert e.decision == "ask" and e.rule == "contacts-people"
+    # No run grant lifts it, a deny stays a deny, and other actions are not touched.
+    grants = [Grant(capability="http.request")]
+    assert evaluate(act, allow_all, grants=grants, ask_contacts=True).decision == "ask"
+    deny = Policy(name="p", rules=[Rule(cap="http.request", decision="deny")])
+    assert evaluate(act, deny, ask_contacts=True).decision == "deny"
+    plain = Action(capability="http.request")
+    assert evaluate(plain, allow_all, ask_contacts=True).decision == "allow"

@@ -6,7 +6,7 @@
  * the run's live stream reports a tool/approval/plan event. The database is the
  * source of truth, so this renders correctly after a reload or days later.
  */
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import {
   Ban,
   CheckCircle2,
@@ -29,6 +29,7 @@ import {
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
+import { Elapsed } from '@/components/ui/Elapsed'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { toolOutputUrl, useEditPlan, useRun } from '@/features/runs/api'
@@ -112,6 +113,18 @@ function WebDetails({ data }: { data: WebData }) {
   )
 }
 
+/** How long a call took (a sub-agent's included), or how long it has run so far. */
+function CallDuration({ call }: { call: ToolCallView }) {
+  if (!call.started_at) return null // it never ran (denied, invalid, a question for you)
+  const style = 'shrink-0 text-[11.5px] tabular-nums text-subtle'
+  if (call.status === 'running' || call.status === 'waiting_child') {
+    return <Elapsed since={call.started_at} className={style} />
+  }
+  if (!call.ended_at) return null
+  const seconds = (Date.parse(call.ended_at) - Date.parse(call.started_at)) / 1000
+  return <span className={style}>{formatDuration(seconds, { style: 'timer' })}</span>
+}
+
 function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; docked?: boolean }) {
   const shell = call.tool_name === 'run_shell'
   // null = not toggled by the user: shell commands open by themselves while running.
@@ -138,6 +151,7 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
         className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] hover:bg-surface-hover pointer-coarse:py-2.5">
         <Icon className={cn('h-3.5 w-3.5 shrink-0', s.tone, (call.status === 'running' || call.status === 'waiting_child') && 'animate-spin')} />
         <span className="min-w-0 flex-1 truncate">{describe(call)}</span>
+        <CallDuration call={call} />
         <span className={cn('shrink-0 text-[11.5px]', s.tone)}>{t(s.label)}</span>
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-subtle transition-transform', open && 'rotate-90')} />
       </button>
@@ -302,9 +316,11 @@ interface RunActivityProps {
   poll?: boolean
   /** The page shows a pending approval itself (ApprovalDock): don't repeat its buttons here. */
   docked?: boolean
+  /** The answer's live timer, shown beside "Working…" while the run goes on. */
+  timer?: ReactNode
 }
 
-export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
+export function RunActivity({ runId, live, poll, docked, timer }: RunActivityProps) {
   const timeline = useTimeline(runId, poll)
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const data = timeline.data
@@ -327,6 +343,7 @@ export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
         className="flex w-full items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-muted hover:text-text pointer-coarse:py-3">
         {data.status === 'paused' ? <Pause className="h-3.5 w-3.5" /> : <Wrench className={cn('h-3.5 w-3.5', working && 'animate-pulse text-accent')} />}
         <span className={cn(working && 'shimmer')}>{headline(data, going)}</span>
+        {going && timer && <span className="text-[12px] font-normal text-subtle">{timer}</span>}
         {hasDetails && <ChevronRight className={cn('ml-auto h-3.5 w-3.5 transition-transform', isOpen && 'rotate-90')} />}
       </button>
       {active && (

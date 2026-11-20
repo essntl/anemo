@@ -12,14 +12,15 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, TimestampMixin
+from app.db.base import Base, IdMixin, ProvenanceMixin, SourceMixin, TimestampMixin
 
 
-class CalendarEvent(Base, IdMixin, TimestampMixin):
+class CalendarEvent(Base, IdMixin, TimestampMixin, ProvenanceMixin, SourceMixin):
     """An event, or the first occurrence and rule of a repeating one.
 
     start_at/end_at are instants. For all-day events they are midnight at the start of
@@ -32,6 +33,13 @@ class CalendarEvent(Base, IdMixin, TimestampMixin):
     __table_args__ = (
         Index("ix_calendar_events_range", "start_at", "end_at"),
         Index("ix_calendar_events_project", "project_id"),
+        Index(
+            "ix_calendar_events_external_key",
+            "external_key",
+            unique=True,
+            postgresql_where=text("external_key IS NOT NULL"),
+        ),
+        Index("ix_calendar_events_properties", "properties", postgresql_using="gin"),
     )
 
     title: Mapped[str] = mapped_column(String(300))
@@ -55,6 +63,11 @@ class CalendarEvent(Base, IdMixin, TimestampMixin):
     )
     created_by: Mapped[str] = mapped_column(String(10), default="user")  # user | agent
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Property values (features/properties), validated by properties.service.validate;
+    # the same for every occurrence of a repeating event.
+    properties: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
 
 
 class EventException(Base, IdMixin):

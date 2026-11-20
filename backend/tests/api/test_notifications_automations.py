@@ -34,6 +34,17 @@ from tests.web_server import web_server
 pytestmark = requires_db
 
 
+def turn_context_sent() -> str:
+    """The turn context (date, memories, the automation's part) the model last got."""
+    last = FakeAdapter.requests[-1]
+    return "\n".join(
+        b.text
+        for m in last.messages
+        for b in m.content
+        if b.type == "text" and b.text.startswith("<turn_context>")
+    )
+
+
 async def global_events(kind: str) -> list[dict]:
     entries = await get_redis().xrange(bus.GLOBAL_STREAM)
     decoded = [bus.decode(fields) for _, fields in entries]
@@ -251,10 +262,19 @@ async def test_agent_sends_a_notification(authed):
 # -- automations --------------------------------------------------------------------------
 
 HOURLY = {"kind": "interval", "every_minutes": 60}
+# The settings every automation had before the per-automation ones (spec 02): what an
+# existing schedule keeps. These tests check that it behaves exactly as before.
+EXISTING = {"notify": "always", "max_retries": 0, "max_tool_calls": None, "max_runtime_s": None}
 
 
 async def make(client, **fields) -> dict:
-    body = {"name": "Morning news", "prompt": "summarise the news", "schedule": HOURLY, **fields}
+    body = {
+        "name": "Morning news",
+        "prompt": "summarise the news",
+        "schedule": HOURLY,
+        **EXISTING,
+        **fields,
+    }
     r = await client.post("/api/automations", json=body)
     assert r.status_code == 201, r.text
     return r.json()
@@ -283,7 +303,7 @@ async def test_create_list_update_and_validate(authed):
     a = await make(authed, schedule={"kind": "cron", "cron": "0 8 * * 1-5", "tz": "Europe/Paris"})
     assert a["schedule_text"] == "At 08:00 on Monday through Friday"
     assert a["enabled"] and a["next_run_at"] and a["last_status"] is None
-    assert a["on_ask"] == "pause" and a["notify"] == "always" and a["state"] == {}
+    assert a["on_ask"] == "pause" and a["notify"] == "always" and a["state_note"] is None
     assert [x["name"] for x in (await authed.get("/api/automations")).json()] == ["Morning news"]
 
     preview = await authed.post(
@@ -348,11 +368,12 @@ async def test_scheduled_run_delivers_its_answer(authed):
     assert conv["automation_id"] == a["id"] and conv["title"].startswith("Morning news · ")
     listed = (await authed.get("/api/conversations")).json()
     assert run["conversation_id"] not in [c["id"] for c in listed]
-    # It is told that nobody is watching, and gets the tools for notes between runs.
+    # It is told that nobody is watching, and gets the tool for its note between runs.
     request = FakeAdapter.requests[-1]
     assert 'unattended run of the automation "Morning news"' in request.system
+    assert "Your final answer is the result the user receives" in request.system
     names = [t.name for t in request.tools]
-    assert "get_automation_state" in names and "set_automation_state" in names
+    assert "update_automation_state" in names
     assert "ask_user" not in names  # nobody is there to answer
     # No title or memory jobs for scheduled runs.
     async with get_sessionmaker()() as db:
@@ -482,29 +503,33 @@ async def test_notes_between_runs(authed):
     a = await make(authed, prompt="check the price", notify="never")
     script(
         "check the price",
-        [
-            call("get_automation_state"),
-            call("set_automation_state", key="last_price", value="42"),
-            call("set_automation_state", key="temp", value="x"),
-            call("set_automation_state", key="temp"),
-            Done("tool_use"),
-        ],
+        [call("update_automation_state", note="temp"), Done("tool_use")],
+        [call("update_automation_state", note="last price: 42"), Done("tool_use")],
         [TextDelta("Saved."), Done("end")],
     )
     await fire(authed, a)
-    assert "No notes saved yet" in tool_results_sent_to_model()[0]
-    assert (await get(authed, a["id"]))["state"] == {"last_price": "42"}
+    assert "(empty: nothing kept yet)" in turn_context_sent()
+    assert (await get(authed, a["id"]))["state_note"] == "last price: 42"  # replaced
     assert (await authed.get("/api/notifications")).json() == []  # notify: never
 
+    # The next run finds the note in its context, without asking for it.
+    script("check the price", [TextDelta("Same price."), Done("end")])
     await fire(authed, a)
-    assert '"last_price": "42"' in tool_results_sent_to_model()[0]
+    assert "State note kept by earlier runs" in turn_context_sent()
+    assert "last price: 42" in turn_context_sent()
 
-    # Outside an automation the tools are not offered, and do nothing if called anyway.
+    # The user can read and change it too.
+    r = await authed.patch(f"/api/automations/{a['id']}", json={"state_note": "  by hand "})
+    assert r.json()["state_note"] == "by hand"
+    too_long = await authed.patch(f"/api/automations/{a['id']}", json={"state_note": "x" * 4001})
+    assert too_long.status_code == 422
+
+    # Outside an automation the tool is not offered, and does nothing if called anyway.
     cid = (await authed.post("/api/conversations", json={})).json()["id"]
-    script("peek", [call("get_automation_state"), Done("tool_use")], [Done("end")])
+    script("peek", [call("update_automation_state", note="x"), Done("tool_use")], [Done("end")])
     r = await authed.post(f"/api/conversations/{cid}/turns", json={"text": "peek", "mode": "agent"})
     await execute_run(uuid.UUID(r.json()["run_id"]))
-    assert "get_automation_state" not in [t.name for t in FakeAdapter.requests[-1].tools]
+    assert "update_automation_state" not in [t.name for t in FakeAdapter.requests[-1].tools]
     assert "Unknown tool" in tool_results_sent_to_model()[-1]
 
 
@@ -517,7 +542,9 @@ async def test_failed_runs_are_retried(authed):
     assert (await authed.get("/api/notifications")).json() == []  # not yet: it tries again
     async with get_sessionmaker()() as db:
         job = await db.scalar(select(Job).where(Job.type == "automation.retry"))
-        assert job is not None and job.payload == {"automation_id": a["id"], "retry": 1}
+        failed_run = (await runs_of(authed, a["id"]))[0]["id"]
+        assert job is not None
+        assert job.payload == {"automation_id": a["id"], "retry": 1, "run_id": failed_run}
         assert job.run_at > datetime.now(UTC) + timedelta(minutes=1)
 
     await automations.retry_run(uuid.UUID(a["id"]), 1)

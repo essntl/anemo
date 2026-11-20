@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatUpcoming } from '@/lib/format'
-import { defaultForm, fromSchedule, type Schedule, type ScheduleForm, toSchedule } from './scheduleForm'
+import { defaultForm, fromSchedule, minMinutes, type Schedule, type ScheduleForm, toSchedule } from './scheduleForm'
 
 const TZ = 'Europe/Amsterdam'
 const form = (patch: Partial<ScheduleForm>): ScheduleForm => ({ ...defaultForm(new Date(2026, 9, 1)), ...patch })
@@ -14,6 +14,9 @@ describe('schedule editor', () => {
     expect(toSchedule(form({ frequency: 'monthly', time: '07:00', monthDay: 15 }), TZ)).toEqual(cron('0 7 15 * *'))
     expect(toSchedule(form({ frequency: 'hours', every: 3 }), TZ)).toMatchObject({ kind: 'interval', every_minutes: 180 })
     expect(toSchedule(form({ frequency: 'minutes', every: 2 }), TZ)).toMatchObject({ kind: 'interval', every_minutes: 5 })
+    // With a change check it may run every minute.
+    expect(toSchedule(form({ frequency: 'minutes', every: 1 }), TZ, minMinutes(true))).toMatchObject({ every_minutes: 1 })
+    expect(minMinutes(false)).toBe(5)
     expect(toSchedule(form({ frequency: 'cron', cron: ' 0 6 * * 1,3 ' }), TZ)).toEqual(cron('0 6 * * 1,3'))
   })
 

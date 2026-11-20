@@ -64,7 +64,17 @@ def default_handlers() -> dict[str, Handler]:
     async def automation_retry(payload: dict[str, Any]) -> None:
         from app.features.automations import service as automations
 
-        await automations.retry_run(uuid.UUID(payload["automation_id"]), int(payload["retry"]))
+        failed = payload.get("run_id")  # the run that failed (older jobs don't say)
+        await automations.retry_run(
+            uuid.UUID(payload["automation_id"]),
+            int(payload["retry"]),
+            uuid.UUID(failed) if failed else None,
+        )
+
+    async def automation_check(payload: dict[str, Any]) -> None:
+        from app.features.automations import change_check
+
+        await change_check.run_check(uuid.UUID(payload["automation_id"]))
 
     async def automation_delete(payload: dict[str, Any]) -> None:
         from app.features.automations import removal
@@ -88,6 +98,7 @@ def default_handlers() -> dict[str, Handler]:
 
     return {
         "automation.retry": automation_retry,
+        "automation.check": automation_check,
         "automation.delete": automation_delete,
         "capture.save": capture_save,
         "research.writeup": research_writeup,

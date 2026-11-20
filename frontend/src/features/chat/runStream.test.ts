@@ -21,6 +21,15 @@ describe('runReducer', () => {
     })
   })
 
+  it('keeps the newest time spent waiting for the user', () => {
+    expect(initialRunView.waiting).toBeNull()
+    const since = '2026-11-20T12:00:00+00:00'
+    const waiting = apply([{ type: 'run.timing', data: { waiting_ms: 0, waiting_since: since } }])
+    expect(waiting.waiting).toEqual({ waiting_ms: 0, waiting_since: since })
+    const resumed = runReducer(waiting, { type: 'run.timing', data: { waiting_ms: 4200, waiting_since: null } })
+    expect(resumed.waiting).toEqual({ waiting_ms: 4200, waiting_since: null })
+  })
+
   it('discards partial output when the run is restarted', () => {
     const view = apply([
       { type: 'message.delta', data: { text: 'partial' } },

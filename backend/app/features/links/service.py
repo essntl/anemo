@@ -8,23 +8,51 @@
 """
 
 import asyncio
+import time
 import uuid
+from typing import Any
 
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
+from app.core.refs import ObjectRef, ref_url
+from app.features.calendar import recurrence
+from app.features.calendar import service as calendar
+from app.features.calendar.models import CalendarEvent
+from app.features.documents import meta
+from app.features.documents import properties as doc_properties
 from app.features.documents import service as documents
 from app.features.documents.models import Document
-from app.features.links import parse
-from app.features.links.models import TaskFile
-from app.features.links.schemas import Backlinks, LinkedDocument, LinkedTask, TaskFileOut
+from app.features.links import index as links_index
+from app.features.links import parse, targets
+from app.features.links.models import ObjectLink, TaskFile
+from app.features.links.schemas import (
+    Backlinks,
+    BrokenLinkOut,
+    LinkedDocument,
+    LinkedEvent,
+    LinkedTask,
+    LinkGroups,
+    LinkItem,
+    LinkOut,
+    LinksOut,
+    TaskFileOut,
+)
+from app.features.properties import service as properties
+from app.features.provenance import service as provenance
+from app.features.provenance import sources
 from app.features.tasks import service as tasks
 from app.features.tasks.models import Project, Task
 from app.workspace import files
 
 DEFAULT_FOLDER = "files"
+# Reading links looks at the documents folder first (files changed outside the app), but
+# at most this often: a look reads the folder, and the links panels ask often.
+RECONCILE_EVERY_S = 10.0
+_reconciled_at = 0.0  # time.monotonic() of the last look
+MEETING_NOTES = "meeting-notes"  # the built-in type of a meeting's notes
 
 
 # -- attachments ---------------------------------------------------------------------------
@@ -123,26 +151,205 @@ async def file_backlinks(db: AsyncSession, path: str) -> Backlinks:
     return Backlinks(tasks=[_task(t) for t in task_rows], documents=[_doc(d) for d in docs])
 
 
+async def _incoming(db: AsyncSession, to_type: str, to_id: uuid.UUID) -> dict[str, list[uuid.UUID]]:
+    """The items that link to this one, by type, each once (oldest link first)."""
+    rows = await db.execute(
+        select(ObjectLink.from_type, ObjectLink.from_id)
+        .where(ObjectLink.to_type == to_type, ObjectLink.to_id == to_id)
+        .order_by(ObjectLink.created_at, ObjectLink.id)
+    )
+    found: dict[str, list[uuid.UUID]] = {}
+    for from_type, from_id in rows:
+        ids = found.setdefault(from_type, [])
+        if from_id not in ids and (from_type, from_id) != (to_type, to_id):
+            ids.append(from_id)
+    return found
+
+
+async def _backlinks(db: AsyncSession, to_type: str, to_id: uuid.UUID) -> Backlinks:
+    """Documents, tasks and events that link to an item (from the link index)."""
+    await _fresh(db)  # files changed outside the app: their links too
+    found = await _incoming(db, to_type, to_id)
+    task_ids = found.get("task", [])
+    doc_ids = found.get("document", [])
+    event_ids = found.get("event", [])
+    task_rows = {t.id: t for t in await db.scalars(select(Task).where(Task.id.in_(task_ids)))}
+    docs = await db.scalars(
+        select(Document).where(Document.id.in_(doc_ids)).order_by(Document.path)
+    )
+    events = {
+        e.id: e
+        for e in await db.scalars(select(CalendarEvent).where(CalendarEvent.id.in_(event_ids)))
+    }
+    return Backlinks(
+        tasks=[_task(task_rows[i]) for i in task_ids if i in task_rows],
+        documents=[_doc(d) for d in docs],
+        events=[
+            LinkedEvent(id=events[i].id, title=events[i].title, start_at=events[i].start_at)
+            for i in event_ids
+            if i in events
+        ],
+    )
+
+
 async def document_backlinks(db: AsyncSession, document_id: uuid.UUID) -> Backlinks:
-    """Documents and tasks whose Markdown links to this document."""
-    needle = f"/documents/{document_id}"
-    task_rows = await db.scalars(select(Task).where(Task.description.contains(needle)))
-    docs = [
-        d
-        for d, text in await _documents_text(db)
-        if d.id != document_id and document_id in parse.doc_ids_in(text)
-    ]
-    return Backlinks(tasks=[_task(t) for t in task_rows], documents=[_doc(d) for d in docs])
+    """Documents, tasks and events that link to this document."""
+    return await _backlinks(db, "document", document_id)
 
 
 async def task_backlinks(db: AsyncSession, task_id: uuid.UUID) -> Backlinks:
-    """Documents (and other tasks' notes) that link to this task."""
-    needle = f"/tasks?task={task_id}"
-    task_rows = await db.scalars(
-        select(Task).where(Task.description.contains(needle), Task.id != task_id)
+    """Documents, other tasks and events that link to this task."""
+    return await _backlinks(db, "task", task_id)
+
+
+# -- the link index: links and backlinks of any item ------------------------------------
+
+
+async def _fresh(db: AsyncSession) -> None:
+    """Pick up documents changed outside the app (their links too), at most every
+    RECONCILE_EVERY_S seconds per process."""
+    global _reconciled_at
+    now = time.monotonic()
+    if now - _reconciled_at < RECONCILE_EVERY_S:
+        return
+    _reconciled_at = now
+    await documents.reconcile(db)
+
+
+def _item(target: targets.Target) -> LinkItem:
+    return LinkItem(
+        type=target.ref.type,
+        id=target.ref.id,
+        ref=target.ref.url,
+        title=target.title,
+        detail=target.detail,
+        state=target.state,
     )
-    docs = [d for d, text in await _documents_text(db) if task_id in parse.task_ids_in(text)]
-    return Backlinks(tasks=[_task(t) for t in task_rows], documents=[_doc(d) for d in docs])
+
+
+def _group(links: list[LinkOut]) -> LinkGroups:
+    groups = LinkGroups()
+    for link in links:
+        getattr(groups, link.type).append(link)
+    return groups
+
+
+def _far(row: ObjectLink, end: str) -> ObjectRef:
+    if end == "to":
+        return ObjectRef(row.to_type, row.to_id)  # type: ignore[arg-type]
+    return ObjectRef(row.from_type, row.from_id)  # type: ignore[arg-type]
+
+
+async def check_item(db: AsyncSession, ref: ObjectRef) -> None:
+    """The item exists now (NotFound otherwise)."""
+    if (await targets.describe(db, [ref]))[ref].state != "live":
+        raise NotFound(f"There is no {ref.type} {ref.url}")
+
+
+async def links_of(db: AsyncSession, ref: ObjectRef) -> LinksOut:
+    """What an item links to and what links to it, grouped by type. A link that is both
+    in the text and set explicitly shows once, as explicit (so it can be removed)."""
+    await _fresh(db)  # files changed outside the app: their links too
+    out_rows = list(
+        await db.scalars(
+            select(ObjectLink)
+            .where(ObjectLink.from_type == ref.type, ObjectLink.from_id == ref.id)
+            .order_by(ObjectLink.created_at, ObjectLink.id)
+        )
+    )
+    in_rows = list(
+        await db.scalars(
+            select(ObjectLink)
+            .where(ObjectLink.to_type == ref.type, ObjectLink.to_id == ref.id)
+            .order_by(ObjectLink.created_at, ObjectLink.id)
+        )
+    )
+    found = await targets.describe(
+        db, [_far(r, "to") for r in out_rows] + [_far(r, "from") for r in in_rows]
+    )
+    actors = await provenance.describe(db, [r.created_by_ref for r in [*out_rows, *in_rows]])
+
+    def pick(rows: list[ObjectLink], end: str, *, live_only: bool) -> list[LinkOut]:
+        best: dict[ObjectRef, ObjectLink] = {}
+        for r in rows:
+            key = _far(r, end)
+            if key not in best or r.origin == "explicit":
+                best[key] = r
+        out = []
+        for key, r in best.items():
+            target = found[key]
+            if live_only and target.state != "live":
+                continue  # an item that is gone has no links of its own
+            out.append(
+                LinkOut(
+                    **_item(target).model_dump(),
+                    origin=r.origin,  # type: ignore[arg-type]
+                    created_by_actor=actors.get(r.created_by_ref),
+                    created_at=r.created_at,
+                )
+            )
+        return out
+
+    return LinksOut(
+        links=_group(pick(out_rows, "to", live_only=False)),
+        backlinks=_group(pick(in_rows, "from", live_only=True)),
+    )
+
+
+async def _owner(db: AsyncSession, ref: ObjectRef) -> Task | CalendarEvent:
+    """The task or event explicit links are set on (AppError for other types)."""
+    if ref.type == "task":
+        return await tasks.get_task(db, ref.id)
+    if ref.type == "event":
+        return await calendar.get_event(db, ref.id)
+    raise AppError(
+        "Links are set on tasks and events; documents link in their text",
+        code="links_not_explicit",
+    )
+
+
+async def change_links(db: AsyncSession, ref: ObjectRef, add: list[str], remove: list[str]) -> None:
+    """Link a task or event to these items (references; each must exist now), or no
+    longer (only explicit links: an inline one goes when its text no longer has it).
+    A change counts as a change to the item (provenance). Commits."""
+    item = await _owner(db, ref)
+    if await links_index.change_explicit(db, ref.type, ref.id, add, remove):
+        sources.record_changed(item)
+    await db.commit()
+    await (tasks.notify() if ref.type == "task" else calendar.notify())
+
+
+async def broken_links(db: AsyncSession, limit: int = 500) -> list[BrokenLinkOut]:
+    """Links to items deleted for good (or never there), with the item each is in,
+    newest first. A link to an item in the trash is not broken: it can come back."""
+    await _fresh(db)
+    dead = list(
+        await db.scalars(
+            select(ObjectLink)
+            .where(targets.gone_for_good(ObjectLink.to_type, ObjectLink.to_id))
+            .order_by(ObjectLink.created_at.desc(), ObjectLink.id.desc())
+        )
+    )
+    found = await targets.describe(db, [_far(r, "to") for r in dead])
+    owners = await targets.describe(db, [_far(r, "from") for r in dead])
+    out: list[BrokenLinkOut] = []
+    seen: set[tuple[ObjectRef, ObjectRef]] = set()
+    for r in dead:
+        source, target = owners[_far(r, "from")], found[_far(r, "to")]
+        if source.state != "live" or (source.ref, target.ref) in seen:
+            continue
+        seen.add((source.ref, target.ref))
+        out.append(
+            BrokenLinkOut(
+                source=_item(source),
+                target=_item(target),
+                origin=r.origin,  # type: ignore[arg-type]
+                created_at=r.created_at,
+            )
+        )
+        if len(out) >= limit:
+            break
+    return out
 
 
 # -- keeping links valid --------------------------------------------------------------------
@@ -160,6 +367,7 @@ async def on_moved(
     notes and links in documents (saved as a revision by `author`). Commits."""
     old, new = old.strip("/"), new.strip("/")
     counts = {"attachments": 0, "tasks": 0, "documents": 0}
+    await documents.follow_move(db, old, new)  # documents in it keep their id and history
     prefix = old + "/"
     rows = list(
         await db.scalars(
@@ -198,3 +406,39 @@ async def on_moved(
     if counts["attachments"] or counts["tasks"]:
         await tasks.notify()
     return counts
+
+
+# -- connecting things from the UI -------------------------------------------------------
+
+
+async def create_meeting_notes(db: AsyncSession, event_id: uuid.UUID) -> Document:
+    """A document for an event's meeting notes, linked both ways: its text links to the
+    event (inline), the event links to it (explicit). It gets the event's properties
+    that documents there can have, and `type: meeting-notes`, in the event's project
+    folder. Commits."""
+    event = await calendar.get_event(db, event_id)
+    project = await db.get(Project, event.project_id) if event.project_id else None
+    day = event.start_at.astimezone(recurrence.zone(event.tz)).date().isoformat()
+    title = f"Meeting notes: {event.title} ({day})"[:200]
+    path = documents.unique_path(project.slug if project else "", title)
+    project_id = await meta.project_for_path(db, path)
+    values: dict[str, Any] = {}
+    wanted = dict(event.properties or {})
+    type_prop = (await properties.load(db)).get("type")
+    if type_prop is not None and type_prop.option(MEETING_NOTES) is not None:
+        wanted.setdefault("type", MEETING_NOTES)
+    for key, value in wanted.items():
+        try:  # one that documents there can't have is left out
+            values |= await properties.validate(db, "document", project_id, {key: value})
+        except AppError:
+            continue
+    name = event.title.replace("[", "(").replace("]", ")")
+    body = f"# {title}\n\n[{name}]({ref_url('event', event.id)}) · {day}\n\n"
+    content = await doc_properties.with_defaults(db, path, body, values)
+    doc = await documents.create(db, path, content, author="user")
+    await links_index.add_explicit(db, "event", event.id, [ObjectRef("document", doc.id)])
+    sources.record_changed(event)
+    await db.commit()
+    await db.refresh(doc)
+    await calendar.notify()
+    return doc

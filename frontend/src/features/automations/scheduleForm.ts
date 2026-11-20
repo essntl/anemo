@@ -55,11 +55,15 @@ function cronTime(time: string): string {
   return `${m || 0} ${h || 0}`
 }
 
-export function toSchedule(form: ScheduleForm, tz: string): Schedule {
+/** How often an automation may run, in minutes: every 5, or with a change check every
+ * minute (the server checks first, the model only runs when something changed). */
+export const minMinutes = (hasCheck: boolean) => (hasCheck ? 1 : 5)
+
+export function toSchedule(form: ScheduleForm, tz: string, fewest = 5): Schedule {
   const base = { cron: null, every_minutes: null, at: null, rrule: null, tz }
   switch (form.frequency) {
     case 'minutes':
-      return { ...base, kind: 'interval', every_minutes: Math.max(5, Math.round(form.every)) }
+      return { ...base, kind: 'interval', every_minutes: Math.max(fewest, Math.round(form.every)) }
     case 'hours':
       return { ...base, kind: 'interval', every_minutes: Math.max(1, Math.round(form.every)) * 60 }
     case 'daily':

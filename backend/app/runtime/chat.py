@@ -131,6 +131,8 @@ async def _finish(
         message.model_id = result.model.model_id
         message.model_label = f"{result.model.display_name} · {result.model.provider_name}"
         run.model_id = result.model.model_id
+        if text and result.first_text_at is not None:
+            runs.note_first_text(run, result.first_text_at)  # the answer's time to first text
         u = result.usage
         run.totals = {"input_tokens": u.input_tokens, "output_tokens": u.output_tokens}
         if u.equivalent_cost_usd is not None:

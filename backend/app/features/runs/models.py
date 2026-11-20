@@ -2,7 +2,18 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -77,6 +88,20 @@ class Run(Base, IdMixin, TimestampMixin):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Timing (see service.run_timing): when the first text of the answer arrived, and
+    # the time spent waiting for the user (approvals, questions, a pause), which is not
+    # part of how long the answer took. `waiting_since` is set while it waits now.
+    first_text_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # How long it had waited for the user by then (not part of the time to first text).
+    first_text_waiting_ms: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    waiting_ms: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    waiting_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Automation runs: the model's one-line outcome, whether the run did nothing (changed
+    # nothing, notified nobody), and the changes recorded from its tool calls
+    # ([{tool, summary, ref?}], sub-agents' included). See features/automations.
+    outcome_line: Mapped[str | None] = mapped_column(Text)
+    nothing_to_do: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    changes: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
 
 
 class RunEvent(Base):

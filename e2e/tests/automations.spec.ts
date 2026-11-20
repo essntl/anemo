@@ -24,7 +24,7 @@ test('automations: create, see the schedule, turn off, edit and delete', async (
     await page.goto('/automations')
     await page.getByRole('button', { name: 'New', exact: true }).click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByLabel('Name').fill(name)
+    await dialog.getByLabel('Name', { exact: true }).fill(name)
     await dialog.getByLabel('What should it do?').fill('Say hello.')
 
     // The preview explains the schedule and refuses one that runs too often.
@@ -56,11 +56,17 @@ test('automations: create, see the schedule, turn off, edit and delete', async (
     await card.getByRole('button', { name: 'More actions' }).click()
     await page.getByRole('button', { name: 'Edit' }).click()
     await expect(dialog.getByLabel('At', { exact: true })).toHaveValue('09:30')
-    await dialog.getByLabel('Name').fill(`${name} renamed`)
+    // A new automation got its own limits, and its runs keep a state note.
+    await expect(dialog.getByLabel('Most tool calls per run')).toHaveValue('30')
+    await expect(dialog.getByLabel('Longest run (minutes)')).toHaveValue('5')
+    await dialog.getByLabel('State note').fill('Seen so far: nothing.')
+    await dialog.getByLabel('Name', { exact: true }).fill(`${name} renamed`)
     await dialog.getByRole('button', { name: 'Save' }).click()
     await expect(dialog).toHaveCount(0)
     const renamed = page.locator('div.rounded-card', { hasText: `${name} renamed` })
     await expect(renamed).toBeVisible()
+    const saved = (await (await page.request.get('/api/automations')).json()) as { name: string; state_note: string | null }[]
+    expect(saved.find((a) => a.name === `${name} renamed`)?.state_note).toBe('Seen so far: nothing.')
 
     await renamed.getByRole('button', { name: 'More actions' }).click()
     await page.getByRole('button', { name: 'Delete' }).click()

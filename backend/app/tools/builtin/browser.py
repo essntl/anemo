@@ -177,6 +177,7 @@ def _mine_action(summary: str, risk: Literal["safe", "dangerous"] = "safe") -> A
         risk=risk,
         summary=f"{summary} (your Chrome)",
         always_ask="a click or typing in your own Chrome" if risk != "safe" else None,
+        contacts_people=risk != "safe",  # a click or typing may send something to someone
     )
 
 
@@ -219,6 +220,7 @@ class BrowserOpen(Tool):
         "page's text and a numbered list of what can be clicked or typed into."
     )
     capability = CAPABILITY
+    changes_state = False  # looking, not acting
     Input = OpenInput
     timeout_s = browser_client.ACTION_TIMEOUT_S + 10
 
@@ -259,6 +261,7 @@ class BrowserRead(Tool):
         "returns the page as it is, with a note; it cannot wait for something to disappear."
     )
     capability = CAPABILITY
+    changes_state = False  # looking, not acting
     Input = ReadInput
     timeout_s = browser_client.ACTION_TIMEOUT_S + 10
 
@@ -314,6 +317,8 @@ class BrowserClick(Tool):
                 capability=CAPABILITY,
                 risk="moderate",
                 summary=f"Click {_element(ctx, args.ref)} in the browser",
+                # It may submit a form that sends something to someone: automation runs ask.
+                contacts_people=True,
             )
         ]
 
@@ -422,7 +427,11 @@ class BrowserType(Tool):
             what = _element(ctx, args.ref, "my_browser") if args.ref else None
             return [_mine_action(self._summary(args, what), "dangerous")]
         what = _element(ctx, args.ref) if args.ref else None
-        return [Action(capability=CAPABILITY, risk="moderate", summary=self._summary(args, what))]
+        summary = self._summary(args, what)
+        # Typing (and pressing Enter) may send a message: automation runs ask.
+        return [
+            Action(capability=CAPABILITY, risk="moderate", summary=summary, contacts_people=True)
+        ]
 
     async def run(self, args: TypeInput, ctx: ToolContext) -> ToolResult:
         if args.text is None:
@@ -460,6 +469,7 @@ class BrowserScreenshot(Tool):
         "text is not enough: layout, charts, images, or to check how something looks."
     )
     capability = CAPABILITY
+    changes_state = False  # looking, not acting
     Input = ScreenshotInput
     timeout_s = browser_client.ACTION_TIMEOUT_S + 10
 

@@ -9,7 +9,15 @@ from fastapi import APIRouter, Query
 from app.api.deps import Db
 from app.core.errors import AppError
 from app.features.calendar import service
-from app.features.calendar.schemas import EventIn, EventOut, OccurrenceIn, OccurrenceOut
+from app.features.calendar.models import CalendarEvent
+from app.features.calendar.schemas import (
+    EventIn,
+    EventOut,
+    OccurrenceIn,
+    OccurrenceOut,
+    PropertiesIn,
+)
+from app.features.provenance import service as provenance
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
@@ -22,6 +30,11 @@ def _aware(value: datetime, name: str) -> datetime:
     return value
 
 
+async def _event(db: Db, event: CalendarEvent) -> EventOut:
+    actors = await provenance.describe(db, service.actor_refs([event]))
+    return service.event_out(event, actors)
+
+
 @router.get("/events", response_model=list[OccurrenceOut])
 async def list_occurrences(
     db: Db,
@@ -30,24 +43,41 @@ async def list_occurrences(
     project_id: uuid.UUID | None = None,
 ) -> list[OccurrenceOut]:
     found = await service.occurrences(db, _aware(start, "start"), _aware(end, "end"), project_id)
-    return [o.out() for o in found]
+    actors = await provenance.describe(db, service.actor_refs([o.event for o in found]))
+    return [o.out(actors) for o in found]
 
 
 @router.post("/events", response_model=EventOut, status_code=201)
 async def create_event(body: EventIn, db: Db) -> EventOut:
-    return service.event_out(await service.create_event(db, body))
+    return await _event(db, await service.create_event(db, body))
 
 
 @router.get("/events/{event_id}", response_model=EventOut)
 async def get_event(event_id: uuid.UUID, db: Db) -> EventOut:
-    return service.event_out(await service.get_event(db, event_id))
+    return await _event(db, await service.get_event(db, event_id))
 
 
 @router.put("/events/{event_id}", response_model=EventOut)
 async def update_event(event_id: uuid.UUID, body: EventIn, db: Db) -> EventOut:
     """Change the event (for a repeating event: the whole series)."""
     event = await service.get_event(db, event_id)
-    return service.event_out(await service.update_event(db, event, body))
+    dropped: list[str] = []
+    out = await _event(db, await service.update_event(db, event, body, dropped=dropped))
+    return out.model_copy(update={"dropped_properties": dropped})
+
+
+@router.put("/events/{event_id}/properties", response_model=EventOut)
+async def set_properties(event_id: uuid.UUID, body: PropertiesIn, db: Db) -> EventOut:
+    """Change some property values of an event (for a repeating event: of the series)."""
+    event = await service.get_event(db, event_id)
+    return await _event(db, await service.set_properties(db, event, body.set))
+
+
+@router.post("/events/{event_id}/detach-source", response_model=EventOut)
+async def detach_source(event_id: uuid.UUID, db: Db) -> EventOut:
+    """Make a synced event an ordinary one: its source fields are cleared."""
+    event = await service.get_event(db, event_id)
+    return await _event(db, await service.detach_source(db, event))
 
 
 @router.delete("/events/{event_id}", status_code=204)

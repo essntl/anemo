@@ -43,10 +43,12 @@ import {
 } from '../api'
 import { useChatActions } from '../chatActions'
 import { TemporaryLabel } from '../temporary'
+import { LiveTiming } from '../components/AnswerTiming'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { ModelPicker } from '../components/ModelPicker'
 import { type RunEvent, type RunView, useRunStream } from '../runStream'
+import { withWaiting } from '../timing'
 import { useStickToBottom } from '../useStickToBottom'
 
 /** From this width up there is room for the browser next to the chat. */
@@ -285,6 +287,7 @@ function Conversation() {
               )
             }
             const isLive = m.run_id === activeRunId && m.status === 'streaming'
+            const liveTiming = isLive && m.timing ? withWaiting(m.timing, live.waiting) : null
             return (
               <div key={m.id} className={enter(m.id)}>
                 {isLive ? (
@@ -295,8 +298,12 @@ function Conversation() {
                     error={live.error}
                     modelLabel={live.modelLabel}
                     notice={live.notice}
-                    activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live docked /> : undefined}
+                    activity={m.mode === 'agent' && m.run_id ? (
+                      <RunActivity runId={m.run_id} live docked
+                        timer={liveTiming && <LiveTiming timing={liveTiming} paused={live.status === 'paused'} />} />
+                    ) : undefined}
                     questions={live.questions}
+                    timing={liveTiming}
                   />
                 ) : (() => {
                   const versions = m.versions ?? []
@@ -321,6 +328,7 @@ function Conversation() {
                       modelLabel={shown.model_label}
                       questions={shown.questions}
                       files={shown.attachments}
+                      timing={shown.timing}
                       activity={shown.mode === 'agent' && shown.run_id ? <RunActivity runId={shown.run_id} live={false} /> : undefined}
                       versions={versions.length > 1 ? { index, count: versions.length, onSelect: select } : undefined}
                       onRegenerate={

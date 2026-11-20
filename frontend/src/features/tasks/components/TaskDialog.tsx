@@ -12,9 +12,13 @@ import { plural, t } from '@/lib/i18n'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
 import { focusOnTask } from '@/features/focus/focusOnTask'
-import { BacklinkList } from '@/features/links/BacklinkList'
+import { LinksPanel } from '@/features/links/LinksPanel'
 import { TaskAttachments } from '@/features/links/TaskAttachments'
-import { useTaskBacklinks } from '@/features/links/api'
+import { droppedLabels } from '@/features/links/linkTypes'
+import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/features/properties/api'
+import { PropertyChips } from '@/features/properties/PropertyChips'
+import { type Synced } from '@/features/provenance/labels'
+import { ActorLine, SourceBadge, SourceDetails } from '@/features/provenance/Provenance'
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -22,6 +26,7 @@ import {
   type TaskStatus,
   useCreateTask,
   useDeleteTask,
+  useDetachTaskSource,
   useProjects,
   useSaveProject,
   useTasks,
@@ -58,12 +63,19 @@ interface TaskDialogProps {
 
 const tagList = (text: string) => text.split(',').map((t) => t.trim()).filter(Boolean)
 
+/** The property values besides the tags (which have their own field). */
+const withoutTags = (values: Record<string, unknown> | undefined) =>
+  Object.fromEntries(Object.entries(values ?? {}).filter(([key]) => key !== 'tags'))
+
 export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskDialogProps) {
   const projects = useProjects()
   const all = useTasks().data ?? []
   const create = useCreateTask()
   const update = useUpdateTask()
   const remove = useDeleteTask()
+  const detach = useDetachTaskSource()
+  // The source fields as they are now (detaching clears them while the editor is open).
+  const [synced, setSynced] = useState<Synced>(task ?? {})
   const saveProject = useSaveProject()
   const navigate = useNavigate()
   const [title, setTitle] = useState(task?.title ?? '')
@@ -76,15 +88,18 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
   const [repeat, setRepeat] = useState(task?.rrule ?? '')
   const [projectId, setProjectId] = useState(task?.project_id ?? defaults?.project_id ?? '')
   const [tags, setTags] = useState((task?.tags ?? []).join(', '))
+  const startValues = withoutTags(task?.properties)
+  const [values, setValues] = useState<Record<string, unknown>>(startValues)
+  const definitions = useProperties().data ?? []
+  const available = propertiesFor(definitions, projectId || null, 'task').filter((p) => p.key !== 'tags')
   const [checklist, setChecklist] = useState(task?.checklist ?? [])
   const [parentId, setParentId] = useState(task?.parent_id ?? '')
   const [blockedBy, setBlockedBy] = useState(task?.blocked_by ?? [])
   const parents = parentCandidates(all, task)
   const parent = all.find((t) => t.id === parentId)
   const hasSubtasks = task !== null && all.some((t) => t.parent_id === task.id)
-  const backlinks = useTaskBacklinks(task?.id ?? null)
   const pending = create.isPending || update.isPending
-  const error = create.error ?? update.error ?? remove.error ?? saveProject.error
+  const error = create.error ?? update.error ?? remove.error ?? saveProject.error ?? detach.error
 
   const chooseProject = async (value: string) => {
     if (value !== NEW_PROJECT) return setProjectId(value)
@@ -115,8 +130,13 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
       parent_id: parentId || null,
       blocked_by: blockedBy,
     }
-    if (task) update.mutate({ id: task.id, body: { ...body, ...(choice ? { subtasks: choice } : {}) } }, { onSuccess: after })
-    else create.mutate(body, { onSuccess: after })
+    if (task) {
+      const changes = propertyChanges(startValues, values)
+      const properties = Object.keys(changes).length ? { properties: changes } : {}
+      update.mutate({ id: task.id, body: { ...body, ...properties, ...(choice ? { subtasks: choice } : {}) } }, { onSuccess: after })
+    } else {
+      create.mutate({ ...body, properties: valuesFor(definitions, values, projectId || null, 'task') }, { onSuccess: after })
+    }
   }
   // Another task opens in the editor: keep what was typed here first, like Save would.
   const openTask = onOpenTask
@@ -164,7 +184,8 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
                 <CornerDownRight className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{t('Subtask of {title}', { title: parent.title })}</span>
               </button>
             )}
-            {task?.created_by === 'agent' && <span className="text-[12px] text-muted">{t('Added by an agent.')}</span>}
+            {task && <SourceBadge item={synced} />}
+            {task?.created_by === 'agent' && !task.created_by_actor && <span className="text-[12px] text-muted">{t('Added by an agent.')}</span>}
           </div>
           <div className="md:-ml-1"><ChecklistEditor items={checklist} onChange={setChecklist} /></div>
           {/* Stored as Markdown, like documents. An empty editor gives an empty text. */}
@@ -201,6 +222,24 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
           <Field label={t('Tags')} hint={t('Comma-separated')}>
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder={t('errands, phone')} />
           </Field>
+          {droppedLabels(values, available, definitions).length > 0 && (
+            <p role="status" className="text-[12.5px] text-warning">
+              {t('Not allowed in this project, so they go when you save: {properties}', { properties: droppedLabels(values, available, definitions).join(', ') })}
+            </p>
+          )}
+          {available.length > 0 && (
+            <section aria-label={t('Properties')} className="flex flex-wrap items-center gap-1.5">
+              <PropertyChips available={available} values={values}
+                onChange={(key, value) => {
+                  setValues((current) => {
+                    const next = { ...current }
+                    if (value === null) delete next[key]
+                    else next[key] = value
+                    return next
+                  })
+                }} />
+            </section>
+          )}
           <Field label={t('Subtask of')} hint={hasSubtasks ? t('It has subtasks of its own, so it can’t be one.') : undefined}>
             <Select value={parentId} onValueChange={setParentId} disabled={hasSubtasks} aria-label={t('Subtask of')}
               options={[
@@ -214,7 +253,12 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
           )}
           <BlockedByEditor task={task} all={all} blockedBy={blockedBy} onChange={setBlockedBy} onOpen={openTask} />
           <TaskAttachments taskId={task?.id ?? null} projectId={projectId || null} />
-          <BacklinkList title={t('Linked from')} links={backlinks.data} />
+          {task && <LinksPanel type="task" id={task.id} editable onOpen={openLink} />}
+          {task && (
+            <SourceDetails item={synced} detaching={detach.isPending}
+              onDetach={() => detach.mutate(task.id, { onSuccess: (detached) => setSynced(detached) })} />
+          )}
+          {task && <ActorLine created={task.created_by_actor} updated={task.updated_by_actor} />}
           {task && status !== 'done' && status !== 'cancelled' && (
             <Button variant="secondary" icon={<Timer className="h-4 w-4" />} onClick={() => focusOnTask(task)}>
               {t('Focus on this')}

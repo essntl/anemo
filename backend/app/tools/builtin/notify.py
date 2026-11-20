@@ -35,6 +35,8 @@ class SendNotification(Tool):
     capability = "notify.send"
     Input = NotifyInput
     idempotent = False
+    # Telling the user is not a change; automation runs see who was notified separately.
+    changes_state = False
 
     def actions(self, args: NotifyInput, ctx: ToolContext) -> list[Action]:
         return [Action(capability=self.capability, summary=f"Notify you: {args.title}")]

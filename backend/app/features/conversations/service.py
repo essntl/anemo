@@ -33,7 +33,9 @@ from app.features.documents.models import Document
 from app.features.profiles.models import AgentProfile
 from app.features.projects import service as projects
 from app.features.research.models import ResearchSession
+from app.features.runs import service as runs_service
 from app.features.runs.models import ACTIVE_STATUSES, Run
+from app.features.runs.schemas import RunTiming
 from app.features.skills import service as skills
 from app.features.tasks.schemas import clean_tags
 from app.jobs import queue
@@ -97,8 +99,10 @@ def message_out(
     files: list[Attachment] | None = None,
     mode: str | None = None,
     runs: dict[uuid.UUID, RunInfo] | None = None,
+    timings: dict[uuid.UUID, RunTiming] | None = None,
 ) -> MessageOut:
     runs = runs or {}
+    timings = timings if m.role == "assistant" and timings else {}
     info = runs.get(m.run_id) if m.run_id else None
     files = files or []
     if m.role == "assistant":
@@ -128,6 +132,7 @@ def message_out(
                         if (a.run_id is not None and a.run_id == run_id)
                         or (a.run_id is None and run_id == m.run_id)
                     ],
+                    timing=timings.get(run_id) if run_id else None,
                 )
             )
     return MessageOut(
@@ -153,6 +158,7 @@ def message_out(
         questions=_questions(info),
         versions=versions,
         version=min(m.version, len(m.versions or [])) if m.versions else 0,
+        timing=timings.get(m.run_id) if m.run_id else None,
     )
 
 
@@ -169,6 +175,13 @@ async def _run_info(db: AsyncSession, rows: list[ChatMessage]) -> dict[uuid.UUID
         run_id: (kind, questions if isinstance(questions, list) else [])
         for run_id, kind, questions in result.all()
     }
+
+
+async def message_timings(db: AsyncSession, rows: list[ChatMessage]) -> dict[uuid.UUID, RunTiming]:
+    """How long the answers among `rows` (and their earlier versions) took, by run."""
+    ids = {m.run_id for m in rows if m.role == "assistant" and m.run_id}
+    ids |= {r for m in rows for v in m.versions or [] if (r := _version_run_id(v))}
+    return await runs_service.timings(db, ids)
 
 
 async def get_conversation(db: AsyncSession, conversation_id: uuid.UUID) -> Conversation:
@@ -418,7 +431,8 @@ async def list_messages(db: AsyncSession, conversation_id: uuid.UUID) -> list[Me
         if att.message_id:
             files.setdefault(att.message_id, []).append(att)
     runs = await _run_info(db, rows)
-    return [message_out(m, files.get(m.id), runs=runs) for m in rows]
+    timings = await message_timings(db, rows)
+    return [message_out(m, files.get(m.id), runs=runs, timings=timings) for m in rows]
 
 
 async def _next_seq(db: AsyncSession, conversation_id: uuid.UUID) -> int:
@@ -674,7 +688,9 @@ async def select_version(
     last.versions, last.version = everything, version
     await db.commit()
     await db.refresh(last)
-    return message_out(last, runs=await _run_info(db, [last]))
+    return message_out(
+        last, runs=await _run_info(db, [last]), timings=await message_timings(db, [last])
+    )
 
 
 async def _last_exchange(

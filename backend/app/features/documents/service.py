@@ -17,13 +17,17 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import set_committed_value
 
+from app.core.actor import EXTERNAL, current_actor
 from app.core.errors import AppError, NotFound
 from app.events import bus
+from app.features.documents import meta
 from app.features.documents.models import Document, DocumentRevision
+from app.features.links import index as links_index
 from app.jobs import queue
 from app.knowledge import index
 from app.workspace import files, safe_fs
@@ -188,10 +192,13 @@ async def reconcile(db: AsyncSession) -> list[str]:
             moved = next((d for d in gone.values() if d.content_hash == digest), None)
             if moved is not None:
                 gone.pop(moved.path)
+                meta.record_move(db, moved.id, moved.path)  # moved outside the app
                 moved.path, moved.title = info.path, title_of(content, info.path)
                 moved.size, moved.mtime = info.size, info.mtime
             else:
-                doc = Document(path=info.path, title="", content_hash="")
+                doc = Document(
+                    path=info.path, title="", content_hash="", created_by_ref=EXTERNAL.ref
+                )
                 try:
                     async with db.begin_nested():
                         db.add(doc)
@@ -216,8 +223,12 @@ async def reconcile(db: AsyncSession) -> list[str]:
         if await asyncio.to_thread(_exists, doc.path):
             continue
         await index.delete_source(db, SOURCE_TYPE, [doc.id])
+        await links_index.drop_outgoing(db, "document", doc.id)
         await db.delete(doc)
         changed = True
+    # Indexed from other content, or never (before properties, a new index format).
+    changed = await _index_stale(db) or changed
+    changed = await _links_stale(db) or changed
     if changed or db.dirty:
         await db.commit()
     return folders
@@ -239,9 +250,22 @@ async def _apply(
     doc.word_count = word_count(content)
     doc.size, doc.mtime = info.size, info.mtime
     doc.last_editor = author
+    # Who did it (app/core/actor.py): a change picked up from the folder was made outside.
+    actor_ref = EXTERNAL.ref if author == "external" else current_actor().ref
+    doc.updated_by_ref = actor_ref
     # Outside changes are only seen now and then, so each one keeps its own revision.
-    await _add_revision(db, doc, content, author, run_id, new_revision or author == "external")
+    await _add_revision(
+        db,
+        doc,
+        content,
+        author,
+        run_id,
+        new_revision or author == "external",
+        actor_ref=actor_ref,
+    )
     await _schedule_index(db, doc)
+    await meta.index(db, doc, content)  # properties and keyword search, from the text
+    await _index_links(db, doc, content)  # the links in it
 
 
 async def _add_revision(
@@ -251,6 +275,8 @@ async def _add_revision(
     author: str,
     run_id: uuid.UUID | None,
     force_new: bool = False,
+    *,
+    actor_ref: str | None = None,
 ) -> None:
     latest = await db.scalar(
         select(DocumentRevision)
@@ -266,6 +292,7 @@ async def _add_revision(
         and latest is not None
         and latest.author == author
         and latest.run_id == run_id
+        and latest.actor_ref == actor_ref
         and now - latest.created_at < REVISION_WINDOW
     )
     if same_session and latest is not None:
@@ -278,6 +305,7 @@ async def _add_revision(
             content_hash=sha(content),
             author=author,
             run_id=run_id,
+            actor_ref=actor_ref,
             created_at=now,
             updated_at=now,
         )
@@ -317,7 +345,8 @@ async def index_document(db: AsyncSession, document_id: uuid.UUID) -> bool:
         content = await asyncio.to_thread(_read, doc.path)
     except AppError:
         return False
-    chunks = [f"{doc.title}\n\n{c}" for c in chunk_markdown(content)]
+    header = await meta.chunk_header(db, doc)  # title, folder and properties
+    chunks = [f"{header}\n\n{c}" for c in chunk_markdown(content)]
     await index.index_source(db, SOURCE_TYPE, doc.id, chunks)
     doc.indexed_hash = sha(content)
     await db.commit()
@@ -392,7 +421,7 @@ async def create(
 ) -> Document:
     path = check_path(path)
     await asyncio.to_thread(files.write_bytes, path, content.encode(), must_not_exist=True)
-    doc = Document(path=path, title="", content_hash="")
+    doc = Document(path=path, title="", content_hash="", created_by_ref=current_actor().ref)
     db.add(doc)
     await db.flush()
     info = await asyncio.to_thread(_info, path)
@@ -418,9 +447,11 @@ async def move(db: AsyncSession, doc: Document, new_path: str) -> Document:
     new_path = check_path(new_path)
     if new_path != doc.path:
         await asyncio.to_thread(files.move, doc.path, new_path)
+        meta.record_move(db, doc.id, doc.path)
         doc.path = new_path
         info = await asyncio.to_thread(_info, new_path)
         doc.size, doc.mtime = info.size, info.mtime
+        await _reindex_moved(db, doc)
         await db.commit()
         await db.refresh(doc)
     return doc
@@ -430,5 +461,135 @@ async def remove(db: AsyncSession, doc: Document, deleted_by: str = "user") -> N
     """Move the file to the workspace trash and drop the index entry."""
     await asyncio.to_thread(files.trash, doc.path, deleted_by)
     await index.delete_source(db, SOURCE_TYPE, [doc.id])
+    await links_index.drop_outgoing(db, "document", doc.id)  # links to it stay (broken)
     await db.delete(doc)
     await db.commit()
+
+
+async def follow_move(db: AsyncSession, old: str, new: str) -> None:
+    """A file or folder was moved from `old` to `new` outside this service (Files, the
+    file tools): the documents in it keep their id and history at the new path, and
+    the old path goes into the path history. Doesn't commit."""
+    old, new = old.strip("/"), new.strip("/")
+    rows = await db.scalars(
+        select(Document).where(
+            or_(Document.path == old, Document.path.startswith(old + "/", autoescape=True))
+        )
+    )
+    for doc in list(rows):
+        target = new + doc.path[len(old) :]
+        if (
+            not target.startswith(f"{DOCS_DIR}/")
+            or not target.lower().endswith(".md")
+            or await by_path(db, target) is not None
+            or not await asyncio.to_thread(_exists, target)
+        ):
+            continue  # left documents/ or isn't where we expect: reconcile sorts it out
+        meta.record_move(db, doc.id, doc.path)
+        doc.path = target
+        await _reindex_moved(db, doc)
+
+
+def read_file(path: str) -> str:
+    """A document file's text as it is on disk (no index update; see read())."""
+    return _read(path)
+
+
+async def schedule_reindex(db: AsyncSession, doc: Document) -> None:
+    """Rebuild the document's search chunks a little later although its text didn't
+    change (a property label changed: the chunk header names it). Doesn't commit."""
+    doc.indexed_hash = None
+    await queue.enqueue(
+        db,
+        "document.index",
+        {"document_id": str(doc.id)},
+        run_at=datetime.now(UTC) + INDEX_DELAY,
+        dedupe_key=f"document.index:{doc.id}:{doc.content_hash}:{uuid.uuid4().hex}",
+    )
+
+
+def file_exists(path: str) -> bool:
+    """Whether the document file is there (on disk, now)."""
+    return _exists(path)
+
+
+async def _index_stale(db: AsyncSession) -> bool:
+    """Rebuild the properties and keyword index of documents whose index was built
+    from other content, or never (documents from before properties, or after the index
+    changed). Doesn't commit. Whether there were any."""
+    stale = list(
+        await db.scalars(
+            select(Document).where(
+                or_(
+                    Document.properties_hash.is_(None),
+                    Document.properties_hash != Document.content_hash,
+                )
+            )
+        )
+    )
+    for doc in stale:
+        try:
+            content = await asyncio.to_thread(_read, doc.path)
+        except AppError:
+            continue  # gone or unreadable: the next look sorts it out
+        if sha(content) != doc.content_hash:
+            await _apply(
+                db, doc, content, await asyncio.to_thread(_info, doc.path), author="external"
+            )
+        else:
+            await meta.index(db, doc, content)
+    return bool(stale)
+
+
+async def _reindex_moved(db: AsyncSession, doc: Document) -> None:
+    """A document at a new path: its project-scoped properties may (not) apply there,
+    and its search chunks name the folder. Doesn't commit."""
+    try:
+        content = await asyncio.to_thread(_read, doc.path)
+    except AppError:
+        return
+    await meta.index(db, doc, content)
+    await schedule_reindex(db, doc)
+
+
+async def _index_links(db: AsyncSession, doc: Document, content: str | None) -> bool:
+    """Rebuild the link index from the document's text (never fails the save:
+    links/index.refresh_inline) and record which content it was built from. When that
+    fails, nothing is recorded, so the next reconcile tries again. `content` None: the
+    file can't be read as text, so it has no links. Keeps updated_at. Doesn't commit.
+    Whether it worked."""
+    await db.flush()
+    ok = await links_index.refresh_inline(db, "document", doc.id, content or "")
+    done = doc.content_hash if ok else None
+    await db.execute(
+        update(Document)
+        .where(Document.id == doc.id)
+        .values(links_hash=done, updated_at=Document.updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    set_committed_value(doc, "links_hash", done)
+    return ok
+
+
+async def _links_stale(db: AsyncSession) -> bool:
+    """Index the links of documents whose links were indexed from other content, or
+    never (documents from before the link index), or whose indexing failed. A file
+    that can't be read counts as having no links (until its content changes). Doesn't
+    commit. Whether anything was written."""
+    stale = list(
+        await db.scalars(
+            select(Document).where(
+                or_(Document.links_hash.is_(None), Document.links_hash != Document.content_hash)
+            )
+        )
+    )
+    wrote = False
+    for doc in stale:
+        try:
+            content: str | None = await asyncio.to_thread(_read, doc.path)
+        except AppError:
+            content = None  # unreadable: nothing to index, and not tried again and again
+        if content is not None and sha(content) != doc.content_hash:
+            continue  # changed: reconcile reads it as a change, links included
+        wrote = await _index_links(db, doc, content) or wrote
+    return wrote

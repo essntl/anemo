@@ -9,6 +9,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from app.events import bus
 from app.providers.base import (
@@ -46,6 +47,8 @@ class StreamResult:
     # one call); each becomes its own usage record.
     usage_parts: list[Usage] = field(default_factory=list)
     stop_reason: StopReason = "end"
+    # When the first text of this call arrived (the run's time to first text).
+    first_text_at: datetime | None = None
 
 
 @dataclass
@@ -89,6 +92,8 @@ async def _stream_once(
     try:
         async for event in adapter.stream_chat(req):
             if isinstance(event, TextDelta):
+                if result.first_text_at is None and event.text:
+                    result.first_text_at = datetime.now(UTC)
                 await reasoning_out.flush()
                 text_parts.append(event.text)
                 await text_out.add(event.text)

@@ -23,6 +23,7 @@ export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'mcp', label: msg('MCP'), sensitive: true },
   { to: 'notifications', label: msg('Notifications') },
   { to: 'memory', label: msg('Memory') },
+  { to: 'properties', label: msg('Properties'), of: ['documents'] },
   { to: 'sharing', label: msg('Shared links') },
   { to: 'usage', label: msg('Usage') },
   { to: 'advanced', label: msg('Advanced') },

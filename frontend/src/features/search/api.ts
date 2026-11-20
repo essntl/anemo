@@ -4,6 +4,7 @@ import { api, type Schemas, unwrap } from '@/api/client'
 export type SearchHit = Schemas['SearchHit']
 export type SearchGroup = Schemas['SearchGroup']
 export type SearchKind = SearchHit['kind']
+export type SearchFilter = Schemas['FilterChip']
 
 interface SearchOptions {
   /** Only these kinds; default: everything. */

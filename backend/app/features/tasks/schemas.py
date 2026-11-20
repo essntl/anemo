@@ -1,11 +1,12 @@
 import secrets
 import uuid
 from datetime import date, datetime, time
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 from app.features.calendar.recurrence import normalize_rrule
+from app.features.provenance.schemas import ActorOut
 
 # "waiting": on someone or something else (an answer, a delivery); still open.
 TaskStatus = Literal["todo", "in_progress", "waiting", "blocked", "done", "cancelled"]
@@ -31,6 +32,13 @@ def clean_rrule(rule: str | None) -> str | None:
 
 MAX_CHECKLIST = 100
 MAX_BLOCKERS = 50
+MAX_PROPERTIES = 30
+MAX_LINKS = 50  # references given in one call
+PROPERTIES = (
+    'Property values (features/properties), e.g. {"client": "ludmyla-doula"}: select '
+    "values are slugs, a multi_select a list, dates YYYY-MM-DD. tags is the same list as "
+    "`tags`. On a change: the keys given are set, null removes one."
+)
 # What happens to a parent's open subtasks when it is finished.
 SubtasksChoice = Literal["finish", "keep"]
 
@@ -80,6 +88,15 @@ class TaskIn(BaseModel):
     blocked_by: list[uuid.UUID] = Field(
         default_factory=list, max_length=MAX_BLOCKERS, description="Tasks this one waits on"
     )
+    properties: dict[str, Any] = Field(
+        default_factory=dict, max_length=MAX_PROPERTIES, description=PROPERTIES
+    )
+    links: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_LINKS,
+        description="References of items to link it to: /documents/<id>, /calendar?event=<id>, "
+        "/tasks?task=<id>, /c/<id>",
+    )
 
     @field_validator("tags")
     @classmethod
@@ -106,6 +123,9 @@ class TaskPatch(BaseModel):
     parent_id: uuid.UUID | None = None
     checklist: list[ChecklistItem] | None = Field(None, max_length=MAX_CHECKLIST)
     blocked_by: list[uuid.UUID] | None = Field(None, max_length=MAX_BLOCKERS)
+    properties: dict[str, Any] | None = Field(
+        None, max_length=MAX_PROPERTIES, description=PROPERTIES
+    )
     subtasks: SubtasksChoice | None = Field(
         None,
         description="Finishing a task with open subtasks: also finish them, or keep them open. "
@@ -143,6 +163,23 @@ class TaskOut(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+    # Where a synced task came from (all None for ordinary ones); see db.base.SourceMixin.
+    source: str | None = None
+    external_key: str | None = None
+    source_url: str | None = None
+    synced_at: datetime | None = None
+    edited_by_user_at: datetime | None = Field(
+        None, description="When the user last changed this synced task by hand"
+    )
+    created_by_actor: ActorOut | None = Field(None, description="Who made it (None: unknown)")
+    updated_by_actor: ActorOut | None = Field(None, description="Who changed it last")
+    properties: dict[str, Any] = Field(
+        default_factory=dict, description="Property values; `tags`: the slugs the tags name"
+    )
+    dropped_properties: list[str] = Field(
+        default_factory=list,
+        description="Property keys this change dropped: not allowed in the project it moved to",
+    )
 
 
 class ReorderIn(BaseModel):

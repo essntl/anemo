@@ -1,18 +1,28 @@
 """Calendar events: storing them, and listing the occurrences in a date range."""
 
+import re
 import uuid
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, or_, select, true
+from sqlalchemy import ColumnElement, delete, or_, select, true
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import current_actor
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.calendar import recurrence
 from app.features.calendar.models import CalendarEvent, EventException
 from app.features.calendar.schemas import EventIn, EventOut, OccurrenceIn, OccurrenceOut
+from app.features.links import index as links_index
+from app.features.links import targets
+from app.features.properties import items as item_properties
+from app.features.properties import service as properties
+from app.features.properties.filters import property_conditions
+from app.features.provenance import sources
+from app.features.provenance.schemas import ActorOut, SourceIn
 from app.features.tasks.models import Project, Task
 from app.features.trash import service as trash
 from app.features.trash.models import TrashedItem
@@ -68,23 +78,113 @@ def _apply(event: CalendarEvent, body: EventIn) -> None:
 
 
 async def create_event(
-    db: AsyncSession, body: EventIn, *, created_by: str = "user", run_id: uuid.UUID | None = None
+    db: AsyncSession,
+    body: EventIn,
+    *,
+    created_by: str = "user",
+    run_id: uuid.UUID | None = None,
+    source: SourceIn | None = None,
+    links: list[str] | None = None,
+    create_values: bool = False,
 ) -> CalendarEvent:
+    """`source`: where a synced event comes from. A key that is taken (by an event, or
+    one in the trash) creates nothing: ExternalKeyTaken. `body.properties` are validated
+    (AppError code property_invalid; `create_values` allows new values of a closed
+    list); `links`: references of items to link it to (each must exist)."""
+    key = source.external_key if source else None
+    await sources.check_key(db, "event", CalendarEvent, key)
+    refs = [targets.as_ref(r) for r in links or []]
     event = CalendarEvent(created_by=created_by, run_id=run_id)
     _apply(event, body)
+    sources.record_created(event, source)
+    await item_properties.set_properties(
+        db, event, "event", body.properties or {}, create_values=create_values
+    )
+    if refs:
+        await targets.check_linkable(db, refs)
     db.add(event)
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Another request made an event with this key at the same moment.
+        await db.rollback()
+        await sources.check_key(db, "event", CalendarEvent, key)
+        raise
+    if refs:
+        await links_index.add_explicit(db, "event", event.id, refs)
+    await links_index.refresh_inline(db, "event", event.id, event.description)
     await db.commit()
     await db.refresh(event)
     await notify()
     return event
 
 
-async def update_event(db: AsyncSession, event: CalendarEvent, body: EventIn) -> CalendarEvent:
+def _fields(event: CalendarEvent) -> tuple[Any, ...]:
+    """What _apply sets, to tell whether a save changed anything."""
+    return (
+        event.title,
+        event.description,
+        event.location,
+        event.all_day,
+        event.tz,
+        event.start_at,
+        event.end_at,
+        event.rrule,
+        event.remind_minutes,
+        event.color,
+        event.task_id,
+        event.project_id,
+    )
+
+
+async def update_event(
+    db: AsyncSession,
+    event: CalendarEvent,
+    body: EventIn,
+    *,
+    source_url: str | None = None,
+    links_add: list[str] | None = None,
+    links_remove: list[str] | None = None,
+    create_values: bool = False,
+    dropped: list[str] | None = None,
+) -> CalendarEvent:
+    """Replace the event's fields with `body`. `source_url`: a new link to the original of
+    a synced event (its key can't change). `body.properties`: the values to change (None
+    removes one; left out, they stay), validated as on create. Moving it to another
+    project drops the values not allowed there; their keys are added to `dropped`.
+    `links_add` / `links_remove`: references of items to link it to, or no longer."""
     before = (event.start_at, event.rrule, event.all_day, event.tz)
+    fields = _fields(event)
+    old_project = event.project_id
+    url_changed = sources.set_source_url(event, source_url)  # refused on an ordinary event
     _apply(event, body)
+    changed = url_changed or fields != _fields(event)
+    changed = (
+        await item_properties.set_properties(
+            db,
+            event,
+            "event",
+            body.properties or {},
+            create_values=create_values,
+            merge=True,
+            project_changed=event.project_id != old_project,
+            dropped=dropped,
+        )
+        or changed
+    )
+    if links_add or links_remove:
+        changed = (
+            await links_index.change_explicit(
+                db, "event", event.id, links_add or [], links_remove or []
+            )
+            or changed
+        )
+    if changed:
+        sources.record_changed(event, synced=source_url is not None)
     if before != (event.start_at, event.rrule, event.all_day, event.tz):
         # Changes to single occurrences no longer line up with the new schedule.
         await db.execute(delete(EventException).where(EventException.event_id == event.id))
+    await links_index.refresh_inline(db, "event", event.id, event.description)
     await db.commit()
     await db.refresh(event)
     await notify()
@@ -100,8 +200,12 @@ async def delete_event(
     payload = {
         "event": trash.row_to_json(event),
         "exceptions": [trash.row_to_json(e) for e in exceptions],
+        # Its own links go with it (and come back on restore); links to it stay.
+        "links": await links_index.drop_outgoing(db, "event", event.id),
     }
-    item = trash.put(db, "event", event.id, event.title, payload, deleted_by)
+    item = trash.put(
+        db, "event", event.id, event.title, payload, deleted_by, external_key=event.external_key
+    )
     await db.delete(event)
     await db.commit()
     await notify()
@@ -122,8 +226,11 @@ async def restore_event(db: AsyncSession, item: TrashedItem) -> CalendarEvent:
     if values.get("project_id") and await db.get(Project, values["project_id"]) is None:
         values["project_id"] = None
     event = CalendarEvent(**values)
+    event.updated_by_ref = current_actor().ref  # putting it back is a change
     db.add(event)
     await db.flush()
+    await links_index.restore_explicit(db, "event", event.id, item.payload.get("links"))
+    await links_index.refresh_inline(db, "event", event.id, event.description)
     for row in item.payload.get("exceptions") or []:
         db.add(EventException(**trash.row_values(EventException, row)))
     await db.delete(item)
@@ -148,6 +255,7 @@ async def _restore_occurrence(db: AsyncSession, item: TrashedItem) -> CalendarEv
     # No row: the event's schedule changed since, and cancelled occurrences went with it.
     if row is not None:
         row.is_cancelled = False
+        event.updated_by_ref = current_actor().ref  # putting it back is a change
         if not row.override:
             await db.delete(row)
     await db.delete(item)
@@ -156,7 +264,19 @@ async def _restore_occurrence(db: AsyncSession, item: TrashedItem) -> CalendarEv
     return event
 
 
-def event_out(event: CalendarEvent) -> EventOut:
+async def detach_source(db: AsyncSession, event: CalendarEvent) -> CalendarEvent:
+    """Make a synced event an ordinary one (see provenance.sources.detach)."""
+    sources.detach(event)
+    await db.commit()
+    await db.refresh(event)
+    await notify()
+    return event
+
+
+def event_out(event: CalendarEvent, actors: dict[str, ActorOut] | None = None) -> EventOut:
+    """`actors`: provenance.describe() of the event's actor references (without it they
+    are left out)."""
+    actors = actors or {}
     return EventOut(
         id=event.id,
         title=event.title,
@@ -176,7 +296,20 @@ def event_out(event: CalendarEvent) -> EventOut:
         task_id=event.task_id,
         project_id=event.project_id,
         created_by=event.created_by,
+        source=event.source,
+        external_key=event.external_key,
+        source_url=event.source_url,
+        synced_at=event.synced_at,
+        edited_by_user_at=event.edited_by_user_at,
+        created_by_actor=actors.get(event.created_by_ref or ""),
+        updated_by_actor=actors.get(event.updated_by_ref or ""),
+        properties=event.properties or {},
     )
+
+
+def actor_refs(events: list[CalendarEvent]) -> list[str | None]:
+    """The actor references of these events, for provenance.describe()."""
+    return [ref for e in events for ref in (e.created_by_ref, e.updated_by_ref)]
 
 
 @dataclass
@@ -190,9 +323,9 @@ class Occurrence:
     location: str
     changed: bool = False
 
-    def out(self) -> OccurrenceOut:
+    def out(self, actors: dict[str, ActorOut] | None = None) -> OccurrenceOut:
         e = self.event
-        base = event_out(e).model_dump()
+        base = event_out(e, actors).model_dump()
         base.update(
             title=self.title,
             description=self.description,
@@ -211,7 +344,9 @@ class Occurrence:
         )
 
 
-def _base(event: CalendarEvent, start: datetime) -> Occurrence:
+def base_occurrence(event: CalendarEvent, start: datetime) -> Occurrence:
+    """The occurrence of `event` that starts at `start`, as the series has it (no changes
+    to single occurrences applied)."""
     return Occurrence(
         event=event,
         original_start=start,
@@ -236,19 +371,70 @@ def _with_override(occ: Occurrence, override: dict[str, Any]) -> Occurrence:
     return replace(occ, **changes)
 
 
+def _matching(
+    source: str | None,
+    external_key: str | None,
+    query: str | None,
+    property_filter: dict[str, Any] | None = None,
+) -> list[ColumnElement[bool]]:
+    """Conditions for list_events' filters: the source, the key, words in the text, and
+    property values (`property_filter`, already checked: properties.check_filter)."""
+    found: list[ColumnElement[bool]] = []
+    if property_filter:
+        found += property_conditions(CalendarEvent.properties, property_filter)
+    if source:
+        found.append(CalendarEvent.source == source.strip().lower())
+    if external_key:
+        found.append(CalendarEvent.external_key == external_key.strip())
+    if query and query.strip():
+        # The words as they are: % and _ match only themselves.
+        words = re.sub(r"([\\%_])", r"\\\1", query.strip())
+        like = f"%{words}%"
+        found.append(
+            CalendarEvent.title.ilike(like, escape="\\")
+            | CalendarEvent.description.ilike(like, escape="\\")
+            | CalendarEvent.location.ilike(like, escape="\\")
+        )
+    return found
+
+
+async def find_events(
+    db: AsyncSession,
+    *,
+    source: str | None = None,
+    external_key: str | None = None,
+    query: str | None = None,
+    property_filter: dict[str, Any] | None = None,
+    limit: int = 200,
+) -> list[CalendarEvent]:
+    """Events matching the filters, whenever they are (a repeating one once, as its
+    series), the latest first. `property_filter`: as in list_tasks (checked here)."""
+    checked = await properties.check_filter(db, property_filter) if property_filter else None
+    stmt = select(CalendarEvent).where(*_matching(source, external_key, query, checked))
+    return list(await db.scalars(stmt.order_by(CalendarEvent.start_at.desc()).limit(limit)))
+
+
 async def occurrences(
     db: AsyncSession,
     range_start: datetime,
     range_end: datetime,
     project_id: uuid.UUID | None = None,
+    *,
+    source: str | None = None,
+    external_key: str | None = None,
+    query: str | None = None,
+    property_filter: dict[str, Any] | None = None,
 ) -> list[Occurrence]:
     """Every event occurrence overlapping [range_start, range_end), sorted by start.
-    With `project_id`, only that project's events."""
+    With `project_id`, only that project's events; `source`, `external_key`, `query` and
+    `property_filter` narrow them as in find_events."""
     if range_end <= range_start or range_end - range_start > MAX_RANGE:
         raise AppError("Choose a range of at most 400 days", code="invalid_range")
+    checked = await properties.check_filter(db, property_filter) if property_filter else None
     events = list(
         await db.scalars(
             select(CalendarEvent).where(
+                *_matching(source, external_key, query, checked),
                 CalendarEvent.project_id == project_id if project_id else true(),
                 CalendarEvent.start_at < range_end,
                 or_(
@@ -275,7 +461,7 @@ async def occurrences(
     found: list[Occurrence] = []
     for event in events:
         if not event.rrule:
-            found.append(_base(event, event.start_at))
+            found.append(base_occurrence(event, event.start_at))
             continue
         duration = event.end_at - event.start_at
         changed = exceptions.get(event.id, {})
@@ -289,7 +475,7 @@ async def occurrences(
             if start in seen:
                 continue
             seen.add(start)
-            occ = _base(event, start)
+            occ = base_occurrence(event, start)
             exception = changed.get(start)
             if exception is not None:
                 if exception.is_cancelled:
@@ -323,6 +509,7 @@ async def set_occurrence(
     if row is None:
         row = EventException(event_id=event.id, original_start=original_start, override={})
         db.add(row)
+    before = (bool(row.is_cancelled), dict(row.override or {}))
     if body.cancelled and not row.is_cancelled:
         when = original_start.astimezone(recurrence.zone(event.tz))
         trash.put(
@@ -343,5 +530,20 @@ async def set_occurrence(
                 value.astimezone(UTC).isoformat() if isinstance(value, datetime) else value
             )
     row.override = override
+    if (bool(row.is_cancelled), override) != before:
+        sources.record_changed(event)
     await db.commit()
     await notify()
+
+
+async def set_properties(
+    db: AsyncSession, event: CalendarEvent, values: dict[str, Any]
+) -> CalendarEvent:
+    """Set (or, with None, remove) some property values of an event, leaving the others
+    and everything else as it is (a table or board view edits one cell). Commits."""
+    if await item_properties.set_properties(db, event, "event", values, merge=True):
+        sources.record_changed(event)
+    await db.commit()
+    await db.refresh(event)
+    await notify()
+    return event

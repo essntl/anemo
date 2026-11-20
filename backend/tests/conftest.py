@@ -4,6 +4,8 @@ Unit tests need nothing external. Integration/API tests that touch the
 database run against a throwaway `aiw_test` database on the same Postgres
 server as DATABASE_URL (inside the dev container: `make test-backend`), and
 Redis database 15. They are skipped automatically when no database is configured.
+TEST_DATABASE_URL and TEST_REDIS_URL name both explicitly, so several checkouts can
+test at the same time without sharing a database.
 """
 
 import asyncio
@@ -20,7 +22,11 @@ TEST_PASSWORD = "correct horse battery staple"
 _base_db_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
 if _base_db_url and not os.environ.get("TEST_DATABASE_URL"):
     _base_db_url = _base_db_url.rsplit("/", 1)[0] + "/aiw_test"
-_redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0").rsplit("/", 1)[0] + "/15"
+# TEST_REDIS_URL picks the Redis database itself (several checkouts testing at once,
+# each with its own); otherwise database 15 on the REDIS_URL server.
+_redis_url = os.environ.get("TEST_REDIS_URL") or (
+    os.environ.get("REDIS_URL", "redis://localhost:6379/0").rsplit("/", 1)[0] + "/15"
+)
 
 os.environ.update(
     {

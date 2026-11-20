@@ -13,9 +13,11 @@ TICK_S = 30.0
 
 
 def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
+    from app.features.automations import removal as automation_removal
     from app.features.automations import service as automations
     from app.features.calendar import reminders
     from app.features.conversations import service as conversations
+    from app.features.documents import properties as documents
     from app.features.notifications import service as notifications
     from app.features.runs import service as runs
     from app.features.updates import service as updates
@@ -23,10 +25,13 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     return [
         ("reminders", reminders.fire_due),
         ("automations", automations.fire_due),
+        ("automations.prune", automation_removal.prune_run_chats),  # run chats past keeping
         ("notifications.prune", notifications.prune),
         ("approvals.expire", runs.expire_stale_approvals),
         ("chats.temporary", conversations.delete_expired_temporary),
         ("updates.check", updates.check_if_due),  # about once a day
+        # Once per worker start: documents changed while Anemo wasn't running.
+        ("documents.reconcile", documents.reconcile_on_start),
     ]
 
 
