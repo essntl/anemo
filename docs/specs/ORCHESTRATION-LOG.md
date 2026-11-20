@@ -7,13 +7,14 @@ Whoever resumes this work continues from this log.
 
 | Wave | Package | Branch | Worktree | Status |
 |---|---|---|---|---|
+| 3 | integration, migration check, final report | `integrate/fundamentals` | orchestrator | **done**: see `FINAL-REPORT.md` |
 | 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done |
 | 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | **merged** into integrate/fundamentals (ac85f41); after the merge: backend `all` and the frontend checks (449 tests) green |
 | 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | **merged** (55a50f4; 0050 re-chained onto 0045); after the merge: backend `all` and the frontend checks (497 tests) green |
 | 1 | T Response timer | `feat/t` | `../anemo-t` | **merged** (230371b; 0040 re-chained onto 0036); after the merge: backend `all` and the frontend checks (474 tests) green |
 | 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | **merged** (956a65f; 0045 re-chained onto 0040); after the merge: backend `all` and the frontend checks (482 tests) green |
-| 2 | A3 Tasks and events join in | `feat/a3` | `../anemo-a3` | reviewed (1 blocker); builder fixing |
-| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | fixes done (5 commits, suite green, new migration 0070); waiting to merge after A3 |
+| 2 | A3 Tasks and events join in | `feat/a3` | `../anemo-a3` | **merged** (4350d92); after the merge: backend `all` and the frontend checks (505 tests) green |
+| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | **merged** (0ab5e53; 0070 re-chained onto 0060); after the merge: backend `all` (1207 tests) and the frontend checks (509 tests) green |
 
 - **Merge order:** A1, T, B1, A2; then A3, B2.
 - **Progress notes:** `C:\Users\user\Documents\Projects\anemo-progress\<id>.md` (outside the repo).
@@ -158,6 +159,19 @@ other, not at the same time.
 - First run on the head after wave 1 (0052): all OK except one bug. 0045's state note
   grew a "note: " prefix on each rollback and reapply. The orchestrator fixed it
   (306da8a) and extended B1's migration test. To re-run after A3 and B2 are merged.
+
+- **A3** fixes (2 commits, including the blocker: one tag resolution rule) merged as
+  4350d92, with no conflicts.
+- **B2** merged as 0ab5e53. Its one conflict, in `events.py`, kept both sides.
+
+## Wave 3
+
+- **Full suite on the final branch:** green (backend `all`: 1207 tests; frontend: 509
+  tests).
+- **Migration check** (`w3_migrations.py`) on the final branch: ALL OK. It covers all
+  9 new migrations, on an empty database and on the seeded one, with every step rolled
+  back and applied again.
+- **Final report:** `FINAL-REPORT.md`.
 
 ## Open questions for the user
 
