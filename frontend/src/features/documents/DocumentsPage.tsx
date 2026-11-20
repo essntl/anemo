@@ -20,6 +20,7 @@ import { useDocuments } from './api'
 import { documentPathFromAddress } from './passage'
 import { DocumentEditor } from './components/DocumentEditor'
 import { DocumentList } from './components/DocumentList'
+import { SuggestionsReview } from '@/features/properties/SuggestionsReview'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -75,6 +76,7 @@ export function DocumentsPage() {
     <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
       {/* Beside an open document the list can be put away (the button in the editor's header). */}
       <aside className={cn('w-full shrink-0 border-r border-border md:w-60', address && 'hidden', address && listOpen && 'md:block')}>
+        <SuggestionsReview />
         <DocumentList currentFolder={open?.folder ?? project?.slug ?? ''} projectFolder={project?.slug} projectName={project?.name} outside={outside} />
       </aside>
       <section className={cn('min-w-0 flex-1', !address && 'hidden md:block')}>

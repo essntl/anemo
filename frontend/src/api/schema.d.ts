@@ -511,6 +511,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/properties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Properties Settings */
+        put: operations["put_properties_settings_api_settings_properties_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -2187,6 +2204,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{document_id}/properties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Properties
+         * @description Change properties: the front matter is rewritten through the normal save, so the
+         *     change gets a revision. 400 property_invalid (with the closest existing values) and
+         *     409 conflict_base_hash write nothing.
+         */
+        put: operations["set_properties_api_documents__document_id__properties_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/folder-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Folder Defaults
+         * @description The default properties of the document's folder it doesn't have (offered after a
+         *     move; never applied without asking).
+         */
+        get: operations["folder_defaults_api_documents__document_id__folder_defaults_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Path History
+         * @description Where the document was before (old paths keep leading to it).
+         */
+        get: operations["path_history_api_documents__document_id__paths_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/hub": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hub
+         * @description When the document is the hub page of property values (a client's page): every
+         *     item with each value.
+         */
+        get: operations["hub_api_documents__document_id__hub_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/mentions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Old Path Mentions
+         * @description After a move: project instructions and memories that still name the old path.
+         */
+        get: operations["old_path_mentions_api_documents__document_id__mentions_get"];
+        put?: never;
+        /**
+         * Update Mentions
+         * @description Point the chosen instructions and memories at the document's path now.
+         */
+        post: operations["update_mentions_api_documents__document_id__mentions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/daily-notes/{day}": {
         parameters: {
             query?: never;
@@ -3678,6 +3803,302 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/properties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Properties
+         * @description Every property with its values and how many documents use each.
+         */
+        get: operations["list_properties_api_properties_get"];
+        put?: never;
+        /** Create Property */
+        post: operations["create_property_api_properties_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{definition_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Property
+         * @description Files keep what they say about it; it is no longer indexed or offered.
+         */
+        delete: operations["delete_property_api_properties__definition_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Property */
+        patch: operations["update_property_api_properties__definition_id__patch"];
+        trace?: never;
+    };
+    "/api/properties/{definition_id}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Option */
+        post: operations["add_option_api_properties__definition_id__options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{definition_id}/options/{option_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Option
+         * @description Only a value nothing uses; merge it into another to replace it everywhere.
+         */
+        delete: operations["delete_option_api_properties__definition_id__options__option_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Option
+         * @description A new label touches no files (the index and search follow); the hub document is
+         *     the value's own page.
+         */
+        patch: operations["update_option_api_properties__definition_id__options__option_id__patch"];
+        trace?: never;
+    };
+    "/api/properties/{definition_id}/options/{option_id}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename Option
+         * @description Give a value a new slug: every document with it is rewritten (a revision each).
+         */
+        post: operations["rename_option_api_properties__definition_id__options__option_id__rename_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{definition_id}/options/{option_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge Option
+         * @description Replace this value by another everywhere (a revision each) and remove it.
+         */
+        post: operations["merge_option_api_properties__definition_id__options__option_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate
+         * @description Check values without saving anything (the UI asks before adding a tag). Errors
+         *     come back as 400 property_invalid with the closest existing values.
+         */
+        post: operations["validate_api_properties_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reindex
+         * @description Re-read every document whose index is out of date (changed outside Anemo).
+         */
+        post: operations["reindex_api_properties_reindex_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Suggestions
+         * @description Properties the assistant suggested for documents, waiting to be applied or dismissed.
+         */
+        get: operations["list_suggestions_api_properties_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/suggestions/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Suggestions
+         * @description Write the chosen suggestions into their documents (a revision each).
+         */
+        post: operations["apply_suggestions_api_properties_suggestions_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/suggestions/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Suggestions */
+        post: operations["dismiss_suggestions_api_properties_suggestions_dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Views */
+        get: operations["list_views_api_views_get"];
+        put?: never;
+        /** Create View */
+        post: operations["create_view_api_views_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/views/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Query
+         * @description The rows of a query that isn't saved (a view being edited, a hub page).
+         */
+        post: operations["run_query_api_views_query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get View */
+        get: operations["get_view_api_views__view_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete View */
+        delete: operations["delete_view_api_views__view_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update View */
+        patch: operations["update_view_api_views__view_id__patch"];
+        trace?: never;
+    };
+    "/api/views/{view_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** View Rows */
+        get: operations["view_rows_api_views__view_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3736,6 +4157,7 @@ export interface components {
             files: components["schemas"]["FilesSettings"];
             setup: components["schemas"]["SetupSettings"];
             updates: components["schemas"]["UpdateSettings"];
+            properties: components["schemas"]["PropertySettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -3766,6 +4188,13 @@ export interface components {
             mode: "append";
             /** Document Id */
             document_id?: string | null;
+        };
+        /** AppliedOut */
+        AppliedOut: {
+            /** Applied */
+            applied: number;
+            /** Problems */
+            problems: string[];
         };
         /** ApprovalOut */
         ApprovalOut: {
@@ -4570,6 +4999,10 @@ export interface components {
             folder: string;
             /** Content */
             content?: string | null;
+            /** Properties */
+            properties?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** DailyNoteIn */
         DailyNoteIn: {
@@ -4627,6 +5060,72 @@ export interface components {
             plan?: components["schemas"]["PlanIn"] | null;
             /** Answer */
             answer?: string | null;
+        };
+        /** DefinitionIn */
+        DefinitionIn: {
+            /** Key */
+            key: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "select" | "multi_select" | "text" | "date" | "number" | "checkbox";
+            /** Applies To */
+            applies_to?: ("document" | "task" | "event")[];
+            /** Project Ids */
+            project_ids?: string[] | null;
+            /** Options */
+            options?: string[];
+        };
+        /** DefinitionOut */
+        DefinitionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "select" | "multi_select" | "text" | "date" | "number" | "checkbox";
+            /** Applies To */
+            applies_to: ("document" | "task" | "event")[];
+            /** Project Ids */
+            project_ids: string[] | null;
+            /** Open Vocabulary */
+            open_vocabulary: boolean;
+            /** Builtin */
+            builtin: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /** Options */
+            options: components["schemas"]["OptionOut"][];
+            /** Count */
+            count: number;
+        };
+        /**
+         * DefinitionPatch
+         * @description Only the fields that are sent change; `project_ids: null` makes it global.
+         */
+        DefinitionPatch: {
+            /** Label */
+            label?: string | null;
+            /** Applies To */
+            applies_to?: ("document" | "task" | "event")[] | null;
+            /** Project Ids */
+            project_ids?: string[] | null;
+            /** Sort Order */
+            sort_order?: number | null;
         };
         /** DestinationIn */
         DestinationIn: {
@@ -4726,6 +5225,15 @@ export interface components {
             created_by_actor?: components["schemas"]["ActorOut"] | null;
             /** @description Who saved it last */
             updated_by_actor?: components["schemas"]["ActorOut"] | null;
+            /**
+             * Properties
+             * @default {}
+             */
+            properties: {
+                [key: string]: unknown;
+            };
+            /** Properties Error */
+            properties_error?: string | null;
             /** Content */
             content: string;
             /** Hash */
@@ -4764,6 +5272,15 @@ export interface components {
             created_by_actor?: components["schemas"]["ActorOut"] | null;
             /** @description Who saved it last */
             updated_by_actor?: components["schemas"]["ActorOut"] | null;
+            /**
+             * Properties
+             * @default {}
+             */
+            properties: {
+                [key: string]: unknown;
+            };
+            /** Properties Error */
+            properties_error?: string | null;
         };
         /**
          * EditLastIn
@@ -4973,6 +5490,30 @@ export interface components {
              * @default false
              */
             show_documents_folder: boolean;
+        };
+        /**
+         * FilterChip
+         * @description A filter typed into the query (`client:ludmyla-doula`, `in:tech-services`).
+         */
+        FilterChip: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Suggestions
+             * @default []
+             */
+            suggestions: string[];
         };
         /** FocusSessionIn */
         FocusSessionIn: {
@@ -5193,6 +5734,18 @@ export interface components {
             /** Session Id */
             session_id: string;
         };
+        /**
+         * FolderDefaults
+         * @description Properties a new document in `folder` (or below it) starts with.
+         */
+        FolderDefaults: {
+            /** Folder */
+            folder: string;
+            /** Properties */
+            properties?: {
+                [key: string]: unknown;
+            };
+        };
         /** GeneralSettings */
         GeneralSettings: {
             /**
@@ -5243,6 +5796,21 @@ export interface components {
             layout?: components["schemas"]["WidgetLayout"][];
             /** Mobile Layout */
             mobile_layout?: components["schemas"]["WidgetLayout"][];
+        };
+        /** HubSection */
+        HubSection: {
+            /** Key */
+            key: string;
+            /** Property Label */
+            property_label: string;
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: components["schemas"]["ViewRow"][];
+            /** Truncated */
+            truncated: boolean;
         };
         /** ImportIn */
         ImportIn: {
@@ -5642,6 +6210,44 @@ export interface components {
             id: string;
             /** Content */
             content: string;
+        };
+        /** MentionOut */
+        MentionOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "project" | "memory";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Text */
+            text: string;
+        };
+        /** MentionRef */
+        MentionRef: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "project" | "memory";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** MergeIn */
+        MergeIn: {
+            /**
+             * Into Option Id
+             * Format: uuid
+             */
+            into_option_id: string;
         };
         /** MessageOut */
         MessageOut: {
@@ -6098,6 +6704,43 @@ export interface components {
             /** Changed */
             changed: boolean;
         };
+        /** OptionIn */
+        OptionIn: {
+            /** Label */
+            label: string;
+            /** Slug */
+            slug?: string | null;
+        };
+        /** OptionOut */
+        OptionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Label */
+            label: string;
+            /** Hub Document Id */
+            hub_document_id: string | null;
+            /** Sort Order */
+            sort_order: number;
+            /** Count */
+            count: number;
+        };
+        /**
+         * OptionPatch
+         * @description Only the fields that are sent change; `hub_document_id: null` removes the hub.
+         */
+        OptionPatch: {
+            /** Label */
+            label?: string | null;
+            /** Hub Document Id */
+            hub_document_id?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        };
         /** PageContentOut */
         PageContentOut: {
             /** Url */
@@ -6166,6 +6809,18 @@ export interface components {
         PathIn: {
             /** Path */
             path: string;
+        };
+        /** PathOut */
+        PathOut: {
+            /** Old Path */
+            old_path: string;
+            /**
+             * Moved At
+             * Format: date-time
+             */
+            moved_at: string;
+            /** Actor Ref */
+            actor_ref: string;
         };
         /** PdfPage */
         PdfPage: {
@@ -6606,6 +7261,32 @@ export interface components {
             /** Tasks Completed */
             tasks_completed: number;
         };
+        /** PropertiesIn */
+        PropertiesIn: {
+            /** Set */
+            set: {
+                [key: string]: unknown;
+            };
+            /**
+             * Base Hash
+             * @description Hash of the version being edited
+             */
+            base_hash?: string | null;
+            /**
+             * Create Values
+             * @default false
+             */
+            create_values: boolean;
+        };
+        /**
+         * PropertySettings
+         * @description Document properties (Settings > Properties). The definitions themselves are rows
+         *     of their own (features/properties); this holds the folder defaults.
+         */
+        PropertySettings: {
+            /** Folder Defaults */
+            folder_defaults?: components["schemas"]["FolderDefaults"][];
+        };
         /** ProviderIn */
         ProviderIn: {
             /** Name */
@@ -6775,6 +7456,15 @@ export interface components {
             created_by_actor?: components["schemas"]["ActorOut"] | null;
             /** @description Who saved it last */
             updated_by_actor?: components["schemas"]["ActorOut"] | null;
+            /**
+             * Properties
+             * @default {}
+             */
+            properties: {
+                [key: string]: unknown;
+            };
+            /** Properties Error */
+            properties_error?: string | null;
             /** Excerpt */
             excerpt: string;
         };
@@ -6791,10 +7481,10 @@ export interface components {
             /** Title */
             title: string;
         };
-        /** ReindexOut */
-        ReindexOut: {
-            /** Queued */
-            queued: boolean;
+        /** RenameIn */
+        RenameIn: {
+            /** Slug */
+            slug: string;
         };
         /**
          * ReorderIn
@@ -7067,6 +7757,33 @@ export interface components {
         RevokedOut: {
             /** Revoked */
             revoked: number;
+        };
+        /** RewriteOut */
+        RewriteOut: {
+            /** Documents */
+            documents: number;
+            /**
+             * Views
+             * @default 0
+             */
+            views: number;
+            /**
+             * Folder Defaults
+             * @default 0
+             */
+            folder_defaults: number;
+            /**
+             * Failed
+             * @default []
+             */
+            failed: string[];
+        };
+        /** RowsOut */
+        RowsOut: {
+            /** Rows */
+            rows: components["schemas"]["ViewRow"][];
+            /** Truncated */
+            truncated: boolean;
         };
         /** Rule */
         Rule: {
@@ -7480,6 +8197,12 @@ export interface components {
             by_meaning: boolean;
             /** Groups */
             groups: components["schemas"]["SearchGroup"][];
+            /**
+             * Filters
+             * @default []
+             */
+            filters: components["schemas"]["FilterChip"][];
+            view?: components["schemas"]["ViewQuery"] | null;
         };
         /** SearchTestIn */
         SearchTestIn: {
@@ -7921,6 +8644,16 @@ export interface components {
              */
             icon: string;
         };
+        /** SortKey */
+        SortKey: {
+            /** Key */
+            key: string;
+            /**
+             * Desc
+             * @default false
+             */
+            desc: boolean;
+        };
         /** SshKeyOut */
         SshKeyOut: {
             /** Available */
@@ -7949,6 +8682,38 @@ export interface components {
             /** Projects */
             projects: components["schemas"]["ProjectStats"][];
             agents: components["schemas"]["AgentStats"];
+        };
+        /** SuggestionIds */
+        SuggestionIds: {
+            /** Ids */
+            ids: string[];
+        };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Title */
+            title: string;
+            /** Path */
+            path: string;
+            /** Current */
+            current: {
+                [key: string]: unknown;
+            };
+            /** Suggested */
+            suggested: {
+                [key: string]: unknown;
+            };
+            /** Actor Ref */
+            actor_ref: string;
         };
         /** SummaryItem */
         SummaryItem: {
@@ -8511,6 +9276,13 @@ export interface components {
             /** Revision Id */
             revision_id?: string | null;
         };
+        /** UpdateMentionsIn */
+        UpdateMentionsIn: {
+            /** Old Path */
+            old_path: string;
+            /** Items */
+            items: components["schemas"]["MentionRef"][];
+        };
         /**
          * UpdateSettings
          * @description The update notice (Settings > Advanced). UPDATE_CHECK=false in .env wins.
@@ -8521,6 +9293,11 @@ export interface components {
              * @default true
              */
             check: boolean;
+        };
+        /** UpdatedOut */
+        UpdatedOut: {
+            /** Updated */
+            updated: number;
         };
         /** UpdatesOut */
         UpdatesOut: {
@@ -8651,6 +9428,28 @@ export interface components {
              */
             unknown_cost_requests: number;
         };
+        /** ValidateIn */
+        ValidateIn: {
+            /**
+             * Object Type
+             * @default document
+             * @enum {string}
+             */
+            object_type: "document" | "task" | "event";
+            /** Project Id */
+            project_id?: string | null;
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        /** ValidateOut */
+        ValidateOut: {
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -8668,6 +9467,129 @@ export interface components {
         VersionIn: {
             /** Version */
             version: number;
+        };
+        /** ViewIn */
+        ViewIn: {
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            query?: components["schemas"]["ViewQuery"];
+            /**
+             * Layout
+             * @default list
+             * @enum {string}
+             */
+            layout: "list" | "table" | "board";
+        };
+        /** ViewOut */
+        ViewOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Pinned */
+            pinned: boolean;
+            /** Sort Order */
+            sort_order: number;
+            query: components["schemas"]["ViewQuery"];
+            /**
+             * Layout
+             * @enum {string}
+             */
+            layout: "list" | "table" | "board";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * ViewPatch
+         * @description Only the fields that are sent change; `project_id: null` makes it global.
+         */
+        ViewPatch: {
+            /** Name */
+            name?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Pinned */
+            pinned?: boolean | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            query?: components["schemas"]["ViewQuery"] | null;
+            /** Layout */
+            layout?: ("list" | "table" | "board") | null;
+        };
+        /**
+         * ViewQuery
+         * @description What a view shows. The same shape for every object type: documents now; tasks
+         *     and events join through `types`.
+         */
+        ViewQuery: {
+            /** Types */
+            types?: ("document" | "task" | "event" | "chat")[];
+            /** Text */
+            text?: string | null;
+            /** Folder */
+            folder?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Properties */
+            properties?: {
+                [key: string]: unknown;
+            };
+            /** Updated After */
+            updated_after?: string | null;
+            /** Updated Before */
+            updated_before?: string | null;
+            /**
+             * Include Archived
+             * @default false
+             */
+            include_archived: boolean;
+            /** Sort */
+            sort?: components["schemas"]["SortKey"][];
+            /** Group By */
+            group_by?: string | null;
+            /** Columns */
+            columns?: string[];
+        };
+        /** ViewRow */
+        ViewRow: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "document" | "task" | "event" | "chat";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            /** Properties */
+            properties: {
+                [key: string]: unknown;
+            };
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** WebSettings */
         WebSettings: {
@@ -8801,6 +9723,16 @@ export interface components {
             content: string;
             /** Base Hash */
             base_hash?: string | null;
+        };
+        /** ReindexOut */
+        app__features__memory__router__ReindexOut: {
+            /** Queued */
+            queued: boolean;
+        };
+        /** ReindexOut */
+        app__features__properties__schemas__ReindexOut: {
+            /** Documents */
+            documents: number;
         };
     };
     responses: never;
@@ -9776,6 +10708,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdateSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_properties_settings_api_settings_properties_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PropertySettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertySettings"];
                 };
             };
             /** @description Validation Error */
@@ -12988,7 +13955,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReindexOut"];
+                    "application/json": components["schemas"]["app__features__memory__router__ReindexOut"];
                 };
             };
             /** @description Validation Error */
@@ -13536,6 +14503,216 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_properties_api_documents__document_id__properties_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PropertiesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    folder_defaults_api_documents__document_id__folder_defaults_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    path_history_api_documents__document_id__paths_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hub_api_documents__document_id__hub_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubSection"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    old_path_mentions_api_documents__document_id__mentions_get: {
+        parameters: {
+            query: {
+                old_path: string;
+            };
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_mentions_api_documents__document_id__mentions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMentionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatedOut"];
                 };
             };
             /** @description Validation Error */
@@ -17198,6 +18375,729 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_properties_api_properties_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinitionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_property_api_properties_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinitionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinitionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_property_api_properties__definition_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_property_api_properties__definition_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinitionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinitionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_option_api_properties__definition_id__options_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_option_api_properties__definition_id__options__option_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+                option_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_option_api_properties__definition_id__options__option_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+                option_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_option_api_properties__definition_id__options__option_id__rename_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+                option_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RewriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_option_api_properties__definition_id__options__option_id__merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+                option_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RewriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_api_properties_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reindex_api_properties_reindex_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__features__properties__schemas__ReindexOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_suggestions_api_properties_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_suggestions_api_properties_suggestions_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppliedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_suggestions_api_properties_suggestions_dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_views_api_views_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_view_api_views_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ViewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_query_api_views_query_post: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ViewQuery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RowsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_view_api_views__view_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_view_api_views__view_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_view_api_views__view_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ViewPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_rows_api_views__view_id__rows_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RowsOut"];
                 };
             };
             /** @description Validation Error */

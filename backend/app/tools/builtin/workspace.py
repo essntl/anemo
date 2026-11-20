@@ -16,6 +16,7 @@ from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.features.attachments import extract, images
+from app.features.documents import references
 from app.features.links import service as links
 from app.policy.models import Action, Risk
 from app.tools.base import Tool, ToolContext, ToolResult
@@ -439,11 +440,19 @@ class MovePath(Tool):
         # Attachments of tasks and links in tasks and documents follow the file.
         async with get_sessionmaker()() as db:
             changed = await links.on_moved(db, source, dest, author="agent", run_id=ctx.run_id)
+            # Instructions and memories naming a moved document's old path: offered to the
+            # user to update (an Inbox item), never rewritten here.
+            mentioned = await references.offer_after_move(db, source, dest)
         note = ""
         if changed["attachments"] or changed["tasks"] or changed["documents"]:
             note = (
                 f" Updated links: {changed['attachments']} attachment(s), "
                 f"{changed['tasks']} task(s), {changed['documents']} document(s)."
+            )
+        if mentioned:
+            note += (
+                " " + " ".join(mentioned) + " The user was offered to update them (Inbox): "
+                "don't change them yourself unless asked."
             )
         return ToolResult(content=f"Moved {source} to {dest}.{note}", data={"path": dest})
 

@@ -7,18 +7,23 @@ import posixpath
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Literal
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Query, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import Db
 from app.core.errors import AppError, NotFound
-from app.features.documents import service
+from app.features.documents import paths, references, service
+from app.features.documents import properties as doc_properties
 from app.features.documents.models import Document, DocumentRevision
 from app.features.links import service as links
+from app.features.properties import service as properties
 from app.features.provenance import service as provenance
 from app.features.provenance.schemas import ActorOut
+from app.features.views import service as views
+from app.features.views.schemas import ViewQuery, ViewRow
 from app.workspace import files
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -34,6 +39,8 @@ class DocumentOut(BaseModel):
     updated_at: datetime
     created_by_actor: ActorOut | None = Field(None, description="Who made it (None: unknown)")
     updated_by_actor: ActorOut | None = Field(None, description="Who saved it last")
+    properties: dict[str, Any] = {}  # from the front matter (features/properties)
+    properties_error: str | None = None  # why the front matter can't be read
 
 
 class DocumentContent(DocumentOut):
@@ -66,6 +73,8 @@ def _out(d: Document, actors: dict[str, ActorOut] | None = None) -> DocumentOut:
         updated_at=d.updated_at,
         created_by_actor=actors.get(d.created_by_ref or ""),
         updated_by_actor=actors.get(d.updated_by_ref or ""),
+        properties=d.properties or {},
+        properties_error=d.properties_error,
     )
 
 
@@ -127,6 +136,8 @@ async def document_by_path(db: Db, path: str) -> DocumentOut:
     documents in the Documents editor, never as plain text)."""
     await service.reconcile(db)
     doc = await service.by_path(db, path.strip("/"))
+    if doc is None:  # moved or renamed since: its old path still leads to it
+        doc = await paths.by_old_path(db, path.strip("/"))
     if doc is None:
         raise NotFound("Not a document")
     return _out(doc, await _actors(db, [doc]))
@@ -168,6 +179,8 @@ class CreateIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     folder: str = Field("", max_length=500)
     content: str | None = Field(None, max_length=2_000_000)  # default: a heading with the title
+    # Written into its front matter, with the folder's default properties.
+    properties: dict[str, Any] | None = Field(None, max_length=30)
 
 
 @router.post("", response_model=DocumentContent, status_code=201)
@@ -175,6 +188,7 @@ async def create_document(body: CreateIn, db: Db) -> DocumentContent:
     title = body.title.strip()
     path = service.unique_path(body.folder, title)
     content = body.content if body.content is not None else f"# {title}\n\n"
+    content = await doc_properties.with_defaults(db, path, content, body.properties)
     doc = await service.create(db, path, content, author="user")
     return _content(doc, content, await _actors(db, [doc]))
 
@@ -296,3 +310,125 @@ async def restore_revision(
         db, doc, revision.content, base_hash=doc.content_hash, author="user", new_revision=True
     )
     return _content(doc, revision.content, await _actors(db, [doc]))
+
+
+# -- properties ------------------------------------------------------------------------------
+
+
+class PropertiesIn(BaseModel):
+    set: dict[str, Any] = Field(max_length=50)  # key -> value; null removes the key
+    base_hash: str | None = Field(None, description="Hash of the version being edited")
+    create_values: bool = False  # add values that aren't in a property's list yet
+
+
+@router.put("/{document_id}/properties", response_model=DocumentContent)
+async def set_properties(document_id: uuid.UUID, body: PropertiesIn, db: Db) -> DocumentContent:
+    """Change properties: the front matter is rewritten through the normal save, so the
+    change gets a revision. 400 property_invalid (with the closest existing values) and
+    409 conflict_base_hash write nothing."""
+    doc = await service.get(db, document_id)
+    doc = await doc_properties.set_properties(
+        db,
+        doc,
+        body.set,
+        base_hash=body.base_hash,
+        author="user",
+        create_values=body.create_values,
+    )
+    return _content(doc, await service.read(db, doc), await _actors(db, [doc]))
+
+
+@router.get("/{document_id}/folder-defaults", response_model=dict[str, Any])
+async def folder_defaults(document_id: uuid.UUID, db: Db) -> dict[str, Any]:
+    """The default properties of the document's folder it doesn't have (offered after a
+    move; never applied without asking)."""
+    return await doc_properties.defaults_to_offer(db, await service.get(db, document_id))
+
+
+class PathOut(BaseModel):
+    old_path: str
+    moved_at: datetime
+    actor_ref: str
+
+
+@router.get("/{document_id}/paths", response_model=list[PathOut])
+async def path_history(document_id: uuid.UUID, db: Db) -> list[PathOut]:
+    """Where the document was before (old paths keep leading to it)."""
+    doc = await service.get(db, document_id)
+    return [
+        PathOut(old_path=p.old_path, moved_at=p.moved_at, actor_ref=p.actor_ref)
+        for p in await paths.history(db, doc.id)
+    ]
+
+
+class HubSection(BaseModel):
+    key: str
+    property_label: str
+    value: str  # the slug
+    label: str
+    rows: list[ViewRow]
+    truncated: bool
+
+
+@router.get("/{document_id}/hub", response_model=list[HubSection])
+async def hub(document_id: uuid.UUID, db: Db) -> list[HubSection]:
+    """When the document is the hub page of property values (a client's page): every
+    item with each value."""
+    doc = await service.get(db, document_id)
+    out = []
+    for prop, option in await properties.hub_values(db, doc.id):
+        rows, truncated = await views.rows(
+            db, ViewQuery(properties={prop.key: option.slug}, include_archived=True)
+        )
+        out.append(
+            HubSection(
+                key=prop.key,
+                property_label=prop.definition.label,
+                value=option.slug,
+                label=option.label,
+                rows=[r for r in rows if not (r.type == "document" and r.id == doc.id)],
+                truncated=truncated,
+            )
+        )
+    return out
+
+
+class MentionOut(BaseModel):
+    kind: Literal["project", "memory"]
+    id: uuid.UUID
+    title: str
+    text: str  # the line that names the old path
+
+
+@router.get("/{document_id}/mentions", response_model=list[MentionOut])
+async def old_path_mentions(
+    document_id: uuid.UUID, db: Db, old_path: str = Query(max_length=1000)
+) -> list[MentionOut]:
+    """After a move: project instructions and memories that still name the old path."""
+    await service.get(db, document_id)
+    return [
+        MentionOut(kind=m.kind, id=m.id, title=m.title, text=m.text)
+        for m in await references.mentions(db, old_path)
+    ]
+
+
+class MentionRef(BaseModel):
+    kind: Literal["project", "memory"]
+    id: uuid.UUID
+
+
+class UpdateMentionsIn(BaseModel):
+    old_path: str = Field(min_length=1, max_length=1000)
+    items: list[MentionRef] = Field(max_length=200)
+
+
+class UpdatedOut(BaseModel):
+    updated: int
+
+
+@router.post("/{document_id}/mentions", response_model=UpdatedOut)
+async def update_mentions(document_id: uuid.UUID, body: UpdateMentionsIn, db: Db) -> UpdatedOut:
+    """Point the chosen instructions and memories at the document's path now."""
+    doc = await service.get(db, document_id)
+    items = [(i.kind, i.id) for i in body.items]
+    return UpdatedOut(updated=await references.update(db, body.old_path, doc.path, items))

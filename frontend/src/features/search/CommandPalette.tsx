@@ -18,6 +18,7 @@ import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { useSearch } from './api'
 import { Highlighted } from './Highlighted'
+import { FilterChips, FilterSuggestions } from './FilterChips'
 import { kindInfo } from './kinds'
 import { useOffPages } from '@/features/settings/navigation'
 import { matchingActions } from './actions'
@@ -159,6 +160,12 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
         </button>
         <kbd className="hidden shrink-0 rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] text-subtle md:block">esc</kbd>
       </div>
+      {typed && ((results.data?.filters?.length ?? 0) > 0 || typed.includes(':')) && (
+        <div className="flex flex-col gap-1.5 border-t border-border px-3 py-2">
+          <FilterChips filters={results.data?.filters ?? []} />
+          <FilterSuggestions query={query} onPick={(next) => { setQuery(next); setSelected(0) }} />
+        </div>
+      )}
       <ul id="palette-list" role="listbox" aria-label={t('Results')} className="min-h-0 flex-1 overflow-y-auto border-t border-border p-2"
         onMouseEnter={() => setHeld(true)} onMouseLeave={() => setHeld(false)}>
         {items.map((item, i) => (
