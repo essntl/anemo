@@ -9,7 +9,7 @@ To add a section: define a model, then register it in SECTIONS.
 
 import uuid
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -212,6 +212,20 @@ class ModelDefaults(BaseModel):
     reasoning_effort: ReasoningEffort = "medium"
 
 
+class FolderDefaults(BaseModel):
+    """Properties a new document in `folder` (or below it) starts with."""
+
+    folder: str = Field(max_length=500)  # inside documents/, e.g. "tech-services/clients/x"
+    properties: dict[str, Any] = Field(default_factory=dict, max_length=30)
+
+
+class PropertySettings(BaseModel):
+    """Document properties (Settings > Properties). The definitions themselves are rows
+    of their own (features/properties); this holds the folder defaults."""
+
+    folder_defaults: list[FolderDefaults] = Field(default_factory=list, max_length=200)
+
+
 @dataclass(frozen=True)
 class SectionSpec:
     model: type[BaseModel]
@@ -234,4 +248,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "files": SectionSpec(FilesSettings),
     "setup": SectionSpec(SetupSettings),
     "updates": SectionSpec(UpdateSettings),
+    "properties": SectionSpec(PropertySettings),
 }

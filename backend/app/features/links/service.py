@@ -160,6 +160,7 @@ async def on_moved(
     notes and links in documents (saved as a revision by `author`). Commits."""
     old, new = old.strip("/"), new.strip("/")
     counts = {"attachments": 0, "tasks": 0, "documents": 0}
+    await documents.follow_move(db, old, new)  # documents in it keep their id and history
     prefix = old + "/"
     rows = list(
         await db.scalars(

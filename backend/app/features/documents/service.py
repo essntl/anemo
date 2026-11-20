@@ -17,12 +17,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound
 from app.events import bus
+from app.features.documents import meta
 from app.features.documents.models import Document, DocumentRevision
 from app.jobs import queue
 from app.knowledge import index
@@ -188,6 +189,7 @@ async def reconcile(db: AsyncSession) -> list[str]:
             moved = next((d for d in gone.values() if d.content_hash == digest), None)
             if moved is not None:
                 gone.pop(moved.path)
+                meta.record_move(db, moved.id, moved.path)  # moved outside the app
                 moved.path, moved.title = info.path, title_of(content, info.path)
                 moved.size, moved.mtime = info.size, info.mtime
             else:
@@ -242,6 +244,7 @@ async def _apply(
     # Outside changes are only seen now and then, so each one keeps its own revision.
     await _add_revision(db, doc, content, author, run_id, new_revision or author == "external")
     await _schedule_index(db, doc)
+    await meta.index(db, doc, content)  # properties and keyword search, from the text
 
 
 async def _add_revision(
@@ -317,7 +320,8 @@ async def index_document(db: AsyncSession, document_id: uuid.UUID) -> bool:
         content = await asyncio.to_thread(_read, doc.path)
     except AppError:
         return False
-    chunks = [f"{doc.title}\n\n{c}" for c in chunk_markdown(content)]
+    header = await meta.chunk_header(db, doc)  # title, folder and properties
+    chunks = [f"{header}\n\n{c}" for c in chunk_markdown(content)]
     await index.index_source(db, SOURCE_TYPE, doc.id, chunks)
     doc.indexed_hash = sha(content)
     await db.commit()
@@ -418,6 +422,7 @@ async def move(db: AsyncSession, doc: Document, new_path: str) -> Document:
     new_path = check_path(new_path)
     if new_path != doc.path:
         await asyncio.to_thread(files.move, doc.path, new_path)
+        meta.record_move(db, doc.id, doc.path)
         doc.path = new_path
         info = await asyncio.to_thread(_info, new_path)
         doc.size, doc.mtime = info.size, info.mtime
@@ -432,3 +437,36 @@ async def remove(db: AsyncSession, doc: Document, deleted_by: str = "user") -> N
     await index.delete_source(db, SOURCE_TYPE, [doc.id])
     await db.delete(doc)
     await db.commit()
+
+
+async def follow_move(db: AsyncSession, old: str, new: str) -> None:
+    """A file or folder was moved from `old` to `new` outside this service (Files, the
+    file tools): the documents in it keep their id and history at the new path, and
+    the old path goes into the path history. Doesn't commit."""
+    old, new = old.strip("/"), new.strip("/")
+    rows = await db.scalars(
+        select(Document).where(
+            or_(Document.path == old, Document.path.startswith(old + "/", autoescape=True))
+        )
+    )
+    for doc in list(rows):
+        target = new + doc.path[len(old) :]
+        if (
+            not target.startswith(f"{DOCS_DIR}/")
+            or not target.lower().endswith(".md")
+            or await by_path(db, target) is not None
+            or not await asyncio.to_thread(_exists, target)
+        ):
+            continue  # left documents/ or isn't where we expect: reconcile sorts it out
+        meta.record_move(db, doc.id, doc.path)
+        doc.path = target
+
+
+def read_file(path: str) -> str:
+    """A document file's text as it is on disk (no index update; see read())."""
+    return _read(path)
+
+
+async def schedule_index(db: AsyncSession, doc: Document) -> None:
+    """(Re)build the document's search chunks a little later (doesn't commit)."""
+    await _schedule_index(db, doc)
