@@ -39,6 +39,9 @@ const messages: Messages = {
   "Nothing matches this view yet": "Під це подання поки ніщо не підходить",
   "Give documents, tasks or events the properties it looks for, or change what it shows.": "Додайте документам, завданням чи подіям властивості, які воно шукає, або змініть, що воно показує.",
   "{n} item | {n} items": "{n} елемент | {n} елементи | {n} елементів",
+  "Not allowed in this project, so they go when you save: {properties}": "Не дозволені в цьому проєкті, тож зникнуть під час збереження: {properties}",
+  "deleted for good": "видалено назавжди",
+  "removed": "прибрано",
 }
 
 export default messages

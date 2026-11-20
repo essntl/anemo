@@ -25,7 +25,8 @@ import { ActorLine, SourceDetails } from '@/features/provenance/Provenance'
 import { useCreateMeetingNotes } from '@/features/links/api'
 import { LinksPanel } from '@/features/links/LinksPanel'
 import { NotesWithLinks } from '@/features/links/NotesWithLinks'
-import { propertiesFor, propertyChanges, useProperties } from '@/features/properties/api'
+import { droppedLabels } from '@/features/links/linkTypes'
+import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/features/properties/api'
 import { PropertyChips } from '@/features/properties/PropertyChips'
 import { NewTaskDialog } from '@/features/links/NewTaskDialog'
 import { eventLink } from '@/lib/appLinks'
@@ -92,7 +93,9 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
   const [projectId, setProjectId] = useState(source ? (source.project_id ?? '') : (currentProject?.id ?? ''))
   const startValues = source?.properties ?? {}
   const [values, setValues] = useState<Record<string, unknown>>(startValues)
-  const available = propertiesFor(useProperties().data ?? [], projectId || null, 'event')
+  const definitions = useProperties().data ?? []
+  const available = propertiesFor(definitions, projectId || null, 'event')
+  const dropping = droppedLabels(values, available, definitions)
   const navigate = useNavigate()
   const meetingNotes = useCreateMeetingNotes()
   const [newTask, setNewTask] = useState(false)
@@ -141,7 +144,7 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
       color: source?.color ?? null,
       task_id: source?.task_id ?? null,
       project_id: projectId || null,
-      properties: mode === 'event' ? propertyChanges(startValues, values) : values,
+      properties: mode === 'event' ? propertyChanges(startValues, values) : valuesFor(definitions, values, projectId || null, 'event'),
     }
     save.mutate({ id: mode === 'event' ? source?.id : undefined, body }, { onSuccess: onClose })
   }
@@ -233,6 +236,11 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
             <Select value={projectId} onValueChange={setProjectId}
               options={[{ value: '', label: t('No project') }, ...(projects.data ?? []).filter((p) => !p.archived || p.id === projectId).map((p) => ({ value: p.id, label: p.name }))]} />
           </Field>
+        )}
+        {mode !== 'occurrence' && dropping.length > 0 && (
+          <p role="status" className="text-[12.5px] text-warning">
+            {t('Not allowed in this project, so they go when you save: {properties}', { properties: dropping.join(', ') })}
+          </p>
         )}
         {mode !== 'occurrence' && available.length > 0 && (
           <section aria-label={t('Properties')} className="flex flex-wrap items-center gap-1.5">

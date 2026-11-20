@@ -16,6 +16,7 @@ import { t } from '@/lib/i18n'
 import { uploadAsset } from '../api'
 import { editorExtensions } from '../editorExtensions'
 import { assetUrl } from '../markdown'
+import { bracketInput } from '../bracketInput'
 import { EditorToolbar } from './EditorToolbar'
 import { LinkPickerDialog } from './LinkPickerDialog'
 
@@ -75,7 +76,6 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   useEffect(() => {
     openLinkRef.current = openLink
   })
-  const openBrackets = useRef(() => setPickingLink('brackets'))
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -95,12 +95,7 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
         return true
       },
       // Typing `[[` opens the picker; the brackets go, and the link is put in their place.
-      handleTextInput: (view, from, to, text) => {
-        if (text !== '[' || from < 1 || view.state.doc.textBetween(from - 1, from) !== '[') return false
-        view.dispatch(view.state.tr.delete(from - 1, to))
-        openBrackets.current()
-        return true
-      },
+      handleTextInput: bracketInput(() => setPickingLink('brackets')),
       handlePaste: (_view, event) => {
         const images = Array.from(event.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/'))
         if (notes || !images.length) return false
@@ -121,7 +116,10 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   }, [editor])
 
   /** Link the selected text to `href`, or insert `title` as the link when nothing is selected. */
+  // Whether the `[[` picker ended with a choice (else the brackets go back).
+  const picked = useRef(false)
   const insertLink = (href: string, title: string) => {
+    picked.current = true
     if (!editor) return
     const chain = editor.chain().focus()
     if (editor.state.selection.empty) chain.insertContent({ type: 'text', text: title, marks: [{ type: 'link', attrs: { href } }] }).run()
@@ -132,7 +130,12 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   const picker = (
     <Lingering value={pickingLink}>
       {(mode) => (
-        <LinkPickerDialog onPick={insertLink} onClose={() => setPickingLink(false)} pagesOnly={mode === 'brackets'}
+        <LinkPickerDialog onPick={insertLink} pagesOnly={mode === 'brackets'}
+          onClose={() => {
+            if (mode === 'brackets' && !picked.current) editor.chain().focus().insertContent('[[').run()
+            picked.current = false
+            setPickingLink(false)
+          }}
           title={mode === 'brackets' ? t('Link to a document, task, event or chat') : undefined}
           onPickImage={notes ? undefined : (path, alt) => editor.chain().focus().insertContent({ type: 'image', attrs: { src: assetUrl(path), alt } }).run()} />
       )}

@@ -76,3 +76,51 @@ describe('the links panel', () => {
     expect(screen.queryByRole('button', { name: 'Remove the link to Old' })).toBeNull()
   })
 })
+
+describe('[[ in the rich editor', () => {
+  const type = (editor: import('@tiptap/core').Editor, text: string) => {
+    const { from, to } = editor.state.selection
+    const handled = editor.view.someProp('handleTextInput', (f) => f(editor.view, from, to, text, () => editor.state.tr))
+    if (!handled) editor.commands.insertContent(text)
+  }
+
+  it('opens the picker in text, not in code', async () => {
+    const { Editor } = await import('@tiptap/core')
+    const { editorExtensions } = await import('@/features/documents/editorExtensions')
+    const { bracketInput } = await import('@/features/documents/bracketInput')
+    const open = vi.fn()
+    const editor = new Editor({ extensions: editorExtensions, content: '<p>See </p>', editorProps: { handleTextInput: bracketInput(open) } })
+    editor.commands.focus('end')
+    type(editor, '[')
+    type(editor, '[')
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(editor.getText()).not.toContain('[') // the brackets went
+
+    open.mockClear()
+    editor.commands.setContent('<pre><code>x</code></pre>')
+    editor.commands.setTextSelection(2) // after the x, in the code block
+    type(editor, '[')
+    type(editor, '[')
+    expect(open).not.toHaveBeenCalled()
+    expect(editor.getText()).toContain('[[')
+
+    editor.commands.setContent('<p><code>ab</code></p>')
+    editor.commands.setTextSelection(2) // inside the inline code, between a and b
+    type(editor, '[')
+    type(editor, '[')
+    expect(open).not.toHaveBeenCalled()
+    expect(editor.getText()).toBe('a[[b')
+    editor.destroy()
+  })
+})
+
+describe('dead links and values that go', () => {
+  it('say how an item is gone', async () => {
+    const { linkState, droppedLabels } = await import('./linkTypes')
+    expect(linkState({ state: 'in_trash', type: 'task' })).toBe('in the trash')
+    expect(linkState({ state: 'deleted', type: 'task' })).toBe('deleted for good')
+    expect(linkState({ state: 'deleted', type: 'document' })).toBe('removed')
+    expect(linkState({ state: 'live', type: 'document' })).toBeNull()
+    expect(droppedLabels({ client: 'x', status: 'a', tags: ['t'] }, [{ key: 'status' }], [{ key: 'client', label: 'Client' }])).toEqual(['Client'])
+  })
+})

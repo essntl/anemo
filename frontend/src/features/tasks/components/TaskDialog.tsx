@@ -14,7 +14,8 @@ import { tidyMarkdown } from '@/features/documents/markdown'
 import { focusOnTask } from '@/features/focus/focusOnTask'
 import { LinksPanel } from '@/features/links/LinksPanel'
 import { TaskAttachments } from '@/features/links/TaskAttachments'
-import { propertiesFor, propertyChanges, useProperties } from '@/features/properties/api'
+import { droppedLabels } from '@/features/links/linkTypes'
+import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/features/properties/api'
 import { PropertyChips } from '@/features/properties/PropertyChips'
 import { type Synced } from '@/features/provenance/labels'
 import { ActorLine, SourceBadge, SourceDetails } from '@/features/provenance/Provenance'
@@ -134,7 +135,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
       const properties = Object.keys(changes).length ? { properties: changes } : {}
       update.mutate({ id: task.id, body: { ...body, ...properties, ...(choice ? { subtasks: choice } : {}) } }, { onSuccess: after })
     } else {
-      create.mutate({ ...body, properties: values }, { onSuccess: after })
+      create.mutate({ ...body, properties: valuesFor(definitions, values, projectId || null, 'task') }, { onSuccess: after })
     }
   }
   // Another task opens in the editor: keep what was typed here first, like Save would.
@@ -221,6 +222,11 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
           <Field label={t('Tags')} hint={t('Comma-separated')}>
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder={t('errands, phone')} />
           </Field>
+          {droppedLabels(values, available, definitions).length > 0 && (
+            <p role="status" className="text-[12.5px] text-warning">
+              {t('Not allowed in this project, so they go when you save: {properties}', { properties: droppedLabels(values, available, definitions).join(', ') })}
+            </p>
+          )}
           {available.length > 0 && (
             <section aria-label={t('Properties')} className="flex flex-wrap items-center gap-1.5">
               <PropertyChips available={available} values={values}
