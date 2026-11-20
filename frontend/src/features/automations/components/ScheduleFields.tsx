@@ -18,9 +18,11 @@ interface Props {
   tz: string
   /** What the server says about the schedule as it is now (see useSchedulePreview). */
   preview: SchedulePreview
+  /** The fewest minutes between runs (1 with a change check). */
+  fewest?: number
 }
 
-export function ScheduleFields({ form, onChange, tz, preview }: Props) {
+export function ScheduleFields({ form, onChange, tz, preview, fewest = 5 }: Props) {
   const set = (patch: Partial<ScheduleForm>) => onChange({ ...form, ...patch })
 
   return (
@@ -59,7 +61,7 @@ export function ScheduleFields({ form, onChange, tz, preview }: Props) {
         {(form.frequency === 'hours' || form.frequency === 'minutes') && (
           <Field label={form.frequency === 'hours' ? t('Every … hours') : t('Every … minutes')}
             hint={form.frequency === 'minutes' ? t('At least 5') : undefined}>
-            <Input type="number" min={form.frequency === 'minutes' ? 5 : 1} max={form.frequency === 'minutes' ? 720 : 168}
+            <Input type="number" min={form.frequency === 'minutes' ? fewest : 1} max={form.frequency === 'minutes' ? 720 : 168}
               value={form.every} onChange={(e) => set({ every: Number(e.target.value) || 0 })} />
           </Field>
         )}

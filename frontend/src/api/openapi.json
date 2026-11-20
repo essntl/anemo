@@ -25250,7 +25250,7 @@
               {
                 "type": "integer",
                 "maximum": 44640.0,
-                "minimum": 5.0
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -25299,6 +25299,11 @@
         "properties": {
           "schedule": {
             "$ref": "#/components/schemas/Schedule"
+          },
+          "change_check": {
+            "type": "boolean",
+            "title": "Change Check",
+            "default": false
           }
         },
         "type": "object",

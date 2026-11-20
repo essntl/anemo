@@ -17,7 +17,7 @@ import { useModels } from '@/features/providers/api'
 import { msg, rich, t } from '@/lib/i18n'
 import { type Automation, type NotifyWhen, type OnAsk, useSaveAutomation, useSchedulePreview } from '../api'
 import { checksValid, runSettingsBody, runSettingsFrom } from '../runSettings'
-import { defaultForm, fromSchedule, toSchedule } from '../scheduleForm'
+import { defaultForm, fromSchedule, minMinutes, toSchedule } from '../scheduleForm'
 import type { AutomationTemplate } from '../templates'
 import { RunSettings } from './RunSettings'
 import { ScheduleFields } from './ScheduleFields'
@@ -66,7 +66,9 @@ export function AutomationDialog({ automation, template, onClose }: { automation
   // Repeating schedules keep the time zone they were made in. A one-time run is
   // entered in this browser's time zone, so it is also described in it.
   const tz = schedule.frequency === 'once' ? browserTimeZone() : (automation?.schedule.tz ?? browserTimeZone())
-  const preview = useSchedulePreview(toSchedule(schedule, tz))
+  const hasCheck = runSettings.checks.some((c) => c.tool.trim() !== '')
+  const fewest = minMinutes(hasCheck)
+  const preview = useSchedulePreview(toSchedule(schedule, tz, fewest), hasCheck)
   const usableModels = (models.data ?? []).filter((m) => m.enabled && m.provider_enabled && m.capabilities.tools)
   const channels = destinations.data ?? []
   const valid = name.trim() !== '' && prompt.trim() !== '' && preview.valid && checksValid(runSettings.checks)
@@ -78,7 +80,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
         body: {
           name: name.trim(),
           prompt,
-          schedule: toSchedule(schedule, tz),
+          schedule: toSchedule(schedule, tz, fewest),
           enabled: automation?.enabled ?? true,
           profile_id: profileId || null,
           model_id: modelId || null,
@@ -117,7 +119,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
             placeholder={t("Search for today's news about open-source AI and give me the five most important stories, each with a link.")}
             onChange={(e) => setPrompt(e.target.value)} />
         </Field>
-        <ScheduleFields form={schedule} onChange={setSchedule} tz={tz} preview={preview} />
+        <ScheduleFields form={schedule} onChange={setSchedule} tz={tz} preview={preview} fewest={fewest} />
       </div>
 
       <Section title={t('Agent')}

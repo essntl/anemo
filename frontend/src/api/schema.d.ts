@@ -7267,6 +7267,11 @@ export interface components {
         /** SchedulePreviewIn */
         SchedulePreviewIn: {
             schedule: components["schemas"]["Schedule"];
+            /**
+             * Change Check
+             * @default false
+             */
+            change_check: boolean;
         };
         /** SchedulePreviewOut */
         SchedulePreviewOut: {

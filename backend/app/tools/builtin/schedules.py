@@ -25,7 +25,15 @@ from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.features.automations import service
 from app.features.automations.models import Automation
-from app.features.automations.schedule import Schedule, describe, upcoming
+from app.features.automations.schedule import (
+    MIN_GAP,
+    MIN_GAP_CHECKED,
+    Schedule,
+    describe,
+    floor,
+    stored,
+    upcoming,
+)
 from app.features.automations.schemas import (
     DEFAULT_MAX_RUNTIME_S,
     DEFAULT_MAX_TOOL_CALLS,
@@ -47,7 +55,7 @@ MAX_SCHEDULES = 50  # how many may exist at once before the tool refuses to add 
 RRULE = (
     "Repeat rule (RFC 5545), e.g. FREQ=DAILY;BYHOUR=7;BYMINUTE=0 or "
     "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=7;BYMINUTE=0 or FREQ=HOURLY;INTERVAL=2. Times "
-    "are in the user's time zone. At most every 5 minutes"
+    "are in the user's time zone. At most every 5 minutes (every minute with a change check)"
 )
 AT = (
     "Local date and time in the user's time zone, e.g. 2026-11-12T07:00. Alone: run once, "
@@ -219,8 +227,16 @@ def _problems(exc: ValidationError) -> str:
     return "; ".join(str(e["msg"]).removeprefix("Value error, ") for e in exc.errors())
 
 
-def _schedule(rrule: str | None, at: datetime | None, tz: str) -> Schedule:
-    """Raises ValidationError (a bad rule, too often) or ValueError (no time of day)."""
+def _schedule(
+    rrule: str | None, at: datetime | None, tz: str, *, every_minute: bool = False
+) -> Schedule:
+    """Raises ValidationError (a bad rule, too often) or ValueError (no time of day).
+    `every_minute`: it may run that often (it has a change check)."""
+    with floor(MIN_GAP_CHECKED if every_minute else MIN_GAP):
+        return _new_schedule(rrule, at, tz)
+
+
+def _new_schedule(rrule: str | None, at: datetime | None, tz: str) -> Schedule:
     if at is not None and at.tzinfo is None:
         at = at.replace(tzinfo=ZoneInfo(tz))
     if rrule is None:
@@ -285,7 +301,7 @@ class ListSchedules(Tool):
         zone = ZoneInfo(tz)
         lines = ["The user has paused all schedules: nothing runs until they resume."] * paused
         for a in rows:
-            facts = [describe(Schedule.model_validate(a.schedule))]
+            facts = [describe(stored(a.schedule))]
             if not a.enabled:
                 facts.append("off")
             elif a.next_run_at:
@@ -381,7 +397,7 @@ class CreateSchedule(Tool):
         async with get_sessionmaker()() as db:
             tz = await settings_service.user_timezone(db)
             try:
-                schedule = _schedule(args.rrule, args.at, tz)
+                schedule = _schedule(args.rrule, args.at, tz, every_minute=bool(args.change_check))
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid schedule: {_problems(exc)}", is_error=True)
             except ValueError as exc:
@@ -493,7 +509,9 @@ class UpdateSchedule(Tool):
             }
             if args.rrule is not None or args.at is not None:
                 try:
-                    changes["schedule"] = _schedule(args.rrule, args.at, tz)
+                    # (Whether it has a change check, and so may run every minute,
+                    # is checked with the change: service.update.)
+                    changes["schedule"] = _schedule(args.rrule, args.at, tz, every_minute=True)
                 except ValidationError as exc:
                     return ToolResult(content=f"Invalid schedule: {_problems(exc)}", is_error=True)
                 except ValueError as exc:
@@ -508,7 +526,7 @@ class UpdateSchedule(Tool):
                 await db.rollback()
                 return ToolResult(content=exc.message, is_error=True)
             await db.commit()
-            schedule = Schedule.model_validate(automation.schedule)
+            schedule = stored(automation.schedule)
             name, enabled = automation.name, automation.enabled
         await service.notify_changed()
         state = _when(schedule, tz) if enabled else "switched off"

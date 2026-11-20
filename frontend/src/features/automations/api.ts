@@ -87,10 +87,11 @@ function problemOf(error: unknown): string {
 }
 
 /** Asks the server what a schedule means: in words, and when it runs next. */
-export function useSchedulePreview(schedule: Schedule): SchedulePreview {
+export function useSchedulePreview(schedule: Schedule, changeCheck = false): SchedulePreview {
   const query = useQuery({
-    queryKey: [...automationsKey, 'preview', schedule],
-    queryFn: async () => unwrap(await api.POST('/api/automations/schedule-preview', { body: { schedule } })),
+    queryKey: [...automationsKey, 'preview', schedule, changeCheck],
+    queryFn: async () =>
+      unwrap(await api.POST('/api/automations/schedule-preview', { body: { schedule, change_check: changeCheck } })),
     retry: false,
     // Keep showing the previous answer while the next one loads (no flicker while typing).
     placeholderData: (previous) => previous,

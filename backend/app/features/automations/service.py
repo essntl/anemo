@@ -34,7 +34,13 @@ from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.automations.models import Automation
-from app.features.automations.schedule import Schedule, describe, next_run
+from app.features.automations.schedule import (
+    TOO_OFTEN,
+    Schedule,
+    describe,
+    next_run,
+    stored,
+)
 from app.features.automations.schemas import (
     AutomationIn,
     AutomationOut,
@@ -193,7 +199,7 @@ _LIVE_STATUS = {
 
 
 async def automation_out(db: AsyncSession, a: Automation) -> AutomationOut:
-    schedule = Schedule.model_validate(a.schedule)
+    schedule = stored(a.schedule)
     # Only a run that is working shows as the live status; one that waits for approval
     # is listed under pending_approvals, and later runs report how they went.
     run = await busy_run(db, a.id)
@@ -318,7 +324,7 @@ def _checks(checks: list[ChangeCheck] | None) -> list[dict[str, Any]] | None:
 
 
 def _reschedule(automation: Automation) -> None:
-    schedule = Schedule.model_validate(automation.schedule)
+    schedule = stored(automation.schedule)
     automation.next_run_at = next_run(schedule, _now()) if automation.enabled else None
 
 
@@ -423,7 +429,7 @@ async def update(db: AsyncSession, automation: Automation, data: AutomationPatch
         timing_changed = True
         if not data.enabled and automation.last_status == "retrying":
             automation.last_status = "failed"  # turning it off also cancels a pending retry
-    schedule = Schedule.model_validate(automation.schedule)
+    schedule = stored(automation.schedule)
     await _check_references(
         db,
         automation.profile_id,
@@ -435,6 +441,11 @@ async def update(db: AsyncSession, automation: Automation, data: AutomationPatch
         schedule.tz,
         automation.project_id,
     )
+    if not automation.change_check:
+        try:  # without a check, not more often than every 5 minutes
+            Schedule.model_validate(automation.schedule)
+        except ValueError as exc:
+            raise AppError(TOO_OFTEN, code="schedule_too_often") from exc
     if timing_changed:
         _reschedule(automation)
         if automation.enabled and automation.next_run_at is None:
@@ -458,7 +469,7 @@ async def start_run(
     `change`: what the change check found (its old and new results), for the run's
     context. Adds to the caller's transaction."""
     now = now or _now()
-    schedule = Schedule.model_validate(automation.schedule)
+    schedule = stored(automation.schedule)
     local = now.astimezone(ZoneInfo(schedule.tz))
     conversation = Conversation(
         title=f"{automation.name} · {local.day} {local:%b %H:%M}"[:200],
@@ -542,7 +553,7 @@ async def fire_due(now: datetime | None = None) -> int:
             scheduled = automation.next_run_at
             assert scheduled is not None
             try:
-                schedule = Schedule.model_validate(automation.schedule)
+                schedule = stored(automation.schedule)
             except ValueError:
                 log.warning("automation has an invalid schedule; turned off")
                 automation.enabled, automation.next_run_at = False, None
@@ -694,7 +705,7 @@ async def _save_document(
     db: AsyncSession, automation: Automation, run: Run, answer: str
 ) -> tuple[str | None, str | None]:
     """Returns (link to the document, error)."""
-    schedule = Schedule.model_validate(automation.schedule)
+    schedule = stored(automation.schedule)
     try:
         path = documents.check_path(
             render_path(automation.document_path or "", _now(), schedule.tz)

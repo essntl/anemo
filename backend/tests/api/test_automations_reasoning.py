@@ -818,3 +818,25 @@ async def test_a_run_back_after_a_crash_waits_without_counting_restarts(authed):
     await set_run(working, status="completed")
     await execute_run(uuid.UUID(crashed))
     assert await attempt() == ("completed", 1)
+
+
+async def test_with_a_change_check_it_may_run_every_minute(authed):
+    await setup(authed)
+    every_minute = {"kind": "interval", "every_minutes": 1}
+    body = {"name": "Fast", "prompt": "p", "schedule": every_minute}
+    refused = await authed.post("/api/automations", json=body)
+    assert refused.status_code == 422 and "at most every 5 minutes" in refused.text
+    check = [{"tool": "list_tasks", "args": {}}]
+    a = await create(authed, schedule=every_minute, change_check=check)
+    due = datetime.fromisoformat(a["next_run_at"])
+    assert await automations.fire_due(due + timedelta(seconds=1)) == 0  # the check is queued
+    after = datetime.fromisoformat((await get(authed, a["id"]))["next_run_at"])
+    assert after - due == timedelta(minutes=1)
+    # Without the check, it may not stay that fast.
+    r = await authed.patch(f"/api/automations/{a['id']}", json={"change_check": None})
+    assert r.status_code == 400 and r.json()["error"]["code"] == "schedule_too_often"
+    # The preview says the same.
+    preview = "/api/automations/schedule-preview"
+    assert (await authed.post(preview, json={"schedule": every_minute})).status_code == 422
+    with_check = {"schedule": every_minute, "change_check": True}
+    assert (await authed.post(preview, json=with_check)).status_code == 200

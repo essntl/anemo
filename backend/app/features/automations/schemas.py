@@ -2,9 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ModelWrapValidatorHandler, model_validator
 
-from app.features.automations.schedule import Schedule
+from app.features.automations.schedule import MIN_GAP, MIN_GAP_CHECKED, Schedule, floor
 
 OnAsk = Literal["pause", "deny", "fail"]
 # agent_decides: only when the run calls send_notification (or keeps failing).
@@ -48,6 +48,15 @@ class AutomationIn(BaseModel):
     change_check: list[ChangeCheck] | None = Field(None, max_length=5)
     run_anyway_hours: int | None = Field(None, ge=1, le=24 * 30)
 
+    @model_validator(mode="wrap")
+    @classmethod
+    def _every_minute_with_a_check(
+        cls, data: Any, handler: ModelWrapValidatorHandler["AutomationIn"]
+    ) -> "AutomationIn":
+        checked = isinstance(data, dict) and bool(data.get("change_check"))
+        with floor(MIN_GAP_CHECKED if checked else MIN_GAP):
+            return handler(data)
+
 
 class AutomationPatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=120)
@@ -71,6 +80,15 @@ class AutomationPatch(BaseModel):
     change_check: list[ChangeCheck] | None = Field(None, max_length=5)
     run_anyway_hours: int | None = Field(None, ge=1, le=24 * 30)
 
+    @model_validator(mode="wrap")
+    @classmethod
+    def _every_minute_if_checked(
+        cls, data: Any, handler: ModelWrapValidatorHandler["AutomationPatch"]
+    ) -> "AutomationPatch":
+        # Whether the automation has a check is known only with it: service.update checks.
+        with floor(MIN_GAP_CHECKED):
+            return handler(data)
+
 
 class PendingApproval(BaseModel):
     """An approval one of the automation's runs is waiting for."""
@@ -83,6 +101,14 @@ class PendingApproval(BaseModel):
 
 
 class AutomationOut(BaseModel):
+    @model_validator(mode="wrap")
+    @classmethod
+    def _as_stored(
+        cls, data: Any, handler: ModelWrapValidatorHandler["AutomationOut"]
+    ) -> "AutomationOut":
+        with floor(MIN_GAP_CHECKED):  # a saved schedule, checked when it was set
+            return handler(data)
+
     id: uuid.UUID
     name: str
     prompt: str
@@ -119,6 +145,17 @@ class AutomationOut(BaseModel):
 
 class SchedulePreviewIn(BaseModel):
     schedule: Schedule
+    # The automation will have a change check: it may then run every minute.
+    change_check: bool = False
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _every_minute_with_a_check(
+        cls, data: Any, handler: ModelWrapValidatorHandler["SchedulePreviewIn"]
+    ) -> "SchedulePreviewIn":
+        checked = isinstance(data, dict) and bool(data.get("change_check"))
+        with floor(MIN_GAP_CHECKED if checked else MIN_GAP):
+            return handler(data)
 
 
 class SchedulePreviewOut(BaseModel):
