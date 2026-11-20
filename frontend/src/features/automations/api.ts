@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
+import { mcpKey } from '@/features/mcp/api'
 import { runsKey, runsSummaryKey } from '@/features/runs/api'
 import { msg, t } from '@/lib/i18n'
 import type { Schedule } from './scheduleForm'
@@ -41,9 +42,10 @@ export function useAutomations() {
 }
 
 /**
- * The run log of one automation, newest first. `version` changes when one of its runs
- * starts or ends (the card's state, which the app's live events keep current), so the
- * log is fetched again then: a run's timer stops when it ends.
+ * The run log of one automation, newest first. Every status change of a run (it starts,
+ * waits for you, goes on after an approval, ends) is a live "run.status" event, which
+ * refetches everything under `runsKey`. `version` (the card's state, kept current by
+ * "automations.changed") also refetches it when a run is queued or skipped.
  */
 export function useAutomationRuns(id: string, version = '') {
   return useQuery({
@@ -65,10 +67,13 @@ export function useAutomationRun(id: string, runId: string | null) {
 }
 
 /** The tools for an automation's tool list and change check: the built-in ones and those
- *  of the connected MCP servers. */
+ *  of the connected MCP servers. Under the MCP key: fetched again when a server or its
+ *  tools change ("mcp.changed"), not with every change of an automation. */
+export const automationToolsKey = [...mcpKey, 'automation-tools'] as const
+
 export function useToolCatalog() {
   return useQuery({
-    queryKey: [...automationsKey, 'tools'],
+    queryKey: automationToolsKey,
     queryFn: async () => unwrap(await api.GET('/api/automations/tools')),
     staleTime: 5 * 60_000,
   })

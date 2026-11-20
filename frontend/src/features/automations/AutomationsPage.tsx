@@ -53,7 +53,7 @@ function RunDuration({ run }: { run: AutomationRun }) {
   const { timing } = run
   return (
     <span className="shrink-0 text-[12px] text-muted">
-      {timing.finished_at ? <AnswerDuration timing={timing} /> : <LiveTiming timing={timing} paused={run.status === 'paused'} />}
+      {timing.finished_at ? <AnswerDuration timing={timing} label={t('How long the run took:')} /> : <LiveTiming timing={timing} paused={run.status === 'paused'} />}
     </span>
   )
 }

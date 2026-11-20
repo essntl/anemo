@@ -29,8 +29,10 @@ describe('the run settings', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'mcp__artemk__open_requests' }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'list_events' }))
     expect(runSettingsBody(form).tool_allowlist).toEqual(['mcp__artemk__open_requests', 'list_events'])
-    expect(screen.getByRole('checkbox', { name: 'mcp__artemk__open_requests' }).closest('label'))
-      .toHaveAttribute('title', 'Booking requests that wait for an answer.')
+    // What each tool does is shown, and read out with it.
+    expect(screen.getByRole('checkbox', { name: 'mcp__artemk__open_requests' }))
+      .toHaveAccessibleDescription('Booking requests that wait for an answer.')
+    expect(screen.getByText('Booking requests that wait for an answer.')).toBeVisible()
   })
 
   it('say that {today} in a check’s arguments is today’s date', async () => {

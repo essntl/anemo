@@ -108,7 +108,7 @@ describe('the automations page', () => {
     show()
     await userEvent.click(screen.getByRole('button', { name: 'History' }))
     // The minute it waited for you is not part of it.
-    const duration = screen.getByRole('button', { name: /2 m 05 s/ })
+    const duration = screen.getByRole('button', { name: 'How long the run took: 2 m 05 s' })
     expect(screen.getByRole('button', { name: /Failed after 41 s/ })).toBeInTheDocument()
     await userEvent.click(duration)
     const details = screen.getByRole('tooltip')

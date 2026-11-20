@@ -3,6 +3,7 @@
  * how long their chats are kept, the tools that may reach other people without asking,
  * the change check and the note the runs keep between them.
  */
+import { useId } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input, Textarea } from '@/components/ui/Input'
@@ -22,6 +23,7 @@ interface Props {
 
 export function RunSettings({ form, onChange, editing }: Props) {
   const catalog = useToolCatalog()
+  const ids = useId()
   const set = (patch: Partial<RunSettingsForm>) => onChange({ ...form, ...patch })
   // Tools on the list that the catalog does not know (of a server that is gone, say) stay on it.
   const known = (catalog.data ?? []).map((tool) => tool.name)
@@ -62,13 +64,22 @@ export function RunSettings({ form, onChange, editing }: Props) {
         </label>
         {form.tools !== null && (
           <div className="ml-6 grid max-h-48 gap-x-3 overflow-y-auto sm:grid-cols-2">
-            {names.map((name) => (
-              <label key={name} title={described.get(name)} className="flex min-w-0 items-center gap-2 rounded-control px-2 py-1 text-[12.5px] hover:bg-surface-hover">
-                <input type="checkbox" className="accent-[var(--accent)]" checked={form.tools?.includes(name) ?? false}
-                  onChange={(e) => toggle(name, e.target.checked)} />
-                <span className="truncate font-mono">{name}</span>
-              </label>
-            ))}
+            {names.map((name, i) => {
+              const description = described.get(name)
+              return (
+                <label key={name} className="flex min-w-0 items-start gap-2 rounded-control px-2 py-1 text-[12.5px] hover:bg-surface-hover">
+                  <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={form.tools?.includes(name) ?? false}
+                    aria-labelledby={`${ids}-${i}`} aria-describedby={description ? `${ids}-${i}-about` : undefined}
+                    onChange={(e) => toggle(name, e.target.checked)} />
+                  <span className="min-w-0">
+                    <span id={`${ids}-${i}`} className="block truncate font-mono">{name}</span>
+                    {description && (
+                      <span id={`${ids}-${i}-about`} title={description} className="line-clamp-2 text-[11.5px] text-muted">{description}</span>
+                    )}
+                  </span>
+                </label>
+              )
+            })}
           </div>
         )}
       </fieldset>
