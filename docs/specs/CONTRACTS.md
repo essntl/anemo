@@ -194,6 +194,32 @@ view endpoint returns rows as `{type, id, title, url, properties, updated_at}`.
   configuration, reported as required by spec 01. Existing `knowledge_chunks` rows and
   memory search keep working.
 
+## 5a. Links (A3, wave 2) (change 4)
+
+Table **`object_links`** (A3), the one link index for all types:
+
+| Column | Type | Notes |
+|---|---|---|
+| id, created_at | IdMixin, created_at | |
+| from_type, from_id | String(10) (`ObjectType`), UUID | the item that links |
+| to_type, to_id | String(10) (`ObjectType`), UUID | the item it links to (no FK: dead links must stay visible) |
+| origin | String(10) | `inline` (extracted from Markdown on save, rebuilt every save, never edited directly) or `explicit` (set in the UI or through tools on tasks and events) |
+| created_by_ref | String(120) | `current_actor().ref` when it was made |
+
+Unique `(from_type, from_id, to_type, to_id, origin)`, and indexes on `(to_type, to_id)`
+and `(from_type, from_id)`.
+
+- Documents link only `inline`.
+- References are parsed with `core/refs.parse_ref`.
+- A target's state is resolved when it is read:
+  - live
+  - `in_trash` (`trashed_items`)
+  - `deleted` (neither, or an `external_key_tombstones` entry)
+- Inline links are rebuilt after the document, task or event write. They are added as
+  a separate helper call after the write, the same way A2's index is.
+- The existing `features/links` backlink functions (`document_backlinks`,
+  `task_backlinks`) can then read the index. `task_files` (attachments) stays as it is.
+
 ## 6. Sources and provenance columns (A1)
 
 On **`tasks`** and **`calendar_events`** (A1):
@@ -449,6 +475,8 @@ settled.
 - Change 2 (wave 1, after the T review): `waiting_ms` also counts `paused` time, and a
   top-level run waits while one of its sub-agents waits. B2 shows the duration as
   `finished_at − started_at − waiting_ms` and needs nothing else.
+- Change 4 (before wave 2): section 5a names the link index `object_links` for A3.
+  The wave-1 contracts left it out. Only A3 is affected.
 - Change 3 (wave 1, after the T review): `runs.first_text_waiting_ms` and
   `RunTiming.first_text_waiting_ms`. Time to first text is
   `first_text_at − started_at − first_text_waiting_ms`. T only.
