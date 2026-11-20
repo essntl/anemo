@@ -13,7 +13,7 @@ Whoever resumes this work continues from this log.
 | 1 | T Response timer | `feat/t` | `../anemo-t` | **merged** (230371b; 0040 re-chained onto 0036); after the merge: backend `all` and the frontend checks (474 tests) green |
 | 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | **merged** (956a65f; 0045 re-chained onto 0040); after the merge: backend `all` and the frontend checks (482 tests) green |
 | 2 | A3 Tasks and events join in | `feat/a3` | `../anemo-a3` | building (started 2026-11-20) |
-| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | building (started 2026-11-20) |
+| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | built (5 commits, suite green); in review |
 
 - **Merge order:** A1, T, B1, A2; then A3, B2.
 - **Progress notes:** `C:\Users\user\Documents\Projects\anemo-progress\<id>.md` (outside the repo).
@@ -116,6 +116,16 @@ their context. The suite on the integration branch after the A1 merge was re-run
 the machine responsive: at most 3 agents at a time, and frontend tests with
 `--maxWorkers=2`. A builder runs the backend suite and the frontend tests one after the
 other, not at the same time.
+
+## Open questions for the user
+
+1. **A server-side guard against customer contact details** in events and notifications
+   (spec 02, "Done when"). Today only the run's prompt keeps them out, and the tests
+   prove it only with a scripted model. B2 proposes a per-automation opt-in check in the
+   runtime. It would refuse write and notify calls whose arguments repeat contact fields
+   from untrusted tool results word for word. It misses paraphrases, and it can match by
+   mistake when a customer's name is the user's own. This is a design addition, so the
+   user decides.
 
 ## Decisions during wave 1
 
