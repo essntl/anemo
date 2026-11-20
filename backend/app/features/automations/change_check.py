@@ -13,8 +13,9 @@ model. A check that can't be made (unknown tool, one that would change something
 needs approval, a tool error) starts no run and counts as a failure.
 
 `{today}` in an argument is the user's date at the time of the check (YYYY-MM-DD), e.g.
-`{"from": "{today}"}` for the bookings from today on. The results are compared by the
-arguments as saved, so a new day alone is no change.
+`{"from": "{today}"}` for the bookings from today on. Each result keeps the arguments
+as saved (`args`, which its fingerprint uses: a new day alone is no change) and as
+called (`called_with`), so a run sees which day each result is for.
 
 Worker side only (the `automation.check` job): it runs tools.
 """
@@ -54,7 +55,12 @@ TODAY = "{today}"  # in an argument: the user's date when the check is made
 
 
 class CheckFailed(Exception):
-    pass
+    """`detail`: what the tool said, which may carry outside content (kept short on the
+    page and dropped with the retention, never notified: service.count_failure)."""
+
+    def __init__(self, message: str, detail: str | None = None) -> None:
+        super().__init__(message)
+        self.detail = detail
 
 
 @dataclass
@@ -63,6 +69,7 @@ class _Call:
     tool: Tool
     args: BaseModel
     ctx: ToolContext
+    called_with: dict[str, Any]  # the arguments with {today} filled in
 
 
 def _now() -> datetime:
@@ -113,8 +120,9 @@ async def _prepare(
         tool = tools.get(check.tool)
         if tool is None:
             raise CheckFailed(f"there is no tool {check.tool}")
+        called_with = with_today(check.args, today)
         try:
-            args = tool.Input.model_validate(with_today(check.args, today))
+            args = tool.Input.model_validate(called_with)
         except ValidationError as exc:
             problems = "; ".join(str(e["msg"]) for e in exc.errors()[:3])
             raise CheckFailed(f"invalid arguments for {check.tool}: {problems}") from exc
@@ -134,7 +142,7 @@ async def _prepare(
         verdict = combine([evaluate(a, policy, ceiling=ceiling) for a in actions])
         if verdict.decision != "allow":
             raise CheckFailed(f"{check.tool} is not allowed without asking ({verdict.reason})")
-        calls.append(_Call(check, tool, args, ctx))
+        calls.append(_Call(check, tool, args, ctx, called_with))
     return calls
 
 
@@ -144,12 +152,13 @@ async def _call(call: _Call) -> dict[str, Any]:
     except TimeoutError as exc:
         raise CheckFailed(f"{call.check.tool} timed out") from exc
     except Exception as exc:  # noqa: BLE001 - a broken tool fails the check, not the worker
-        raise CheckFailed(f"{call.check.tool} failed: {type(exc).__name__}: {exc}") from exc
+        raise CheckFailed(f"{call.check.tool} failed ({type(exc).__name__})", str(exc)) from exc
     if result.is_error:
-        raise CheckFailed(f"{call.check.tool} returned an error: {result.content[:500]}")
+        raise CheckFailed(f"{call.check.tool} returned an error", result.content)
     return {
         "tool": call.check.tool,
         "args": call.check.args,
+        "called_with": call.called_with,
         "content": result.content[:MAX_RESULT_CHARS],
         "hash": fingerprint(call.check.tool, call.check.args, result.content),
     }
@@ -236,6 +245,8 @@ async def _failed(db: Any, automation: Automation, exc: CheckFailed) -> str:
     log.warning(
         "automation change check failed", extra={"ctx": {"automation_id": str(automation.id)}}
     )
-    await service.count_failure(db, automation, f"The change check failed: {exc}", None)
+    await service.count_failure(
+        db, automation, f"The change check failed: {exc}", None, detail=exc.detail
+    )
     await service.notify_changed()
     return "failed"

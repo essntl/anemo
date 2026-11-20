@@ -79,6 +79,7 @@ WORKING = ("queued", "running")
 DEFER = timedelta(seconds=20)  # how long a run that has to wait for its sibling waits
 MAX_CHANGES = 200  # changes recorded per run
 FAILURES_BEFORE_ALERT = 3  # agent_decides: one notification after this many in a row
+MAX_ERROR_DETAIL = 200  # characters of what a failed check's tool returned, kept on the page
 OUTCOME_CHARS = 300
 _OUTCOME = re.compile(r"^[\s*_>#-]*outcome[*_]*\s*:[*_]*\s*(.+?)[\s*_]*$", re.IGNORECASE)
 
@@ -776,6 +777,13 @@ async def _notified(db: AsyncSession, run_id: uuid.UUID) -> bool:
     )
 
 
+def _newer_than_snapshot(automation: Automation, run: Run) -> bool:
+    """Whether the run started after the run whose results the check keeps: an older run
+    that ends later (it waited for an approval) must not move the check back."""
+    at = (automation.change_check_snapshot or {}).get("at")
+    return at is None or datetime.fromisoformat(at) < run.created_at
+
+
 async def on_run_finished(db: AsyncSession, run: Run, status: str, error: str | None) -> None:
     """Called when an automation's run ends (completed, failed or cancelled): records its
     outcome line, delivers the result, moves the change check on after a success, and
@@ -797,7 +805,7 @@ async def on_run_finished(db: AsyncSession, run: Run, status: str, error: str | 
     if status == "completed":
         automation.failure_streak, automation.last_error = 0, None
         change = (run.options.get("automation") or {}).get("change")
-        if change is not None:
+        if change is not None and _newer_than_snapshot(automation, run):
             # Only a run that succeeded moves the check on: a failed one is retried with
             # the same change (and the next check still sees it as one).
             automation.change_check_snapshot = {
@@ -853,13 +861,25 @@ async def on_run_finished(db: AsyncSession, run: Run, status: str, error: str | 
 
 
 async def count_failure(
-    db: AsyncSession, automation: Automation, error: str, link: str | None
+    db: AsyncSession,
+    automation: Automation,
+    error: str,
+    link: str | None,
+    detail: str | None = None,
 ) -> None:
     """A run (or change check) failed for good: count it, and tell the user. With
     agent_decides once, when it has failed FAILURES_BEFORE_ALERT times in a row; else, as
-    before, every time (but not with "never"). Commits."""
+    before, every time (but not with "never"). Commits.
+
+    `detail`: what a tool returned with its error, which may carry outside content (a
+    customer's details). It is kept short on the page only (the second line of
+    last_error, dropped with the retention: removal.forget_old_check_results), never put
+    in the notification."""
     automation.failure_streak += 1
     automation.last_status, automation.last_error = "failed", error[:2000]
+    if detail:
+        automation.last_error += "\n" + " ".join(detail.split())[:MAX_ERROR_DETAIL]
+    automation.last_error_at = _now()
     name, notify, streak = automation.name, automation.notify, automation.failure_streak
     destinations = _destinations(automation)
     await db.commit()
@@ -882,6 +902,39 @@ async def count_failure(
     )
 
 
+async def _approval_calls(db: AsyncSession, pending: list[Approval]) -> dict[uuid.UUID, ToolCall]:
+    ids = [a.tool_call_id for a in pending]
+    calls = await db.scalars(select(ToolCall).where(ToolCall.id.in_(ids)))
+    return {c.id: c for c in calls}
+
+
+def _from_outside(call: ToolCall | None) -> bool:
+    """A call whose summary shows arguments that can carry what someone outside wrote (a
+    reply to send, a customer's phone number): one that reaches other people, or a tool
+    of another system (MCP)."""
+    if call is None:
+        return False
+    reaches = any(a.get("contacts_people") for a in call.actions or [])
+    return reaches or (call.capability or "").startswith("mcp.")
+
+
+def _approval_body(name: str, pending: list[Approval], calls: dict[uuid.UUID, ToolCall]) -> str:
+    """What a notification about a run's approvals says. For a call from outside only the
+    tool's name, not its arguments: the run's chat, which the notification links to,
+    shows them in full (and goes with the automation's retention)."""
+    lines = []
+    for approval in pending:
+        call = calls.get(approval.tool_call_id)
+        if call is not None and _from_outside(call):
+            lines.append(
+                f"A run of “{name}” asks to use {call.tool_name}: open it to see "
+                "what exactly it would do."
+            )
+        else:
+            lines.append(approval.summary)
+    return "\n".join(lines) or "An action is waiting for your approval."
+
+
 async def on_needs_approval(
     db: AsyncSession, run: Run, automation_id: uuid.UUID | None = None
 ) -> None:
@@ -898,15 +951,19 @@ async def on_needs_approval(
             select(Approval).where(Approval.run_id == run.id, Approval.status == "pending")
         )
     )
+    calls = await _approval_calls(db, pending)
     # Push notifications can answer it right there, but only a single plain yes/no:
-    # a plan to review, a question or several requests at once open the app.
+    # a plan to review, a question or several requests at once open the app. So does a
+    # call from outside: the notification doesn't say what it would do.
     single = pending[0] if len(pending) == 1 and pending[0].kind == "action" else None
+    if single is not None and _from_outside(calls.get(single.tool_call_id)):
+        single = None
     automation.last_status = "waiting"
     await db.commit()
     await notifications.create(
         db,
         title=f"{automation.name} needs your approval",
-        body="\n".join(a.summary for a in pending) or "An action is waiting for your approval.",
+        body=_approval_body(automation.name, pending, calls),
         kind="approval",
         level="warning",
         link=f"/c/{run.conversation_id}" if run.conversation_id else None,

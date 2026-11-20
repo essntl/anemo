@@ -47,21 +47,29 @@ async def delete_with_runs(automation_id: uuid.UUID) -> None:
 async def forget_old_check_results(now: datetime) -> None:
     """The change check keeps the results of the last successful run, for the next run's
     context. What tools returned is kept no longer than the automation keeps its run
-    chats: after that only the fingerprints stay (enough to compare)."""
+    chats: after that only the fingerprints stay (enough to compare). The same goes for
+    what a tool said when the check failed (the second line of `last_error`)."""
     async with get_sessionmaker()() as db:
         rows = await db.scalars(
             select(Automation).where(
                 Automation.chat_retention_days.is_not(None),
-                Automation.change_check_snapshot.is_not(None),
+                or_(
+                    Automation.change_check_snapshot.is_not(None),
+                    Automation.last_error.is_not(None),
+                ),
             )
         )
         changed = False
         for automation in rows:
+            kept = timedelta(days=automation.chat_retention_days or 0)
+            error, error_at = automation.last_error, automation.last_error_at
+            if error and error_at and now - error_at >= kept and len(error.splitlines()) > 1:
+                automation.last_error = error.splitlines()[0]
+                changed = True
             snapshot = dict(automation.change_check_snapshot or {})
-            days = automation.chat_retention_days or 0
             at = datetime.fromisoformat(snapshot.get("at") or now.isoformat())
             results = snapshot.get("results") or []
-            if now - at < timedelta(days=days) or not any("content" in r for r in results):
+            if now - at < kept or not any("content" in r for r in results):
                 continue
             snapshot["results"] = [{k: v for k, v in r.items() if k != "content"} for r in results]
             automation.change_check_snapshot = snapshot

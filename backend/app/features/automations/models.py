@@ -66,6 +66,9 @@ class Automation(Base, IdMixin, TimestampMixin):
     # Runs that failed for good in a row (after their retries), and the last error.
     failure_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_error: Mapped[str | None] = mapped_column(Text)
+    # When it happened: what a failed check's tool returned (the second line of
+    # last_error) is dropped after the automation's retention.
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # running | waiting | completed | failed | cancelled | retrying | missed | skipped |

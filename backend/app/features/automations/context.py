@@ -8,6 +8,7 @@ the approval summaries, which earlier runs wrote and an injected instruction may
 shaped. The system prompt says what the mark means.
 """
 
+import json
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -25,9 +26,18 @@ def _when(value: str | datetime, tz: str) -> str:
     return f"{at.astimezone(ZoneInfo(tz)):%a %Y-%m-%d %H:%M}"
 
 
+def _called(result: dict[str, Any]) -> str:
+    """Which call a result is from: the tool and the arguments it was called with
+    ({today} filled in). The arguments are the automation's own, not outside content."""
+    args = result.get("called_with", result.get("args")) or {}
+    called = f"{result['tool']} {json.dumps(args, ensure_ascii=False)}" if args else result["tool"]
+    return f"{called}:\n"
+
+
 def _results(results: list[dict[str, Any]], tz: str) -> str:
     return "\n".join(
-        untrusted(
+        _called(r)
+        + untrusted(
             f"{r['tool']}{' (error)' if r.get('is_error') else ''}",
             r["content"] or "(empty)" if "content" in r else "(no longer kept)",
         )
