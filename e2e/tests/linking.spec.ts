@@ -49,7 +49,7 @@ test('an event linked to a brief shows on the brief, and gets meeting notes', as
 
     await page.goto(`/calendar?event=${event.id}`)
     const dialog = page.getByRole('dialog')
-    await expect(dialog.getByRole('region', { name: 'Links' }).getByText(`E2E brief ${mark}`)).toBeVisible()
+    await expect(dialog.getByRole('region', { name: 'Links' }).getByRole('link', { name: `E2E brief ${mark}` })).toBeVisible()
     await dialog.getByRole('button', { name: 'Create meeting notes' }).click()
     await expect(page).toHaveURL(/\/documents\//)
     notesId = page.url().split('/documents/')[1].split(/[?#]/)[0]

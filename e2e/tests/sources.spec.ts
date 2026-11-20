@@ -39,7 +39,7 @@ test("an event's link opens it, and a task says who made it", async ({ page }) =
 
     // A task's link marks it in the list; opening it shows who made it.
     await page.goto(`/tasks?task=${task.id}`)
-    await page.locator('[aria-current="true"]').getByRole('button', { name: 'Open task' }).click()
+    await page.locator('[aria-current="true"]').getByRole('button', { name: taskTitle, exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Task', exact: true }).getByText('Created by you.')).toBeVisible()
   } finally {
     await page.request.delete(`/api/calendar/events/${event.id}`)
