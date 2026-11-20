@@ -169,7 +169,8 @@ async def test_a_document_with_a_client_and_a_tag_shows_in_both_views(authed, do
         "/api/views", json={"name": "X", "query": {"properties": {"client": "x"}}}
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "property_invalid"
-    r = await authed.post("/api/views/query", json={"types": ["task"]})
+    # Views show documents, tasks and events (phase 3), not chats.
+    r = await authed.post("/api/views/query", json={"types": ["chat"]})
     assert r.status_code == 400 and r.json()["error"]["code"] == "view_type"
 
 
@@ -1055,7 +1056,7 @@ async def test_merging_a_value_reaches_every_file_view_and_folder_default(authed
 
     (folder / "c.md").write_text("---\nclient: ludmyla\n---\n# C\n")  # fixed by hand
     again = (await authed.post(url, json={"into_option_id": keep["id"]})).json()
-    assert again == {"documents": 1, "views": 1, "folder_defaults": 1, "failed": []}
+    assert again == {"documents": 1, "views": 1, "folder_defaults": 1, "failed": [], "items": 0}
     for name in ("a.md", "b.md", "c.md"):
         assert "client: ludmyla-doula" in (folder / name).read_text(), name
     saved = (await authed.get(f"/api/views/{view.json()['id']}")).json()

@@ -81,6 +81,7 @@ class RewriteOut(BaseModel):
     # Documents that couldn't be rewritten. Then nothing else changed: fix them and run
     # it again (what was rewritten stays so).
     failed: list[str] = []
+    items: int = 0  # tasks and events that had the value (their rows are changed)
 
 
 class ValidateIn(BaseModel):
@@ -114,3 +115,31 @@ class SuggestionIds(BaseModel):
 class AppliedOut(BaseModel):
     applied: int
     problems: list[str]  # suggestions that no longer fit, kept for another look
+
+
+class TagValueOut(BaseModel):
+    """A tag that names a value of another property (`ludmyla-doula` -> client), with the
+    items that have the tag: turning it into the value is offered, never done unasked."""
+
+    tag: str
+    key: str
+    value: str  # the slug
+    value_label: str
+    property_label: str
+    documents: int
+    tasks: int
+    events: int
+    titles: list[str]  # the first few items with the tag
+
+
+class TagValueIn(BaseModel):
+    tag: str = Field(min_length=1, max_length=80)
+    key: str = Field(min_length=1, max_length=60)
+    value: str = Field(min_length=1, max_length=80)
+
+
+class TagValueAppliedOut(BaseModel):
+    documents: int  # rewritten (a revision each)
+    tasks: int
+    events: int
+    failed: list[str]  # items left as they were, and why

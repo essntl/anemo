@@ -17,15 +17,17 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.actor import EXTERNAL, current_actor
 from app.core.errors import AppError, NotFound
 from app.events import bus
 from app.features.documents import meta
 from app.features.documents.models import Document, DocumentRevision
+from app.features.links import index as links_index
 from app.jobs import queue
 from app.knowledge import index
 from app.workspace import files, safe_fs
@@ -221,10 +223,12 @@ async def reconcile(db: AsyncSession) -> list[str]:
         if await asyncio.to_thread(_exists, doc.path):
             continue
         await index.delete_source(db, SOURCE_TYPE, [doc.id])
+        await links_index.drop_outgoing(db, "document", doc.id)
         await db.delete(doc)
         changed = True
     # Indexed from other content, or never (before properties, a new index format).
     changed = await _index_stale(db) or changed
+    changed = await _links_stale(db) or changed
     if changed or db.dirty:
         await db.commit()
     return folders
@@ -261,6 +265,7 @@ async def _apply(
     )
     await _schedule_index(db, doc)
     await meta.index(db, doc, content)  # properties and keyword search, from the text
+    await _index_links(db, doc, content)  # the links in it
 
 
 async def _add_revision(
@@ -456,6 +461,7 @@ async def remove(db: AsyncSession, doc: Document, deleted_by: str = "user") -> N
     """Move the file to the workspace trash and drop the index entry."""
     await asyncio.to_thread(files.trash, doc.path, deleted_by)
     await index.delete_source(db, SOURCE_TYPE, [doc.id])
+    await links_index.drop_outgoing(db, "document", doc.id)  # links to it stay (broken)
     await db.delete(doc)
     await db.commit()
 
@@ -544,3 +550,38 @@ async def _reindex_moved(db: AsyncSession, doc: Document) -> None:
         return
     await meta.index(db, doc, content)
     await schedule_reindex(db, doc)
+
+
+async def _index_links(db: AsyncSession, doc: Document, content: str) -> None:
+    """Rebuild the link index from the document's text (never fails the save:
+    links/index.refresh_inline). Keeps updated_at. Doesn't commit."""
+    await db.flush()
+    await links_index.refresh_inline(db, "document", doc.id, content)
+    await db.execute(
+        update(Document)
+        .where(Document.id == doc.id)
+        .values(links_hash=doc.content_hash, updated_at=Document.updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    set_committed_value(doc, "links_hash", doc.content_hash)
+
+
+async def _links_stale(db: AsyncSession) -> bool:
+    """Index the links of documents whose links were indexed from other content, or
+    never (documents from before the link index). Doesn't commit. Whether there were
+    any."""
+    stale = list(
+        await db.scalars(
+            select(Document).where(
+                or_(Document.links_hash.is_(None), Document.links_hash != Document.content_hash)
+            )
+        )
+    )
+    for doc in stale:
+        try:
+            content = await asyncio.to_thread(_read, doc.path)
+        except AppError:
+            continue  # gone or unreadable: the next look sorts it out
+        if sha(content) == doc.content_hash:  # else the next look re-reads it as a change
+            await _index_links(db, doc, content)
+    return bool(stale)

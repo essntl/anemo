@@ -16,6 +16,7 @@ from app.core.errors import AppError, Conflict, NotFound
 from app.features.documents import meta, service
 from app.features.documents.models import Document
 from app.features.properties import frontmatter
+from app.features.properties import items as item_properties
 from app.features.properties import service as properties
 from app.features.properties.models import PropertyDefinition, PropertyOption, PropertySuggestion
 from app.features.settings import service as settings
@@ -156,6 +157,7 @@ class Rewritten:
     views: int = 0  # saved views whose filter named the value
     folder_defaults: int = 0  # folder rules that gave it
     failed: list[str] = field(default_factory=list)  # documents that couldn't be rewritten
+    items: int = 0  # tasks and events that had it
 
 
 async def _rewrite_files(
@@ -261,6 +263,7 @@ async def rename_value(
     renamed = await db.get(PropertyOption, option_id)
     if renamed is not None:
         renamed.slug = new
+    out.items = await item_properties.rewrite_value(db, definition.key, old[0], new)
     await _rewrite_settings(db, definition, old[0], new, out)
     await db.commit()
     # Rewritten documents were indexed while the new slug wasn't a value yet.
@@ -287,6 +290,7 @@ async def merge_values(
         if target is not None and target.hub_document_id is None:
             target.hub_document_id = gone.hub_document_id
         await db.delete(gone)
+    out.items = await item_properties.rewrite_value(db, definition.key, old[0], new)
     await _rewrite_settings(db, definition, old[0], new, out)
     await db.commit()
     return out
@@ -326,7 +330,9 @@ async def relabel(db: AsyncSession, option: PropertyOption) -> None:
 
 
 async def option_in_use(db: AsyncSession, definition: PropertyDefinition, slug: str) -> int:
-    return len(list(await db.scalars(select(Document.id).where(_uses(definition, slug)))))
+    """How many documents, tasks and events have the value."""
+    docs = len(list(await db.scalars(select(Document.id).where(_uses(definition, slug)))))
+    return docs + await item_properties.uses(db, definition.key, slug)
 
 
 # -- keeping the index in step -----------------------------------------------------------
@@ -370,7 +376,7 @@ async def delete_option(
     used = await option_in_use(db, definition, option.slug)
     if used:
         raise Conflict(
-            f"{used} documents use this value: merge it into another one instead",
+            f"{used} items use this value: merge it into another one instead",
             code="property_value_in_use",
             details={"documents": used},
         )

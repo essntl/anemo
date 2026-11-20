@@ -1509,6 +1509,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/links/broken": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Broken Links
+         * @description Links to items deleted for good, and where each is, so they can be fixed.
+         */
+        get: operations["broken_links_api_links_broken_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/links/{object_type}/{object_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Links Of
+         * @description What the item links to and what links to it ("Linked from"), grouped by type.
+         *     Links to items in the trash or deleted for good say so (`state`).
+         */
+        get: operations["links_of_api_links__object_type___object_id__get"];
+        put?: never;
+        /**
+         * Add Links
+         * @description Link a task or event to other items (explicit links; each must exist).
+         */
+        post: operations["add_links_api_links__object_type___object_id__post"];
+        /**
+         * Remove Link
+         * @description Remove an explicit link (a link in the text goes when the text no longer has it).
+         */
+        delete: operations["remove_link_api_links__object_type___object_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/events/{event_id}/meeting-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Meeting Notes
+         * @description Make a document for the event's meeting notes, with the event's properties, linked
+         *     both ways (the notes link to the event, the event to the notes).
+         */
+        post: operations["create_meeting_notes_api_calendar_events__event_id__meeting_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/files": {
         parameters: {
             query?: never;
@@ -2277,7 +2347,8 @@ export interface paths {
         /**
          * Hub
          * @description When the document is the hub page of property values (a client's page): every
-         *     item with each value.
+         *     document, task and event with each value (the UI groups them by type; what links to
+         *     the hub itself comes from its backlinks).
          */
         get: operations["hub_api_documents__document_id__hub_get"];
         put?: never;
@@ -2615,6 +2686,26 @@ export interface paths {
         post?: never;
         /** Delete Event */
         delete: operations["delete_event_api_calendar_events__event_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/events/{event_id}/properties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Properties
+         * @description Change some property values of an event (for a repeating event: of the series).
+         */
+        put: operations["set_properties_api_calendar_events__event_id__properties_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3812,7 +3903,8 @@ export interface paths {
         };
         /**
          * List Properties
-         * @description Every property with its values and how many documents use each.
+         * @description Every property with its values and how many documents, tasks and events use
+         *     each.
          */
         get: operations["list_properties_api_properties_get"];
         put?: never;
@@ -4019,6 +4111,65 @@ export interface paths {
         put?: never;
         /** Dismiss Suggestions */
         post: operations["dismiss_suggestions_api_properties_suggestions_dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/tag-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tag Suggestions
+         * @description Tags that name a value of another property (a client's tag), offered to be turned
+         *     into that value. Worked out from the data; dismissed ones are left out.
+         */
+        get: operations["tag_suggestions_api_properties_tag_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/tag-suggestions/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Tag Suggestion
+         * @description Give every item with the tag the value, and remove the tag (documents get a
+         *     revision). Items that can't take it are left alone and listed.
+         */
+        post: operations["apply_tag_suggestion_api_properties_tag_suggestions_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/tag-suggestions/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Tag Suggestion */
+        post: operations["dismiss_tag_suggestion_api_properties_tag_suggestions_dismiss_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4558,6 +4709,8 @@ export interface components {
             tasks: components["schemas"]["LinkedTask"][];
             /** Documents */
             documents: components["schemas"]["LinkedDocument"][];
+            /** Events */
+            events?: components["schemas"]["LinkedEvent"][];
         };
         /** Body_pdf_text_api_extension_pdf_text_post */
         Body_pdf_text_api_extension_pdf_text_post: {
@@ -4601,6 +4754,24 @@ export interface components {
              * @description Copy the messages up to and including this one
              */
             upto_seq: number;
+        };
+        /**
+         * BrokenLinkOut
+         * @description A link to something deleted for good, and the item it is in.
+         */
+        BrokenLinkOut: {
+            source: components["schemas"]["LinkItem"];
+            target: components["schemas"]["LinkItem"];
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "inline" | "explicit";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** BrowserInput */
         BrowserInput: {
@@ -5362,6 +5533,13 @@ export interface components {
             task_id?: string | null;
             /** Project Id */
             project_id?: string | null;
+            /**
+             * Properties
+             * @description Property values, e.g. {"client": "ludmyla-doula", "tags": ["website"]}. On a change only the keys given change (null removes one); leave it out to keep them.
+             */
+            properties?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * EventOut
@@ -5426,6 +5604,13 @@ export interface components {
             created_by_actor?: components["schemas"]["ActorOut"] | null;
             /** @description Who changed it last */
             updated_by_actor?: components["schemas"]["ActorOut"] | null;
+            /**
+             * Properties
+             * @description Property values
+             */
+            properties?: {
+                [key: string]: unknown;
+            };
         };
         /** ExplainIn */
         ExplainIn: {
@@ -5872,6 +6057,113 @@ export interface components {
              */
             max_subagent_depth: number;
         };
+        /**
+         * LinkGroups
+         * @description Links grouped by the type of the item at the other end.
+         */
+        LinkGroups: {
+            /** Document */
+            document?: components["schemas"]["LinkOut"][];
+            /** Task */
+            task?: components["schemas"]["LinkOut"][];
+            /** Event */
+            event?: components["schemas"]["LinkOut"][];
+            /** Chat */
+            chat?: components["schemas"]["LinkOut"][];
+        };
+        /**
+         * LinkItem
+         * @description An item at one end of a link, as it is now.
+         */
+        LinkItem: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "document" | "task" | "event" | "chat";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ref
+             * @description Its canonical reference (= app URL, the Markdown link)
+             */
+            ref: string;
+            /**
+             * Title
+             * @description Empty when it is gone for good
+             */
+            title: string;
+            /**
+             * Detail
+             * @description A document's path, a task's status, an event's start
+             * @default
+             */
+            detail: string;
+            /**
+             * State
+             * @description live; in_trash (a task or event in the trash); deleted (gone for good)
+             * @enum {string}
+             */
+            state: "live" | "in_trash" | "deleted";
+        };
+        /** LinkOut */
+        LinkOut: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "document" | "task" | "event" | "chat";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ref
+             * @description Its canonical reference (= app URL, the Markdown link)
+             */
+            ref: string;
+            /**
+             * Title
+             * @description Empty when it is gone for good
+             */
+            title: string;
+            /**
+             * Detail
+             * @description A document's path, a task's status, an event's start
+             * @default
+             */
+            detail: string;
+            /**
+             * State
+             * @description live; in_trash (a task or event in the trash); deleted (gone for good)
+             * @enum {string}
+             */
+            state: "live" | "in_trash" | "deleted";
+            /**
+             * Origin
+             * @description explicit: set on the task or event (can be removed); inline: a link in its text (edit the text to change it)
+             * @enum {string}
+             */
+            origin: "inline" | "explicit";
+            created_by_actor?: components["schemas"]["ActorOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** LinkTo */
+        LinkTo: {
+            /**
+             * To
+             * @description References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>
+             */
+            to: string[];
+        };
         /** LinkedDocument */
         LinkedDocument: {
             /**
@@ -5884,6 +6176,21 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** LinkedEvent */
+        LinkedEvent: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+        };
         /** LinkedTask */
         LinkedTask: {
             /**
@@ -5895,6 +6202,13 @@ export interface components {
             title: string;
             /** Status */
             status: string;
+        };
+        /** LinksOut */
+        LinksOut: {
+            /** @description What the item links to */
+            links: components["schemas"]["LinkGroups"];
+            /** @description What links to it ("Linked from") */
+            backlinks: components["schemas"]["LinkGroups"];
         };
         /** ListingOut */
         ListingOut: {
@@ -6690,6 +7004,13 @@ export interface components {
             /** @description Who changed it last */
             updated_by_actor?: components["schemas"]["ActorOut"] | null;
             /**
+             * Properties
+             * @description Property values
+             */
+            properties?: {
+                [key: string]: unknown;
+            };
+            /**
              * Event Id
              * Format: uuid
              */
@@ -7261,23 +7582,6 @@ export interface components {
             /** Tasks Completed */
             tasks_completed: number;
         };
-        /** PropertiesIn */
-        PropertiesIn: {
-            /** Set */
-            set: {
-                [key: string]: unknown;
-            };
-            /**
-             * Base Hash
-             * @description Hash of the version being edited
-             */
-            base_hash?: string | null;
-            /**
-             * Create Values
-             * @default false
-             */
-            create_values: boolean;
-        };
         /**
          * PropertySettings
          * @description Document properties (Settings > Properties). The definitions themselves are rows
@@ -7777,6 +8081,11 @@ export interface components {
              * @default []
              */
             failed: string[];
+            /**
+             * Items
+             * @default 0
+             */
+            items: number;
         };
         /** RowsOut */
         RowsOut: {
@@ -8763,6 +9072,51 @@ export interface components {
             /** Count */
             count: number;
         };
+        /** TagValueAppliedOut */
+        TagValueAppliedOut: {
+            /** Documents */
+            documents: number;
+            /** Tasks */
+            tasks: number;
+            /** Events */
+            events: number;
+            /** Failed */
+            failed: string[];
+        };
+        /** TagValueIn */
+        TagValueIn: {
+            /** Tag */
+            tag: string;
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * TagValueOut
+         * @description A tag that names a value of another property (`ludmyla-doula` -> client), with the
+         *     items that have the tag: turning it into the value is offered, never done unasked.
+         */
+        TagValueOut: {
+            /** Tag */
+            tag: string;
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            /** Value Label */
+            value_label: string;
+            /** Property Label */
+            property_label: string;
+            /** Documents */
+            documents: number;
+            /** Tasks */
+            tasks: number;
+            /** Events */
+            events: number;
+            /** Titles */
+            titles: string[];
+        };
         /** TaskFileOut */
         TaskFileOut: {
             /** Path */
@@ -8828,6 +9182,18 @@ export interface components {
              * @description Tasks this one waits on
              */
             blocked_by?: string[];
+            /**
+             * Properties
+             * @description Property values (features/properties), e.g. {"client": "ludmyla-doula"}: select values are slugs, a multi_select a list, dates YYYY-MM-DD. tags is the same list as `tags`. On a change: the keys given are set, null removes one.
+             */
+            properties?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Links
+             * @description References of items to link it to: /documents/<id>, /calendar?event=<id>, /tasks?task=<id>, /c/<id>
+             */
+            links?: string[];
         };
         /** TaskOut */
         TaskOut: {
@@ -8901,6 +9267,13 @@ export interface components {
             created_by_actor?: components["schemas"]["ActorOut"] | null;
             /** @description Who changed it last */
             updated_by_actor?: components["schemas"]["ActorOut"] | null;
+            /**
+             * Properties
+             * @description Property values; `tags` is the same list as tags
+             */
+            properties?: {
+                [key: string]: unknown;
+            };
         };
         /** TaskPatch */
         TaskPatch: {
@@ -8930,6 +9303,13 @@ export interface components {
             checklist?: components["schemas"]["ChecklistItem"][] | null;
             /** Blocked By */
             blocked_by?: string[] | null;
+            /**
+             * Properties
+             * @description Property values (features/properties), e.g. {"client": "ludmyla-doula"}: select values are slugs, a multi_select a list, dates YYYY-MM-DD. tags is the same list as `tags`. On a change: the keys given are set, null removes one.
+             */
+            properties?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Subtasks
              * @description Finishing a task with open subtasks: also finish them, or keep them open. Without it, finishing such a task is refused (409 open_subtasks).
@@ -9533,8 +9913,8 @@ export interface components {
         };
         /**
          * ViewQuery
-         * @description What a view shows. The same shape for every object type: documents now; tasks
-         *     and events join through `types`.
+         * @description What a view shows. The same shape for every object type (`types`: documents,
+         *     tasks, events, or a mix of them).
          */
         ViewQuery: {
             /** Types */
@@ -9686,12 +10066,39 @@ export interface components {
                 [key: string]: "none" | "read" | "read_write";
             };
         };
+        /**
+         * PropertiesIn
+         * @description Property values to set; null removes one. The others stay as they are.
+         */
+        app__features__calendar__schemas__PropertiesIn: {
+            /** Set */
+            set: {
+                [key: string]: unknown;
+            };
+        };
         /** MoveIn */
         app__features__documents__router__MoveIn: {
             /** Name */
             name?: string | null;
             /** Folder */
             folder?: string | null;
+        };
+        /** PropertiesIn */
+        app__features__documents__router__PropertiesIn: {
+            /** Set */
+            set: {
+                [key: string]: unknown;
+            };
+            /**
+             * Base Hash
+             * @description Hash of the version being edited
+             */
+            base_hash?: string | null;
+            /**
+             * Create Values
+             * @default false
+             */
+            create_values: boolean;
         };
         /** SaveIn */
         app__features__documents__router__SaveIn: {
@@ -12838,6 +13245,177 @@ export interface operations {
             };
         };
     };
+    broken_links_api_links_broken_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokenLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    links_of_api_links__object_type___object_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                object_type: "document" | "task" | "event" | "chat";
+                object_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_links_api_links__object_type___object_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                object_type: "task" | "event";
+                object_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkTo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_link_api_links__object_type___object_id__delete: {
+        parameters: {
+            query: {
+                /** @description The linked item's reference */
+                to: string;
+            };
+            header?: never;
+            path: {
+                object_type: "task" | "event";
+                object_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_meeting_notes_api_calendar_events__event_id__meeting_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_folder_api_files_get: {
         parameters: {
             query?: {
@@ -14529,7 +15107,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PropertiesIn"];
+                "application/json": components["schemas"]["app__features__documents__router__PropertiesIn"];
             };
         };
         responses: {
@@ -15596,6 +16174,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_properties_api_calendar_events__event_id__properties_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__features__calendar__schemas__PropertiesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -18849,6 +19464,105 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SuggestionIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tag_suggestions_api_properties_tag_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagValueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_tag_suggestion_api_properties_tag_suggestions_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagValueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagValueAppliedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_tag_suggestion_api_properties_tag_suggestions_dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagValueIn"];
             };
         };
         responses: {

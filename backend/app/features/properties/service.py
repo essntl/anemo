@@ -509,6 +509,28 @@ async def validate(
     return out
 
 
+async def register_open(db: AsyncSession, key: str, values: list[str]) -> None:
+    """Make each of these a value of an open-vocabulary property, spelled as given and
+    without the near-duplicate check (a task's `tags` parameter: tags work exactly as
+    they always did, and the shared `tags` property knows them). Values it has already
+    (by slug or label, in any case) are left alone. Flushes, doesn't commit."""
+    prop = (await load(db)).get(key)
+    if prop is None or not prop.definition.open_vocabulary or prop.type not in SELECT_TYPES:
+        return
+    for value in values:
+        if not value or len(value) > 80 or prop.option(value) is not None:
+            continue
+        option = PropertyOption(
+            definition_id=prop.definition.id,
+            slug=value,
+            label=value[:120],
+            sort_order=len(prop.options),
+        )
+        db.add(option)
+        prop.options.append(option)
+    await db.flush()
+
+
 async def check_written(
     db: AsyncSession,
     object_type: str,

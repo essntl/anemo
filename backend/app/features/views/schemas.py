@@ -19,8 +19,8 @@ class SortKey(BaseModel):
 
 
 class ViewQuery(BaseModel):
-    """What a view shows. The same shape for every object type: documents now; tasks
-    and events join through `types`."""
+    """What a view shows. The same shape for every object type (`types`: documents,
+    tasks, events, or a mix of them)."""
 
     types: list[ObjectType] = Field(default_factory=_documents_only, min_length=1)
     text: str | None = Field(None, max_length=300)

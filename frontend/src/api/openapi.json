@@ -5727,6 +5727,353 @@
         }
       }
     },
+    "/api/links/broken": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Broken Links",
+        "description": "Links to items deleted for good, and where each is, so they can be fixed.",
+        "operationId": "broken_links_api_links_broken_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BrokenLinkOut"
+                  },
+                  "title": "Response Broken Links Api Links Broken Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/links/{object_type}/{object_id}": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Links Of",
+        "description": "What the item links to and what links to it (\"Linked from\"), grouped by type.\nLinks to items in the trash or deleted for good say so (`state`).",
+        "operationId": "links_of_api_links__object_type___object_id__get",
+        "parameters": [
+          {
+            "name": "object_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "document",
+                "task",
+                "event",
+                "chat"
+              ],
+              "type": "string",
+              "title": "Object Type"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinksOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Add Links",
+        "description": "Link a task or event to other items (explicit links; each must exist).",
+        "operationId": "add_links_api_links__object_type___object_id__post",
+        "parameters": [
+          {
+            "name": "object_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "task",
+                "event"
+              ],
+              "type": "string",
+              "title": "Object Type"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkTo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinksOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Remove Link",
+        "description": "Remove an explicit link (a link in the text goes when the text no longer has it).",
+        "operationId": "remove_link_api_links__object_type___object_id__delete",
+        "parameters": [
+          {
+            "name": "object_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "task",
+                "event"
+              ],
+              "type": "string",
+              "title": "Object Type"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "description": "The linked item's reference",
+              "title": "To"
+            },
+            "description": "The linked item's reference"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendar/events/{event_id}/meeting-notes": {
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Create Meeting Notes",
+        "description": "Make a document for the event's meeting notes, with the event's properties, linked\nboth ways (the notes link to the event, the event to the notes).",
+        "operationId": "create_meeting_notes_api_calendar_events__event_id__meeting_notes_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files": {
       "get": {
         "tags": [
@@ -8764,7 +9111,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PropertiesIn"
+                "$ref": "#/components/schemas/app__features__documents__router__PropertiesIn"
               }
             }
           }
@@ -8925,7 +9272,7 @@
           "documents"
         ],
         "summary": "Hub",
-        "description": "When the document is the hub page of property values (a client's page): every\nitem with each value.",
+        "description": "When the document is the hub page of property values (a client's page): every\ndocument, task and event with each value (the UI groups them by type; what links to\nthe hub itself comes from its backlinks).",
         "operationId": "hub_api_documents__document_id__hub_get",
         "parameters": [
           {
@@ -10860,6 +11207,76 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendar/events/{event_id}/properties": {
+      "put": {
+        "tags": [
+          "calendar"
+        ],
+        "summary": "Set Properties",
+        "description": "Change some property values of an event (for a repeating event: of the series).",
+        "operationId": "set_properties_api_calendar_events__event_id__properties_put",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__features__calendar__schemas__PropertiesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -16016,7 +16433,7 @@
           "properties"
         ],
         "summary": "List Properties",
-        "description": "Every property with its values and how many documents use each.",
+        "description": "Every property with its values and how many documents, tasks and events use\neach.",
         "operationId": "list_properties_api_properties_get",
         "parameters": [
           {
@@ -16866,6 +17283,172 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SuggestionIds"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/tag-suggestions": {
+      "get": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Tag Suggestions",
+        "description": "Tags that name a value of another property (a client's tag), offered to be turned\ninto that value. Worked out from the data; dismissed ones are left out.",
+        "operationId": "tag_suggestions_api_properties_tag_suggestions_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagValueOut"
+                  },
+                  "title": "Response Tag Suggestions Api Properties Tag Suggestions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/tag-suggestions/apply": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Apply Tag Suggestion",
+        "description": "Give every item with the tag the value, and remove the tag (documents get a\nrevision). Items that can't take it are left alone and listed.",
+        "operationId": "apply_tag_suggestion_api_properties_tag_suggestions_apply_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagValueIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagValueAppliedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/tag-suggestions/dismiss": {
+      "post": {
+        "tags": [
+          "properties"
+        ],
+        "summary": "Dismiss Tag Suggestion",
+        "operationId": "dismiss_tag_suggestion_api_properties_tag_suggestions_dismiss_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagValueIn"
               }
             }
           }
@@ -18812,6 +19395,13 @@
             },
             "type": "array",
             "title": "Documents"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedEvent"
+            },
+            "type": "array",
+            "title": "Events"
           }
         },
         "type": "object",
@@ -18932,6 +19522,38 @@
           "upto_seq"
         ],
         "title": "BranchIn"
+      },
+      "BrokenLinkOut": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/LinkItem"
+          },
+          "target": {
+            "$ref": "#/components/schemas/LinkItem"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "explicit"
+            ],
+            "title": "Origin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "origin",
+          "created_at"
+        ],
+        "title": "BrokenLinkOut",
+        "description": "A link to something deleted for good, and the item it is in."
       },
       "BrowserInput": {
         "properties": {
@@ -21099,6 +21721,20 @@
               }
             ],
             "title": "Project Id"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object",
+                "maxProperties": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties",
+            "description": "Property values, e.g. {\"client\": \"ludmyla-doula\", \"tags\": [\"website\"]}. On a change only the keys given change (null removes one); leave it out to keep them."
           }
         },
         "type": "object",
@@ -21309,6 +21945,12 @@
               }
             ],
             "description": "Who changed it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "description": "Property values"
           }
         },
         "type": "object",
@@ -22264,6 +22906,195 @@
         "type": "object",
         "title": "Limits"
       },
+      "LinkGroups": {
+        "properties": {
+          "document": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Document"
+          },
+          "task": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Task"
+          },
+          "event": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Event"
+          },
+          "chat": {
+            "items": {
+              "$ref": "#/components/schemas/LinkOut"
+            },
+            "type": "array",
+            "title": "Chat"
+          }
+        },
+        "type": "object",
+        "title": "LinkGroups",
+        "description": "Links grouped by the type of the item at the other end."
+      },
+      "LinkItem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "document",
+              "task",
+              "event",
+              "chat"
+            ],
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its canonical reference (= app URL, the Markdown link)"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Empty when it is gone for good"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "A document's path, a task's status, an event's start",
+            "default": ""
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "in_trash",
+              "deleted"
+            ],
+            "title": "State",
+            "description": "live; in_trash (a task or event in the trash); deleted (gone for good)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "ref",
+          "title",
+          "state"
+        ],
+        "title": "LinkItem",
+        "description": "An item at one end of a link, as it is now."
+      },
+      "LinkOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "document",
+              "task",
+              "event",
+              "chat"
+            ],
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its canonical reference (= app URL, the Markdown link)"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Empty when it is gone for good"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "A document's path, a task's status, an event's start",
+            "default": ""
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "in_trash",
+              "deleted"
+            ],
+            "title": "State",
+            "description": "live; in_trash (a task or event in the trash); deleted (gone for good)"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "explicit"
+            ],
+            "title": "Origin",
+            "description": "explicit: set on the task or event (can be removed); inline: a link in its text (edit the text to change it)"
+          },
+          "created_by_actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "ref",
+          "title",
+          "state",
+          "origin",
+          "created_at"
+        ],
+        "title": "LinkOut"
+      },
+      "LinkTo": {
+        "properties": {
+          "to": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "To",
+            "description": "References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to"
+        ],
+        "title": "LinkTo"
+      },
       "LinkedDocument": {
         "properties": {
           "id": {
@@ -22288,6 +23119,31 @@
         ],
         "title": "LinkedDocument"
       },
+      "LinkedEvent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "start_at"
+        ],
+        "title": "LinkedEvent"
+      },
       "LinkedTask": {
         "properties": {
           "id": {
@@ -22311,6 +23167,24 @@
           "status"
         ],
         "title": "LinkedTask"
+      },
+      "LinksOut": {
+        "properties": {
+          "links": {
+            "$ref": "#/components/schemas/LinkGroups",
+            "description": "What the item links to"
+          },
+          "backlinks": {
+            "$ref": "#/components/schemas/LinkGroups",
+            "description": "What links to it (\"Linked from\")"
+          }
+        },
+        "type": "object",
+        "required": [
+          "links",
+          "backlinks"
+        ],
+        "title": "LinksOut"
       },
       "ListingOut": {
         "properties": {
@@ -24570,6 +25444,12 @@
             ],
             "description": "Who changed it last"
           },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "description": "Property values"
+          },
           "event_id": {
             "type": "string",
             "format": "uuid",
@@ -25943,38 +26823,6 @@
         ],
         "title": "ProjectStats"
       },
-      "PropertiesIn": {
-        "properties": {
-          "set": {
-            "additionalProperties": true,
-            "type": "object",
-            "maxProperties": 50,
-            "title": "Set"
-          },
-          "base_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Hash",
-            "description": "Hash of the version being edited"
-          },
-          "create_values": {
-            "type": "boolean",
-            "title": "Create Values",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "set"
-        ],
-        "title": "PropertiesIn"
-      },
       "PropertySettings": {
         "properties": {
           "folder_defaults": {
@@ -27261,6 +28109,11 @@
             "type": "array",
             "title": "Failed",
             "default": []
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items",
+            "default": 0
           }
         },
         "type": "object",
@@ -29838,6 +30691,123 @@
         ],
         "title": "TagCount"
       },
+      "TagValueAppliedOut": {
+        "properties": {
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "tasks": {
+            "type": "integer",
+            "title": "Tasks"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "tasks",
+          "events",
+          "failed"
+        ],
+        "title": "TagValueAppliedOut"
+      },
+      "TagValueIn": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Tag"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "key",
+          "value"
+        ],
+        "title": "TagValueIn"
+      },
+      "TagValueOut": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "title": "Tag"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "value_label": {
+            "type": "string",
+            "title": "Value Label"
+          },
+          "property_label": {
+            "type": "string",
+            "title": "Property Label"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "tasks": {
+            "type": "integer",
+            "title": "Tasks"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "titles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Titles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "key",
+          "value",
+          "value_label",
+          "property_label",
+          "documents",
+          "tasks",
+          "events",
+          "titles"
+        ],
+        "title": "TagValueOut",
+        "description": "A tag that names a value of another property (`ludmyla-doula` -> client), with the\nitems that have the tag: turning it into the value is offered, never done unasked."
+      },
       "TaskFileOut": {
         "properties": {
           "path": {
@@ -30025,6 +30995,22 @@
             "maxItems": 50,
             "title": "Blocked By",
             "description": "Tasks this one waits on"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 30,
+            "title": "Properties",
+            "description": "Property values (features/properties), e.g. {\"client\": \"ludmyla-doula\"}: select values are slugs, a multi_select a list, dates YYYY-MM-DD. tags is the same list as `tags`. On a change: the keys given are set, null removes one."
+          },
+          "links": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Links",
+            "description": "References of items to link it to: /documents/<id>, /calendar?event=<id>, /tasks?task=<id>, /c/<id>"
           }
         },
         "type": "object",
@@ -30266,6 +31252,12 @@
               }
             ],
             "description": "Who changed it last"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties",
+            "description": "Property values; `tags` is the same list as tags"
           }
         },
         "type": "object",
@@ -30469,6 +31461,20 @@
               }
             ],
             "title": "Blocked By"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object",
+                "maxProperties": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties",
+            "description": "Property values (features/properties), e.g. {\"client\": \"ludmyla-doula\"}: select values are slugs, a multi_select a list, dates YYYY-MM-DD. tags is the same list as `tags`. On a change: the keys given are set, null removes one."
           },
           "subtasks": {
             "anyOf": [
@@ -32223,7 +33229,7 @@
         },
         "type": "object",
         "title": "ViewQuery",
-        "description": "What a view shows. The same shape for every object type: documents now; tasks\nand events join through `types`."
+        "description": "What a view shows. The same shape for every object type (`types`: documents,\ntasks, events, or a mix of them)."
       },
       "ViewRow": {
         "properties": {
@@ -32455,6 +33461,22 @@
         "title": "WorkspaceSettings",
         "description": "Stored in app_settings[\"workspace\"]."
       },
+      "app__features__calendar__schemas__PropertiesIn": {
+        "properties": {
+          "set": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 30,
+            "title": "Set"
+          }
+        },
+        "type": "object",
+        "required": [
+          "set"
+        ],
+        "title": "PropertiesIn",
+        "description": "Property values to set; null removes one. The others stay as they are."
+      },
       "app__features__documents__router__MoveIn": {
         "properties": {
           "name": {
@@ -32485,6 +33507,38 @@
         },
         "type": "object",
         "title": "MoveIn"
+      },
+      "app__features__documents__router__PropertiesIn": {
+        "properties": {
+          "set": {
+            "additionalProperties": true,
+            "type": "object",
+            "maxProperties": 50,
+            "title": "Set"
+          },
+          "base_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Hash",
+            "description": "Hash of the version being edited"
+          },
+          "create_values": {
+            "type": "boolean",
+            "title": "Create Values",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "set"
+        ],
+        "title": "PropertiesIn"
       },
       "app__features__documents__router__SaveIn": {
         "properties": {
