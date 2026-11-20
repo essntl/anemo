@@ -21,6 +21,7 @@ const timing = (over: Partial<RunTiming> = {}): RunTiming => ({
   finished_at: at(0),
   outcome: 'done',
   first_text_at: at(-39),
+  first_text_waiting_ms: 0,
   waiting_ms: 0,
   waiting_since: null,
   tool_calls: 3,

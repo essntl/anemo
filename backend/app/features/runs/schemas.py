@@ -20,6 +20,9 @@ class RunTiming(BaseModel):
     finished_at: datetime | None
     outcome: Outcome | None  # None while it runs
     first_text_at: datetime | None
+    # The time it had waited for you before its first text: the time to first text
+    # is `first_text_at - started_at - first_text_waiting_ms`.
+    first_text_waiting_ms: int = 0
     waiting_ms: int
     waiting_since: datetime | None
     tool_calls: int

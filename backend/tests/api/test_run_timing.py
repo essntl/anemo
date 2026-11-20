@@ -5,18 +5,20 @@ when its first text came, and the time spent waiting for the user, which is not 
 its duration. Messages carry it as `timing`; every API response carries the server's
 time, so the browser can show it on its own clock."""
 
+import importlib.util
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
-from sqlalchemy import update
+from sqlalchemy import select, text, update
 
 from app.core.db import get_sessionmaker
 from app.core.redis import get_redis
 from app.events import bus
 from app.features.conversations.models import ChatMessage
 from app.features.runs import service as runs
-from app.features.runs.models import Run
+from app.features.runs.models import Approval, Run, ToolCall
 from app.providers.base import Done, TextDelta
 from app.runtime.chat import execute_chat_run
 from app.runtime.dispatch import execute_run
@@ -293,3 +295,167 @@ async def test_tool_call_counts_are_per_run(authed):
         found = await runs.timings(db, [uuid.UUID(run_id), uuid.uuid4()])
     assert counts == {uuid.UUID(run_id): 2}
     assert list(found) == [uuid.UUID(run_id)] and found[uuid.UUID(run_id)].tool_calls == 2
+
+
+async def test_time_to_first_text_leaves_out_an_approval_before_it(authed):
+    cid = await setup(authed, **{"fs.read": "ask"})
+    script(
+        "read todo",
+        [call("read_file", path="notes/todo.md"), Done("tool_use")],  # no text before it asks
+        [TextDelta("Read it."), Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "read todo")
+    await wait_longer(run_id, 30)
+    approval = (await authed.get("/api/approvals")).json()[0]
+    await authed.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"})
+    await execute_run(uuid.UUID(run_id))
+    timing = (await reply(authed, cid))["timing"]
+    assert timing["first_text_waiting_ms"] == timing["waiting_ms"] >= 30_000 - SLACK_MS
+    first = at(timing["first_text_at"]) - at(timing["started_at"])
+    to_first_text = first.total_seconds() * 1000 - timing["first_text_waiting_ms"]
+    assert -SLACK_MS <= to_first_text < 30_000 - SLACK_MS
+
+
+async def test_an_expired_approval_ends_the_wait(authed):
+    cid = await setup(authed, **{"fs.read": "ask"})
+    script("read todo", [call("read_file", path="notes/todo.md"), Done("tool_use")])
+    run_id = await agent_turn(authed, cid, "read todo")
+    await wait_longer(run_id, 30)
+    later = datetime.now(UTC) + runs.APPROVAL_TTL + timedelta(minutes=1)
+    assert await runs.expire_stale_approvals(later) == 1
+    assert await run_status(authed, run_id) == "queued"
+    timing = (await reply(authed, cid))["timing"]
+    assert timing["waiting_since"] is None and timing["waiting_ms"] >= 30_000 - SLACK_MS
+    assert (await timing_events(run_id))[-1]["waiting_since"] is None
+
+
+async def test_stopping_a_waiting_sub_agent_ends_the_answers_wait(authed):
+    cid = await setup(authed, **{"agent.spawn": "autonomous", "fs.read": "ask"})
+    script(
+        "research notes",
+        [call("run_subagent", task="read the todo"), Done("tool_use")],
+        [TextDelta("It could not."), Done("end")],
+    )
+    script("read the todo", [call("read_file", path="notes/todo.md"), Done("tool_use")])
+    run_id = await agent_turn(authed, cid, "research notes")
+    (child,) = await children_of(authed, run_id)
+    await execute_run(uuid.UUID(child["id"]))
+    assert (await reply(authed, cid))["timing"]["waiting_since"] is not None
+    await wait_longer(run_id, 20)
+
+    await authed.post(f"/api/runs/{child['id']}/cancel")
+    assert await run_status(authed, child["id"]) == "cancelled"
+    timing = (await reply(authed, cid))["timing"]
+    assert timing["waiting_since"] is None and timing["waiting_ms"] >= 20_000 - SLACK_MS
+    assert (await run_row(child["id"])).waiting_since is None
+    assert await run_status(authed, run_id) == "queued"  # it goes on without the sub-agent
+    await execute_run(uuid.UUID(run_id))
+    assert (await reply(authed, cid))["timing"]["outcome"] == "done"
+
+
+async def test_editing_the_last_message_and_switching_versions_give_the_timing(authed):
+    await chat_models(authed)
+    cid = (await authed.post("/api/conversations", json={})).json()["id"]
+    first = (await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})).json()
+    await execute_chat_run(uuid.UUID(first["run_id"]))
+
+    r = await authed.post(f"/api/conversations/{cid}/edit-last", json={"text": "hello"})
+    edited = r.json()
+    timing = edited["assistant_message"]["timing"]
+    run = (await authed.get(f"/api/runs/{edited['run_id']}")).json()
+    assert timing["started_at"] == run["created_at"] and timing["outcome"] is None
+    await execute_chat_run(uuid.UUID(edited["run_id"]))
+    done = (await reply(authed, cid))["timing"]
+    assert done["outcome"] == "done" and done["started_at"] == timing["started_at"]
+
+    again = (await authed.post(f"/api/conversations/{cid}/regenerate")).json()
+    await execute_chat_run(uuid.UUID(again["run_id"]))
+    answer = await reply(authed, cid)
+    assert answer["timing"] != done
+    r = await authed.post(
+        f"/api/conversations/{cid}/messages/{answer['id']}/version", json={"version": 0}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["timing"] == done  # the earlier answer, with its own timing
+
+
+def load_migration_0040():
+    path = Path(__file__).parents[2] / "migrations" / "versions" / "0040_run_timing.py"
+    spec = importlib.util.spec_from_file_location("migration_0040", path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    return migration
+
+
+async def test_the_migration_gives_earlier_runs_their_waits(authed):
+    """Migration 0040 on runs from before it: waits that are over count (cut to the run,
+    overlaps merged), and runs that wait right now get `waiting_since`."""
+    migration = load_migration_0040()
+    t0 = datetime(2026, 11, 1, 9, tzinfo=UTC)
+
+    def t(s: int) -> datetime:
+        return t0 + timedelta(seconds=s)
+
+    async with get_sessionmaker()() as db:
+
+        def a_run(status: str, ended: int | None = None, changed: int = 0, **more) -> Run:
+            run = Run(kind="agent", status=status, created_at=t(0), updated_at=t(changed), **more)
+            run.ended_at = t(ended) if ended is not None else None
+            db.add(run)
+            return run
+
+        done = a_run("completed", 100)
+        cut = a_run("completed", 10)
+        root = a_run("waiting_subagent")
+        paused = a_run("paused", changed=50)
+        await db.flush()
+        asking = a_run("waiting_approval", parent_run_id=root.id, root_run_id=root.id)
+        finished_child = a_run("completed", 50, parent_run_id=root.id, root_run_id=root.id)
+        await db.flush()
+
+        async def asked(run: Run, start: int, end: int | None, status: str, changed: int) -> None:
+            row = ToolCall(run_id=run.id, step=0, position=0, provider_call_id="c", tool_name="x")
+            db.add(row)
+            await db.flush()
+            decided = t(end) if end is not None else None
+            db.add(
+                Approval(
+                    run_id=run.id,
+                    tool_call_id=row.id,
+                    status=status,
+                    summary="s",
+                    created_at=t(start),
+                    updated_at=t(changed),
+                    decided_at=decided,
+                )
+            )
+
+        await asked(done, 10, 20, "approved", 20)  # 10 s
+        await asked(done, 25, None, "expired", 30)  # ended with its run, no answer: 5 s
+        await asked(cut, 5, 60, "approved", 60)  # answered after the run ended: 5 s
+        await asked(asking, 5, 15, "approved", 15)
+        await asked(finished_child, 10, 18, "denied", 18)  # overlaps the one above
+        await asked(asking, 40, None, "pending", 40)  # waits now
+        await db.commit()
+
+        ids = [done.id, cut.id, root.id, asking.id, finished_child.id, paused.id]
+        for _ in range(2):  # running it again changes nothing
+            for statement in migration.BACKFILL:
+                await db.execute(text(statement))
+            await db.commit()
+            found = {
+                r.id: r
+                for r in await db.scalars(
+                    select(Run).where(Run.id.in_(ids)).execution_options(populate_existing=True)
+                )
+            }
+            assert found[done.id].waiting_ms == 15_000
+            assert found[cut.id].waiting_ms == 5_000
+            assert found[root.id].waiting_ms == 13_000  # 5..18 s, merged
+            assert found[root.id].waiting_since == t(40)  # its sub-agent asks now
+            assert found[asking.id].waiting_ms == 10_000
+            assert found[asking.id].waiting_since == t(40)
+            assert found[finished_child.id].waiting_ms == 8_000
+            assert found[paused.id].waiting_since == t(50)
+            assert found[done.id].waiting_since is None

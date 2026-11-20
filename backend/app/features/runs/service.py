@@ -138,6 +138,7 @@ def run_timing(run: Run, tool_calls: int) -> RunTiming:
         finished_at=run.ended_at,
         outcome=OUTCOMES.get(run.status),
         first_text_at=run.first_text_at,
+        first_text_waiting_ms=run.first_text_waiting_ms or 0,
         waiting_ms=run.waiting_ms or 0,
         waiting_since=run.waiting_since,
         tool_calls=tool_calls,
@@ -172,12 +173,25 @@ async def timings(db: AsyncSession, run_ids: Iterable[uuid.UUID]) -> dict[uuid.U
                 Run.created_at,
                 Run.ended_at,
                 Run.first_text_at,
+                Run.first_text_waiting_ms,
                 Run.waiting_ms,
                 Run.waiting_since,
             )
         )
     )
     return {run.id: run_timing(run, counts.get(run.id, 0)) for run in found}
+
+
+def note_first_text(run: Run, at: datetime) -> None:
+    """Record when the answer's first text came (once), and how long the run had waited
+    for the user by then, which is not part of its time to first text."""
+    if run.first_text_at is not None:
+        return
+    run.first_text_at = at
+    waited = run.waiting_ms or 0
+    if run.waiting_since is not None and run.waiting_since < at:
+        waited += int((at - run.waiting_since).total_seconds() * 1000)
+    run.first_text_waiting_ms = waited
 
 
 def waiting_payload(run: Run) -> dict[str, Any]:

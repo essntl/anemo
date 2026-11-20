@@ -92,6 +92,8 @@ class Run(Base, IdMixin, TimestampMixin):
     # the time spent waiting for the user (approvals, questions, a pause), which is not
     # part of how long the answer took. `waiting_since` is set while it waits now.
     first_text_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # How long it had waited for the user by then (not part of the time to first text).
+    first_text_waiting_ms: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     waiting_ms: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     waiting_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

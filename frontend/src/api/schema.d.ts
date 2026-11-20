@@ -7049,6 +7049,11 @@ export interface components {
             outcome: ("done" | "stopped" | "failed") | null;
             /** First Text At */
             first_text_at: string | null;
+            /**
+             * First Text Waiting Ms
+             * @default 0
+             */
+            first_text_waiting_ms: number;
             /** Waiting Ms */
             waiting_ms: number;
             /** Waiting Since */

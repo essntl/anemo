@@ -27,10 +27,12 @@ export function durationMs(timing: RunTiming): number | null {
   return Math.max(Date.parse(timing.finished_at) - Date.parse(timing.started_at) - timing.waiting_ms, 0)
 }
 
-/** How long it took until the first text of the answer arrived (null: no text). */
+/** How long it took until the first text of the answer arrived, without the time it
+ *  waited for you before that (null: no text). */
 export function firstTextMs(timing: RunTiming): number | null {
   if (!timing.first_text_at) return null
-  return Math.max(Date.parse(timing.first_text_at) - Date.parse(timing.started_at), 0)
+  const waited = timing.first_text_waiting_ms
+  return Math.max(Date.parse(timing.first_text_at) - Date.parse(timing.started_at) - waited, 0)
 }
 
 /** The time it waited for you in all, up to `now` (the server's time) if it waits now. */

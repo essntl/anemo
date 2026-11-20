@@ -7,6 +7,7 @@ const timing = (over: Partial<RunTiming> = {}): RunTiming => ({
   finished_at: null,
   outcome: null,
   first_text_at: null,
+  first_text_waiting_ms: 0,
   waiting_ms: 0,
   waiting_since: null,
   tool_calls: 0,
@@ -18,6 +19,8 @@ describe('answer timing', () => {
     const done = timing({ finished_at: at(50), waiting_ms: 9_000, first_text_at: at(2), outcome: 'done' })
     expect(durationMs(done)).toBe(41_000)
     expect(firstTextMs(done)).toBe(2_000)
+    // It asked for an approval before writing anything: that wait is not counted.
+    expect(firstTextMs(timing({ first_text_at: at(40), first_text_waiting_ms: 35_000 }))).toBe(5_000)
     expect(durationMs(timing())).toBeNull()
     expect(firstTextMs(timing())).toBeNull()
   })
