@@ -426,15 +426,21 @@ async def test_a_near_duplicate_value_is_refused_with_a_suggestion(authed, docs)
     ts = await project(authed, "Tech Services")
     await client_property(authed, ts["id"], "Ludmyla Doula")
     doc = await new_doc(authed, "Brief", "tech-services", tags=["website"])
+    result = await run(
+        doc_tools.SetDocumentProperties, documents=[doc["path"]], set={"client": "Ludmyla"}
+    )
+    assert result.is_error, result.content
+    assert "'Ludmyla' is not one of its values (closest: ludmyla-doula)" in result.content
+    assert result.data["errors"][0]["suggestions"] == ["ludmyla-doula"]
+    # Spelled nearly like an existing value: refused even when adding values is asked for.
     for create_value in (False, True):
         result = await run(
             doc_tools.SetDocumentProperties,
             documents=[doc["path"]],
-            set={"client": "Ludmyla"},
+            set={"client": "Ludmila Doula"},
             create_value=create_value,
         )
-        assert result.is_error, result.content
-        assert "nearly an existing value: ludmyla-doula" in result.content
+        assert result.is_error and "nearly an existing value: ludmyla-doula" in result.content
         assert result.data["errors"][0]["suggestions"] == ["ludmyla-doula"]
     near_tag = await run(
         doc_tools.SetDocumentProperties, documents=[doc["id"]], set={"tags": ["websites"]}
@@ -960,3 +966,55 @@ async def test_approvals_name_the_document_an_id_or_old_path_stands_for(authed, 
     write = doc_tools.WriteDocument()
     [action] = write.actions(write.Input(path="documents/clients/brief.md", content="# New"), ctx())
     assert action.resource == "documents/clients/brief.md"
+
+
+async def test_new_values_that_only_resemble_existing_ones_are_allowed(authed, docs):
+    doc = await new_doc(authed, "Contract", "", tags=["legal", "invoice-2025"])
+    result = await run(
+        doc_tools.SetDocumentProperties,
+        documents=[doc["id"]],
+        set={"tags": ["legal", "legal-review", "invoice-2026"]},
+    )
+    assert not result.is_error, result.content
+    assert "'legal-review' is a new value; similar existing ones: legal" in result.content
+    assert (await doc_row(doc["id"])).properties["tags"] == [
+        "legal",
+        "legal-review",
+        "invoice-2026",
+    ]
+
+
+async def test_agent_saves_get_the_same_value_checks(authed, docs):
+    ts = await project(authed, "Tech Services")
+    await client_property(authed, ts["id"], "Ludmyla Doula")
+    await new_doc(authed, "Site", "tech-services", tags=["website"])
+    refused = await run(
+        doc_tools.WriteDocument,
+        path="documents/tech-services/new.md",
+        content="---\ntags: [websites]\n---\n# New\n",
+    )
+    assert refused.is_error and "nearly an existing value: website" in refused.content
+    assert not (docs / "tech-services" / "new.md").exists()
+    ok = await run(
+        doc_tools.WriteDocument,
+        path="documents/tech-services/new.md",
+        content="---\ntags: [website, seo]\n---\n# New\n",
+    )
+    assert not ok.is_error, ok.content
+    edit = await run(
+        doc_tools.EditDocument,
+        path="documents/tech-services/new.md",
+        old_text="tags: [website, seo]",
+        new_text="tags: [website, seo]\nclient: Ludmila Doula",
+    )
+    assert edit.is_error and "nearly an existing value: ludmyla-doula" in edit.content
+    assert "client" not in (docs / "tech-services" / "new.md").read_text()
+    # A value the text already had doesn't stop an unrelated edit (hand-made front matter).
+    (docs / "tech-services" / "new.md").write_text("---\ntype: novel\n---\n# New\n\nText.\n")
+    again = await run(
+        doc_tools.EditDocument,
+        path="documents/tech-services/new.md",
+        old_text="Text.",
+        new_text="More.",
+    )
+    assert not again.is_error and "can't be read" in again.content

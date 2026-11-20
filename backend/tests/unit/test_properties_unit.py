@@ -7,7 +7,7 @@ from app.core.errors import AppError
 from app.features.documents.models import Document
 from app.features.properties import frontmatter
 from app.features.properties.filters import property_conditions
-from app.features.properties.service import is_near, normalise
+from app.features.properties.service import extends, is_near, normalise
 
 
 def test_front_matter_is_read_and_broken_yaml_is_reported_not_raised():
@@ -55,7 +55,10 @@ def test_near_duplicates():
     assert normalise("Ludmyla Doula") == "ludmyla-doula"
     assert normalise("  Юридичне  питання ") == "юридичне-питання"
     assert normalise("a__b--c") == "a-b-c"
-    assert is_near("ludmyla", "ludmyla-doula")  # the first words of an existing value
+    assert not is_near("ludmyla", "ludmyla-doula") and extends("ludmyla", "ludmyla-doula")
+    assert not is_near("legal-review", "legal")  # more words: another value
+    assert not is_near("invoice-2025", "invoice-2026") and not is_near("q1-2026", "q2-2026")
+    assert is_near("ludmila-doula", "ludmyla-doula")
     assert is_near("lgeal", "legal") and is_near("websites", "website")  # spelling
     assert not is_near("legal", "legal")  # equal is not "near"
     assert not is_near("web", "web-design")  # short values are only compared exactly

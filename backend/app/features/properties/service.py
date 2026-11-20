@@ -47,10 +47,11 @@ SELECT_TYPES = ("select", "multi_select")
 APPLIES_TO: tuple[ObjectType, ...] = ("document", "task", "event")
 
 MAX_TEXT = 2000
-# Near-duplicates: two values whose normal forms are this similar (difflib ratio), or
-# where one is the first words of the other ("ludmyla" / "ludmyla-doula").
+# Near-duplicates: two values whose normal forms are this similar (difflib ratio), unless
+# they differ only in digits ("q1-2026" / "q2-2026").
 NEAR_RATIO = 0.8
 NEAR_MIN_CHARS = 4  # shorter values are only compared exactly ("ui" / "ux" are fine)
+_DIGITS = re.compile(r"\d+")
 
 KEY_PATTERN = r"^[a-z][a-z0-9_-]{0,59}$"
 RESERVED_KEYS = frozenset({"title"})  # front matter keys with another meaning
@@ -112,11 +113,17 @@ def is_near(a: str, b: str) -> bool:
         return False
     if min(len(a), len(b)) < NEAR_MIN_CHARS:
         return False
-    if difflib.SequenceMatcher(None, a, b).ratio() >= NEAR_RATIO:
-        return True
+    if _DIGITS.sub("", a) == _DIGITS.sub("", b):
+        return False  # only digits differ: invoice-2025 and invoice-2026 are two things
+    return difflib.SequenceMatcher(None, a, b).ratio() >= NEAR_RATIO
+
+
+def extends(a: str, b: str) -> bool:
+    """Whether one value's words begin the other's (`legal` and `legal-review`): not a
+    near-duplicate, but worth mentioning when one of them is new."""
     wa, wb = a.split("-"), b.split("-")
     shorter, longer = (wa, wb) if len(wa) <= len(wb) else (wb, wa)
-    return longer[: len(shorter)] == shorter
+    return a != b and longer[: len(shorter)] == shorter
 
 
 @dataclass
@@ -248,12 +255,15 @@ class _Check:
         *,
         create_values: bool,
         from_file: bool,
+        check_near: bool,
     ) -> None:
         self.db = db
         self.props = props
         self.create_values = create_values
         self.from_file = from_file
+        self.check_near = check_near
         self.problems: list[Problem] = []
+        self.notes: list[str] = []  # new values that resemble existing ones
 
     def fail(
         self, key: str, value: Any, message: str, suggestions: list[str] | None = None
@@ -269,7 +279,7 @@ class _Check:
             return found.slug
         near = prop.near(value)
         allowed = prop.definition.open_vocabulary or self.create_values
-        if near and not self.from_file:
+        if near and self.check_near:
             names = ", ".join(o.slug for o in near)
             self.fail(
                 prop.key,
@@ -301,6 +311,11 @@ class _Check:
         )
         self.db.add(option)
         prop.options.append(option)
+        similar = [o.slug for o in prop.options if o is not option and extends(slug, o.slug)]
+        if similar:
+            self.notes.append(
+                f"{prop.key}: '{slug}' is a new value; similar existing ones: {', '.join(similar)}"
+            )
         return slug
 
     async def value(self, prop: Prop, value: Any) -> Any:
@@ -395,9 +410,12 @@ async def _check(
     *,
     create_values: bool,
     from_file: bool,
-) -> tuple[dict[str, Any], list[Problem]]:
+    check_near: bool,
+) -> tuple[dict[str, Any], list[Problem], list[str]]:
     props = await load(db)
-    check = _Check(db, props, create_values=create_values, from_file=from_file)
+    check = _Check(
+        db, props, create_values=create_values, from_file=from_file, check_near=check_near
+    )
     out: dict[str, Any] = {}
     for key, value in values.items():
         prop = props.get(key)
@@ -426,9 +444,33 @@ async def _check(
         if len(check.problems) == before:
             out[key] = normalised
     if check.problems:
-        return {}, check.problems
+        return {}, check.problems, []
     await db.flush()
-    return out, []
+    return out, [], check.notes
+
+
+async def validate_noting(
+    db: AsyncSession,
+    object_type: str,
+    project_id: uuid.UUID | None,
+    values: dict[str, Any],
+    *,
+    create_values: bool = False,
+) -> tuple[dict[str, Any], list[str]]:
+    """As validate(), with notes about new values that resemble existing ones
+    (`legal-review` next to `legal`): allowed, but worth telling."""
+    out, problems, notes = await _check(
+        db,
+        object_type,
+        project_id,
+        values,
+        create_values=create_values,
+        from_file=False,
+        check_near=True,
+    )
+    if problems:
+        _raise(problems)
+    return out, notes
 
 
 async def validate(
@@ -440,19 +482,43 @@ async def validate(
     create_values: bool = False,
 ) -> dict[str, Any]:
     """The values, checked and normalised (slugs for select values, "YYYY-MM-DD" dates,
-    numbers, booleans). A None (or empty) value means "remove the key" and stays None.
+    finite numbers, booleans). A None (or empty) value means "remove the key" and
+    stays None.
 
     Raises AppError code "property_invalid", with `details.errors` listing each
     problem and the closest existing values. Unknown keys, values not in a closed
     list (unless `create_values`) and near-duplicates are refused. New values of an
     open vocabulary (`tags`), and with `create_values` of a closed list, are created
     (flushed, not committed: the caller's change commits them)."""
-    out, problems = await _check(
-        db, object_type, project_id, values, create_values=create_values, from_file=False
+    out, _ = await validate_noting(db, object_type, project_id, values, create_values=create_values)
+    return out
+
+
+async def check_written(
+    db: AsyncSession,
+    object_type: str,
+    project_id: uuid.UUID | None,
+    before: dict[str, Any],
+    after: dict[str, Any],
+) -> list[str]:
+    """Front matter an agent is about to save: the properties it changes must be valid
+    and must not be near-duplicates of existing values (as set_document_properties
+    checks them). Other keys, and values the text already had, are left alone (a file
+    edited by hand keeps whatever it says). Raises AppError code property_invalid;
+    returns notes about new values that resemble existing ones."""
+    changed = {k: v for k, v in after.items() if before.get(k) != v}
+    _, problems, notes = await _check(
+        db,
+        object_type,
+        project_id,
+        changed,
+        create_values=False,
+        from_file=True,
+        check_near=True,
     )
     if problems:
         _raise(problems)
-    return out
+    return notes
 
 
 async def from_front_matter(
@@ -461,8 +527,14 @@ async def from_front_matter(
     """The properties a file's front matter gives, or ({}, why not) when they are not
     valid. Keys without a definition are left alone (other programs' front matter);
     new tags written by hand are added to the vocabulary."""
-    out, problems = await _check(
-        db, object_type, project_id, meta, create_values=False, from_file=True
+    out, problems, _ = await _check(
+        db,
+        object_type,
+        project_id,
+        meta,
+        create_values=False,
+        from_file=True,
+        check_near=False,
     )
     if problems:
         return {}, " ".join(

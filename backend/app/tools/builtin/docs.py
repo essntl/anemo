@@ -440,6 +440,24 @@ async def _record(ctx: ToolContext, path: str, before: str | None, after: str, b
     )
 
 
+async def _check_front_matter(
+    db: AsyncSession, path: str, before: str | None, after: str
+) -> list[str]:
+    """The properties an agent's text sets are checked like set_document_properties
+    checks them (unknown values and near-duplicates are refused, nothing is written).
+    Returns notes about new values that resemble existing ones."""
+    written = frontmatter.parse(after)
+    if written.error:
+        return []  # saved as it is, with a warning on the document
+    earlier = frontmatter.parse(before).meta if before else {}
+    project_id = await meta.project_for_path(db, path)
+    return await properties.check_written(db, "document", project_id, earlier, written.meta)
+
+
+def _notes(notes: list[str]) -> str:
+    return "".join(f"\nNote: {n}." for n in notes)
+
+
 def _warning(doc: Document) -> str:
     if not doc.properties_error:
         return ""
@@ -481,13 +499,14 @@ class WriteDocument(Tool):
                 await service.reconcile(db)
                 doc = await service.by_path(db, path)
                 if doc is None:
+                    notes = await _check_front_matter(db, path, None, args.content)
                     content = await doc_properties.with_defaults(
                         db, path, args.content, args.properties
                     )
                     doc = await service.create(db, path, content, author="agent", run_id=ctx.run_id)
                     await _record(ctx, path, None, doc.content_hash, None)
                     return ToolResult(
-                        content=f"Created {path} (link {link(doc)}){_warning(doc)}",
+                        content=f"Created {path} (link {link(doc)}){_warning(doc)}{_notes(notes)}",
                         data={"path": path, "op": "create"},
                     )
                 if not args.overwrite:
@@ -497,6 +516,7 @@ class WriteDocument(Tool):
                         is_error=True,
                     )
                 content = args.content
+                notes = await _check_front_matter(db, path, await service.read(db, doc), content)
                 if args.properties:
                     project_id = await meta.project_for_path(db, path)
                     values = await properties.validate(db, "document", project_id, args.properties)
@@ -510,7 +530,7 @@ class WriteDocument(Tool):
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
         return ToolResult(
-            content=f"Replaced {path} (link {link(doc)}){_warning(doc)}",
+            content=f"Replaced {path} (link {link(doc)}){_warning(doc)}{_notes(notes)}",
             data={"path": path, "op": "modify"},
         )
 
@@ -572,6 +592,7 @@ class EditDocument(Tool):
                         is_error=True,
                     )
                 updated = content.replace(args.old_text, args.new_text)
+                notes = await _check_front_matter(db, path, content, updated)
                 before = doc.content_hash
                 backup = await asyncio.to_thread(_backup, files.resolve(path))
                 doc = await service.save(
@@ -583,7 +604,7 @@ class EditDocument(Tool):
         moved = f" {found.note}" if found.note else ""
         return ToolResult(
             content=f"Edited {path} ({count} replacement{'s' if count != 1 else ''}; "
-            f"link {link(doc)}).{moved}{_warning(doc)}",
+            f"link {link(doc)}).{moved}{_warning(doc)}{_notes(notes)}",
             data={"path": path, "op": "modify"},
         )
 
@@ -657,12 +678,13 @@ class SetDocumentProperties(Tool):
                     dict.fromkeys([(await paths.resolve(db, ref)).doc.id for ref in args.documents])
                 )
                 normalised: dict[str, Any] = {}
+                notes: list[str] = []
                 # Check every document first, so a bad value changes nothing at all.
                 for doc_id in ids:
                     checked = await service.get(db, doc_id)
                     frontmatter.update(await service.read(db, checked), {})  # readable block
                     project_id = await meta.project_for_path(db, checked.path)
-                    normalised = await properties.validate(
+                    normalised, notes = await properties.validate_noting(
                         db, "document", project_id, changes, create_values=args.create_value
                     )
                 await db.rollback()  # values the check made are made again when used
@@ -697,7 +719,10 @@ class SetDocumentProperties(Tool):
                 await db.commit()
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True, data=_problems(exc))
-        return ToolResult(content="Properties now:\n" + "\n".join(done), data={"count": len(done)})
+        return ToolResult(
+            content="Properties now:\n" + "\n".join(done) + _notes(notes),
+            data={"count": len(done)},
+        )
 
 
 def _problems(exc: AppError) -> dict[str, Any] | None:
