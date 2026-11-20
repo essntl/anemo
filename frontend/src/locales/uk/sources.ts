@@ -29,6 +29,9 @@ const messages: Messages = {
   "Last synced {when}": "Остання синхронізація: {when}",
   "You changed it by hand {when}": "Ви змінили це вручну: {when}",
   "Detach from source": "Від’єднати від джерела",
+  "Event not found. It may have been deleted.": "Подію не знайдено. Можливо, її видалено.",
+  "This event is in the trash.": "Ця подія в кошику.",
+  "Open the trash": "Відкрити кошик",
 }
 
 export default messages

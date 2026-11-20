@@ -29,6 +29,9 @@ const messages: Messages = {
   "Last synced {when}": "Последняя синхронизация: {when}",
   "You changed it by hand {when}": "Вы изменили это вручную: {when}",
   "Detach from source": "Отсоединить от источника",
+  "Event not found. It may have been deleted.": "Событие не найдено. Возможно, оно удалено.",
+  "This event is in the trash.": "Это событие в корзине.",
+  "Open the trash": "Открыть корзину",
 }
 
 export default messages

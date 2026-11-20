@@ -32,6 +32,11 @@ test("an event's link opens it, and a task says who made it", async ({ page }) =
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(page).not.toHaveURL(/event=/)
 
+    // A link to an event that isn't there says so, above the calendar, and nothing opens.
+    await page.goto('/calendar?event=00000000-0000-7000-8000-000000000000')
+    await expect(page.getByRole('status').getByText('Event not found. It may have been deleted.')).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
     await page.goto(`/tasks?task=${task.id}`)
     await expect(page.getByRole('dialog').getByText('Created by you.')).toBeVisible()
   } finally {

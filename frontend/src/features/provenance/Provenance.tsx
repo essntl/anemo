@@ -67,7 +67,7 @@ export function SourceBadge({ item, className }: { item: Synced; className?: str
   }
   return (
     // A link to another site: opened in a new tab, on a click only.
-    <a href={item.source_url} target="_blank" rel="noopener noreferrer" title={t('{title} – open the original', { title })}
+    <a href={item.source_url} target="_blank" rel="noopener noreferrer" data-source-link title={t('{title} – open the original', { title })}
       onClick={(e) => e.stopPropagation()} className={cn(look, 'hover:bg-surface-hover hover:text-text')}>
       <RefreshCw aria-hidden className="h-2.5 w-2.5 shrink-0" /><span className="truncate">{name}</span>
       <ExternalLink aria-hidden className="h-2.5 w-2.5 shrink-0" />

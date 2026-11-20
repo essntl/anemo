@@ -29,3 +29,10 @@ export function actorLabel(actor: Actor): string {
       return t('You')
   }
 }
+
+/**
+ * Whether a click landed on a source badge's link: the calendar then lets the link open
+ * the original instead of opening the event (its own click handler sees the click first).
+ */
+export const onSourceLink = (target: EventTarget | null): boolean =>
+  target instanceof Element && target.closest('[data-source-link]') !== null
