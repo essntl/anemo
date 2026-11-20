@@ -146,6 +146,19 @@ other, not at the same time.
     clean tags through properties, a shared bounded lookup helper, wording and the
     downgrade note, cheaper reconcile on link GETs
 
+## Wave 3 preparation
+
+- `anemo-progress/bin/w3_migrations.py` (run with `w3_run.sh`) checks the migrations.
+  It runs every migration from zero on an empty database, rolls each back one step at a
+  time, and applies them again. It does the same on a database seeded at 0034 with
+  documents (with and without front matter, one broken, an Obsidian-style one, a daily
+  note), tasks with tags, events with links, a trashed task, an old automation with JSON
+  state, and a chat. It then runs the app's reconcile and checks the index, then rolls
+  back and up again.
+- First run on the head after wave 1 (0052): all OK except one bug. 0045's state note
+  grew a "note: " prefix on each rollback and reapply. The orchestrator fixed it
+  (306da8a) and extended B1's migration test. To re-run after A3 and B2 are merged.
+
 ## Open questions for the user
 
 1. **A server-side guard against customer contact details** in events and notifications
