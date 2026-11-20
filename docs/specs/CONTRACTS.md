@@ -253,7 +253,8 @@ The canonical store is `runs` and `tool_calls`. Messages reach their timing thro
 - **New columns on `runs`** (T):
   - `first_text_at` timestamptz, nullable
   - `waiting_ms` BigInteger, NOT NULL, default 0: the total time spent waiting for the
-    user (approvals, `ask_user`)
+    user (approvals, `ask_user`, and `paused`, which waits for the user to resume; a
+    top-level run also waits while one of its sub-agents waits) (change 2)
   - `waiting_since` timestamptz, nullable: set while waiting now
 - **`tool_calls.started_at` / `ended_at`** exist already. T makes sure every finished
   call gets `ended_at`, including cancelled ones in `agent_finalize.finalize`, and that
@@ -443,3 +444,6 @@ settled.
 - Change 1 (wave 1, after the A1 review): `external_key_tombstones`, so that purging a
   synced item from the trash doesn't let a sync recreate it. A1 builds it in its
   existing migration range (0035–0039). No other package is affected.
+- Change 2 (wave 1, after the T review): `waiting_ms` also counts `paused` time, and a
+  top-level run waits while one of its sub-agents waits. B2 shows the duration as
+  `finished_at − started_at − waiting_ms` and needs nothing else.

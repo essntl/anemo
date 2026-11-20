@@ -99,6 +99,7 @@ fill-ins in `packages.md`).
 | # | When | Change | Why | Affected |
 |---|---|---|---|---|
 | 1 | W1, A1 review | `external_key_tombstones`: purging a synced item from the trash keeps its key | Spec 01 1.2: "If I deleted a synced event, an automation must not recreate it"; the purge freed the key | A1 only |
+| 2 | W1, T review | `waiting_ms` counts `paused` and a waiting sub-agent | The run waits for the user then too, and the UI says so | T (done); B2 reads it |
 
 ## Stop (2026-11-20)
 
@@ -139,3 +140,18 @@ other, not at the same time.
   Accepted as is: the external actor is inferred from `author == "external"` (the same
   result as `acting_as(EXTERNAL)`), and the one-line change in `search/service.py`
   required by contract section 2.
+- **A1** fixes checked by the orchestrator (3 commits); merged as ac85f41.
+- **T** (first review): no blockers. Sent back:
+  - the clock offset taken from the receive time, not the midpoint (slow requests
+    skewed it)
+  - the migration sets `waiting_since` for runs waiting or paused at upgrade time, and
+    counts expired approvals
+  - the timer kept out of the `role=status` live region
+  - "time to first text" without the waiting
+  - the popover's accessibility and touch handling
+  - the timer next to the agent's "Working…" indicator, as the spec asks
+  - one duration per shell row
+  - timing tests for `edit_last`/`select_version`, approval expiry and cancelling a
+    waiting sub-agent
+
+  Accepted: `paused` counts as waiting (contract change 2).
