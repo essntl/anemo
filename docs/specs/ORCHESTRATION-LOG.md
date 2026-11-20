@@ -13,7 +13,7 @@ Whoever resumes this work continues from this log.
 | 1 | T Response timer | `feat/t` | `../anemo-t` | **merged** (230371b; 0040 re-chained onto 0036); after the merge: backend `all` and the frontend checks (474 tests) green |
 | 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | **merged** (956a65f; 0045 re-chained onto 0040); after the merge: backend `all` and the frontend checks (482 tests) green |
 | 2 | A3 Tasks and events join in | `feat/a3` | `../anemo-a3` | built (3 commits, suite green); in review |
-| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | reviewed; builder fixing the review findings |
+| 2 | B2 Automations with sources | `feat/b2` | `../anemo-b2` | fixes done (5 commits, suite green, new migration 0070); waiting to merge after A3 |
 
 - **Merge order:** A1, T, B1, A2; then A3, B2.
 - **Progress notes:** `C:\Users\user\Documents\Projects\anemo-progress\<id>.md` (outside the repo).
@@ -143,6 +143,10 @@ other, not at the same time.
    from untrusted tool results word for word. It misses paraphrases, and it can match by
    mistake when a customer's name is the user's own. This is a design addition, so the
    user decides.
+3. **Approval summaries are cut at 500 characters** (`Approval.summary` String(500)).
+   Setting up the artemk automation shows the tools and the checks, but not "run anyway
+   every 6 h" or the prompt; the user reads those in the chat. A wider column or a card
+   with the full arguments would fix it, if wanted.
 2. **Residual risk, accepted:** the contact rule trusts an MCP server's
    `readOnlyHint`. A server that marks a contacting tool as read-only, and that the
    user has set to "allow", could run without asking. MCP tools ask by default.
