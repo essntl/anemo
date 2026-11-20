@@ -7,11 +7,11 @@ Whoever resumes this work continues from this log.
 
 | Wave | Package | Branch | Worktree | Status |
 |---|---|---|---|---|
-| 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done; waiting for the user's backup |
-| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | worktree created, not started |
-| 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | worktree created, not started |
-| 1 | T Response timer | `feat/t` | `../anemo-t` | worktree created, not started |
-| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | worktree created, not started |
+| 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done |
+| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | building (started 2026-11-20) |
+| 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | building (started 2026-11-20) |
+| 1 | T Response timer | `feat/t` | `../anemo-t` | building (started 2026-11-20) |
+| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | building (started 2026-11-20) |
 | 2 | A3 Tasks and events join in | `feat/a3` | — | after A1, T, B1, A2 are merged |
 | 2 | B2 Automations with sources | `feat/b2` | — | after A1, T, B1, A2 are merged |
 
@@ -75,8 +75,8 @@ The runner is `anemo-progress/bin/anemo-test.sh <id> all|check|pytest|gen-api`; 
 
 ### Open (needs the user)
 
-1. **A backup of the live database.** The user said it is not done yet (2026-11-20).
-   Wave 1 waits for it.
+1. ~~A backup of the live database~~: the user confirmed it is done (2026-11-20), and
+   wave 1 started.
 
 ### Wave 1 briefings
 
