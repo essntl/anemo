@@ -110,6 +110,10 @@ const messages: Messages = {
   "Apply to {title}": "Застосувати до {title}",
   "{n} suggested property change to review | {n} suggested property changes to review": "{n} запропонована зміна властивостей на перегляд | {n} запропоновані зміни властивостей на перегляд | {n} запропонованих змін властивостей на перегляд",
   "{n} document changed. | {n} documents changed.": "Змінено {n} документ. | Змінено {n} документи. | Змінено {n} документів.",
+  "Not changed yet: these documents can’t be rewritten. Fix them and try again. {list}": "Поки нічого не змінено: ці документи неможливо перезаписати. Виправте їх і спробуйте ще раз. {list}",
+  "Pinned": "Закріплено",
+  "Not grouped": "Без групування",
+  "Grouped by {property}": "Групувати за: {property}",
 }
 
 export default messages
