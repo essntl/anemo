@@ -14669,6 +14669,60 @@
         }
       }
     },
+    "/api/automations/tools": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Tool Catalog",
+        "description": "The tools its runs can be given: the built-in ones and those of the connected MCP\nservers (by the names runs call them).",
+        "operationId": "tool_catalog_api_automations_tools_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationToolOut"
+                  },
+                  "title": "Response Tool Catalog Api Automations Tools Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/automations/{automation_id}": {
       "get": {
         "tags": [
@@ -19345,6 +19399,9 @@
               }
             ],
             "title": "Error"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/RunTiming"
           }
         },
         "type": "object",
@@ -19356,7 +19413,8 @@
           "outcome_line",
           "nothing_to_do",
           "conversation_id",
-          "error"
+          "error",
+          "timing"
         ],
         "title": "AutomationRunOut",
         "description": "One run in an automation's run log."
@@ -19379,6 +19437,41 @@
         "type": "object",
         "title": "AutomationSettings",
         "description": "Protections for runs that start by themselves (Automations, the schedule tools)."
+      },
+      "AutomationToolOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "capability"
+        ],
+        "title": "AutomationToolOut",
+        "description": "A tool an automation's runs can be given (catalog.tools)."
       },
       "Backlinks": {
         "properties": {

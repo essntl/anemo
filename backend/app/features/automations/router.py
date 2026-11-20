@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.api.deps import Db, client_ip
 from app.core.errors import Conflict
 from app.features.audit import service as audit
-from app.features.automations import service
+from app.features.automations import catalog, service
 from app.features.automations.models import Automation
 from app.features.automations.schedule import describe, upcoming
 from app.features.automations.schemas import (
@@ -18,6 +18,7 @@ from app.features.automations.schemas import (
     AutomationOut,
     AutomationPatch,
     AutomationRunOut,
+    AutomationToolOut,
     RunStarted,
     SchedulePreviewIn,
     SchedulePreviewOut,
@@ -40,6 +41,13 @@ async def schedule_preview(body: SchedulePreviewIn) -> SchedulePreviewOut:
     return SchedulePreviewOut(
         text=describe(body.schedule), next_runs=upcoming(body.schedule, datetime.now(UTC), 5)
     )
+
+
+@router.get("/tools", response_model=list[AutomationToolOut])
+async def tool_catalog(db: Db) -> list[AutomationToolOut]:
+    """The tools its runs can be given: the built-in ones and those of the connected MCP
+    servers (by the names runs call them)."""
+    return await catalog.tools(db)
 
 
 @router.post("", response_model=AutomationOut, status_code=201)

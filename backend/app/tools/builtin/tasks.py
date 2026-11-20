@@ -371,7 +371,7 @@ class CreateTask(Tool):
                 text = src.taken(
                     exc, line=existing, update_tool="update_task", trash_place="Tasks > Trash"
                 )
-                return ToolResult(content=text, data={"existing": exc.details})
+                return ToolResult(content=text, data={"existing": exc.details}, changed=False)
             except (AppError, ValueError) as exc:
                 return ToolResult(
                     content=getattr(exc, "message", str(exc)),

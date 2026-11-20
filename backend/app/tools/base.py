@@ -90,6 +90,9 @@ class ToolResult(BaseModel):
     is_error: bool = False
     data: dict[str, Any] | None = None  # structured extras for the UI (never sent to the model)
     images: list[str] = []  # attachment ids shown to the model right after this result
+    # Whether this call changed something; None: as `Tool.changes(args)` says. False for a
+    # write that was refused without an error (e.g. a create whose external key is taken).
+    changed: bool | None = None
 
 
 class Tool(ABC):

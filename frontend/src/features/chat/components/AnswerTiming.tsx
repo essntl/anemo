@@ -32,9 +32,10 @@ export function LiveTiming({ timing, paused = false }: { timing: RunTiming; paus
 
 /**
  * How long a finished answer took ("41 s"), quiet beside its model; a stopped or failed
- * one says so. Hovering or clicking shows the details.
+ * one says so. Hovering or clicking shows the details. `label`: what a screen reader
+ * hears first (e.g. for a run rather than an answer).
  */
-export function AnswerDuration({ timing }: { timing: RunTiming }) {
+export function AnswerDuration({ timing, label: spoken }: { timing: RunTiming; label?: string }) {
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
   const open = pinned || hovered
@@ -63,7 +64,7 @@ export function AnswerDuration({ timing }: { timing: RunTiming }) {
         onClick={() => setPinned(!pinned)} onBlur={() => setPinned(false)}
         className={cn('rounded-md px-1.5 py-0.5 tabular-nums hover:bg-surface-hover hover:text-text',
           timing.outcome !== 'done' && 'rounded-full bg-surface-2 px-2 text-muted')}>
-        <span className="sr-only">{t('How long the answer took:')}</span> {label}
+        <span className="sr-only">{spoken ?? t('How long the answer took:')}</span> {label}
       </button>
       {open && (
         <div id={detailsId} role="tooltip" className="absolute bottom-full left-0 z-20 mb-1.5 w-60 rounded-lg border border-border bg-surface p-2.5 text-[12px] text-text shadow-float">

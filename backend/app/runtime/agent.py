@@ -1035,7 +1035,8 @@ class AgentRun:
     ) -> None:
         """Automation runs: a call that changed something goes into the run's list of
         changes (a sub-agent's into the automation run it works for)."""
-        if self.automation is None or result.is_error or not tool.changes(args):
+        changed = tool.changes(args) if result.changed is None else result.changed
+        if self.automation is None or result.is_error or not changed:
             return
         summary = "; ".join(a.get("summary") or "" for a in row.actions if a.get("summary"))
         change: dict[str, Any] = {"tool": tool.name, "summary": (summary or tool.name)[:300]}

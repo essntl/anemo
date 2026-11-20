@@ -3,6 +3,7 @@
  * how long their chats are kept, the tools that may reach other people without asking,
  * the change check and the note the runs keep between them.
  */
+import { useId } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input, Textarea } from '@/components/ui/Input'
@@ -22,9 +23,11 @@ interface Props {
 
 export function RunSettings({ form, onChange, editing }: Props) {
   const catalog = useToolCatalog()
+  const ids = useId()
   const set = (patch: Partial<RunSettingsForm>) => onChange({ ...form, ...patch })
-  // Tools on the list that the catalog does not know (MCP tools, say) stay on it.
+  // Tools on the list that the catalog does not know (of a server that is gone, say) stay on it.
   const known = (catalog.data ?? []).map((tool) => tool.name)
+  const described = new Map((catalog.data ?? []).map((tool) => [tool.name, tool.description]))
   const names = [...known, ...(form.tools ?? []).filter((n) => !known.includes(n))]
   const retention = RETENTION.includes(form.retentionDays) ? RETENTION : [...RETENTION, form.retentionDays]
   const toggle = (name: string, on: boolean) =>
@@ -61,13 +64,22 @@ export function RunSettings({ form, onChange, editing }: Props) {
         </label>
         {form.tools !== null && (
           <div className="ml-6 grid max-h-48 gap-x-3 overflow-y-auto sm:grid-cols-2">
-            {names.map((name) => (
-              <label key={name} className="flex min-w-0 items-center gap-2 rounded-control px-2 py-1 text-[12.5px] hover:bg-surface-hover">
-                <input type="checkbox" className="accent-[var(--accent)]" checked={form.tools?.includes(name) ?? false}
-                  onChange={(e) => toggle(name, e.target.checked)} />
-                <span className="truncate font-mono">{name}</span>
-              </label>
-            ))}
+            {names.map((name, i) => {
+              const description = described.get(name)
+              return (
+                <label key={name} className="flex min-w-0 items-start gap-2 rounded-control px-2 py-1 text-[12.5px] hover:bg-surface-hover">
+                  <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={form.tools?.includes(name) ?? false}
+                    aria-labelledby={`${ids}-${i}`} aria-describedby={description ? `${ids}-${i}-about` : undefined}
+                    onChange={(e) => toggle(name, e.target.checked)} />
+                  <span className="min-w-0">
+                    <span id={`${ids}-${i}`} className="block truncate font-mono">{name}</span>
+                    {description && (
+                      <span id={`${ids}-${i}-about`} title={description} className="line-clamp-2 text-[11.5px] text-muted">{description}</span>
+                    )}
+                  </span>
+                </label>
+              )
+            })}
           </div>
         )}
       </fieldset>
@@ -81,7 +93,8 @@ export function RunSettings({ form, onChange, editing }: Props) {
       <fieldset>
         <legend className="text-[13px] font-medium">{t('Change check')}</legend>
         <p className="mb-2 mt-0.5 text-[12px] text-muted">
-          {t('Read-only tools the server calls before each scheduled run, without the model. When their results are the same as at the last successful run, the run is skipped.')}
+          {t('Read-only tools the server calls before each scheduled run, without the model. When their results are the same as at the last successful run, the run is skipped.')}{' '}
+          {t('In the arguments, {placeholder} stands for today’s date.', { placeholder: '{today}' })}
         </p>
         <div className="flex flex-col gap-2">
           {form.checks.map((row, i) => {
@@ -91,7 +104,7 @@ export function RunSettings({ form, onChange, editing }: Props) {
               <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
                 <Input aria-label={t('Tool')} value={row.tool} placeholder="list_events" spellCheck={false} list="automation-tools"
                   onChange={(e) => update({ tool: e.target.value })} />
-                <Input aria-label={t('Arguments (JSON)')} value={row.args} placeholder='{"date": "today"}' spellCheck={false}
+                <Input aria-label={t('Arguments (JSON)')} value={row.args} placeholder='{"from_date": "{today}"}' spellCheck={false}
                   aria-invalid={bad} className={bad ? 'border-error' : undefined} onChange={(e) => update({ args: e.target.value })} />
                 <Button variant="ghost" size="sm" icon={<Trash2 className="h-3.5 w-3.5" />} aria-label={t('Remove')}
                   onClick={() => set({ checks: form.checks.filter((_, j) => j !== i) })} />

@@ -323,7 +323,7 @@ class CreateEvent(Tool):
                 text = src.taken(
                     exc, line=existing, update_tool="update_event", trash_place="Calendar > Trash"
                 )
-                return ToolResult(content=text, data={"existing": exc.details})
+                return ToolResult(content=text, data={"existing": exc.details}, changed=False)
             except AppError as exc:
                 return ToolResult(content=exc.message, is_error=True)
             line = _describe(service.base_occurrence(event, event.start_at), tz)
