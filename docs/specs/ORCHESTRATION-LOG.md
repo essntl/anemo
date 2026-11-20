@@ -108,6 +108,13 @@ the suite run on the integration branch after the A1 merge. The progress notes a
 "continue from your progress note and the branch". Re-run the T review. Run
 `anemo-test.sh int all` on the integration branch.
 
+**Resumed (2026-11-20, evening).** The "stop" was a Windows lag that needed a restart.
+Postgres recovered cleanly. The A2 and B1 builders and the T reviewer were resumed with
+their context. The suite on the integration branch after the A1 merge was re-run. To keep
+the machine responsive: at most 3 agents at a time, and frontend tests with
+`--maxWorkers=2`. A builder runs the backend suite and the frontend tests one after the
+other, not at the same time.
+
 ## Decisions during wave 1
 
 - **T:** a `paused` run counts as waiting for the user (it waits for the user to resume
