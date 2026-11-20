@@ -64,6 +64,16 @@ export function useSaveEvent() {
   })
 }
 
+/** Make a synced event an ordinary one (its source fields are cleared). */
+export function useDetachEventSource() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.POST('/api/calendar/events/{event_id}/detach-source', { params: { path: { event_id: id } } })),
+    onSettled: refresh,
+  })
+}
+
 export function useDeleteEvent() {
   const refresh = useRefresh()
   return useMutation({

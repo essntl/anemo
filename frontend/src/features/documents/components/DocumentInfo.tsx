@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { FileText, History, SquareCheckBig, X } from 'lucide-react'
 import { useDocumentBacklinks } from '@/features/links/api'
+import { ActorLine } from '@/features/provenance/Provenance'
+import { actorLabel } from '@/features/provenance/labels'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { dateLocale, msg, plural, t } from '@/lib/i18n'
-import { useRevisions } from '../api'
+import { useDocuments, useRevisions } from '../api'
 import type { OutlineItem } from '../outline'
 
 type Tab = 'outline' | 'details' | 'chat'
@@ -63,6 +65,8 @@ function Outline({ outline, active, onJump }: { outline: OutlineItem[]; active: 
 function Details({ documentId, path, words, onHistory }: { documentId: string; path: string; words: number; onHistory: () => void }) {
   const links = useDocumentBacklinks(documentId).data
   const revisions = useRevisions(documentId, true)
+  // Who made it (who saved each version is in the history below).
+  const created = useDocuments().data?.documents.find((d) => d.id === documentId)?.created_by_actor
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3">
       <section aria-label={t('File')}>
@@ -72,6 +76,7 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
           {plural(words, '{count} word', '{count} words', { count: words.toLocaleString(dateLocale()) })}
           <span className="text-muted"> · {t('about {minutes} min to read', { minutes: Math.max(1, Math.round(words / 220)) })}</span>
         </p>
+        <ActorLine created={created} className="px-2 pt-1" />
       </section>
 
       <section aria-label={t('Linked from')}>
@@ -95,7 +100,7 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
           <button key={r.id} type="button" onClick={onHistory} className={cn(ROW, 'min-h-11 items-start py-1.5')}>
             <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
             <span className="min-w-0">
-              <span className="block truncate">{t(AUTHORS[r.author] ?? r.author)}{r.current && ` · ${t('current')}`}</span>
+              <span className="block truncate">{r.actor ? actorLabel(r.actor) : t(AUTHORS[r.author] ?? r.author)}{r.current && ` · ${t('current')}`}</span>
               <span className="block text-[12px] text-muted">{formatWhen(r.updated_at)}</span>
             </span>
           </button>
