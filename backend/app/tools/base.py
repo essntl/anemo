@@ -28,6 +28,20 @@ RecordChangeFn = Callable[..., Awaitable[None]]
 AddImageFn = Callable[[str, PreparedImage], Awaitable[str]]
 
 
+# Capabilities whose calls change nothing outside the run, besides the "*.read" ones.
+# ("agent.spawn": a sub-agent's own calls are what count.)
+READ_ONLY_CAPABILITIES = ("net.search", "net.fetch", "automation.state")
+READ_ONLY_PREFIXES = ("util.", "agent.")
+
+
+def reads_only(capability: str) -> bool:
+    return (
+        capability.endswith(".read")
+        or capability in READ_ONLY_CAPABILITIES
+        or capability.startswith(READ_ONLY_PREFIXES)
+    )
+
+
 async def _no_record(**_: Any) -> None:
     return None
 
@@ -88,6 +102,20 @@ class Tool(ABC):
     # Safe to run again if a worker crashed mid-call (reads: yes; writes: no).
     idempotent: ClassVar[bool] = True
     timeout_s: ClassVar[float] = 30.0
+    # Whether a successful call changes something (a file, a task, an event, a page in
+    # another system): an automation run's changes are recorded from these calls, and a
+    # run without any (that notified nobody) did "nothing". None: decided by the
+    # capability (reads, searches and the agent's own helpers change nothing).
+    changes_state: ClassVar[bool | None] = None
+    # Executed when the model calls it, but never offered (left out of the tool list):
+    # old names that existing prompts may still use.
+    hidden: ClassVar[bool] = False
+
+    def changes(self, args: Any) -> bool:
+        """Whether this call changes something. Override when it depends on the call."""
+        if self.changes_state is not None:
+            return self.changes_state
+        return not reads_only(self.capability)
 
     def actions(self, args: Any, ctx: ToolContext) -> list[Action]:
         """What this call would do. Override to add resources and risk."""

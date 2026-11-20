@@ -68,6 +68,11 @@ class Action(BaseModel):
     # says (e.g. a click or typing in the user's own browser): "allow" becomes "ask", and
     # an earlier "allow for this run" doesn't skip it. A deny stays a deny.
     always_ask: str | None = None
+    # Set by code for actions that reach other people (a message, an email, a request
+    # that changes something on another server, a shell with network). In automation
+    # runs these are asked about every time, unless that automation allows the tool
+    # (see engine.evaluate's `ask_contacts`).
+    contacts_people: bool = False
 
 
 class Grant(BaseModel):

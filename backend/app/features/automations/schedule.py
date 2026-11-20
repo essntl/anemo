@@ -5,9 +5,12 @@ Cron and repeat-rule times are local wall-clock times in the schedule's time zon
 ("every day at 08:00" stays 08:00 when the clocks change). All results are UTC.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime, timedelta
 from itertools import islice, pairwise
-from typing import Literal, Self
+from typing import Any, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from cronsim import CronSim, CronSimError
@@ -16,6 +19,21 @@ from dateutil.rrule import rrulestr
 from pydantic import BaseModel, Field, model_validator
 
 MIN_GAP = timedelta(minutes=5)  # automations cannot run more often than this
+# ...except with a change check: then the server's check runs that often, and the model
+# only when something changed (spec 02, 2.6).
+MIN_GAP_CHECKED = timedelta(minutes=1)
+TOO_OFTEN = "Automations can run at most every 5 minutes (every minute with a change check)"
+_floor: ContextVar[timedelta] = ContextVar("schedule_floor", default=MIN_GAP)
+
+
+@contextmanager
+def floor(gap: timedelta) -> Iterator[None]:
+    """Schedules validated inside may run as often as every `gap`."""
+    token = _floor.set(gap)
+    try:
+        yield
+    finally:
+        _floor.reset(token)
 
 
 def _zone(name: str) -> ZoneInfo:
@@ -58,7 +76,7 @@ def _rule(rule: str, start: datetime, zone: ZoneInfo) -> RRule:
 class Schedule(BaseModel):
     kind: Literal["cron", "interval", "once", "rrule"]
     cron: str | None = Field(None, max_length=100)  # minute hour day month weekday
-    every_minutes: int | None = Field(None, ge=5, le=60 * 24 * 31)
+    every_minutes: int | None = Field(None, ge=1, le=60 * 24 * 31)
     # once: when it runs. rrule: where the rule starts (its first run, and the time of
     # day of the others unless the rule says BYHOUR/BYMINUTE); left out: now.
     at: datetime | None = None
@@ -80,12 +98,14 @@ class Schedule(BaseModel):
                 times = []
             if not times:
                 raise ValueError("This schedule never runs")
-            if any(b - a < MIN_GAP for a, b in pairwise(times)):
-                raise ValueError("Automations can run at most every 5 minutes")
+            if any(b - a < _floor.get() for a, b in pairwise(times)):
+                raise ValueError(TOO_OFTEN)
             self.cron, self.every_minutes, self.at, self.rrule = expr, None, None, None
         elif self.kind == "interval":
             if self.every_minutes is None:
                 raise ValueError("Say how often it runs (every_minutes)")
+            if timedelta(minutes=self.every_minutes) < _floor.get():
+                raise ValueError(TOO_OFTEN)
             self.cron, self.at, self.rrule = None, None, None
         elif self.kind == "rrule":
             rule = clean_rrule(self.rrule or "")
@@ -96,8 +116,8 @@ class Schedule(BaseModel):
             times = list(islice(_rule(rule, start, zone), 12))
             if not times:
                 raise ValueError("This schedule never runs")
-            if any(b - a < MIN_GAP for a, b in pairwise(times)):
-                raise ValueError("Automations can run at most every 5 minutes")
+            if any(b - a < _floor.get() for a, b in pairwise(times)):
+                raise ValueError(TOO_OFTEN)
             self.rrule, self.at, self.cron, self.every_minutes = rule, start, None, None
         else:
             if self.at is None:
@@ -107,6 +127,13 @@ class Schedule(BaseModel):
             self.at = self.at.astimezone(UTC)
             self.cron, self.every_minutes, self.rrule = None, None, None
         return self
+
+
+def stored(data: dict[str, Any]) -> Schedule:
+    """A schedule as it is saved. How often it may run was checked when it was set (with a
+    change check, every minute), so that is not checked again here."""
+    with floor(MIN_GAP_CHECKED):
+        return Schedule.model_validate(data)
 
 
 def next_run(

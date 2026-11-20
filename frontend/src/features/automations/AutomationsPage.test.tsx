@@ -3,9 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-/* "Pause all" and who set an automation up. */
+/* "Pause all", who set an automation up, its run log and what it waits for. */
 const state = vi.hoisted(() => ({
   automations: [] as Record<string, unknown>[],
+  runs: [] as Record<string, unknown>[],
+  linked: [] as Record<string, unknown>[],
+  asked: [] as (string | null)[],
   protections: { paused: false, max_run_minutes: 30 },
   save: vi.fn(),
 }))
@@ -13,7 +16,11 @@ const idle = { mutate: vi.fn(), isPending: false, error: null }
 vi.mock('./api', () => ({
   STATUS_LABELS: {},
   useAutomations: () => ({ data: state.automations, isSuccess: true, isError: false }),
-  useAutomationRuns: () => ({ data: [] }),
+  useAutomationRuns: () => ({ data: state.runs }),
+  useAutomationRun: (_id: string, runId: string | null) => {
+    state.asked.push(runId)
+    return { data: runId ? state.linked : undefined }
+  },
   useDeleteAutomation: () => idle,
   useRunAutomation: () => idle,
   useSetAutomationEnabled: () => idle,
@@ -32,11 +39,19 @@ const automation = (over: Record<string, unknown> = {}) => ({
   next_run_at: null, last_run_at: null, last_status: null, active_run_id: null, created_by: 'user', ...over,
 })
 
-const show = () => render(<MemoryRouter><AutomationsPage /></MemoryRouter>)
+const show = (url = '/automations') => render(<MemoryRouter initialEntries={[url]}><AutomationsPage /></MemoryRouter>)
+
+const logged = (over: Record<string, unknown> = {}) => ({
+  run_id: 'r1', status: 'completed', trigger: 'schedule', created_at: '2026-11-20T10:00:00Z', ended_at: '2026-11-20T10:01:00Z',
+  outcome_line: 'nothing new', nothing_to_do: true, changes: [], conversation_id: 'c1', error: null, ...over,
+})
 
 describe('the automations page', () => {
   beforeEach(() => {
     state.automations = [automation()]
+    state.runs = []
+    state.linked = []
+    state.asked = []
     state.protections = { paused: false, max_run_minutes: 30 }
     state.save.mockReset()
   })
@@ -60,5 +75,50 @@ describe('the automations page', () => {
     state.automations = [automation(), automation({ id: 'a2', name: 'Price check', created_by: 'agent' })]
     show()
     expect(screen.getAllByText('Set up by the assistant')).toHaveLength(1)
+  })
+
+  it('shows the run log: outcome lines, runs that did nothing, and what a run changed', async () => {
+    state.runs = [
+      logged({ run_id: 'r2', outcome_line: 'added request #12', nothing_to_do: false,
+        changes: [{ tool: 'create_event', summary: 'Add event: Request #12', ref: '/calendar?event=e1' }] }),
+      logged(),
+      logged({ run_id: 'r3', status: 'failed', outcome_line: null, nothing_to_do: false, error: 'Stopped after 30 tool calls.' }),
+    ]
+    show()
+    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByText('added request #12')).toBeInTheDocument()
+    expect(screen.getByText('nothing new')).toBeInTheDocument()
+    expect(screen.getAllByText('Nothing to do')).toHaveLength(1)
+    expect(screen.getByText('Stopped after 30 tool calls.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '1 change' }))
+    expect(screen.getByRole('link', { name: 'Add event: Request #12' })).toHaveAttribute('href', '/calendar?event=e1')
+  })
+
+  it('opens the run log of the automation a link points to, at that run', () => {
+    state.automations = [automation(), automation({ id: 'a2', name: 'Bookings' })]
+    state.runs = [logged({ run_id: 'r9', nothing_to_do: false, changes: [{ tool: 'update_event', summary: 'Moved #3' }] })]
+    show('/automations?automation=a2&run=r9')
+    // Only that automation's history is open, and the linked run shows its changes.
+    expect(screen.getAllByText('nothing new')).toHaveLength(1)
+    expect(screen.getByText('Moved #3')).toBeInTheDocument()
+  })
+
+  it('fetches a linked run that is older than the log shows', () => {
+    state.runs = [logged({ run_id: 'r-new', outcome_line: 'newest' })]
+    state.linked = [logged({ run_id: 'r-old', outcome_line: 'a run from long ago', nothing_to_do: false })]
+    show('/automations?automation=a1&run=r-old')
+    expect(state.asked).toContain('r-old')
+    expect(screen.getByText('a run from long ago')).toBeInTheDocument()
+    expect(screen.getByText('newest')).toBeInTheDocument()
+  })
+
+  it('shows repeated failures and the approvals its runs wait for', () => {
+    state.automations = [automation({
+      failure_streak: 3, last_error: 'provider down',
+      pending_approvals: [{ approval_id: 'p1', run_id: 'r1', conversation_id: 'c7', summary: 'Write notes/a.md', created_at: '2026-11-20T10:00:00Z' }],
+    })]
+    show()
+    expect(screen.getByText('Failed 3 times in a row: provider down')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', '/c/c7')
   })
 })

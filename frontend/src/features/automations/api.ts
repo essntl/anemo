@@ -6,8 +6,15 @@ import type { Schedule } from './scheduleForm'
 
 export type Automation = Schemas['AutomationOut']
 export type AutomationInput = Required<Schemas['AutomationIn']>
+/** What the dialog saves: the state note only when the user changed it (a run may have
+ * replaced it while the dialog was open). */
+export type AutomationSave = Omit<AutomationInput, 'state_note'> & { state_note?: string | null }
 export type OnAsk = Automation['on_ask']
 export type NotifyWhen = Automation['notify']
+/** One line of an automation's run log: its outcome and what it changed. */
+export type AutomationRun = Schemas['AutomationRunOut']
+export type ChangeCheck = Schemas['ChangeCheck']
+export type ToolInfo = Schemas['ToolOut']
 
 export const automationsKey = ['automations'] as const
 
@@ -22,6 +29,7 @@ export const STATUS_LABELS: Record<string, string> = {
   retrying: msg('Failed, will retry'),
   missed: msg('Missed (the app was off)'),
   skipped: msg('Skipped (still running)'),
+  no_change: msg('Skipped (no change)'),
 }
 
 export function useAutomations() {
@@ -31,12 +39,31 @@ export function useAutomations() {
   })
 }
 
-/** The last runs of one automation, newest first. */
+/** The run log of one automation, newest first. */
 export function useAutomationRuns(id: string) {
   return useQuery({
     queryKey: [...runsKey, 'automation', id],
     queryFn: async () =>
-      unwrap(await api.GET('/api/runs', { params: { query: { automation_id: id, kind: 'all', limit: 20 } } })),
+      unwrap(await api.GET('/api/automations/{automation_id}/runs', { params: { path: { automation_id: id }, query: { limit: 30 } } })),
+  })
+}
+
+/** One run of the log, found by its id (a link may point to one older than the log shows). */
+export function useAutomationRun(id: string, runId: string | null) {
+  return useQuery({
+    queryKey: [...runsKey, 'automation', id, 'run', runId],
+    enabled: runId !== null,
+    queryFn: async () =>
+      unwrap(await api.GET('/api/automations/{automation_id}/runs', { params: { path: { automation_id: id }, query: { run_id: runId } } })),
+  })
+}
+
+/** The built-in tools (for an automation's tool list and change check). */
+export function useToolCatalog() {
+  return useQuery({
+    queryKey: ['tools'],
+    queryFn: async () => unwrap(await api.GET('/api/tools')),
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -60,10 +87,11 @@ function problemOf(error: unknown): string {
 }
 
 /** Asks the server what a schedule means: in words, and when it runs next. */
-export function useSchedulePreview(schedule: Schedule): SchedulePreview {
+export function useSchedulePreview(schedule: Schedule, changeCheck = false): SchedulePreview {
   const query = useQuery({
-    queryKey: [...automationsKey, 'preview', schedule],
-    queryFn: async () => unwrap(await api.POST('/api/automations/schedule-preview', { body: { schedule } })),
+    queryKey: [...automationsKey, 'preview', schedule, changeCheck],
+    queryFn: async () =>
+      unwrap(await api.POST('/api/automations/schedule-preview', { body: { schedule, change_check: changeCheck } })),
     retry: false,
     // Keep showing the previous answer while the next one loads (no flicker while typing).
     placeholderData: (previous) => previous,
@@ -89,7 +117,7 @@ function useRefresh() {
 export function useSaveAutomation() {
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: async (v: { id?: string; body: AutomationInput }) =>
+    mutationFn: async (v: { id?: string; body: AutomationSave }) =>
       v.id
         ? unwrap(await api.PATCH('/api/automations/{automation_id}', { params: { path: { automation_id: v.id } }, body: v.body }))
         : unwrap(await api.POST('/api/automations', { body: v.body })),
