@@ -11,7 +11,7 @@ Whoever resumes this work continues from this log.
 | 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | **merged** into integrate/fundamentals (ac85f41); after the merge: backend `all` and the frontend checks (449 tests) green |
 | 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | building (resumed) |
 | 1 | T Response timer | `feat/t` | `../anemo-t` | reviewed; builder fixing the review findings |
-| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | built (4 commits, suite green); in review |
+| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | reviewed; builder fixing the review findings |
 | 2 | A3 Tasks and events join in | `feat/a3` | — | after A1, T, B1, A2 are merged |
 | 2 | B2 Automations with sources | `feat/b2` | — | after A1, T, B1, A2 are merged |
 
@@ -155,3 +155,25 @@ other, not at the same time.
     waiting sub-agent
 
   Accepted: `paused` counts as waiting (contract change 2).
+- **B1** (first review): no blockers. Sent back:
+  - the approval summary shows the settings an update clears
+  - the old state tools kept as hidden aliases of the state note (decision: one tool
+    offered, old prompts keep working)
+  - the failure streak reset by a successful check
+  - MCP contact rule without the server's `openWorldHint`
+  - browser click/type reach people
+  - untrusted marking of MCP results, the state note and approval summaries
+  - a sub-agent waiting for approval doesn't block
+  - `change_check_snapshot` within the retention
+  - the dialog doesn't overwrite the state note
+  - the deep link finds older runs
+  - minors: a 1-minute interval with a change check, no state tool in checks,
+    `may_start` lock/attempt/backoff, card status, the run-log query in the service,
+    the limit message, a migration test
+
+  Accepted and to report to the user:
+  - Waiting approvals no longer block firings, for existing automations too. Existing
+    `pause` automations whose actions vary per run may get a new approval each firing.
+  - The contact rule (always ask) applies to existing automations too.
+  - The state conversion to a text note is lossy for multi-line values, and the
+    downgrade gives back `{"note": …}`.
