@@ -281,7 +281,8 @@ Each one has a working downgrade.
    notifications.** Today only the automation's prompt keeps them out (spec 02). B2
    proposes an opt-in check per automation: it refuses write and notify calls that
    repeat a phone, email or name word for word from the booking data. It misses
-   reworded details, and can trip when a customer shares your name. Build it?
+   reworded details, and can trip when a customer shares your name. **Your answer:
+   not now.**
 2. **Approval summaries are cut at 500 characters.** When the artemk automation is set
    up, the card doesn't show "run anyway every 6 h" or the prompt; you read those in
    the chat. Widen it, or show the full arguments on the card?

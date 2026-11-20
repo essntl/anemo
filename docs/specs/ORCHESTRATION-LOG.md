@@ -181,7 +181,7 @@ other, not at the same time.
    runtime. It would refuse write and notify calls whose arguments repeat contact fields
    from untrusted tool results word for word. It misses paraphrases, and it can match by
    mistake when a customer's name is the user's own. This is a design addition, so the
-   user decides.
+   user decides. **Decided 2026-11-20: not now.**
 3. **Approval summaries are cut at 500 characters** (`Approval.summary` String(500)).
    Setting up the artemk automation shows the tools and the checks, but not "run anyway
    every 6 h" or the prompt; the user reads those in the chat. A wider column or a card
