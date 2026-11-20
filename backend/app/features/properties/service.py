@@ -732,3 +732,17 @@ async def check_filter(db: AsyncSession, filters: dict[str, Any]) -> dict[str, A
     if problems:
         _raise(problems)
     return out
+
+
+async def key_counts(
+    db: AsyncSession, column: InstrumentedAttribute[Any] | ColumnElement[Any]
+) -> dict[str, int]:
+    """How many rows of a table have a value for each key."""
+    rows: list[dict[str, Any]] = list(await db.scalars(select(column).where(column != {})))
+    return dict(Counter(key for values in rows for key in values or {}))
+
+
+async def hub_values(db: AsyncSession, document_id: uuid.UUID) -> list[tuple[Prop, PropertyOption]]:
+    """The values whose hub page this document is."""
+    props = await load(db)
+    return [(p, o) for p in props.values() for o in p.options if o.hub_document_id == document_id]

@@ -4,17 +4,32 @@ Reading uses the file-read permission (fs.read) and the folder access from
 Settings > Workspace; writing uses its own category, "Edit documents"
 (docs.write). Changes by an agent get a revision in the document's history and
 are listed under "Files changed" with Revert, like other file changes.
+
+Folders say where a document lives (one per document); properties in its front
+matter say what it is about (any number: type, status, tags, client, ...). The
+tools take a document's path, id or link (`/documents/<id>`), and an old path still
+finds a document that was moved, with a note to update the reference.
 """
 
 import asyncio
+from collections import Counter
+from datetime import UTC, date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
-from app.features.documents import service
+from app.features.documents import meta, paths, service
+from app.features.documents import properties as doc_properties
+from app.features.documents import search as doc_search
 from app.features.documents.models import Document
+from app.features.projects import service as projects
+from app.features.properties import frontmatter
+from app.features.properties import service as properties
+from app.features.tasks.models import Project
 from app.knowledge import index
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
@@ -23,9 +38,19 @@ from app.workspace import files
 
 MAX_WRITE_CHARS = 1_000_000
 
+# Said in every document tool that files or finds documents, so the model doesn't
+# make a folder per topic.
+FOLDERS_AND_PROPERTIES = (
+    " Folders say where a document lives; properties (type, status, tags, client, ...) "
+    "say what it is about: categorise with properties, not with new folders."
+)
+
 
 def _safe_path(path: str) -> str:
-    """The normalized document path; an unusable one is left for path_action to refuse."""
+    """The normalized document path; an unusable one is left for path_action to refuse.
+    An id or link names a document whose path isn't known yet: the documents folder."""
+    if paths.as_id(path) is not None:
+        return service.DOCS_DIR
     try:
         return service.check_path(path)
     except AppError:
@@ -43,6 +68,7 @@ LINKING = (
     "given next to it here; add #text=<a few exact words from it> to point at a passage "
     "(or #<heading> for a section)."
 )
+DOCUMENT_REF = "The document: its path (documents/notes/idea.md), id or link (/documents/<id>)"
 
 
 def link(doc: Document) -> str:
@@ -59,43 +85,149 @@ async def _link_for(path: str) -> str | None:
         return link(doc) if doc else None
 
 
+# -- filters -----------------------------------------------------------------------------
+
+
+class FilterInput(BaseModel):
+    folder: str | None = Field(
+        None, max_length=500, description="Only documents in this folder (and below it)"
+    )
+    project: str | None = Field(
+        None, max_length=100, description="Only documents of this project (its folder)"
+    )
+    properties: dict[str, Any] | None = Field(
+        None,
+        description=(
+            'Property conditions, all must hold: {"client": "ludmyla-doula"} (equals; for '
+            'tags: has), {"status": {"in": ["draft", "active"]}}, {"tags": {"has": "legal"}}, '
+            '{"type": {"missing": true}}. Values are slugs (see list_properties).'
+        ),
+    )
+    updated_after: date | datetime | None = Field(None, description="Changed on or after (ISO)")
+    updated_before: date | datetime | None = Field(None, description="Changed before (ISO)")
+    include_archived: bool = Field(False, description="Also documents with status: archived")
+
+
+def _when(value: date | datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if not isinstance(value, datetime):
+        value = datetime(value.year, value.month, value.day)
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+async def _project(db: AsyncSession, name: str) -> Project:
+    project = await projects.find(db, name)
+    if project is None:
+        raise AppError(f"There is no project '{name}' (see list_projects).", code="not_found")
+    return project
+
+
+async def _filter(db: AsyncSession, args: FilterInput) -> doc_search.DocFilter:
+    return doc_search.DocFilter(
+        folder=args.folder,
+        project_id=(await _project(db, args.project)).id if args.project else None,
+        properties=await properties.check_filter(db, args.properties or {}),
+        updated_after=_when(args.updated_after),
+        updated_before=_when(args.updated_before),
+        include_archived=args.include_archived,
+    )
+
+
+def _has_filters(args: FilterInput) -> bool:
+    return bool(
+        args.folder
+        or args.project
+        or args.properties
+        or args.updated_after
+        or args.updated_before
+        or args.include_archived
+    )
+
+
+def _props_line(props: dict[str, properties.Prop], doc: Document) -> str:
+    return properties.summary(props, doc.properties or {})
+
+
+# -- tools -------------------------------------------------------------------------------
+
+
+class ListDocumentsInput(FilterInput):
+    group_by: str | None = Field(
+        None, max_length=60, description="A property key to group the list by, e.g. client"
+    )
+
+
 class ListDocuments(Tool):
     name = "list_documents"
     description = (
-        "List the user's documents (Markdown files under documents/) with their titles. "
+        "List the user's documents (Markdown files under documents/) with their titles and "
+        "properties, optionally filtered. "
         "The daily note on the user's Home page is documents/daily/<YYYY-MM-DD>.md "
         "(documents/<project folder>/daily/... for a project): one '- [ ] note' line each."
+        + FOLDERS_AND_PROPERTIES
         + LINKING
     )
     capability = "fs.read"
-    Input = NoInput
+    Input = ListDocumentsInput
 
-    def actions(self, args: NoInput, ctx: ToolContext) -> list[Action]:
+    def actions(self, args: ListDocumentsInput, ctx: ToolContext) -> list[Action]:
         return [path_action(ctx, self.capability, service.DOCS_DIR, "List documents in", "read")]
 
-    async def run(self, args: NoInput, ctx: ToolContext) -> ToolResult:
-        async with get_sessionmaker()() as db:
-            await service.reconcile(db)
-            docs = list(await db.scalars(select(Document).order_by(Document.path)))
+    async def run(self, args: ListDocumentsInput, ctx: ToolContext) -> ToolResult:
+        try:
+            async with get_sessionmaker()() as db:
+                await service.reconcile(db)
+                f = await _filter(db, args)
+                props = await properties.load(db)
+                if args.group_by and args.group_by not in props:
+                    raise AppError(f"There is no property '{args.group_by}' (see list_properties).")
+                docs = await doc_search.listing(db, f)
+                await db.commit()  # built-in properties on first use
+        except AppError as exc:
+            return ToolResult(content=exc.message, is_error=True)
         if not docs:
+            if _has_filters(args):
+                return ToolResult(content="No documents match.", data={"count": 0})
             return ToolResult(content="There are no documents yet.")
-        lines = [
-            f"- {d.title} ({d.path}, link {link(d)}, {d.word_count} words, "
-            f"changed {d.updated_at:%Y-%m-%d})"
-            for d in docs[:300]
-        ]
-        return ToolResult(content="\n".join(lines), data={"count": len(docs)})
+
+        def line(d: Document) -> str:
+            extra = _props_line(props, d)
+            return (
+                f"- {d.title} ({d.path}, link {link(d)}, {d.word_count} words, "
+                f"changed {d.updated_at:%Y-%m-%d})" + (f" [{extra}]" if extra else "")
+            )
+
+        shown = docs[:300]
+        if not args.group_by:
+            lines = [line(d) for d in shown]
+        else:
+            key = args.group_by
+            groups: dict[str, list[Document]] = {}
+            for d in shown:
+                value = (d.properties or {}).get(key)
+                for v in value if isinstance(value, list) else [value]:
+                    groups.setdefault(f"{key}: {v}" if v is not None else f"no {key}", []).append(d)
+            lines = []
+            for name in sorted(groups, key=lambda g: (g.startswith("no "), g)):
+                lines += [f"## {name}", *(line(d) for d in groups[name]), ""]
+        more = (
+            f"\n({len(docs) - 300} more not shown: narrow the filters.)" if len(docs) > 300 else ""
+        )
+        return ToolResult(content="\n".join(lines).rstrip() + more, data={"count": len(docs)})
 
 
 class ReadDocumentInput(BaseModel):
-    path: str = Field(description="e.g. documents/notes/idea.md (see list_documents)")
+    path: str = Field(description=DOCUMENT_REF + " (see list_documents)")
     start: int = Field(0, ge=0, description="Character offset, to continue a long document")
     max_chars: int = Field(15_000, ge=500, le=15_000)
 
 
 class ReadDocument(Tool):
     name = "read_document"
-    description = "Read one of the user's documents as Markdown." + LINKING
+    description = (
+        "Read one of the user's documents as Markdown, with its properties above it." + LINKING
+    )
     capability = "fs.read"
     Input = ReadDocumentInput
 
@@ -104,7 +236,11 @@ class ReadDocument(Tool):
 
     async def run(self, args: ReadDocumentInput, ctx: ToolContext) -> ToolResult:
         try:
-            path = service.check_path(args.path)
+            async with get_sessionmaker()() as db:
+                found = await paths.resolve(db, args.path)
+                props = await properties.load(db)
+                await db.commit()
+            path = found.doc.path
             content, _ = await asyncio.to_thread(files.read_text, path, service.MAX_DOC_BYTES)
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
@@ -116,23 +252,40 @@ class ReadDocument(Tool):
             if end < len(content)
             else ""
         )
-        found = await _link_for(path)
-        header = f"{path} (link {found})" if found else path
+        header = f"{path} (link {link(found.doc)})"
+        lines = [found.note] if found.note else []
+        summary = _props_line(props, found.doc)
+        if summary:
+            lines.append(f"Properties: {summary}")
+        if found.doc.properties_error:
+            lines.append(f"[The properties can't be read: {found.doc.properties_error}]")
+        top = "".join(f"{line}\n" for line in lines)
         return ToolResult(
-            content=f"{header}:\n{text}{note}", data={"path": path, "chars": len(content)}
+            content=f"{header}:\n{top}{text}{note}", data={"path": path, "chars": len(content)}
         )
 
 
-class SearchDocumentsInput(BaseModel):
+class SearchDocumentsInput(FilterInput):
     query: str = Field(min_length=1, max_length=500)
     limit: int = Field(8, ge=1, le=20)
+    scope: Literal["project", "all"] | None = Field(
+        None,
+        description=(
+            "In a project chat the search covers that project's documents (default "
+            '"project"); "all" also searches outside it. Only widen it when the request '
+            "needs documents from elsewhere."
+        ),
+    )
 
 
 class SearchDocuments(Tool):
     name = "search_documents"
     description = (
         "Find documents by what they say (by meaning when an embedding model is set, "
-        "otherwise by words). Returns the best-matching passages with their document paths."
+        "and by words), optionally filtered by folder, project, properties and dates. "
+        "Returns the best-matching passages with their document paths and properties. "
+        "Documents with status: archived are left out unless include_archived is set."
+        + FOLDERS_AND_PROPERTIES
         + LINKING
     )
     capability = "fs.read"
@@ -142,29 +295,79 @@ class SearchDocuments(Tool):
         return [path_action(ctx, self.capability, service.DOCS_DIR, "Search documents in", "read")]
 
     async def run(self, args: SearchDocumentsInput, ctx: ToolContext) -> ToolResult:
-        async with get_sessionmaker()() as db:
-            await service.reconcile(db)
-            hits = await index.search(
-                db, args.query, service.SOURCE_TYPE, limit=args.limit, min_similarity=0.25
-            )
-            docs = {
-                d.id: d
-                for d in await db.scalars(
-                    select(Document).where(Document.id.in_([h.source_id for h in hits]))
+        min_similarity = 0.25
+        try:
+            async with get_sessionmaker()() as db:
+                await service.reconcile(db)
+                f = await _filter(db, args)
+                # A project chat searches its own project unless told otherwise: the
+                # documents of other projects stay out of its context.
+                in_project = (
+                    ctx.project_id is not None
+                    and args.scope != "all"
+                    and not args.project
+                    and await db.get(Project, ctx.project_id) is not None
                 )
-            }
-            await db.commit()  # usage of the query embedding
-        found = [(docs[h.source_id], h) for h in hits if h.source_id in docs]
-        if not found:
-            return ToolResult(content="No documents match. (New documents take a moment to index.)")
-        parts = [f"## {d.title} ({d.path}, link {link(d)})\n{h.content[:800]}" for d, h in found]
-        return ToolResult(content="\n\n".join(parts), data={"paths": [d.path for d, _ in found]})
+                if in_project:
+                    f.project_id = ctx.project_id
+                vector = await index.embed_query(db, args.query)
+                hits = await doc_search.search(
+                    db,
+                    args.query,
+                    f,
+                    limit=args.limit,
+                    query_vector=vector,
+                    min_similarity=min_similarity,
+                )
+                outside = 0
+                if in_project:
+                    f.project_id, f.outside_project_id = None, ctx.project_id
+                    outside = await doc_search.count_matches(
+                        db, args.query, f, query_vector=vector, min_similarity=min_similarity
+                    )
+                props = await properties.load(db)
+                await db.commit()  # usage of the query embedding
+            texts = await doc_search.passages(hits, args.query)
+        except AppError as exc:
+            return ToolResult(content=exc.message, is_error=True)
+        more = (
+            f"\n\n{outside} more match{'es' if outside != 1 else ''} outside this project. "
+            'Search again with scope: "all" only if the request needs them.'
+            if outside
+            else ""
+        )
+        if not hits:
+            return ToolResult(
+                content="No documents match. (New documents take a moment to index.)" + more,
+                data={"paths": [], "outside_project": outside},
+            )
+        parts = []
+        for hit in hits:
+            d = hit.doc
+            summary = _props_line(props, d)
+            parts.append(
+                f"## {d.title} ({d.path}, link {link(d)})\n"
+                + (f"Properties: {summary}\n" if summary else "")
+                + texts.get(d.id, "")[:800]
+            )
+        return ToolResult(
+            content="\n\n".join(parts) + more,
+            data={"paths": [h.doc.path for h in hits], "outside_project": outside},
+        )
 
 
 class WriteDocumentInput(BaseModel):
     path: str = Field(description="documents/<folder>/<name>.md")
     content: str = Field(max_length=MAX_WRITE_CHARS, description="The full Markdown text")
     overwrite: bool = Field(False, description="Replace the document if it exists")
+    properties: dict[str, Any] | None = Field(
+        None,
+        description=(
+            'Properties to give it, e.g. {"type": "brief", "tags": ["website"]} (written into '
+            "its front matter; see list_properties). A new document also gets its folder's "
+            "default properties."
+        ),
+    )
 
 
 async def _record(ctx: ToolContext, path: str, before: str | None, after: str, backup: str | None):
@@ -177,11 +380,18 @@ async def _record(ctx: ToolContext, path: str, before: str | None, after: str, b
     )
 
 
+def _warning(doc: Document) -> str:
+    if not doc.properties_error:
+        return ""
+    return f" Note: its properties can't be read ({doc.properties_error}); the text is saved."
+
+
 class WriteDocument(Tool):
     name = "write_document"
     description = (
         "Create a document, or replace one completely with overwrite=true. Start it with "
-        "a '# Title' heading. To change part of a document prefer edit_document."
+        "a '# Title' heading. To change part of a document prefer edit_document; to change "
+        "only its properties, set_document_properties." + FOLDERS_AND_PROPERTIES
     )
     capability = "docs.write"
     Input = WriteDocumentInput
@@ -211,12 +421,13 @@ class WriteDocument(Tool):
                 await service.reconcile(db)
                 doc = await service.by_path(db, path)
                 if doc is None:
-                    doc = await service.create(
-                        db, path, args.content, author="agent", run_id=ctx.run_id
+                    content = await doc_properties.with_defaults(
+                        db, path, args.content, args.properties
                     )
+                    doc = await service.create(db, path, content, author="agent", run_id=ctx.run_id)
                     await _record(ctx, path, None, doc.content_hash, None)
                     return ToolResult(
-                        content=f"Created {path} (link {link(doc)})",
+                        content=f"Created {path} (link {link(doc)}){_warning(doc)}",
                         data={"path": path, "op": "create"},
                     )
                 if not args.overwrite:
@@ -225,21 +436,27 @@ class WriteDocument(Tool):
                         "overwrite=true to replace it.",
                         is_error=True,
                     )
+                content = args.content
+                if args.properties:
+                    project_id = await meta.project_for_path(db, path)
+                    values = await properties.validate(db, "document", project_id, args.properties)
+                    content = frontmatter.update(content, values)
                 before = doc.content_hash
                 backup = await asyncio.to_thread(_backup, files.resolve(path))
                 doc = await service.save(
-                    db, doc, args.content, base_hash=None, author="agent", run_id=ctx.run_id
+                    db, doc, content, base_hash=None, author="agent", run_id=ctx.run_id
                 )
                 await _record(ctx, path, before, doc.content_hash, backup)
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
         return ToolResult(
-            content=f"Replaced {path} (link {link(doc)})", data={"path": path, "op": "modify"}
+            content=f"Replaced {path} (link {link(doc)}){_warning(doc)}",
+            data={"path": path, "op": "modify"},
         )
 
 
 class EditDocumentInput(BaseModel):
-    path: str
+    path: str = Field(description=DOCUMENT_REF)
     old_text: str = Field(min_length=1, description="Exact text to replace (must be unique)")
     new_text: str
     replace_all: bool = False
@@ -269,12 +486,17 @@ class EditDocument(Tool):
 
     async def run(self, args: EditDocumentInput, ctx: ToolContext) -> ToolResult:
         try:
-            path = service.check_path(args.path)
             async with get_sessionmaker()() as db:
                 await service.reconcile(db)
-                doc = await service.by_path(db, path)
-                if doc is None:
+                found = await paths.find(db, args.path)
+                if found is None:
+                    path = (
+                        service.check_path(args.path)
+                        if paths.as_id(args.path) is None
+                        else args.path
+                    )
                     return ToolResult(content=f"There is no document {path}.", is_error=True)
+                doc, path = found.doc, found.doc.path
                 content = await service.read(db, doc)
                 count = content.count(args.old_text)
                 if count == 0:
@@ -298,11 +520,179 @@ class EditDocument(Tool):
                 await _record(ctx, path, before, doc.content_hash, backup)
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
+        moved = f" {found.note}" if found.note else ""
         return ToolResult(
             content=f"Edited {path} ({count} replacement{'s' if count != 1 else ''}; "
-            f"link {link(doc)}).",
+            f"link {link(doc)}).{moved}{_warning(doc)}",
             data={"path": path, "op": "modify"},
         )
+
+
+class SetDocumentPropertiesInput(BaseModel):
+    documents: list[str] = Field(
+        min_length=1, max_length=50, description="Paths, ids or links of the documents"
+    )
+    set: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            'Properties to set, e.g. {"client": "ludmyla-doula", "tags": ["website", "legal"]}: '
+            "select values are slugs, tags a list, dates YYYY-MM-DD. A tags list replaces the "
+            "document's tags."
+        ),
+    )
+    remove: list[str] = Field(default_factory=list, description="Property keys to remove")
+    create_value: bool = Field(
+        False,
+        description=(
+            "Add a value that isn't in a property's list yet (asks the user). New tags need "
+            "nothing; reuse existing values whenever one fits."
+        ),
+    )
+
+
+class SetDocumentProperties(Tool):
+    name = "set_document_properties"
+    description = (
+        "Set or remove properties of one or more documents (written into their front "
+        "matter, with a revision). Keys and values must exist: call list_properties first. "
+        "Unknown keys, values not in a property's list and near-duplicates of existing "
+        "values are refused with the closest existing ones." + FOLDERS_AND_PROPERTIES
+    )
+    capability = "docs.write"
+    Input = SetDocumentPropertiesInput
+    idempotent = False
+
+    def actions(self, args: SetDocumentPropertiesInput, ctx: ToolContext) -> list[Action]:
+        out = []
+        for ref in args.documents:
+            action = path_action(
+                ctx, self.capability, _safe_path(ref), "Set properties of", "read_write", "moderate"
+            )
+            if args.create_value:
+                action.always_ask = "It adds new values to a property's list"
+            out.append(action)
+        return out
+
+    async def run(self, args: SetDocumentPropertiesInput, ctx: ToolContext) -> ToolResult:
+        changes: dict[str, Any] = {**args.set, **{k: None for k in args.remove}}
+        if not changes:
+            return ToolResult(content="Nothing to change: give set or remove.", is_error=True)
+        done: list[str] = []
+        try:
+            async with get_sessionmaker()() as db:
+                await service.reconcile(db)
+                ids = list(
+                    dict.fromkeys([(await paths.resolve(db, ref)).doc.id for ref in args.documents])
+                )
+                # Check every document first, so a bad value changes nothing at all.
+                for doc_id in ids:
+                    checked = await service.get(db, doc_id)
+                    frontmatter.update(await service.read(db, checked), {})  # readable block
+                    project_id = await meta.project_for_path(db, checked.path)
+                    await properties.validate(
+                        db, "document", project_id, changes, create_values=args.create_value
+                    )
+                await db.rollback()  # values the check made are made again when used
+                for doc_id in ids:
+                    doc = await db.get(Document, doc_id)
+                    if doc is None:
+                        continue
+                    before = doc.content_hash
+                    backup = await asyncio.to_thread(_backup, files.resolve(doc.path))
+                    doc = await doc_properties.set_properties(
+                        db,
+                        doc,
+                        changes,
+                        base_hash=None,
+                        author="agent",
+                        run_id=ctx.run_id,
+                        create_values=args.create_value,
+                    )
+                    if doc.content_hash != before:
+                        await _record(ctx, doc.path, before, doc.content_hash, backup)
+                    props = await properties.load(db)
+                    done.append(
+                        f"- {doc.title} ({doc.path}): {_props_line(props, doc) or 'no properties'}"
+                    )
+                await db.commit()
+        except AppError as exc:
+            return ToolResult(content=exc.message, is_error=True, data=_problems(exc))
+        return ToolResult(content="Properties now:\n" + "\n".join(done), data={"count": len(done)})
+
+
+def _problems(exc: AppError) -> dict[str, Any] | None:
+    if exc.code != "property_invalid" or not isinstance(exc.details, dict):
+        return None
+    return {"errors": exc.details.get("errors", [])}
+
+
+class ListPropertiesInput(BaseModel):
+    key: str | None = Field(None, max_length=60, description="Only this property")
+
+
+class ListProperties(Tool):
+    name = "list_properties"
+    description = (
+        "The properties documents can have (type, status, tags, client, ...): their keys, "
+        "types, allowed values (slugs) and how many documents use each value. Call this "
+        "before setting or filtering by properties, and reuse existing values."
+        + FOLDERS_AND_PROPERTIES
+    )
+    capability = "fs.read"
+    Input = ListPropertiesInput
+
+    def actions(self, args: ListPropertiesInput, ctx: ToolContext) -> list[Action]:
+        return [path_action(ctx, self.capability, service.DOCS_DIR, "List properties of", "read")]
+
+    async def run(self, args: ListPropertiesInput, ctx: ToolContext) -> ToolResult:
+        async with get_sessionmaker()() as db:
+            await service.reconcile(db)
+            props = await properties.load(db)
+            counts = await properties.value_counts(db, Document.properties)
+            names = {str(p.id): p.name for p in await projects_all(db)}
+            await db.commit()
+        lines = []
+        for key, prop in props.items():
+            d = prop.definition
+            if args.key and key != args.key:
+                continue
+            if (
+                d.project_ids is not None
+                and ctx.project_id is not None
+                and str(ctx.project_id) not in d.project_ids
+            ):
+                continue  # another project's property
+            notes = [d.type]
+            if d.label.lower() != key:
+                notes.append(f'"{d.label}"')
+            if d.project_ids is not None:
+                notes.append(
+                    "only in " + ", ".join(names.get(p, "a deleted project") for p in d.project_ids)
+                )
+            if d.open_vocabulary:
+                notes.append("open: new values need no approval")
+            used: Counter[str] = counts.get(key) or Counter()
+            head = f"- {key} ({'; '.join(notes)})"
+            if prop.type in properties.SELECT_TYPES:
+                values = [
+                    o.slug
+                    + (f' "{o.label}"' if o.label.lower() != o.slug.replace("-", " ") else "")
+                    + (f" ({used[o.slug]})" if used.get(o.slug) else "")
+                    for o in prop.options
+                ]
+                head += ": " + (", ".join(values) if values else "no values yet")
+            elif used:
+                head += f": used by {sum(used.values())} documents"
+            lines.append(head)
+        if not lines:
+            return ToolResult(
+                content=f"There is no property '{args.key}'." if args.key else "No properties."
+            )
+        return ToolResult(content="\n".join(lines), data={"count": len(lines)})
+
+
+async def projects_all(db: AsyncSession) -> list[Project]:
+    return list(await db.scalars(select(Project)))
 
 
 DOCUMENT_TOOLS: list[Tool] = [
@@ -311,4 +701,6 @@ DOCUMENT_TOOLS: list[Tool] = [
     SearchDocuments(),
     WriteDocument(),
     EditDocument(),
+    SetDocumentProperties(),
+    ListProperties(),
 ]

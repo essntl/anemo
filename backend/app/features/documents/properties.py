@@ -130,19 +130,20 @@ def _uses(definition: PropertyDefinition, slug: str) -> Any:
     )
 
 
-def _names(option: PropertyOption, value: Any) -> bool:
+def _names(slug: str, label: str, value: Any) -> bool:
     """Whether a value in a file names the option (by slug, or by label as people write)."""
     text = str(value).strip().casefold()
-    return value == option.slug or text in (option.slug.casefold(), option.label.strip().casefold())
+    return value == slug or text in (slug.casefold(), label.strip().casefold())
 
 
 async def _rewrite_value(
-    db: AsyncSession, definition: PropertyDefinition, option: PropertyOption, new: str
+    db: AsyncSession, definition: PropertyDefinition, old: tuple[str, str], new: str
 ) -> int:
-    """Every document with the option gets `new` instead (one revision each)."""
+    """Every document with the value `old` (slug, label) gets `new` instead (one
+    revision each). `new` must be a value already, so the index takes it."""
     await service.reconcile(db)
     changed = 0
-    for doc in list(await db.scalars(select(Document).where(_uses(definition, option.slug)))):
+    for doc in list(await db.scalars(select(Document).where(_uses(definition, old[0])))):
         content = await service.read(db, doc)
         current = frontmatter.parse(content)
         if current.error or definition.key not in current.meta:
@@ -152,11 +153,11 @@ async def _rewrite_value(
         if isinstance(stored, list):
             replaced = []
             for item in stored:
-                item = new if _names(option, item) else item
+                item = new if _names(*old, item) else item
                 if item not in replaced:
                     replaced.append(item)
         else:
-            replaced = new if _names(option, stored) else stored
+            replaced = new if _names(*old, stored) else stored
         updated = frontmatter.update(content, {definition.key: replaced})
         if updated != content:
             await service.save(
@@ -186,8 +187,10 @@ async def rename_value(
             f"The value '{new}' already exists: merge into it instead",
             code="property_value_exists",
         )
-    changed = await _rewrite_value(db, definition, option, new)
+    old = (option.slug, option.label)
     option.slug = new
+    await db.flush()
+    changed = await _rewrite_value(db, definition, old, new)
     await db.commit()
     await _reindex_with(db, definition, new)  # files that named it by label
     return changed
@@ -200,7 +203,7 @@ async def merge_values(
     many documents were changed."""
     if into.definition_id != definition.id or into.id == option.id:
         raise AppError("Merge into another value of the same property", code="property_value")
-    changed = await _rewrite_value(db, definition, option, into.slug)
+    changed = await _rewrite_value(db, definition, (option.slug, option.label), into.slug)
     if into.hub_document_id is None:
         into.hub_document_id = option.hub_document_id
     await db.delete(option)
@@ -270,3 +273,18 @@ async def reconcile_on_start() -> None:
     async with get_sessionmaker()() as db:
         await reindex_stale(db)
     _started = True
+
+
+async def delete_option(
+    db: AsyncSession, definition: PropertyDefinition, option: PropertyOption
+) -> None:
+    """Remove a value nothing uses (Conflict otherwise: merge it instead). Commits."""
+    used = await option_in_use(db, definition, option.slug)
+    if used:
+        raise Conflict(
+            f"{used} documents use this value: merge it into another one instead",
+            code="property_value_in_use",
+            details={"documents": used},
+        )
+    await db.delete(option)
+    await db.commit()

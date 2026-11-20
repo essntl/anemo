@@ -85,15 +85,27 @@ def _yaml_value(value: Any) -> Any:
     return value
 
 
+class _Dumper(yaml.SafeDumper):
+    """Keys one per line, lists of values on one line: `tags: [a, b]`."""
+
+
+def _flow_list(dumper: yaml.SafeDumper, data: list[Any]) -> yaml.Node:
+    return dumper.represent_sequence("tag:yaml.org,2002:seq", data, flow_style=True)
+
+
+_Dumper.add_representer(list, _flow_list)
+
+
 def dump(meta: dict[str, Any]) -> str:
     """The front matter block for `meta` ("" when it is empty)."""
     if not meta:
         return ""
-    text = yaml.safe_dump(
+    text = yaml.dump(
         {k: _yaml_value(v) for k, v in meta.items()},
+        Dumper=_Dumper,
         sort_keys=False,
         allow_unicode=True,
-        default_flow_style=None,  # lists of values on one line: tags: [a, b]
+        default_flow_style=False,
         width=10_000,
     )
     return f"---\n{text}---\n"

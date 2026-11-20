@@ -21,11 +21,15 @@ from sqlalchemy import ColumnElement, Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
+from app.core.errors import AppError
 from app.features.automations.models import Automation
 from app.features.calendar.models import CalendarEvent
 from app.features.conversations.models import ChatMessage, Conversation
+from app.features.documents import search as doc_search
 from app.features.documents.models import Document
 from app.features.memory.models import Memory
+from app.features.projects import service as projects
+from app.features.properties import service as properties
 from app.features.tasks import service as tasks
 from app.features.tasks.models import Task
 from app.knowledge import index
@@ -54,11 +58,24 @@ class SearchGroup(BaseModel):
     has_more: bool  # there are more hits than were asked for
 
 
+class FilterChip(BaseModel):
+    """A filter typed into the query (`client:ludmyla-doula`, `in:tech-services`)."""
+
+    key: str  # a property key, or "in" (a project or folder)
+    value: str  # as typed
+    label: str  # what the chip shows: "Client: Ludmyla Doula"
+    ok: bool  # false: an unknown value (an error chip; nothing can match it)
+    message: str = ""
+    suggestions: list[str] = []  # the closest existing values
+
+
 class SearchOut(BaseModel):
     query: str
     # Whether documents and memories were also searched by meaning.
     by_meaning: bool
     groups: list[SearchGroup]
+    # The filters found in the query; only documents are filtered by them.
+    filters: list[FilterChip] = []
 
 
 @dataclass
@@ -67,6 +84,8 @@ class Query:
     words: list[str]  # lower-cased words, for "contains every word" matching
     limit: int
     vector: index.QueryVector | None  # set in hybrid mode with an embedding model
+    # Filters typed into the query (documents only); None when there are none.
+    doc_filter: doc_search.DocFilter | None = None
 
 
 def words_of(text: str) -> list[str]:
@@ -150,16 +169,24 @@ async def _chats(db: AsyncSession, q: Query) -> list[SearchHit]:
 
 
 async def _documents(db: AsyncSession, q: Query) -> list[SearchHit]:
-    """By content (the knowledge index: keywords, and meaning in hybrid mode), then by
-    title and path."""
-    found = await index.search(
-        db, q.text, "document", limit=q.limit, query_vector=q.vector, all_words=True
-    )
-    texts = {hit.source_id: hit.content for hit in found}
-    order = list(texts)
+    """By title, properties and content (the document search: keywords, and meaning in
+    hybrid mode), then by title and path; within the filters typed into the query."""
+    f = q.doc_filter or doc_search.DocFilter()
+    if q.words:
+        found = await doc_search.search(
+            db, q.text, f, limit=q.limit, query_vector=q.vector, all_words=True
+        )
+    else:  # only filters: the matching documents, the last changed first
+        listed = await doc_search.listing(db, f, sort=[("updated_at", True)], limit=q.limit)
+        found = [doc_search.Hit(d, 0.0) for d in listed]
+    texts = await doc_search.passages(found, q.text, chars=600)
+    order = [hit.doc.id for hit in found]
     by_name = await db.scalars(
         select(Document.id)
-        .where(contains_all(q.words, Document.title, Document.path))
+        .where(
+            contains_all(q.words, Document.title, Document.path),
+            *await doc_search.conditions(db, f),
+        )
         .limit(q.limit)
     )
     order += [doc_id for doc_id in by_name if doc_id not in texts]
@@ -330,16 +357,25 @@ SEARCHERS: dict[Kind, Callable[[AsyncSession, Query], Awaitable[list[SearchHit]]
 async def search(
     db: AsyncSession, text: str, *, kinds: list[Kind], limit: int, mode: Mode
 ) -> SearchOut:
-    text = text.strip()
+    original = text.strip()
+    keys = {IN_KEY, *(await properties.load(db))}
+    await db.commit()  # the built-in properties, on first use
+    text, typed = split_filters(original, keys)
+    chips, doc_filter = await resolve_filters(db, typed)
     words = words_of(text)
-    if not words:
-        return SearchOut(query=text, by_meaning=False, groups=[])
+    if not words and not chips:
+        return SearchOut(query=original, by_meaning=False, groups=[])
+    if chips:
+        # Filters are about documents (tasks and events have no properties yet).
+        kinds = [k for k in kinds if k == "document"]
+        if not all(c.ok for c in chips) or not kinds:
+            return SearchOut(query=original, by_meaning=False, groups=[], filters=chips)
     vector = None
-    if mode == "hybrid" and ("document" in kinds or "memory" in kinds):
+    if words and mode == "hybrid" and ("document" in kinds or "memory" in kinds):
         vector = await index.embed_query(db, text)  # once, for both
         await db.commit()  # the embedding call is recorded as usage
     # One more than asked for, to know whether there is more.
-    query = Query(text=text, words=words, limit=limit + 1, vector=vector)
+    query = Query(text=text, words=words, limit=limit + 1, vector=vector, doc_filter=doc_filter)
     groups = []
     for kind in KINDS:
         if kind not in kinds:
@@ -347,4 +383,90 @@ async def search(
         hits = await SEARCHERS[kind](db, query)
         if hits:
             groups.append(SearchGroup(kind=kind, hits=hits[:limit], has_more=len(hits) > limit))
-    return SearchOut(query=text, by_meaning=vector is not None, groups=groups)
+    return SearchOut(query=original, by_meaning=vector is not None, groups=groups, filters=chips)
+
+
+# -- filters typed into the query ------------------------------------------------------------
+
+# `key:value` or `key:"two words"`; the key must look like a property key (so that a
+# time like 10:30 or an address stays text).
+_FILTER = re.compile(r'(?<!\S)([a-z][a-z0-9_-]{0,59}):(?:"([^"]*)"|(\S+))')
+IN_KEY = "in"  # in:<project or folder>
+
+
+def split_filters(text: str, keys: set[str]) -> tuple[str, list[tuple[str, str]]]:
+    """The text without its `key:value` filters (for these keys), and the filters.
+    Anything else that looks like one (`re:`, an address) stays text."""
+    found: list[tuple[str, str]] = []
+
+    def take(m: re.Match[str]) -> str:
+        if m.group(1) not in keys:
+            return m.group(0)
+        found.append((m.group(1), m.group(2) if m.group(2) is not None else m.group(3)))
+        return " "
+
+    rest = _FILTER.sub(take, text)
+    return " ".join(rest.split()), found
+
+
+async def resolve_filters(
+    db: AsyncSession, typed: list[tuple[str, str]]
+) -> tuple[list[FilterChip], doc_search.DocFilter | None]:
+    """Chips for the typed filters (unknown keys stay text), and the document filter
+    they make. A value that doesn't exist is an error chip."""
+    if not typed:
+        return [], None
+    props = await properties.load(db)
+    chips: list[FilterChip] = []
+    f = doc_search.DocFilter()
+    for key, value in typed:
+        if key == IN_KEY:
+            project = await projects.find(db, value)
+            if project is not None:
+                f.project_id = project.id
+                chips.append(FilterChip(key=key, value=value, label=f"In: {project.name}", ok=True))
+            elif await asyncio.to_thread(_is_documents_folder, value):
+                f.folder = value
+                chips.append(FilterChip(key=key, value=value, label=f"In: {value}", ok=True))
+            else:
+                chips.append(
+                    FilterChip(
+                        key=key,
+                        value=value,
+                        label=f"In: {value}",
+                        ok=False,
+                        message="No project or folder with this name",
+                    )
+                )
+            continue
+        prop = props.get(key)
+        if prop is None:
+            continue  # split_filters only takes known keys
+        option = prop.option(value) if prop.type in properties.SELECT_TYPES else None
+        if prop.type in properties.SELECT_TYPES and option is None:
+            chips.append(
+                FilterChip(
+                    key=key,
+                    value=value,
+                    label=f"{prop.definition.label}: {value}",
+                    ok=False,
+                    message=f"'{value}' is not one of its values",
+                    suggestions=prop.closest(value),
+                )
+            )
+            continue
+        stored: Any = option.slug if option else value
+        f.properties[key] = stored
+        shown = option.label if option else value
+        chips.append(
+            FilterChip(key=key, value=value, label=f"{prop.definition.label}: {shown}", ok=True)
+        )
+    await db.commit()  # built-in properties on first use
+    return chips, f
+
+
+def _is_documents_folder(folder: str) -> bool:
+    try:
+        return files.resolve(doc_search.folder_prefix(folder).rstrip("/")).is_dir()
+    except AppError:
+        return False
