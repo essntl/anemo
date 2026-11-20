@@ -78,7 +78,9 @@ async def test_every_weekday_at_seven_runs_and_notifies_by_itself(authed):
     assert await listed(authed) == []
     (approval,) = await approve_all(authed, run_id)
     assert approval["summary"] == (
-        f"Schedule “Morning briefing”, repeating ({WEEKDAYS_7}) (notify: every result): {BRIEFING}"
+        f"Schedule “Morning briefing”, repeating ({WEEKDAYS_7}) (notify: every result; "
+        "tools: all; model: default; at most 30 tool calls; at most 5 min; chats kept "
+        f"forever; no change check): {BRIEFING}"
     )
     assert await run_status(authed, run_id) == "completed"
 

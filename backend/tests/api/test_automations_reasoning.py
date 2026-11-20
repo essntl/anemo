@@ -566,10 +566,11 @@ async def test_the_assistant_proposes_the_settings_and_the_user_confirms_them(au
     await execute_run(uuid.UUID(run_id))
     assert "Unknown tools: nope." in tool_results_sent_to_model()[-1]
     (approval,) = (await authed.get("/api/approvals")).json()
-    assert approval["summary"].startswith(
-        "Schedule “Task watch”, repeating (FREQ=HOURLY) (tools: list_tasks, send_notification; "
-        "limits: 10 tool calls, 2 min; chats kept 7 days; change check: list_tasks; "
-        "run anyway every 6 h): Tell me about new tasks."
+    assert approval["summary"] == (
+        "Schedule “Task watch”, repeating (FREQ=HOURLY) (notify: when the run decides to; "
+        "tools: list_tasks, send_notification; model: default; at most 10 tool calls; "
+        "at most 2 min; chats kept 7 days; change check: list_tasks; run anyway every 6 h): "
+        "Tell me about new tasks."
     )
     await authed.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"})
     await execute_run(uuid.UUID(run_id))
@@ -601,7 +602,8 @@ async def test_the_assistant_proposes_the_settings_and_the_user_confirms_them(au
     second = r.json()["run_id"]
     await execute_run(uuid.UUID(second))
     (approval,) = (await authed.get("/api/approvals")).json()
-    assert approval["summary"] == "Change a schedule (notify: every result)"
+    # A setting that is cleared is shown too.
+    assert approval["summary"] == "Change a schedule (notify: every result; chats kept forever)"
     await authed.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"})
     await execute_run(uuid.UUID(second))
     after = await get(authed, a["id"])

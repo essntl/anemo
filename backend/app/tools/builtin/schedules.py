@@ -125,25 +125,38 @@ class SettingsIn(BaseModel):
     )
 
 
-def _settings_words(args: SettingsIn) -> list[str]:
-    """The settings in the words of the approval request."""
+def _settings_words(args: SettingsIn, *, creating: bool) -> list[str]:
+    """The settings in the words of the approval request: every one that is given, also
+    when it is cleared, and for a new schedule also what it gets by default."""
+    given = args.model_fields_set
+    shown = set(SettingsIn.model_fields) if creating else given
     words = []
-    if args.notify:
-        words.append(f"notify: {NOTIFY_WORDS[args.notify]}")
-    if args.tools is not None:
-        words.append("tools: " + (", ".join(args.tools) or "none"))
-    if args.model:
-        words.append(f"model: {args.model}")
-    if args.max_tool_calls or args.max_minutes:
-        limits = [f"{args.max_tool_calls} tool calls"] * bool(args.max_tool_calls)
-        limits += [f"{args.max_minutes} min"] * bool(args.max_minutes)
-        words.append("limits: " + ", ".join(limits))
-    if args.retention_days:
-        words.append(f"chats kept {args.retention_days} days")
-    if args.change_check:
-        words.append("change check: " + ", ".join(c.tool for c in args.change_check))
-    if args.run_anyway_hours:
-        words.append(f"run anyway every {args.run_anyway_hours} h")
+    if "notify" in shown and (args.notify or creating):
+        words.append(f"notify: {NOTIFY_WORDS[args.notify or 'agent_decides']}")
+    if "tools" in shown:
+        tools = "all" if args.tools is None else (", ".join(args.tools) or "none")
+        words.append(f"tools: {tools}")
+    if "model" in shown:
+        words.append(f"model: {args.model or 'default'}")
+    if "max_tool_calls" in shown:
+        calls = args.max_tool_calls
+        if creating and "max_tool_calls" not in given:
+            calls = DEFAULT_MAX_TOOL_CALLS
+        words.append(f"at most {calls} tool calls" if calls else "tool calls: the agent's limit")
+    if "max_minutes" in shown:
+        minutes = args.max_minutes
+        if creating and "max_minutes" not in given:
+            minutes = DEFAULT_MAX_RUNTIME_S // 60
+        words.append(f"at most {minutes} min" if minutes else "time: the agent's limit")
+    if "retention_days" in shown:
+        days = args.retention_days
+        words.append(f"chats kept {days} days" if days else "chats kept forever")
+    if "change_check" in shown:
+        checks = ", ".join(c.tool for c in args.change_check or [])
+        words.append(f"change check: {checks}" if checks else "no change check")
+    if "run_anyway_hours" in shown and (args.change_check or not creating):
+        hours = args.run_anyway_hours
+        words.append(f"run anyway every {hours} h" if hours else "no run anyway")
     return words
 
 
@@ -173,10 +186,10 @@ async def _settings_fields(db: Any, args: SettingsIn) -> dict[str, Any]:
         fields["tool_allowlist"] = args.tools
     if "model" in set_:
         fields["model_id"] = await _model_id(db, args.model) if args.model else None
-    if args.max_tool_calls is not None:
+    if "max_tool_calls" in set_:  # None: the agent's own limit
         fields["max_tool_calls"] = args.max_tool_calls
-    if args.max_minutes is not None:
-        fields["max_runtime_s"] = args.max_minutes * 60
+    if "max_minutes" in set_:
+        fields["max_runtime_s"] = args.max_minutes * 60 if args.max_minutes else None
     if "retention_days" in set_:
         fields["chat_retention_days"] = args.retention_days
     if "change_check" in set_:
@@ -352,7 +365,7 @@ class CreateSchedule(Tool):
         when = f"repeating ({args.rrule})" if args.rrule else f"once at {args.at:%Y-%m-%d %H:%M}"
         if args.rrule and args.at:
             when += f" from {args.at:%Y-%m-%d %H:%M}"
-        words = _settings_words(args)
+        words = _settings_words(args, creating=True)
         settings = f" ({'; '.join(words)})" if words else ""
         head = f"Schedule “{args.name}”, {when}{settings}: "
         return [
@@ -454,7 +467,7 @@ class UpdateSchedule(Tool):
         if args.rrule or args.at:
             start = f"{args.at:%Y-%m-%d %H:%M}" if args.at else None
             parts.append("new times: " + " from ".join(filter(None, [args.rrule, start])))
-        parts += _settings_words(args)
+        parts += _settings_words(args, creating=False)
         if args.prompt:
             parts.append(f"new prompt: {_short(args.prompt, 400)}")
         return [
