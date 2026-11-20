@@ -406,7 +406,11 @@ class AgentRun:
         specs = (
             []
             if self.tools_off
-            else [t.spec() for t in sorted(self.tools.values(), key=lambda t: t.name)]
+            else [
+                t.spec()
+                for t in sorted(self.tools.values(), key=lambda t: t.name)
+                if not t.hidden  # old names that are still executed, but never offered
+            ]
         )
 
         def build(model: ResolvedModel) -> ChatRequest:
@@ -846,7 +850,7 @@ class AgentRun:
     ) -> Any:
         """Parsed arguments, or None after recording why the call cannot run."""
         if tool is None:
-            names = ", ".join(sorted(self.tools)) or "none"
+            names = ", ".join(sorted(n for n, t in self.tools.items() if not t.hidden)) or "none"
             await self._finish_row(
                 db,
                 row,

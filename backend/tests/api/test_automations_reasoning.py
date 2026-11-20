@@ -606,3 +606,34 @@ async def test_the_assistant_proposes_the_settings_and_the_user_confirms_them(au
     await execute_run(uuid.UUID(second))
     after = await get(authed, a["id"])
     assert after["notify"] == "always" and after["chat_retention_days"] is None
+
+
+# -- the old state tools ---------------------------------------------------------------------
+
+
+async def test_an_existing_prompt_that_uses_the_old_state_tools_keeps_working(authed):
+    await setup(authed)
+    a = await make(authed, prompt="remember the price")  # an existing automation
+    note = "last_price: 41\nother: x"
+    await authed.patch(f"/api/automations/{a['id']}", json={"state_note": note})
+    script(
+        "remember the price",
+        [
+            call("get_automation_state"),
+            call("set_automation_state", key="last_price", value="42"),
+            call("set_automation_state", key="seen", value="yes"),
+            call("set_automation_state", key="other"),
+            Done("tool_use"),
+        ],
+        [TextDelta("Saved."), Done("end")],
+    )
+    run_id = await fire(authed, a)
+    assert [c["status"] for c in (await timeline(authed, run_id))["tool_calls"]] == [
+        "succeeded"
+    ] * 4
+    assert tool_results_sent_to_model()[0] == note  # get returns the note
+    assert (await get(authed, a["id"]))["state_note"] == "last_price: 42\nseen: yes"
+    # Executed, but only the new tool is offered.
+    names = {t.name for t in FakeAdapter.requests[-1].tools}
+    assert "update_automation_state" in names
+    assert not {"get_automation_state", "set_automation_state"} & names

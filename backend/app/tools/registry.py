@@ -10,7 +10,7 @@ from app.policy.models import Action, Policy
 from app.tools.base import Tool
 from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.ask import AskUser
-from app.tools.builtin.automation import AUTOMATION_TOOLS
+from app.tools.builtin.automation import AUTOMATION_TOOLS, STATE_ALIASES
 from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
@@ -94,6 +94,8 @@ def allowed(tools: list[Tool], allowlist: Iterable[str] | None) -> list[Tool]:
     if allowlist is None:
         return tools
     names = {*allowlist, *ALWAYS_OFFERED}
+    if "update_automation_state" in names:
+        names |= STATE_ALIASES  # its old names, which existing prompts may still use
     return [t for t in tools if t.name in names]
 
 

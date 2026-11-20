@@ -107,6 +107,9 @@ class Tool(ABC):
     # run without any (that notified nobody) did "nothing". None: decided by the
     # capability (reads, searches and the agent's own helpers change nothing).
     changes_state: ClassVar[bool | None] = None
+    # Executed when the model calls it, but never offered (left out of the tool list):
+    # old names that existing prompts may still use.
+    hidden: ClassVar[bool] = False
 
     def changes(self, args: Any) -> bool:
         """Whether this call changes something. Override when it depends on the call."""
