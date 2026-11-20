@@ -936,3 +936,27 @@ async def test_a_new_label_reaches_the_search_chunks(authed, docs):
     assert (await chunk_after_the_job()).startswith(
         "Brief | tech-services | Customer: Ludmyla Doula AS\n"
     )
+
+
+async def test_approvals_name_the_document_an_id_or_old_path_stands_for(authed, docs):
+    doc = await new_doc(authed, "Brief", "clients", "Text.")
+    await authed.post(f"/api/documents/{doc['id']}/move", json={"folder": "archive"})
+    now = "documents/archive/brief.md"
+    edit = doc_tools.EditDocument()
+    for ref in (doc["id"], f"/documents/{doc['id']}", "documents/clients/brief.md", now):
+        [action] = edit.actions(edit.Input(path=ref, old_text="Text.", new_text="x"), ctx())
+        assert action.resource == now and action.summary == f"Edit document {now}", ref
+    props = doc_tools.SetDocumentProperties()
+    actions = props.actions(props.Input(documents=[doc["id"]], set={"type": "plan"}), ctx())
+    assert [a.resource for a in actions] == [now]
+    read = doc_tools.ReadDocument()
+    [action] = read.actions(read.Input(path="documents/clients/brief.md"), ctx())
+    assert action.resource == now
+    # Not found: one unknown document, never the whole folder.
+    missing = str(uuid.uuid4())
+    [action] = edit.actions(edit.Input(path=missing, old_text="a", new_text="b"), ctx())
+    assert action.resource == f"documents/{missing}"
+    # A new document is written where it is asked for, even at an old path.
+    write = doc_tools.WriteDocument()
+    [action] = write.actions(write.Input(path="documents/clients/brief.md", content="# New"), ctx())
+    assert action.resource == "documents/clients/brief.md"

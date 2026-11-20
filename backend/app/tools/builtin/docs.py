@@ -47,15 +47,29 @@ FOLDERS_AND_PROPERTIES = (
 )
 
 
-def _safe_path(path: str) -> str:
-    """The normalized document path; an unusable one is left for path_action to refuse.
-    An id or link names a document whose path isn't known yet: the documents folder."""
-    if paths.as_id(path) is not None:
-        return service.DOCS_DIR
+def _new_path(path: str) -> str:
+    """A path a document is written to (as given: never an old one resolved)."""
     try:
         return service.check_path(path)
     except AppError:
         return path
+
+
+def _safe_path(ref: str) -> str:
+    """The path of the document `ref` names, for the approval and its "always allow":
+    an id, link or old path is looked up, so it shows where the document is now. One
+    that can't be found stands for that one unknown document, never the folder. An
+    unusable path is left for path_action to refuse."""
+    doc_id = paths.as_id(ref)
+    if doc_id is not None:
+        return paths.current_path_sync(ref) or f"{service.DOCS_DIR}/{doc_id}"
+    try:
+        path = service.check_path(ref)
+    except AppError:
+        return ref
+    if files.resolve(path).is_file():
+        return path
+    return paths.current_path_sync(path) or path  # moved since (or a new document)
 
 
 class NoInput(BaseModel):
@@ -444,7 +458,7 @@ class WriteDocument(Tool):
     idempotent = False
 
     def actions(self, args: WriteDocumentInput, ctx: ToolContext) -> list[Action]:
-        path = _safe_path(args.path)
+        path = _new_path(args.path)
         try:
             exists = files.resolve(path).is_file()
         except AppError:
