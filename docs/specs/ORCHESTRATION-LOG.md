@@ -11,7 +11,7 @@ Whoever resumes this work continues from this log.
 | 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | **merged** into integrate/fundamentals (ac85f41); after the merge: backend `all` and the frontend checks (449 tests) green |
 | 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | reviewed (1 blocker); builder fixing |
 | 1 | T Response timer | `feat/t` | `../anemo-t` | **merged** (230371b; 0040 re-chained onto 0036); after the merge: backend `all` and the frontend checks (474 tests) green |
-| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | reviewed; builder fixing the review findings |
+| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | **merged** (956a65f; 0045 re-chained onto 0040); after the merge: backend `all` and the frontend checks (482 tests) green |
 | 2 | A3 Tasks and events join in | `feat/a3` | — | after A1, T, B1, A2 are merged |
 | 2 | B2 Automations with sources | `feat/b2` | — | after A1, T, B1, A2 are merged |
 
@@ -157,6 +157,10 @@ other, not at the same time.
 
   Accepted: `paused` counts as waiting (contract change 2).
 - **T** fixes (3 commits) checked by the orchestrator and merged as 230371b.
+- **B1** fixes (9 commits) merged as 956a65f. Conflict in `runs/models.py`: both
+  sides added columns, so both were kept. Checked across packages: B1's `may_start`
+  writes `run.status` directly (`queued` ↔ `running`, no waiting state involved) and
+  `set_status("running")` still follows, so T's waiting and `started_at` stay right.
 - **A2** (first review): **1 blocker**, YAML aliases or recursion in front matter crash
   the save path and every document tool. Sent back:
   - re-embedding after a label change
