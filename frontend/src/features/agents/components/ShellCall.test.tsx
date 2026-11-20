@@ -51,7 +51,8 @@ describe('ShellDetails', () => {
     })
     render(<ShellDetails call={done} />)
     expect(screen.getByText('exit 1')).toBeInTheDocument()
-    expect(screen.getByText('2.3 s')).toBeInTheDocument()
+    // How long it took is shown once, in the call's row (RunActivity), not here again.
+    expect(screen.queryByText('2.3 s')).not.toBeInTheDocument()
     expect(screen.getByText('internet')).toBeInTheDocument()
     expect(screen.getByText('1 failed')).toBeInTheDocument()
     expect(screen.queryByText('running…')).not.toBeInTheDocument()

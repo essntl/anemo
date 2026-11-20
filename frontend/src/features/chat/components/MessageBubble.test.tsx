@@ -41,18 +41,39 @@ describe('the duration of an answer', () => {
   it('is shown quietly, with the details on hover or click', () => {
     render(<AssistantMessage text="Done." status="complete" timing={timing({ waiting_ms: 9_000, finished_at: at(9) })} />)
     const duration = screen.getByRole('button', { name: 'How long the answer took: 41 s' })
+    expect(duration).toHaveTextContent('41 s') // the name includes the text you see
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
-    fireEvent.mouseEnter(duration)
+    fireEvent.pointerEnter(duration, { pointerType: 'mouse' })
     const details = screen.getByRole('tooltip')
+    expect(duration).toHaveAttribute('aria-describedby', details.id)
+    expect(duration).toHaveAttribute('aria-controls', details.id)
     expect(details).toHaveTextContent('Total41 s')
     expect(details).toHaveTextContent('Time to first text2 s')
     expect(details).toHaveTextContent('Waiting for you9 s')
     expect(details).toHaveTextContent('Tool calls3')
-    fireEvent.mouseLeave(duration)
+    fireEvent.pointerLeave(duration, { pointerType: 'mouse' })
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(duration).not.toHaveAttribute('aria-describedby')
+
     fireEvent.click(duration) // a click keeps them open (phones have no hover)
     expect(screen.getByRole('tooltip')).toBeInTheDocument()
-    fireEvent.keyDown(duration, { key: 'Escape' })
+    fireEvent.keyDown(document.body, { key: 'Escape' }) // wherever the focus is
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    fireEvent.pointerEnter(duration, { pointerType: 'mouse' })
+    fireEvent.keyDown(document.body, { key: 'Escape' }) // also when only hovered
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('opens the details on a tap and closes them on the next, never stuck open', () => {
+    render(<AssistantMessage text="Done." status="complete" timing={timing()} />)
+    const duration = screen.getByRole('button', { name: 'How long the answer took: 41 s' })
+    // A tap: the touch's pointer events don't count as hovering.
+    fireEvent.pointerEnter(duration, { pointerType: 'touch' })
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    fireEvent.click(duration)
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    fireEvent.click(duration)
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
@@ -88,9 +109,18 @@ describe('the live timer', () => {
     expect(vi.getTimerCount()).toBe(0) // nothing ticks while it waits
   })
 
-  it('stands beside "Thinking" before any text', () => {
+  it('stands beside "Thinking" before any text, without ticking for screen readers', () => {
     render(<AssistantMessage text="" status="streaming" timing={live({ started_at: at(-3) })} />)
-    expect(screen.getByRole('status', { name: 'Waiting for the model' })).toHaveTextContent('Thinking3 s')
+    const thinking = screen.getByRole('status', { name: 'Waiting for the model' })
+    expect(thinking).toHaveTextContent('Thinking3 s')
+    // The live region only hears a text that stays the same.
+    expect(screen.getByText('3 s')).toHaveAttribute('aria-hidden', 'true')
+    expect(thinking).toHaveTextContent('running since')
+  })
+
+  it('is left to the agent’s activity bar for an agent answer', () => {
+    render(<AssistantMessage text="Writ" status="streaming" timing={live()} activity={<div>activity</div>} />)
+    expect(screen.queryByLabelText('Time this answer has taken')).not.toBeInTheDocument()
   })
 
   it('stops when the answer ends', () => {

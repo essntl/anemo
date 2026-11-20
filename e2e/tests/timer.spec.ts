@@ -54,7 +54,8 @@ test('while the agent waits for your answer, the timer says so', async ({ page }
   await send(page, 'Paint the fence, but ask me first')
   const card = page.getByRole('group', { name: "The agent's question" })
   await expect(card.getByText('Which colour do you want?')).toBeVisible()
-  await expect(page.getByLabel('Time this answer has taken')).toContainText('waiting for you')
+  // The agent's timer stands beside its activity bar, stopped while it waits.
+  await expect(page.getByText('· waiting for you', { exact: true })).toBeVisible()
   await card.getByRole('button', { name: 'Green' }).click()
   await expect(page.getByText('Thanks. The user answered: Green')).toBeVisible()
   await expect(page.getByRole('button', { name: /^How long the answer took: \d+ s$/ })).toBeVisible()

@@ -29,6 +29,15 @@ describe('Elapsed', () => {
     expect(screen.getByText('1 m 19 s')).toBeInTheDocument()
   })
 
+  it('ticks only for the eye: screen readers get a text that stays the same', () => {
+    render(<Elapsed since={serverAgo(75)} />)
+    expect(screen.getByText('1 m 15 s')).toHaveAttribute('aria-hidden', 'true')
+    const label = screen.getByText(/^running since /).textContent
+    act(() => void vi.advanceTimersByTime(3000))
+    expect(screen.getByText('1 m 18 s')).toBeInTheDocument()
+    expect(screen.getByText(/^running since /).textContent).toBe(label)
+  })
+
   it('leaves out time that does not count', () => {
     render(<Elapsed since={serverAgo(75)} minusMs={70_000} />)
     expect(screen.getByText('5 s')).toBeInTheDocument()

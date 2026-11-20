@@ -6,7 +6,7 @@
  * the run's live stream reports a tool/approval/plan event. The database is the
  * source of truth, so this renders correctly after a reload or days later.
  */
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import {
   Ban,
   CheckCircle2,
@@ -316,9 +316,11 @@ interface RunActivityProps {
   poll?: boolean
   /** The page shows a pending approval itself (ApprovalDock): don't repeat its buttons here. */
   docked?: boolean
+  /** The answer's live timer, shown beside "Working…" while the run goes on. */
+  timer?: ReactNode
 }
 
-export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
+export function RunActivity({ runId, live, poll, docked, timer }: RunActivityProps) {
   const timeline = useTimeline(runId, poll)
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const data = timeline.data
@@ -341,6 +343,7 @@ export function RunActivity({ runId, live, poll, docked }: RunActivityProps) {
         className="flex w-full items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-muted hover:text-text pointer-coarse:py-3">
         {data.status === 'paused' ? <Pause className="h-3.5 w-3.5" /> : <Wrench className={cn('h-3.5 w-3.5', working && 'animate-pulse text-accent')} />}
         <span className={cn(working && 'shimmer')}>{headline(data, going)}</span>
+        {going && timer && <span className="text-[12px] font-normal text-subtle">{timer}</span>}
         {hasDetails && <ChevronRight className={cn('ml-auto h-3.5 w-3.5 transition-transform', isOpen && 'rotate-90')} />}
       </button>
       {active && (

@@ -285,8 +285,9 @@ export function AssistantMessage({
 
       {files && files.length > 0 && <AnswerFiles files={files} />}
 
-      {/* The answer's timer, while it is written (the line above shows it while thinking). */}
-      {live && !waiting && timing && (
+      {/* A chat answer's timer while it is written (beside "Thinking" before any text; an
+          agent's is beside its "Working…"). */}
+      {live && !waiting && !activity && timing && (
         <div role="timer" className="mt-2 flex h-6 items-center pl-[3px] text-[12px] text-subtle" aria-label={t('Time this answer has taken')}>
           <LiveTiming timing={timing} paused={status === 'paused'} />
         </div>

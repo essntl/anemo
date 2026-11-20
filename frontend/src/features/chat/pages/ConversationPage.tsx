@@ -43,6 +43,7 @@ import {
 } from '../api'
 import { useChatActions } from '../chatActions'
 import { TemporaryLabel } from '../temporary'
+import { LiveTiming } from '../components/AnswerTiming'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { ModelPicker } from '../components/ModelPicker'
@@ -286,6 +287,7 @@ function Conversation() {
               )
             }
             const isLive = m.run_id === activeRunId && m.status === 'streaming'
+            const liveTiming = isLive && m.timing ? withWaiting(m.timing, live.waiting) : null
             return (
               <div key={m.id} className={enter(m.id)}>
                 {isLive ? (
@@ -296,9 +298,12 @@ function Conversation() {
                     error={live.error}
                     modelLabel={live.modelLabel}
                     notice={live.notice}
-                    activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live docked /> : undefined}
+                    activity={m.mode === 'agent' && m.run_id ? (
+                      <RunActivity runId={m.run_id} live docked
+                        timer={liveTiming && <LiveTiming timing={liveTiming} paused={live.status === 'paused'} />} />
+                    ) : undefined}
                     questions={live.questions}
-                    timing={m.timing ? withWaiting(m.timing, live.waiting) : null}
+                    timing={liveTiming}
                   />
                 ) : (() => {
                   const versions = m.versions ?? []

@@ -78,4 +78,13 @@ describe('tool call durations', () => {
     expect(row('run_subagent b')).toHaveTextContent('9 s')
     expect(row('read_file a')).toHaveTextContent('2 m 05 s')
   })
+
+  it('shows the answer’s timer beside "Working…" while the run goes on', () => {
+    const { rerender } = render(<RunActivity runId="r1" live timer={<span>12 s</span>} />)
+    const bar = screen.getByText('Working…').closest('button')!
+    expect(bar).toHaveTextContent('Working…12 s')
+    timeline = { ...timeline, status: 'completed' }
+    rerender(<RunActivity runId="r1" live={false} timer={<span>12 s</span>} />)
+    expect(screen.queryByText('12 s')).not.toBeInTheDocument()
+  })
 })

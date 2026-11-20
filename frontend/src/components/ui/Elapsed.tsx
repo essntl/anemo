@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/cn'
 import { formatDuration } from '@/lib/format'
+import { dateLocale, t } from '@/lib/i18n'
 import { serverNow } from '@/lib/serverClock'
 
 interface ElapsedProps {
@@ -39,9 +40,12 @@ export function Elapsed({ since, minusMs = 0, className }: ElapsedProps) {
     schedule(serverNow())
     return () => window.clearTimeout(timer)
   }, [since, minusMs])
+  const started = new Date(since).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' })
   return (
     <span className={cn('tabular-nums', className)}>
-      {formatDuration(elapsedMs(since, minusMs, now) / 1000, { style: 'timer' })}
+      {/* Screen readers get a text that stays the same, not a new number every second. */}
+      <span aria-hidden="true">{formatDuration(elapsedMs(since, minusMs, now) / 1000, { style: 'timer' })}</span>
+      <span className="sr-only">{t('running since {time}', { time: started })}</span>
     </span>
   )
 }

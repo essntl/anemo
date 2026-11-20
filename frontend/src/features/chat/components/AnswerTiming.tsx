@@ -2,9 +2,10 @@
  * How long an answer takes: the live timer while it is written, and the duration
  * once it is done (with the details on hover or click). See ../timing.ts.
  */
-import { useState } from 'react'
+import { type PointerEvent, useId, useState } from 'react'
 import { Pause } from 'lucide-react'
 import { Elapsed } from '@/components/ui/Elapsed'
+import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
 import { formatDuration } from '@/lib/format'
 import { t } from '@/lib/i18n'
@@ -36,6 +37,13 @@ export function LiveTiming({ timing, paused = false }: { timing: RunTiming; paus
 export function AnswerDuration({ timing }: { timing: RunTiming }) {
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
+  const open = pinned || hovered
+  const detailsId = useId()
+  // Escape closes the details, wherever the focus is.
+  useShortcut('app.close', () => {
+    setPinned(false)
+    setHovered(false)
+  }, { enabled: open })
   const total = durationMs(timing)
   if (total === null) return null
   const duration = timer(total)
@@ -44,23 +52,21 @@ export function AnswerDuration({ timing }: { timing: RunTiming }) {
       : timing.outcome === 'failed' ? t('Failed after {duration}', { duration })
         : duration
   const first = firstTextMs(timing)
-  const open = pinned || hovered
+  // Hover is for a mouse only: a tap also sends pointer events, and would leave it open.
+  const hover = (on: boolean) => (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType === 'mouse') setHovered(on)
+  }
   return (
-    <span className="relative mr-2 shrink-0" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <button type="button" aria-expanded={open} aria-label={t('How long the answer took: {duration}', { duration: label })}
+    <span className="relative mr-2 shrink-0" onPointerEnter={hover(true)} onPointerLeave={hover(false)}>
+      <button type="button" aria-expanded={open} aria-controls={open ? detailsId : undefined}
+        aria-describedby={open ? detailsId : undefined}
         onClick={() => setPinned(!pinned)} onBlur={() => setPinned(false)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            setPinned(false)
-            setHovered(false)
-          }
-        }}
         className={cn('rounded-md px-1.5 py-0.5 tabular-nums hover:bg-surface-hover hover:text-text',
           timing.outcome !== 'done' && 'rounded-full bg-surface-2 px-2 text-muted')}>
-        {label}
+        <span className="sr-only">{t('How long the answer took:')}</span> {label}
       </button>
       {open && (
-        <div role="tooltip" className="absolute bottom-full left-0 z-20 mb-1.5 w-60 rounded-lg border border-border bg-surface p-2.5 text-[12px] text-text shadow-float">
+        <div id={detailsId} role="tooltip" className="absolute bottom-full left-0 z-20 mb-1.5 w-60 rounded-lg border border-border bg-surface p-2.5 text-[12px] text-text shadow-float">
           <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
             <dt className="text-muted">{t('Total')}</dt>
             <dd className="text-right tabular-nums">{duration}</dd>
