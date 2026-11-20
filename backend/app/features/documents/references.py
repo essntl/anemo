@@ -4,12 +4,15 @@ path. They are offered for updating (the user picks), never rewritten silently."
 import uuid
 from dataclasses import dataclass
 from typing import Literal
+from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.features.documents.models import Document
 from app.features.memory import service as memories
 from app.features.memory.models import Memory
+from app.features.notifications import service as notifications
 from app.features.projects import service as projects
 from app.features.tasks.models import Project
 
@@ -71,3 +74,35 @@ async def update(
                 )
                 changed += 1
     return changed
+
+
+async def offer_after_move(db: AsyncSession, old: str, new: str) -> list[str]:
+    """After a file or folder was moved by the agent (`move_path`): for each document
+    in it whose old path project instructions or memories still name, an Inbox item
+    that offers the update, as the Documents page does after a move. Nothing is
+    rewritten here. Commits. Returns a line per document for the tool result."""
+    old, new = old.strip("/"), new.strip("/")
+    moved = await db.scalars(
+        select(Document).where(
+            or_(Document.path == new, Document.path.startswith(new + "/", autoescape=True))
+        )
+    )
+    lines = []
+    for doc in list(moved):
+        old_path = old + doc.path[len(new) :]
+        found = await mentions(db, old_path)
+        if not found:
+            continue
+        places = "; ".join(
+            f"the instructions of {m.title}" if m.kind == "project" else f"the memory “{m.title}”"
+            for m in found
+        )
+        await notifications.create(
+            db,
+            title=f"“{doc.title}” was moved: update the old path?",
+            body=f"{places} still name {old_path}. Open the document to update them.",
+            kind="agent",
+            link=f"/documents/{doc.id}?moved_from={quote(old_path)}",
+        )
+        lines.append(f"{places} still name {old_path}.")
+    return lines

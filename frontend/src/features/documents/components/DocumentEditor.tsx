@@ -115,7 +115,16 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
   const busy = autosave.state !== 'saved'
   // A link to a part of the document (#heading, #text=…): scroll there and highlight it.
   const page = useRef<HTMLDivElement>(null)
-  const { hash } = useLocation()
+  const { hash, search } = useLocation()
+  // Opened from the Inbox after the agent moved the document: the same offer as after a move here.
+  const movedFrom = new URLSearchParams(search).get('moved_from')
+  useEffect(() => {
+    if (!movedFrom) return
+    navigate(`/documents/${doc.id}${hash}`, { replace: true })
+    void offerMentions(movedFrom)
+    // Once, for the address it was opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movedFrom])
   useShowPassage(page, hash, () => toast({ message: t('The quoted passage isn’t in this document any more.') }))
   // The outline of what is being typed, the heading in view (rich editor) and the way to one.
   const outline = useOutline(page, autosave.text, showInfo && mode === 'rich')
@@ -148,6 +157,10 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
         setProperties.mutate({ set: offered, baseHash: autosave.baseHash() }, { onError: (err) => toast({ message: errorMessage(err) }) })
       }
     }
+    await offerMentions(oldPath)
+  }
+  // Project instructions and memories that still name the old path: offered, never rewritten unasked.
+  const offerMentions = async (oldPath: string) => {
     const mentions = await oldPathMentions(doc.id, oldPath).catch(() => [])
     if (mentions.length === 0) return
     const names = mentions.map((m) => (m.kind === 'project' ? t('the instructions of {project}', { project: m.title }) : t('the memory “{memory}”', { memory: m.title }))).join('; ')

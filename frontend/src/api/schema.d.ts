@@ -7486,6 +7486,21 @@ export interface components {
         RewriteOut: {
             /** Documents */
             documents: number;
+            /**
+             * Views
+             * @default 0
+             */
+            views: number;
+            /**
+             * Folder Defaults
+             * @default 0
+             */
+            folder_defaults: number;
+            /**
+             * Failed
+             * @default []
+             */
+            failed: string[];
         };
         /** RowsOut */
         RowsOut: {

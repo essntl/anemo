@@ -26194,6 +26194,24 @@
           "documents": {
             "type": "integer",
             "title": "Documents"
+          },
+          "views": {
+            "type": "integer",
+            "title": "Views",
+            "default": 0
+          },
+          "folder_defaults": {
+            "type": "integer",
+            "title": "Folder Defaults",
+            "default": 0
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed",
+            "default": []
           }
         },
         "type": "object",

@@ -1070,3 +1070,34 @@ async def test_merging_a_value_reaches_every_file_view_and_folder_default(authed
     saved = (await authed.get(f"/api/views/{view.json()['id']}")).json()
     assert saved["query"]["properties"] == {"client": "doula"}
     assert (await authed.get(f"/api/views/{view.json()['id']}/rows")).json()["rows"]
+
+
+async def test_an_agent_move_offers_to_update_instructions_and_memories(authed, docs):
+    from app.features.notifications.models import Notification
+    from app.tools.builtin.workspace import MovePath
+
+    doc = await new_doc(authed, "Rules", "nicole", "Filing rules.")
+    r = await authed.post(
+        "/api/projects",
+        json={"name": "Nicole", "instructions": "Read documents/nicole/rules.md first."},
+    )
+    assert r.status_code == 201, r.text
+    move = MovePath()
+    result = await move.run(
+        move.Input(
+            source="documents/nicole/rules.md", destination="documents/nicole/admin/rules.md"
+        ),
+        ctx(),
+    )
+    assert not result.is_error, result.content
+    assert "the instructions of Nicole still name documents/nicole/rules.md" in result.content
+    assert "offered to update them" in result.content
+    async with get_sessionmaker()() as db:
+        [note] = list(await db.scalars(select(Notification)))
+    assert note.link == f"/documents/{doc['id']}?moved_from=documents/nicole/rules.md"
+    # Nothing was rewritten: the user decides.
+    assert (
+        "documents/nicole/rules.md" in (await authed.get("/api/projects")).json()[0]["instructions"]
+    )
+    history = (await authed.get(f"/api/documents/{doc['id']}/paths")).json()
+    assert [h["old_path"] for h in history] == ["documents/nicole/rules.md"]
