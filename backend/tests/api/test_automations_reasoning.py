@@ -368,6 +368,59 @@ async def test_a_change_check_that_would_change_something_starts_nothing(authed)
     unknown = await create(authed, name="Other", change_check=[{"tool": "nope", "args": {}}])
     assert await change_check.run_check(uuid.UUID(unknown["id"])) == "failed"
     assert "there is no tool nope" in (await get(authed, unknown["id"]))["last_error"]
+    # Its own note counts as read-only for runs, but a check must not write it.
+    note = [{"tool": "update_automation_state", "args": {"note": "x"}}]
+    writer = await create(authed, name="Writer", change_check=note)
+    assert await change_check.run_check(uuid.UUID(writer["id"])) == "failed"
+    assert "not a read-only tool" in (await get(authed, writer["id"]))["last_error"]
+    assert (await get(authed, writer["id"]))["state_note"] is None
+
+
+async def test_a_check_that_works_again_ends_the_failure_streak(authed, workspace):  # noqa: F811
+    await setup(authed)
+    requests = workspace / "notes" / "requests.md"
+    requests.write_text("request 1\n")
+    a = await create(
+        authed, change_check=[{"tool": "read_file", "args": {"path": "notes/requests.md"}}]
+    )
+    script("check the bookings", [TextDelta("Outcome: added request 1"), Done("end")])
+    assert await change_check.run_check(uuid.UUID(a["id"])) == "started"
+    await execute_run(uuid.UUID((await runs_of(authed, a["id"]))[0]["id"]))
+
+    async def outage() -> None:
+        requests.unlink()
+        for _ in range(3):
+            assert await change_check.run_check(uuid.UUID(a["id"])) == "failed"
+
+    await outage()
+    assert [n["title"] for n in await notifications(authed)] == ["Bookings failed 3 times in a row"]
+    requests.write_text("request 1\n")
+    assert await change_check.run_check(uuid.UUID(a["id"])) == "no_change"
+    after = await get(authed, a["id"])
+    assert after["failure_streak"] == 0 and after["last_error"] is None
+    await outage()  # a later outage alerts again
+    assert len(await notifications(authed)) == 2
+
+
+async def test_check_results_are_not_kept_longer_than_the_run_chats(authed, workspace):  # noqa: F811
+    await setup(authed)
+    (workspace / "notes" / "requests.md").write_text("Customer: +47 123 45 678\n")
+    check = [{"tool": "read_file", "args": {"path": "notes/requests.md"}}]
+    a = await create(authed, change_check=check, chat_retention_days=7)
+    script("check the bookings", [TextDelta("Outcome: nothing new"), Done("end")])
+    assert await change_check.run_check(uuid.UUID(a["id"])) == "started"
+    await execute_run(uuid.UUID((await runs_of(authed, a["id"]))[0]["id"]))
+    (kept,) = (await row(a["id"])).change_check_snapshot["results"]
+    assert "+47 123 45 678" in kept["content"]  # the next run (within the week) needs it
+
+    await removal.prune_run_chats(datetime.now(UTC) + timedelta(days=6))
+    assert "content" in (await row(a["id"])).change_check_snapshot["results"][0]
+    later = datetime.now(UTC) + timedelta(days=8)
+    await removal.prune_run_chats(later)
+    (left,) = (await row(a["id"])).change_check_snapshot["results"]
+    assert "content" not in left and left["hash"] == kept["hash"]
+    # Comparing still works on what is left.
+    assert await change_check.run_check(uuid.UUID(a["id"]), now=later) == "no_change"
 
 
 # -- retention ------------------------------------------------------------------------------

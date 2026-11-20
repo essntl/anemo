@@ -35,7 +35,7 @@ def _results(results: list[dict[str, Any]], tz: str) -> str:
     return "\n".join(
         untrusted(
             f"{r['tool']}{' (error)' if r.get('is_error') else ''}",
-            r.get("content") or "(empty)",
+            r["content"] or "(empty)" if "content" in r else "(no longer kept)",
         )
         for r in results
     )

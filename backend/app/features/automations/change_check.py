@@ -106,7 +106,9 @@ async def _prepare(db: Any, automation: Automation, checks: list[ChangeCheck]) -
             project_id=automation.project_id,
         )
         actions = tool.actions(args, ctx)
-        if tool.changes(args) or any(a.contacts_people for a in actions):
+        # (An automation's own note counts as read-only elsewhere, but writes.)
+        writes_note = tool.capability == "automation.state"
+        if tool.changes(args) or writes_note or any(a.contacts_people for a in actions):
             raise CheckFailed(f"{check.tool} is not a read-only tool")
         verdict = combine([evaluate(a, policy, ceiling=ceiling) for a in actions])
         if verdict.decision != "allow":
@@ -187,7 +189,9 @@ async def run_check(automation_id: uuid.UUID, now: datetime | None = None) -> st
         snapshot = automation.change_check_snapshot
         reason = reason_to_run(snapshot, results, automation.run_anyway_hours, now)
         if reason is None:
+            # The check worked: whatever failed before is over.
             automation.last_status = "no_change"
+            automation.failure_streak, automation.last_error = 0, None
             await db.commit()
             log.info(
                 "automation skipped: no change",

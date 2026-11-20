@@ -44,11 +44,38 @@ async def delete_with_runs(automation_id: uuid.UUID) -> None:
     await service.notify_changed()
 
 
+async def forget_old_check_results(now: datetime) -> None:
+    """The change check keeps the results of the last successful run, for the next run's
+    context. What tools returned is kept no longer than the automation keeps its run
+    chats: after that only the fingerprints stay (enough to compare)."""
+    async with get_sessionmaker()() as db:
+        rows = await db.scalars(
+            select(Automation).where(
+                Automation.chat_retention_days.is_not(None),
+                Automation.change_check_snapshot.is_not(None),
+            )
+        )
+        changed = False
+        for automation in rows:
+            snapshot = dict(automation.change_check_snapshot or {})
+            days = automation.chat_retention_days or 0
+            at = datetime.fromisoformat(snapshot.get("at") or now.isoformat())
+            results = snapshot.get("results") or []
+            if now - at < timedelta(days=days) or not any("content" in r for r in results):
+                continue
+            snapshot["results"] = [{k: v for k, v in r.items() if k != "content"} for r in results]
+            automation.change_check_snapshot = snapshot
+            changed = True
+        if changed:
+            await db.commit()
+
+
 async def prune_run_chats(now: datetime | None = None) -> int:
     """Periodic: delete the chats (and with them the runs, tool calls and outputs) of
     finished automation runs that are no longer kept. Returns how many."""
     now = now or datetime.now(UTC)
     retention = func.make_interval(0, 0, 0, Automation.chat_retention_days)
+    await forget_old_check_results(now)
     async with get_sessionmaker()() as db:
         ids = list(
             await db.scalars(
