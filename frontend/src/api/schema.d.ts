@@ -5567,6 +5567,7 @@ export interface components {
              * @default 0
              */
             version: number;
+            timing?: components["schemas"]["RunTiming"] | null;
         };
         /**
          * MessageVersion
@@ -5597,6 +5598,7 @@ export interface components {
              * @default []
              */
             attachments: components["schemas"]["AttachmentSummary"][];
+            timing?: components["schemas"]["RunTiming"] | null;
         };
         /**
          * ModelDefaults
@@ -7141,6 +7143,39 @@ export interface components {
              * Format: uuid
              */
             conversation_id: string;
+        };
+        /**
+         * RunTiming
+         * @description How long an answer took, from the server's records (service.run_timing).
+         *
+         *     The duration is `finished_at - started_at - waiting_ms`. While the run waits for
+         *     the user, `waiting_since` says since when; that time isn't part of the duration
+         *     either. Compare the times with the server's clock, not the browser's: every API
+         *     response has it in its `X-Server-Time` header (milliseconds since the epoch).
+         */
+        RunTiming: {
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Outcome */
+            outcome: ("done" | "stopped" | "failed") | null;
+            /** First Text At */
+            first_text_at: string | null;
+            /**
+             * First Text Waiting Ms
+             * @default 0
+             */
+            first_text_waiting_ms: number;
+            /** Waiting Ms */
+            waiting_ms: number;
+            /** Waiting Since */
+            waiting_since: string | null;
+            /** Tool Calls */
+            tool_calls: number;
         };
         /** RunTotals */
         RunTotals: {

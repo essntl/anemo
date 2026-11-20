@@ -21,10 +21,6 @@ interface ShellResult {
   stderr: string
 }
 
-function formatDuration(ms: number): string {
-  return ms < 1000 ? t('{n} ms', { n: ms }) : t('{n} s', { n: (ms / 1000).toFixed(ms < 10_000 ? 1 : 0) })
-}
-
 export function ShellDetails({ call }: { call: ToolCallView }) {
   const shell = call.result_data?.shell as ShellResult | undefined
   const live = useShellOutput((s) => s.output[call.id])
@@ -54,7 +50,6 @@ export function ShellDetails({ call }: { call: ToolCallView }) {
             <span className={cn('font-medium', shell.exit_code === 0 ? 'text-tool-ok' : 'text-error')}>
               {shell.exit_code === null ? t('no exit code') : t('exit {code}', { code: shell.exit_code })}
             </span>
-            <span>{formatDuration(shell.duration_ms)}</span>
             {shell.timed_out && <span className="text-error">{t('timed out')}</span>}
             {shell.truncated && <span>{t('output shortened')}</span>}
           </>

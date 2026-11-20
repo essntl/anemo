@@ -1,14 +1,31 @@
 /** Small display formatters shared across pages. */
 import { dateLocale, t } from '@/lib/i18n'
 
-/** 42 → "42 s", 185 → "3 min 5 s", 7300 → "2 h 1 min". */
-export function formatDuration(seconds: number): string {
+/**
+ * 42 → "42 s", 185 → "3 min 5 s", 7300 → "2 h 1 min".
+ *
+ * `style: 'timer'` is how long an answer or a tool call takes, the same while it
+ * counts and once it is done: whole seconds, 42 → "42 s", 125 → "2 m 05 s",
+ * 3780 → "1 h 03 m".
+ */
+export function formatDuration(seconds: number, opts: { style?: 'timer' } = {}): string {
+  if (opts.style === 'timer') return formatTimer(seconds)
   const s = Math.round(seconds)
   if (s < 60) return t('{s} s', { s })
   const m = Math.floor(s / 60)
   if (m < 60) return s % 60 ? t('{m} min {s} s', { m, s: s % 60 }) : t('{m} min', { m })
   const h = Math.floor(m / 60)
   return m % 60 ? t('{h} h {m} min', { h, m: m % 60 }) : t('{h} h', { h })
+}
+
+function formatTimer(seconds: number): string {
+  // Whole seconds, counted down: a live count never shows a second that hasn't passed.
+  const s = Math.max(Math.floor(seconds), 0)
+  if (s < 60) return t('{s} s', { s })
+  const two = (n: number) => String(n).padStart(2, '0')
+  const m = Math.floor(s / 60)
+  if (m < 60) return t('{m} m {s} s', { m, s: two(s % 60) })
+  return t('{h} h {m} m', { h: Math.floor(m / 60), m: two(m % 60) })
 }
 
 /** "14:03" today, "Yesterday 14:03", otherwise "12 Sep 14:03" (with the year if not this year). */

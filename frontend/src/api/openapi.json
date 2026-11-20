@@ -20595,6 +20595,16 @@
             "type": "integer",
             "title": "Version",
             "default": 0
+          },
+          "timing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunTiming"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -20693,6 +20703,16 @@
             "type": "array",
             "title": "Attachments",
             "default": []
+          },
+          "timing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunTiming"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -24908,6 +24928,92 @@
           "conversation_id"
         ],
         "title": "RunStarted"
+      },
+      "RunTiming": {
+        "properties": {
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "stopped",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "first_text_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Text At"
+          },
+          "first_text_waiting_ms": {
+            "type": "integer",
+            "title": "First Text Waiting Ms",
+            "default": 0
+          },
+          "waiting_ms": {
+            "type": "integer",
+            "title": "Waiting Ms"
+          },
+          "waiting_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Since"
+          },
+          "tool_calls": {
+            "type": "integer",
+            "title": "Tool Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "started_at",
+          "finished_at",
+          "outcome",
+          "first_text_at",
+          "waiting_ms",
+          "waiting_since",
+          "tool_calls"
+        ],
+        "title": "RunTiming",
+        "description": "How long an answer took, from the server's records (service.run_timing).\n\nThe duration is `finished_at - started_at - waiting_ms`. While the run waits for\nthe user, `waiting_since` says since when; that time isn't part of the duration\neither. Compare the times with the server's clock, not the browser's: every API\nresponse has it in its `X-Server-Time` header (milliseconds since the epoch)."
       },
       "RunTotals": {
         "properties": {

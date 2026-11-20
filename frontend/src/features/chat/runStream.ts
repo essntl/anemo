@@ -9,6 +9,7 @@
 import { useEffect, useReducer, useRef } from 'react'
 import { t } from '@/lib/i18n'
 import type { QuestionMark } from './api'
+import type { Waiting } from './timing'
 
 export const TERMINAL = ['completed', 'failed', 'cancelled']
 
@@ -23,6 +24,9 @@ export interface RunView {
   pauseRequested: boolean
   /** Agent runs: where the agent stopped to ask the user something, and the answer. */
   questions: QuestionMark[]
+  /** The time the run has waited for the user, as last reported (null: nothing new
+   *  since the answer was loaded). */
+  waiting: Waiting | null
 }
 
 export const initialRunView: RunView = {
@@ -34,6 +38,7 @@ export const initialRunView: RunView = {
   error: null,
   pauseRequested: false,
   questions: [],
+  waiting: null,
 }
 
 export interface RunEvent {
@@ -57,6 +62,11 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
         pauseRequested: status === 'running' ? state.pauseRequested : false,
       }
     }
+    case 'run.timing':
+      return {
+        ...state,
+        waiting: { waiting_ms: Number(data.waiting_ms) || 0, waiting_since: str(data.waiting_since) || null },
+      }
     case 'run.pause_requested':
       return { ...state, pauseRequested: true }
     case 'run.pause_cancelled':
@@ -96,6 +106,7 @@ const EVENT_TYPES = [
   'run.model',
   'run.fallback',
   'run.restarted',
+  'run.timing', // the time spent waiting for the user changed (the timer stops or goes on)
   // Agent runs: the timeline itself is loaded from the API when these arrive.
   'tool.started',
   'tool.completed',

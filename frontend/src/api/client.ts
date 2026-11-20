@@ -6,11 +6,23 @@
  * Regenerate types after backend changes with `make gen-api`.
  */
 import createClient from 'openapi-fetch'
+import { noteServerTime } from '@/lib/serverClock'
 import type { components, paths } from './schema'
 
 export type Schemas = components['schemas']
 
 export const api = createClient<paths>({ baseUrl: '', credentials: 'same-origin' })
+
+// Every answer says what time it is on the server, so server times show right here.
+const sentAt = new WeakMap<Request, number>()
+api.use({
+  onRequest({ request }) {
+    sentAt.set(request, Date.now())
+  },
+  onResponse({ request, response }) {
+    noteServerTime(response, sentAt.get(request))
+  },
+})
 
 /** Error thrown for non-2xx responses, carrying the backend's stable error code. */
 export class ApiError extends Error {

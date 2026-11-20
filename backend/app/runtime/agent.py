@@ -461,6 +461,8 @@ class AgentRun:
             "text": "\n\n".join(texts),
             "reasoning": run.totals.get("reasoning", "") + result.reasoning_text,
         }
+        if result.text and result.first_text_at is not None:
+            runs.note_first_text(run, result.first_text_at)  # the answer's time to first text
 
     async def _inject_notes(
         self, db: AsyncSession, run: Run, transcript: list[Message]
