@@ -14,6 +14,8 @@ import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { msg, t } from '@/lib/i18n'
 import { type SearchGroup, type SearchKind, useSearch } from './api'
+import { FilterChips, FilterSuggestions } from './FilterChips'
+import { SaveAsView } from '@/features/views/SaveAsView'
 import { Highlighted } from './Highlighted'
 import { kindInfo, KINDS } from './kinds'
 
@@ -81,6 +83,13 @@ export function SearchPage() {
           placeholder={t('Search chats, documents, tasks, files…')}
           className="h-11 w-full rounded-control border border-border bg-surface pl-10 pr-3 text-[15px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft" />
       </form>
+      <FilterSuggestions query={typed} onPick={(next) => setTyped(next)} />
+      {results.data && (results.data.filters?.length ?? 0) > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <FilterChips filters={results.data.filters ?? []} className="flex-1" />
+          {results.data.view && (results.data.filters ?? []).every((f) => f.ok) && <SaveAsView query={results.data.view} />}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-1" role="tablist" aria-label={t('Kind of result')}>
         {[{ kind: null, label: msg('Everything') }, ...KINDS].map((k) => (
