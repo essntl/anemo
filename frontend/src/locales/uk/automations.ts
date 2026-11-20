@@ -123,5 +123,6 @@ const messages: Messages = {
   "{n} change | {n} changes": "{n} зміна | {n} зміни | {n} змін",
   "Failed {n} time in a row: {error} | Failed {n} times in a row: {error}": "Помилка {n} раз поспіль: {error} | Помилка {n} рази поспіль: {error} | Помилка {n} разів поспіль: {error}",
   "{n} approval waiting | {n} approvals waiting": "{n} підтвердження очікує | {n} підтвердження очікують | {n} підтверджень очікують",
+  "In the arguments, {placeholder} stands for today’s date.": "В аргументах {placeholder} означає сьогоднішню дату.",
 }
 export default messages

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
 import { runsKey, runsSummaryKey } from '@/features/runs/api'
 import { msg, t } from '@/lib/i18n'
@@ -11,10 +11,11 @@ export type AutomationInput = Required<Schemas['AutomationIn']>
 export type AutomationSave = Omit<AutomationInput, 'state_note'> & { state_note?: string | null }
 export type OnAsk = Automation['on_ask']
 export type NotifyWhen = Automation['notify']
-/** One line of an automation's run log: its outcome and what it changed. */
+/** One line of an automation's run log: its outcome, what it changed and how long it took. */
 export type AutomationRun = Schemas['AutomationRunOut']
 export type ChangeCheck = Schemas['ChangeCheck']
-export type ToolInfo = Schemas['ToolOut']
+/** A tool an automation's runs can be given: a built-in one, or one of a connected MCP server. */
+export type ToolInfo = Schemas['AutomationToolOut']
 
 export const automationsKey = ['automations'] as const
 
@@ -39,10 +40,15 @@ export function useAutomations() {
   })
 }
 
-/** The run log of one automation, newest first. */
-export function useAutomationRuns(id: string) {
+/**
+ * The run log of one automation, newest first. `version` changes when one of its runs
+ * starts or ends (the card's state, which the app's live events keep current), so the
+ * log is fetched again then: a run's timer stops when it ends.
+ */
+export function useAutomationRuns(id: string, version = '') {
   return useQuery({
-    queryKey: [...runsKey, 'automation', id],
+    queryKey: [...runsKey, 'automation', id, version],
+    placeholderData: keepPreviousData,
     queryFn: async () =>
       unwrap(await api.GET('/api/automations/{automation_id}/runs', { params: { path: { automation_id: id }, query: { limit: 30 } } })),
   })
@@ -58,11 +64,12 @@ export function useAutomationRun(id: string, runId: string | null) {
   })
 }
 
-/** The built-in tools (for an automation's tool list and change check). */
+/** The tools for an automation's tool list and change check: the built-in ones and those
+ *  of the connected MCP servers. */
 export function useToolCatalog() {
   return useQuery({
-    queryKey: ['tools'],
-    queryFn: async () => unwrap(await api.GET('/api/tools')),
+    queryKey: [...automationsKey, 'tools'],
+    queryFn: async () => unwrap(await api.GET('/api/automations/tools')),
     staleTime: 5 * 60_000,
   })
 }

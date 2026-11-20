@@ -3395,6 +3395,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automations/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tool Catalog
+         * @description The tools its runs can be given: the built-in ones and those of the connected MCP
+         *     servers (by the names runs call them).
+         */
+        get: operations["tool_catalog_api_automations_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automations/{automation_id}": {
         parameters: {
             query?: never;
@@ -4535,6 +4556,7 @@ export interface components {
             conversation_id: string | null;
             /** Error */
             error: string | null;
+            timing: components["schemas"]["RunTiming"];
         };
         /**
          * AutomationSettings
@@ -4551,6 +4573,20 @@ export interface components {
              * @default 30
              */
             max_run_minutes: number;
+        };
+        /**
+         * AutomationToolOut
+         * @description A tool an automation's runs can be given (catalog.tools).
+         */
+        AutomationToolOut: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Capability */
+            capability: string;
+            /** Server */
+            server?: string | null;
         };
         /** Backlinks */
         Backlinks: {
@@ -17493,6 +17529,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchedulePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_catalog_api_automations_tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationToolOut"][];
                 };
             };
             /** @description Validation Error */

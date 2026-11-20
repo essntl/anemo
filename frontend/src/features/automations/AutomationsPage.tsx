@@ -1,7 +1,8 @@
 /**
  * Automations: prompts an agent runs by itself on a schedule. Each card shows
  * when it runs next and how the last run went; its history (the run log) lists past
- * runs with their outcome and what they changed. `?automation=<id>&run=<run id>` opens
+ * runs with their outcome, what they changed and how long they took (shown as the chat
+ * shows an answer's duration). `?automation=<id>&run=<run id>` opens
  * that automation's run log at that run (links to what an automation did).
  */
 import { useEffect, useRef, useState } from 'react'
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Switch } from '@/components/ui/Switch'
+import { AnswerDuration, LiveTiming } from '@/features/chat/components/AnswerTiming'
 import { RunStatusBadge } from '@/features/runs/components/RunStatusBadge'
 import { useSaveSection, useSettings } from '@/features/settings/api'
 import { cn } from '@/lib/cn'
@@ -45,8 +47,19 @@ const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' 
   missed: 'warning',
 }
 
-/** One run in the log: when, how it went, the model's outcome line and the changes the
- * server recorded from its tool calls. */
+/** How long a run took, quietly, with the details on hover or click (as in the chat);
+ * counting up while it works, standing still while it waits for you. */
+function RunDuration({ run }: { run: AutomationRun }) {
+  const { timing } = run
+  return (
+    <span className="shrink-0 text-[12px] text-muted">
+      {timing.finished_at ? <AnswerDuration timing={timing} /> : <LiveTiming timing={timing} paused={run.status === 'paused'} />}
+    </span>
+  )
+}
+
+/** One run in the log: when, how it went, how long it took, the model's outcome line
+ * and the changes the server recorded from its tool calls. */
 function RunLogEntry({ run, highlighted }: { run: AutomationRun; highlighted: boolean }) {
   const ref = useRef<HTMLLIElement>(null)
   const [open, setOpen] = useState(highlighted)
@@ -61,6 +74,7 @@ function RunLogEntry({ run, highlighted }: { run: AutomationRun; highlighted: bo
         <Link to={run.conversation_id ? `/c/${run.conversation_id}` : `/runs/${run.run_id}`}
           className="w-32 shrink-0 text-muted hover:underline">{formatWhen(run.created_at)}</Link>
         <RunStatusBadge status={run.status} />
+        <RunDuration run={run} />
         {run.nothing_to_do && <Badge tone="neutral">{t('Nothing to do')}</Badge>}
         <span className={cn('min-w-0 flex-1 truncate text-[12.5px]', run.error ? 'text-error' : 'text-subtle')} title={summary ?? undefined}>
           {summary}
@@ -89,7 +103,7 @@ function RunLogEntry({ run, highlighted }: { run: AutomationRun; highlighted: bo
 /** The run log of one automation; each run opens its conversation. A run a link points
  * to that is older than the log shows is fetched on its own and shown first. */
 function RunHistory({ automation, highlight }: { automation: Automation; highlight: string | null }) {
-  const runs = useAutomationRuns(automation.id)
+  const runs = useAutomationRuns(automation.id, [automation.active_run_id, automation.last_status, automation.last_run_at].join('|'))
   const listed = runs.data?.some((run) => run.run_id === highlight) ?? true
   const linked = useAutomationRun(automation.id, highlight && !listed ? highlight : null)
   if (runs.isError) return <p className="text-[12.5px] text-error">{errorMessage(runs.error)}</p>

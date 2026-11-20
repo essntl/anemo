@@ -41,9 +41,14 @@ const automation = (over: Record<string, unknown> = {}) => ({
 
 const show = (url = '/automations') => render(<MemoryRouter initialEntries={[url]}><AutomationsPage /></MemoryRouter>)
 
+const timing = (over: Record<string, unknown> = {}) => ({
+  started_at: '2026-11-20T10:00:00Z', finished_at: '2026-11-20T10:01:00Z', outcome: 'done', first_text_at: '2026-11-20T10:00:20Z',
+  first_text_waiting_ms: 0, waiting_ms: 0, waiting_since: null, tool_calls: 4, ...over,
+})
+
 const logged = (over: Record<string, unknown> = {}) => ({
   run_id: 'r1', status: 'completed', trigger: 'schedule', created_at: '2026-11-20T10:00:00Z', ended_at: '2026-11-20T10:01:00Z',
-  outcome_line: 'nothing new', nothing_to_do: true, changes: [], conversation_id: 'c1', error: null, ...over,
+  outcome_line: 'nothing new', nothing_to_do: true, changes: [], conversation_id: 'c1', error: null, timing: timing(), ...over,
 })
 
 describe('the automations page', () => {
@@ -92,6 +97,33 @@ describe('the automations page', () => {
     expect(screen.getByText('Stopped after 30 tool calls.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '1 change' }))
     expect(screen.getByRole('link', { name: 'Add event: Request #12' })).toHaveAttribute('href', '/calendar?event=e1')
+  })
+
+  it('says how long each run took, with the same details as the chat', async () => {
+    state.runs = [
+      logged({ run_id: 'r2', ended_at: '2026-11-20T10:03:05Z',
+        timing: timing({ finished_at: '2026-11-20T10:03:05Z', waiting_ms: 60_000, tool_calls: 7 }) }),
+      logged({ run_id: 'r3', status: 'failed', outcome_line: null, timing: timing({ outcome: 'failed', finished_at: '2026-11-20T10:00:41Z' }) }),
+    ]
+    show()
+    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    // The minute it waited for you is not part of it.
+    const duration = screen.getByRole('button', { name: /2 m 05 s/ })
+    expect(screen.getByRole('button', { name: /Failed after 41 s/ })).toBeInTheDocument()
+    await userEvent.click(duration)
+    const details = screen.getByRole('tooltip')
+    expect(details).toHaveTextContent('Total2 m 05 s')
+    expect(details).toHaveTextContent('Waiting for you1 m 00 s')
+    expect(details).toHaveTextContent('Tool calls7')
+  })
+
+  it('counts up while a run works, and stands still while it waits for you', async () => {
+    state.runs = [logged({ run_id: 'r4', status: 'waiting_approval', ended_at: null, outcome_line: null, nothing_to_do: false,
+      timing: timing({ finished_at: null, outcome: null, waiting_since: '2026-11-20T10:00:30Z' }) })]
+    show()
+    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByText(/waiting for you/)).toBeInTheDocument()
+    expect(screen.getByText('30 s')).toBeInTheDocument()
   })
 
   it('opens the run log of the automation a link points to, at that run', () => {
