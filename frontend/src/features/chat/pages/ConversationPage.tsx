@@ -47,6 +47,7 @@ import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { ModelPicker } from '../components/ModelPicker'
 import { type RunEvent, type RunView, useRunStream } from '../runStream'
+import { withWaiting } from '../timing'
 import { useStickToBottom } from '../useStickToBottom'
 
 /** From this width up there is room for the browser next to the chat. */
@@ -297,6 +298,7 @@ function Conversation() {
                     notice={live.notice}
                     activity={m.mode === 'agent' && m.run_id ? <RunActivity runId={m.run_id} live docked /> : undefined}
                     questions={live.questions}
+                    timing={m.timing ? withWaiting(m.timing, live.waiting) : null}
                   />
                 ) : (() => {
                   const versions = m.versions ?? []
@@ -321,6 +323,7 @@ function Conversation() {
                       modelLabel={shown.model_label}
                       questions={shown.questions}
                       files={shown.attachments}
+                      timing={shown.timing}
                       activity={shown.mode === 'agent' && shown.run_id ? <RunActivity runId={shown.run_id} live={false} /> : undefined}
                       versions={versions.length > 1 ? { index, count: versions.length, onSelect: select } : undefined}
                       onRegenerate={

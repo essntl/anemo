@@ -29,6 +29,7 @@ import {
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
+import { Elapsed } from '@/components/ui/Elapsed'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { toolOutputUrl, useEditPlan, useRun } from '@/features/runs/api'
@@ -112,6 +113,18 @@ function WebDetails({ data }: { data: WebData }) {
   )
 }
 
+/** How long a call took (a sub-agent's included), or how long it has run so far. */
+function CallDuration({ call }: { call: ToolCallView }) {
+  if (!call.started_at) return null // it never ran (denied, invalid, a question for you)
+  const style = 'shrink-0 text-[11.5px] tabular-nums text-subtle'
+  if (call.status === 'running' || call.status === 'waiting_child') {
+    return <Elapsed since={call.started_at} className={style} />
+  }
+  if (!call.ended_at) return null
+  const seconds = (Date.parse(call.ended_at) - Date.parse(call.started_at)) / 1000
+  return <span className={style}>{formatDuration(seconds, { style: 'timer' })}</span>
+}
+
 function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; docked?: boolean }) {
   const shell = call.tool_name === 'run_shell'
   // null = not toggled by the user: shell commands open by themselves while running.
@@ -138,6 +151,7 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
         className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] hover:bg-surface-hover pointer-coarse:py-2.5">
         <Icon className={cn('h-3.5 w-3.5 shrink-0', s.tone, (call.status === 'running' || call.status === 'waiting_child') && 'animate-spin')} />
         <span className="min-w-0 flex-1 truncate">{describe(call)}</span>
+        <CallDuration call={call} />
         <span className={cn('shrink-0 text-[11.5px]', s.tone)}>{t(s.label)}</span>
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-subtle transition-transform', open && 'rotate-90')} />
       </button>

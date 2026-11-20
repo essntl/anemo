@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { SkillIcon } from '@/features/skills/icons'
+import { AnswerDuration, LiveTiming } from './AnswerTiming'
 import { AttachmentChip } from './AttachmentChip'
 import { ReferenceChip } from './ChatReference'
 import { PageChip } from './PageChip'
 import type { QuestionMark } from '../api'
 import { splitAtQuestions } from '../questionMarks'
+import type { RunTiming } from '../timing'
 
 type AttachmentSummary = Schemas['AttachmentSummary']
 type ReferenceSummary = Schemas['ReferenceSummary']
@@ -195,6 +197,8 @@ interface AssistantProps {
   files?: AttachmentSummary[]
   /** Asks the model to correct a diagram in this answer that can't be drawn. */
   onFixDiagram?: (problem: DiagramProblem) => void
+  /** How long the answer takes (the server's record); none for answers from before. */
+  timing?: RunTiming | null
 }
 
 /** Files the agent made for you, under its answer. */
@@ -236,6 +240,7 @@ export function AssistantMessage({
   versions,
   files,
   onFixDiagram,
+  timing,
 }: AssistantProps) {
   const [copied, setCopied] = useState(false)
   const live = ['streaming', 'queued', 'running', 'waiting_approval', 'waiting_subagent', 'paused'].includes(status)
@@ -262,6 +267,7 @@ export function AssistantMessage({
             <span className="h-1.5 w-1.5 rounded-full bg-accent" />
           </span>
           <span className="shimmer font-medium">{t('Thinking')}</span>
+          {timing && <span className="text-[12px] text-subtle"><LiveTiming timing={timing} /></span>}
         </div>
       )}
       {(text || Boolean(questions?.length)) && (
@@ -279,6 +285,13 @@ export function AssistantMessage({
 
       {files && files.length > 0 && <AnswerFiles files={files} />}
 
+      {/* The answer's timer, while it is written (the line above shows it while thinking). */}
+      {live && !waiting && timing && (
+        <div role="timer" className="mt-2 flex h-6 items-center pl-[3px] text-[12px] text-subtle" aria-label={t('Time this answer has taken')}>
+          <LiveTiming timing={timing} paused={status === 'paused'} />
+        </div>
+      )}
+
       {status === 'failed' && (
         <div className="mt-2 flex items-start gap-2 rounded-xl bg-error/10 px-3 py-2 text-[13px] text-error">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -290,7 +303,9 @@ export function AssistantMessage({
       {!live && (
         <div className="mt-2 flex items-center gap-1 pl-[3px] text-[12px] text-subtle opacity-70 transition-opacity group-hover:opacity-100">
           {versions && versions.count > 1 && <VersionArrows {...versions} />}
-          {status === 'cancelled' && <span className="mr-2 shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-muted">{t('Stopped')}</span>}
+          {/* A stopped answer with a duration says so in it. */}
+          {status === 'cancelled' && !timing?.finished_at && <span className="mr-2 shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-muted">{t('Stopped')}</span>}
+          {timing && <AnswerDuration timing={timing} />}
           {/* On a phone the buttons are just icons, so the model's name has the room. */}
           {modelLabel && <span className="mr-2 min-w-0 flex-1 break-words leading-snug md:flex-none" title={modelLabel}>{modelLabel}</span>}
           {text && (

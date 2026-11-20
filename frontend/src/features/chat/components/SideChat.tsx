@@ -23,6 +23,7 @@ import {
   useSendTurn,
 } from '../api'
 import { type RunEvent, type RunView, useRunStream } from '../runStream'
+import { withWaiting } from '../timing'
 import { useStickToBottom } from '../useStickToBottom'
 import { Composer } from './Composer'
 import { AssistantMessage, UserBubble } from './MessageBubble'
@@ -227,10 +228,11 @@ function Thread({ conversationId, onRestart, onGone, prepare = same, display = s
             return m.run_id === activeRunId && m.status === 'streaming' ? (
               <AssistantMessage key={m.id} text={live.text} reasoning={live.reasoning}
                 status={live.status === 'queued' || live.status === 'running' ? 'streaming' : live.status}
-                error={live.error} modelLabel={live.modelLabel} notice={live.notice} activity={activity(true)} questions={live.questions} />
+                error={live.error} modelLabel={live.modelLabel} notice={live.notice} activity={activity(true)} questions={live.questions}
+                timing={m.timing ? withWaiting(m.timing, live.waiting) : null} />
             ) : (
               <AssistantMessage key={m.id} text={m.text} reasoning={m.reasoning} status={m.status} error={m.error} modelLabel={m.model_label}
-                questions={m.questions} files={m.attachments} activity={activity(false)} />
+                questions={m.questions} files={m.attachments} activity={activity(false)} timing={m.timing} />
             )
           })}
         </div>

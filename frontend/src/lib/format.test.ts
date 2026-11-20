@@ -20,6 +20,18 @@ describe('formatters', () => {
     expect(formatDuration(7300)).toBe('2 h 1 min')
   })
 
+  it('formats how long an answer takes, live or done, in whole seconds', () => {
+    const timer = (s: number) => formatDuration(s, { style: 'timer' })
+    expect(timer(0)).toBe('0 s')
+    expect(timer(42.9)).toBe('42 s')
+    expect(timer(59.99)).toBe('59 s')
+    expect(timer(60)).toBe('1 m 00 s')
+    expect(timer(125)).toBe('2 m 05 s')
+    expect(timer(3599)).toBe('59 m 59 s')
+    expect(timer(3780)).toBe('1 h 03 m')
+    expect(timer(-3)).toBe('0 s')
+  })
+
   it('formats costs, keeping unknown apart from zero', () => {
     expect(formatCost(null)).toBe('unknown')
     expect(formatCost(0)).toBe('$0')
