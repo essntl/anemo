@@ -46,7 +46,8 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)
   const editorRef = useRef<Editor | null>(null)
-  const [pickingLink, setPickingLink] = useState(false)
+  // The link picker: from the toolbar (files too), or from typing `[[` (items only).
+  const [pickingLink, setPickingLink] = useState<false | 'toolbar' | 'brackets'>(false)
 
   /** Upload images and insert them at the cursor (or at `pos` for a drop). */
   const insertImages = async (files: File[], pos?: number) => {
@@ -74,6 +75,7 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   useEffect(() => {
     openLinkRef.current = openLink
   })
+  const openBrackets = useRef(() => setPickingLink('brackets'))
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -90,6 +92,13 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
         if (!href || event.button !== 0) return false
         event.preventDefault()
         openLinkRef.current(href)
+        return true
+      },
+      // Typing `[[` opens the picker; the brackets go, and the link is put in their place.
+      handleTextInput: (view, from, to, text) => {
+        if (text !== '[' || from < 1 || view.state.doc.textBetween(from - 1, from) !== '[') return false
+        view.dispatch(view.state.tr.delete(from - 1, to))
+        openBrackets.current()
         return true
       },
       handlePaste: (_view, event) => {
@@ -122,8 +131,9 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   if (!editor) return null
   const picker = (
     <Lingering value={pickingLink}>
-      {() => (
-        <LinkPickerDialog onPick={insertLink} onClose={() => setPickingLink(false)}
+      {(mode) => (
+        <LinkPickerDialog onPick={insertLink} onClose={() => setPickingLink(false)} pagesOnly={mode === 'brackets'}
+          title={mode === 'brackets' ? t('Link to a document, task, event or chat') : undefined}
           onPickImage={notes ? undefined : (path, alt) => editor.chain().focus().insertContent({ type: 'image', attrs: { src: assetUrl(path), alt } }).run()} />
       )}
     </Lingering>
@@ -133,7 +143,7 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
       // Columns all the way down, so the text area fills whatever height the box has and
       // a click anywhere in it lands in the editor.
       <div className={cn('flex min-h-0 flex-col overflow-hidden rounded-control border border-border bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft', className)}>
-        <EditorToolbar editor={editor} onPickLink={() => setPickingLink(true)} />
+        <EditorToolbar editor={editor} onPickLink={() => setPickingLink('toolbar')} />
         <div className="flex max-h-[45dvh] min-h-0 flex-1 flex-col overflow-y-auto md:max-h-none">
           <EditorContent editor={editor} className="flex flex-1 flex-col" />
         </div>
@@ -143,7 +153,7 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <EditorToolbar editor={editor} onPickLink={() => setPickingLink(true)} onPickImage={() => fileInput.current?.click()} />
+      <EditorToolbar editor={editor} onPickLink={() => setPickingLink('toolbar')} onPickImage={() => fileInput.current?.click()} />
       <input ref={fileInput} type="file" accept="image/*" multiple hidden
         onChange={(e) => {
           void insertImages(Array.from(e.target.files ?? []))

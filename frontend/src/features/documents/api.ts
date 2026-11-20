@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
 import { t } from '@/lib/i18n'
 
+export type HubSection = Schemas['HubSection']
 export type DocumentSummary = Schemas['DocumentOut']
 export type DocumentContent = Schemas['DocumentContent']
 export type Revision = Schemas['RevisionOut']
