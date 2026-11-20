@@ -31,6 +31,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import USER, Actor, acting_as
 from app.core.db import get_sessionmaker
 from app.events import bus
 from app.features.attachments import service as attachments
@@ -148,6 +149,7 @@ class AgentRun:
         reasoning_effort: ReasoningEffort | None = None,
         conversation_id: uuid.UUID | None = None,
         answer: tuple[uuid.UUID, uuid.UUID] | None = None,
+        actor: Actor = USER,
     ) -> None:
         # Which model session this run continues (claude_code), and the turn context
         # of its user message (see runtime/turn_context.py).
@@ -191,6 +193,7 @@ class AgentRun:
             conversation_id=conversation_id,
             message_id=answer[0] if answer else None,
             answer_run_id=answer[1] if answer else None,
+            actor=actor,
         )
         self.current_call: uuid.UUID | None = None
         # Active time is counted per worker segment and added up in run.totals, so
@@ -938,7 +941,8 @@ class AgentRun:
         self.current_call = self.ctx.call_id = row.id
         await self._emit("tool.started", {"tool_call_id": str(row.id), "tool": tool.name})
         try:
-            result = await asyncio.wait_for(tool.run(args, self.ctx), timeout=tool.timeout_s)
+            with acting_as(self.ctx.actor):  # what the tool writes is recorded as the run's
+                result = await asyncio.wait_for(tool.run(args, self.ctx), timeout=tool.timeout_s)
         except TimeoutError:
             result = ToolResult(
                 content=f"{tool.name} timed out after {tool.timeout_s:.0f}s.", is_error=True
@@ -1245,6 +1249,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         reasoning_effort=effort,
         conversation_id=run.conversation_id,
         answer=answer_message,
+        actor=runs.actor_for(run),
     )
 
 

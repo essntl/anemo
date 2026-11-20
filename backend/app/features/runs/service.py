@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import USER, Actor
 from app.core.db import get_sessionmaker
 from app.core.errors import NotFound
 from app.events import bus
@@ -34,6 +35,20 @@ async def get_run(db: AsyncSession, run_id: uuid.UUID) -> Run:
     if run is None:
         raise NotFound("Run not found")
     return run
+
+
+def actor_for(run: Run) -> Actor:
+    """Who a run acts for: its automation (sub-agents included, as their automation's
+    run), else the assistant in its chat. See app/core/actor.py."""
+    automation = (run.policy or {}).get("automation") or {}
+    automation_id = run.automation_id or (
+        uuid.UUID(automation["id"]) if automation.get("id") else None
+    )
+    if automation_id is not None:
+        return Actor.automation(automation_id, run.root_run_id or run.id)
+    if run.conversation_id is not None:
+        return Actor.chat(run.conversation_id)
+    return USER
 
 
 async def active_run_for_conversation(db: AsyncSession, conversation_id: uuid.UUID) -> Run | None:

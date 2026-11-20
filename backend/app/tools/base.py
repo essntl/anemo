@@ -16,6 +16,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
+from app.core.actor import USER, Actor
 from app.features.attachments.images import PreparedImage
 from app.policy.models import Action, Limits
 from app.providers.base import ToolSpec
@@ -65,6 +66,9 @@ class ToolContext:
     conversation_id: uuid.UUID | None = None
     message_id: uuid.UUID | None = None
     answer_run_id: uuid.UUID | None = None  # the run of that answer
+    # Who the run acts for (provenance). Set by the runtime, never from model input;
+    # it is also the current actor while run() executes (app/core/actor.py).
+    actor: Actor = USER
 
 
 class ToolResult(BaseModel):
