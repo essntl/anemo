@@ -213,6 +213,18 @@ On **`tasks`** and **`calendar_events`** (A1):
   `trashed_items` (a payload snapshot), so A1 adds `trashed_items.external_key`
   String(200), nullable, with a partial unique index on `(kind, external_key)`. The
   service checks both tables before it creates anything.
+- **Deleting for good keeps the key too** (contract change 1). When a trashed task or
+  event that has an `external_key` is purged, A1 writes a tombstone row to a new table,
+  **`external_key_tombstones`**:
+  - `id`, `kind` (`task` | `event`), `external_key` String(200)
+  - `title` String(300): the item's title, for the tool message
+  - `deleted_at`, `actor_ref` String(120)
+  - a unique index on `(kind, external_key)`
+
+  `create_*` with that key creates nothing. Its result says it was "deleted for good by
+  the user on <date>; don't recreate it unless the user asks". Detaching from the
+  source frees the key and leaves no tombstone. The tombstones are not shown in the
+  trash.
 - **On `documents`** (A1): `created_by_ref` and `updated_by_ref`, the same types.
 - **On `document_revisions`** (A1): `actor_ref` String(120), nullable. The revision
   merge rule (same author, same run, within 10 minutes) also requires the same
@@ -428,3 +440,6 @@ settled.
 ## Change log
 
 - Wave 0: first version.
+- Change 1 (wave 1, after the A1 review): `external_key_tombstones`, so that purging a
+  synced item from the trash doesn't let a sync recreate it. A1 builds it in its
+  existing migration range (0035–0039). No other package is affected.

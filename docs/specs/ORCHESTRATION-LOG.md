@@ -8,7 +8,7 @@ Whoever resumes this work continues from this log.
 | Wave | Package | Branch | Worktree | Status |
 |---|---|---|---|---|
 | 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done |
-| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | building (started 2026-11-20) |
+| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | built (4 commits, suite green); in review |
 | 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | building (started 2026-11-20) |
 | 1 | T Response timer | `feat/t` | `../anemo-t` | building (started 2026-11-20) |
 | 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | building (started 2026-11-20) |
@@ -96,4 +96,23 @@ fill-ins in `packages.md`).
 
 ## Contract changes
 
-None yet.
+| # | When | Change | Why | Affected |
+|---|---|---|---|---|
+| 1 | W1, A1 review | `external_key_tombstones`: purging a synced item from the trash keeps its key | Spec 01 1.2: "If I deleted a synced event, an automation must not recreate it"; the purge freed the key | A1 only |
+
+## Reviews
+
+- **A1** (first review): no blockers. Sent back:
+  - the event source badge in the calendar views
+  - the purge tombstone (contract change 1)
+  - a race test on the unique key
+  - `blocked_by` compared as a set
+  - refuse `source_url` without a source
+  - make `calendar.service._base` public (separate refactor commit)
+  - escape `%` and `_` in `list_events` `query`, and say when results are cut at 200
+  - `set_occurrence` without a change records nothing; restore sets `updated_by_ref`
+  - a "not found / in the trash" message for `?event=`
+
+  Accepted as is: the external actor is inferred from `author == "external"` (the same
+  result as `acting_as(EXTERNAL)`), and the one-line change in `search/service.py`
+  required by contract section 2.
