@@ -4,6 +4,7 @@ the index follows from the file. Nothing writes properties to the database only.
 """
 
 import uuid
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import delete, func, or_, select
@@ -19,6 +20,7 @@ from app.features.properties import service as properties
 from app.features.properties.models import PropertyDefinition, PropertyOption, PropertySuggestion
 from app.features.settings import service as settings
 from app.features.settings.sections import PropertySettings
+from app.features.views.models import SavedView
 
 _started = False  # this process has reconciled the index once (see reconcile_on_start)
 
@@ -137,47 +139,111 @@ def _names(slug: str, label: str, value: Any) -> bool:
     return value == slug or text in (slug.casefold(), label.strip().casefold())
 
 
-async def _rewrite_value(
+def _replaced(stored: Any, old: tuple[str, str], new: str) -> Any:
+    if isinstance(stored, list):
+        out: list[Any] = []
+        for item in stored:
+            item = new if _names(*old, item) else item
+            if item not in out:
+                out.append(item)
+        return out
+    return new if _names(*old, stored) else stored
+
+
+@dataclass
+class Rewritten:
+    documents: int = 0  # files rewritten (a revision each)
+    views: int = 0  # saved views whose filter named the value
+    folder_defaults: int = 0  # folder rules that gave it
+    failed: list[str] = field(default_factory=list)  # documents that couldn't be rewritten
+
+
+async def _rewrite_files(
     db: AsyncSession, definition: PropertyDefinition, old: tuple[str, str], new: str
-) -> int:
-    """Every document with the value `old` (slug, label) gets `new` instead (one
-    revision each). `new` must be a value already, so the index takes it."""
+) -> Rewritten:
+    """Every document whose file names the value `old` (slug, label) gets `new`
+    instead, one revision each. Found by the files, not the index, so documents whose
+    properties can't be indexed now are rewritten too. A file that can't be rewritten
+    is reported and the others go on. Commits each document."""
     await service.reconcile(db)
-    changed = 0
-    for doc in list(await db.scalars(select(Document).where(_uses(definition, old[0])))):
-        content = await service.read(db, doc)
-        current = frontmatter.parse(content)
-        if current.error or definition.key not in current.meta:
-            continue
-        stored = current.meta[definition.key]
-        replaced: Any
-        if isinstance(stored, list):
-            replaced = []
-            for item in stored:
-                item = new if _names(*old, item) else item
-                if item not in replaced:
-                    replaced.append(item)
-        else:
-            replaced = new if _names(*old, stored) else stored
-        updated = frontmatter.update(content, {definition.key: replaced})
-        if updated != content:
+    out = Rewritten()
+    for doc in list(await db.scalars(select(Document).order_by(Document.path))):
+        try:
+            content = await service.read(db, doc)
+            current = frontmatter.parse(content)
+            if current.error:
+                if _mentions(content, old):
+                    out.failed.append(f"{doc.path}: {current.error}")
+                continue
+            if definition.key not in current.meta:
+                continue
+            replaced = _replaced(current.meta[definition.key], old, new)
+            if replaced == current.meta[definition.key]:
+                continue
+            updated = frontmatter.update(content, {definition.key: replaced})
             await service.save(
                 db, doc, updated, base_hash=doc.content_hash, author="user", new_revision=True
             )
-            changed += 1
-    return changed
+            out.documents += 1
+        except (AppError, OSError) as exc:
+            await db.rollback()
+            out.failed.append(f"{doc.path}: {getattr(exc, 'message', str(exc))}")
+    return out
+
+
+def _mentions(content: str, old: tuple[str, str]) -> bool:
+    head = frontmatter.FRONT_MATTER.match(content)
+    return head is not None and old[0] in head.group(2)
+
+
+def _filter_value(spec: Any, old: str, new: str) -> Any:
+    if isinstance(spec, dict) and len(spec) == 1:
+        op, arg = next(iter(spec.items()))
+        if op in ("in", "has"):
+            return {
+                op: [new if a == old else a for a in arg]
+                if isinstance(arg, list)
+                else (new if arg == old else arg)
+            }
+        return spec
+    return new if spec == old else spec
+
+
+async def _rewrite_settings(
+    db: AsyncSession, definition: PropertyDefinition, old: str, new: str, out: Rewritten
+) -> None:
+    """Saved views and folder defaults that name the value follow it. Doesn't commit."""
+    key = definition.key
+    for view in list(await db.scalars(select(SavedView))):
+        specs = dict((view.query or {}).get("properties") or {})
+        if key in specs and _filter_value(specs[key], old, new) != specs[key]:
+            specs[key] = _filter_value(specs[key], old, new)
+            view.query = {**view.query, "properties": specs}
+            out.views += 1
+    section = await settings.get_section(db, PropertySettings, "properties")
+    changed = False
+    for rule in section.folder_defaults:
+        if key in rule.properties:
+            value = _replaced(rule.properties[key], (old, ""), new)
+            if value != rule.properties[key]:
+                rule.properties[key] = value
+                out.folder_defaults += 1
+                changed = True
+    if changed:
+        await settings.put_section(db, "properties", section)
 
 
 async def rename_value(
     db: AsyncSession, definition: PropertyDefinition, option: PropertyOption, slug: str
-) -> int:
-    """Give a value a new slug, rewriting every document that has it. Commits.
-    Returns how many documents were changed."""
+) -> Rewritten:
+    """Give a value a new slug: every document that has it, saved views and folder
+    defaults are rewritten, then the value itself changes. Safe to run again: when a
+    file couldn't be rewritten nothing else changes, and the files done stay done."""
     new = properties.normalise(slug)
     if not new:
         raise AppError("A value needs a name", code="property_value")
     if new == option.slug:
-        return 0
+        return Rewritten()
     taken = await db.scalar(
         select(PropertyOption.id).where(
             PropertyOption.definition_id == definition.id, PropertyOption.slug == new
@@ -188,28 +254,42 @@ async def rename_value(
             f"The value '{new}' already exists: merge into it instead",
             code="property_value_exists",
         )
-    old = (option.slug, option.label)
-    option.slug = new
-    await db.flush()
-    changed = await _rewrite_value(db, definition, old, new)
+    option_id, old = option.id, (option.slug, option.label)
+    out = await _rewrite_files(db, definition, old, new)
+    if out.failed:
+        return out  # the value keeps its slug; run it again once those files are fixed
+    renamed = await db.get(PropertyOption, option_id)
+    if renamed is not None:
+        renamed.slug = new
+    await _rewrite_settings(db, definition, old[0], new, out)
     await db.commit()
-    await _reindex_with(db, definition, new)  # files that named it by label
-    return changed
+    # Rewritten documents were indexed while the new slug wasn't a value yet.
+    await _reindex(db, or_(_uses(definition, new), Document.properties_error.is_not(None)))
+    return out
 
 
 async def merge_values(
     db: AsyncSession, definition: PropertyDefinition, option: PropertyOption, into: PropertyOption
-) -> int:
-    """Replace one value by another everywhere and remove it. Commits. Returns how
-    many documents were changed."""
+) -> Rewritten:
+    """Replace one value by another everywhere (documents, saved views, folder
+    defaults) and remove it. Safe to run again: the value is only removed when every
+    file was rewritten."""
     if into.definition_id != definition.id or into.id == option.id:
         raise AppError("Merge into another value of the same property", code="property_value")
-    changed = await _rewrite_value(db, definition, (option.slug, option.label), into.slug)
-    if into.hub_document_id is None:
-        into.hub_document_id = option.hub_document_id
-    await db.delete(option)
+    option_id, into_id = option.id, into.id
+    old, new = (option.slug, option.label), into.slug
+    out = await _rewrite_files(db, definition, old, new)
+    if out.failed:
+        return out
+    gone = await db.get(PropertyOption, option_id)
+    target = await db.get(PropertyOption, into_id)
+    if gone is not None:
+        if target is not None and target.hub_document_id is None:
+            target.hub_document_id = gone.hub_document_id
+        await db.delete(gone)
+    await _rewrite_settings(db, definition, old[0], new, out)
     await db.commit()
-    return changed
+    return out
 
 
 async def _reindex(db: AsyncSession, where: Any) -> None:

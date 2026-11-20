@@ -53,6 +53,12 @@ function useFail() {
 }
 
 function ValueChip({ definition, option }: { definition: PropertyDefinition; option: PropertyOption }) {
+  const rewritten = (r: { documents: number; failed: string[] }) =>
+    toast({
+      message: r.failed.length
+        ? t('Not changed yet: these documents can’t be rewritten. Fix them and try again. {list}', { list: r.failed.join('; ') })
+        : plural(r.documents, '{n} document rewritten.', '{n} documents rewritten.'),
+    })
   const update = useUpdateOption()
   const rename = useRenameOption()
   const merge = useMergeOption()
@@ -71,7 +77,7 @@ function ValueChip({ definition, option }: { definition: PropertyDefinition; opt
     const slug = await promptDialog({ title: t('Change how it is written in the files'), label: t('Name in the files'), initial: option.slug, confirmLabel: t('Change'),
       message: plural(option.count, 'The {n} document with it is rewritten (with a revision).', 'The {n} documents with it are rewritten (each with a revision).') })
     if (slug && slug !== option.slug) {
-      rename.mutate({ ...ids, slug }, { onError: fail, onSuccess: (r) => toast({ message: plural(r.documents, '{n} document rewritten.', '{n} documents rewritten.') }) })
+      rename.mutate({ ...ids, slug }, { onError: fail, onSuccess: rewritten })
     }
   }
   const mergeInto = async () => {
@@ -81,7 +87,7 @@ function ValueChip({ definition, option }: { definition: PropertyDefinition; opt
       options: definition.options.filter((o) => o.id !== option.id).map((o) => ({ value: o.id, label: o.label, hint: o.slug })),
       empty: t('There is no other value to merge into.'),
     })
-    if (into) merge.mutate({ ...ids, into }, { onError: fail, onSuccess: (r) => toast({ message: plural(r.documents, '{n} document rewritten.', '{n} documents rewritten.') }) })
+    if (into) merge.mutate({ ...ids, into }, { onError: fail, onSuccess: rewritten })
   }
   const pickHub = async () => {
     const NONE = '-'

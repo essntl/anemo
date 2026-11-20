@@ -625,14 +625,14 @@ async def test_renaming_and_merging_values_rewrites_every_file(authed, docs):
         f"/api/properties/{client['id']}/options/{old['id']}/merge",
         json={"into_option_id": keep["id"]},
     )
-    assert r.status_code == 200 and r.json() == {"documents": 1}
+    assert r.status_code == 200 and r.json()["documents"] == 1
     assert "client: ludmyla-doula" in (docs / "tech-services" / "a.md").read_text()
     assert len((await authed.get(f"/api/documents/{a['id']}/revisions")).json()) == 2
     r = await authed.post(
         f"/api/properties/{client['id']}/options/{keep['id']}/rename",
         json={"slug": "ludmyla-doula-as"},
     )
-    assert r.json() == {"documents": 2}
+    assert r.json()["documents"] == 2
     for name in ("a.md", "b.md"):
         assert "client: ludmyla-doula-as" in (docs / "tech-services" / name).read_text()
     assert (await doc_row(b["id"])).properties == {"client": "ludmyla-doula-as"}
@@ -1018,3 +1018,55 @@ async def test_agent_saves_get_the_same_value_checks(authed, docs):
         new_text="More.",
     )
     assert not again.is_error and "can't be read" in again.content
+
+
+async def test_merging_a_value_reaches_every_file_view_and_folder_default(authed, docs):
+    ts = await project(authed, "Tech Services")
+    client = await client_property(authed, ts["id"], "Ludmyla", "Ludmyla Doula")
+    old, keep = client["options"]
+    folder = docs / "tech-services"
+    await new_doc(authed, "A", "tech-services", client="ludmyla")
+    # A document whose properties can't be indexed now (another value isn't allowed).
+    (folder / "b.md").write_text("---\nclient: ludmyla\ntype: novel\n---\n# B\n")
+    # A document whose front matter can't be read at all.
+    (folder / "c.md").write_text("---\nclient: ludmyla\ntags: [x\n---\n# C\n")
+    view = await authed.post(
+        "/api/views", json={"name": "L", "query": {"properties": {"client": "ludmyla"}}}
+    )
+    assert view.status_code == 201, view.text
+    await authed.put(
+        "/api/settings/properties",
+        json={
+            "folder_defaults": [{"folder": "tech-services", "properties": {"client": "ludmyla"}}]
+        },
+    )
+    url = f"/api/properties/{client['id']}/options/{old['id']}/merge"
+
+    first = (await authed.post(url, json={"into_option_id": keep["id"]})).json()
+    assert first["failed"] == [
+        "documents/tech-services/c.md: The properties block is not valid YAML (line 3)."
+    ]
+    assert first["documents"] == 2  # the others are done; nothing else changed yet
+    assert "client: ludmyla-doula" in (folder / "b.md").read_text()
+    assert [o["slug"] for o in (await authed.get("/api/properties")).json()[-1]["options"]] == [
+        "ludmyla",
+        "ludmyla-doula",
+    ]
+
+    (folder / "c.md").write_text("---\nclient: ludmyla\n---\n# C\n")  # fixed by hand
+    again = (await authed.post(url, json={"into_option_id": keep["id"]})).json()
+    assert again == {"documents": 1, "views": 1, "folder_defaults": 1, "failed": []}
+    for name in ("a.md", "b.md", "c.md"):
+        assert "client: ludmyla-doula" in (folder / name).read_text(), name
+    saved = (await authed.get(f"/api/views/{view.json()['id']}")).json()
+    assert saved["query"]["properties"] == {"client": "ludmyla-doula"}
+    rules = (await authed.get("/api/settings")).json()["properties"]["folder_defaults"]
+    assert rules[0]["properties"] == {"client": "ludmyla-doula"}
+    # Renaming moves views along too.
+    r = await authed.post(
+        f"/api/properties/{client['id']}/options/{keep['id']}/rename", json={"slug": "doula"}
+    )
+    assert r.json()["documents"] == 3 and r.json()["views"] == 1
+    saved = (await authed.get(f"/api/views/{view.json()['id']}")).json()
+    assert saved["query"]["properties"] == {"client": "doula"}
+    assert (await authed.get(f"/api/views/{view.json()['id']}/rows")).json()["rows"]

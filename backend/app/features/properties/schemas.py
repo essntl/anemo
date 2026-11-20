@@ -76,6 +76,11 @@ class MergeIn(BaseModel):
 
 class RewriteOut(BaseModel):
     documents: int  # how many documents were rewritten (one revision each)
+    views: int = 0  # saved views whose filter named the value
+    folder_defaults: int = 0  # folder rules that gave the value
+    # Documents that couldn't be rewritten. Then nothing else changed: fix them and run
+    # it again (what was rewritten stays so).
+    failed: list[str] = []
 
 
 class ValidateIn(BaseModel):

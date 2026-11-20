@@ -160,9 +160,7 @@ async def rename_option(
     """Give a value a new slug: every document with it is rewritten (a revision each)."""
     definition = await service.get_definition(db, definition_id)
     option = await service.get_option(db, definition, option_id)
-    return RewriteOut(
-        documents=await doc_properties.rename_value(db, definition, option, body.slug)
-    )
+    return _rewritten(await doc_properties.rename_value(db, definition, option, body.slug))
 
 
 @router.post("/{definition_id}/options/{option_id}/merge", response_model=RewriteOut)
@@ -173,7 +171,13 @@ async def merge_option(
     definition = await service.get_definition(db, definition_id)
     option = await service.get_option(db, definition, option_id)
     into = await service.get_option(db, definition, body.into_option_id)
-    return RewriteOut(documents=await doc_properties.merge_values(db, definition, option, into))
+    return _rewritten(await doc_properties.merge_values(db, definition, option, into))
+
+
+def _rewritten(r: doc_properties.Rewritten) -> RewriteOut:
+    return RewriteOut(
+        documents=r.documents, views=r.views, folder_defaults=r.folder_defaults, failed=r.failed
+    )
 
 
 @router.post("/validate", response_model=ValidateOut)
