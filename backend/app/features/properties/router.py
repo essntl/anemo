@@ -10,6 +10,7 @@ from app.features.documents.models import Document
 from app.features.properties import service
 from app.features.properties.models import PropertyOption
 from app.features.properties.schemas import (
+    AppliedOut,
     DefinitionIn,
     DefinitionOut,
     DefinitionPatch,
@@ -20,6 +21,8 @@ from app.features.properties.schemas import (
     ReindexOut,
     RenameIn,
     RewriteOut,
+    SuggestionIds,
+    SuggestionOut,
     ValidateIn,
     ValidateOut,
 )
@@ -184,3 +187,32 @@ async def validate(body: ValidateIn, db: Db) -> ValidateOut:
 async def reindex(db: Db) -> ReindexOut:
     """Re-read every document whose index is out of date (changed outside Anemo)."""
     return ReindexOut(documents=await doc_properties.reindex_stale(db))
+
+
+@router.get("/suggestions", response_model=list[SuggestionOut])
+async def list_suggestions(db: Db) -> list[SuggestionOut]:
+    """Properties the assistant suggested for documents, waiting to be applied or dismissed."""
+    return [
+        SuggestionOut(
+            id=s.id,
+            document_id=d.id,
+            title=d.title,
+            path=d.path,
+            current=d.properties or {},
+            suggested=s.properties,
+            actor_ref=s.actor_ref,
+        )
+        for s, d in await doc_properties.suggestions(db)
+    ]
+
+
+@router.post("/suggestions/apply", response_model=AppliedOut)
+async def apply_suggestions(body: SuggestionIds, db: Db) -> AppliedOut:
+    """Write the chosen suggestions into their documents (a revision each)."""
+    applied, problems = await doc_properties.apply_suggestions(db, body.ids)
+    return AppliedOut(applied=applied, problems=problems)
+
+
+@router.post("/suggestions/dismiss", status_code=204)
+async def dismiss_suggestions(body: SuggestionIds, db: Db) -> None:
+    await doc_properties.dismiss_suggestions(db, body.ids)

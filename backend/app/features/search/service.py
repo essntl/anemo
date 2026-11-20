@@ -187,7 +187,7 @@ async def _documents(db: AsyncSession, q: Query) -> list[SearchHit]:
     by_name = await db.scalars(
         select(Document.id)
         .where(
-            contains_all(q.words, Document.title, Document.path),
+            *([contains_all(q.words, Document.title, Document.path)] if q.words else []),
             *await doc_search.conditions(db, f),
         )
         .limit(q.limit)

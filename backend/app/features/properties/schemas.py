@@ -90,3 +90,22 @@ class ValidateOut(BaseModel):
 
 class ReindexOut(BaseModel):
     documents: int  # documents whose index was rebuilt
+
+
+class SuggestionOut(BaseModel):
+    id: uuid.UUID
+    document_id: uuid.UUID
+    title: str
+    path: str
+    current: dict[str, Any]  # the document's properties now
+    suggested: dict[str, Any]  # what applying sets (None removes)
+    actor_ref: str  # who suggested it (chat:<id>, automation:<id>/<run>)
+
+
+class SuggestionIds(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+
+
+class AppliedOut(BaseModel):
+    applied: int
+    problems: list[str]  # suggestions that no longer fit, kept for another look

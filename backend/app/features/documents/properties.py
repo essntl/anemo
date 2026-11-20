@@ -6,16 +6,17 @@ the index follows from the file. Nothing writes properties to the database only.
 import uuid
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import current_actor
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict, NotFound
 from app.features.documents import meta, service
 from app.features.documents.models import Document
 from app.features.properties import frontmatter
 from app.features.properties import service as properties
-from app.features.properties.models import PropertyDefinition, PropertyOption
+from app.features.properties.models import PropertyDefinition, PropertyOption, PropertySuggestion
 from app.features.settings import service as settings
 from app.features.settings.sections import PropertySettings
 
@@ -287,4 +288,67 @@ async def delete_option(
             details={"documents": used},
         )
     await db.delete(option)
+    await db.commit()
+
+
+# -- suggestions to review ---------------------------------------------------------------
+
+
+async def suggest(db: AsyncSession, document_ids: list[uuid.UUID], values: dict[str, Any]) -> int:
+    """Put properties up for the user to apply (validated, nothing written to files).
+    A document keeps one suggestion; a new one adds to it. Commits. Returns how many."""
+    for doc_id in document_ids:
+        existing = await db.scalar(
+            select(PropertySuggestion).where(PropertySuggestion.document_id == doc_id)
+        )
+        if existing is None:
+            db.add(
+                PropertySuggestion(
+                    document_id=doc_id, properties=values, actor_ref=current_actor().ref
+                )
+            )
+        else:
+            existing.properties = {**existing.properties, **values}
+            existing.actor_ref = current_actor().ref
+    await db.commit()
+    return len(document_ids)
+
+
+async def suggestions(db: AsyncSession) -> list[tuple[PropertySuggestion, Document]]:
+    rows = await db.execute(
+        select(PropertySuggestion, Document)
+        .join(Document, Document.id == PropertySuggestion.document_id)
+        .order_by(Document.path)
+    )
+    return [(s, d) for s, d in rows.all()]
+
+
+async def apply_suggestions(db: AsyncSession, ids: list[uuid.UUID]) -> tuple[int, list[str]]:
+    """Write the chosen suggestions into their documents (a revision each) and drop
+    them. A suggestion that no longer fits (a value removed meanwhile) is kept and its
+    problem returned. Commits."""
+    applied, problems = 0, []
+    for suggestion_id in ids:
+        suggestion = await db.get(PropertySuggestion, suggestion_id)
+        if suggestion is None:
+            continue
+        doc = await db.get(Document, suggestion.document_id)
+        if doc is None:
+            continue
+        try:
+            await set_properties(
+                db, doc, dict(suggestion.properties), base_hash=None, author="user"
+            )
+        except AppError as exc:
+            await db.rollback()
+            problems.append(f"{doc.title}: {exc.message}")
+            continue
+        await db.delete(suggestion)
+        await db.commit()
+        applied += 1
+    return applied, problems
+
+
+async def dismiss_suggestions(db: AsyncSession, ids: list[uuid.UUID]) -> None:
+    await db.execute(delete(PropertySuggestion).where(PropertySuggestion.id.in_(ids)))
     await db.commit()

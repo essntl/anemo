@@ -548,6 +548,13 @@ class SetDocumentPropertiesInput(BaseModel):
             "nothing; reuse existing values whenever one fits."
         ),
     )
+    suggest: bool = Field(
+        False,
+        description=(
+            "Don't change the documents: put the properties up for the user to review and "
+            "apply (to tag many existing documents at once)."
+        ),
+    )
 
 
 class SetDocumentProperties(Tool):
@@ -563,6 +570,11 @@ class SetDocumentProperties(Tool):
     idempotent = False
 
     def actions(self, args: SetDocumentPropertiesInput, ctx: ToolContext) -> list[Action]:
+        if args.suggest:  # nothing changes until the user applies them
+            return [
+                path_action(ctx, "fs.read", _safe_path(ref), "Suggest properties for", "read")
+                for ref in args.documents
+            ]
         out = []
         for ref in args.documents:
             action = path_action(
@@ -584,15 +596,23 @@ class SetDocumentProperties(Tool):
                 ids = list(
                     dict.fromkeys([(await paths.resolve(db, ref)).doc.id for ref in args.documents])
                 )
+                normalised: dict[str, Any] = {}
                 # Check every document first, so a bad value changes nothing at all.
                 for doc_id in ids:
                     checked = await service.get(db, doc_id)
                     frontmatter.update(await service.read(db, checked), {})  # readable block
                     project_id = await meta.project_for_path(db, checked.path)
-                    await properties.validate(
+                    normalised = await properties.validate(
                         db, "document", project_id, changes, create_values=args.create_value
                     )
                 await db.rollback()  # values the check made are made again when used
+                if args.suggest:
+                    count = await doc_properties.suggest(db, ids, normalised)
+                    return ToolResult(
+                        content=f"Suggested for {count} document{'s' if count != 1 else ''}: "
+                        "the user reviews them under Documents > Suggested properties.",
+                        data={"suggested": count},
+                    )
                 for doc_id in ids:
                     doc = await db.get(Document, doc_id)
                     if doc is None:

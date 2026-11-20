@@ -1,9 +1,12 @@
 import uuid
+from datetime import datetime
+from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.actor import ACTOR_REF_LENGTH
 from app.db.base import Base, IdMixin, TimestampMixin
 
 
@@ -47,3 +50,17 @@ class PropertyOption(Base, IdMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL")
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class PropertySuggestion(Base, IdMixin):
+    """Properties the assistant suggests for a document, waiting for the user to apply or
+    dismiss them (bulk tagging of existing documents: nothing is tagged unasked)."""
+
+    __tablename__ = "property_suggestions"
+
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), unique=True
+    )
+    properties: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # key -> value
+    actor_ref: Mapped[str] = mapped_column(String(ACTOR_REF_LENGTH))  # who suggested it
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

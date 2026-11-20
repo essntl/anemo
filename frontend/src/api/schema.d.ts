@@ -3907,6 +3907,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/properties/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Suggestions
+         * @description Properties the assistant suggested for documents, waiting to be applied or dismissed.
+         */
+        get: operations["list_suggestions_api_properties_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/suggestions/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Suggestions
+         * @description Write the chosen suggestions into their documents (a revision each).
+         */
+        post: operations["apply_suggestions_api_properties_suggestions_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/suggestions/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Suggestions */
+        post: operations["dismiss_suggestions_api_properties_suggestions_dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/views": {
         parameters: {
             query?: never;
@@ -4044,6 +4101,13 @@ export interface components {
             mode: "append";
             /** Document Id */
             document_id?: string | null;
+        };
+        /** AppliedOut */
+        AppliedOut: {
+            /** Applied */
+            applied: number;
+            /** Problems */
+            problems: string[];
         };
         /** ApprovalOut */
         ApprovalOut: {
@@ -8277,6 +8341,38 @@ export interface components {
             /** Projects */
             projects: components["schemas"]["ProjectStats"][];
             agents: components["schemas"]["AgentStats"];
+        };
+        /** SuggestionIds */
+        SuggestionIds: {
+            /** Ids */
+            ids: string[];
+        };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Title */
+            title: string;
+            /** Path */
+            path: string;
+            /** Current */
+            current: {
+                [key: string]: unknown;
+            };
+            /** Suggested */
+            suggested: {
+                [key: string]: unknown;
+            };
+            /** Actor Ref */
+            actor_ref: string;
         };
         /** SummaryItem */
         SummaryItem: {
@@ -18200,6 +18296,105 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["app__features__properties__schemas__ReindexOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_suggestions_api_properties_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_suggestions_api_properties_suggestions_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppliedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_suggestions_api_properties_suggestions_dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -688,6 +688,10 @@ async def test_the_search_box_turns_filters_into_chips(authed, docs):
         ("In: Tech Services", True),
     ]
     assert [g["kind"] for g in result["groups"]] == ["document"]  # filters are about documents
+    # The same search, as a view would keep it ("Save as view").
+    view = result["view"]
+    assert view["properties"] == {"client": "ludmyla-doula", "type": "brief"}
+    assert view["project_id"] == ts["id"] and view["text"] == "price"
     assert [h["id"] for h in result["groups"][0]["hits"]] == [brief["id"]]
     # Only filters: everything that matches them.
     only = await find('client:"Ludmyla Doula"')
@@ -751,3 +755,31 @@ async def test_a_rename_found_by_reconcile_goes_into_the_path_history(authed, do
     assert "moved to `documents/elsewhere/shell.md`" in read.content
     history = (await authed.get(f"/api/documents/{doc['id']}/paths")).json()
     assert [h["old_path"] for h in history] == ["documents/shell.md"]
+
+
+async def test_suggested_properties_wait_for_the_user(authed, docs):
+    a = await new_doc(authed, "Old offer", "", "Text.")
+    b = await new_doc(authed, "Old plan", "", "Text.")
+    args = doc_tools.SetDocumentProperties.Input(
+        documents=[a["id"], b["path"]], set={"type": "Plan", "tags": ["archive-2025"]}, suggest=True
+    )
+    [action, _] = doc_tools.SetDocumentProperties().actions(args, ctx())
+    assert action.capability == "fs.read" and action.summary.startswith("Suggest properties for")
+    result = await doc_tools.SetDocumentProperties().run(args, ctx())
+    assert not result.is_error and result.data == {"suggested": 2}, result.content
+    assert "type" not in (docs / "old-offer.md").read_text()  # nothing written
+    listed = (await authed.get("/api/properties/suggestions")).json()
+    expected = {"type": "plan", "tags": ["archive-2025"]}
+    assert [(s["title"], s["suggested"]) for s in listed] == [
+        ("Old offer", expected),
+        ("Old plan", expected),
+    ]
+    # Apply some, dismiss the rest.
+    r = await authed.post("/api/properties/suggestions/apply", json={"ids": [listed[0]["id"]]})
+    assert r.json() == {"applied": 1, "problems": []}
+    applied = (docs / "old-offer.md").read_text()
+    assert "type: plan\n" in applied and "tags: [archive-2025]\n" in applied
+    r = await authed.post("/api/properties/suggestions/dismiss", json={"ids": [listed[1]["id"]]})
+    assert r.status_code == 204
+    assert (await authed.get("/api/properties/suggestions")).json() == []
+    assert "type" not in (docs / "old-plan.md").read_text()
