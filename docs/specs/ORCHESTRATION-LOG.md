@@ -10,7 +10,7 @@ Whoever resumes this work continues from this log.
 | 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done |
 | 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | **merged** into integrate/fundamentals (ac85f41); after the merge: backend `all` and the frontend checks (449 tests) green |
 | 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | reviewed (1 blocker); builder fixing |
-| 1 | T Response timer | `feat/t` | `../anemo-t` | **merged** (230371b; 0040 re-chained onto 0036); suite after the merge running |
+| 1 | T Response timer | `feat/t` | `../anemo-t` | **merged** (230371b; 0040 re-chained onto 0036); after the merge: backend `all` and the frontend checks (474 tests) green |
 | 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | reviewed; builder fixing the review findings |
 | 2 | A3 Tasks and events join in | `feat/a3` | — | after A1, T, B1, A2 are merged |
 | 2 | B2 Automations with sources | `feat/b2` | — | after A1, T, B1, A2 are merged |
