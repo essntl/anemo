@@ -2,7 +2,7 @@
 127.0.0.1, and a script for a local ("stdio") one."""
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -48,9 +48,11 @@ class Running:
 
 
 @asynccontextmanager
-async def http_server(path: str = "/mcp") -> AsyncIterator[Running]:
-    """Serves build() over Streamable HTTP, or over SSE with path="/sse"."""
-    mcp_server = build()
+async def http_server(
+    path: str = "/mcp", server: Callable[[], MCPServer] = build
+) -> AsyncIterator[Running]:
+    """Serves build() (or `server()`) over Streamable HTTP, or over SSE with path="/sse"."""
+    mcp_server = server()
     security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
     if path == "/sse":
         inner = mcp_server.sse_app(transport_security=security)
