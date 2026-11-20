@@ -14,7 +14,7 @@ from tests.api.test_agent import (
     workspace,  # noqa: F401 - autouse fixture
 )
 from tests.api.test_automations_reasoning import create, run_log
-from tests.api.test_notifications_automations import fire
+from tests.api.test_notifications_automations import fire, global_events
 from tests.api.test_run_timing import SLACK, at, duration_ms, wait_longer
 from tests.conftest import requires_db
 
@@ -42,6 +42,12 @@ async def test_each_run_in_the_log_says_how_long_it_took(authed):
     (approval,) = (await authed.get("/api/approvals")).json()
     await authed.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"})
     await execute_run(uuid.UUID(run_id))
+    # Every change of its status was announced (the app then fetches the run log again),
+    # also when it went on after the approval: the log doesn't stay at "waiting for you".
+    statuses = [e["status"] for e in await global_events("run.status") if e["run_id"] == run_id]
+    after_the_wait = statuses[statuses.index("waiting_approval") + 1 :]
+    assert "running" in after_the_wait and after_the_wait[-1] == "completed"
+    assert all(e["automation"] for e in await global_events("run.status") if e["run_id"] == run_id)
 
     (entry,) = await run_log(authed, a["id"])
     timing = entry["timing"]

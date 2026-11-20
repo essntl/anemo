@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 SERVER = "artemk"  # its name in Anemo, so its tools are mcp__artemk__<tool>
@@ -69,6 +70,8 @@ class Artemk:
     bookings: list[Booking] = field(default_factory=list)
     # Every call, in order: (tool, arguments).
     calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
+    # Set: open_requests fails with this message (an outage that quotes a booking, say).
+    fail_with: str | None = None
 
     @property
     def contacted(self) -> list[tuple[str, dict[str, Any]]]:
@@ -89,6 +92,8 @@ class Artemk:
         def open_requests() -> str:
             """Booking requests that wait for an answer."""
             self.calls.append(("open_requests", {}))
+            if self.fail_with:
+                raise ToolError(self.fail_with)
             return listing([b for b in self.bookings if b.status == "requested"])
 
         @server.tool(annotations=read_only)
