@@ -8,10 +8,10 @@ Whoever resumes this work continues from this log.
 | Wave | Package | Branch | Worktree | Status |
 |---|---|---|---|---|
 | 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done |
-| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | reviewed; builder fixing the review findings |
-| 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | building (started 2026-11-20) |
-| 1 | T Response timer | `feat/t` | `../anemo-t` | built (3 commits, suite green); in review |
-| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | building (started 2026-11-20) |
+| 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | **merged** into integrate/fundamentals (ac85f41); suite after the merge not yet run |
+| 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | stopped while building: 4 commits, 7 files uncommitted (it was running the frontend checks) |
+| 1 | T Response timer | `feat/t` | `../anemo-t` | built (3 commits, suite green); review stopped before it reported |
+| 1 | B1 Automations core | `feat/b1` | `../anemo-b1` | stopped while building: 4 commits, clean tree (it was running the full suite) |
 | 2 | A3 Tasks and events join in | `feat/a3` | — | after A1, T, B1, A2 are merged |
 | 2 | B2 Automations with sources | `feat/b2` | — | after A1, T, B1, A2 are merged |
 
@@ -99,6 +99,14 @@ fill-ins in `packages.md`).
 | # | When | Change | Why | Affected |
 |---|---|---|---|---|
 | 1 | W1, A1 review | `external_key_tombstones`: purging a synced item from the trash keeps its key | Spec 01 1.2: "If I deleted a synced event, an automation must not recreate it"; the purge freed the key | A1 only |
+
+## Stop (2026-11-20)
+
+The user said "stop". These were stopped: the A2 and B1 builders, the T reviewer, and
+the suite run on the integration branch after the A1 merge. The progress notes are in
+`anemo-progress/<id>.md`. To resume, restart the A2/B1 builders with their briefing plus
+"continue from your progress note and the branch". Re-run the T review. Run
+`anemo-test.sh int all` on the integration branch.
 
 ## Decisions during wave 1
 
