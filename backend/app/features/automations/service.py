@@ -263,11 +263,14 @@ async def run_log(
         stmt = stmt.where(Run.created_at < before)
     if run_id is not None:
         stmt = stmt.where(Run.id == run_id)
-    return [run_log_entry(r) for r in await db.scalars(stmt)]
+    found = list(await db.scalars(stmt))
+    counts = await runs.tool_call_counts(db, (r.id for r in found))
+    return [run_log_entry(r, counts.get(r.id, 0)) for r in found]
 
 
-def run_log_entry(run: Run) -> AutomationRunOut:
-    """One line of the automation's run log."""
+def run_log_entry(run: Run, tool_calls: int = 0) -> AutomationRunOut:
+    """One line of the automation's run log, with how long the run took (`tool_calls`:
+    how many calls it made)."""
     return AutomationRunOut(
         run_id=run.id,
         status=run.status,
@@ -279,6 +282,7 @@ def run_log_entry(run: Run) -> AutomationRunOut:
         changes=[RunChange.model_validate(c) for c in run.changes or []],
         conversation_id=run.conversation_id,
         error=(run.error or {}).get("message"),
+        timing=runs.run_timing(run, tool_calls),
     )
 
 

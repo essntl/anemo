@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field, ModelWrapValidatorHandler, model_validator
 
 from app.features.automations.schedule import MIN_GAP, MIN_GAP_CHECKED, Schedule, floor
+from app.features.runs.schemas import RunTiming
 
 OnAsk = Literal["pause", "deny", "fail"]
 # agent_decides: only when the run calls send_notification (or keeps failing).
@@ -189,3 +190,5 @@ class AutomationRunOut(BaseModel):
     changes: list[RunChange] = []
     conversation_id: uuid.UUID | None
     error: str | None
+    # How long it took, as the chat shows it: finished_at - started_at - waiting_ms.
+    timing: RunTiming
