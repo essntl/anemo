@@ -256,6 +256,8 @@ The canonical store is `runs` and `tool_calls`. Messages reach their timing thro
     user (approvals, `ask_user`, and `paused`, which waits for the user to resume; a
     top-level run also waits while one of its sub-agents waits) (change 2)
   - `waiting_since` timestamptz, nullable: set while waiting now
+  - `first_text_waiting_ms` BigInteger, NOT NULL, default 0: how long the run had waited
+    when its first text came, so "time to first text" leaves that wait out (change 3)
 - **`tool_calls.started_at` / `ended_at`** exist already. T makes sure every finished
   call gets `ended_at`, including cancelled ones in `agent_finalize.finalize`, and that
   sub-agent calls get both.
@@ -266,7 +268,7 @@ The canonical store is `runs` and `tool_calls`. Messages reach their timing thro
   RunTiming {
     started_at, finished_at | None,
     outcome: "done" | "stopped" | "failed" | None,  # None while running
-    first_text_at | None, waiting_ms, waiting_since | None,
+    first_text_at | None, first_text_waiting_ms, waiting_ms, waiting_since | None,
     tool_calls: int,
   }
   ```
@@ -447,3 +449,6 @@ settled.
 - Change 2 (wave 1, after the T review): `waiting_ms` also counts `paused` time, and a
   top-level run waits while one of its sub-agents waits. B2 shows the duration as
   `finished_at − started_at − waiting_ms` and needs nothing else.
+- Change 3 (wave 1, after the T review): `runs.first_text_waiting_ms` and
+  `RunTiming.first_text_waiting_ms`. Time to first text is
+  `first_text_at − started_at − first_text_waiting_ms`. T only.

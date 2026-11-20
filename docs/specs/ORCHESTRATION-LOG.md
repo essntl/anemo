@@ -100,6 +100,7 @@ fill-ins in `packages.md`).
 |---|---|---|---|---|
 | 1 | W1, A1 review | `external_key_tombstones`: purging a synced item from the trash keeps its key | Spec 01 1.2: "If I deleted a synced event, an automation must not recreate it"; the purge freed the key | A1 only |
 | 2 | W1, T review | `waiting_ms` counts `paused` and a waiting sub-agent | The run waits for the user then too, and the UI says so | T (done); B2 reads it |
+| 3 | W1, T fixes | `runs.first_text_waiting_ms` / `RunTiming.first_text_waiting_ms` | "Time to first text" must leave earlier waits out | T only |
 
 ## Stop (2026-11-20)
 
