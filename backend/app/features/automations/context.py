@@ -2,8 +2,10 @@
 approvals earlier runs are still waiting for, and what the change check found.
 
 It goes into the turn context of the run's message (runtime/agent_snapshot.py), so the
-system prompt stays the same from run to run. Content from outside Anemo is marked as
-data (`untrusted`); the system prompt says what that means.
+system prompt stays the same from run to run. Content that did not come from the user
+is marked as data (`untrusted`): what the check's tools returned, and also the note and
+the approval summaries, which earlier runs wrote and an injected instruction may have
+shaped. The system prompt says what the mark means.
 """
 
 from datetime import datetime
@@ -15,15 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.automations.models import Automation
 from app.features.automations.service import pending_approvals
 from app.features.runs.models import Run
-
-OPEN, CLOSE = "<untrusted_data", "</untrusted_data>"
-
-
-def untrusted(source: str, text: str) -> str:
-    """`text` from outside, marked as data. A closing tag inside it can't end the mark."""
-    body = text.replace(CLOSE[:-1], "<\\/untrusted_data")
-    label = source.replace('"', "'")
-    return f'{OPEN} source="{label}">\n{body}\n{CLOSE}'
+from app.tools.untrusted import untrusted
 
 
 def _when(value: str | datetime, tz: str) -> str:
@@ -72,14 +66,15 @@ async def run_context(db: AsyncSession, run: Run, tz: str) -> str:
     parts = [
         "## This automation",
         "State note kept by earlier runs (replace it with update_automation_state):\n"
-        + (note or "(empty: nothing kept yet)"),
+        + (untrusted("state note", note) if note else "(empty: nothing kept yet)"),
     ]
     waiting = [p for p in await pending_approvals(db, automation.id) if p.run_id != run.id]
     if waiting:
         listing = "\n".join(f"- {p.summary} (asked {_when(p.created_at, tz)})" for p in waiting)
         parts.append(
             "Waiting for the user's approval, asked by earlier runs. Do not ask for these "
-            "again: they happen if the user approves them.\n" + listing
+            "again: they happen if the user approves them.\n"
+            + untrusted("pending approvals", listing)
         )
     change = (run.options.get("automation") or {}).get("change")
     if change:

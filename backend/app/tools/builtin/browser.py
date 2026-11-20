@@ -177,6 +177,7 @@ def _mine_action(summary: str, risk: Literal["safe", "dangerous"] = "safe") -> A
         risk=risk,
         summary=f"{summary} (your Chrome)",
         always_ask="a click or typing in your own Chrome" if risk != "safe" else None,
+        contacts_people=risk != "safe",  # a click or typing may send something to someone
     )
 
 
@@ -316,6 +317,8 @@ class BrowserClick(Tool):
                 capability=CAPABILITY,
                 risk="moderate",
                 summary=f"Click {_element(ctx, args.ref)} in the browser",
+                # It may submit a form that sends something to someone: automation runs ask.
+                contacts_people=True,
             )
         ]
 
@@ -424,7 +427,11 @@ class BrowserType(Tool):
             what = _element(ctx, args.ref, "my_browser") if args.ref else None
             return [_mine_action(self._summary(args, what), "dangerous")]
         what = _element(ctx, args.ref) if args.ref else None
-        return [Action(capability=CAPABILITY, risk="moderate", summary=self._summary(args, what))]
+        summary = self._summary(args, what)
+        # Typing (and pressing Enter) may send a message: automation runs ask.
+        return [
+            Action(capability=CAPABILITY, risk="moderate", summary=summary, contacts_people=True)
+        ]
 
     async def run(self, args: TypeInput, ctx: ToolContext) -> ToolResult:
         if args.text is None:

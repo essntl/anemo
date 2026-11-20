@@ -24,6 +24,7 @@ from app.mcp import client
 from app.policy.models import Action, Risk
 from app.providers.base import ToolSpec
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.untrusted import untrusted
 
 MAX_NAME = 64  # providers limit tool names to 64 of [a-zA-Z0-9_-]
 MAX_DESCRIPTION = 1500
@@ -85,9 +86,6 @@ class McpToolBase(Tool):
     remote_name: str
     risk: Risk
     schema: dict[str, Any]
-    # The server says the tool talks to the world outside it (MCP's openWorldHint,
-    # true unless the server says otherwise).
-    open_world: bool = True
     timeout_s = CALL_TIMEOUT_S + client.CONNECT_TIMEOUT_S + 10
 
     def spec(self) -> ToolSpec:
@@ -103,8 +101,9 @@ class McpToolBase(Tool):
                 risk=self.risk,
                 summary=f"{self.server_name}: {self.remote_name} {_brief(args.root)}",
                 # A tool that may write to another system can reach other people
-                # (send a mail, post a message): automation runs ask.
-                contacts_people=self.changes(args) and self.open_world,
+                # (send a mail, post a message): automation runs ask. The server's own
+                # hints (openWorldHint) are not trusted for this.
+                contacts_people=self.changes(args),
             )
         ]
 
@@ -121,8 +120,13 @@ class McpToolBase(Tool):
             result = await client.call_tool(target, self.remote_name, args.root, CALL_TIMEOUT_S)
         except client.McpError as exc:
             return ToolResult(content=str(exc), is_error=True)
+        # In an automation run (nobody watching) what another system returns is marked
+        # as data, not instructions (tools/untrusted.py).
+        unattended = ctx.actor.kind == "automation"
         return ToolResult(
-            content=result.text,
+            content=untrusted(f"{self.server_name}: {self.remote_name}", result.text)
+            if unattended
+            else result.text,
             is_error=result.is_error,
             data={"mcp": {"server": self.server_name, "tool": self.remote_name}},
         )
@@ -142,10 +146,6 @@ def build(server: McpServer, tool: McpTool) -> Tool:
         "server_name": server.name,
         "remote_name": tool.name,
         "risk": risk,
-        "open_world": (tool.annotations or {}).get(
-            "openWorldHint", (tool.annotations or {}).get("open_world_hint", True)
-        )
-        is not False,
         "schema": provider_schema(tool.input_schema),
     }
     return type("McpTool", (McpToolBase,), attributes)()  # type: ignore[no-any-return]
