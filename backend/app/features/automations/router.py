@@ -24,7 +24,6 @@ from app.features.automations.schemas import (
 )
 from app.features.conversations import service as conversations
 from app.features.conversations.models import Conversation
-from app.features.runs.models import Run
 
 router = APIRouter(prefix="/automations", tags=["automations"])
 
@@ -112,19 +111,12 @@ async def run_log(
     db: Db,
     before: datetime | None = Query(None, description="Only runs started before this time"),
     limit: int = Query(50, ge=1, le=200),
+    run_id: uuid.UUID | None = Query(None, description="Only this run (a link to one)"),
 ) -> list[AutomationRunOut]:
     """The automation's runs, newest first, with the model's outcome line and the changes
     the server recorded. Page with `before` = the last item's created_at."""
     automation = await service.get(db, automation_id)
-    stmt = (
-        select(Run)
-        .where(Run.automation_id == automation.id)
-        .order_by(Run.created_at.desc())
-        .limit(limit)
-    )
-    if before is not None:
-        stmt = stmt.where(Run.created_at < before)
-    return [service.run_log_entry(r) for r in await db.scalars(stmt)]
+    return await service.run_log(db, automation, before=before, limit=limit, run_id=run_id)
 
 
 @router.post("/{automation_id}/run", response_model=RunStarted, status_code=202)

@@ -149,6 +149,16 @@ async def test_changes_are_recorded_from_tool_calls_and_notifying_is_up_to_the_r
     assert newest["outcome_line"] == "told you about #13"
     assert [n["title"] for n in await notifications(authed)] == ["New request #13"]
     assert run_id != newest["run_id"]
+    # A link to one run finds it even when it is not on the first page.
+    url = f"/api/automations/{a['id']}/runs"
+    assert [e["run_id"] for e in (await authed.get(url, params={"limit": 1})).json()] == [
+        newest["run_id"]
+    ]
+    linked = (await authed.get(url, params={"run_id": run_id, "limit": 1})).json()
+    assert [e["run_id"] for e in linked] == [run_id]
+    elsewhere = await create(authed, name="Other")
+    other_url = f"/api/automations/{elsewhere['id']}/runs"
+    assert (await authed.get(other_url, params={"run_id": run_id})).json() == []
 
 
 def test_outcome_lines() -> None:
@@ -172,7 +182,7 @@ async def test_a_run_over_its_tool_call_limit_stops_and_fails(authed):
 
     run = (await authed.get(f"/api/runs/{run_id}")).json()
     assert run["status"] == "failed"
-    assert run["error"]["message"] == "Stopped after 3 tool calls (the limit for agent runs)."
+    assert run["error"]["message"] == "Stopped after 3 tool calls (this automation's limit)."
     calls = (await timeline(authed, run_id))["tool_calls"]
     assert [c["status"] for c in calls][:3] == ["succeeded"] * 3
     # What it did before it stopped is still recorded.

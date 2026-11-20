@@ -23,6 +23,7 @@ import {
   type Automation,
   type AutomationRun,
   STATUS_LABELS,
+  useAutomationRun,
   useAutomationRuns,
   useAutomations,
   useDeleteAutomation,
@@ -85,14 +86,19 @@ function RunLogEntry({ run, highlighted }: { run: AutomationRun; highlighted: bo
   )
 }
 
-/** The run log of one automation; each run opens its conversation. */
+/** The run log of one automation; each run opens its conversation. A run a link points
+ * to that is older than the log shows is fetched on its own and shown first. */
 function RunHistory({ automation, highlight }: { automation: Automation; highlight: string | null }) {
   const runs = useAutomationRuns(automation.id)
+  const listed = runs.data?.some((run) => run.run_id === highlight) ?? true
+  const linked = useAutomationRun(automation.id, highlight && !listed ? highlight : null)
   if (runs.isError) return <p className="text-[12.5px] text-error">{errorMessage(runs.error)}</p>
   if (!runs.data) return <p className="text-[12.5px] text-muted">{t('Loading…')}</p>
-  if (runs.data.length === 0) return <p className="text-[12.5px] text-muted">{t('It has not run yet.')}</p>
+  const older = listed ? [] : (linked.data ?? [])
+  if (runs.data.length === 0 && older.length === 0) return <p className="text-[12.5px] text-muted">{t('It has not run yet.')}</p>
   return (
     <ul className="flex flex-col">
+      {older.map((run) => <RunLogEntry key={run.run_id} run={run} highlighted />)}
       {runs.data.map((run) => <RunLogEntry key={run.run_id} run={run} highlighted={run.run_id === highlight} />)}
     </ul>
   )

@@ -12,7 +12,7 @@ describe('run settings', () => {
   it('starts new automations with the limits new ones get, and keeps an existing one as it was', () => {
     expect(runSettingsBody(runSettingsFrom(null))).toEqual({
       tool_allowlist: null, max_tool_calls: 30, max_runtime_s: 300, chat_retention_days: null,
-      contact_tools_allowed: [], change_check: null, run_anyway_hours: null, state_note: null,
+      contact_tools_allowed: [], change_check: null, run_anyway_hours: null,
     })
     // No settings of its own: none are added by opening and saving it.
     expect(runSettingsBody(runSettingsFrom(existing()))).toMatchObject({ max_tool_calls: null, max_runtime_s: null })
@@ -29,8 +29,15 @@ describe('run settings', () => {
     expect(runSettingsBody(form)).toEqual({
       tool_allowlist: a.tool_allowlist, max_tool_calls: 12, max_runtime_s: 600, chat_retention_days: 7,
       contact_tools_allowed: ['send_sms', 'send_mail'], change_check: a.change_check, run_anyway_hours: 6,
-      state_note: 'reminded about #12',
     })
+  })
+
+  it('sends the state note only when the user changed it', () => {
+    // A run may have replaced it while the dialog was open (or it may be an old, long one).
+    const form = runSettingsFrom(existing({ state_note: 'x'.repeat(5000) }))
+    expect(runSettingsBody(form)).not.toHaveProperty('state_note')
+    expect(runSettingsBody({ ...form, stateNote: ' seen #12 ', stateNoteEdited: true }).state_note).toBe('seen #12')
+    expect(runSettingsBody({ ...form, stateNote: '', stateNoteEdited: true }).state_note).toBeNull()
   })
 
   it('checks the arguments of the change check', () => {

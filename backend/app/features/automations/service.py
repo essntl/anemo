@@ -237,6 +237,29 @@ async def automation_out(db: AsyncSession, a: Automation) -> AutomationOut:
     )
 
 
+async def run_log(
+    db: AsyncSession,
+    automation: Automation,
+    *,
+    before: datetime | None = None,
+    limit: int = 50,
+    run_id: uuid.UUID | None = None,
+) -> list[AutomationRunOut]:
+    """The automation's runs, newest first (`run_id`: only that one, if it is one of
+    them; a link may point to a run older than the first page)."""
+    stmt = (
+        select(Run)
+        .where(Run.automation_id == automation.id)
+        .order_by(Run.created_at.desc())
+        .limit(limit)
+    )
+    if before is not None:
+        stmt = stmt.where(Run.created_at < before)
+    if run_id is not None:
+        stmt = stmt.where(Run.id == run_id)
+    return [run_log_entry(r) for r in await db.scalars(stmt)]
+
+
 def run_log_entry(run: Run) -> AutomationRunOut:
     """One line of the automation's run log."""
     return AutomationRunOut(

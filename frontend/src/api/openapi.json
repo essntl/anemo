@@ -13899,6 +13899,25 @@
             }
           },
           {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this run (a link to one)",
+              "title": "Run Id"
+            },
+            "description": "Only this run (a link to one)"
+          },
+          {
             "name": "aiw_session",
             "in": "cookie",
             "required": false,

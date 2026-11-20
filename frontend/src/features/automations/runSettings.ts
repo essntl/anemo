@@ -3,7 +3,7 @@
  * that may reach people without asking, the change check, the state note) as form
  * values, and back to what the API takes. Empty fields mean "no setting of its own".
  */
-import type { Automation, AutomationInput } from './api'
+import type { Automation, AutomationSave } from './api'
 
 export interface CheckRow {
   tool: string
@@ -23,10 +23,12 @@ export interface RunSettingsForm {
   checks: CheckRow[]
   runAnywayHours: string
   stateNote: string
+  /** Only a note the user changed is saved: a run may have replaced it meanwhile. */
+  stateNoteEdited: boolean
 }
 
 type RunSettingsBody = Pick<
-  AutomationInput,
+  AutomationSave,
   | 'tool_allowlist'
   | 'max_tool_calls'
   | 'max_runtime_s'
@@ -44,7 +46,9 @@ const text = (n: number | null | undefined) => (n == null ? '' : String(n))
 
 export function runSettingsFrom(a: Automation | null): RunSettingsForm {
   if (!a) {
-    return { tools: null, ...NEW_LIMITS, retentionDays: '', contactsAllowed: '', checks: [], runAnywayHours: '', stateNote: '' }
+    return {
+      tools: null, ...NEW_LIMITS, retentionDays: '', contactsAllowed: '', checks: [], runAnywayHours: '', stateNote: '', stateNoteEdited: false,
+    }
   }
   return {
     tools: a.tool_allowlist ?? null,
@@ -55,6 +59,7 @@ export function runSettingsFrom(a: Automation | null): RunSettingsForm {
     checks: (a.change_check ?? []).map((c) => ({ tool: c.tool, args: JSON.stringify(c.args ?? {}) })),
     runAnywayHours: text(a.run_anyway_hours),
     stateNote: a.state_note ?? '',
+    stateNoteEdited: false,
   }
 }
 
@@ -88,6 +93,6 @@ export function runSettingsBody(form: RunSettingsForm): RunSettingsBody {
     contact_tools_allowed: form.contactsAllowed.split(',').map((s) => s.trim()).filter(Boolean),
     change_check: checks.length ? checks.map((r) => ({ tool: r.tool.trim(), args: parseArgs(r.args) ?? {} })) : null,
     run_anyway_hours: checks.length ? whole(form.runAnywayHours) : null,
-    state_note: form.stateNote.trim() || null,
+    ...(form.stateNoteEdited ? { state_note: form.stateNote.trim() || null } : {}),
   }
 }

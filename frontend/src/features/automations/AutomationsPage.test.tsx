@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({
   automations: [] as Record<string, unknown>[],
   runs: [] as Record<string, unknown>[],
+  linked: [] as Record<string, unknown>[],
+  asked: [] as (string | null)[],
   protections: { paused: false, max_run_minutes: 30 },
   save: vi.fn(),
 }))
@@ -15,6 +17,10 @@ vi.mock('./api', () => ({
   STATUS_LABELS: {},
   useAutomations: () => ({ data: state.automations, isSuccess: true, isError: false }),
   useAutomationRuns: () => ({ data: state.runs }),
+  useAutomationRun: (_id: string, runId: string | null) => {
+    state.asked.push(runId)
+    return { data: runId ? state.linked : undefined }
+  },
   useDeleteAutomation: () => idle,
   useRunAutomation: () => idle,
   useSetAutomationEnabled: () => idle,
@@ -44,6 +50,8 @@ describe('the automations page', () => {
   beforeEach(() => {
     state.automations = [automation()]
     state.runs = []
+    state.linked = []
+    state.asked = []
     state.protections = { paused: false, max_run_minutes: 30 }
     state.save.mockReset()
   })
@@ -93,6 +101,15 @@ describe('the automations page', () => {
     // Only that automation's history is open, and the linked run shows its changes.
     expect(screen.getAllByText('nothing new')).toHaveLength(1)
     expect(screen.getByText('Moved #3')).toBeInTheDocument()
+  })
+
+  it('fetches a linked run that is older than the log shows', () => {
+    state.runs = [logged({ run_id: 'r-new', outcome_line: 'newest' })]
+    state.linked = [logged({ run_id: 'r-old', outcome_line: 'a run from long ago', nothing_to_do: false })]
+    show('/automations?automation=a1&run=r-old')
+    expect(state.asked).toContain('r-old')
+    expect(screen.getByText('a run from long ago')).toBeInTheDocument()
+    expect(screen.getByText('newest')).toBeInTheDocument()
   })
 
   it('shows repeated failures and the approvals its runs wait for', () => {

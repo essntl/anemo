@@ -16197,6 +16197,8 @@ export interface operations {
                 /** @description Only runs started before this time */
                 before?: string | null;
                 limit?: number;
+                /** @description Only this run (a link to one) */
+                run_id?: string | null;
             };
             header?: never;
             path: {

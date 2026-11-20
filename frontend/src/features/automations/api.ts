@@ -6,6 +6,9 @@ import type { Schedule } from './scheduleForm'
 
 export type Automation = Schemas['AutomationOut']
 export type AutomationInput = Required<Schemas['AutomationIn']>
+/** What the dialog saves: the state note only when the user changed it (a run may have
+ * replaced it while the dialog was open). */
+export type AutomationSave = Omit<AutomationInput, 'state_note'> & { state_note?: string | null }
 export type OnAsk = Automation['on_ask']
 export type NotifyWhen = Automation['notify']
 /** One line of an automation's run log: its outcome and what it changed. */
@@ -42,6 +45,16 @@ export function useAutomationRuns(id: string) {
     queryKey: [...runsKey, 'automation', id],
     queryFn: async () =>
       unwrap(await api.GET('/api/automations/{automation_id}/runs', { params: { path: { automation_id: id }, query: { limit: 30 } } })),
+  })
+}
+
+/** One run of the log, found by its id (a link may point to one older than the log shows). */
+export function useAutomationRun(id: string, runId: string | null) {
+  return useQuery({
+    queryKey: [...runsKey, 'automation', id, 'run', runId],
+    enabled: runId !== null,
+    queryFn: async () =>
+      unwrap(await api.GET('/api/automations/{automation_id}/runs', { params: { path: { automation_id: id }, query: { run_id: runId } } })),
   })
 }
 
@@ -103,7 +116,7 @@ function useRefresh() {
 export function useSaveAutomation() {
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: async (v: { id?: string; body: AutomationInput }) =>
+    mutationFn: async (v: { id?: string; body: AutomationSave }) =>
       v.id
         ? unwrap(await api.PATCH('/api/automations/{automation_id}', { params: { path: { automation_id: v.id } }, body: v.body }))
         : unwrap(await api.POST('/api/automations', { body: v.body })),

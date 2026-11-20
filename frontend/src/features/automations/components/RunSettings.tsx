@@ -118,7 +118,7 @@ export function RunSettings({ form, onChange, editing }: Props) {
 
       {editing && (
         <Field label={t('State note')} hint={t('What the runs keep for the next ones. Every run sees it and may replace it.')}>
-          <Textarea rows={3} value={form.stateNote} maxLength={4000} onChange={(e) => set({ stateNote: e.target.value })} />
+          <Textarea rows={3} value={form.stateNote} maxLength={4000} onChange={(e) => set({ stateNote: e.target.value, stateNoteEdited: true })} />
         </Field>
       )}
     </div>

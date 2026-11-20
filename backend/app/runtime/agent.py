@@ -104,10 +104,16 @@ LIMIT_NOTICE = (
 )
 
 
-def limit_message(limit: str, limits: Limits) -> str:
-    """The note appended to the answer when a limit stops a run."""
+def limit_message(limit: str, limits: Limits, *, own: bool = False) -> str:
+    """The note appended to the answer when a limit stops a run. `own`: the limits are
+    an automation's own (tool calls and time)."""
     if limit == "steps":
         return f"Stopped after {limits.max_steps} steps (the step limit for agent runs)."
+    if limit == "tool_calls" and own:
+        return f"Stopped after {limits.max_tool_calls} tool calls (this automation's limit)."
+    if limit == "time" and own:
+        minutes = max(1, limits.max_runtime_s // 60)
+        return f"Stopped: the run reached this automation's time limit ({minutes} min)."
     if limit == "tool_calls":
         return f"Stopped after {limits.max_tool_calls} tool calls (the limit for agent runs)."
     if limit == "time":
@@ -1382,7 +1388,7 @@ async def _record_outcome(
         elif outcome.startswith("limit:") and _limit_fails(run, agent):
             # An automation with limits of its own: reaching one is a failure (a cheap model
             # looping). What it changed until then stays recorded.
-            note = limit_message(outcome.removeprefix("limit:"), agent.policy.limits)
+            note = limit_message(outcome.removeprefix("limit:"), agent.policy.limits, own=True)
             await finalize(db, run, "failed", error=note, note=f"\n\n_{note}_")
         elif outcome.startswith("limit:"):
             note = limit_message(outcome.removeprefix("limit:"), agent.policy.limits)
