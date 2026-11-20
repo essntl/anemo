@@ -286,6 +286,10 @@ async def test_a_run_waiting_for_approval_does_not_block_or_repeat(authed, works
     assert "already waits for the user's approval" in tool_results_sent_to_model()[-1]
     assert (await authed.get(f"/api/runs/{second}")).json()["status"] == "completed"
     assert len((await authed.get("/api/approvals")).json()) == 1
+    # The card shows how the latest run went; the waiting one is listed on its own.
+    card = await get(authed, a["id"])
+    assert card["last_status"] == "completed" and len(card["pending_approvals"]) == 1
+    assert card["active_run_id"] is None
     asked = [n for n in await notifications(authed) if n["kind"] == "approval"]
     assert len(asked) == 1 and asked[0]["link"] == f"/c/{pending['conversation_id']}"
 
@@ -776,3 +780,31 @@ async def test_a_paused_run_does_not_hold_up_later_runs(authed):
     later = await fire(authed, a)  # it waits for the user, like an approval: not busy
     assert later != paused
     assert (await authed.get(f"/api/runs/{later}")).json()["status"] == "completed"
+
+
+async def test_a_run_back_after_a_crash_waits_without_counting_restarts(authed):
+    await setup(authed)
+    a = await create(authed)
+    script("check the bookings", [TextDelta("Outcome: nothing new"), Done("end")])
+    crashed = await fire(authed, a, execute=False)
+    await set_run(crashed, status="running")  # its worker died
+    async with get_sessionmaker()() as db:  # another run of it that is working now
+        automation = await db.get(Automation, uuid.UUID(a["id"]))
+        assert automation is not None
+        working = str((await automations.start_run(db, automation, trigger="manual")).id)
+        await db.commit()
+    await set_run(working, status="running")
+
+    async def attempt() -> tuple[str, int]:
+        async with get_sessionmaker()() as db:
+            run = await db.get(Run, uuid.UUID(crashed))
+            assert run is not None
+            return run.status, run.attempt
+
+    await execute_run(uuid.UUID(crashed))
+    assert await attempt() == ("queued", 1)  # counted once, then it waits as queued
+    await execute_run(uuid.UUID(crashed))
+    assert await attempt() == ("queued", 1)  # waiting again is not another restart
+    await set_run(working, status="completed")
+    await execute_run(uuid.UUID(crashed))
+    assert await attempt() == ("completed", 1)
