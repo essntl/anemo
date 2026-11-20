@@ -82,5 +82,22 @@ def test_an_existing_automation_keeps_its_notes_and_todays_behaviour() -> None:
             assert row["max_runtime_s"] is None and row["chat_retention_days"] is None
             assert row["contact_tools_allowed"] is None and row["change_check"] is None
             assert row["failure_streak"] == 0 and row["last_error"] is None
+
+        # Rolled back and applied again, both kinds of note come back as they were.
+        free_text = "Reminded him about #12 already.\nAsk again on Monday"
+        asyncio.run(
+            _sql(
+                _dsn(url), "UPDATE automations SET state_note = $1 WHERE name = 'Quiet'", free_text
+            )
+        )
+        _alembic(url, "downgrade", "0040")
+        states = asyncio.run(_sql(_dsn(url), "SELECT name, state FROM automations ORDER BY name"))
+        assert [json.loads(str(s["state"])) for s in states] == [
+            {"last_price": "42", "seen": "#12"},  # back to its keys
+            {"note": free_text},  # kept whole
+        ]
+        _alembic(url, "upgrade", "head")
+        notes = asyncio.run(_sql(_dsn(url), "SELECT state_note FROM automations ORDER BY name"))
+        assert [n["state_note"] for n in notes] == ["last_price: 42\nseen: #12", free_text]
     finally:
         asyncio.run(_sql(admin, f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))

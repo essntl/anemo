@@ -45,13 +45,18 @@ def upgrade() -> None:
         sa.Column("failure_streak", sa.Integer(), server_default="0", nullable=False),
     )
     op.add_column("automations", sa.Column("last_error", sa.Text(), nullable=True))
-    # The notes kept so far become the note, "key: value" per line, in key order.
+    # The notes kept so far become the note, "key: value" per line, in key order. A state
+    # that is only {"note": ...} (what downgrade() keeps of a free-text note) is that text.
     op.execute(
         """
-        UPDATE automations SET state_note = (
-            SELECT string_agg(key || ': ' || value, E'\\n' ORDER BY key)
-            FROM jsonb_each_text(automations.state)
-        )
+        UPDATE automations SET state_note = CASE
+            WHEN state ? 'note' AND (SELECT count(*) FROM jsonb_object_keys(state)) = 1
+                THEN state->>'note'
+            ELSE (
+                SELECT string_agg(key || ': ' || value, E'\\n' ORDER BY key)
+                FROM jsonb_each_text(automations.state)
+            )
+        END
         WHERE state_note IS NULL AND state IS NOT NULL AND state <> '{}'::jsonb
         """
     )
@@ -79,10 +84,23 @@ def downgrade() -> None:
             nullable=False,
         ),
     )
-    # The note can't be split back into keys reliably: it is kept whole as one note.
+    # A note of "key: value" lines (distinct keys), as upgrade() writes them, goes back
+    # to those keys; any other note is kept whole as {"note": ...}. Either way upgrade()
+    # gives the same note again.
     op.execute(
-        "UPDATE automations SET state = jsonb_build_object('note', state_note) "
-        "WHERE state_note IS NOT NULL AND state_note <> ''"
+        r"""
+        UPDATE automations SET state = COALESCE(
+            (
+                SELECT jsonb_object_agg(split_part(line, ': ', 1),
+                                        substr(line, strpos(line, ': ') + 2))
+                FROM regexp_split_to_table(automations.state_note, E'\n') AS line
+                HAVING bool_and(line ~ '^[^:\n]+: ')
+                   AND count(*) = count(DISTINCT split_part(line, ': ', 1))
+            ),
+            jsonb_build_object('note', state_note)
+        )
+        WHERE state_note IS NOT NULL AND state_note <> ''
+        """
     )
     for column in (
         "last_error",
