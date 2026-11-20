@@ -32,6 +32,7 @@ from app.features.projects import service as projects
 from app.features.properties import service as properties
 from app.features.tasks import service as tasks
 from app.features.tasks.models import Task
+from app.features.views.schemas import ViewQuery
 from app.knowledge import index
 from app.workspace import files
 
@@ -76,6 +77,8 @@ class SearchOut(BaseModel):
     groups: list[SearchGroup]
     # The filters found in the query; only documents are filtered by them.
     filters: list[FilterChip] = []
+    # The same search of documents as a saved view would run it ("Save as view").
+    view: ViewQuery | None = None
 
 
 @dataclass
@@ -383,7 +386,19 @@ async def search(
         hits = await SEARCHERS[kind](db, query)
         if hits:
             groups.append(SearchGroup(kind=kind, hits=hits[:limit], has_more=len(hits) > limit))
-    return SearchOut(query=original, by_meaning=vector is not None, groups=groups, filters=chips)
+    view = ViewQuery(
+        text=text or None,
+        folder=doc_filter.folder if doc_filter else None,
+        project_id=doc_filter.project_id if doc_filter else None,
+        properties=doc_filter.properties if doc_filter else {},
+    )
+    return SearchOut(
+        query=original,
+        by_meaning=vector is not None,
+        groups=groups,
+        filters=chips,
+        view=view,
+    )
 
 
 # -- filters typed into the query ------------------------------------------------------------

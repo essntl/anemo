@@ -702,3 +702,52 @@ async def test_the_search_box_turns_filters_into_chips(authed, docs):
     assert plain["filters"] == [] and plain["query"] == "re:price"
     folder = await find("in:tech-services/missing price")
     assert not folder["filters"][0]["ok"]
+
+
+async def test_a_move_offers_to_update_instructions_and_memories(authed, docs):
+    doc = await new_doc(authed, "Rules", "nicole", "Filing rules.")
+    r = await authed.post(
+        "/api/projects",
+        json={"name": "Nicole", "instructions": "Read documents/nicole/rules.md first."},
+    )
+    assert r.status_code == 201, r.text
+    nicole = r.json()
+    memory = (
+        await authed.post(
+            "/api/memories", json={"content": "The rules are in documents/nicole/rules.md"}
+        )
+    ).json()
+    await authed.post(f"/api/documents/{doc['id']}/move", json={"folder": "nicole/admin"})
+    old = "documents/nicole/rules.md"
+    found = (
+        await authed.get(f"/api/documents/{doc['id']}/mentions", params={"old_path": old})
+    ).json()
+    assert {(m["kind"], m["id"]) for m in found} == {
+        ("project", nicole["id"]),
+        ("memory", memory["id"]),
+    }
+    # Nothing changed by itself; the user picks what to update.
+    assert (
+        "documents/nicole/rules.md" in (await authed.get("/api/projects")).json()[0]["instructions"]
+    )
+    r = await authed.post(
+        f"/api/documents/{doc['id']}/mentions",
+        json={"old_path": old, "items": [{"kind": "project", "id": nicole["id"]}]},
+    )
+    assert r.json() == {"updated": 1}
+    project_now = next(
+        p for p in (await authed.get("/api/projects")).json() if p["id"] == nicole["id"]
+    )
+    assert project_now["instructions"] == "Read documents/nicole/admin/rules.md first."
+    memories = (await authed.get("/api/memories")).json()
+    assert any("documents/nicole/rules.md" in m["content"] for m in memories)
+
+
+async def test_a_rename_found_by_reconcile_goes_into_the_path_history(authed, docs):
+    doc = await new_doc(authed, "Shell", "", "Moved by a shell.")
+    (docs / "elsewhere").mkdir()
+    (docs / "shell.md").rename(docs / "elsewhere" / "shell.md")
+    read = await run(doc_tools.ReadDocument, path="documents/shell.md")
+    assert "moved to `documents/elsewhere/shell.md`" in read.content
+    history = (await authed.get(f"/api/documents/{doc['id']}/paths")).json()
+    assert [h["old_path"] for h in history] == ["documents/shell.md"]

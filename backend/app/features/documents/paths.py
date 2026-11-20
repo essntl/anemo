@@ -6,6 +6,7 @@ reference in a prompt, a memory or a link keeps working. A path that a document 
 now always means that document, even if another one lived there before.
 """
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 
@@ -62,8 +63,8 @@ async def find(db: AsyncSession, value: str) -> Found | None:
         return Found(doc) if doc else None
     path = service.check_path(value)
     doc = await service.by_path(db, path)
-    if doc is None:
-        await service.reconcile(db)
+    if doc is None or not await asyncio.to_thread(service.file_exists, path):
+        await service.reconcile(db)  # new, moved or removed outside the app since
         doc = await service.by_path(db, path)
     if doc is not None:
         return Found(doc)

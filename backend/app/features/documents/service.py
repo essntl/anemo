@@ -470,3 +470,8 @@ def read_file(path: str) -> str:
 async def schedule_index(db: AsyncSession, doc: Document) -> None:
     """(Re)build the document's search chunks a little later (doesn't commit)."""
     await _schedule_index(db, doc)
+
+
+def file_exists(path: str) -> bool:
+    """Whether the document file is there (on disk, now)."""
+    return _exists(path)
