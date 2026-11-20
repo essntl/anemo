@@ -7,7 +7,7 @@ Whoever resumes this work continues from this log.
 
 | Wave | Package | Branch | Worktree | Status |
 |---|---|---|---|---|
-| 0 | contracts and stubs | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done, waiting for the user's OK |
+| 0 | contracts, stubs, test environment | `integrate/fundamentals` | `.claude/worktrees/orchestrator-spec-d10889` (orchestrator) | done; waiting for the user's backup |
 | 1 | A1 Sources and provenance | `feat/a1` | `../anemo-a1` | worktree created, not started |
 | 1 | A2 Documents: properties, search, views, paths | `feat/a2` | `../anemo-a2` | worktree created, not started |
 | 1 | T Response timer | `feat/t` | `../anemo-t` | worktree created, not started |
@@ -65,12 +65,23 @@ Whoever resumes this work continues from this log.
   on Windows; that is a local quirk, not a code problem.
 - The frontend test for appLinks passes.
 
+### Test environment
+
+The user chose WSL Ubuntu and installed `Ubuntu-24.04`. The orchestrator set it up with
+`anemo-progress/bin/setup-wsl.sh`: Postgres 17.12 with pgvector 0.8.7, Redis 7.0, uv and
+Python 3.13, the user `anemo`, and the role `anemo_test` (CREATEDB, not a superuser).
+The runner is `anemo-progress/bin/anemo-test.sh <id> all|check|pytest|gen-api`; see
+`TESTING.md`. Baseline on the integration branch: `all` is green, 1046 passed, 0 skipped.
+
 ### Open (needs the user)
 
-1. **The test environment.** This machine has no Docker, Postgres, Valkey or WSL distro,
-   and the backend can't import on Windows (it uses Linux-only `os.O_*` flags). So the
-   API tests, which are most of the suite, can't run here. See the question to the user.
-2. **A backup of the live database** before wave 1.
+1. **A backup of the live database.** The user said it is not done yet (2026-11-20).
+   Wave 1 waits for it.
+
+### Wave 1 briefings
+
+They are prepared in `anemo-progress/briefings/` (`common.md` plus per-package
+fill-ins in `packages.md`).
 
 ## Decisions
 
