@@ -65,7 +65,11 @@ GRACE = timedelta(hours=1)  # a run that is later than this (e.g. after downtime
 RETRY_DELAY = timedelta(minutes=2)  # doubled for every further retry
 # Statuses of a run that is doing something (or is about to): another run of the same
 # automation waits. A run waiting for approval holds nothing up.
-BUSY_STATUSES = ("queued", "running", "paused", "waiting_subagent")
+# A paused run waits for the user like one waiting for approval, so it holds nothing up
+# either (when it is resumed, it waits its turn: may_start). A run waiting for its
+# sub-agents is busy unless all that is left is waiting for the user (_is_busy).
+BUSY_STATUSES = ("queued", "running", "waiting_subagent")
+WORKING = ("queued", "running")
 DEFER = timedelta(seconds=20)  # how long a run that has to wait for its sibling waits
 MAX_CHANGES = 200  # changes recorded per run
 FAILURES_BEFORE_ALERT = 3  # agent_decides: one notification after this many in a row
@@ -98,15 +102,35 @@ async def active_run(db: AsyncSession, automation_id: uuid.UUID) -> Run | None:
     return run
 
 
+async def _is_busy(db: AsyncSession, run: Run) -> bool:
+    """Whether this run (a top-level one) is working, itself or through its sub-agents.
+    Waiting for the user, also through a sub-agent, is not working."""
+    if run.status in WORKING:
+        return True
+    if run.status != "waiting_subagent":
+        return False
+    below = set(
+        await db.scalars(
+            select(Run.status).where(Run.root_run_id == run.id, Run.status.in_(ACTIVE_STATUSES))
+        )
+    )
+    if below & set(WORKING):
+        return True
+    # None of them waits for the user: they are done and it is about to go on.
+    return not below & {"waiting_approval", "paused"}
+
+
 async def busy_run(db: AsyncSession, automation_id: uuid.UUID) -> Run | None:
-    """The automation's run that is working now, if any (not one waiting for approval)."""
-    run: Run | None = await db.scalar(
+    """The automation's run that is working now, if any (not one waiting for the user)."""
+    candidates = await db.scalars(
         select(Run)
         .where(Run.automation_id == automation_id, Run.status.in_(BUSY_STATUSES))
         .order_by(Run.created_at.desc())
-        .limit(1)
     )
-    return run
+    for run in list(candidates):
+        if await _is_busy(db, run):
+            return run
+    return None
 
 
 def runs_of(automation_id: uuid.UUID) -> Any:
@@ -170,7 +194,9 @@ _LIVE_STATUS = {
 
 async def automation_out(db: AsyncSession, a: Automation) -> AutomationOut:
     schedule = Schedule.model_validate(a.schedule)
-    run = await active_run(db, a.id)
+    # Only a run that is working shows as the live status; one that waits for approval
+    # is listed under pending_approvals, and later runs report how they went.
+    run = await busy_run(db, a.id)
     return AutomationOut(
         id=a.id,
         name=a.name,
@@ -546,27 +572,39 @@ async def retry_run(
     await notify_changed()
 
 
+def _automation_of(run: Run) -> uuid.UUID | None:
+    """The automation a run works for: its own, or for a sub-agent its top run's."""
+    if run.automation_id is not None:
+        return run.automation_id
+    inherited = (run.options.get("subagent") or {}).get("automation") or {}
+    return uuid.UUID(inherited["id"]) if inherited.get("id") else None
+
+
 async def may_start(db: AsyncSession, run: Run) -> bool:
-    """Whether the worker may drive this run now: not while another run of the same
-    automation is working (or, when both are being picked up at once, an older one).
-    Then the run is queued again for a little later and this commits. Otherwise the
-    automation stays locked until the caller commits, so workers decide in turn."""
-    if run.automation_id is None:
+    """Whether the worker may drive this run (or sub-agent) now: not while another run of
+    the same automation is working (or, when two are picked up at once, an older one).
+
+    Then the run is queued again for a little later. Otherwise it is marked running at
+    once. Either way this commits, so the lock on the automation, which makes workers
+    decide in turn, is not held while the run is set up."""
+    automation_id = _automation_of(run)
+    if automation_id is None:
         return True
-    await db.execute(
-        select(Automation.id).where(Automation.id == run.automation_id).with_for_update()
-    )
+    root = run if run.root_run_id is None else await db.get(Run, run.root_run_id)
+    root = root or run
+    await db.execute(select(Automation.id).where(Automation.id == automation_id).with_for_update())
     others = await db.scalars(
         select(Run).where(
-            Run.automation_id == run.automation_id,
-            Run.id != run.id,
+            Run.automation_id == automation_id,
+            Run.id != root.id,
             Run.status.in_(BUSY_STATUSES),
         )
     )
     for other in list(others):
-        working = other.status != "queued" or (
-            other.created_at < run.created_at and await _being_picked_up(db, other.id)
-        )
+        if other.status == "queued":
+            working = other.created_at < root.created_at and await _being_picked_up(db, other.id)
+        else:
+            working = await _is_busy(db, other)
         if working:
             await queue.enqueue(
                 db,
@@ -575,12 +613,17 @@ async def may_start(db: AsyncSession, run: Run) -> bool:
                 lane="background",
                 run_at=_now() + DEFER,
             )
+            # It waits as queued: a run picked up again after a crash ("running") is not
+            # counted as restarted once more on each try.
+            run.status = "queued"
             await db.commit()
             log.info(
                 "automation run waits for the one before it",
                 extra={"ctx": {"run_id": str(run.id), "waits_for": str(other.id)}},
             )
             return False
+    run.status = "running"  # others see it working from now on (set_status follows)
+    await db.commit()
     return True
 
 

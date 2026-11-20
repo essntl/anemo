@@ -730,3 +730,49 @@ async def test_mcp_tools_are_marked_as_data_and_writing_ones_ask(authed):
         add, hello = (await timeline(authed, run_id))["tool_calls"]
         assert add["result"] == '<untrusted_data source="Test tools: add">\n5\n</untrusted_data>'
         assert hello["decision"] == "ask" and "reaches other people" in hello["decision_reason"]
+
+
+async def test_a_sub_agent_waiting_for_approval_does_not_block_later_runs(authed):
+    await setup(authed, **{"agent.spawn": "autonomous"})
+    a = await create(authed, prompt="delegate")
+    script(
+        "delegate",
+        [call("run_subagent", task="write it"), Done("tool_use")],
+        [TextDelta("Outcome: delegated"), Done("end")],
+    )
+    script(
+        "write it",
+        [call("write_file", path="notes/a.md", content="hello"), Done("tool_use")],
+        [TextDelta("Written."), Done("end")],
+    )
+    first = await fire(authed, a)
+    assert (await authed.get(f"/api/runs/{first}")).json()["status"] == "waiting_subagent"
+    children = (await authed.get("/api/runs", params={"parent_run_id": first})).json()
+    (child,) = children
+    await execute_run(uuid.UUID(child["id"]))
+    assert (await authed.get(f"/api/runs/{child['id']}")).json()["status"] == "waiting_approval"
+    (pending,) = (await get(authed, a["id"]))["pending_approvals"]
+    assert pending["run_id"] == child["id"]
+
+    # The next firing is not held up, and is told what the sub-agent waits for.
+    await fire(authed, a, execute=False)
+    (second,) = [r["id"] for r in await runs_of(authed, a["id"]) if r["id"] != first]
+    await execute_run(uuid.UUID(second))
+    assert pending["summary"] in turn_context_sent()
+    assert (await authed.get(f"/api/runs/{second}")).json()["status"] == "waiting_subagent"
+
+    # Approved while the second run's sub-agent is working: the first one's waits its turn.
+    await authed.post(f"/api/approvals/{pending['approval_id']}", json={"decision": "approve"})
+    await execute_run(uuid.UUID(child["id"]))
+    assert (await authed.get(f"/api/runs/{child['id']}")).json()["status"] == "queued"
+
+
+async def test_a_paused_run_does_not_hold_up_later_runs(authed):
+    await setup(authed)
+    a = await create(authed)
+    script("check the bookings", [TextDelta("Outcome: nothing new"), Done("end")])
+    paused = await fire(authed, a, execute=False)
+    await set_run(paused, status="paused")  # the user paused it, and left it
+    later = await fire(authed, a)  # it waits for the user, like an approval: not busy
+    assert later != paused
+    assert (await authed.get(f"/api/runs/{later}")).json()["status"] == "completed"
