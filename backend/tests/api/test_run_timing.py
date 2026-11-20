@@ -62,8 +62,15 @@ async def timing_events(run_id: str) -> list[dict]:
     return [data for kind, data in (bus.decode(f) for _, f in entries) if kind == "run.timing"]
 
 
+# The run's start is the database's clock (created_at), the rest the worker's; and the
+# test machine's clock can be stepped by a second now and then (WSL does). Times that
+# are compared allow for that much.
+SLACK_MS = 2_000
+SLACK = timedelta(milliseconds=SLACK_MS)
+
+
 def duration_ms(timing: dict) -> float:
-    total = at(timing["finished_at"]) - at(timing["started_at"])  # type: ignore[operator]
+    total = at(timing["finished_at"]) - at(timing["started_at"])
     return total.total_seconds() * 1000 - timing["waiting_ms"]
 
 
@@ -92,10 +99,11 @@ async def test_a_chat_answer_records_its_timing(authed):
     assert timing["started_at"] == run["created_at"] == started["started_at"]
     assert timing["finished_at"] == run["ended_at"]
     assert timing["outcome"] == "done"
-    assert at(timing["started_at"]) <= at(timing["first_text_at"]) <= at(timing["finished_at"])
+    assert at(timing["started_at"]) - SLACK <= at(timing["first_text_at"])
+    assert at(timing["first_text_at"]) <= at(timing["finished_at"]) + SLACK
     assert timing["waiting_ms"] == 0 and timing["waiting_since"] is None
     assert timing["tool_calls"] == 0
-    assert duration_ms(timing) >= 0
+    assert duration_ms(timing) >= -SLACK_MS
 
 
 async def test_every_api_response_says_the_servers_time(client):
@@ -123,7 +131,7 @@ async def test_waiting_for_an_approval_is_not_counted(authed):
     approval = (await authed.get("/api/approvals")).json()[0]
     await authed.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"})
     resumed = (await reply(authed, cid))["timing"]
-    assert resumed["waiting_since"] is None and resumed["waiting_ms"] >= 30_000
+    assert resumed["waiting_since"] is None and resumed["waiting_ms"] >= 30_000 - SLACK_MS
     # The live stream says so too, so a timer that is running picks it up.
     assert (await timing_events(run_id))[-1] == {
         "waiting_ms": resumed["waiting_ms"],
@@ -136,7 +144,7 @@ async def test_waiting_for_an_approval_is_not_counted(authed):
     assert timing["outcome"] == "done" and timing["tool_calls"] == 1
     assert timing["finished_at"] is not None and timing["waiting_ms"] == resumed["waiting_ms"]
     # The 30 s it waited are not part of how long it took.
-    assert 0 <= duration_ms(timing) < 30_000
+    assert -SLACK_MS <= duration_ms(timing) < 30_000 - SLACK_MS
     assert run.first_text_at is not None
     (row,) = (await timeline(authed, run_id))["tool_calls"]
     assert row["started_at"] and at(row["started_at"]) <= at(row["ended_at"])
@@ -156,7 +164,7 @@ async def test_a_question_and_a_pause_wait_for_the_user_too(authed):
     await authed.post(
         f"/api/approvals/{approval['id']}", json={"decision": "approve", "answer": "Evening"}
     )
-    assert (await reply(authed, cid))["timing"]["waiting_ms"] >= 10_000
+    assert (await reply(authed, cid))["timing"]["waiting_ms"] >= 10_000 - SLACK_MS
 
     # Paused by the user: the run waits for them to resume it.
     await authed.post(f"/api/runs/{run_id}/pause")
@@ -164,7 +172,7 @@ async def test_a_question_and_a_pause_wait_for_the_user_too(authed):
     assert (await reply(authed, cid))["timing"]["waiting_since"] is not None
     await authed.post(f"/api/runs/{run_id}/resume")
     timing = (await reply(authed, cid))["timing"]
-    assert timing["waiting_since"] is None and timing["waiting_ms"] >= 10_000
+    assert timing["waiting_since"] is None and timing["waiting_ms"] >= 10_000 - SLACK_MS
 
 
 async def test_stopped_and_failed_answers_get_their_outcome(authed):
@@ -174,7 +182,7 @@ async def test_stopped_and_failed_answers_get_their_outcome(authed):
     await authed.post(f"/api/runs/{run_id}/cancel")
     timing = (await reply(authed, cid))["timing"]
     assert timing["outcome"] == "stopped" and timing["finished_at"] is not None
-    assert timing["waiting_since"] is None and duration_ms(timing) >= 0
+    assert timing["waiting_since"] is None and duration_ms(timing) >= -SLACK_MS
     # A call that never finished ends with the run.
     (row,) = (await timeline(authed, run_id))["tool_calls"]
     assert row["status"] == "cancelled" and row["ended_at"] is not None
@@ -219,8 +227,8 @@ async def test_a_sub_agents_question_makes_the_answer_wait(authed):
     assert (await reply(authed, cid))["timing"]["waiting_since"] is None
     await run_all(authed, run_id)
     timing = (await reply(authed, cid))["timing"]
-    assert timing["outcome"] == "done" and timing["waiting_ms"] >= 20_000
-    assert 0 <= duration_ms(timing) < 20_000
+    assert timing["outcome"] == "done" and timing["waiting_ms"] >= 20_000 - SLACK_MS
+    assert -SLACK_MS <= duration_ms(timing) < 20_000 - SLACK_MS
     # The sub-agent's call has its own start and end.
     (row,) = (await timeline(authed, run_id))["tool_calls"]
     assert row["tool_name"] == "run_subagent" and row["status"] == "succeeded"
