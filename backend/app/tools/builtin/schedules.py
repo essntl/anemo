@@ -13,6 +13,7 @@ when, is asked about every time, with the prompt and the times in the approval
 itself cannot create, change or delete schedules.
 """
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Literal
@@ -41,6 +42,7 @@ from app.features.automations.schemas import (
     AutomationPatch,
     ChangeCheck,
 )
+from app.features.profiles.models import AgentProfile
 from app.features.projects import service as projects
 from app.features.providers.models import Model
 from app.features.settings import service as settings_service
@@ -80,7 +82,13 @@ TOOLS = (
 CHECK = (
     "Optional change check: read-only tool calls ({tool, args}) the server makes before "
     "each scheduled run; when their results are the same as at the last successful run, "
-    "the run is skipped"
+    "the run is skipped. In args, `{today}` is replaced by the user's date (YYYY-MM-DD) "
+    "when the check runs"
+)
+PROFILE = (
+    "An agent profile (its name, as in Settings > Agent profiles) whose permissions its "
+    "runs get, e.g. one that lets them delete calendar events without asking; by default "
+    "the default agent's"
 )
 
 
@@ -102,6 +110,7 @@ class SettingsIn(BaseModel):
         description="A model's name (as in Settings > Providers & Models) for its runs; "
         "by default the model set for automations in Settings",
     )
+    profile: str | None = Field(None, max_length=100, description=PROFILE)
     max_tool_calls: int | None = Field(
         None,
         ge=1,
@@ -146,6 +155,8 @@ def _settings_words(args: SettingsIn, *, creating: bool) -> list[str]:
         words.append(f"tools: {tools}")
     if "model" in shown:
         words.append(f"model: {args.model or 'default'}")
+    if "profile" in given:
+        words.append(f"profile: {args.profile or 'the default agent'}")
     if "max_tool_calls" in shown:
         calls = args.max_tool_calls
         if creating and "max_tool_calls" not in given:
@@ -160,7 +171,10 @@ def _settings_words(args: SettingsIn, *, creating: bool) -> list[str]:
         days = args.retention_days
         words.append(f"chats kept {days} days" if days else "chats kept forever")
     if "change_check" in shown:
-        checks = ", ".join(c.tool for c in args.change_check or [])
+        checks = ", ".join(
+            f"{c.tool} {json.dumps(c.args, ensure_ascii=False)}" if c.args else c.tool
+            for c in args.change_check or []
+        )
         words.append(f"change check: {checks}" if checks else "no change check")
     if "run_anyway_hours" in shown and (args.change_check or not creating):
         hours = args.run_anyway_hours
@@ -194,6 +208,8 @@ async def _settings_fields(db: Any, args: SettingsIn) -> dict[str, Any]:
         fields["tool_allowlist"] = args.tools
     if "model" in set_:
         fields["model_id"] = await _model_id(db, args.model) if args.model else None
+    if "profile" in set_:
+        fields["profile_id"] = await _profile_id(db, args.profile) if args.profile else None
     if "max_tool_calls" in set_:  # None: the agent's own limit
         fields["max_tool_calls"] = args.max_tool_calls
     if "max_minutes" in set_:
@@ -221,6 +237,17 @@ async def _model_id(db: Any, name: str) -> uuid.UUID:
     if model is None:
         raise ValueError(f"No model '{name}' (see Settings > Providers & Models).")
     return model.id  # type: ignore[no-any-return]
+
+
+async def _profile_id(db: Any, name: str) -> uuid.UUID:
+    wanted = name.strip()
+    same = [func.lower(AgentProfile.name) == wanted.lower()]
+    if (match := _id(wanted)) is not None:
+        same.append(AgentProfile.id == match)
+    profile = await db.scalar(select(AgentProfile).where(or_(*same)).limit(1))
+    if profile is None:
+        raise ValueError(f"No agent profile '{name}' (see Settings > Agent profiles).")
+    return profile.id  # type: ignore[no-any-return]
 
 
 def _problems(exc: ValidationError) -> str:
@@ -298,6 +325,7 @@ class ListSchedules(Tool):
             paused = (await service.protections(db)).paused
             rows = list(await db.scalars(select(Automation).order_by(Automation.name)))
             names = {p.id: p.name for p in await db.scalars(select(Project))}
+            profiles = {p.id: p.name for p in await db.scalars(select(AgentProfile))}
         zone = ZoneInfo(tz)
         lines = ["The user has paused all schedules: nothing runs until they resume."] * paused
         for a in rows:
@@ -316,6 +344,8 @@ class ListSchedules(Tool):
             settings = [f"notify {NOTIFY_WORDS.get(a.notify, a.notify)}"]
             if a.tool_allowlist is not None:
                 settings.append("tools: " + (", ".join(a.tool_allowlist) or "none"))
+            if a.profile_id in profiles:
+                settings.append(f"profile {profiles[a.profile_id]}")
             if a.max_tool_calls or a.max_runtime_s:
                 limits = [f"{a.max_tool_calls} tool calls"] * bool(a.max_tool_calls)
                 limits += [f"{(a.max_runtime_s or 0) // 60} min"] * bool(a.max_runtime_s)
