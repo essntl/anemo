@@ -285,7 +285,7 @@ class CreateEvent(Tool):
                 text = src.taken(
                     exc, line=existing, update_tool="update_event", trash_place="Calendar > Trash"
                 )
-                return ToolResult(content=text, data={"existing": exc.details})
+                return ToolResult(content=text, data={"existing": exc.details}, changed=False)
             line = _describe(service.base_occurrence(event, event.start_at), tz)
         return ToolResult(
             content=f"Added: {line}", data={"event": {"id": str(event.id), "title": event.title}}
