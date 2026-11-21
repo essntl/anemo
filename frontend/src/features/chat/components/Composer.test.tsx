@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -121,8 +121,8 @@ describe('pasting an image on a phone', () => {
     const controls = {
       mode: <button>Mode</button>,
       options: [
-        { key: 'model', label: 'Model', node: <button>Model</button> },
-        { key: 'profile', label: 'Agent profile', agent: true, node: <button>Profile</button> },
+        { key: 'model', node: <button>Model</button> },
+        { key: 'profile', agent: true, node: <button>Profile</button> },
       ],
     }
     render(
@@ -136,18 +136,12 @@ describe('pasting an image on a phone', () => {
     expect(names).toEqual(['Add to the message', 'Mode', 'Profile', 'Model', 'Dictate', 'Send'])
   })
 
-  it('is one line at rest where it is narrow (a phone), and opens up in use with its options in one menu', async () => {
+  it('is one line at rest where it is narrow (a phone), and opens up in use with its options in a sheet', async () => {
     // jsdom lays nothing out: give the box a phone's width.
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} constructor(cb: (entries: unknown[]) => void) { queueMicrotask(() => cb([])) } })
     const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360 } as DOMRect)
-    const controls = {
-      mode: <button>Mode</button>,
-      summary: 'Sonnet',
-      options: [
-        { key: 'model', label: 'Model', node: <button>Pick a model</button> },
-        { key: 'profile', label: 'Agent profile', agent: true, node: <button>Profile</button> },
-      ],
-    }
+    const sheet = vi.fn(({ open }: { open: boolean; onOpenChange: (open: boolean) => void }) => (open ? <div role="dialog">The options</div> : null))
+    const controls = { mode: <button>Mode</button>, summary: 'Sonnet', options: [{ key: 'model', node: <button>Pick a model</button> }], sheet }
     media.coarse = true // a touch screen: the box doesn't take the focus by itself
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -170,13 +164,14 @@ describe('pasting an image on a phone', () => {
     expect(screen.queryByRole('button', { name: 'Pick a model' })).not.toBeInTheDocument()
 
     await userEvent.click(menu)
-    expect(await screen.findByRole('button', { name: 'Pick a model' })).toBeInTheDocument()
-    expect(screen.getByText('Agent profile')).toBeInTheDocument()
-    // The menu is part of using the box: it stays open though the focus is in the menu.
+    expect(screen.getByRole('dialog')).toHaveTextContent('The options')
+    // The sheet is part of using the box: it stays open though the focus has left it.
+    await userEvent.click(document.body)
     expect(row).not.toHaveAttribute('inert')
+    act(() => sheet.mock.lastCall![0].onOpenChange(false))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     // Something typed keeps it open after the focus has gone.
-    await userEvent.keyboard('{Escape}')
     await userEvent.type(screen.getByRole('textbox'), 'Hi')
     await userEvent.click(document.body)
     expect(row).not.toHaveAttribute('inert')

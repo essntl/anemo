@@ -315,6 +315,12 @@
   .sheet[data-state='closed'] { animation: sheet-out 150ms var(--ease-in) forwards; }
 }
 
+/* A sheet with two heights (components/ui/DetentSheet.tsx): it slides in from the bottom
+   at any width, and glides to the height it comes to rest at. */
+.sheet-detents { transition: height 280ms var(--ease-out); }
+.sheet-detents[data-state='open'] { animation: sheet-in 260ms var(--ease-out); }
+.sheet-detents[data-state='closed'] { animation: sheet-out 180ms var(--ease-in) forwards; }
+
 .toast { animation: rise-in var(--motion-in) var(--ease-out); }
 .toast[data-leaving] { animation: rise-out var(--motion-out) var(--ease-in) forwards; }
 

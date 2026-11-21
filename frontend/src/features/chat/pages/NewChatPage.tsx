@@ -6,7 +6,7 @@ import { api, errorMessage, unwrap } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { type Mode, ModeSwitch, PermissionChip } from '@/features/agents/components/ModeSwitch'
-import { useProfiles, useSlashSkills } from '@/features/profiles/api'
+import { useSlashSkills } from '@/features/profiles/api'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useSetupStatus } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
@@ -20,6 +20,7 @@ import { rich, t } from '@/lib/i18n'
 import { conversationKey, conversationsKey, createConversation, messagesKey, useConversations } from '../api'
 import { Composer, type ComposerHandle } from '../components/Composer'
 import { useChatModel } from '../chatModel'
+import { ChatOptionsSheet } from '../components/ChatOptionsSheet'
 import { ModelPicker } from '../components/ModelPicker'
 import { ReasoningControl } from '../components/ReasoningControl'
 
@@ -121,7 +122,6 @@ export function NewChatPage() {
   const scope = useScope()
   const project = scope.kind === 'project' ? scope.project : null
   const chatModel = useChatModel(modelId ?? project?.default_model_id ?? settings.data?.models.chat ?? null)
-  const profiles = useProfiles()
   const [profileOverride, setProfileId] = useState<string | null | undefined>(undefined)
   const profileId = profileOverride !== undefined ? profileOverride : (project?.default_profile_id ?? null)
   // A temporary chat is deleted five minutes after its last message (?temporary=1 starts one).
@@ -204,12 +204,17 @@ export function NewChatPage() {
               summary: chatModel.name,
               detail: chatModel.level,
               options: [
-                { key: 'model', label: t('Model'), node: <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} /> },
-                ...(chatModel.reasons ? [{ key: 'reasoning', label: t('Reasoning'), node: <ReasoningControl /> }] : []),
-                ...(mode === 'agent' ? [{ key: 'permissions', label: t('Permissions'), agent: true, node: <PermissionChip profileId={profileId} /> }] : []),
-                ...(mode === 'agent' && profiles.data?.length
-                  ? [{ key: 'profile', label: t('Agent profile'), agent: true, node: <ProfilePicker value={profileId} onChange={setProfileId} /> }] : []),
+                { key: 'model', node: <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} /> },
+                ...(chatModel.reasons ? [{ key: 'reasoning', node: <ReasoningControl /> }] : []),
+                ...(mode === 'agent' ? [
+                  { key: 'permissions', agent: true, node: <PermissionChip profileId={profileId} /> },
+                  { key: 'profile', agent: true, node: <ProfilePicker value={profileId} onChange={setProfileId} /> },
+                ] : []),
               ],
+              sheet: (state) => (
+                <ChatOptionsSheet {...state} modelId={modelId ?? (project?.default_model_id ?? settings.data?.models.chat ?? null)} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onModel={setModelId}
+                  mode={mode} profileId={profileId} onProfile={setProfileId} />
+              ),
             }}
           />
           <p className="mt-2 hidden items-center justify-center gap-4 text-[12px] text-subtle md:flex pointer-coarse:hidden">

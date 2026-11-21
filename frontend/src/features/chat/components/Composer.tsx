@@ -56,30 +56,30 @@ interface ComposerProps {
 /** One control under the text box: a model picker, the reasoning level, a profile. */
 export interface ComposerControl {
   key: string
-  /** What it is, for the menu the controls move into where the box is narrow. */
-  label: string
   node: ReactNode
-  /** It belongs to the agent: on a wide box it comes first, next to the mode switch. */
+  /** It belongs to the agent: it comes first, next to the mode switch. */
   agent?: boolean
-  /** It is switched on (a temporary chat, say): the menu's button shows that. */
-  active?: boolean
 }
 
 export interface ComposerControls {
   /** Chat or Agent: always in the row. */
   mode?: ReactNode
-  /** The rest. On a wide box they sit in the row; on a narrow one (a phone) they are
-   *  in one menu, a row each in this order, so the box stays a single uncrowded line. */
+  /** The rest, in the row of a wide box. */
   options?: ComposerControl[]
-  /** What the menu's button says: the model's name. */
+  /**
+   * The same on a narrow box (a phone), where they don't fit the row: a sheet that one
+   * button in the row opens. The box says when it is open.
+   */
+  sheet?: (state: { open: boolean; onOpenChange: (open: boolean) => void }) => ReactNode
+  /** What that button says: the model's name. */
   summary?: string
   /** Said after it, quieter, where there is room: the reasoning level. */
   detail?: string
 }
 
-/** Below this width (px) of the box itself, the options are in a menu. */
+/** Below this width (px) of the box itself, the options are in a sheet. */
 const NARROW = 640
-/** From this width the menu's button has room for its detail too. */
+/** From this width the sheet's button has room for its detail too. */
 const ROOMY = 440
 /** Below this one it has no room for words at all: it is an icon. */
 const TIGHT = 340
@@ -490,15 +490,18 @@ export function Composer({
               e.target.value = ''
             }}
           />
-          {narrow ? (
+          {narrow && controls?.sheet ? (
             // Out of the way while the box rests (the text is on this line then).
             <div inert={resting} className={cn('flex min-w-0 items-center gap-1 transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none',
               resting && 'translate-y-1.5 opacity-0')}>
-              {controls?.mode}
-              {options.length > 0 && (
-                <OptionsMenu options={options} open={optionsOpen} onOpenChange={setOptionsOpen}
-                  summary={width >= TIGHT ? controls?.summary : undefined} detail={width >= ROOMY ? controls?.detail : undefined} />
-              )}
+              {controls.mode}
+              <button type="button" aria-label={t('Model and options')} title={t('Model and options')} aria-haspopup="dialog" aria-expanded={optionsOpen}
+                onClick={() => setOptionsOpen(true)}
+                className="flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full bg-surface-2 px-3 text-[12.5px] font-medium text-text transition-colors hover:bg-surface-hover pointer-coarse:h-9 pointer-coarse:min-w-9">
+                {controls.summary && width >= TIGHT ? <span className="min-w-0 truncate">{controls.summary}</span> : <SlidersHorizontal className="h-4 w-4 shrink-0" />}
+                {controls.summary && controls.detail && width >= ROOMY && <span className="shrink-0 font-normal text-muted">{controls.detail}</span>}
+              </button>
+              {controls.sheet({ open: optionsOpen, onOpenChange: setOptionsOpen })}
             </div>
           ) : (
             <>
@@ -545,42 +548,5 @@ export function Composer({
         )}
       </Lingering>
     </div>
-  )
-}
-
-/**
- * The options of a narrow message box, behind one button: a row each, with its name.
- * The controls are the same ones a wide box shows in its row.
- */
-function OptionsMenu({ options, summary, detail, open, onOpenChange }: {
-  options: ComposerControl[]
-  summary?: string
-  detail?: string
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}) {
-  const active = options.some((o) => o.active)
-  return (
-    <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Trigger asChild>
-        <button type="button" aria-label={t('Model and options')} title={t('Model and options')}
-          className={cn('flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:min-w-9',
-            active ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-text hover:bg-surface-hover data-[state=open]:bg-surface-hover')}>
-          {summary ? <span className="min-w-0 truncate">{summary}</span> : <SlidersHorizontal className="h-4 w-4 shrink-0" />}
-          {summary && detail && <span className="shrink-0 font-normal text-muted">{detail}</span>}
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content side="top" align="start" sideOffset={8} collisionPadding={12}
-          className="composer-options pop z-50 w-80 max-w-[calc(100vw-24px)] rounded-card border border-border bg-card p-1.5 shadow-float">
-          {options.map((o) => (
-            <div key={o.key} className="flex min-h-10 items-center justify-between gap-3 py-0.5 pl-2.5 pr-1 pointer-coarse:min-h-11">
-              <span className="shrink-0 text-[13px] font-medium">{o.label}</span>
-              <div className="flex min-w-0 items-center justify-end">{o.node}</div>
-            </div>
-          ))}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
   )
 }
