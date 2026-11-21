@@ -50,6 +50,7 @@ from app.providers.base import (
     ToolCall,
     ToolResultBlock,
     ToolUseBlock,
+    TranscriptionResult,
     Usage,
 )
 from app.providers.claude_code_models import subscription_models
@@ -448,6 +449,18 @@ class ClaudeCodeAdapter:
 
     async def embed(self, model: str, texts: list[str]) -> EmbedResult:
         raise ProviderError("A Claude subscription offers no embedding models.", retryable=False)
+
+    async def transcribe(
+        self,
+        model: str,
+        audio: bytes,
+        *,
+        filename: str,
+        content_type: str,
+        language: str | None = None,
+        prompt: str | None = None,
+    ) -> TranscriptionResult:
+        raise ProviderError("A Claude subscription offers no speech-to-text.", retryable=False)
 
     async def stream_chat(self, req: ChatRequest) -> AsyncIterator[ProviderEvent]:
         if req.session_key is None:

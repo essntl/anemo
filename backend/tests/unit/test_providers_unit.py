@@ -26,6 +26,16 @@ def test_capability_guesses():
     assert guess_capabilities("qwen2.5:7b")["tools"]
 
 
+def test_speech_to_text_models_are_their_own_kind():
+    for key in ("whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe", "whisper-large-v3"):
+        caps = guess_capabilities(key)
+        assert caps["transcription"], key
+        # Not chat models, even though gpt-4o-* matches the chat rules first.
+        assert not caps["chat"] and not caps["tools"] and not caps["vision"], key
+    assert not guess_capabilities("gpt-4o")["transcription"]
+    assert not guess_capabilities("gpt-4o-mini-tts")["transcription"]
+
+
 def test_adaptive_thinking_detection():
     assert anthropic_uses_adaptive_thinking("claude-opus-5-5")
     assert anthropic_uses_adaptive_thinking("claude-sonnet-4-6")
@@ -41,6 +51,9 @@ def test_route_candidates_order_and_dedupe():
     assert candidate_ids(RouteRequest(task="chat", explicit_model_id=c), d) == [c, a]
     # Embeddings never silently fall back to a chat model.
     assert candidate_ids(RouteRequest(task="embeddings"), d) == []
+    # Nor does speech to text; the dictation clean-up does use the chat model.
+    assert candidate_ids(RouteRequest(task="transcription"), d) == []
+    assert candidate_ids(RouteRequest(task="dictation"), d) == [a]
 
 
 def _tool_conversation() -> list[Message]:

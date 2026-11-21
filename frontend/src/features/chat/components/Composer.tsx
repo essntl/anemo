@@ -4,6 +4,8 @@ import { Link } from 'react-router'
 import { ArrowUp, ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
 import { toast } from '@/components/ui/toast'
+import { DictationButton } from '@/features/dictation/DictationButton'
+import { useDictationMessageBox } from '@/features/dictation/useDictationMessageBox'
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { SkillIcon } from '@/features/skills/icons'
@@ -71,6 +73,8 @@ export function Composer({
   // Touch screens: the on-screen keyboard has its own send flow, so Enter adds a line
   // and the box doesn't grab focus (which would pop the keyboard up on every visit).
   const touch = useMediaQuery('(pointer: coarse)')
+  // Dictated text lands here when no other text field had the focus.
+  useDictationMessageBox(textRef, (said) => setText((now) => (now ? `${now} ${said}` : said)))
 
   // Skills: typing / at the start opens a menu of them; the chosen one is shown as a chip.
   const allSkills = useSlashSkills()
@@ -326,6 +330,7 @@ export function Composer({
         )}
         <textarea
           ref={textRef}
+          data-dictation="chat"
           rows={1}
           autoFocus={autoFocus && !touch}
           value={text}
@@ -408,29 +413,32 @@ export function Composer({
           />
           {toolbar}
         </div>
-        {running ? (
-          <button
-            type="button"
-            onClick={onStop}
-            aria-label={t('Stop')}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-bg transition-opacity hover:opacity-85 pointer-coarse:h-10 pointer-coarse:w-10"
-          >
-            <Square className="h-3.5 w-3.5 fill-current" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={send}
-            aria-label={t('Send')}
-            disabled={!canSend}
-            className={cn(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-contrast transition-all pointer-coarse:h-10 pointer-coarse:w-10',
-              'hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40',
-            )}
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          <DictationButton target={textRef} disabled={disabled} />
+          {running ? (
+            <button
+              type="button"
+              onClick={onStop}
+              aria-label={t('Stop')}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-bg transition-opacity hover:opacity-85 pointer-coarse:h-10 pointer-coarse:w-10"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={send}
+              aria-label={t('Send')}
+              disabled={!canSend}
+              className={cn(
+                'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-contrast transition-all pointer-coarse:h-10 pointer-coarse:w-10',
+                'hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40',
+              )}
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
       <Lingering value={picking}>
         {() => (

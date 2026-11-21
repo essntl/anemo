@@ -1,9 +1,11 @@
 """Provider and model management. API keys and headers are stored as encrypted secrets."""
 
 import asyncio
+import io
 import json
 import time
 import uuid
+import wave
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -27,6 +29,7 @@ from app.providers.base import (
     ChatRequest,
     DiscoveredModel,
     Message,
+    ProviderAdapter,
     ProviderError,
     TextDelta,
     Usage,
@@ -289,6 +292,40 @@ async def set_capability(db: AsyncSession, model_id: uuid.UUID, name: str, value
         await db.flush()
 
 
+def _silence_wav(seconds: float = 0.5, rate: int = 16_000) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(b"\0\0" * int(rate * seconds))
+    return buf.getvalue()
+
+
+async def _test_transcription(adapter: ProviderAdapter, model: Model) -> TestResult:
+    """A speech-to-text model gets half a second of silence: any answer means it works."""
+    started = time.monotonic()
+    try:
+        result = await asyncio.wait_for(
+            adapter.transcribe(
+                model.model_key, _silence_wav(), filename="test.wav", content_type="audio/wav"
+            ),
+            timeout=TEST_TIMEOUT_S,
+        )
+    except ProviderError as exc:
+        return TestResult(ok=False, message=str(exc))
+    except TimeoutError:
+        return TestResult(ok=False, message="The model did not respond in time")
+    ms = int((time.monotonic() - started) * 1000)
+    model.last_tested_at = datetime.now(UTC)
+    return TestResult(
+        ok=True,
+        message=f"Model transcribed in {ms} ms",
+        latency_ms=ms,
+        detail=result.text[:200] or "(silence, as expected)",
+    )
+
+
 async def test_model(db: AsyncSession, model: Model) -> tuple[TestResult, Usage | None]:
     """Runs a tiny streamed completion. Returns the result and the Usage (if any)."""
     if model.provider.type == "claude_code":
@@ -303,6 +340,8 @@ async def test_model(db: AsyncSession, model: Model) -> tuple[TestResult, Usage 
             )
         return status, None
     adapter = make_adapter(await build_config(db, model.provider))
+    if model.capabilities.get("transcription"):
+        return await _test_transcription(adapter, model), None
     req = ChatRequest(
         model=model.model_key,
         messages=[Message.user("Reply with exactly one word: OK")],

@@ -34,6 +34,7 @@ from app.providers.base import (
     ToolCall,
     ToolResultBlock,
     ToolUseBlock,
+    TranscriptionResult,
     Usage,
 )
 from app.providers.catalog import guess_capabilities
@@ -247,6 +248,37 @@ class OpenAIChatAdapter:
         ordered = sorted(response.data, key=lambda d: d.index)
         tokens = response.usage.prompt_tokens if response.usage else None
         return EmbedResult(vectors=[list(d.embedding) for d in ordered], input_tokens=tokens)
+
+    async def transcribe(
+        self,
+        model: str,
+        audio: bytes,
+        *,
+        filename: str,
+        content_type: str,
+        language: str | None = None,
+        prompt: str | None = None,
+    ) -> TranscriptionResult:
+        """Speech to text (OpenAI, and servers that offer the same endpoint: Groq,
+        faster-whisper, speaches, ...)."""
+        params: dict[str, Any] = {"model": model, "file": (filename, audio, content_type)}
+        if language:
+            params["language"] = language
+        if prompt:
+            params["prompt"] = prompt
+        try:
+            response = await self.client.audio.transcriptions.create(**params)
+        except Exception as exc:  # noqa: BLE001
+            raise _map_error(exc) from exc
+        text = response if isinstance(response, str) else getattr(response, "text", "")
+        used = getattr(response, "usage", None)
+        tokens_in = getattr(used, "input_tokens", None) if used is not None else None
+        tokens_out = getattr(used, "output_tokens", None) if used is not None else None
+        return TranscriptionResult(
+            text=(text or "").strip(),
+            input_tokens=tokens_in if isinstance(tokens_in, int) else None,
+            output_tokens=tokens_out if isinstance(tokens_out, int) else None,
+        )
 
     async def list_models(self) -> list[DiscoveredModel]:
         if self.is_openrouter:

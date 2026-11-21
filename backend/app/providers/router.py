@@ -50,9 +50,13 @@ class RouteRequest:
     required_capabilities: frozenset[str] = frozenset()
 
 
+# Tasks that need their own kind of model: they never fall back to the chat model.
+OWN_KIND_TASKS = frozenset({"embeddings", "transcription"})
+
+
 def candidate_ids(req: RouteRequest, defaults: ModelDefaults) -> list[uuid.UUID]:
     """Rule 1 - order: explicit choice, then the task default and its fallbacks,
-    then (for non-embedding tasks) the chat default and its fallbacks."""
+    then (except for embeddings and transcription) the chat default and its fallbacks."""
     ids: list[uuid.UUID] = []
     if req.explicit_model_id:
         ids.append(req.explicit_model_id)
@@ -60,7 +64,7 @@ def candidate_ids(req: RouteRequest, defaults: ModelDefaults) -> list[uuid.UUID]
     if primary:
         ids.append(primary)
     ids.extend(defaults.fallbacks.get(req.task, []))
-    if req.task != "embeddings":
+    if req.task not in OWN_KIND_TASKS:
         if defaults.chat:
             ids.append(defaults.chat)
         ids.extend(defaults.fallbacks.get("chat", []))

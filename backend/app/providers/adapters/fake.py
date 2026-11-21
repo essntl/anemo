@@ -38,6 +38,7 @@ from app.providers.base import (
     TextBlock,
     TextDelta,
     ToolCall,
+    TranscriptionResult,
     Usage,
 )
 
@@ -89,6 +90,9 @@ class FakeAdapter:
     requests: ClassVar[list[ChatRequest]] = []
     embedded: ClassVar[list[str]] = []  # texts sent to embed()
     extraction_reply: ClassVar[str] = "[]"  # what the memory extraction prompt gets back
+    # What transcribe() hears, and what it was last sent (tests set and read these).
+    transcript: ClassVar[str] = "Um, so, uh, please add milk to my shopping list."
+    transcribed: ClassVar[list[dict[str, Any]]] = []
 
     def __init__(self, cfg: ProviderConfig) -> None:
         self.cfg = cfg
@@ -134,6 +138,14 @@ class FakeAdapter:
             return
         if "fail" in prompt.lower() and "provider" in prompt.lower():
             raise ProviderError("Simulated provider failure", retryable=False)
+        if prompt.startswith("<transcript>"):
+            # Dictation clean-up: drops the fillers, as a real model would.
+            spoken = prompt.removeprefix("<transcript>").removesuffix("</transcript>")
+            tidy = re.sub(r"\b(um|uh|so)\b,?\s*", "", spoken, flags=re.I).strip()
+            yield TextDelta(tidy[:1].upper() + tidy[1:])
+            yield Usage(input_tokens=len(prompt.split()) + 50, output_tokens=len(tidy.split()))
+            yield Done("end")
+            return
 
         delay = 0.25 if req.model == "slow" else 0.02
         if req.model == "reasoning":
@@ -230,6 +242,31 @@ class FakeAdapter:
             norm = math.sqrt(sum(v * v for v in vec)) or 1.0
             vectors.append([v / norm for v in vec])
         return EmbedResult(vectors=vectors, input_tokens=sum(len(t.split()) for t in texts))
+
+    async def transcribe(
+        self,
+        model: str,
+        audio: bytes,
+        *,
+        filename: str,
+        content_type: str,
+        language: str | None = None,
+        prompt: str | None = None,
+    ) -> TranscriptionResult:
+        FakeAdapter.transcribed = [
+            *FakeAdapter.transcribed[-9:],
+            {
+                "model": model,
+                "size": len(audio),
+                "filename": filename,
+                "content_type": content_type,
+                "language": language,
+                "prompt": prompt,
+            },
+        ]
+        if model == "broken-ears":
+            raise ProviderError("The fake transcription failed.", retryable=True)
+        return TranscriptionResult(text=FakeAdapter.transcript, input_tokens=30, output_tokens=12)
 
     async def list_models(self) -> list[DiscoveredModel]:
         base = {"chat": True, "streaming": True, "tools": True}

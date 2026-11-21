@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { dictation } from '@/features/dictation/dictationStore'
 import { Composer } from './Composer'
 
 // The hook returns the skills themselves (an array), not a query.
@@ -100,5 +101,19 @@ describe('pasting an image on a phone', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add to the message' }))
     await userEvent.click(await screen.findByRole('button', { name: /Paste an image/ }))
     expect(await screen.findByText(/^Pasted image .*\.png$/)).toBeInTheDocument()
+  })
+
+  it('dictates into its own box with the microphone button', async () => {
+    const start = vi.spyOn(dictation, 'start').mockResolvedValue()
+    renderComposer(() => undefined)
+    await userEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+    expect(start).toHaveBeenCalledWith(screen.getByRole('textbox'))
+    start.mockRestore()
+  })
+
+  it('is where dictated text goes when a new chat was opened for it', () => {
+    vi.spyOn(dictation, 'takePendingText').mockReturnValueOnce('Plan my week')
+    renderComposer(() => undefined)
+    expect(screen.getByRole('textbox')).toHaveValue('Plan my week')
   })
 })
