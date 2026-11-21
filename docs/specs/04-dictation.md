@@ -65,11 +65,14 @@ gets the transcript and the word list, nothing else: no memories, documents or t
   goes: `chat` or `text`). The service transcribes with the first transcription model that
   works, then cleans up with the dictation model (fallbacks as for inline). If the
   clean-up fails, the raw transcript comes back with a warning, so nothing said is lost.
-  Audio up to 25 MB (the OpenAI limit, about 25 minutes of Opus).
+  Audio up to 25 MB (the OpenAI limit; a 10-minute recording is 19 MB as WAV).
 
 **Frontend**
 - `features/dictation/recorder.ts`: microphone, `MediaRecorder` (Opus in WebM, or MP4 on
   Safari), level meter, a 10-minute limit.
+- `features/dictation/wav.ts`: the recording is sent as WAV (16 kHz, mono, 16-bit), the
+  one format every server takes: those built on whisper.cpp (Lemonade, for example)
+  refuse WebM and MP4. If the browser can't convert it, the recording goes as it is.
 - `features/dictation/dictationStore.ts`: idle / starting / recording / working, the
   target field, start, finish, cancel.
 - `features/dictation/insert.ts`: puts text into a textarea, input or editable area so
