@@ -71,14 +71,18 @@ export interface ComposerControls {
   /** The rest. On a wide box they sit in the row; on a narrow one (a phone) they are
    *  in one menu, a row each in this order, so the box stays a single uncrowded line. */
   options?: ComposerControl[]
-  /** A few words for the menu's button where there is room for them: the model's name. */
+  /** What the menu's button says: the model's name. */
   summary?: string
+  /** Said after it, quieter, where there is room: the reasoning level. */
+  detail?: string
 }
 
 /** Below this width (px) of the box itself, the options are in a menu. */
 const NARROW = 640
-/** From this width the menu's button also says which model it is. */
+/** From this width the menu's button has room for its detail too. */
 const ROOMY = 440
+/** Below this one it has no room for words at all: it is an icon. */
+const TIGHT = 340
 
 /** The width of an element, or null where it can't be measured (not laid out yet). */
 function useWidth(ref: RefObject<HTMLElement | null>): number | null {
@@ -110,6 +114,24 @@ export function Composer({
   const width = useWidth(rootRef)
   const narrow = width !== null && width < NARROW
   const options = controls?.options ?? []
+  // A narrow box at rest is one line: "+", the text, the microphone and send. Being
+  // used (the focus is in it, something is typed or attached, one of its menus is
+  // open), it opens up: the text moves a line up and the controls appear under it.
+  const [focused, setFocused] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  // A tap on one of the box's own buttons is not leaving it, even where the browser
+  // takes the focus away without giving it to the button (Safari).
+  const pressedInside = useRef(false)
+  useEffect(() => {
+    if (!narrow) return
+    const onPointerDown = (e: PointerEvent) => {
+      const root = rootRef.current
+      pressedInside.current = Boolean(root?.contains(e.target as Node))
+      if (!pressedInside.current && !root?.contains(document.activeElement)) setFocused(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [narrow])
   const files = useAttachments()
   const [references, setReferences] = useState<ChatRef[]>([])
   const [picking, setPicking] = useState(false)
@@ -170,6 +192,9 @@ export function Composer({
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
   }, [text])
+
+  const inUse = focused || Boolean(text || files.items.length || references.length || skill) || adding || optionsOpen || picking
+  const resting = narrow && !inUse
 
   // A message can be just files: a pasted screenshot, a document to look at.
   const canSend = Boolean(text.trim() || (filesOnly && files.readyIds.length)) && !running && !disabled && !files.uploading
@@ -294,6 +319,10 @@ export function Composer({
   return (
     <div
       ref={rootRef}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget) && !pressedInside.current) setFocused(false)
+      }}
       onDragOver={(e) => {
         e.preventDefault()
         setDragging(true)
@@ -362,7 +391,10 @@ export function Composer({
           </Link>
         </div>
       )}
-      <div className="flex items-start">
+      {/* At rest the text sits on the line of the buttons, between "+" and the microphone
+          (pulled down over the empty middle of that row); in use it slides up to its own line. */}
+      <div className={cn('flex items-start', narrow && 'pointer-events-none relative z-10 transition-[margin,padding] duration-200 ease-out motion-reduce:transition-none',
+        resting && '-mb-10 pl-11 pr-[5.5rem]')}>
         {chosen && (
           <button type="button" onClick={() => chooseSkill(null, text)} title={t('Remove the skill (or Backspace in an empty box)')}
             aria-label={t('Skill: {name}. Remove it', { name: chosen.name })}
@@ -384,7 +416,7 @@ export function Composer({
           placeholder={
             dragging ? t('Drop files to attach')
               : chosen ? (chosen.hint || chosen.description)
-                : (placeholder ?? (slashSkills.length ? t('Message the assistant… (/ for skills)') : t('Message the assistant…')))
+                : (placeholder ?? (slashSkills.length && !resting ? t('Message the assistant… (/ for skills)') : t('Message the assistant…')))
           }
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
@@ -392,10 +424,11 @@ export function Composer({
           aria-expanded={menuOpen ? true : undefined}
           aria-controls={menuOpen ? menuId : undefined}
           aria-activedescendant={menuOpen && matches.length ? `${menuId}-${Math.min(active, matches.length - 1)}` : undefined}
-          className="block max-h-60 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none"
+          className={cn('pointer-events-auto block max-h-60 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none',
+            resting && 'placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap')}
         />
       </div>
-      <div className="flex items-center justify-between gap-1 pl-1 md:gap-2">
+      <div className={cn('flex items-center justify-between gap-1 pl-1 md:gap-2', narrow && 'h-10')}>
         <div className="flex min-w-0 items-center gap-1">
           {/* One "+" for what can be added to a message: files, another chat, a skill. */}
           <Popover.Root open={adding} onOpenChange={setAdding}>
@@ -457,11 +490,23 @@ export function Composer({
               e.target.value = ''
             }}
           />
-          {controls?.mode}
-          {narrow
-            ? options.length > 0 && <OptionsMenu options={options} summary={width >= ROOMY ? controls?.summary : undefined} />
-            // The agent's own controls first, next to the mode switch they belong to.
-            : [...options.filter((o) => o.agent), ...options.filter((o) => !o.agent)].map((o) => <Fragment key={o.key}>{o.node}</Fragment>)}
+          {narrow ? (
+            // Out of the way while the box rests (the text is on this line then).
+            <div inert={resting} className={cn('flex min-w-0 items-center gap-1 transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none',
+              resting && 'translate-y-1.5 opacity-0')}>
+              {controls?.mode}
+              {options.length > 0 && (
+                <OptionsMenu options={options} open={optionsOpen} onOpenChange={setOptionsOpen}
+                  summary={width >= TIGHT ? controls?.summary : undefined} detail={width >= ROOMY ? controls?.detail : undefined} />
+              )}
+            </div>
+          ) : (
+            <>
+              {controls?.mode}
+              {/* The agent's own controls first, next to the mode switch they belong to. */}
+              {[...options.filter((o) => o.agent), ...options.filter((o) => !o.agent)].map((o) => <Fragment key={o.key}>{o.node}</Fragment>)}
+            </>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <DictationButton target={textRef} disabled={disabled} />
@@ -507,17 +552,22 @@ export function Composer({
  * The options of a narrow message box, behind one button: a row each, with its name.
  * The controls are the same ones a wide box shows in its row.
  */
-function OptionsMenu({ options, summary }: { options: ComposerControl[]; summary?: string }) {
+function OptionsMenu({ options, summary, detail, open, onOpenChange }: {
+  options: ComposerControl[]
+  summary?: string
+  detail?: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const active = options.some((o) => o.active)
   return (
-    <Popover.Root>
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
       <Popover.Trigger asChild>
         <button type="button" aria-label={t('Model and options')} title={t('Model and options')}
-          className={cn('flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-lg px-2 text-[12.5px] transition-colors pointer-coarse:h-10 pointer-coarse:min-w-10',
-            'data-[state=open]:bg-surface-hover',
-            active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
-          <SlidersHorizontal className="h-4 w-4 shrink-0" />
-          {summary && <span className="min-w-0 truncate">{summary}</span>}
+          className={cn('flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:min-w-9',
+            active ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-text hover:bg-surface-hover data-[state=open]:bg-surface-hover')}>
+          {summary ? <span className="min-w-0 truncate">{summary}</span> : <SlidersHorizontal className="h-4 w-4 shrink-0" />}
+          {summary && detail && <span className="shrink-0 font-normal text-muted">{detail}</span>}
         </button>
       </Popover.Trigger>
       <Popover.Portal>

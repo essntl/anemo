@@ -161,7 +161,14 @@ export function NewChatPage() {
     // Phones: the heading and the starters scroll, the message box stays at the bottom
     // within thumb reach. From `md` up: the box sits under the heading, the starters under it.
     <div className="flex h-full flex-col px-2 pb-2 md:items-center md:overflow-y-auto md:px-6 md:pb-8">
-      <PageHeader title={t('New chat')} />
+      <PageHeader title={t('New chat')}>
+        <button type="button" aria-pressed={temporary} aria-label={t('Temporary chat')} onClick={() => setTemporary(!temporary)}
+          title={t('Temporary chat: deleted 5 minutes after the last message')}
+          className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors pointer-coarse:h-10 pointer-coarse:w-10',
+            temporary ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+          <Timer className="h-4 w-4" />
+        </button>
+      </PageHeader>
       <div className="flex min-h-0 w-full max-w-3xl flex-1 flex-col md:flex-none md:pt-[9vh]">
         <div className="px-2 pt-3 md:mb-4 md:px-1 md:pt-0">
           <h2 className="text-[24px] font-bold leading-tight tracking-tight md:text-[30px]">{temporary ? t('Temporary chat') : t('What do you need done?')}</h2>
@@ -195,20 +202,13 @@ export function NewChatPage() {
             controls={{
               mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
               summary: chatModel.name,
+              detail: chatModel.level,
               options: [
                 { key: 'model', label: t('Model'), node: <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} /> },
                 ...(chatModel.reasons ? [{ key: 'reasoning', label: t('Reasoning'), node: <ReasoningControl /> }] : []),
                 ...(mode === 'agent' ? [{ key: 'permissions', label: t('Permissions'), agent: true, node: <PermissionChip profileId={profileId} /> }] : []),
                 ...(mode === 'agent' && profiles.data?.length
                   ? [{ key: 'profile', label: t('Agent profile'), agent: true, node: <ProfilePicker value={profileId} onChange={setProfileId} /> }] : []),
-                { key: 'temporary', label: t('Temporary chat'), active: temporary, node: (
-                  <button type="button" aria-pressed={temporary} aria-label={t('Temporary chat')} onClick={() => setTemporary(!temporary)}
-                  title={t('Temporary chat: deleted 5 minutes after the last message')}
-                  className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors pointer-coarse:h-10 pointer-coarse:w-10',
-                    temporary ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
-                  <Timer className="h-4 w-4" />
-                </button>
-                ) },
               ],
             }}
           />

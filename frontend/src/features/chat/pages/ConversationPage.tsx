@@ -380,6 +380,7 @@ function Conversation() {
           controls={{
             mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
             summary: chatModel.name,
+            detail: chatModel.level,
             options: [
               { key: 'model', label: t('Model'), node: <ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} /> },
               ...(chatModel.reasons ? [{ key: 'reasoning', label: t('Reasoning'), node: <ReasoningControl /> }] : []),

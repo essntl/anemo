@@ -136,17 +136,19 @@ describe('pasting an image on a phone', () => {
     expect(names).toEqual(['Add to the message', 'Mode', 'Profile', 'Model', 'Dictate', 'Send'])
   })
 
-  it('puts them in one menu where it is narrow (a phone), a named row each', async () => {
+  it('is one line at rest where it is narrow (a phone), and opens up in use with its options in one menu', async () => {
     // jsdom lays nothing out: give the box a phone's width.
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} constructor(cb: (entries: unknown[]) => void) { queueMicrotask(() => cb([])) } })
     const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360 } as DOMRect)
     const controls = {
       mode: <button>Mode</button>,
+      summary: 'Sonnet',
       options: [
         { key: 'model', label: 'Model', node: <button>Pick a model</button> },
-        { key: 'temporary', label: 'Temporary chat', active: true, node: <button>Timer</button> },
+        { key: 'profile', label: 'Agent profile', agent: true, node: <button>Profile</button> },
       ],
     }
+    media.coarse = true // a touch screen: the box doesn't take the focus by itself
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>
@@ -155,12 +157,33 @@ describe('pasting an image on a phone', () => {
       </QueryClientProvider>,
     )
     const menu = await screen.findByRole('button', { name: 'Model and options' })
-    expect(screen.getByRole('button', { name: 'Mode' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Pick a model' })).not.toBeInTheDocument()
     rect.mockRestore()
+    // At rest the controls are out of reach; "+", the microphone and send are not.
+    const row = menu.parentElement!
+    expect(row).toHaveAttribute('inert')
+    expect(screen.getByRole('button', { name: 'Dictate' }).closest('[inert]')).toBeNull()
+    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Message the assistant…')
+
+    await userEvent.click(screen.getByRole('textbox'))
+    expect(row).not.toHaveAttribute('inert')
+    expect(menu).toHaveTextContent('Sonnet')
+    expect(screen.queryByRole('button', { name: 'Pick a model' })).not.toBeInTheDocument()
+
     await userEvent.click(menu)
     expect(await screen.findByRole('button', { name: 'Pick a model' })).toBeInTheDocument()
-    expect(screen.getByText('Temporary chat')).toBeInTheDocument()
+    expect(screen.getByText('Agent profile')).toBeInTheDocument()
+    // The menu is part of using the box: it stays open though the focus is in the menu.
+    expect(row).not.toHaveAttribute('inert')
+
+    // Something typed keeps it open after the focus has gone.
+    await userEvent.keyboard('{Escape}')
+    await userEvent.type(screen.getByRole('textbox'), 'Hi')
+    await userEvent.click(document.body)
+    expect(row).not.toHaveAttribute('inert')
+    await userEvent.clear(screen.getByRole('textbox'))
+    await userEvent.click(document.body)
+    expect(row).toHaveAttribute('inert')
+    media.coarse = false
     vi.unstubAllGlobals()
   })
 })
