@@ -18,6 +18,7 @@ import { ApprovalDock } from '@/features/agents/components/ApprovalCard'
 import { RunActivity, RunPanel } from '@/features/agents/components/RunActivity'
 import { type Mode, ModeSwitch, PermissionChip } from '@/features/agents/components/ModeSwitch'
 import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
+import { useProfiles } from '@/features/profiles/api'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
@@ -46,7 +47,9 @@ import { TemporaryLabel } from '../temporary'
 import { LiveTiming } from '../components/AnswerTiming'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
+import { useChatModel } from '../chatModel'
 import { ModelPicker } from '../components/ModelPicker'
+import { ReasoningControl } from '../components/ReasoningControl'
 import { type RunEvent, type RunView, useRunStream } from '../runStream'
 import { withWaiting } from '../timing'
 import { useStickToBottom } from '../useStickToBottom'
@@ -130,6 +133,8 @@ function Conversation() {
   const activeRunId = conversation.data?.active_run_id ?? null
   const modelId = modelOverride ?? conversation.data?.model_id ?? null
   const defaultModelId = settings.data?.models.chat ?? null
+  const chatModel = useChatModel(modelId ?? defaultModelId)
+  const profiles = useProfiles()
 
   const onFinished = (view: RunView) => {
     // Show the final state immediately, then reconcile with the server copy.
@@ -374,8 +379,14 @@ function Conversation() {
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           controls={{
             mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
-            agent: mode === 'agent' && <><PermissionChip profileId={profileId} /><ProfilePicker value={profileId} onChange={setProfileOverride} /></>,
-            model: <ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} />,
+            summary: chatModel.name,
+            options: [
+              { key: 'model', label: t('Model'), node: <ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} /> },
+              ...(chatModel.reasons ? [{ key: 'reasoning', label: t('Reasoning'), node: <ReasoningControl /> }] : []),
+              ...(mode === 'agent' ? [{ key: 'permissions', label: t('Permissions'), agent: true, node: <PermissionChip profileId={profileId} /> }] : []),
+              ...(mode === 'agent' && profiles.data?.length
+                ? [{ key: 'profile', label: t('Agent profile'), agent: true, node: <ProfilePicker value={profileId} onChange={setProfileOverride} /> }] : []),
+            ],
           }}
         />
       </div>

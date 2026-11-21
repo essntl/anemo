@@ -167,6 +167,7 @@ const messages: Messages = {
   "Manage": "Керувати",
   "Tasks due": "Завдання з терміном",
   "Due": "Термін",
+  "Model and options": "Модель і параметри",
   "Temporary chat": "Тимчасовий чат",
   "What do you need done?": "Що потрібно зробити?",
   "Deleted 5 minutes after the last message, unless you keep it. Nothing is remembered from it.": "Буде видалено через 5 хвилин після останнього повідомлення, якщо його не зберегти. З нього нічого не запам’ятовується.",

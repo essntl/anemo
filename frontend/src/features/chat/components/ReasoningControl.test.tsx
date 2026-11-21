@@ -22,7 +22,8 @@ vi.mock('@/api/client', () => ({
   errorMessage: (e: unknown) => String(e),
 }))
 
-const { ModelPicker } = await import('./ModelPicker')
+const { ReasoningControl } = await import('./ReasoningControl')
+const { useChatModel } = await import('../chatModel')
 const { useSendTurn, useRegenerate } = await import('../api')
 
 const MODELS = [
@@ -38,10 +39,15 @@ function client(effort = 'medium') {
   return qc
 }
 
+/** As the chat pages do: the control is offered when the chosen model's level can be set. */
+function Controls({ modelId }: { modelId: string }) {
+  return useChatModel(modelId).reasons ? <ReasoningControl /> : null
+}
+
 function picker(modelId: string, qc = client()) {
   render(
     <QueryClientProvider client={qc}>
-      <ModelPicker value={modelId} defaultModelId="thinker" onChange={() => {}} />
+      <Controls modelId={modelId} />
     </QueryClientProvider>,
   )
   return qc

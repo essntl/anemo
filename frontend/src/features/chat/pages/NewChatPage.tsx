@@ -6,7 +6,7 @@ import { api, errorMessage, unwrap } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { type Mode, ModeSwitch, PermissionChip } from '@/features/agents/components/ModeSwitch'
-import { useSlashSkills } from '@/features/profiles/api'
+import { useProfiles, useSlashSkills } from '@/features/profiles/api'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useSetupStatus } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
@@ -19,7 +19,9 @@ import { formatWhen } from '@/lib/format'
 import { rich, t } from '@/lib/i18n'
 import { conversationKey, conversationsKey, createConversation, messagesKey, useConversations } from '../api'
 import { Composer, type ComposerHandle } from '../components/Composer'
+import { useChatModel } from '../chatModel'
 import { ModelPicker } from '../components/ModelPicker'
+import { ReasoningControl } from '../components/ReasoningControl'
 
 const PANEL = 'rounded-card bg-card p-2 shadow-soft'
 const PANEL_TITLE = 'flex h-8 items-center px-2 text-[12px] font-semibold'
@@ -118,6 +120,8 @@ export function NewChatPage() {
   // A chat started while a project is chosen belongs to it, and starts with its defaults.
   const scope = useScope()
   const project = scope.kind === 'project' ? scope.project : null
+  const chatModel = useChatModel(modelId ?? project?.default_model_id ?? settings.data?.models.chat ?? null)
+  const profiles = useProfiles()
   const [profileOverride, setProfileId] = useState<string | null | undefined>(undefined)
   const profileId = profileOverride !== undefined ? profileOverride : (project?.default_profile_id ?? null)
   // A temporary chat is deleted five minutes after its last message (?temporary=1 starts one).
@@ -190,16 +194,22 @@ export function NewChatPage() {
             onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
             controls={{
               mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
-              agent: mode === 'agent' && <><PermissionChip profileId={profileId} /><ProfilePicker value={profileId} onChange={setProfileId} /></>,
-              model: <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} />,
-              extras: (
-                <button type="button" aria-pressed={temporary} aria-label={t('Temporary chat')} onClick={() => setTemporary(!temporary)}
+              summary: chatModel.name,
+              options: [
+                { key: 'model', label: t('Model'), node: <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} /> },
+                ...(chatModel.reasons ? [{ key: 'reasoning', label: t('Reasoning'), node: <ReasoningControl /> }] : []),
+                ...(mode === 'agent' ? [{ key: 'permissions', label: t('Permissions'), agent: true, node: <PermissionChip profileId={profileId} /> }] : []),
+                ...(mode === 'agent' && profiles.data?.length
+                  ? [{ key: 'profile', label: t('Agent profile'), agent: true, node: <ProfilePicker value={profileId} onChange={setProfileId} /> }] : []),
+                { key: 'temporary', label: t('Temporary chat'), active: temporary, node: (
+                  <button type="button" aria-pressed={temporary} aria-label={t('Temporary chat')} onClick={() => setTemporary(!temporary)}
                   title={t('Temporary chat: deleted 5 minutes after the last message')}
                   className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors pointer-coarse:h-10 pointer-coarse:w-10',
                     temporary ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
                   <Timer className="h-4 w-4" />
                 </button>
-              ),
+                ) },
+              ],
             }}
           />
           <p className="mt-2 hidden items-center justify-center gap-4 text-[12px] text-subtle md:flex pointer-coarse:hidden">

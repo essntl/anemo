@@ -1,7 +1,7 @@
-import { useEffect, useId, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, Fragment, type DragEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
-import { ArrowUp, ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, Square, SquareSlash, X } from 'lucide-react'
+import { ArrowUp, ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, SlidersHorizontal, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
 import { toast } from '@/components/ui/toast'
 import { DictationButton } from '@/features/dictation/DictationButton'
@@ -41,11 +41,7 @@ interface ComposerProps {
   placeholder?: string
   /** Text the box starts with (e.g. a question about a document). */
   initialText?: string
-  /**
-   * The controls under the text box. Each has its place, so the box can lay them out
-   * for its width: one row where there is room; on a phone two, with the mode and the
-   * model above, and what belongs to the agent next to "+" below.
-   */
+  /** The controls under the text box: the mode switch, the model and the like. */
   controls?: ComposerControls
   /** The chat this composer belongs to: it cannot reference itself. */
   conversationId?: string
@@ -57,32 +53,45 @@ interface ComposerProps {
   autoFocus?: boolean
 }
 
-export interface ComposerControls {
-  /** Chat or Agent. */
-  mode?: ReactNode
-  /** What only an agent has: its permissions and profile. */
-  agent?: ReactNode
-  /** The model, and how hard it thinks. */
-  model?: ReactNode
-  /** Anything else (a temporary chat, say), next to the microphone on a phone. */
-  extras?: ReactNode
+/** One control under the text box: a model picker, the reasoning level, a profile. */
+export interface ComposerControl {
+  key: string
+  /** What it is, for the menu the controls move into where the box is narrow. */
+  label: string
+  node: ReactNode
+  /** It belongs to the agent: on a wide box it comes first, next to the mode switch. */
+  agent?: boolean
+  /** It is switched on (a temporary chat, say): the menu's button shows that. */
+  active?: boolean
 }
 
-// The row of controls is one wrapping flex row. Wide ("@2xl" of the box itself, not of
-// the screen: the box is also narrow beside a side panel), everything is on one line in
-// the order written. Narrower, `order` and a line break make two lines.
-const PLACE = {
-  mode: 'flex shrink-0 items-center @max-2xl/composer:order-1',
-  model: 'flex min-w-0 items-center @max-2xl/composer:order-2 @max-2xl/composer:flex-1 @max-2xl/composer:justify-end',
-  lineBreak: 'order-3 h-1.5 basis-full @2xl/composer:hidden',
-  add: '@max-2xl/composer:order-4',
-  // Takes the room that is left on its line, so a long profile name is shortened
-  // instead of pushing the send button onto a third line.
-  agent: 'flex min-w-0 items-center gap-0.5 @max-2xl/composer:order-5 @max-2xl/composer:flex-1',
-  spacer: 'min-w-0 flex-1 @max-2xl/composer:order-6',
-  spacerBesideAgent: '@max-2xl/composer:hidden',
-  extras: 'flex shrink-0 items-center @max-2xl/composer:order-7',
-  send: 'flex shrink-0 items-center gap-1 @max-2xl/composer:order-8',
+export interface ComposerControls {
+  /** Chat or Agent: always in the row. */
+  mode?: ReactNode
+  /** The rest. On a wide box they sit in the row; on a narrow one (a phone) they are
+   *  in one menu, a row each in this order, so the box stays a single uncrowded line. */
+  options?: ComposerControl[]
+  /** A few words for the menu's button where there is room for them: the model's name. */
+  summary?: string
+}
+
+/** Below this width (px) of the box itself, the options are in a menu. */
+const NARROW = 640
+/** From this width the menu's button also says which model it is. */
+const ROOMY = 440
+
+/** The width of an element, or null where it can't be measured (not laid out yet). */
+function useWidth(ref: RefObject<HTMLElement | null>): number | null {
+  const [width, setWidth] = useState<number | null>(null)
+  // Before the first paint, so a phone never shows the wide row for a moment.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setWidth(el.getBoundingClientRect().width || null))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return width
 }
 
 const ADD_ITEM = 'flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left text-[13.5px] font-medium hover:bg-surface-hover disabled:opacity-40 pointer-coarse:py-2.5'
@@ -97,6 +106,10 @@ export function Composer({
   const [dragging, setDragging] = useState(false)
   const textRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const width = useWidth(rootRef)
+  const narrow = width !== null && width < NARROW
+  const options = controls?.options ?? []
   const files = useAttachments()
   const [references, setReferences] = useState<ChatRef[]>([])
   const [picking, setPicking] = useState(false)
@@ -280,6 +293,7 @@ export function Composer({
 
   return (
     <div
+      ref={rootRef}
       onDragOver={(e) => {
         e.preventDefault()
         setDragging(true)
@@ -381,14 +395,14 @@ export function Composer({
           className="block max-h-60 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none"
         />
       </div>
-      <div className="@container/composer">
-        <div className="flex flex-wrap items-center gap-x-1 pl-1 @2xl/composer:flex-nowrap">
+      <div className="flex items-center justify-between gap-1 pl-1 md:gap-2">
+        <div className="flex min-w-0 items-center gap-1">
           {/* One "+" for what can be added to a message: files, another chat, a skill. */}
           <Popover.Root open={adding} onOpenChange={setAdding}>
             <Popover.Trigger asChild>
               <button type="button" aria-label={t('Add to the message')} title={t('Attach files, reference a chat or use a skill')} disabled={disabled}
                 className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 hover:bg-surface-hover disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10',
-                  PLACE.add, skill ? 'text-accent' : 'text-text')}>
+                  skill ? 'text-accent' : 'text-text')}>
                 <Plus className={cn('h-4 w-4 transition-transform', adding && 'rotate-45')} />
               </button>
             </Popover.Trigger>
@@ -443,13 +457,13 @@ export function Composer({
               e.target.value = ''
             }}
           />
-          {controls?.mode && <div className={PLACE.mode}>{controls.mode}</div>}
-          {controls?.agent && <div className={PLACE.agent}>{controls.agent}</div>}
-          {controls?.model && <div className={PLACE.model}>{controls.model}</div>}
-          {(controls?.mode || controls?.model) && <span aria-hidden className={PLACE.lineBreak} />}
-          {controls?.extras && <div className={PLACE.extras}>{controls.extras}</div>}
-          <span aria-hidden className={cn(PLACE.spacer, controls?.agent && PLACE.spacerBesideAgent)} />
-          <div className={PLACE.send}>
+          {controls?.mode}
+          {narrow
+            ? options.length > 0 && <OptionsMenu options={options} summary={width >= ROOMY ? controls?.summary : undefined} />
+            // The agent's own controls first, next to the mode switch they belong to.
+            : [...options.filter((o) => o.agent), ...options.filter((o) => !o.agent)].map((o) => <Fragment key={o.key}>{o.node}</Fragment>)}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           <DictationButton target={textRef} disabled={disabled} />
           {running ? (
             <button
@@ -474,7 +488,6 @@ export function Composer({
               <ArrowUp className="h-4 w-4" />
             </button>
           )}
-          </div>
         </div>
       </div>
       <Lingering value={picking}>
@@ -487,5 +500,37 @@ export function Composer({
         )}
       </Lingering>
     </div>
+  )
+}
+
+/**
+ * The options of a narrow message box, behind one button: a row each, with its name.
+ * The controls are the same ones a wide box shows in its row.
+ */
+function OptionsMenu({ options, summary }: { options: ComposerControl[]; summary?: string }) {
+  const active = options.some((o) => o.active)
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button type="button" aria-label={t('Model and options')} title={t('Model and options')}
+          className={cn('flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-lg px-2 text-[12.5px] transition-colors pointer-coarse:h-10 pointer-coarse:min-w-10',
+            'data-[state=open]:bg-surface-hover',
+            active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+          <SlidersHorizontal className="h-4 w-4 shrink-0" />
+          {summary && <span className="min-w-0 truncate">{summary}</span>}
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content side="top" align="start" sideOffset={8} collisionPadding={12}
+          className="composer-options pop z-50 w-80 max-w-[calc(100vw-24px)] rounded-card border border-border bg-card p-1.5 shadow-float">
+          {options.map((o) => (
+            <div key={o.key} className="flex min-h-10 items-center justify-between gap-3 py-0.5 pl-2.5 pr-1 pointer-coarse:min-h-11">
+              <span className="shrink-0 text-[13px] font-medium">{o.label}</span>
+              <div className="flex min-w-0 items-center justify-end">{o.node}</div>
+            </div>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   )
 }

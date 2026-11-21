@@ -117,8 +117,14 @@ describe('pasting an image on a phone', () => {
     expect(screen.getByRole('textbox')).toHaveValue('Plan my week')
   })
 
-  it('shows each control once, in its place, and leaves out the ones not given', () => {
-    const controls = { mode: <button>Mode</button>, agent: false, model: <button>Model</button>, extras: <button>Extra</button> }
+  it('shows its controls in the row where it is wide: the agent’s first, then the others', () => {
+    const controls = {
+      mode: <button>Mode</button>,
+      options: [
+        { key: 'model', label: 'Model', node: <button>Model</button> },
+        { key: 'profile', label: 'Agent profile', agent: true, node: <button>Profile</button> },
+      ],
+    }
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>
@@ -126,8 +132,35 @@ describe('pasting an image on a phone', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    // One row in this order where there is room; CSS reorders it into two on a phone.
     const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)
-    expect(names).toEqual(['Add to the message', 'Mode', 'Model', 'Extra', 'Dictate', 'Send'])
+    expect(names).toEqual(['Add to the message', 'Mode', 'Profile', 'Model', 'Dictate', 'Send'])
+  })
+
+  it('puts them in one menu where it is narrow (a phone), a named row each', async () => {
+    // jsdom lays nothing out: give the box a phone's width.
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} constructor(cb: (entries: unknown[]) => void) { queueMicrotask(() => cb([])) } })
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360 } as DOMRect)
+    const controls = {
+      mode: <button>Mode</button>,
+      options: [
+        { key: 'model', label: 'Model', node: <button>Pick a model</button> },
+        { key: 'temporary', label: 'Temporary chat', active: true, node: <button>Timer</button> },
+      ],
+    }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <Composer running={false} onSend={() => undefined} controls={controls} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    const menu = await screen.findByRole('button', { name: 'Model and options' })
+    expect(screen.getByRole('button', { name: 'Mode' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pick a model' })).not.toBeInTheDocument()
+    rect.mockRestore()
+    await userEvent.click(menu)
+    expect(await screen.findByRole('button', { name: 'Pick a model' })).toBeInTheDocument()
+    expect(screen.getByText('Temporary chat')).toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 })
