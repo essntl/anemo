@@ -1,7 +1,10 @@
 /**
- * Recording from the microphone, in a format the speech-to-text models take (Opus in
- * WebM in Chrome and Firefox, MP4 in Safari), with a level for the meter.
+ * Recording from the microphone, with a level for the meter. The browser records in
+ * its own format (Opus in WebM in Chrome and Firefox, MP4 in Safari); what comes out
+ * is WAV, which every speech-to-text server takes (see wav.ts).
  */
+
+import { toWav } from './wav'
 
 const FORMATS = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
 
@@ -17,7 +20,7 @@ export class RecorderError extends Error {
 }
 
 export interface Recording {
-  /** Stops and returns what was recorded. */
+  /** Stops and returns what was recorded, as WAV where the browser can convert it. */
   stop: () => Promise<Blob>
   /** Stops and throws the recording away. */
   cancel: () => void
@@ -97,7 +100,7 @@ export async function startRecording(): Promise<Recording> {
       new Promise<Blob>((resolve) => {
         const done = () => {
           release()
-          resolve(new Blob(chunks, { type: recorder.mimeType || format || 'audio/webm' }))
+          void toWav(new Blob(chunks, { type: recorder.mimeType || format || 'audio/webm' })).then(resolve)
         }
         recorder.onstop = done
         if (recorder.state === 'inactive') done()

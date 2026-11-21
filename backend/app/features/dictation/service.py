@@ -23,8 +23,8 @@ from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, 
 
 log = logging.getLogger(__name__)
 
-# OpenAI's limit for one request; about 25 minutes of Opus speech, far more than the
-# browser records (10 minutes).
+# OpenAI's limit for one request. The browser sends WAV (16 kHz mono, 19 MB for the
+# 10 minutes it records at most); other formats are taken too.
 MAX_AUDIO_BYTES = 25 * 1024 * 1024
 MAX_TOKENS_CLEAN_UP = 4000
 # Whisper reads only the last ~224 tokens of its prompt.
