@@ -66,7 +66,7 @@ function Options({ modelId, defaultModelId, onModel, mode, profileId, onProfile 
     onModel(id === defaultModelId ? null : id)
   }
   const row = (m: (typeof usable)[number]) => (
-    <Row key={m.id} checked={m.id === modelId} onClick={() => choose(m.id)}
+    <Row key={m.id} value={m.id} checked={m.id === modelId} onClick={() => choose(m.id)}
       title={m.display_name} detail={m.id === defaultModelId ? t('{provider} · Default', { provider: m.provider_name }) : m.provider_name} />
   )
 
@@ -140,9 +140,9 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** One choice: its name, a quieter line under it, and a tick when it is the chosen one. */
-function Row({ title, detail, checked, onClick, flat }: { title: string; detail?: string; checked: boolean; onClick: () => void; flat?: boolean }) {
+function Row({ title, detail, value, checked, onClick, flat }: { title: string; detail?: string; value?: string; checked: boolean; onClick: () => void; flat?: boolean }) {
   return (
-    <button type="button" role="radio" aria-checked={checked} onClick={onClick}
+    <button type="button" role="radio" aria-checked={checked} data-value={value} onClick={onClick}
       className={cn('flex w-full items-center gap-3 px-4 text-left transition-colors hover:bg-surface-hover active:bg-surface-hover', flat ? 'min-h-11 py-2' : 'min-h-14 py-2.5')}>
       <span className="min-w-0 flex-1">
         <span className={cn('block truncate font-medium', flat ? 'text-[14px]' : 'text-[15px]')}>{title}</span>
