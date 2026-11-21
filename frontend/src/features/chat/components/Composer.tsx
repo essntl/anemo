@@ -41,8 +41,12 @@ interface ComposerProps {
   placeholder?: string
   /** Text the box starts with (e.g. a question about a document). */
   initialText?: string
-  /** Controls shown under the text box (model picker, mode switch). */
-  toolbar?: ReactNode
+  /**
+   * The controls under the text box. Each has its place, so the box can lay them out
+   * for its width: one row where there is room; on a phone two, with the mode and the
+   * model above, and what belongs to the agent next to "+" below.
+   */
+  controls?: ComposerControls
   /** The chat this composer belongs to: it cannot reference itself. */
   conversationId?: string
   /** Offer skills with / (not when the message answers an agent's question). Default true. */
@@ -53,13 +57,41 @@ interface ComposerProps {
   autoFocus?: boolean
 }
 
+export interface ComposerControls {
+  /** Chat or Agent. */
+  mode?: ReactNode
+  /** What only an agent has: its permissions and profile. */
+  agent?: ReactNode
+  /** The model, and how hard it thinks. */
+  model?: ReactNode
+  /** Anything else (a temporary chat, say), next to the microphone on a phone. */
+  extras?: ReactNode
+}
+
+// The row of controls is one wrapping flex row. Wide ("@2xl" of the box itself, not of
+// the screen: the box is also narrow beside a side panel), everything is on one line in
+// the order written. Narrower, `order` and a line break make two lines.
+const PLACE = {
+  mode: 'flex shrink-0 items-center @max-2xl/composer:order-1',
+  model: 'flex min-w-0 items-center @max-2xl/composer:order-2 @max-2xl/composer:flex-1 @max-2xl/composer:justify-end',
+  lineBreak: 'order-3 h-1.5 basis-full @2xl/composer:hidden',
+  add: '@max-2xl/composer:order-4',
+  // Takes the room that is left on its line, so a long profile name is shortened
+  // instead of pushing the send button onto a third line.
+  agent: 'flex min-w-0 items-center gap-0.5 @max-2xl/composer:order-5 @max-2xl/composer:flex-1',
+  spacer: 'min-w-0 flex-1 @max-2xl/composer:order-6',
+  spacerBesideAgent: '@max-2xl/composer:hidden',
+  extras: 'flex shrink-0 items-center @max-2xl/composer:order-7',
+  send: 'flex shrink-0 items-center gap-1 @max-2xl/composer:order-8',
+}
+
 const ADD_ITEM = 'flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left text-[13.5px] font-medium hover:bg-surface-hover disabled:opacity-40 pointer-coarse:py-2.5'
 
 /** The box grows with the text up to this height (px), then scrolls. */
 const MAX_HEIGHT = 240
 
 export function Composer({
-  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
+  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, controls, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
 }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
@@ -349,14 +381,14 @@ export function Composer({
           className="block max-h-60 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none"
         />
       </div>
-      <div className="flex items-center justify-between gap-1 pl-1 md:gap-2">
-        <div className="flex min-w-0 items-center gap-0.5 md:gap-1">
+      <div className="@container/composer">
+        <div className="flex flex-wrap items-center gap-x-1 pl-1 @2xl/composer:flex-nowrap">
           {/* One "+" for what can be added to a message: files, another chat, a skill. */}
           <Popover.Root open={adding} onOpenChange={setAdding}>
             <Popover.Trigger asChild>
               <button type="button" aria-label={t('Add to the message')} title={t('Attach files, reference a chat or use a skill')} disabled={disabled}
                 className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 hover:bg-surface-hover disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10',
-                  skill ? 'text-accent' : 'text-text')}>
+                  PLACE.add, skill ? 'text-accent' : 'text-text')}>
                 <Plus className={cn('h-4 w-4 transition-transform', adding && 'rotate-45')} />
               </button>
             </Popover.Trigger>
@@ -411,9 +443,13 @@ export function Composer({
               e.target.value = ''
             }}
           />
-          {toolbar}
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
+          {controls?.mode && <div className={PLACE.mode}>{controls.mode}</div>}
+          {controls?.agent && <div className={PLACE.agent}>{controls.agent}</div>}
+          {controls?.model && <div className={PLACE.model}>{controls.model}</div>}
+          {(controls?.mode || controls?.model) && <span aria-hidden className={PLACE.lineBreak} />}
+          {controls?.extras && <div className={PLACE.extras}>{controls.extras}</div>}
+          <span aria-hidden className={cn(PLACE.spacer, controls?.agent && PLACE.spacerBesideAgent)} />
+          <div className={PLACE.send}>
           <DictationButton target={textRef} disabled={disabled} />
           {running ? (
             <button
@@ -438,6 +474,7 @@ export function Composer({
               <ArrowUp className="h-4 w-4" />
             </button>
           )}
+          </div>
         </div>
       </div>
       <Lingering value={picking}>

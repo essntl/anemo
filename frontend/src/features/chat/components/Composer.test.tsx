@@ -116,4 +116,18 @@ describe('pasting an image on a phone', () => {
     renderComposer(() => undefined)
     expect(screen.getByRole('textbox')).toHaveValue('Plan my week')
   })
+
+  it('shows each control once, in its place, and leaves out the ones not given', () => {
+    const controls = { mode: <button>Mode</button>, agent: false, model: <button>Model</button>, extras: <button>Extra</button> }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <Composer running={false} onSend={() => undefined} controls={controls} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    // One row in this order where there is room; CSS reorders it into two on a phone.
+    const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)
+    expect(names).toEqual(['Add to the message', 'Mode', 'Model', 'Extra', 'Dictate', 'Send'])
+  })
 })

@@ -5,7 +5,7 @@ import { Loader2, MessageSquare, Timer } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
+import { type Mode, ModeSwitch, PermissionChip } from '@/features/agents/components/ModeSwitch'
 import { useSlashSkills } from '@/features/profiles/api'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useSetupStatus } from '@/features/providers/api'
@@ -188,19 +188,19 @@ export function NewChatPage() {
             onSend={start}
             // Skills that need tools (e.g. web search for /fact-check) switch to Agent mode.
             onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
-            toolbar={
-              <>
-                <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
-                {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileId} />}
-                <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} />
+            controls={{
+              mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
+              agent: mode === 'agent' && <><PermissionChip profileId={profileId} /><ProfilePicker value={profileId} onChange={setProfileId} /></>,
+              model: <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} />,
+              extras: (
                 <button type="button" aria-pressed={temporary} aria-label={t('Temporary chat')} onClick={() => setTemporary(!temporary)}
                   title={t('Temporary chat: deleted 5 minutes after the last message')}
                   className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors pointer-coarse:h-10 pointer-coarse:w-10',
                     temporary ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
                   <Timer className="h-4 w-4" />
                 </button>
-              </>
-            }
+              ),
+            }}
           />
           <p className="mt-2 hidden items-center justify-center gap-4 text-[12px] text-subtle md:flex pointer-coarse:hidden">
             <span className="flex items-center gap-1.5"><ShortcutKeys id="chat.send" /> {t('send')}</span>

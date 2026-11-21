@@ -16,7 +16,7 @@ import { BrowserView } from '@/features/browser/BrowserView'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { ApprovalDock } from '@/features/agents/components/ApprovalCard'
 import { RunActivity, RunPanel } from '@/features/agents/components/RunActivity'
-import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
+import { type Mode, ModeSwitch, PermissionChip } from '@/features/agents/components/ModeSwitch'
 import { noticeMemoryEvent } from '@/features/memory/memoryNotice'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useResumeRun } from '@/features/runs/api'
@@ -372,13 +372,11 @@ function Conversation() {
                 : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
           }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
-          toolbar={
-            <>
-              <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
-              {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileOverride} />}
-              <ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} />
-            </>
-          }
+          controls={{
+            mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
+            agent: mode === 'agent' && <><PermissionChip profileId={profileId} /><ProfilePicker value={profileId} onChange={setProfileOverride} /></>,
+            model: <ModelPicker value={modelId} defaultModelId={defaultModelId} onChange={setModelOverride} />,
+          }}
         />
       </div>
     </div>

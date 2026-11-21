@@ -32,7 +32,7 @@ export function ModelPicker({
       <Select
         aria-label={t('Model')}
         variant="ghost"
-        className="max-w-40 px-1 md:max-w-56 md:px-2"
+        className="max-w-56"
         value={current}
         onValueChange={(v) => onChange(v || null)}
         options={[
