@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -115,5 +115,70 @@ describe('pasting an image on a phone', () => {
     vi.spyOn(dictation, 'takePendingText').mockReturnValueOnce('Plan my week')
     renderComposer(() => undefined)
     expect(screen.getByRole('textbox')).toHaveValue('Plan my week')
+  })
+
+  it('shows its controls in the row where it is wide: the agent’s first, then the others', () => {
+    const controls = {
+      mode: <button>Mode</button>,
+      options: [
+        { key: 'model', node: <button>Model</button> },
+        { key: 'profile', agent: true, node: <button>Profile</button> },
+      ],
+    }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <Composer running={false} onSend={() => undefined} controls={controls} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)
+    expect(names).toEqual(['Add to the message', 'Mode', 'Profile', 'Model', 'Dictate', 'Send'])
+  })
+
+  it('is one line at rest where it is narrow (a phone), and opens up in use with its options in a sheet', async () => {
+    // jsdom lays nothing out: give the box a phone's width.
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} constructor(cb: (entries: unknown[]) => void) { queueMicrotask(() => cb([])) } })
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 360 } as DOMRect)
+    const sheet = vi.fn(({ open }: { open: boolean; onOpenChange: (open: boolean) => void }) => (open ? <div role="dialog">The options</div> : null))
+    const controls = { mode: <button>Mode</button>, summary: 'Sonnet', options: [{ key: 'model', node: <button>Pick a model</button> }], sheet }
+    media.coarse = true // a touch screen: the box doesn't take the focus by itself
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <Composer running={false} onSend={() => undefined} controls={controls} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    const menu = await screen.findByRole('button', { name: 'Model and options' })
+    rect.mockRestore()
+    // At rest the controls are out of reach; "+", the microphone and send are not.
+    const row = menu.parentElement!
+    expect(row).toHaveAttribute('inert')
+    expect(screen.getByRole('button', { name: 'Dictate' }).closest('[inert]')).toBeNull()
+    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Message the assistant…')
+
+    await userEvent.click(screen.getByRole('textbox'))
+    expect(row).not.toHaveAttribute('inert')
+    expect(menu).toHaveTextContent('Sonnet')
+    expect(screen.queryByRole('button', { name: 'Pick a model' })).not.toBeInTheDocument()
+
+    await userEvent.click(menu)
+    expect(screen.getByRole('dialog')).toHaveTextContent('The options')
+    // The sheet is part of using the box: it stays open though the focus has left it.
+    await userEvent.click(document.body)
+    expect(row).not.toHaveAttribute('inert')
+    act(() => sheet.mock.lastCall![0].onOpenChange(false))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    // Something typed keeps it open after the focus has gone.
+    await userEvent.type(screen.getByRole('textbox'), 'Hi')
+    await userEvent.click(document.body)
+    expect(row).not.toHaveAttribute('inert')
+    await userEvent.clear(screen.getByRole('textbox'))
+    await userEvent.click(document.body)
+    expect(row).toHaveAttribute('inert')
+    media.coarse = false
+    vi.unstubAllGlobals()
   })
 })

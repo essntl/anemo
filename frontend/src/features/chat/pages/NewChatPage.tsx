@@ -5,7 +5,7 @@ import { Loader2, MessageSquare, Timer } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { type Mode, ModeSwitch } from '@/features/agents/components/ModeSwitch'
+import { type Mode, ModeSwitch, PermissionChip } from '@/features/agents/components/ModeSwitch'
 import { useSlashSkills } from '@/features/profiles/api'
 import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useSetupStatus } from '@/features/providers/api'
@@ -19,7 +19,10 @@ import { formatWhen } from '@/lib/format'
 import { rich, t } from '@/lib/i18n'
 import { conversationKey, conversationsKey, createConversation, messagesKey, useConversations } from '../api'
 import { Composer, type ComposerHandle } from '../components/Composer'
+import { useChatModel } from '../chatModel'
+import { ChatOptionsSheet } from '../components/ChatOptionsSheet'
 import { ModelPicker } from '../components/ModelPicker'
+import { ReasoningControl } from '../components/ReasoningControl'
 
 const PANEL = 'rounded-card bg-card p-2 shadow-soft'
 const PANEL_TITLE = 'flex h-8 items-center px-2 text-[12px] font-semibold'
@@ -118,6 +121,7 @@ export function NewChatPage() {
   // A chat started while a project is chosen belongs to it, and starts with its defaults.
   const scope = useScope()
   const project = scope.kind === 'project' ? scope.project : null
+  const chatModel = useChatModel(modelId ?? project?.default_model_id ?? settings.data?.models.chat ?? null)
   const [profileOverride, setProfileId] = useState<string | null | undefined>(undefined)
   const profileId = profileOverride !== undefined ? profileOverride : (project?.default_profile_id ?? null)
   // A temporary chat is deleted five minutes after its last message (?temporary=1 starts one).
@@ -157,7 +161,14 @@ export function NewChatPage() {
     // Phones: the heading and the starters scroll, the message box stays at the bottom
     // within thumb reach. From `md` up: the box sits under the heading, the starters under it.
     <div className="flex h-full flex-col px-2 pb-2 md:items-center md:overflow-y-auto md:px-6 md:pb-8">
-      <PageHeader title={t('New chat')} />
+      <PageHeader title={t('New chat')}>
+        <button type="button" aria-pressed={temporary} aria-label={t('Temporary chat')} onClick={() => setTemporary(!temporary)}
+          title={t('Temporary chat: deleted 5 minutes after the last message')}
+          className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors pointer-coarse:h-10 pointer-coarse:w-10',
+            temporary ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
+          <Timer className="h-4 w-4" />
+        </button>
+      </PageHeader>
       <div className="flex min-h-0 w-full max-w-3xl flex-1 flex-col md:flex-none md:pt-[9vh]">
         <div className="px-2 pt-3 md:mb-4 md:px-1 md:pt-0">
           <h2 className="text-[24px] font-bold leading-tight tracking-tight md:text-[30px]">{temporary ? t('Temporary chat') : t('What do you need done?')}</h2>
@@ -188,19 +199,23 @@ export function NewChatPage() {
             onSend={start}
             // Skills that need tools (e.g. web search for /fact-check) switch to Agent mode.
             onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
-            toolbar={
-              <>
-                <ModeSwitch mode={mode} onChange={setModeOverride} profileId={profileId} />
-                {mode === 'agent' && <ProfilePicker value={profileId} onChange={setProfileId} />}
-                <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} />
-                <button type="button" aria-pressed={temporary} aria-label={t('Temporary chat')} onClick={() => setTemporary(!temporary)}
-                  title={t('Temporary chat: deleted 5 minutes after the last message')}
-                  className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors pointer-coarse:h-10 pointer-coarse:w-10',
-                    temporary ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-hover hover:text-text')}>
-                  <Timer className="h-4 w-4" />
-                </button>
-              </>
-            }
+            controls={{
+              mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
+              summary: chatModel.name,
+              detail: chatModel.level,
+              options: [
+                { key: 'model', node: <ModelPicker value={modelId} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onChange={setModelId} /> },
+                ...(chatModel.reasons ? [{ key: 'reasoning', node: <ReasoningControl /> }] : []),
+                ...(mode === 'agent' ? [
+                  { key: 'permissions', agent: true, node: <PermissionChip profileId={profileId} /> },
+                  { key: 'profile', agent: true, node: <ProfilePicker value={profileId} onChange={setProfileId} /> },
+                ] : []),
+              ],
+              sheet: (state) => (
+                <ChatOptionsSheet {...state} modelId={modelId ?? (project?.default_model_id ?? settings.data?.models.chat ?? null)} defaultModelId={project?.default_model_id ?? settings.data?.models.chat ?? null} onModel={setModelId}
+                  mode={mode} profileId={profileId} onProfile={setProfileId} />
+              ),
+            }}
           />
           <p className="mt-2 hidden items-center justify-center gap-4 text-[12px] text-subtle md:flex pointer-coarse:hidden">
             <span className="flex items-center gap-1.5"><ShortcutKeys id="chat.send" /> {t('send')}</span>

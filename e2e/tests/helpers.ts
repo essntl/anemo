@@ -53,8 +53,29 @@ export async function newChat(page: Page, mode: 'Chat' | 'Agent', modelId: strin
   await pickModel(page, modelId)
 }
 
-/** Chooses a model in the composer's model dropdown. */
+/**
+ * On a phone the message box is one line until it is used: tapping into it brings up
+ * its controls (the mode switch, the model button).
+ */
+export async function openMessageBox(page: Page) {
+  await page.getByPlaceholder('Message the assistant…').click()
+  await expect(page.getByRole('radio', { name: 'Chat' })).toBeEnabled()
+}
+
+/** Chooses a model in the composer: its model dropdown, or on a phone its options sheet. */
 export async function pickModel(page: Page, modelId: string) {
+  const sheetButton = page.getByRole('button', { name: 'Model and options' })
+  if (await sheetButton.isVisible()) {
+    await sheetButton.click()
+    const sheet = page.getByRole('dialog', { name: 'Model and options' })
+    // A model that is not among the first few is further down: bring the rest up.
+    const more = sheet.getByRole('button', { name: 'Show more' })
+    if (await more.isEnabled()) await more.click()
+    await sheet.locator(`[role="radio"][data-value="${modelId}"]`).click()
+    await page.keyboard.press('Escape')
+    await expect(sheet).toHaveCount(0)
+    return
+  }
   await page.getByRole('combobox', { name: 'Model' }).click()
   await page.locator(`[role="option"][data-value="${modelId}"]`).click()
   // The list hands focus back to its button when its closing animation ends; typing

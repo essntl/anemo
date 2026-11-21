@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { answerPrompt, confirmWith, fakeModels, login, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, openMessageBox, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic } from './helpers'
 
 /*
  * Phone layout and installable-app checks. Runs in the "mobile" project
@@ -475,6 +475,7 @@ test('chat on a phone: send with the button, Enter adds a new line', async ({ pa
   await login(page)
   const models = await fakeModels(page.request)
   await page.goto('/') // the start page may be Home
+  await openMessageBox(page)
   await page.getByRole('radio', { name: 'Chat' }).click()
   await pickModel(page, models.echo)
   const box = page.getByPlaceholder('Message the assistant…')
@@ -508,6 +509,7 @@ test('chat on a phone: "Paste an image" in the + menu attaches the image on the 
   await login(page)
   const models = await fakeModels(page.request)
   await page.goto('/')
+  await openMessageBox(page)
   await page.getByRole('radio', { name: 'Chat' }).click()
   await pickModel(page, models.echo)
   await page.bringToFront() // the clipboard is only for a focused page

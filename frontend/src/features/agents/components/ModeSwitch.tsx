@@ -35,37 +35,25 @@ import { usePermissionSummary } from '../api'
 export type Mode = 'chat' | 'agent'
 
 /** Chat answers directly; Agent may use tools within the user's permission settings. */
-export function ModeSwitch({
-  mode,
-  onChange,
-  profileId = null,
-}: {
-  mode: Mode
-  onChange: (mode: Mode) => void
-  /** Agent profile whose permissions the chip shows (null: the default agent). */
-  profileId?: string | null
-}) {
+export function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
   return (
-    <div className="flex shrink-0 items-center gap-0.5 md:gap-1">
-      <div className="inline-flex rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label={t('Mode')}>
-        {(['chat', 'agent'] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            role="radio"
-            aria-checked={mode === m}
-            onClick={() => onChange(m)}
-            className={cn(
-              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[12.5px] font-medium transition-colors md:px-2.5 pointer-coarse:h-9',
-              mode === m ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text',
-            )}
-          >
-            {m === 'chat' ? <MessageSquare className="hidden h-3.5 w-3.5 sm:block" /> : <Bot className="hidden h-3.5 w-3.5 sm:block" />}
-            {m === 'chat' ? t('Chat') : t('Agent')}
-          </button>
-        ))}
-      </div>
-      {mode === 'agent' && <PermissionChip profileId={profileId} />}
+    <div className="inline-flex shrink-0 rounded-lg bg-surface-2 p-0.5" role="radiogroup" aria-label={t('Mode')}>
+      {(['chat', 'agent'] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={mode === m}
+          onClick={() => onChange(m)}
+          className={cn(
+            'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:px-3',
+            mode === m ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text',
+          )}
+        >
+          {m === 'chat' ? <MessageSquare className="hidden h-3.5 w-3.5 sm:block" /> : <Bot className="hidden h-3.5 w-3.5 sm:block" />}
+          {m === 'chat' ? t('Chat') : t('Agent')}
+        </button>
+      ))}
     </div>
   )
 }
@@ -104,8 +92,34 @@ const ICONS: Record<string, LucideIcon> = {
  * Shows, before starting, exactly what an agent run may do: one small tile per kind of
  * action, coloured by whether it happens without asking, mostly without asking, only
  * after asking, or never. Pointing at (or tapping) a tile explains it below the grid.
+ * `profileId`: the agent profile whose permissions it shows (null: the default agent).
  */
-function PermissionChip({ profileId }: { profileId: string | null }) {
+export function PermissionChip({ profileId = null }: { profileId?: string | null }) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button type="button" aria-label={t('Permissions')}
+          className="flex h-8 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-[12px] text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-10 pointer-coarse:min-w-10">
+          <ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t('Permissions')}</span>
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content side="top" align="start" sideOffset={8} collisionPadding={12}
+          className="pop z-50 max-h-[var(--radix-popover-content-available-height)] w-[26rem] max-w-[calc(100vw-24px)] overflow-y-auto rounded-card border border-border bg-card p-3.5 text-[13px] shadow-float">
+          <PermissionOverview profileId={profileId} />
+          <Popover.Arrow className="fill-card" />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
+
+/**
+ * What an agent run may do, laid out: the legend, a tile per kind of action, what the
+ * tile pointed at means, and the limits. `heading={false}` where the place it is shown
+ * in already says what it is.
+ */
+export function PermissionOverview({ profileId = null, heading = true }: { profileId?: string | null; heading?: boolean }) {
   const summary = usePermissionSummary(profileId)
   const items = (summary.data?.items ?? [])
     .filter((i) => i.available)
@@ -113,79 +127,69 @@ function PermissionChip({ profileId }: { profileId: string | null }) {
   const [focused, setFocused] = useState<string | null>(null)
   const shown = items.find((i) => i.capability === focused)
   return (
-    <Popover.Root onOpenChange={() => setFocused(null)}>
-      <Popover.Trigger asChild>
-        <button type="button" aria-label={t('Permissions')}
-          className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] text-muted hover:bg-surface-hover hover:text-text pointer-coarse:h-9">
-          <ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t('Permissions')}</span>
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content side="top" align="start" sideOffset={8} collisionPadding={12}
-          className="pop z-50 max-h-[var(--radix-popover-content-available-height)] w-[26rem] max-w-[calc(100vw-24px)] overflow-y-auto rounded-card border border-border bg-card p-3.5 text-[13px] shadow-float">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-accent" />
-            <span className="flex-1 font-semibold">{t('What the agent may do')}</span>
-          </div>
-          {/* The legend, with how many of each. */}
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {ORDER.map((key) => {
-              const count = items.filter((i) => i.group === key).length
-              if (!count) return null
-              const g = GROUPS[key]
-              return (
-                <span key={key} title={t(g.title)}
-                  className={cn('flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium', g.tint, g.tone)}>
-                  <g.icon className="h-3 w-3" /> {t(g.short)} <span className="tabular-nums opacity-70">{count}</span>
+    <>
+      {heading && (
+        <div className="mb-2.5 flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-accent" />
+          <span className="flex-1 font-semibold">{t('What the agent may do')}</span>
+        </div>
+      )}
+      {/* The legend, with how many of each. */}
+      <div className="flex flex-wrap gap-1.5">
+        {ORDER.map((key) => {
+          const count = items.filter((i) => i.group === key).length
+          if (!count) return null
+          const g = GROUPS[key]
+          return (
+            <span key={key} title={t(g.title)}
+              className={cn('flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium', g.tint, g.tone)}>
+              <g.icon className="h-3 w-3" /> {t(g.short)} <span className="tabular-nums opacity-70">{count}</span>
+            </span>
+          )
+        })}
+      </div>
+      <ul className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3" aria-label={t('Permissions')}>
+        {items.map((i) => {
+          const g = GROUPS[i.group]
+          const Icon = ICONS[i.capability] ?? Wrench
+          return (
+            <li key={i.capability}>
+              <button type="button" aria-label={`${t(i.label)}: ${t(i.detail)}`} aria-pressed={focused === i.capability}
+                onMouseEnter={() => setFocused(i.capability)} onFocus={() => setFocused(i.capability)}
+                onClick={() => setFocused(i.capability)}
+                className={cn('relative flex h-full w-full items-center gap-2 rounded-lg border py-1.5 pl-2 pr-3.5 text-left transition-colors',
+                  focused === i.capability ? 'border-border-strong bg-surface-hover' : 'border-border hover:bg-surface-hover')}>
+                <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', g.tint, g.tone)}>
+                  <Icon className="h-3.5 w-3.5" />
                 </span>
-              )
-            })}
-          </div>
-          <ul className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3" aria-label={t('Permissions')}>
-            {items.map((i) => {
-              const g = GROUPS[i.group]
-              const Icon = ICONS[i.capability] ?? Wrench
-              return (
-                <li key={i.capability}>
-                  <button type="button" aria-label={`${t(i.label)}: ${t(i.detail)}`} aria-pressed={focused === i.capability}
-                    onMouseEnter={() => setFocused(i.capability)} onFocus={() => setFocused(i.capability)}
-                    onClick={() => setFocused(i.capability)}
-                    className={cn('relative flex h-full w-full items-center gap-2 rounded-lg border py-1.5 pl-2 pr-3.5 text-left transition-colors',
-                      focused === i.capability ? 'border-border-strong bg-surface-hover' : 'border-border hover:bg-surface-hover')}>
-                    <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', g.tint, g.tone)}>
-                      <Icon className="h-3.5 w-3.5" />
-                    </span>
-                    <span className={cn('min-w-0 flex-1 text-[12px] leading-tight', i.group === 'never' && 'text-muted line-through')}>
-                      {t(i.label)}
-                    </span>
-                    <g.icon className={cn('absolute right-1 top-1 h-2.5 w-2.5', g.tone)} aria-hidden />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-          {/* What the tile pointed at means; without one, how to find out. Tall enough for the
-              longest explanation (two lines; three on a phone), so the card keeps its size, instead
-              of jumping, while the pointer moves over the tiles. */}
-          <p className="mt-2.5 min-h-[calc(2*1.5em+0.75rem)] rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12px] leading-[1.5] text-muted max-sm:min-h-[calc(3*1.5em+0.75rem)]" aria-live="polite">
-            {shown ? (
-              <><span className="font-medium text-text">{t(shown.label)}:</span> {t(shown.detail)}. {t(shown.description)}</>
-            ) : (
-              t('Point at or tap a permission to see what it covers.')
-            )}
-          </p>
-          {summary.data && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-1 border-t border-border pt-2.5 text-[12px] text-muted">
-              <span>
-                {t('Limits: {steps} steps, {calls} tool calls, {minutes} min.', { steps: summary.data.max_steps, calls: summary.data.max_tool_calls, minutes: Math.round(summary.data.max_runtime_s / 60) })}
-                {summary.data.plan_review === 'always' && ` ${t('You review its plan first.')}`}
-              </span>
-              <Link to={profileId ? '/agents' : '/settings/permissions'} className="ml-auto text-accent underline">{t('Change')}</Link>
-            </div>
-          )}
-          <Popover.Arrow className="fill-card" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+                <span className={cn('min-w-0 flex-1 text-[12px] leading-tight', i.group === 'never' && 'text-muted line-through')}>
+                  {t(i.label)}
+                </span>
+                <g.icon className={cn('absolute right-1 top-1 h-2.5 w-2.5', g.tone)} aria-hidden />
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {/* What the tile pointed at means; without one, how to find out. Tall enough for the
+          longest explanation (two lines; three on a phone), so the card keeps its size, instead
+          of jumping, while the pointer moves over the tiles. */}
+      <p className="mt-2.5 min-h-[calc(2*1.5em+0.75rem)] rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12px] leading-[1.5] text-muted max-sm:min-h-[calc(3*1.5em+0.75rem)]" aria-live="polite">
+        {shown ? (
+          <><span className="font-medium text-text">{t(shown.label)}:</span> {t(shown.detail)}. {t(shown.description)}</>
+        ) : (
+          t('Point at or tap a permission to see what it covers.')
+        )}
+      </p>
+      {summary.data && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-1 border-t border-border pt-2.5 text-[12px] text-muted">
+          <span>
+            {t('Limits: {steps} steps, {calls} tool calls, {minutes} min.', { steps: summary.data.max_steps, calls: summary.data.max_tool_calls, minutes: Math.round(summary.data.max_runtime_s / 60) })}
+            {summary.data.plan_review === 'always' && ` ${t('You review its plan first.')}`}
+          </span>
+          <Link to={profileId ? '/agents' : '/settings/permissions'} className="ml-auto text-accent underline">{t('Change')}</Link>
+        </div>
+      )}
+    </>
   )
 }

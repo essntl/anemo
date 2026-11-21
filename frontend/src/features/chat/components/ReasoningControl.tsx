@@ -34,7 +34,8 @@ export function ReasoningControl() {
           )}
         >
           <Brain className={cn('h-3.5 w-3.5', index > 0 && 'text-accent')} />
-          <span className="hidden sm:inline">{t(level.label)}</span>
+          {/* Named where there is room: a wide screen, or its row in the message box's options menu. */}
+          <span className="hidden sm:inline in-[.composer-options]:inline">{t(level.label)}</span>
           <EffortMeter index={index} />
         </button>
       </Popover.Trigger>

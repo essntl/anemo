@@ -1,7 +1,7 @@
-import { useEffect, useId, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, Fragment, type DragEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
-import { ArrowUp, ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, Square, SquareSlash, X } from 'lucide-react'
+import { ArrowUp, ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, SlidersHorizontal, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
 import { toast } from '@/components/ui/toast'
 import { DictationButton } from '@/features/dictation/DictationButton'
@@ -41,8 +41,8 @@ interface ComposerProps {
   placeholder?: string
   /** Text the box starts with (e.g. a question about a document). */
   initialText?: string
-  /** Controls shown under the text box (model picker, mode switch). */
-  toolbar?: ReactNode
+  /** The controls under the text box: the mode switch, the model and the like. */
+  controls?: ComposerControls
   /** The chat this composer belongs to: it cannot reference itself. */
   conversationId?: string
   /** Offer skills with / (not when the message answers an agent's question). Default true. */
@@ -53,18 +53,85 @@ interface ComposerProps {
   autoFocus?: boolean
 }
 
+/** One control under the text box: a model picker, the reasoning level, a profile. */
+export interface ComposerControl {
+  key: string
+  node: ReactNode
+  /** It belongs to the agent: it comes first, next to the mode switch. */
+  agent?: boolean
+}
+
+export interface ComposerControls {
+  /** Chat or Agent: always in the row. */
+  mode?: ReactNode
+  /** The rest, in the row of a wide box. */
+  options?: ComposerControl[]
+  /**
+   * The same on a narrow box (a phone), where they don't fit the row: a sheet that one
+   * button in the row opens. The box says when it is open.
+   */
+  sheet?: (state: { open: boolean; onOpenChange: (open: boolean) => void }) => ReactNode
+  /** What that button says: the model's name. */
+  summary?: string
+  /** Said after it, quieter, where there is room: the reasoning level. */
+  detail?: string
+}
+
+/** Below this width (px) of the box itself, the options are in a sheet. */
+const NARROW = 640
+/** From this width the sheet's button has room for its detail too. */
+const ROOMY = 440
+/** Below this one it has no room for words at all: it is an icon. */
+const TIGHT = 340
+
+/** The width of an element, or null where it can't be measured (not laid out yet). */
+function useWidth(ref: RefObject<HTMLElement | null>): number | null {
+  const [width, setWidth] = useState<number | null>(null)
+  // Before the first paint, so a phone never shows the wide row for a moment.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setWidth(el.getBoundingClientRect().width || null))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return width
+}
+
 const ADD_ITEM = 'flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left text-[13.5px] font-medium hover:bg-surface-hover disabled:opacity-40 pointer-coarse:py-2.5'
 
 /** The box grows with the text up to this height (px), then scrolls. */
 const MAX_HEIGHT = 240
 
 export function Composer({
-  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, toolbar, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
+  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, controls, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
 }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
   const textRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const width = useWidth(rootRef)
+  const narrow = width !== null && width < NARROW
+  const options = controls?.options ?? []
+  // A narrow box at rest is one line: "+", the text, the microphone and send. Being
+  // used (the focus is in it, something is typed or attached, one of its menus is
+  // open), it opens up: the text moves a line up and the controls appear under it.
+  const [focused, setFocused] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  // A tap on one of the box's own buttons is not leaving it, even where the browser
+  // takes the focus away without giving it to the button (Safari).
+  const pressedInside = useRef(false)
+  useEffect(() => {
+    if (!narrow) return
+    const onPointerDown = (e: PointerEvent) => {
+      const root = rootRef.current
+      pressedInside.current = Boolean(root?.contains(e.target as Node))
+      if (!pressedInside.current && !root?.contains(document.activeElement)) setFocused(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [narrow])
   const files = useAttachments()
   const [references, setReferences] = useState<ChatRef[]>([])
   const [picking, setPicking] = useState(false)
@@ -125,6 +192,9 @@ export function Composer({
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
   }, [text])
+
+  const inUse = focused || Boolean(text || files.items.length || references.length || skill) || adding || optionsOpen || picking
+  const resting = narrow && !inUse
 
   // A message can be just files: a pasted screenshot, a document to look at.
   const canSend = Boolean(text.trim() || (filesOnly && files.readyIds.length)) && !running && !disabled && !files.uploading
@@ -248,6 +318,11 @@ export function Composer({
 
   return (
     <div
+      ref={rootRef}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget) && !pressedInside.current) setFocused(false)
+      }}
       onDragOver={(e) => {
         e.preventDefault()
         setDragging(true)
@@ -316,7 +391,10 @@ export function Composer({
           </Link>
         </div>
       )}
-      <div className="flex items-start">
+      {/* At rest the text sits on the line of the buttons, between "+" and the microphone
+          (pulled down over the empty middle of that row); in use it slides up to its own line. */}
+      <div className={cn('flex items-start', narrow && 'pointer-events-none relative z-10 transition-[margin,padding] duration-200 ease-out motion-reduce:transition-none',
+        resting && '-mb-10 pl-11 pr-[5.5rem]')}>
         {chosen && (
           <button type="button" onClick={() => chooseSkill(null, text)} title={t('Remove the skill (or Backspace in an empty box)')}
             aria-label={t('Skill: {name}. Remove it', { name: chosen.name })}
@@ -338,7 +416,7 @@ export function Composer({
           placeholder={
             dragging ? t('Drop files to attach')
               : chosen ? (chosen.hint || chosen.description)
-                : (placeholder ?? (slashSkills.length ? t('Message the assistant… (/ for skills)') : t('Message the assistant…')))
+                : (placeholder ?? (slashSkills.length && !resting ? t('Message the assistant… (/ for skills)') : t('Message the assistant…')))
           }
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
@@ -346,11 +424,12 @@ export function Composer({
           aria-expanded={menuOpen ? true : undefined}
           aria-controls={menuOpen ? menuId : undefined}
           aria-activedescendant={menuOpen && matches.length ? `${menuId}-${Math.min(active, matches.length - 1)}` : undefined}
-          className="block max-h-60 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none"
+          className={cn('pointer-events-auto block max-h-60 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none',
+            resting && 'placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap')}
         />
       </div>
-      <div className="flex items-center justify-between gap-1 pl-1 md:gap-2">
-        <div className="flex min-w-0 items-center gap-0.5 md:gap-1">
+      <div className={cn('flex items-center justify-between gap-1 pl-1 md:gap-2', narrow && 'h-10')}>
+        <div className="flex min-w-0 items-center gap-1">
           {/* One "+" for what can be added to a message: files, another chat, a skill. */}
           <Popover.Root open={adding} onOpenChange={setAdding}>
             <Popover.Trigger asChild>
@@ -411,7 +490,26 @@ export function Composer({
               e.target.value = ''
             }}
           />
-          {toolbar}
+          {narrow && controls?.sheet ? (
+            // Out of the way while the box rests (the text is on this line then).
+            <div inert={resting} className={cn('flex min-w-0 items-center gap-1 transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none',
+              resting && 'translate-y-1.5 opacity-0')}>
+              {controls.mode}
+              <button type="button" aria-label={t('Model and options')} title={t('Model and options')} aria-haspopup="dialog" aria-expanded={optionsOpen}
+                onClick={() => setOptionsOpen(true)}
+                className="flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full bg-surface-2 px-3 text-[12.5px] font-medium text-text transition-colors hover:bg-surface-hover pointer-coarse:h-9 pointer-coarse:min-w-9">
+                {controls.summary && width >= TIGHT ? <span className="min-w-0 truncate">{controls.summary}</span> : <SlidersHorizontal className="h-4 w-4 shrink-0" />}
+                {controls.summary && controls.detail && width >= ROOMY && <span className="shrink-0 font-normal text-muted">{controls.detail}</span>}
+              </button>
+              {controls.sheet({ open: optionsOpen, onOpenChange: setOptionsOpen })}
+            </div>
+          ) : (
+            <>
+              {controls?.mode}
+              {/* The agent's own controls first, next to the mode switch they belong to. */}
+              {[...options.filter((o) => o.agent), ...options.filter((o) => !o.agent)].map((o) => <Fragment key={o.key}>{o.node}</Fragment>)}
+            </>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <DictationButton target={textRef} disabled={disabled} />
