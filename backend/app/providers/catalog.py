@@ -24,6 +24,7 @@ CAPABILITY_NAMES = (
     "reasoning",
     "structured_output",
     "embeddings",
+    "transcription",
 )
 
 _RULES: list[tuple[str, dict[str, bool]]] = [
@@ -39,6 +40,18 @@ _RULES: list[tuple[str, dict[str, bool]]] = [
     (r"(^|/)(qwen|llama-?3|mistral|mixtral|gemma|phi|deepseek)", {"tools": True}),
     (r"(deepseek-r1|qwq|thinking|reason)", {"reasoning": True}),
     (r"(vision|vl\b|llava|-vl-)", {"vision": True}),
+    # Speech-to-text last, so no chat rule above (e.g. gpt-4o) adds chat features to it.
+    (
+        r"(whisper|transcribe)",
+        {
+            "transcription": True,
+            "chat": False,
+            "streaming": False,
+            "tools": False,
+            "vision": False,
+            "structured_output": False,
+        },
+    ),
 ]
 
 

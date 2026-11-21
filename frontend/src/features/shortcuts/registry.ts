@@ -32,7 +32,7 @@ export interface Shortcut {
   prefix?: string
 }
 
-export type AreaId = 'everywhere' | 'search' | 'chat' | 'home' | 'focus' | 'music' | 'files' | 'diagram'
+export type AreaId = 'everywhere' | 'dictation' | 'search' | 'chat' | 'home' | 'focus' | 'music' | 'files' | 'diagram'
 
 export interface Area {
   id: AreaId
@@ -43,6 +43,7 @@ export interface Area {
 
 export const AREAS: Area[] = [
   { id: 'everywhere', title: msg('Everywhere') },
+  { id: 'dictation', title: msg('While dictating') },
   { id: 'search', title: msg('Search box'), pages: (p) => p === '/search' },
   { id: 'chat', title: msg('Chat'), pages: (p) => p === '/' || p.startsWith('/c/') || p === '/chats' },
   { id: 'home', title: msg('Home'), pages: (p) => p === '/home' },
@@ -59,6 +60,10 @@ export const SHORTCUTS = {
   'app.sidebar': { area: 'everywhere', keys: [{ key: '\\', mod: true }], description: msg('Fold or unfold the sidebar') },
   'app.shortcuts': { area: 'everywhere', keys: [{ key: '?' }], description: msg('Show these keyboard shortcuts') },
   'app.close': { area: 'everywhere', keys: [{ key: 'Escape' }], description: msg('Close a dialog, a menu or the Island’s controls') },
+  // Two presses within DOUBLE_PRESS_MS (useDoublePress); also while you type. Two presses leave Caps Lock as it was.
+  'app.dictate': { area: 'everywhere', keys: [{ key: 'CapsLock' }], prefix: msg('Press twice'), description: msg('Dictate: start, and again to finish') },
+
+  'dictation.cancel': { area: 'dictation', keys: [{ key: 'Escape' }], description: msg('Stop without using what was said') },
 
   'search.move': { area: 'search', keys: [{ key: 'ArrowUp' }, { key: 'ArrowDown' }], description: msg('Move through the results') },
   'search.open': { area: 'search', keys: [{ key: 'Enter' }], description: msg('Open the chosen result or run the action') },
@@ -122,6 +127,7 @@ export function isApple(): boolean {
 const KEY_NAMES: Record<string, string> = {
   ' ': 'Space',
   Escape: 'Esc',
+  CapsLock: 'Caps Lock',
   ArrowUp: '↑',
   ArrowDown: '↓',
   ArrowLeft: '←',

@@ -9,7 +9,7 @@ To add a section: define a model, then register it in SECTIONS.
 
 import uuid
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -187,12 +187,14 @@ TaskType = Literal[
     "embeddings",
     "title",
     "inline",
+    "transcription",
+    "dictation",
 ]
 
 
 class ModelDefaults(BaseModel):
     """Which model handles each kind of work. Unset tasks fall back to the chat model
-    (except embeddings, which need an embedding model)."""
+    (except embeddings and transcription, which need a model of their own kind)."""
 
     chat: uuid.UUID | None = None
     agent: uuid.UUID | None = None
@@ -205,6 +207,10 @@ class ModelDefaults(BaseModel):
     # The browser extension's in-page translate/explain, and formatting what it saves into
     # documents. No personal context is ever sent with these.
     inline: uuid.UUID | None = None
+    # Dictation: speech to text (a transcription model), then the clean-up of what was
+    # said (a fast chat model is ideal).
+    transcription: uuid.UUID | None = None
+    dictation: uuid.UUID | None = None
     # Ordered backup models per task, tried when the primary fails or lacks a capability.
     fallbacks: dict[TaskType, list[uuid.UUID]] = Field(default_factory=dict)
     # How hard models that can reason think, unless a message asks for another level
@@ -224,6 +230,24 @@ class PropertySettings(BaseModel):
     of their own (features/properties); this holds the folder defaults."""
 
     folder_defaults: list[FolderDefaults] = Field(default_factory=list, max_length=200)
+
+
+DictationLanguage = Field("", max_length=12, pattern=r"^([A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?)?$")
+
+
+class DictationSettings(BaseModel):
+    """Speaking instead of typing (features/dictation)."""
+
+    # Off: the text as it was heard, without the clean-up.
+    clean_up: bool = True
+    # Pressing Caps Lock twice starts and finishes dictation.
+    caps_lock: bool = True
+    # A language code ("en", "uk", ...), or "" to let the model detect it.
+    language: str = DictationLanguage
+    # Names and terms to spell right; both models get them.
+    vocabulary: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
+        default_factory=list, max_length=200
+    )
 
 
 @dataclass(frozen=True)
@@ -249,4 +273,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "setup": SectionSpec(SetupSettings),
     "updates": SectionSpec(UpdateSettings),
     "properties": SectionSpec(PropertySettings),
+    "dictation": SectionSpec(DictationSettings),
 }

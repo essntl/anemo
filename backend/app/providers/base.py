@@ -289,9 +289,28 @@ class EmbedResult:
     input_tokens: int | None = None
 
 
+@dataclass
+class TranscriptionResult:
+    text: str
+    # Token-priced models (gpt-4o-transcribe) report tokens; Whisper reports nothing.
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+
 class ProviderAdapter(Protocol):
     def stream_chat(self, req: ChatRequest) -> AsyncIterator[ProviderEvent]: ...
 
     async def embed(self, model: str, texts: list[str]) -> EmbedResult: ...
+
+    async def transcribe(
+        self,
+        model: str,
+        audio: bytes,
+        *,
+        filename: str,
+        content_type: str,
+        language: str | None = None,
+        prompt: str | None = None,
+    ) -> TranscriptionResult: ...
 
     async def list_models(self) -> list[DiscoveredModel]: ...

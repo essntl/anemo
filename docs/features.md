@@ -163,6 +163,25 @@ project: **Share** in its menu creates a link that works without logging in.
 
 Details in [docs/security.md](security.md#share-links).
 
+## Dictation
+
+Speak instead of typing: press **Caps Lock twice** anywhere in the app (also while you
+type), or the microphone in the message box. Press Caps Lock twice again to finish, Esc
+to cancel. What you said is transcribed, then tidied by a chat model: "um"s, false starts
+and repeats go, corrections you make while speaking are applied, and a request with
+several parts becomes a list. The text lands where you were typing.
+
+- It needs a speech-to-text model: choose one for **Transcription** in Settings →
+  Providers & Models (OpenAI's `gpt-4o-transcribe` or `whisper-1`, or a Whisper model on
+  an OpenAI-compatible server such as Groq or your own). **Dictation clean-up** picks the
+  model that tidies the text (unset: the chat model).
+- **Settings → Dictation**: tidy-up on or off, the Caps Lock shortcut, the language, and
+  words to spell right (names, projects, terms).
+- Browsers give a page the microphone only over https (or on localhost).
+- Neither the recording nor the text is kept; only a usage record.
+
+Design: [docs/specs/04-dictation.md](specs/04-dictation.md).
+
 ## Profiles, skills, plans and runs
 
 **Profiles & Skills** (sidebar) holds reusable agent setups:

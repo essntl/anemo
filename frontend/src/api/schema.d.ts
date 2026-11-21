@@ -528,6 +528,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/dictation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Dictation Settings */
+        put: operations["put_dictation_settings_api_settings_dictation_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -3315,6 +3332,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dictation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dictate
+         * @description Transcribes the recording, then tidies the text for where it goes.
+         */
+        post: operations["dictate_api_dictation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research/sessions": {
         parameters: {
             query?: never;
@@ -4331,6 +4368,7 @@ export interface components {
             setup: components["schemas"]["SetupSettings"];
             updates: components["schemas"]["UpdateSettings"];
             properties: components["schemas"]["PropertySettings"];
+            dictation: components["schemas"]["DictationSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -4748,6 +4786,17 @@ export interface components {
             documents: components["schemas"]["LinkedDocument"][];
             /** Events */
             events?: components["schemas"]["LinkedEvent"][];
+        };
+        /** Body_dictate_api_dictation_post */
+        Body_dictate_api_dictation_post: {
+            /** Audio */
+            audio: string;
+            /**
+             * Target
+             * @default chat
+             * @enum {string}
+             */
+            target: "chat" | "text";
         };
         /** Body_pdf_text_api_extension_pdf_text_post */
         Body_pdf_text_api_extension_pdf_text_post: {
@@ -5391,6 +5440,40 @@ export interface components {
             enabled?: boolean | null;
             /** Kinds */
             kinds?: ("reminder" | "automation" | "approval" | "agent" | "focus")[] | null;
+        };
+        /** DictationOut */
+        DictationOut: {
+            /** Text */
+            text: string;
+            /** Raw */
+            raw: string;
+            /** Cleaned */
+            cleaned: boolean;
+            /** Warning */
+            warning: string | null;
+        };
+        /**
+         * DictationSettings
+         * @description Speaking instead of typing (features/dictation).
+         */
+        DictationSettings: {
+            /**
+             * Clean Up
+             * @default true
+             */
+            clean_up: boolean;
+            /**
+             * Caps Lock
+             * @default true
+             */
+            caps_lock: boolean;
+            /**
+             * Language
+             * @default
+             */
+            language: string;
+            /** Vocabulary */
+            vocabulary?: string[];
         };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
@@ -6698,7 +6781,7 @@ export interface components {
         /**
          * ModelDefaults
          * @description Which model handles each kind of work. Unset tasks fall back to the chat model
-         *     (except embeddings, which need an embedding model).
+         *     (except embeddings and transcription, which need a model of their own kind).
          */
         ModelDefaults: {
             /** Chat */
@@ -6719,6 +6802,10 @@ export interface components {
             title?: string | null;
             /** Inline */
             inline?: string | null;
+            /** Transcription */
+            transcription?: string | null;
+            /** Dictation */
+            dictation?: string | null;
             /** Fallbacks */
             fallbacks?: {
                 [key: string]: string[];
@@ -11204,6 +11291,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PropertySettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_dictation_settings_api_settings_dictation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DictationSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictationSettings"];
                 };
             };
             /** @description Validation Error */
@@ -17682,6 +17804,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranslateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dictate_api_dictation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_dictate_api_dictation_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictationOut"];
                 };
             };
             /** @description Validation Error */

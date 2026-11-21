@@ -6,7 +6,10 @@ import { Select } from '@/components/ui/Select'
 import { type Model, type ModelDefaults, useSaveModelDefaults } from '../api'
 import { msg, t } from '@/lib/i18n'
 
-type TaskKey = Exclude<keyof ModelDefaults, 'fallbacks'>
+type TaskKey = Exclude<keyof ModelDefaults, 'fallbacks' | 'reasoning_effort'>
+
+/** Tasks that need a model of their own kind: never the chat model. */
+const OWN_KIND = new Set<TaskKey>(['embeddings', 'transcription'])
 
 const TASKS: { key: TaskKey; label: string; hint: string; needs?: string }[] = [
   { key: 'chat', label: msg('Chat'), hint: msg('Normal conversations. Other tasks fall back to this.') },
@@ -18,6 +21,8 @@ const TASKS: { key: TaskKey; label: string; hint: string; needs?: string }[] = [
   { key: 'inline', label: msg('Inline & formatting'), hint: msg('Anemo Companion: translate and explain on web pages, and formatting what it saves. A fast model is ideal.') },
   { key: 'automation', label: msg('Automations'), hint: msg('Scheduled agent jobs.'), needs: 'tools' },
   { key: 'embeddings', label: msg('Embeddings'), hint: msg('Semantic search and memory retrieval.'), needs: 'embeddings' },
+  { key: 'transcription', label: msg('Transcription'), hint: msg('Dictation: turns what you say into text (Whisper, gpt-4o-transcribe, …).'), needs: 'transcription' },
+  { key: 'dictation', label: msg('Dictation clean-up'), hint: msg('Tidies dictated text: fillers out, structure in. A fast model is ideal.') },
 ]
 
 // Parent re-mounts this card (via `key`) when the saved defaults change.
@@ -36,8 +41,8 @@ export function ModelDefaultsCard({ initial, models }: { initial: ModelDefaults;
       <CardBody className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {TASKS.map((task) => {
           const options = enabled.filter((m) =>
-            task.key === 'embeddings'
-              ? m.capabilities.embeddings
+            OWN_KIND.has(task.key)
+              ? m.capabilities[task.key]
               : m.capabilities.chat !== false && (!task.needs || m.capabilities[task.needs]),
           )
           return (
@@ -50,7 +55,9 @@ export function ModelDefaultsCard({ initial, models }: { initial: ModelDefaults;
                 options={[
                   {
                     value: '',
-                    label: task.key === 'chat' ? t('Not set') : task.key === 'embeddings' ? t('Not set (disables semantic search)') : t('Use chat model'),
+                    label: task.key === 'chat' ? t('Not set')
+                      : task.key === 'embeddings' ? t('Not set (disables semantic search)')
+                        : task.key === 'transcription' ? t('Not set (no dictation)') : t('Use chat model'),
                   },
                   ...options.map((m) => ({ value: m.id, label: `${m.display_name} — ${m.provider_name}` })),
                 ]}

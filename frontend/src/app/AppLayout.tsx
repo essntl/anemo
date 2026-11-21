@@ -5,6 +5,7 @@ import { DialogHost } from '@/components/ui/DialogHost'
 import { ToastHost } from '@/components/ui/ToastHost'
 import { ReauthDialog } from '@/features/auth/ReauthDialog'
 import { MoveChatsDialog } from '@/features/chat/components/MoveChatsDialog'
+import { DictationHost } from '@/features/dictation/DictationHost'
 import { useAppEvents } from '@/features/chat/useAppEvents'
 import { useServiceWorkerLinks } from '@/features/notifications/useServiceWorkerLinks'
 import { Island } from '@/features/island/Island'
@@ -121,6 +122,7 @@ export function AppLayout() {
       <ToastHost />
       <CommandPalette />
       <ShortcutSheet />
+      <DictationHost />
     </div>
   )
 }

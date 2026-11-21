@@ -45,6 +45,7 @@ from app.providers.base import (
     ToolCall,
     ToolResultBlock,
     ToolUseBlock,
+    TranscriptionResult,
     Usage,
 )
 from app.providers.catalog import anthropic_uses_adaptive_thinking, guess_capabilities
@@ -219,6 +220,18 @@ class AnthropicAdapter:
 
     async def embed(self, model: str, texts: list[str]) -> EmbedResult:
         raise ProviderError("Anthropic does not offer embedding models.", retryable=False)
+
+    async def transcribe(
+        self,
+        model: str,
+        audio: bytes,
+        *,
+        filename: str,
+        content_type: str,
+        language: str | None = None,
+        prompt: str | None = None,
+    ) -> TranscriptionResult:
+        raise ProviderError("Anthropic does not offer speech-to-text models.", retryable=False)
 
     async def list_models(self) -> list[DiscoveredModel]:
         models: list[DiscoveredModel] = []
