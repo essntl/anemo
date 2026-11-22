@@ -23,10 +23,10 @@ Claude Opus 5.5 (`model: "opus"`).
 | Wave | Package | Branch | Model | Status |
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
-| 1 | D1 devices core | `feat/d1` | Opus 5.5 | not started |
-| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | not started |
-| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | not started |
-| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | not started |
+| 1 | D1 devices core | `feat/d1` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
+| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
+| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
+| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | not started (first free slot; see toolchains) |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
