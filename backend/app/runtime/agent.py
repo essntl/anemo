@@ -80,6 +80,7 @@ from app.runtime.streaming import (
 )
 from app.tools import mcp_tool, registry
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin import computer
 from app.tools.builtin.ask import AskUserInput, clean_options
 from app.tools.builtin.plan import PlanInput
 from app.web.settings import WebSettings
@@ -147,6 +148,7 @@ class AgentRun:
         automation_id: uuid.UUID | None = None,
         on_ask: str = "pause",
         has_browser: bool = False,
+        has_computer: bool = False,
         my_browser: bool = False,
         browser_session: uuid.UUID | None = None,
         ancestors: list[Policy] | None = None,
@@ -185,6 +187,9 @@ class AgentRun:
         self.tools_off = False
         self.system = system or build_system_prompt(None, [], plan_review)
         self.plan_review = plan_review
+        # A computer was online when the run started: the computer tools are offered, and
+        # which computers are online is read again before every step (computer.refresh).
+        self.has_computer = has_computer
         self.ctx = ToolContext(
             run_id=run_id,
             emit=self._emit,
@@ -320,6 +325,8 @@ class AgentRun:
                 run = await _get_run(db, self.run_id)
                 self.ctx.state["plan"] = run.plan
                 self.ctx.state["sources"] = list(run.options.get("sources", []))
+                if self.has_computer:
+                    await computer.refresh(self.ctx)
                 transcript = [Message.model_validate(m) for m in run.transcript]
                 last = transcript[-1]
                 uses = [b for b in last.content if isinstance(b, ToolUseBlock)]
@@ -1285,6 +1292,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
             is_automation=run.automation_id is not None,
             unattended=run.automation_id is not None or bool(run.policy.get("automation")),
             has_browser=bool(run.policy.get("browser")),
+            has_computer=bool(run.policy.get("computer")),
             can_spawn=run.kind == "agent"
             and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),
             can_ask=run.kind == "agent" and run.automation_id is None and run.depth == 0,
@@ -1325,6 +1333,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         automation_id=automation_id,
         on_ask=on_ask,
         has_browser=uses_browser,
+        has_computer=any(t.name in computer.COMPUTER_TOOL_NAMES for t in tools),
         my_browser=bool(run.policy.get("my_browser")),
         browser_session=browser_session,
         ancestors=ancestors,

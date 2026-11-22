@@ -1,0 +1,277 @@
+using Anemo.Desktop.Core.Platform;
+
+namespace Anemo.Desktop.Core.Commands;
+
+public sealed partial class CommandProcessor
+{
+    private Task ActAsync(string action, Args args, IReadOnlyDictionary<string, IUiElement> refs, CancellationToken ct)
+    {
+        switch (action)
+        {
+            case "click":
+                Click(args, refs, MouseButton.Left, 1);
+                break;
+            case "double_click":
+                Click(args, refs, MouseButton.Left, 2);
+                break;
+            case "right_click":
+                Click(args, refs, MouseButton.Right, 1);
+                break;
+            case "type":
+                Type(args, refs, ct);
+                break;
+            case "press":
+                Press(args, ct);
+                break;
+            case "scroll":
+                Scroll(args, refs);
+                break;
+            case "focus_window":
+                Desktop.FocusWindow(_windows.Resolve(Desktop, args.String("window_ref", 20)).Handle);
+                break;
+            case "open":
+                Open(args.String("target", 2000));
+                break;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void Click(Args args, IReadOnlyDictionary<string, IUiElement> refs, MouseButton button, int count)
+    {
+        if (args.OptionalString("ref") is { } reference)
+        {
+            var element = ControlRefs.Resolve(refs, reference);
+            if (!element.IsEnabled)
+            {
+                throw CommandException.Failed("That control is disabled.");
+            }
+
+            // UI Automation first: it doesn't depend on where the window is.
+            if (button == MouseButton.Left && count == 1 && element.TryInvoke())
+            {
+                return;
+            }
+
+            _platform.Input.Click(Guard(element.PrepareForMouse()), button, count);
+            return;
+        }
+
+        _platform.Input.Click(Guard(PointFromArgs(args)), button, count);
+    }
+
+    /// <summary>x, y in the pixels of the last screenshot, back to screen pixels.</summary>
+    private ScreenPoint PointFromArgs(Args args)
+    {
+        var x = args.OptionalNumber("x");
+        var y = args.OptionalNumber("y");
+        if (x is null || y is null)
+        {
+            throw CommandException.Failed("Give a control's ref, or x and y.");
+        }
+
+        var capture = _lastCapture ?? WholeScreenGeometry();
+        if (x < 0 || y < 0 || x > capture.Width || y > capture.Height)
+        {
+            throw CommandException.Failed(
+                $"x and y must be inside the last screenshot ({capture.Width} × {capture.Height} pixels).");
+        }
+
+        return ScreenshotScaler.ToScreen(capture, x.Value, y.Value);
+    }
+
+    /// <summary>Without a screenshot yet: the geometry a look at the whole screen would have.</summary>
+    private ScreenCapture WholeScreenGeometry()
+    {
+        var screen = Desktop.VirtualScreen();
+        var (w, h, scale) = ScreenshotScaler.Fit(screen.Width, screen.Height);
+        return new ScreenCapture([], w, h, scale, screen.X, screen.Y);
+    }
+
+    private void Type(Args args, IReadOnlyDictionary<string, IUiElement> refs, CancellationToken ct)
+    {
+        var text = args.String("text", 5000);
+        if (args.OptionalString("ref") is { } reference)
+        {
+            var element = ControlRefs.Resolve(refs, reference);
+            if (element.IsPassword)
+            {
+                throw CommandException.Refused(PasswordMessage);
+            }
+
+            if (!element.IsEnabled)
+            {
+                throw CommandException.Failed("That control is disabled.");
+            }
+
+            if (element.TrySetValue(text))
+            {
+                return;
+            }
+
+            element.Focus();
+        }
+
+        // Typing goes where the focus is. A Tab or Enter can move the focus, so the text
+        // is typed in pieces that end after each of them, and the focus is checked before
+        // every piece.
+        foreach (var piece in TypingPieces(text))
+        {
+            GuardKeyboard();
+            GuardPasswordFocus();
+            _platform.Input.TypeText(piece, ct);
+        }
+    }
+
+    /// <summary>The text cut after every Tab and line break.</summary>
+    internal static IEnumerable<string> TypingPieces(string text)
+    {
+        const char Tab = (char)9;
+        const char LineBreak = (char)10;
+        var start = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] is Tab or LineBreak)
+            {
+                yield return text[start..(i + 1)];
+                start = i + 1;
+            }
+        }
+
+        if (start < text.Length)
+        {
+            yield return text[start..];
+        }
+    }
+
+    /// <summary>
+    /// Refuses when the focus is a password field, and also when the focused control
+    /// can't be read: fail closed.
+    /// </summary>
+    private void GuardPasswordFocus()
+    {
+        bool password;
+        try
+        {
+            var focused = Desktop.FocusedElement();
+            if (focused is null)
+            {
+                throw CommandException.Refused(UnknownFocusMessage);
+            }
+
+            password = focused.IsPassword;
+        }
+        catch (ElementGoneException)
+        {
+            throw CommandException.Refused(UnknownFocusMessage);
+        }
+
+        if (password)
+        {
+            throw CommandException.Refused(PasswordMessage);
+        }
+    }
+
+    private void Press(Args args, CancellationToken ct)
+    {
+        // Every key is checked before any is pressed.
+        var combos = args.StringList("keys", 1, 10).Select(KeyParser.Parse).ToList();
+        foreach (var combo in combos)
+        {
+            if (IsOwnHotkey(combo))
+            {
+                throw CommandException.Refused($"“{combo.Text}” is Anemo Desktop's own stop or share key.");
+            }
+        }
+
+        foreach (var combo in combos)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Checked before every key: the one before may have moved the focus.
+            GuardKeyboard();
+            if (KeyParser.EntersText(combo))
+            {
+                GuardPasswordFocus();
+            }
+
+            _platform.Input.Press(combo);
+        }
+    }
+
+    private bool IsOwnHotkey(KeyCombo combo)
+    {
+        var settings = _settings();
+        foreach (var text in new[] { settings.StopHotkey, settings.ShareHotkey })
+        {
+            if (Control.Hotkey.Parse(text) is { } hotkey && hotkey.Key == combo.Key
+                && hotkey.Modifiers == KeyParser.HotkeyModifiersOf(combo))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void Scroll(Args args, IReadOnlyDictionary<string, IUiElement> refs)
+    {
+        var direction = args.String("direction", 10) switch
+        {
+            "up" => ScrollDirection.Up,
+            "down" => ScrollDirection.Down,
+            "left" => ScrollDirection.Left,
+            "right" => ScrollDirection.Right,
+            var other => throw CommandException.Failed($"“direction” must be up, down, left or right, not “{other}”."),
+        };
+        var amount = args.Int("amount", 1, 10, fallback: 3);
+
+        if (args.OptionalString("ref") is { } reference)
+        {
+            var element = ControlRefs.Resolve(refs, reference);
+            if (!element.TryScroll(direction, amount))
+            {
+                _platform.Input.Scroll(Guard(element.PrepareForMouse()), direction, amount);
+            }
+
+            return;
+        }
+
+        var at = Desktop.FrontWindow()?.Bounds.Center;
+        if (at is { } point)
+        {
+            Guard(point);
+        }
+
+        _platform.Input.Scroll(at, direction, amount);
+    }
+
+    /// <summary>The agent may not use Anemo Desktop's own windows (its settings, the Stop button).</summary>
+    private ScreenPoint Guard(ScreenPoint point) =>
+        Desktop.IsOwnWindowAt(point) ? throw CommandException.Refused(OwnWindowMessage) : point;
+
+    private void GuardKeyboard()
+    {
+        if (Desktop.IsOwnWindowInFront())
+        {
+            throw CommandException.Refused(OwnWindowMessage);
+        }
+    }
+
+    private void Open(string target)
+    {
+        var trimmed = target.Trim();
+        if (trimmed.Contains("://", StringComparison.Ordinal))
+        {
+            if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+            {
+                throw CommandException.Failed("Only http and https addresses can be opened.");
+            }
+
+            _platform.Apps.OpenUrl(uri);
+            return;
+        }
+
+        _platform.Apps.Launch(AppMatcher.Find(_platform.Apps.ListApps(), trimmed));
+    }
+}

@@ -16,6 +16,9 @@ from app.features.conversations.models import ChatMessage, Conversation
 from app.features.notifications import service as notifications
 from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Approval, Run, ToolCall
+from app.features.settings import service as settings_service
+from app.features.settings.sections import VoiceSettings
+from app.features.voice import speech
 from app.providers.base import (
     ReasoningBlock,
     TextBlock,
@@ -104,6 +107,8 @@ async def finalize(
             db, run, "message.completed", {"message_id": str(message.id), "status": message.status}
         )
     await runs.set_status(db, run, status, error={"message": error} if error else None)
+    if run.options.get("source") == "voice" and status in TERMINAL_STATUSES:
+        await say_answer(db, run, status)
     if run.automation_id is not None:
         try:
             await automations.on_run_finished(db, run, status, error)
@@ -113,6 +118,27 @@ async def finalize(
     await _stop_subagents(db, run)
     if run.parent_run_id is not None:
         await subagents.wake_parent(db, run.parent_run_id)  # it may be waiting for this one
+
+
+async def say_answer(db: AsyncSession, run: Run, status: str) -> None:
+    """A voice run ended: tell the phone what to say (`voice.say`, docs/device-contracts.md
+    §2). Never breaks the run: the answer is in the chat either way."""
+    try:
+        settings = await settings_service.get_section(db, VoiceSettings, "voice")
+        spoken = speech.for_run(status, run.totals.get("text", ""), settings.max_spoken_chars)
+        await bus.publish_global(
+            "voice.say",
+            {
+                "run_id": str(run.id),
+                "conversation_id": str(run.conversation_id) if run.conversation_id else None,
+                "device_id": run.options.get("device_id"),
+                "text": spoken.text,
+                "more": spoken.more,
+            },
+        )
+    except Exception:  # noqa: BLE001 - speaking the answer is best-effort
+        log.exception("voice answer not published", extra={"ctx": {"run_id": str(run.id)}})
+        await db.rollback()
 
 
 async def give_up(db: AsyncSession, run: Run, error: str) -> None:

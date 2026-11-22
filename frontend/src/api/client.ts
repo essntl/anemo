@@ -51,15 +51,22 @@ export function onUnauthorized(fn: () => void): () => void {
 
 type FetchResult<T> = { data?: T; error?: unknown; response: Response }
 
+/** The server's code for a password that didn't match (features/auth/router.py). */
+const WRONG_PASSWORD = 'wrong_password'
+
 /** Return `data` or throw an ApiError. */
 export function unwrap<T>(result: FetchResult<T>): T {
   const { data, error, response } = result
   if (response.ok) return data as T
   const body = (error ?? {}) as ErrorBody
   const code = body.error?.code ?? `http_${response.status}`
-  if (response.status === 401 && !response.url.endsWith('/api/auth/login')) {
-    unauthorizedListeners.forEach((fn) => fn())
-  }
+  // A wrong password (the login form, the "Confirm it's you" dialog) is also a 401, but
+  // the session is still there: the form says so, and nobody is sent to the login page.
+  const sessionGone =
+    response.status === 401 &&
+    code !== WRONG_PASSWORD &&
+    !response.url.endsWith('/api/auth/login')
+  if (sessionGone) unauthorizedListeners.forEach((fn) => fn())
   throw new ApiError(
     response.status,
     code,

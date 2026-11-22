@@ -545,6 +545,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Voice Settings */
+        put: operations["put_voice_settings_api_settings_voice_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -3352,6 +3369,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/devices/shared-screen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Shared Screen
+         * @description Which screen is shared now (device, window and time; never its content).
+         */
+        get: operations["get_shared_screen_api_devices_shared_screen_get"];
+        /**
+         * Share Screen
+         * @description "Share this screen with Anemo": the client sends a screenshot and the window's
+         *     text when the user asks. It replaces what was shared before; the assistant reads it
+         *     with computer_shared_screen. Kept 12 hours.
+         */
+        put: operations["share_screen_api_devices_shared_screen_put"];
+        post?: never;
+        /**
+         * Stop Sharing Screen
+         * @description Forget the shared screen.
+         */
+        delete: operations["stop_sharing_screen_api_devices_shared_screen_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Devices
+         * @description Every device, with whether it is connected now.
+         */
+        get: operations["list_devices_api_devices_get"];
+        put?: never;
+        /**
+         * Add Device
+         * @description A new device and its token, shown once. Needs the password confirmed recently
+         *     (the token is a login that lasts until the device is deleted).
+         */
+        post: operations["add_device_api_devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Device
+         * @description Delete the device: its token stops working and its connection closes at once.
+         */
+        delete: operations["delete_device_api_devices__device_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename Device
+         * @description Rename the device. Needs a browser login: the agent finds devices by name, so a
+         *     device's token must not be able to rename (or swap) them.
+         */
+        patch: operations["rename_device_api_devices__device_id__patch"];
+        trace?: never;
+    };
+    "/api/devices/{device_id}/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Trust
+         * @description Watched (every action asks) or trusted (as the permissions say). Needs the
+         *     password confirmed recently, so a device's own token can't change it.
+         */
+        put: operations["set_trust_api_devices__device_id__trust_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research/sessions": {
         parameters: {
             query?: never;
@@ -4309,6 +4427,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/voice/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Turn
+         * @description A spoken request: transcribed, made a clear request, and started as an agent run
+         *     in the Voice chat (or continuing `conversation_id` within the follow-up window).
+         */
+        post: operations["voice_turn_api_voice_turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/voice/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Reply
+         * @description A spoken answer to a question, or yes/no to an approval or a plan review.
+         */
+        post: operations["voice_reply_api_voice_replies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4369,6 +4528,7 @@ export interface components {
             updates: components["schemas"]["UpdateSettings"];
             properties: components["schemas"]["PropertySettings"];
             dictation: components["schemas"]["DictationSettings"];
+            voice: components["schemas"]["VoiceSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -4832,6 +4992,28 @@ export interface components {
         Body_upload_task_files_api_tasks__task_id__files_upload_post: {
             /** Files */
             files: string[];
+        };
+        /** Body_voice_reply_api_voice_replies_post */
+        Body_voice_reply_api_voice_replies_post: {
+            /** Audio */
+            audio: string;
+            /**
+             * Approval Id
+             * Format: uuid
+             */
+            approval_id: string;
+        };
+        /** Body_voice_turn_api_voice_turns_post */
+        Body_voice_turn_api_voice_turns_post: {
+            /** Audio */
+            audio?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /**
+             * Status
+             * @default false
+             */
+            status: boolean;
         };
         /** BranchIn */
         BranchIn: {
@@ -5440,6 +5622,79 @@ export interface components {
             enabled?: boolean | null;
             /** Kinds */
             kinds?: ("reminder" | "automation" | "approval" | "agent" | "focus")[] | null;
+        };
+        /** DeviceIn */
+        DeviceIn: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "phone" | "computer";
+            /**
+             * Trust
+             * @default watched
+             * @enum {string}
+             */
+            trust: "watched" | "trusted";
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "phone" | "computer";
+            /**
+             * Trust
+             * @enum {string}
+             */
+            trust: "watched" | "trusted";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Client Version */
+            client_version: string | null;
+            /**
+             * Online
+             * @default false
+             */
+            online: boolean;
+            /**
+             * Control
+             * @default false
+             */
+            control: boolean;
+            /**
+             * Shell
+             * @default false
+             */
+            shell: boolean;
+        };
+        /** DeviceRenameIn */
+        DeviceRenameIn: {
+            /** Name */
+            name: string;
+        };
+        /** DeviceTrustIn */
+        DeviceTrustIn: {
+            /**
+             * Trust
+             * @enum {string}
+             */
+            trust: "watched" | "trusted";
         };
         /** DictationOut */
         DictationOut: {
@@ -6968,6 +7223,52 @@ export interface components {
             /** Off */
             off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
         };
+        /** NewDeviceOut */
+        NewDeviceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "phone" | "computer";
+            /**
+             * Trust
+             * @enum {string}
+             */
+            trust: "watched" | "trusted";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Client Version */
+            client_version: string | null;
+            /**
+             * Online
+             * @default false
+             */
+            online: boolean;
+            /**
+             * Control
+             * @default false
+             */
+            control: boolean;
+            /**
+             * Shell
+             * @default false
+             */
+            shell: boolean;
+            /** Token */
+            token: string;
+        };
         /** NewDocument */
         NewDocument: {
             /**
@@ -8402,6 +8703,19 @@ export interface components {
             /** Model Label */
             model_label?: string | null;
         };
+        /**
+         * RunOriginOut
+         * @description Where a run was asked from, when not the app: by voice, from a phone.
+         */
+        RunOriginOut: {
+            /**
+             * Source
+             * @constant
+             */
+            source: "voice";
+            /** Device Name */
+            device_name: string | null;
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -8884,6 +9198,51 @@ export interface components {
             documents?: components["schemas"]["SharedDocument"][] | null;
         };
         /**
+         * SharedScreenIn
+         * @description What the client sends (docs/device-contracts.md §5).
+         */
+        SharedScreenIn: {
+            /**
+             * Screenshot
+             * @description base64 PNG
+             */
+            screenshot: string;
+            window?: components["schemas"]["SharedWindow"];
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /**
+         * SharedScreenOut
+         * @description The shared screen without its content (the content only goes to the assistant).
+         */
+        SharedScreenOut: {
+            /** Device */
+            device: string | null;
+            window: components["schemas"]["SharedWindow"];
+            /**
+             * Shared At
+             * Format: date-time
+             */
+            shared_at: string;
+        };
+        /** SharedScreenSaved */
+        SharedScreenSaved: {
+            /**
+             * Shared At
+             * Format: date-time
+             */
+            shared_at: string;
+            /** Device */
+            device: string | null;
+        };
+        /** SharedScreenState */
+        SharedScreenState: {
+            screen: components["schemas"]["SharedScreenOut"] | null;
+        };
+        /**
          * SharedTabIn
          * @description What the extension sends: the same shape as a page attached to a message.
          */
@@ -8956,6 +9315,19 @@ export interface components {
             subtask_of?: number | null;
             /** Blocked By */
             blocked_by?: number[];
+        };
+        /** SharedWindow */
+        SharedWindow: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * App
+             * @default
+             */
+            app: string;
         };
         /** SkillIn */
         SkillIn: {
@@ -9521,6 +9893,7 @@ export interface components {
             tool_calls: components["schemas"]["ToolCallOut"][];
             /** File Changes */
             file_changes: components["schemas"]["FileChangeOut"][];
+            origin?: components["schemas"]["RunOriginOut"] | null;
         };
         /** TokenIn */
         TokenIn: {
@@ -10111,6 +10484,62 @@ export interface components {
             updated_at: string;
             /** Created At */
             created_at?: string | null;
+        };
+        /** VoiceReplyOut */
+        VoiceReplyOut: {
+            /** Decided */
+            decided: ("approve" | "deny") | null;
+            /** Heard */
+            heard: string;
+            /** Say */
+            say?: string | null;
+        };
+        /**
+         * VoiceSettings
+         * @description Talking to Anemo from a phone (features/voice, docs/specs/05-voice-android.md).
+         */
+        VoiceSettings: {
+            /** Profile Id */
+            profile_id?: string | null;
+            /**
+             * Follow Up Minutes
+             * @default 5
+             */
+            follow_up_minutes: number;
+            /**
+             * Max Spoken Chars
+             * @default 600
+             */
+            max_spoken_chars: number;
+            /**
+             * Approvals By Voice
+             * @default true
+             */
+            approvals_by_voice: boolean;
+            /**
+             * Chat
+             * @default daily
+             * @enum {string}
+             */
+            chat: "daily" | "single";
+        };
+        /**
+         * VoiceTurnOut
+         * @description 202 with the run that started; 200 with `cancelled` or `say` when none did.
+         */
+        VoiceTurnOut: {
+            /** Run Id */
+            run_id?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /** Heard */
+            heard?: string | null;
+            /** Request */
+            request?: string | null;
+            /** Cancelled */
+            cancelled?: boolean | null;
+            /** Say */
+            say?: string | null;
         };
         /** WebSettings */
         WebSettings: {
@@ -11326,6 +11755,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DictationSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_voice_settings_api_settings_voice_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoiceSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceSettings"];
                 };
             };
             /** @description Validation Error */
@@ -17852,6 +18316,272 @@ export interface operations {
             };
         };
     };
+    get_shared_screen_api_devices_shared_screen_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedScreenState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_screen_api_devices_shared_screen_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedScreenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedScreenSaved"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_sharing_screen_api_devices_shared_screen_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_devices_api_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_device_api_devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewDeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_device_api_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_device_api_devices__device_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceRenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_trust_api_devices__device_id__trust_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceTrustIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_sessions_api_research_sessions_get: {
         parameters: {
             query?: never;
@@ -20054,6 +20784,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RowsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_turn_api_voice_turns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_turn_api_voice_turns_post"];
+            };
+        };
+        responses: {
+            /** @description Cancelled, or something to say */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTurnOut"];
+                };
+            };
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_reply_api_voice_replies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_reply_api_voice_replies_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceReplyOut"];
                 };
             };
             /** @description Validation Error */

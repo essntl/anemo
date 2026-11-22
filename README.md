@@ -85,6 +85,19 @@ person, run a second copy.
 - **On your phone**: installable to the home screen, with push notifications. In English,
   Ukrainian and Russian.
 
+**Devices**
+
+- **Voice from your phone** (Anemo Voice, Android): say the wake word and what you want;
+  it runs as an agent request and the phone reads the answer out. Questions and
+  approvals are answered by voice, except dangerous actions, which need a tap.
+- **Your Windows computers** (Anemo Desktop): a tray program that lets the agent look at
+  the screen, click, type, open programs and, on a trusted computer, run PowerShell.
+  Each computer has its own trust level: on your own PC every action asks; the agent's
+  own VM can be left to work on its own. A stop hotkey takes control away at once.
+- Both connect out to Anemo through the address the web app uses; no port is opened on
+  the computer or phone. Set up in **Settings → Devices**; the proxy needs
+  [Websockets Support](docs/deployment.md#behind-nginx-proxy-manager).
+
 All the details, area by area: **[docs/features.md](docs/features.md)**.
 
 ## Install

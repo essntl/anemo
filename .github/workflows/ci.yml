@@ -129,3 +129,33 @@ jobs:
       - name: Install the test browser
         run: sh ../.github/scripts/install-test-browser.sh
       - run: npm run e2e
+
+  desktop:
+    name: Windows client (build, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet build -c Release -p:EnableWindowsTargeting=true
+      - run: dotnet test -c Release -p:EnableWindowsTargeting=true
+
+  android:
+    name: Android app (tests, debug build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      # The runner image has the Android SDK (ANDROID_HOME) with its licences accepted;
+      # Gradle fetches the platform and build tools the project asks for.
+      - run: ./gradlew test assembleDebug

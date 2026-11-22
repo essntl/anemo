@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Everything that can be tested without a Windows desktop: the protocol, the
+       connection, the command handlers, settings and logs. Platform calls are behind
+       the interfaces in Platform/, implemented by the app project (Windows only). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Anemo.Desktop.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Anemo.Desktop.Tests" />
+  </ItemGroup>
+
+</Project>

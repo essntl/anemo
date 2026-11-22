@@ -55,6 +55,73 @@ Companion (the browser extension, `extension/`) or another device. A token is se
   labelled as untrusted data for the model, and never used for memories (nor are the answers
   to such messages).
 
+## Devices (Anemo Desktop, Anemo Voice)
+
+A computer or phone added in **Settings → Devices** gets a token of its own, made and
+shown like the tokens above: once, only its hash stored, adding a device needs your
+password again.
+
+- **What a device token can do.** What an extension token can (see above), so nothing
+  that needs the password again: it can't change trust levels, permissions, providers or
+  other devices, can't add devices or tokens, and can't rename a device (the agent finds
+  devices by name). Deleting the device in Settings → Devices deletes the token: its
+  requests get 401 and its connection closes at once. Revoking its token from the general
+  token list instead closes the connection within a minute (at the next check).
+- **Rolling back by hand.** If the database is taken back past the devices migration
+  (`0072`, with `alembic downgrade`), the devices' tokens stay behind as ordinary, valid
+  API tokens. Delete the devices (or revoke their tokens) first. Restoring a backup made
+  before the update avoids this.
+- **The connection** (`/api/devices/ws`) carries the token in its first message, never in
+  the address. A connection that sends an `Origin` header is refused, so a web page can't
+  pose as a device (devices are native programs; the extension, which must send its
+  origin, has its own connection). The token is checked again every minute; a newer
+  connection of the same device replaces the older one. Commands reach a computer only
+  over this connection; a phone gets only the events of the runs it started itself.
+- **Trust levels.** A *watched* computer (the default) is asked about before every
+  click, keystroke, key press and program it opens, every time: *Allow for this run* and
+  "Fully autonomous" don't change that. The PowerShell tool is not offered there at all.
+  A *trusted* computer follows **Agent Permissions** (*See your computers*, *Use your
+  computers*, *Commands on your computers*), so it can be made fully autonomous. Use it
+  for the agent's own VM, not for a computer with your logins on it. Changing the level
+  needs your password, is in the security log, and makes the client reconnect so it
+  reads the new level. The server checks the level, the client's *Allow control* and its
+  PowerShell switch again just before each command, and the client checks them too.
+- **Looking is not asked about, on a watched computer too.** *See your computers*
+  defaults to *Ask for dangerous actions*, and a screenshot or reading the window in
+  front is a safe action, so by default the agent looks at any connected computer
+  without asking. *Allow control* off and the pause stop acting, not looking. Those
+  screenshots are kept in the run's timeline, so they are in Anemo's data and its
+  backups. To prevent it, set *See your computers* to *Always ask* (or *Never*), or quit
+  Anemo Desktop on that computer.
+- **The PowerShell switch is not a boundary for acting.** Switching PowerShell off in the
+  client only takes away the PowerShell tool. While control is allowed, the agent can
+  still open a terminal from the Start menu or with Win+R and type into it, as an
+  ordinary action: asked every time on a watched computer, decided by *Use your
+  computers* on a trusted one. The hard boundaries are a watched computer, *Allow
+  control* off, and the pause (Stop).
+- **What the agent can do on a computer** is what the logged-in Windows user can do in
+  the programs on its screen (a terminal included), and on a trusted computer with
+  PowerShell on, also through the PowerShell tool. The client runs without admin rights,
+  can't act on the secure desktop (UAC prompts, the lock screen), never types into
+  password fields, never sends Ctrl+Alt+Del, and can't use its own windows. **Stop**
+  (Ctrl+Alt+Shift+S) on the computer cancels the running command and takes control away
+  for an hour; the server sends no action until the client offers control again
+  (looking still works, see above).
+- **Screens are untrusted.** Screenshots, window text and a shared screen can contain
+  text written to steer the agent (an email, a web page, a document). They reach the
+  model labelled as untrusted, like web pages, and what contains the damage is the
+  check on every action, not the model's judgement. A shared screen is a copy sent once
+  when you ask; it is kept in Valkey for 12 hours at most, and the API never returns its
+  content.
+- **Voice.** A spoken reply goes through the same approval check as the app's buttons
+  and is in the security log marked as coming from voice. An action rated dangerous is
+  never decided by voice, and with *Allow approvals by voice* off only questions are. A
+  spoken yes or no is recognised in English, Ukrainian and Russian; in other languages it
+  comes back as unclear and the notification decides.
+  Anyone near the phone while it asks "Allow?" can answer it, as they could tap the
+  notification on an unlocked phone; turn approvals by voice off if that matters to
+  you. The recording and the transcript of a request or reply are not stored.
+
 ## Share links
 
 Anemo has one user, but you can let someone **read** a single chat, document or
@@ -183,6 +250,9 @@ The kinds of action and their defaults:
 | Update memory | Fully autonomous |
 | MCP tools | Always ask (each tool can be set on its own) |
 | Start sub-agents | Never |
+| See your computers | Ask for dangerous actions (looking is safe, so it goes ahead) |
+| Use your computers | Always ask (a watched computer asks every time whatever the level) |
+| Commands on your computers | Always ask (never offered on a watched computer) |
 
 Whether an action is "dangerous" is decided by code, not by the model: for
 example `rm -r`, `git push --force`, piping a download into a shell, or any
@@ -233,6 +303,7 @@ sub-agent depth. When one is reached the run stops and says which.
 | Deleting | Files, tasks and calendar events an agent deletes go to a trash only you can restore from or empty. Forgetting a memory and deleting a schedule are permanent; both say so. |
 | MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
 | Claude Code | Runs in its own container without workspace, database or app secrets, and with no tools of its own: every tool call it makes is a normal Anemo tool call, checked here. |
+| Your computers (Anemo Desktop) | No isolation from the computer itself: the client acts as the logged-in Windows user, so the trust level and the permissions are the boundary (see [Devices](#devices-anemo-desktop-anemo-voice)). A watched computer asks before every action and never gets the PowerShell tool. Not for automations unless the automation lists the tool. |
 
 ## Claude subscription (Claude Code)
 
@@ -267,6 +338,10 @@ searching every response, record and stored file for it.
   prefer "ask" there.
 - **What you approve, runs.** Read approval requests; the exact command or change
   is shown.
+- **A trusted computer is the agent's computer.** On a computer marked trusted, with
+  acting or PowerShell set to fully autonomous, the agent does what that Windows user
+  can, without asking, steered partly by what is on the screen. Keep your own logins,
+  files and password manager off it; your own PC belongs on *watched*.
 - **Websites that block automated browsers.** Anemo does not try to get around bot
   checks or CAPTCHAs. You can take over the agent's browser yourself, or use an
   official API.

@@ -7,13 +7,13 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, MessageSquare, Square } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Mic, Square } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { Markdown } from '@/components/ui/Markdown'
-import { refreshTimeline } from '@/features/agents/api'
+import { refreshTimeline, useTimeline } from '@/features/agents/api'
 import { RunActivity } from '@/features/agents/components/RunActivity'
 import { RunControls } from '@/features/agents/components/RunControls'
 import { useShellOutput } from '@/features/agents/shellOutput'
@@ -41,6 +41,8 @@ export function RunDetailPage() {
   const appendShellOutput = useShellOutput((s) => s.append)
   const data = run.data
   const active = Boolean(data && !TERMINAL.includes(data.status))
+  // Asked by voice from a phone (features/voice): the timeline says so.
+  const origin = useTimeline(data?.kind === 'agent' ? runId : null).data?.origin
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: runKey(runId) })
@@ -88,6 +90,12 @@ export function RunDetailPage() {
           <Link to={`/runs/${data.parent_run_id}`} className="text-[12px] text-accent hover:underline">
             {t('Sub-agent of another run')}
           </Link>
+        )}
+        {origin?.source === 'voice' && (
+          <span className="inline-flex items-center gap-1 text-[12px] text-muted">
+            <Mic className="h-3.5 w-3.5" />
+            {origin.device_name ? t('Asked by voice from {phone}', { phone: origin.device_name }) : t('Asked by voice')}
+          </span>
         )}
       </div>
       <h2 className="mt-2 whitespace-pre-wrap break-words text-lg font-semibold">{data.request || t('(no request)')}</h2>
