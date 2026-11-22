@@ -24,10 +24,10 @@ Claude Opus 5.5 (`model: "opus"`).
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
-| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
+| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | built (278351f, d867da3; 1263 backend tests); review pending; merges after D1 and V1 |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
-| 1 | A1 Android app | `feat/a1` | Opus 5.5 | not started (first free slot; see toolchains) |
+| 1 | A1 Android app | `feat/a1` | Opus 5.5 | building since 2026-11-22 (took D2's slot) |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
 
@@ -87,6 +87,12 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   an action (yes accepts the plan as proposed). Changed: `device-contracts.md` §2 and §4,
   `05-voice-android.md`, `CONTRACTS-devices.md` §3. Touches D1 (forwarding), V1 (replies)
   and A1 (reading it out); all three start from the changed files.
+- **Shared-screen read interface (orchestrator, no wire change).** D2 could not read
+  D1's shared screen: the contract named no function. Added `shared_screen.current()` to
+  `CONTRACTS-devices.md` §1. D1 was already running: check its module against this when
+  it reports, and wire `computer.current_shared_screen` at D2's merge.
+- **D2 notes to check in review:** clicks/typing/keys set `contacts_people` (automations
+  ask), beyond the spec's wording; PowerShell rules added on top of `shell_risk`.
 - **Expired approvals (the user's decision):** no extra event; the phone stops asking on
   the run's terminal `run.status`.
 

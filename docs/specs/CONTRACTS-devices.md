@@ -81,6 +81,23 @@ V1 gets the calling device from the request's session: `session.token_id` (set b
 `auth.tokens.principal`) → `by_token_id`. A request without a device (the browser, the
 `authed` test client) still works: the run then has no `device_id`.
 
+### Shared screen: `app/features/devices/shared_screen.py` (owned by D1, read by D2)
+
+Added during wave 1 (D2 reported the gap):
+
+```python
+async def current() -> SharedScreen | None
+```
+
+`SharedScreen` has `device` (the device's name), `window` (`title`, `app`), `screenshot`
+(base64 PNG), `text` and `shared_at`, as in `device-contracts.md` §5. `None` when nothing
+is shared or it expired. D2's `computer.current_shared_screen` is pointed at it by the
+orchestrator when D2 merges.
+
+The computer tools learn trust and offers for `actions()` (which is synchronous) from a
+list refreshed at the start of each agent step (`computer.refresh(ctx)`, called from
+`runtime/agent.py`, D2's lines), and check again live in `run()`.
+
 ## 3. Events
 
 Everything a phone gets travels on the global stream (`events:global`,
