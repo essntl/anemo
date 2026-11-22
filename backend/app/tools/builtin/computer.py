@@ -532,6 +532,8 @@ _PROGRAM_NAME = re.compile(r"(?:[^\W_]|[ .+-])+")
 
 def _is_url(target: str | None) -> bool:
     return bool(target and re.match(r"(?i)^https?://", target))
+
+
 _FORBIDDEN_KEYS = {"Control+Alt+Delete"}
 
 
