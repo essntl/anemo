@@ -90,6 +90,26 @@ CATEGORIES: list[Category] = [
         "schedule or a changed prompt or time always asks.",
         "ask",
     ),
+    # The Windows computers that run Anemo Desktop (docs/specs/06-desktop-client.md). On
+    # a watched device every action asks, whatever these levels say (tools/builtin/computer.py).
+    Category(
+        "computer.see",
+        "See your computers",
+        "Take screenshots and read the window in front on computers that run Anemo Desktop.",
+        "ask_dangerous",
+    ),
+    Category(
+        "computer.act",
+        "Use your computers",
+        "Click, type, press keys and open programs there. On a watched computer this always asks.",
+        "ask",
+    ),
+    Category(
+        "computer.shell",
+        "Commands on your computers",
+        "Run PowerShell commands on a trusted computer that has PowerShell switched on.",
+        "ask",
+    ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
 ]
