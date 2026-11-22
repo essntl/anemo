@@ -35,6 +35,10 @@ client → {"type": "ping"}            ← {"type": "pong"}           every ~20 
 server → {"type": "event", "id": "<id>", "event": "<type>", "data": {…}}
 ```
 
+When a device's trust level is changed in Settings, the server closes its connection with
+the standard code 1012; the client reconnects as after any drop and reads the new trust
+from `welcome`.
+
 `kind` must match the device's kind (else 4400). `missed` and `cursor` mean what they mean
 on the extension's stream: after a drop, resume from `cursor`; when `missed`, fetch what
 you need by REST.

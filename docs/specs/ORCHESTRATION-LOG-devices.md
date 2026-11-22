@@ -23,7 +23,7 @@ Claude Opus 5.5 (`model: "opus"`).
 | Wave | Package | Branch | Model | Status |
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
-| 1 | D1 devices core | `feat/d1` | Opus 5.5 | built (37be406, c793bcf; 1256 backend, 561 frontend tests; 0072 rolls back); in review (Opus 5.5) |
+| 1 | D1 devices core | `feat/d1` | Opus 5.5 | reviewed (Opus 5.5): no blockers, 5 should-fix + notes; sent back to its builder |
 | 1 | D2 computer tools | `feat/d2` | Opus 5.5 | built (278351f, d867da3; 1263 backend tests); in review (Opus 5.5); merges after D1 and V1 |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (stale approval in the reply path) + fixes; sent back to its builder |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | built (b4dfd60; 186 tests; both publishes work; Linux CI job not run here); review pending |
@@ -93,6 +93,12 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   it reports, and wire `computer.current_shared_screen` at D2's merge.
 - **D2 notes to check in review:** clicks/typing/keys set `contacts_people` (automations
   ask), beyond the spec's wording; PowerShell rules added on top of `shell_risk`.
+- **D1 review, decided (orchestrator).** Wire addition, compatible with both clients: a
+  trust change closes the device's connection with 1012 so it reconnects and reads the
+  new trust (`device-contracts.md` §2; W1 already reconnects on any non-final code: verify
+  in W1's review). Sent back to D1: control characters in names and browser-only rename,
+  no publish when the lock leaves < 5 s, oversize results answered, subscribe before
+  welcome, atomic online key, smaller notes. `devices:lock:<id>` added to CONTRACTS §1.
 - **V1 review, decided (orchestrator; wire clarifications, no design change):**
   `device-contracts.md` §4 now lists the three 422 codes, 200 `{say}` for nothing heard and
   the general error shape; `device_name` and `TimelineOut.origin` accepted and written into

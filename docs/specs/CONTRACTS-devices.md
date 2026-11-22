@@ -39,7 +39,9 @@ async def send(device_id: uuid.UUID, action: str, fields: dict[str, Any],
 ```
 
 - `online`: the device's last offer if it was renewed within 90 s, else `None`.
-- `list_online`: every device that is connected now, phones included. A phone is online
+- `list_online`: every device that is connected now, phones included. A computer whose
+  offer is older than 90 s is still listed (with `control=False, shell=False`); whether it
+  can be used is `online()`'s answer. A phone is online
   while its WebSocket is open (the server renews its entry on each ping) and always has
   `control=False, shell=False`. Sorted by name.
 - `send`: one `device.command`; returns the client's `state` (for `shell`,
@@ -56,7 +58,7 @@ async def send(device_id: uuid.UUID, action: str, fields: dict[str, Any],
 - Timeouts: D2 passes 90 s for everything except `shell`, where it passes the command's
   `timeout_s` + 15.
 - Valkey keys (D1): `devices:online:<device_id>`, `devices:cmd:<conn>`,
-  `devices:res:<command_id>`, `devices:shared_screen`. Nobody else reads them.
+  `devices:res:<command_id>`, `devices:lock:<device_id>`, `devices:shared_screen`. Nobody else reads them.
 
 D2 tests against a fake that implements these three functions (monkeypatched onto the
 module). D2 does not build the real relay.
