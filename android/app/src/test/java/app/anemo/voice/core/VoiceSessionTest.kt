@@ -24,10 +24,14 @@ class VoiceSessionTest {
 
         override fun open(onFrame: (ShortArray) -> Unit, onError: (String) -> Unit) {
             opens++
-            events.add("mic open")
-            if (failOpen) throw IllegalStateException("busy")
+            if (failOpen) {
+                events.add("mic open")
+                throw IllegalStateException("busy")
+            }
+            // Before the test hears "mic open": it uses these right after.
             this.onFrame = onFrame
             this.onError = onError
+            events.add("mic open")
         }
 
         override fun close() {
