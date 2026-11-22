@@ -11,6 +11,7 @@ signOutAfterEach()
 
 type Voice = {
   profile_id: string | null
+  model_id: string | null
   follow_up_minutes: number
   max_spoken_chars: number
   approvals_by_voice: boolean
@@ -39,9 +40,17 @@ test('every voice setting is saved and kept after a reload', async ({ page }) =>
   const made = await page.request.post('/api/profiles', { data: { name: profileName } })
   expect(made.ok(), await made.text()).toBe(true)
   const profile = (await made.json()) as { id: string }
+  // A model an agent can use (one with tools): the choice for "Model for voice requests".
+  type Model = { id: string; display_name: string; enabled: boolean; provider_enabled: boolean; capabilities: { tools?: boolean } }
+  const models = (await (await page.request.get('/api/models')).json()) as Model[]
+  const model = models.find((m) => m.enabled && m.provider_enabled && m.capabilities.tools)
+  expect(model, 'the test install has a model with tools').toBeTruthy()
   try {
     await page.goto('/settings/voice')
     await expect(save(page)).toBeDisabled() // nothing changed yet
+
+    await page.getByRole('combobox', { name: 'Model for voice requests' }).click()
+    await page.getByRole('option', { name: model!.display_name, exact: true }).click()
 
     await page.getByRole('combobox', { name: 'Agent for voice requests' }).click()
     await page.getByRole('option', { name: profileName }).click()
@@ -57,12 +66,14 @@ test('every voice setting is saved and kept after a reload', async ({ page }) =>
 
     await page.reload()
     await expect(page.getByRole('combobox', { name: 'Agent for voice requests' })).toHaveText(profileName)
+    await expect(page.getByRole('combobox', { name: 'Model for voice requests' })).toHaveText(model!.display_name)
     await expect(page.getByRole('combobox', { name: 'The Voice chat' })).toHaveText('One that keeps going')
     await expect(followUp(page)).toHaveValue('12')
     await expect(longest(page)).toHaveValue('900')
     await expect(approvals(page)).toHaveAttribute('aria-checked', String(!wasOn))
     expect(await voiceSettings(page)).toEqual({
       profile_id: profile.id,
+      model_id: model!.id,
       follow_up_minutes: 12,
       max_spoken_chars: 900,
       approvals_by_voice: !wasOn,
@@ -72,6 +83,8 @@ test('every voice setting is saved and kept after a reload', async ({ page }) =>
     // And back to the defaults' kind of values, through the same form.
     await page.getByRole('combobox', { name: 'Agent for voice requests' }).click()
     await page.getByRole('option', { name: 'Default agent' }).click()
+    await page.getByRole('combobox', { name: 'Model for voice requests' }).click()
+    await page.getByRole('option', { name: 'The agent’s model' }).click()
     await page.getByRole('combobox', { name: 'The Voice chat' }).click()
     await page.getByRole('option', { name: 'A new one each day' }).click()
     await followUp(page).fill('0') // 0 turns follow-ups off
@@ -81,7 +94,7 @@ test('every voice setting is saved and kept after a reload', async ({ page }) =>
     await expect(page.getByRole('combobox', { name: 'The Voice chat' })).toHaveText('A new one each day')
     await expect(followUp(page)).toHaveValue('0')
     const now = await voiceSettings(page)
-    expect([now.profile_id, now.chat, now.follow_up_minutes]).toEqual([null, 'daily', 0])
+    expect([now.profile_id, now.model_id, now.chat, now.follow_up_minutes]).toEqual([null, null, 'daily', 0])
   } finally {
     await page.request.put('/api/settings/voice', { data: before })
     await page.request.delete(`/api/profiles/${profile.id}`)
