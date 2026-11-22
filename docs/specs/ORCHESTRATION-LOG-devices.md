@@ -25,8 +25,8 @@ Claude Opus 5.5 (`model: "opus"`).
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | reviewed (Opus 5.5): no blockers, 5 should-fix + notes; sent back to its builder |
 | 1 | D2 computer tools | `feat/d2` | Opus 5.5 | reviewed (Opus 5.5): no blockers; PowerShell rating gaps, `open` filter, grant scope + notes; sent back to its builder |
-| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (stale approval in the reply path) + fixes; sent back to its builder |
-| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | built (b4dfd60; 186 tests; both publishes work; Linux CI job not run here); review pending |
+| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | review fixes in (1ad78c6; 1270 backend tests); ready to merge after D1 (orchestrator checks the fix diff first) |
+| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | built (b4dfd60; 186 tests; both publishes work; Linux CI job not run here); in review (Opus 5.5) |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | building since 2026-11-22 (took D2's slot) |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
