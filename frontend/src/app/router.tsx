@@ -75,6 +75,7 @@ export const router = createBrowserRouter([
               { path: 'skills', ...page(() => import('@/features/skills/SkillsSettingsPage'), 'SkillsSettingsPage') },
               { path: 'dictation', ...page(() => import('@/features/dictation/DictationSettingsPage'), 'DictationSettingsPage') },
               { path: 'devices', ...page(() => import('@/features/devices/DevicesSettingsPage'), 'DevicesSettingsPage') },
+              { path: 'voice', ...page(() => import('@/features/voice/VoiceSettingsPage'), 'VoiceSettingsPage') },
               { path: 'providers', ...page(() => import('@/features/providers/ProvidersPage'), 'ProvidersPage') },
               { path: 'permissions', ...page(() => import('@/features/agents/PermissionsPage'), 'PermissionsPage') },
               { path: 'workspace', ...page(() => import('@/features/files/WorkspaceSettingsPage'), 'WorkspaceSettingsPage') },

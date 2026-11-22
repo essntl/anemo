@@ -1691,6 +1691,65 @@
         }
       }
     },
+    "/api/settings/voice": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Voice Settings",
+        "operationId": "put_voice_settings_api_settings_voice_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -18540,6 +18599,135 @@
           }
         }
       }
+    },
+    "/api/voice/turns": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "summary": "Voice Turn",
+        "description": "A spoken request: transcribed, made a clear request, and started as an agent run\nin the Voice chat (or continuing `conversation_id` within the follow-up window).",
+        "operationId": "voice_turn_api_voice_turns_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_voice_turn_api_voice_turns_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceTurnOut"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Cancelled, or something to say",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceTurnOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice/replies": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "summary": "Voice Reply",
+        "description": "A spoken answer to a question, or yes/no to an approval or a plan review.",
+        "operationId": "voice_reply_api_voice_replies_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_voice_reply_api_voice_replies_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceReplyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -18672,6 +18860,9 @@
           },
           "dictation": {
             "$ref": "#/components/schemas/DictationSettings"
+          },
+          "voice": {
+            "$ref": "#/components/schemas/VoiceSettings"
           }
         },
         "type": "object",
@@ -18692,7 +18883,8 @@
           "setup",
           "updates",
           "properties",
-          "dictation"
+          "dictation",
+          "voice"
         ],
         "title": "AllSettings"
       },
@@ -20198,6 +20390,61 @@
           "files"
         ],
         "title": "Body_upload_task_files_api_tasks__task_id__files_upload_post"
+      },
+      "Body_voice_reply_api_voice_replies_post": {
+        "properties": {
+          "audio": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Audio"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio",
+          "approval_id"
+        ],
+        "title": "Body_voice_reply_api_voice_replies_post"
+      },
+      "Body_voice_turn_api_voice_turns_post": {
+        "properties": {
+          "audio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "status": {
+            "type": "boolean",
+            "title": "Status",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "Body_voice_turn_api_voice_turns_post"
       },
       "BranchIn": {
         "properties": {
@@ -29764,6 +30011,33 @@
         ],
         "title": "RunListItem"
       },
+      "RunOriginOut": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "const": "voice",
+            "title": "Source"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "device_name"
+        ],
+        "title": "RunOriginOut",
+        "description": "Where a run was asked from, when not the app: by voice, from a phone."
+      },
       "RunOut": {
         "properties": {
           "id": {
@@ -32834,6 +33108,16 @@
             },
             "type": "array",
             "title": "File Changes"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunOriginOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -34455,6 +34739,168 @@
           "updated_at"
         ],
         "title": "ViewRow"
+      },
+      "VoiceReplyOut": {
+        "properties": {
+          "decided": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "approve",
+                  "deny"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided"
+          },
+          "heard": {
+            "type": "string",
+            "title": "Heard"
+          },
+          "say": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Say"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decided",
+          "heard"
+        ],
+        "title": "VoiceReplyOut"
+      },
+      "VoiceSettings": {
+        "properties": {
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "follow_up_minutes": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 0.0,
+            "title": "Follow Up Minutes",
+            "default": 5
+          },
+          "max_spoken_chars": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 100.0,
+            "title": "Max Spoken Chars",
+            "default": 600
+          },
+          "approvals_by_voice": {
+            "type": "boolean",
+            "title": "Approvals By Voice",
+            "default": true
+          },
+          "chat": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "single"
+            ],
+            "title": "Chat",
+            "default": "daily"
+          }
+        },
+        "type": "object",
+        "title": "VoiceSettings",
+        "description": "Talking to Anemo from a phone (features/voice, docs/specs/05-voice-android.md)."
+      },
+      "VoiceTurnOut": {
+        "properties": {
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "heard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heard"
+          },
+          "request": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request"
+          },
+          "cancelled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled"
+          },
+          "say": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Say"
+          }
+        },
+        "type": "object",
+        "title": "VoiceTurnOut",
+        "description": "202 with the run that started; 200 with `cancelled` or `say` when none did."
       },
       "WebSettings": {
         "properties": {

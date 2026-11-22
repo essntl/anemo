@@ -18,6 +18,7 @@ export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'skills', label: msg('Skills') },
   { to: 'dictation', label: msg('Dictation') },
   { to: 'devices', label: msg('Devices') },
+  { to: 'voice', label: msg('Voice') },
   { to: 'providers', label: msg('Providers & Models'), sensitive: true },
   { to: 'permissions', label: msg('Agent Permissions'), sensitive: true },
   { to: 'workspace', label: msg('Workspace'), sensitive: true },

@@ -58,6 +58,7 @@ from app.features.trash.router import router as trash_router
 from app.features.updates.router import router as updates_router
 from app.features.usage.router import router as usage_router
 from app.features.views.router import router as views_router
+from app.features.voice.router import router as voice_router
 from app.web.router import router as web_router
 
 api_router = APIRouter(prefix="/api")
@@ -111,4 +112,5 @@ protected.include_router(system_router)
 protected.include_router(updates_router)
 protected.include_router(properties_router)
 protected.include_router(views_router)
+protected.include_router(voice_router)
 api_router.include_router(protected)
