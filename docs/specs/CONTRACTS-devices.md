@@ -159,6 +159,7 @@ V1 adds `VoiceSettings`, registered as `"voice"` (not sensitive):
 | field | type | default |
 |---|---|---|
 | `profile_id` | `uuid.UUID \| None` | `None` (the default agent) |
+| `model_id` | `uuid.UUID \| None` | `None` (the agent's own model); added after the first deploy |
 | `follow_up_minutes` | `int`, 0–60 | `5` (0: follow-ups off) |
 | `max_spoken_chars` | `int`, 100–2000 | `600` |
 | `approvals_by_voice` | `bool` | `True` |

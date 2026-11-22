@@ -17,7 +17,7 @@ vi.mock('@/api/client', () => ({
 
 const { VoiceSettingsPage } = await import('./VoiceSettingsPage')
 
-const DEFAULTS = { profile_id: null, follow_up_minutes: 5, max_spoken_chars: 600, approvals_by_voice: true, chat: 'daily' }
+const DEFAULTS = { profile_id: null, model_id: null, follow_up_minutes: 5, max_spoken_chars: 600, approvals_by_voice: true, chat: 'daily' }
 
 function show() {
   const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })

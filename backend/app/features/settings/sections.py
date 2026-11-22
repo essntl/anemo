@@ -255,6 +255,9 @@ class VoiceSettings(BaseModel):
 
     # The agent profile voice requests run with; None: the default agent.
     profile_id: uuid.UUID | None = None
+    # The model voice requests are answered with; None: the agent's own (its profile's
+    # model, else the Agent model in Settings → Providers & Models).
+    model_id: uuid.UUID | None = None
     # A request this many minutes after an answer continues that chat; 0: never.
     follow_up_minutes: int = Field(5, ge=0, le=60)
     # Longer answers are cut at a sentence end near this, and the rest is in the chat.

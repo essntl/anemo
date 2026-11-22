@@ -372,6 +372,43 @@ async def test_the_profile_from_settings_runs_the_request(authed):
     assert str(run.profile_id) == profile
 
 
+async def test_the_model_from_settings_answers_voice_requests_and_their_follow_ups(authed):
+    ids = await _models(authed)
+    # Without the setting, the agent's own model is asked for (none named on the run).
+    first = await _speak(authed)
+    assert (await _run(first.json()["run_id"])).requested_model_id is None
+    await _finish(first.json()["run_id"])
+
+    await authed.put("/api/settings/voice", json={"model_id": ids["scripted"], "chat": "single"})
+    spoken = (await _speak(authed)).json()
+    run = await _run(spoken["run_id"])
+    assert str(run.requested_model_id) == ids["scripted"]
+    await _finish(spoken["run_id"])
+    # The Voice chat remembers it, so a follow-up there is answered by the same model.
+    again = (await _speak(authed, conversation_id=spoken["conversation_id"])).json()
+    assert again["conversation_id"] == spoken["conversation_id"]
+    assert str((await _run(again["run_id"])).requested_model_id) == ids["scripted"]
+
+
+async def test_a_follow_up_in_another_chat_keeps_that_chats_model(authed):
+    ids = await _models(authed)
+    await authed.put("/api/settings/voice", json={"model_id": ids["scripted"]})
+    typed = (await authed.post("/api/conversations", json={"title": "Typed"})).json()["id"]
+    r = await authed.post(f"/api/conversations/{typed}/turns", json={"text": "hello"})
+    await _finish(r.json()["run_id"])
+    spoken = (await _speak(authed, conversation_id=typed)).json()
+    assert spoken["conversation_id"] == typed
+    assert (await _run(spoken["run_id"])).requested_model_id is None
+
+
+async def test_a_voice_model_that_is_gone_falls_back_to_the_agents_own(authed):
+    ids = await _models(authed)
+    await authed.put("/api/settings/voice", json={"model_id": ids["scripted"]})
+    assert (await authed.delete(f"/api/models/{ids['scripted']}")).status_code in (200, 204)
+    run = await _run((await _speak(authed)).json()["run_id"])
+    assert run.requested_model_id is None
+
+
 @dataclass
 class _Phone:
     id: uuid.UUID
@@ -430,6 +467,7 @@ async def test_voice_settings_have_defaults_and_limits(authed):
     defaults = (await authed.get("/api/settings")).json()["voice"]
     assert defaults == {
         "profile_id": None,
+        "model_id": None,
         "follow_up_minutes": 5,
         "max_spoken_chars": 600,
         "approvals_by_voice": True,

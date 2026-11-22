@@ -15,10 +15,15 @@ import app.anemo.voice.core.Speaker
  * [post] moves the callbacks onto the voice thread.
  */
 class AndroidSpeaker(
-    context: Context,
+    private val context: Context,
     private val voiceName: String,
     private val speed: Float,
     private val post: (Runnable) -> Unit,
+    /** Android's speech engine could not be started: nothing will be spoken. */
+    private val onUnavailable: () -> Unit = {},
+    /** It started after all (another engine was chosen, or it was only slow). */
+    private val onAvailable: () -> Unit = {},
+    private val now: () -> Long = { android.os.SystemClock.elapsedRealtime() },
 ) : Speaker {
     private val audio = context.getSystemService(AudioManager::class.java)
     private val attributes = AudioAttributes.Builder()
@@ -29,7 +34,7 @@ class AndroidSpeaker(
         .setAudioAttributes(attributes)
         .setOnAudioFocusChangeListener { change ->
             // a call or another app took the audio: stop speaking (the loop moves on)
-            if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) tts.stop()
+            if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) tts?.stop()
         }
         .build()
 
@@ -39,17 +44,46 @@ class AndroidSpeaker(
     private var pending: Pair<String, (Boolean) -> Unit>? = null
     private val callbacks = HashMap<String, (Boolean) -> Unit>()
 
-    private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
-        val waiting = synchronized(lock) {
-            ready = status == TextToSpeech.SUCCESS
-            pending.also { pending = null }
-        }
-        if (status == TextToSpeech.SUCCESS) configure()
-        waiting?.let { (text, done) -> speak(text, done) }
-    }
+    private var tts: TextToSpeech? = null
+    private var startedAt = 0L
+    private var failedBefore = false
 
     init {
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+        start()
+    }
+
+    /** Bind Android's speech engine (the one chosen in the phone's settings right now). */
+    private fun start() {
+        startedAt = now()
+        synchronized(lock) { ready = null }
+        var engine: TextToSpeech? = null
+        engine = TextToSpeech(context.applicationContext) { status ->
+            // On some phones a failure is reported from inside the constructor.
+            runCatching { post { started(engine, status == TextToSpeech.SUCCESS) } } // stopped meanwhile: nothing to tell
+        }
+        tts = engine
+    }
+
+    private fun started(engine: TextToSpeech?, ok: Boolean) {
+        if (engine == null || engine !== tts) return // an older attempt
+        val waiting = synchronized(lock) {
+            ready = ok
+            pending.also { pending = null }
+        }
+        if (ok) {
+            configure(engine)
+            if (failedBefore) onAvailable()
+            failedBefore = false
+        } else {
+            failedBefore = true
+            runCatching { engine.shutdown() }
+            onUnavailable()
+        }
+        waiting?.let { (text, done) -> if (ok) speak(text, done) else post { done(false) } }
+    }
+
+    private fun configure(engine: TextToSpeech) {
+        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) = Unit
             override fun onDone(utteranceId: String) = finish(utteranceId, true)
 
@@ -58,13 +92,10 @@ class AndroidSpeaker(
             override fun onError(utteranceId: String, errorCode: Int) = finish(utteranceId, false)
             override fun onStop(utteranceId: String, interrupted: Boolean) = finish(utteranceId, false)
         })
-    }
-
-    private fun configure() {
-        tts.setAudioAttributes(attributes)
-        tts.setSpeechRate(speed)
+        engine.setAudioAttributes(attributes)
+        engine.setSpeechRate(speed)
         if (voiceName.isNotEmpty()) {
-            tts.voices?.firstOrNull { it.name == voiceName }?.let { tts.voice = it }
+            engine.voices?.firstOrNull { it.name == voiceName }?.let { engine.voice = it }
         }
     }
 
@@ -77,7 +108,14 @@ class AndroidSpeaker(
                     return
                 }
                 false -> {
-                    post { onDone(false) }
+                    // The engine didn't start. Try again for this answer (the user may
+                    // have chosen another engine since), but not more than every few seconds.
+                    if (now() - startedAt < RETRY_AFTER_MS) {
+                        post { onDone(false) }
+                        return
+                    }
+                    pending = text to onDone
+                    post { start() }
                     return
                 }
                 true -> "anemo-${nextId++}".also { callbacks[it] = onDone }
@@ -87,13 +125,13 @@ class AndroidSpeaker(
             finish(id, false) // in a call, for example: don't talk over it
             return
         }
-        if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) finish(id, false)
+        if (tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) finish(id, false)
     }
 
     override fun stop() {
         val waiting = synchronized(lock) { pending.also { pending = null } }
         waiting?.second?.let { cb -> post { cb(false) } }
-        tts.stop()
+        tts?.stop()
         audio.abandonAudioFocusRequest(focus)
     }
 
@@ -104,12 +142,14 @@ class AndroidSpeaker(
     }
 
     fun shutdown() {
-        tts.stop()
-        tts.shutdown()
+        runCatching { tts?.stop() }
+        runCatching { tts?.shutdown() }
         audio.abandonAudioFocusRequest(focus)
     }
 
     companion object {
+        private const val RETRY_AFTER_MS = 5_000L
+
         /** The voices Android's speech engine offers, for the settings screen. */
         fun voiceNames(tts: TextToSpeech): List<String> =
             tts.voices.orEmpty().filter { !it.isNetworkConnectionRequired }.map { it.name }.sorted()

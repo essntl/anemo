@@ -10501,6 +10501,8 @@ export interface components {
         VoiceSettings: {
             /** Profile Id */
             profile_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
             /**
              * Follow Up Minutes
              * @default 5

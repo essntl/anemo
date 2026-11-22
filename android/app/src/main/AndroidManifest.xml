@@ -10,6 +10,14 @@
     <!-- Bluetooth SCO before Android 12 -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 
+    <!-- From Android 11 an app only sees the speech engine it has declared it looks
+         for: without this, TextToSpeech can't start and no answer is spoken. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <!-- The token stays on this phone: no cloud backup. Plain https only. -->
     <application
         android:allowBackup="false"
