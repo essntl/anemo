@@ -127,7 +127,8 @@ turns entries into the wire events of `device-contracts.md` §2. Computers get n
 ## 4. Runs started by voice (V1)
 
 `runs.options` gets `"source": "voice"` and, when the caller is a device,
-`"device_id": "<uuid>"`. V1 adds an `options` argument to
+`"device_id": "<uuid>"` and `"device_name"` (the name when it asked, for the run page;
+there is no lookup by id). V1 adds an `options` argument to
 `conversations.service.send_turn` / `_start_run` for this (merged into what is there);
 the `/turns` route's behaviour must not change. The turn note for the listener goes in the
 turn context through the same path (`runs.options["turn_note"]`, read in
@@ -184,7 +185,7 @@ here and not inside your package's own folders is not yours; if you need it, rep
 | `backend/app/runtime/agent.py` | D2 | passing `has_computer` where `has_browser` is passed |
 | `backend/app/runtime/agent_snapshot.py` | D2, V1 | D2: whether computers are online (`run.policy["computer"]`) and the device lines of the turn context; V1: the voice turn note. Each adds its own lines next to `extra = …`, nothing else |
 | `backend/app/runtime/agent_finalize.py` | V1 | publishing `voice.say` |
-| `backend/app/features/runs/agent_router.py` | V1 | `decide_approval`: the `approval.decided` global event, the audit `source` |
+| `backend/app/features/runs/agent_router.py` | V1 | `decide_approval`: the `approval.decided` global event, the audit `source`; `TimelineOut.origin` for "Asked by voice from ‹phone›" |
 | `backend/app/features/conversations/service.py` | V1 | the `options` argument (§4) |
 | `backend/app/features/voice/**` | V1 | everything |
 | `backend/app/features/dictation/service.py` | V1 | `transcribe` and `clean_up` made public, the `voice` purpose, the yes/no classifier. Dictation's behaviour and tests must not change |

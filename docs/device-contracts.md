@@ -127,7 +127,16 @@ last 90 s the device is offline for the agent.
 200 { "cancelled": true }                        the recording was only "cancel"/"never mind"
 200 { "say": "Two runs are working: …" }         for status
 409 { "error": { "code": "no_transcription_model", "message": "…" } }
-422 too large, empty or not audio (code `unsupported_audio`, as dictation)
+200 { "say": "Sorry, I didn't catch that." }    nothing was heard; no run starts
+422 { "error": { "code": "empty_audio" | "audio_too_large" | "unsupported_audio" } }   as dictation
+```
+
+Any other failure has the same `{"error": {"code", "message"}}` shape (for example 400
+`transcription_failed` when the speech-to-text model didn't answer); a client speaks or
+shows `message` and doesn't need to know the code. Whenever a 200 carries `say`, the
+phone speaks it.
+
+```
 ```
 
 ### `POST /api/voice/replies` (multipart)

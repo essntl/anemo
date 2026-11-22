@@ -25,7 +25,7 @@ Claude Opus 5.5 (`model: "opus"`).
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | built (37be406, c793bcf; 1256 backend, 561 frontend tests; 0072 rolls back); in review (Opus 5.5) |
 | 1 | D2 computer tools | `feat/d2` | Opus 5.5 | built (278351f, d867da3; 1263 backend tests); in review (Opus 5.5); merges after D1 and V1 |
-| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | built (1265 backend, 559 frontend tests); in review (Opus 5.5) |
+| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (stale approval in the reply path) + fixes; sent back to its builder |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | built (b4dfd60; 186 tests; both publishes work; Linux CI job not run here); review pending |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | building since 2026-11-22 (took D2's slot) |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
@@ -93,7 +93,13 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   it reports, and wire `computer.current_shared_screen` at D2's merge.
 - **D2 notes to check in review:** clicks/typing/keys set `contacts_people` (automations
   ask), beyond the spec's wording; PowerShell rules added on top of `shell_risk`.
-- **V1 points still to settle after its review:** 422 uses dictation's three codes
+- **V1 review, decided (orchestrator; wire clarifications, no design change):**
+  `device-contracts.md` §4 now lists the three 422 codes, 200 `{say}` for nothing heard and
+  the general error shape; `device_name` and `TimelineOut.origin` accepted and written into
+  `CONTRACTS-devices.md`. Sent back to V1: `populate_existing` in `decide_approval` and
+  `run_not_waiting` → `already_decided`; the Voice chat reuses the oldest idle chat; a
+  rollback in `say_answer`; tests. Check A1 against the 422 codes and `say`.
+- **V1 points as first reported (superseded by the entry above):** 422 uses dictation's three codes
   (`empty_audio`, `audio_too_large`, `unsupported_audio`) where the wire contract names
   one; an empty transcript answers 200 `{say}`; `runs.options["device_name"]` is an extra
   key. A1 was briefed before these were known: check its handling of 422 and `say`.
