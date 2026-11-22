@@ -128,11 +128,20 @@ def _known(ctx: ToolContext, name: str) -> dict[str, Any] | None:
     return found
 
 
+def _resource(ctx: ToolContext, name: str) -> str:
+    """What an "allow for this run" approval is scoped to: the device, by its id (a name
+    may contain "/", which would widen the approval to other devices)."""
+    device = _known(ctx, name)
+    return f"device:{device['id']}" if device else "device:unknown"
+
+
 def _blocked_for_acting(ctx: ToolContext, name: str) -> str | None:
-    """Why acting on this device is not possible now, from the last refresh."""
+    """Why acting on this device is not possible now, from the last refresh. A device the
+    refresh didn't see is not blocked (it may have come online during this step): it is
+    treated as watched, and `run()` checks it live."""
     device = _known(ctx, name)
     if device is None:
-        return f"“{name}” isn't one of the computers online now"
+        return None
     if device["kind"] != "computer":
         return f"“{device['name']}” is a phone, not a computer"
     if not device["control"]:
@@ -142,6 +151,78 @@ def _blocked_for_acting(ctx: ToolContext, name: str) -> str | None:
 
 # -- what the model reads ---------------------------------------------------------
 
+# Caps on what a client sends, before any of it reaches the model (device-contracts §3).
+MAX_CONTROLS = 300
+MAX_TEXT = 40_000
+MAX_WINDOWS = 200
+MAX_LABEL = 300  # a title, an app, a control's role or name
+MAX_VALUE = 1_000  # a control's value, a note
+MAX_REF = 40
+SHELL_HEAD = 20_000
+SHELL_TAIL = 10_000
+
+
+def _cut(value: Any, limit: int) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _clean_window(window: Any) -> dict[str, Any]:
+    if not isinstance(window, dict):
+        return {}
+    return {
+        "ref": _cut(window.get("ref"), MAX_REF),
+        "title": _cut(window.get("title"), MAX_LABEL),
+        "app": _cut(window.get("app"), MAX_LABEL),
+        **({"minimized": bool(window["minimized"])} if "minimized" in window else {}),
+    }
+
+
+def _clean_control(control: dict[str, Any]) -> dict[str, Any]:
+    password = bool(control.get("password"))
+    return {
+        "ref": _cut(control.get("ref"), MAX_REF),
+        "role": _cut(control.get("role"), MAX_LABEL),
+        "name": _cut(control.get("name"), MAX_LABEL),
+        # A password field's value never reaches the model, whatever the client sent.
+        "value": None if password else _cut(control.get("value"), MAX_VALUE),
+        "enabled": control.get("enabled") is not False,
+        "password": password,
+    }
+
+
+def clean_state(state: dict[str, Any]) -> dict[str, Any]:
+    """The client's `state`, capped, and without the values of password fields."""
+    controls = [c for c in state.get("controls") or [] if isinstance(c, dict)]
+    text = str(state.get("text") or "")
+    screenshot = state.get("screenshot")
+    return {
+        "window": _clean_window(state.get("window")),
+        "screenshot": screenshot if isinstance(screenshot, str) else "",
+        "scale": state.get("scale"),
+        "controls": [_clean_control(c) for c in controls[:MAX_CONTROLS]],
+        "text": text[:MAX_TEXT],
+        "truncated": bool(state.get("truncated"))
+        or len(controls) > MAX_CONTROLS
+        or len(text) > MAX_TEXT,
+        "note": _cut(state.get("note"), MAX_VALUE),
+    }
+
+
+def clean_windows(state: dict[str, Any]) -> list[dict[str, Any]]:
+    windows = [w for w in state.get("windows") or [] if isinstance(w, dict)]
+    return [_clean_window(w) for w in windows[:MAX_WINDOWS]]
+
+
+def head_tail(text: str, head: int = SHELL_HEAD, tail: int = SHELL_TAIL) -> str:
+    """At most head + tail characters: the start and the end (the contract's shell output)."""
+    if len(text) <= head + tail:
+        return text
+    left_out = len(text) - head - tail
+    return f"{text[:head]}\n… [{left_out} characters left out] …\n{text[-tail:]}"
+
 
 def _control_line(control: dict[str, Any]) -> str:
     role = control.get("role") or "control"
@@ -149,7 +230,7 @@ def _control_line(control: dict[str, Any]) -> str:
     parts = [f"[{control.get('ref')}] {role}"]
     if name:
         parts.append(f"“{name}”")
-    if control.get("value") not in (None, ""):
+    if control.get("value") not in (None, "") and not control.get("password"):
         parts.append(f"= “{control['value']}”")
     if control.get("enabled") is False:
         parts.append("(disabled)")
@@ -273,8 +354,8 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
             content=f"There is no computer named “{name}”. Computers online now: {listing}.",
             is_error=True,
         )
-    offer = await relay.online(device.id)
-    before = _known(ctx, name)
+    offer = await relay.online(device.id)  # the 90-second rule (CONTRACTS-devices.md §1)
+    before = _known(ctx, name)  # what actions() decided from (this step's list)
     if offer is None:
         (ctx.state.get(_DEVICES) or {}).pop(_key(name), None)
         return ToolResult(
@@ -282,15 +363,8 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
             "or can't reach Anemo). Tell the user, or use another computer.",
             is_error=True,
         )
-    now = {
-        "id": str(device.id),
-        "name": device.name,
-        "kind": device.kind,
-        "trust": device.trust,
-        "control": offer.control,
-        "shell": offer.shell,
-    }
-    ctx.state.setdefault(_DEVICES, {})[_key(name)] = now
+    # The list actions() decides from is not updated here: within a step it stays what
+    # the decisions were made from. The next step reads it again.
     if need == "see":
         return device, device.name
     if not offer.control:
@@ -312,8 +386,16 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
                 "the user to switch it on, or use computer_act.",
                 is_error=True,
             )
-    # Decided as trusted (no question), but the device is watched now: ask instead.
-    if device.trust == "watched" and (before is None or before.get("trust") != "watched"):
+    if before is not None and before.get("id") != str(device.id):
+        # Decided for another device of that name (deleted and added again): ask again.
+        return ToolResult(
+            content=f"“{device.name}” is not the computer this call was checked for. Call the "
+            "tool again.",
+            is_error=True,
+        )
+    # A device the decision didn't know counted as watched (asked about). One decided as
+    # trusted that isn't trusted now got no question: ask now.
+    if device.trust != "trusted" and before is not None and before.get("trust") == "trusted":
         return ToolResult(
             content=f"“{device.name}” is a watched computer now, so the user is asked about "
             "every action there. Call the tool again to ask them.",
@@ -344,6 +426,7 @@ async def _state_result(
 ) -> ToolResult:
     """The state after a look or an action: text for the model, the screenshot for the
     timeline (and for the model, when it can see images)."""
+    state = clean_state(state)
     _remember(ctx, name, state)
     attachment_id, shown = await _screenshot(ctx, state)
     window = state.get("window") or {}
@@ -399,7 +482,7 @@ class ComputerLook(Tool):
         return [
             Action(
                 capability=SEE,
-                resource=_key(args.device),
+                resource=_resource(ctx, args.device),
                 risk="safe",
                 summary=f"Look at {what[args.what]} on {args.device}",
             )
@@ -411,13 +494,13 @@ class ComputerLook(Tool):
             return checked
         device, name = checked
         fields: dict[str, Any] = {"what": args.what}
-        if args.window_ref:
+        if args.what == "window" and args.window_ref:
             fields["window_ref"] = args.window_ref
         state = await _send(ctx, device, "look", fields, SEND_TIMEOUT_S)
         if isinstance(state, ToolResult):
             return state
         if args.what == "windows":
-            windows = [w for w in state.get("windows") or [] if isinstance(w, dict)]
+            windows = clean_windows(state)
             _remember_windows(ctx, name, windows)
             return ToolResult(
                 content=_render_windows(name, windows),
@@ -444,6 +527,11 @@ _CLICKS = ("click", "double_click", "right_click")
 # automation runs ask about these unless the automation allows the tool, as in the browser.
 _REACHES_PEOPLE = {"click", "double_click", "type", "press"}
 _WIN = {"win", "windows", "super"}
+_PROGRAM_NAME = re.compile(r"(?:[^\W_]|[ .+-])+")
+
+
+def _is_url(target: str | None) -> bool:
+    return bool(target and re.match(r"(?i)^https?://", target))
 _FORBIDDEN_KEYS = {"Control+Alt+Delete"}
 
 
@@ -504,10 +592,23 @@ class ActInput(BaseModel):
         if v is None:
             return v
         v = v.strip()
-        if ":" in v and not re.match(r"(?i)^https?://[^\s/]+", v):
-            raise ValueError("target is a program's name or an http(s):// URL")
-        if not re.match(r"(?i)^https?://", v) and len(v) > 200:
-            raise ValueError("a program's name is at most 200 characters")
+        if _is_url(v):
+            if not re.fullmatch(r"(?i)https?://[^\s/?#]+\S*", v):
+                raise ValueError("not a valid http(s):// URL")
+            return v
+        # A name from the Start menu: letters, digits, spaces and . + - only; no paths,
+        # no environment variables, no arguments.
+        if (
+            len(v) > 200
+            or not _PROGRAM_NAME.fullmatch(v)
+            or ".." in v
+            or re.search(r"\s[-/]", v)
+            or v.startswith(("-", "."))
+        ):
+            raise ValueError(
+                "target is a program's name as in the Start menu (letters, digits, spaces and "
+                ". + - only, no path or arguments) or an http(s):// URL"
+            )
         return v
 
     @model_validator(mode="after")
@@ -597,16 +698,20 @@ class ComputerAct(Tool):
     def actions(self, args: ActInput, ctx: ToolContext) -> list[Action]:
         device = _known(ctx, args.device)
         blocked = _blocked_for_acting(ctx, args.device)
+        # A device this step's list doesn't know counts as watched.
         watched = device is None or device.get("trust") != "trusted"
+        reaches_people = args.action in _REACHES_PEOPLE or (
+            args.action == "open" and _is_url(args.target)
+        )
         return [
             Action(
                 capability=ACT,
-                resource=_key(args.device),
+                resource=_resource(ctx, args.device),
                 risk="moderate",
                 summary=_act_summary(args, ctx),
                 blocked=blocked,
                 always_ask=WATCHED_ASKS if watched else None,
-                contacts_people=args.action in _REACHES_PEOPLE,
+                contacts_people=reaches_people,
             )
         ]
 
@@ -653,31 +758,65 @@ _PS_DANGEROUS: list[tuple[str, str]] = [
     ),
     (r"\b(reg|reg\.exe)\s+(add|delete|import|load|unload|restore|copy)\b", "changes the registry"),
     (r"\bregedit\b", "changes the registry"),
-    (
-        r"\b(set|new|remove|rename|copy|move|clear)-item(property)?\b.*\b(hk(lm|cu|cr|u|cc)|"
-        r"registry::)",
-        "changes the registry",
-    ),
     (r"\b(invoke-expression|iex)\b", "runs text as code (Invoke-Expression)"),
+    # The call operator or dot-sourcing on anything but a plain name or path: a command
+    # name built at run time (& ('Remove'+'-Item'), & (gcm i*x), . $x, & { ... }).
+    (r"(^|[\s;|{(=])[&.]\s*([(\[{$]|\"[^\"]*\$)", "runs a command whose name is computed"),
+    (r"(\.|::)delete\s*\(", "deletes with .Delete()"),
+    (r"\bcmd(\.exe)?\b[^\n]*(\^|\"\")", "hides a cmd command with ^ or \"\""),
     (r"-(e|ec|enc|encodedcommand)\b", "runs an encoded command"),
-    (r"-verb\s+['\"]?runas\b", "asks for administrator rights"),
+    (r"\b(powershell|pwsh)(\.exe)?\b[^\n;]*\s-e[a-z]*\b", "runs an encoded command"),
+    (r"-v[a-z]*[:\s]+['\"]?runas\b", "asks for administrator rights"),
     (
         r"\b(stop-computer|restart-computer|shutdown|bcdedit|set-executionpolicy|"
-        r"set-mppreference|add-mppreference|takeown|icacls|vssadmin|wbadmin)\b",
+        r"set-mppreference|add-mppreference|takeown|icacls|vssadmin|wbadmin|set-acl)\b",
         "changes the system",
     ),
     (r"\bnetsh\s+(advfirewall|firewall|interface)\b", "changes the network or firewall"),
-    (r"\b(register-scheduledtask|schtasks\s+/create|new-service|sc(\.exe)?\s+(create|config|delete))\b",
-     "changes services or scheduled tasks"),
+    (r"\b(set-netfirewallprofile|new-netfirewallrule|set-netfirewallrule|"
+     r"disable-netfirewallrule|remove-netfirewallrule)\b", "changes the firewall"),
+    (r"\b(enable-psremoting|wsman:)", "opens remote access"),
+    (r"\b(register-scheduledtask|schtasks\s+/create|new-service|stop-service|"
+     r"sc(\.exe)?\s+(create|config|delete|stop))\b", "changes services or scheduled tasks"),
+    (r"\bset-service\b[^\n]*\b(disabled|stopped)\b", "changes services or scheduled tasks"),
+    (r"\b(invoke-cimmethod|invoke-wmimethod)\b[^\n]*\bwin32_process\b|\[wmiclass\][^\n]*win32_process",
+     "starts a process through WMI"),
+    (r"\bcertutil\b[^\n]*-urlcache|\bbitsadmin\b[^\n]*/transfer|\bmshta\b|"
+     r"\bmsiexec\b[^\n]*https?://", "downloads and runs a program"),
 ]  # fmt: skip
+# The registry: a registry drive together with a cmdlet or alias that writes.
+_PS_REGISTRY = re.compile(r"\bhk(lm|cu|cr|u|cc):|registry::|-psprovider\s+['\"]?registry")
+_PS_WRITES = re.compile(
+    r"\b(set|new|remove|rename|copy|move|clear)-item(property)?\b|"
+    r"\b(sp|si|ni|rni|ren|cpi|cpp|copy|cp|mi|mp|move|mv|rp|ri|rm|del|erase|rd|rmdir|cli|clp)\b"
+)
+# Download, then run what came down.
+_PS_DOWNLOAD = re.compile(
+    r"-outfile\b|\bstart-bitstransfer\b|downloadfile\s*\(|\bcurl(\.exe)?\b[^;\n]*\s-o\s"
+)
+_PS_RUNS = re.compile(
+    r"\b(start-process|saps|start|invoke-item|ii)\b|(^|[\s;&|])\.{1,2}[\\/]|"
+    r"\b[\w-]+\.(exe|msi|bat|cmd|ps1|vbs|scr|com)\b"
+)
 _PS_NETWORK = re.compile(
-    r"(?i)(\bhttps?://|\\\\[\w.-]+\\|\b(invoke-webrequest|iwr|invoke-restmethod|irm|curl|wget|"
+    r"(?i)(\bhttps?://|\\\\[\w.-]+\\|(^|[\s'\"(=])//[\w.-]+/|net\.mail|net\.sockets|webrequest|"
+    r"\b(invoke-webrequest|iwr|invoke-restmethod|irm|curl|wget|"
     r"start-bitstransfer|webclient|httpclient|send-mailmessage|test-connection|"
     r"test-netconnection|ping|ssh|scp|sftp|ftp|telnet|nslookup|resolve-dnsname|tracert|"
-    r"invoke-command|enter-pssession|new-pssession|net\s+use|winget|choco|scoop|"
-    r"install-module|install-package|install-script|update-module|find-module|npm|pnpm|"
-    r"yarn|pip|pip3|nuget|dotnet\s+(add|restore)|git\s+(clone|pull|push|fetch))\b)"
+    r"invoke-command|enter-pssession|new-pssession|net\s+use|winget|choco|scoop|certutil|"
+    r"bitsadmin|mshta|install-module|install-package|install-script|update-module|"
+    r"find-module|npm|pnpm|yarn|pip|pip3|nuget|dotnet\s+(add|restore)|"
+    r"git\s+(clone|pull|push|fetch))\b)"
 )
+
+
+def _downloads_then_runs(lowered: str) -> bool:
+    found = _PS_DOWNLOAD.search(lowered)
+    if found is None:
+        return False
+    rest = lowered[found.end() :]
+    after = re.search(r"[;\n|]|&&", rest)
+    return after is not None and bool(_PS_RUNS.search(rest[after.end() :]))
 
 
 class PowerShellRisk(BaseModel):
@@ -694,11 +833,15 @@ def rate_powershell(command: str) -> PowerShellRisk:
     risk: Risk = base.risk
     reasons = list(base.reasons)
     lowered = command.lower()
-    for pattern, reason in _PS_DANGEROUS:
-        if re.search(pattern, lowered):
-            risk = max_risk(risk, "dangerous")
-            if reason not in reasons:
-                reasons.insert(0, reason)
+    found = [reason for pattern, reason in _PS_DANGEROUS if re.search(pattern, lowered)]
+    if _PS_REGISTRY.search(lowered) and _PS_WRITES.search(lowered):
+        found.append("changes the registry")
+    if _downloads_then_runs(lowered):
+        found.append("downloads and runs a program")
+    for reason in found:
+        risk = max_risk(risk, "dangerous")
+        if reason not in reasons:
+            reasons.insert(0, reason)
     return PowerShellRisk(risk=risk, reasons=reasons, network=bool(_PS_NETWORK.search(command)))
 
 
@@ -739,7 +882,7 @@ class ComputerShell(Tool):
         return [
             Action(
                 capability=SHELL,
-                resource=_key(args.device),
+                resource=_resource(ctx, args.device),
                 risk=rating.risk,
                 summary=f"Run PowerShell `{_short(args.command, 80)}` on {args.device}{why}",
                 blocked=blocked,
@@ -752,12 +895,14 @@ class ComputerShell(Tool):
         if isinstance(checked, ToolResult):
             return checked
         device, name = checked
-        fields = {"command": args.command, "timeout_s": args.timeout_s}
-        result = await _send(ctx, device, "shell", fields, args.timeout_s + SHELL_GRACE_S)
+        timeout = min(args.timeout_s, ctx.limits.max_shell_timeout_s)
+        fields = {"command": args.command, "timeout_s": timeout}
+        result = await _send(ctx, device, "shell", fields, timeout + SHELL_GRACE_S)
         if isinstance(result, ToolResult):
             return result
         exit_code = result.get("exit_code")
-        stdout, stderr = str(result.get("stdout") or ""), str(result.get("stderr") or "")
+        stdout = head_tail(str(result.get("stdout") or ""))
+        stderr = head_tail(str(result.get("stderr") or ""))
         parts = [
             f"PS {name}> {args.command}",
             f"[exit code {exit_code}, {result.get('duration_ms', '?')} ms]",

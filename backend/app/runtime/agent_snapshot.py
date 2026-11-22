@@ -146,10 +146,16 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     # the change check found.
     extra = await automation_context.run_context(db, run, general.timezone)
     # Computers that run Anemo Desktop: offered when one is online, and to an unattended
-    # run only when its automation lists a computer tool. One line per online device.
+    # run only when its automation lists a computer tool; not at all when the three
+    # computer permissions are "Never". One line per online device.
     listed = ((automation and automation.tool_allowlist) or (inherited or {}).get("tools")) or []
-    may_use_computers = not chat and (
-        (automation is None and not inherited) or bool(computer.COMPUTER_TOOL_NAMES & set(listed))
+    may_use_computers = (
+        not chat
+        and any(level_for(settings, cap) != "deny" for cap in computer.COMPUTER_CAPS)
+        and (
+            (automation is None and not inherited)
+            or bool(computer.COMPUTER_TOOL_NAMES & set(listed))
+        )
     )
     online_devices = await computer.online_devices() if may_use_computers else []
     has_computer = any(d.kind == "computer" for d in online_devices)
