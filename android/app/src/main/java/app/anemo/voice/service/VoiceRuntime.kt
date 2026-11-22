@@ -38,6 +38,10 @@ import java.util.concurrent.TimeUnit
  * closed again before the error is thrown.
  */
 object VoiceRuntime {
+    private const val NO_SPEECH =
+        "Android's text-to-speech could not be started, so answers are not spoken. " +
+            "Check Settings → System → Text-to-speech output on this phone."
+
     fun build(
         context: Context,
         settings: VoiceSettings,
@@ -87,7 +91,11 @@ object VoiceRuntime {
         made += { vad.close() }
         val chimes = ToneChimes(settings.sounds)
         made += { chimes.release() }
-        val speaker = AndroidSpeaker(context, settings.ttsVoice, settings.ttsSpeed) { voice.execute(it) }
+        val speaker = AndroidSpeaker(
+            context, settings.ttsVoice, settings.ttsSpeed,
+            post = { voice.execute(it) },
+            onUnavailable = { onStatus { it.copy(notice = NO_SPEECH) } },
+        )
         made += { speaker.shutdown() }
         val audio = context.getSystemService(AudioManager::class.java)
         val microphone = MicrophoneSource(if (settings.bluetoothMic) BluetoothRouting(audio) else null)

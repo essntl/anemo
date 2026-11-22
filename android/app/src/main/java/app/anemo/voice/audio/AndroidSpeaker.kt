@@ -19,6 +19,8 @@ class AndroidSpeaker(
     private val voiceName: String,
     private val speed: Float,
     private val post: (Runnable) -> Unit,
+    /** Android's speech engine could not be started: nothing will be spoken. */
+    private val onUnavailable: () -> Unit = {},
 ) : Speaker {
     private val audio = context.getSystemService(AudioManager::class.java)
     private val attributes = AudioAttributes.Builder()
@@ -44,7 +46,7 @@ class AndroidSpeaker(
             ready = status == TextToSpeech.SUCCESS
             pending.also { pending = null }
         }
-        if (status == TextToSpeech.SUCCESS) configure()
+        if (status == TextToSpeech.SUCCESS) configure() else onUnavailable()
         waiting?.let { (text, done) -> speak(text, done) }
     }
 
