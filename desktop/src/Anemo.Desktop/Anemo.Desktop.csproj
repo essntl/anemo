@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Windows tray app: platform implementations (UI Automation, SendInput, screen
+       capture, clipboard, PowerShell, DPAPI, hotkeys, Startup shortcut) and the UI.
+       Builds anywhere with -p:EnableWindowsTargeting=true; runs on Windows 10 and 11. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>Anemo Desktop</AssemblyName>
+    <RootNamespace>Anemo.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- Single-file, self-contained publish (see README.md). -->
+    <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- UIAutomationClient (System.Windows.Automation) only; no WPF windows, no XAML build. -->
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Anemo.Desktop.Core\Anemo.Desktop.Core.csproj" />
+  </ItemGroup>
+
+</Project>

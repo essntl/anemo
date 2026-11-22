@@ -47,6 +47,12 @@ public interface IDesktop
 
     /// <summary>The control that has the keyboard focus, if any.</summary>
     IUiElement? FocusedElement();
+
+    /// <summary>True when the point is on one of Anemo Desktop's own windows (settings, indicator).</summary>
+    bool IsOwnWindowAt(ScreenPoint point);
+
+    /// <summary>True when one of Anemo Desktop's own windows is in front (has the keyboard).</summary>
+    bool IsOwnWindowInFront();
 }
 
 /// <summary>One node of the UI Automation tree.</summary>

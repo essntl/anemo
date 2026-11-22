@@ -53,11 +53,11 @@ public sealed partial class CommandProcessor
                 return;
             }
 
-            _platform.Input.Click(element.PrepareForMouse(), button, count);
+            _platform.Input.Click(Guard(element.PrepareForMouse()), button, count);
             return;
         }
 
-        _platform.Input.Click(PointFromArgs(args), button, count);
+        _platform.Input.Click(Guard(PointFromArgs(args)), button, count);
     }
 
     /// <summary>x, y in the pixels of the last screenshot, back to screen pixels.</summary>
@@ -113,6 +113,7 @@ public sealed partial class CommandProcessor
         }
 
         // Typing goes where the focus is: check that it isn't a password field.
+        GuardKeyboard();
         if (FocusIsPassword())
         {
             throw CommandException.Refused(PasswordMessage);
@@ -137,6 +138,7 @@ public sealed partial class CommandProcessor
     {
         // Every key is checked before any is pressed.
         var combos = args.StringList("keys", 1, 10).Select(KeyParser.Parse).ToList();
+        GuardKeyboard();
         foreach (var combo in combos)
         {
             ct.ThrowIfCancellationRequested();
@@ -161,13 +163,31 @@ public sealed partial class CommandProcessor
             var element = ControlRefs.Resolve(refs, reference);
             if (!element.TryScroll(direction, amount))
             {
-                _platform.Input.Scroll(element.PrepareForMouse(), direction, amount);
+                _platform.Input.Scroll(Guard(element.PrepareForMouse()), direction, amount);
             }
 
             return;
         }
 
-        _platform.Input.Scroll(Desktop.FrontWindow()?.Bounds.Center, direction, amount);
+        var at = Desktop.FrontWindow()?.Bounds.Center;
+        if (at is { } point)
+        {
+            Guard(point);
+        }
+
+        _platform.Input.Scroll(at, direction, amount);
+    }
+
+    /// <summary>The agent may not use Anemo Desktop's own windows (its settings, the Stop button).</summary>
+    private ScreenPoint Guard(ScreenPoint point) =>
+        Desktop.IsOwnWindowAt(point) ? throw CommandException.Refused(OwnWindowMessage) : point;
+
+    private void GuardKeyboard()
+    {
+        if (Desktop.IsOwnWindowInFront())
+        {
+            throw CommandException.Refused(OwnWindowMessage);
+        }
     }
 
     private void Open(string target)

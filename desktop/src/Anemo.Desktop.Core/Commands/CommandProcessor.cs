@@ -29,6 +29,9 @@ public sealed partial class CommandProcessor : ICommandExecutor
 {
     public const string PasswordMessage = "That is a password field: ask the user to type it.";
 
+    public const string OwnWindowMessage =
+        "That is Anemo Desktop's own window, which the agent can't use. Ask the user to close it.";
+
     public const string SecureDesktopMessage =
         "Windows is showing its secure screen (a UAC prompt or the lock screen), where no program can look or act. Ask the user to deal with it first.";
 

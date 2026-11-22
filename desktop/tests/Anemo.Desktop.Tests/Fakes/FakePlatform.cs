@@ -127,6 +127,16 @@ public sealed class FakeDesktop : IDesktop
     public UiTree ReadTree(long windowHandle, CancellationToken ct) => Tree(windowHandle);
 
     public IUiElement? FocusedElement() => Focused;
+
+    /// <summary>Where Anemo Desktop's own window is (settings or indicator), if shown.</summary>
+    public ScreenRect? OwnWindow { get; set; }
+
+    public bool OwnWindowInFront { get; set; }
+
+    public bool IsOwnWindowAt(ScreenPoint point) =>
+        OwnWindow is { } r && point.X >= r.X && point.Y >= r.Y && point.X < r.X + r.Width && point.Y < r.Y + r.Height;
+
+    public bool IsOwnWindowInFront() => OwnWindowInFront;
 }
 
 public sealed class FakeInput : IInput

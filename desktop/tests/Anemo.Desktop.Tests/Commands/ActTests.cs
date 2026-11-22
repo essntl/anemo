@@ -385,6 +385,33 @@ public sealed class ActTests : IDisposable
         AssertNothingDone();
     }
 
+    [Fact]
+    public async Task A_click_on_Anemo_Desktops_own_window_is_refused()
+    {
+        await LookFirst();
+        _f.Platform.Desktop.OwnWindow = new ScreenRect(100, 50, 200, 100);
+
+        var byPoint = await _f.Fails("click", new JsonObject { ["x"] = 10, ["y"] = 10 }, ResultCodes.Refused);
+        await LookFirst();
+        _f.Platform.Desktop.OwnWindow = new ScreenRect(600, 200, 100, 100);
+        var byRef = await _f.Fails("click", new JsonObject { ["ref"] = "c2" }, ResultCodes.Refused);
+
+        Assert.Equal(CommandProcessor.OwnWindowMessage, byPoint.Error);
+        Assert.Equal(CommandProcessor.OwnWindowMessage, byRef.Error);
+        Assert.Empty(_f.Platform.Input.Events);
+    }
+
+    [Fact]
+    public async Task Keys_are_not_sent_to_Anemo_Desktops_own_window()
+    {
+        _f.Platform.Desktop.OwnWindowInFront = true;
+
+        await _f.Fails("type", new JsonObject { ["text"] = "x" }, ResultCodes.Refused);
+        await _f.Fails("press", new JsonObject { ["keys"] = new JsonArray("Space") }, ResultCodes.Refused);
+
+        Assert.Empty(_f.Platform.Input.Events);
+    }
+
     private void AssertNothingDone()
     {
         Assert.Empty(_f.Platform.Input.Events);

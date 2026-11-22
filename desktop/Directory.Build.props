@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Version>1.0.0</Version>
+    <DebugType>embedded</DebugType>
     <Company>Anemo</Company>
     <Product>Anemo Desktop</Product>
   </PropertyGroup>
