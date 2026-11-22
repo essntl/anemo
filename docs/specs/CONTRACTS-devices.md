@@ -98,10 +98,10 @@ turns entries into the wire events of `device-contracts.md` §2. Computers get n
   `runs.options["source"] == "voice"` and `runs.options["device_id"] == str(device.id)`.
   V1 sets both when it starts the run. D1 may cache the answer per run on a connection.
 - **`approval.requested` on the wire** (D1 builds it): `approval_id`, `run_id`, `kind`
-  (`"action"` or `"question"`), `summary` (`Approval.summary`), `risk` (`ToolCall.risk`,
+  (`"action"`, `"question"` or `"plan"`), `summary` (`Approval.summary`), `risk` (`ToolCall.risk`,
   `"safe"` when empty); for a question also `question` and `options` from the
-  `ask_user` call's `ToolCall.args`. An approval of kind `"plan"` is not forwarded (see
-  the open question in the orchestration log); the push notification handles it.
+  `ask_user` call's `ToolCall.args`. For kind `"plan"`: `steps`, the titles of the
+  proposed plan's steps (`ToolCall.args["steps"]`), and `risk` `"safe"`.
 - **`decision`** is `"approve"` or `"deny"`, as in `DecisionIn`.
 - **`voice.say`** is published for `completed`, `failed` and `cancelled` voice runs. The
   shortening (Markdown out, cut at a sentence end near the limit, "The rest is in the

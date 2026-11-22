@@ -22,7 +22,7 @@ Claude Opus 5.5 (`model: "opus"`).
 
 | Wave | Package | Branch | Model | Status |
 |---|---|---|---|---|
-| 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; waiting for the user's OK |
+| 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | not started |
 | 1 | D2 computer tools | `feat/d2` | Opus 5.5 | not started |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | not started |
@@ -78,17 +78,17 @@ package is reviewed by a fresh Opus 5.5 sub-agent that didn't build it.
 
 ### Open questions for the user
 
-1. **Plan reviews on the phone.** The wire contract's `approval.requested` has kinds
-   `action` and `question`; Anemo also has `plan` (when "review the plan first" is on).
-   For now a plan review of a voice run is not sent to the phone (the push notification
-   and the app handle it). Sending it would be a wire change.
-2. **Approvals that expire** (the run ended while one was pending) publish nothing, so a
-   phone stops asking only on the run's terminal `run.status`. Fine unless you want an
-   explicit `approval.decided` with a third value, which would be a wire change.
+None open (both wave-0 questions are answered under "Decisions during the waves").
 
 ## Decisions during the waves
 
-(none yet)
+- **Plan reviews by voice (the user's decision, a wire change made before wave 1).**
+  `approval.requested` gets kind `"plan"` with `steps`; `/voice/replies` decides it like
+  an action (yes accepts the plan as proposed). Changed: `device-contracts.md` §2 and §4,
+  `05-voice-android.md`, `CONTRACTS-devices.md` §3. Touches D1 (forwarding), V1 (replies)
+  and A1 (reading it out); all three start from the changed files.
+- **Expired approvals (the user's decision):** no extra event; the phone stops asking on
+  the run's terminal `run.status`.
 
 ## Baseline
 

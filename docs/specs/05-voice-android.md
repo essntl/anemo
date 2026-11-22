@@ -77,6 +77,10 @@ The phone's WebSocket gets the events it needs (contract §3): the run's status,
   approval with a **dangerous** action is never decided by voice: the phone says "That one
   needs a tap" and the push notification's Allow / Deny buttons (already built) decide it.
   Voice decisions are written to the audit log with `source: "voice"`.
+- **Plan reviews.** With "review the plan first" on, the phone says "Here is the plan",
+  reads the steps (the first six, then "and N more"), and asks "Go ahead?". Yes accepts
+  the plan as proposed, no rejects it; changing the steps is done in the app. It follows
+  the "Allow approvals by voice" setting.
 
 ## Settings (Settings → Voice)
 
@@ -132,7 +136,7 @@ Kotlin, one module, no Google Play services needed. Package `app.anemo.voice`.
 
 - Wake word → request → agent run → spoken answer, on a real phone, through NPM.
 - A question from `ask_user` is answered by voice; an approval is allowed by voice; a
-  dangerous one is not and says why.
+  dangerous one is not and says why; a plan is read out and accepted by voice.
 - A follow-up within the window continues the chat.
 - Without a transcription model, the phone says so and names the setting.
 - Tests: the voice endpoint (transcribe + request + turn, clean-up failing, no model,

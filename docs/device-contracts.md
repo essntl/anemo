@@ -44,9 +44,14 @@ you need by REST.
 | event | data | when |
 |---|---|---|
 | `run.status` | `{run_id, status}` | a run this device started changes status |
-| `approval.requested` | `{approval_id, run_id, kind: "action" \| "question", summary, risk, question?, options?}` | a run this device started waits for the user |
+| `approval.requested` | `{approval_id, run_id, kind: "action" \| "question" \| "plan", summary, risk, question?, options?, steps?}` | a run this device started waits for the user |
 | `approval.decided` | `{approval_id, decision}` | decided anywhere (stop asking on the phone) |
 | `voice.say` | `{run_id, conversation_id, text, more: bool}` | a run this device started finished; `text` is plain text to speak, `more` when the answer was shortened |
+
+For `kind: "plan"` (the agent's plan waits for a review, when "review the plan first" is
+on), `steps` is the plan's steps in order, as plain text: at most 30 strings of at most
+200 characters each; `risk` is `"safe"`. A client that doesn't know a kind ignores the
+event.
 
 Only events of runs started by *this* device go to a phone. `voice.say` is sent for
 failed and cancelled runs too, with a one-sentence text saying so.
@@ -130,12 +135,15 @@ last 90 s the device is offline for the agent.
 | field | |
 |---|---|
 | `audio` | the spoken reply |
-| `approval_id` | the approval or question it answers |
+| `approval_id` | the approval, question or plan review it answers |
 
 ```
 200 { "decided": "approve" | "deny", "heard": "…" }        answered or decided
 200 { "decided": null, "heard": "…", "say": "Sorry, was that a yes?" }   unclear
 409 { "error": { "code": "needs_tap" } }       a dangerous action: voice can't decide it
+
+A plan review is decided like an action: *yes* accepts the plan as proposed, *no* rejects
+it, anything else is unclear. Changing the steps is done in the app.
 409 { "error": { "code": "already_decided" } } decided elsewhere meanwhile
 ```
 
