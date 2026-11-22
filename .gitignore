@@ -38,3 +38,10 @@ e2e/.tmp/
 
 # A filled-in compose file for your own server (contains passwords).
 *.local.yml
+
+# Android app (android/): build output, the local SDK path, Gradle's caches
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/.kotlin/
