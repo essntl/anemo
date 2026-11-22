@@ -41,7 +41,11 @@ android {
     }
 
     testOptions {
-        unitTests.all { it.useJUnit() }
+        unitTests.all {
+            it.useJUnit()
+            // A folder with the openWakeWord models, for OnnxModelsTest (optional).
+            it.systemProperty("anemo.models", System.getenv("OWW_MODELS") ?: "")
+        }
     }
 
     lint {
