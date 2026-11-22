@@ -27,9 +27,9 @@ Claude Opus 5.5 (`model: "opus"`).
 | 1 | D2 computer tools | `feat/d2` | Opus 5.5 | **merged** (e240b19): tests ran against the real relay first (171 with devices and voice); the shared-screen tool wired to `shared_screen.current()` by the orchestrator, with a test |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | **merged** (8cd3db2) after review fixes (1ad78c6); two one-line conflicts with D1 resolved, schema regenerated |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | **merged** (1c652ce) after review fixes; 222 tests on the integration branch. WGC capture never run; Linux CI build unverified |
-| 1 | A1 Android app | `feat/a1` | Opus 5.5 | reviewed (Opus 5.5): no blockers, 8 should-fix (crash after Stop, unbounded reply listening, error messages, notices…); sent back to its builder |
+| 1 | A1 Android app | `feat/a1` | Opus 5.5 | **merged** (e3e0d1b) after review fixes (ab9cea3, 5f4f144); on the integration branch: 129 JVM tests (3 skipped: need the wake word models), debug APK builds. Never run on a phone |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | building since 2026-11-22, from 1c652ce |
-| 3 | integration, final report | `integrate/devices` | orchestrator | not started |
+| 3 | integration, final report | `integrate/devices` | orchestrator | in progress: migrations and artefacts done (see "Wave 3"); waiting for X1 |
 
 Merge order, whatever order they finish in: D1, V1, D2, W1, A1. After D1 merges, D2's
 tests run against the real relay before D2 merges. Full suite after every merge. Every
@@ -155,3 +155,19 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
 - .NET: a WinForms probe published as a self-contained single file for `win-x64` and
   `win-arm64` with `EnableWindowsTargeting=true`.
 - Not run in wave 0: `make e2e` (the Playwright stack); X1 and wave 3 run it.
+
+## Wave 3
+
+- **Migrations (2026-11-22, throwaway databases on the `anemo-devices` stack, dropped
+  afterwards).** Empty database: zero → head, `alembic check` clean, 0072 down and up
+  again. Database seeded at 0071 (2 tokens incl. an extension-style one, a chat, 3 runs
+  with tool calls and approved / pending / denied approvals): upgrade to 0072 changes no
+  row; a device was added; downgrade to 0071 drops `devices` and leaves every other row
+  (the device's token stays as a plain token: revoke it by hand after a rollback);
+  upgrade again works.
+- **Artefacts** in `../anemo-artifacts/` (not committed), built from e3e0d1b:
+  `win-x64/Anemo Desktop.exe` (78 MB), `win-arm64/Anemo Desktop.exe` (75 MB),
+  `Anemo Voice (debug).apk` (44 MB). Rebuild them if X1's merge or later fixes touch
+  `desktop/` or `android/` (they shouldn't).
+- **Merge glue for W1 + A1:** both appended a job to `ci.yml` and lines to `.gitignore`;
+  both kept.
