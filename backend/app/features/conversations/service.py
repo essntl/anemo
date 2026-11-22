@@ -472,9 +472,11 @@ async def _start_run(
     user_message_id: uuid.UUID | None,
     mode: str = "chat",
     reasoning_effort: ReasoningEffort | None = None,
+    options: dict[str, Any] | None = None,
 ) -> Run:
     """Queue the run that answers `assistant`. A reasoning effort given here is kept in
-    the run's options; without one the worker uses the default in Settings > Models."""
+    the run's options; without one the worker uses the default in Settings > Models.
+    `options` are merged into the run's options (a voice request's source and device)."""
     run = Run(
         kind=mode,
         status="queued",
@@ -484,7 +486,10 @@ async def _start_run(
         assistant_message_id=assistant.id,
         requested_model_id=model_id,
         request=request[:2000],
-        options={"reasoning_effort": reasoning_effort} if reasoning_effort else {},
+        options={
+            **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
+            **(options or {}),
+        },
     )
     db.add(run)
     await db.flush()
@@ -568,6 +573,7 @@ async def send_turn(
     skill_id: uuid.UUID | None = None,
     page: PageIn | None = None,
     reasoning_effort: ReasoningEffort | None = None,
+    options: dict[str, Any] | None = None,
 ) -> tuple[Run, ChatMessage, ChatMessage, list[Attachment]]:
     conv = await _lock_idle_conversation(db, conversation_id)
     references = await _reference_blocks(db, conv.id, reference_ids or [])
@@ -618,7 +624,7 @@ async def send_turn(
     conv.default_mode = mode
     request = text if text.strip() or page is None else f"About the page: {page.title or page.url}"
     run = await _start_run(
-        db, conv, assistant, request, conv.model_id, user.id, mode, reasoning_effort
+        db, conv, assistant, request, conv.model_id, user.id, mode, reasoning_effort, options
     )
     conv.last_message_at = func.now()
     await db.commit()

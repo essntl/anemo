@@ -144,6 +144,8 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     # An automation run also learns its state note, what earlier runs wait for, and what
     # the change check found.
     extra = await automation_context.run_context(db, run, general.timezone)
+    # A voice request: the user listens on a phone (features/voice).
+    extra = "\n\n".join(p for p in (extra, run.options.get("turn_note", "")) if p)
     used = await _add_turn_context(
         db, run, transcript, general.timezone, memory_settings, extra=extra
     )

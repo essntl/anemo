@@ -250,6 +250,21 @@ class DictationSettings(BaseModel):
     )
 
 
+class VoiceSettings(BaseModel):
+    """Talking to Anemo from a phone (features/voice, docs/specs/05-voice-android.md)."""
+
+    # The agent profile voice requests run with; None: the default agent.
+    profile_id: uuid.UUID | None = None
+    # A request this many minutes after an answer continues that chat; 0: never.
+    follow_up_minutes: int = Field(5, ge=0, le=60)
+    # Longer answers are cut at a sentence end near this, and the rest is in the chat.
+    max_spoken_chars: int = Field(600, ge=100, le=2000)
+    # Approvals and plan reviews answered by voice (dangerous actions always need a tap).
+    approvals_by_voice: bool = True
+    # The Voice chat: a new one each day, or one that keeps going.
+    chat: Literal["daily", "single"] = "daily"
+
+
 @dataclass(frozen=True)
 class SectionSpec:
     model: type[BaseModel]
@@ -274,4 +289,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "updates": SectionSpec(UpdateSettings),
     "properties": SectionSpec(PropertySettings),
     "dictation": SectionSpec(DictationSettings),
+    "voice": SectionSpec(VoiceSettings),
 }

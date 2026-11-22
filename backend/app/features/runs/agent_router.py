@@ -72,6 +72,13 @@ class FileChangeOut(BaseModel):
     created_at: datetime
 
 
+class RunOriginOut(BaseModel):
+    """Where a run was asked from, when not the app: by voice, from a phone."""
+
+    source: Literal["voice"]
+    device_name: str | None  # the phone's name then; None when it came without a device
+
+
 class TimelineOut(BaseModel):
     run_id: uuid.UUID
     kind: str
@@ -81,6 +88,13 @@ class TimelineOut(BaseModel):
     plan_version: int
     tool_calls: list[ToolCallOut]
     file_changes: list[FileChangeOut]
+    origin: RunOriginOut | None = None
+
+
+def origin_out(run: Run) -> RunOriginOut | None:
+    if run.options.get("source") != "voice":
+        return None
+    return RunOriginOut(source="voice", device_name=run.options.get("device_name"))
 
 
 @router.get("/runs/{run_id}/timeline", response_model=TimelineOut)
@@ -107,6 +121,7 @@ async def timeline(run_id: uuid.UUID, db: Db) -> TimelineOut:
         pause_requested=run.pause_requested,
         plan=run.plan,
         plan_version=run.plan_version,
+        origin=origin_out(run),
         file_changes=[FileChangeOut.model_validate(c, from_attributes=True) for c in changes],
         tool_calls=[
             ToolCallOut.model_validate(c, from_attributes=True).model_copy(
@@ -177,8 +192,9 @@ async def decide_approval(
 ) -> Approval:
     """Answer an approval request and let its run continue. Commits.
 
-    The one place an approval is decided: the app's approval cards and the buttons on
-    push notifications (`via="push"`) both come through here."""
+    The one place an approval is decided: the app's approval cards, the buttons on
+    push notifications (`via="push"`) and spoken replies (`via="voice"`) all come
+    through here. Everyone listening (a phone that asks too) hears that it was decided."""
     approval = await db.scalar(select(Approval).where(Approval.id == approval_id).with_for_update())
     if approval is None:
         raise NotFound("Approval not found")
@@ -218,6 +234,7 @@ async def decide_approval(
             "summary": approval.summary,
             "scope": body.scope,
             **({"via": via} if via != "app" else {}),
+            **({"source": "voice"} if via == "voice" else {}),
         },
     )
     await queue.enqueue(db, "run.execute", {"run_id": str(run.id)}, lane="interactive")
@@ -225,6 +242,10 @@ async def decide_approval(
         run.id, "approval.resolved", {"approval_id": str(approval.id), "status": approval.status}
     )
     await service.set_status(db, run, "queued")  # commits
+    await bus.publish_global(
+        "approval.decided",
+        {"approval_id": str(approval.id), "run_id": str(run.id), "decision": body.decision},
+    )
     return approval
 
 
