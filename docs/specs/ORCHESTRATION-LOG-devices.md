@@ -24,7 +24,7 @@ Claude Opus 5.5 (`model: "opus"`).
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | reviewed (Opus 5.5): no blockers, 5 should-fix + notes; sent back to its builder |
-| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | built (278351f, d867da3; 1263 backend tests); in review (Opus 5.5); merges after D1 and V1 |
+| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | reviewed (Opus 5.5): no blockers; PowerShell rating gaps, `open` filter, grant scope + notes; sent back to its builder |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (stale approval in the reply path) + fixes; sent back to its builder |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | built (b4dfd60; 186 tests; both publishes work; Linux CI job not run here); review pending |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | building since 2026-11-22 (took D2's slot) |
@@ -93,6 +93,12 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   it reports, and wire `computer.current_shared_screen` at D2's merge.
 - **D2 notes to check in review:** clicks/typing/keys set `contacts_people` (automations
   ask), beyond the spec's wording; PowerShell rules added on top of `shell_risk`.
+- **D2 review (orchestrator).** No path found where a watched device acts unasked. Sent
+  back: PowerShell commands rated too low (call-operator and alias tricks, registry
+  aliases, `-enc` prefixes, download-then-run), `open` accepting paths, one grant covering
+  two devices with `/` in their names, password values, server-side size caps, tests.
+  Accepted: `contacts_people` on click/type/press (as the browser tools), the per-step
+  `refresh`.
 - **D1 review, decided (orchestrator).** Wire addition, compatible with both clients: a
   trust change closes the device's connection with 1012 so it reconnects and reads the
   new trust (`device-contracts.md` §2; W1 already reconnects on any non-final code: verify
