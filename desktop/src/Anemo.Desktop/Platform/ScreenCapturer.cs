@@ -8,9 +8,10 @@ using Anemo.Desktop.Core.Platform;
 namespace Anemo.Desktop.Platform;
 
 /// <summary>
-/// Screenshots with GDI (BitBlt for the screen, PrintWindow for a window behind others),
-/// scaled to at most 1568 px on the long side, as PNG. Anemo Desktop's own indicator is
-/// excluded from captures by Windows (SetWindowDisplayAffinity).
+/// Screenshots with Windows.Graphics.Capture, falling back to GDI (BitBlt for the screen,
+/// PrintWindow for a window behind others) on any failure or timeout; scaled to at most
+/// 1568 px on the long side, as PNG. Anemo Desktop's own indicator is excluded from
+/// captures by Windows (SetWindowDisplayAffinity) on both paths.
 /// </summary>
 internal static class ScreenCapturer
 {
@@ -20,7 +21,14 @@ internal static class ScreenCapturer
         Win32.GetSystemMetrics(Win32.SmCxVirtualScreen),
         Win32.GetSystemMetrics(Win32.SmCyVirtualScreen));
 
-    public static ScreenCapture Screen() => FromScreen(VirtualScreen());
+    /// <summary>Set after a Windows.Graphics.Capture failure, so the next capture doesn't wait for it again.</summary>
+    private static DateTime _graphicsCaptureFailedAt = DateTime.MinValue;
+
+    public static ScreenCapture Screen()
+    {
+        var screen = VirtualScreen();
+        return Try(() => GraphicsCapture.Region(screen), screen.X, screen.Y) ?? FromScreen(screen);
+    }
 
     public static ScreenCapture Window(IntPtr hwnd)
     {
@@ -30,9 +38,40 @@ internal static class ScreenCapturer
             return Screen();
         }
 
-        // In front: what the user sees. Behind others: ask the window to draw itself.
+        // In front: what the user sees there (menus and popups included). Behind others:
+        // the window as it draws itself.
         var front = Win32.GetAncestor(Win32.GetForegroundWindow(), Win32.GaRoot) == hwnd;
-        return front ? FromScreen(Clip(bounds)) : FromPrintWindow(hwnd, bounds) ?? FromScreen(Clip(bounds));
+        if (front)
+        {
+            var visible = Clip(bounds);
+            return Try(() => GraphicsCapture.Region(visible), visible.X, visible.Y) ?? FromScreen(visible);
+        }
+
+        return Try(() => GraphicsCapture.Window(hwnd), bounds.X, bounds.Y)
+            ?? FromPrintWindow(hwnd, bounds)
+            ?? FromScreen(Clip(bounds));
+    }
+
+    /// <summary>The Windows.Graphics.Capture path, or null to fall back to GDI.</summary>
+    private static ScreenCapture? Try(Func<Bitmap> capture, int originX, int originY)
+    {
+        if (DateTime.UtcNow - _graphicsCaptureFailedAt < TimeSpan.FromMinutes(5) || !GraphicsCapture.Available)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var bitmap = capture();
+            return Encode(bitmap, originX, originY);
+        }
+        catch (Exception e)
+        {
+            System.Diagnostics.Debug.WriteLine($"Windows.Graphics.Capture failed: {e.GetType().Name}");
+            _graphicsCaptureFailedAt = DateTime.UtcNow;
+            GraphicsCapture.Reset();
+            return null;
+        }
     }
 
     private static ScreenRect Clip(ScreenRect r)

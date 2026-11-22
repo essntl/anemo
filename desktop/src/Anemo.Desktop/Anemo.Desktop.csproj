@@ -5,7 +5,10 @@
        Builds anywhere with -p:EnableWindowsTargeting=true; runs on Windows 10 and 11. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- The Windows SDK projection for Windows.Graphics.Capture (22621 for IsBorderRequired);
+         runs on Windows 10 1903 (18362) and later, newer APIs behind version checks. -->
+    <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>Anemo Desktop</AssemblyName>
