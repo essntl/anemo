@@ -24,9 +24,9 @@ Claude Opus 5.5 (`model: "opus"`).
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | **merged** (d9c72f4) after review fixes (5c057ef); suite on the integration branch: see below |
-| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | review fixes in (fb247b4, 7bf81a3; 1313 backend tests); next to merge, after its tests run against the real relay |
+| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | **merged** (e240b19): tests ran against the real relay first (171 with devices and voice); the shared-screen tool wired to `shared_screen.current()` by the orchestrator, with a test |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | **merged** (8cd3db2) after review fixes (1ad78c6); two one-line conflicts with D1 resolved, schema regenerated |
-| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (password fields reachable through `press`, paste and Tab) + fixes; sent back to its builder |
+| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | review fixes in (9544da9, b2024cb, 9ac365a, 8b446c1; 222 tests, checked by the orchestrator; both publishes work); merges after the D2 suite. WGC capture added (TFM `net8.0-windows10.0.22621.0`), never run; Linux CI build unverified |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | reviewed (Opus 5.5): no blockers, 8 should-fix (crash after Stop, unbounded reply listening, error messages, notices…); sent back to its builder |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
@@ -98,6 +98,11 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   Spec 05 corrected: openWakeWord's models are CC BY-NC-SA, downloaded, not shipped.
   **For the owner (final report):** the repo is GPL v2; the APK links Apache-2.0
   libraries, which the FSF considers incompatible with GPLv2-only.
+- **Suite after V1's merge:** 1314 backend, 567 frontend, `alembic check` clean.
+- **D2 merge glue (orchestrator):** conflict in `runtime/agent_snapshot.py` (voice note +
+  device lines, both kept); `_shared_by_a_device` adapter in `tools/builtin/computer.py`
+  (D1's `window` is a model, its `device` may be empty) and
+  `test_the_shared_screen_comes_from_the_devices_core`.
 - **Suite after D1's merge:** 1268 backend, 565 frontend, `alembic check` clean.
 - **A1 points:** openWakeWord's models are not bundled (CC BY-NC-SA; downloaded with one
   tap in Settings from the official release); a Status button instead of a spoken
