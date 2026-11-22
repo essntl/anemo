@@ -27,10 +27,14 @@ internal sealed class SettingsForm : Form
     private readonly CheckBox _startWithWindows = new() { Text = "Start with Windows", AutoSize = true };
     private readonly Label _error = new() { AutoSize = true, ForeColor = Color.Firebrick };
     private readonly DesktopSettings _current;
+    private readonly Func<DesktopSettings, string?, string?> _save;
 
-    public SettingsForm(DesktopSettings current, bool hasToken, string status, string defaultWorkFolder)
+    /// <param name="saveSettings">Saves the settings and new token; returns a sentence when that failed.</param>
+    public SettingsForm(
+        DesktopSettings current, bool hasToken, string status, string defaultWorkFolder, Func<DesktopSettings, string?, string?> saveSettings)
     {
         _current = current;
+        _save = saveSettings;
         Text = "Anemo Desktop settings";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -96,9 +100,6 @@ internal sealed class SettingsForm : Form
     /// <summary>The settings to save, after OK.</summary>
     public DesktopSettings? Result { get; private set; }
 
-    /// <summary>The new token, or null to keep the saved one.</summary>
-    public string? NewToken { get; private set; }
-
     private void TrySave(Button save)
     {
         if (AnemoAddress.Parse(_address.Text) is null)
@@ -128,7 +129,7 @@ internal sealed class SettingsForm : Form
             return;
         }
 
-        Result = _current with
+        var result = _current with
         {
             Address = AnemoAddress.Parse(_address.Text)!.ToString(),
             PowerShellEnabled = _powerShell.Checked,
@@ -137,7 +138,14 @@ internal sealed class SettingsForm : Form
             ShareHotkey = share.ToString(),
             StartWithWindows = _startWithWindows.Checked,
         };
-        NewToken = token.Length > 0 ? token : null;
+        var newToken = token.Length > 0 ? token : null;
+        if (_save(result, newToken) is { } problem)
+        {
+            _error.Text = problem; // e.g. Windows couldn't protect the token: the window stays open
+            return;
+        }
+
+        Result = result;
         save.DialogResult = DialogResult.OK;
         DialogResult = DialogResult.OK;
         Close();

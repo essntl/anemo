@@ -162,7 +162,7 @@ internal sealed class UiaElement : IUiElement
         {
             throw new ElementGoneException(e);
         }
-        catch (COMException e)
+        catch (Exception e) when (UiaTree.IsGone(e))
         {
             throw new ElementGoneException(e);
         }

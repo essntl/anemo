@@ -57,9 +57,9 @@ internal sealed class WindowsDesktop : IDesktop
             var focused = AutomationElement.FocusedElement;
             return focused is null ? null : new UiaElement(focused);
         }
-        catch (ElementNotAvailableException)
+        catch (System.Exception e) when (UiaTree.IsGone(e))
         {
-            return null;
+            return null; // the processor refuses typing then (fail closed)
         }
     }
 

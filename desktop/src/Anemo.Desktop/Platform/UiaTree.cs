@@ -37,7 +37,7 @@ internal static class UiaTree
             {
                 root = AutomationElement.FromHandle(hwnd);
             }
-            catch (Exception e) when (e is ElementNotAvailableException or ArgumentException)
+            catch (Exception e) when (IsGone(e) || e is ArgumentException)
             {
                 return new UiTree([], false);
             }
@@ -72,7 +72,7 @@ internal static class UiaTree
             {
                 child = walker.GetFirstChild(element, cache);
             }
-            catch (ElementNotAvailableException)
+            catch (Exception e) when (IsGone(e))
             {
                 return;
             }
@@ -84,7 +84,7 @@ internal static class UiaTree
                 {
                     child = walker.GetNextSibling(child, cache);
                 }
-                catch (ElementNotAvailableException)
+                catch (Exception e) when (IsGone(e))
                 {
                     break;
                 }
@@ -130,7 +130,7 @@ internal static class UiaTree
             var interactive = !offscreen && (InteractiveTypes.Contains(type) || invokable);
             return new UiNode(depth, Role(type), name, value, enabled, password, interactive, new UiaElement(element));
         }
-        catch (ElementNotAvailableException)
+        catch (Exception e) when (IsGone(e))
         {
             return null;
         }
@@ -142,11 +142,19 @@ internal static class UiaTree
         {
             return ((TextPattern)element.GetCurrentPattern(TextPattern.Pattern)).DocumentRange.GetText(MaxDocumentText);
         }
-        catch (Exception e) when (e is InvalidOperationException or ElementNotAvailableException)
+        catch (Exception e) when (IsGone(e))
         {
             return null;
         }
     }
+
+    /// <summary>
+    /// What UI Automation throws when an element vanished or its program stopped
+    /// answering: treated as "not there", never as a crash.
+    /// </summary>
+    public static bool IsGone(Exception e) =>
+        e is ElementNotAvailableException or System.Runtime.InteropServices.COMException
+            or InvalidOperationException or TimeoutException or InvalidCastException;
 
     /// <summary><c>ControlType.Button</c> → <c>button</c>; the same in every Windows language.</summary>
     public static string Role(ControlType type)

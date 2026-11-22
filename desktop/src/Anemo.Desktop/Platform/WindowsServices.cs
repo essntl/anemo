@@ -222,6 +222,7 @@ internal sealed class PowerShellHost : IShellHost
             }
         };
         process.Start();
+        ShellJob.Add(process);
         process.StandardInput.Close();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();

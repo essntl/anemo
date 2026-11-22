@@ -78,6 +78,11 @@ internal sealed class TrayApp : ApplicationContext
         _refresh.Start();
         _ = Task.Run(() => _agent.RunAsync(_quit.Token));
 
+        if (_agent.StartupProblem is { } problem)
+        {
+            _ui.BeginInvoke(() => Balloon(problem, ToolTipIcon.Warning));
+        }
+
         if (!_agent.HasToken)
         {
             // After Application.Run has started, not inside this constructor.
@@ -219,13 +224,12 @@ internal sealed class TrayApp : ApplicationContext
         var device = _agent.Connection.Device;
         var status = TrayStatus.Tooltip(_agent.Connection.Status, _busy, _agent.Control).Replace("Anemo Desktop: ", "")
             + (device is null ? "" : $"\nThis computer is “{device.Name}” in Anemo ({device.Trust}).");
-        using var form = new SettingsForm(_agent.Settings, _agent.HasToken, status, AppPaths.DefaultWorkFolder);
+        using var form = new SettingsForm(_agent.Settings, _agent.HasToken, status, AppPaths.DefaultWorkFolder, SaveSettings);
         _settingsForm = form;
         try
         {
-            if (form.ShowDialog() == DialogResult.OK && form.Result is { } settings)
+            if (form.ShowDialog() == DialogResult.OK)
             {
-                _agent.Save(settings, form.NewToken);
                 RegisterHotkeys();
                 ApplyStartup();
                 Refresh();
@@ -234,6 +238,21 @@ internal sealed class TrayApp : ApplicationContext
         finally
         {
             _settingsForm = null;
+        }
+    }
+
+    /// <summary>Saves from the Settings window; a sentence when it failed (the window stays open).</summary>
+    private string? SaveSettings(DesktopSettings settings, string? newToken)
+    {
+        try
+        {
+            _agent.Save(settings, newToken);
+            return null;
+        }
+        catch (SettingsSaveException e)
+        {
+            _log.Info($"settings not saved: {e.InnerException?.GetType().Name}");
+            return e.Message;
         }
     }
 
