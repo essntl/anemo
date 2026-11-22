@@ -34794,6 +34794,18 @@
             ],
             "title": "Profile Id"
           },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
           "follow_up_minutes": {
             "type": "integer",
             "maximum": 60.0,

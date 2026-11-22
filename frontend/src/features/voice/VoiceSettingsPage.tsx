@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { useProfiles } from '@/features/profiles/api'
+import { useModels } from '@/features/providers/api'
 import { useSettings } from '@/features/settings/api'
 import { msg, rich, t } from '@/lib/i18n'
 import { type VoiceSettings, useSaveVoiceSettings } from './api'
@@ -33,6 +34,8 @@ function Row({ title, hint, children }: { title: string; hint: string; children:
 function VoiceForm({ initial }: { initial: VoiceSettings }) {
   const save = useSaveVoiceSettings()
   const profiles = useProfiles()
+  // An agent needs a model that can use tools.
+  const models = (useModels().data ?? []).filter((m) => m.enabled && m.provider_enabled && m.capabilities.tools)
   const [form, setForm] = useState<VoiceSettings>(initial)
   const dirty = JSON.stringify(form) !== JSON.stringify(initial)
   const set = (patch: Partial<VoiceSettings>) => setForm({ ...form, ...patch })
@@ -47,6 +50,12 @@ function VoiceForm({ initial }: { initial: VoiceSettings }) {
             <Select aria-label={t('Agent for voice requests')} className="w-56" value={form.profile_id ?? ''}
               onValueChange={(v) => set({ profile_id: v || null })}
               options={[{ value: '', label: t('Default agent') }, ...(profiles.data ?? []).map((p) => ({ value: p.id, label: p.name }))]} />
+          </Row>
+          <Row title={t('Model for voice requests')}
+            hint={t('A small, fast model keeps spoken answers quick and cheap. “The agent’s model” uses the agent’s own, else the Agent model in Providers & Models.')}>
+            <Select aria-label={t('Model for voice requests')} className="w-56" value={form.model_id ?? ''}
+              onValueChange={(v) => set({ model_id: v || null })}
+              options={[{ value: '', label: t('The agent’s model') }, ...models.map((m) => ({ value: m.id, label: m.display_name }))]} />
           </Row>
           <Row title={t('The Voice chat')} hint={t('Where voice requests go when they don’t follow up on an answer.')}>
             <Select aria-label={t('The Voice chat')} className="w-56" value={form.chat}

@@ -24,6 +24,7 @@ from app.features.conversations.models import ChatMessage, Conversation
 from app.features.devices import service as devices
 from app.features.dictation import service as dictation
 from app.features.profiles.models import AgentProfile
+from app.features.providers.models import Model
 from app.features.runs.agent_router import DecisionIn, decide_approval
 from app.features.runs.models import ACTIVE_STATUSES, Approval, Run, ToolCall
 from app.features.settings import service as settings_service
@@ -208,6 +209,16 @@ async def _profile_id(db: AsyncSession, settings: VoiceSettings) -> uuid.UUID | 
     return settings.profile_id
 
 
+async def _model_id(db: AsyncSession, settings: VoiceSettings) -> uuid.UUID | None:
+    """The model from Settings → Voice; the agent's own when it is gone or switched off."""
+    if settings.model_id is None:
+        return None
+    model = await db.get(Model, settings.model_id)
+    if model is None or not model.enabled:
+        return None
+    return model.id
+
+
 async def status_text(db: AsyncSession) -> str:
     """What is running, as one or two sentences to speak."""
     rows = list(
@@ -283,12 +294,16 @@ async def turn(
     if device is not None:
         options["device_id"] = str(device.id)
         options["device_name"] = device.name  # for "Asked by voice from ‹phone›"
-    conv = await _follow_up(db, conversation_id, settings) or await _voice_chat(db, settings)
+    followed = await _follow_up(db, conversation_id, settings)
+    conv = followed or await _voice_chat(db, settings)
+    # The voice model is given to a Voice chat, which remembers it for its follow-ups. A
+    # follow-up in another chat the phone named keeps that chat's own model.
+    model_id = None if followed is not None else await _model_id(db, settings)
     run, *_ = await conversations.send_turn(
         db,
         conv.id,
         request,
-        None,
+        model_id,
         mode="agent",
         profile_id=await _profile_id(db, settings),
         options=options,

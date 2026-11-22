@@ -85,6 +85,8 @@ The phone's WebSocket gets the events it needs (contract §3): the run's status,
 ## Settings (Settings → Voice)
 
 - Agent profile for voice requests (default: the default agent).
+- Model for voice requests (default: the agent's own). A small, fast model suits spoken
+  answers; the Voice chat keeps it for its follow-ups.
 - Follow-up window (default 5 minutes; 0 turns follow-ups off).
 - Maximum spoken length (default 600 characters).
 - Allow approvals by voice (on by default; dangerous actions always need a tap).
