@@ -545,6 +545,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Voice Settings */
+        put: operations["put_voice_settings_api_settings_voice_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -4309,6 +4326,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/voice/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Turn
+         * @description A spoken request: transcribed, made a clear request, and started as an agent run
+         *     in the Voice chat (or continuing `conversation_id` within the follow-up window).
+         */
+        post: operations["voice_turn_api_voice_turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/voice/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Reply
+         * @description A spoken answer to a question, or yes/no to an approval or a plan review.
+         */
+        post: operations["voice_reply_api_voice_replies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4369,6 +4427,7 @@ export interface components {
             updates: components["schemas"]["UpdateSettings"];
             properties: components["schemas"]["PropertySettings"];
             dictation: components["schemas"]["DictationSettings"];
+            voice: components["schemas"]["VoiceSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -4832,6 +4891,28 @@ export interface components {
         Body_upload_task_files_api_tasks__task_id__files_upload_post: {
             /** Files */
             files: string[];
+        };
+        /** Body_voice_reply_api_voice_replies_post */
+        Body_voice_reply_api_voice_replies_post: {
+            /** Audio */
+            audio: string;
+            /**
+             * Approval Id
+             * Format: uuid
+             */
+            approval_id: string;
+        };
+        /** Body_voice_turn_api_voice_turns_post */
+        Body_voice_turn_api_voice_turns_post: {
+            /** Audio */
+            audio?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /**
+             * Status
+             * @default false
+             */
+            status: boolean;
         };
         /** BranchIn */
         BranchIn: {
@@ -8402,6 +8483,19 @@ export interface components {
             /** Model Label */
             model_label?: string | null;
         };
+        /**
+         * RunOriginOut
+         * @description Where a run was asked from, when not the app: by voice, from a phone.
+         */
+        RunOriginOut: {
+            /**
+             * Source
+             * @constant
+             */
+            source: "voice";
+            /** Device Name */
+            device_name: string | null;
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -9521,6 +9615,7 @@ export interface components {
             tool_calls: components["schemas"]["ToolCallOut"][];
             /** File Changes */
             file_changes: components["schemas"]["FileChangeOut"][];
+            origin?: components["schemas"]["RunOriginOut"] | null;
         };
         /** TokenIn */
         TokenIn: {
@@ -10111,6 +10206,62 @@ export interface components {
             updated_at: string;
             /** Created At */
             created_at?: string | null;
+        };
+        /** VoiceReplyOut */
+        VoiceReplyOut: {
+            /** Decided */
+            decided: ("approve" | "deny") | null;
+            /** Heard */
+            heard: string;
+            /** Say */
+            say?: string | null;
+        };
+        /**
+         * VoiceSettings
+         * @description Talking to Anemo from a phone (features/voice, docs/specs/05-voice-android.md).
+         */
+        VoiceSettings: {
+            /** Profile Id */
+            profile_id?: string | null;
+            /**
+             * Follow Up Minutes
+             * @default 5
+             */
+            follow_up_minutes: number;
+            /**
+             * Max Spoken Chars
+             * @default 600
+             */
+            max_spoken_chars: number;
+            /**
+             * Approvals By Voice
+             * @default true
+             */
+            approvals_by_voice: boolean;
+            /**
+             * Chat
+             * @default daily
+             * @enum {string}
+             */
+            chat: "daily" | "single";
+        };
+        /**
+         * VoiceTurnOut
+         * @description 202 with the run that started; 200 with `cancelled` or `say` when none did.
+         */
+        VoiceTurnOut: {
+            /** Run Id */
+            run_id?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /** Heard */
+            heard?: string | null;
+            /** Request */
+            request?: string | null;
+            /** Cancelled */
+            cancelled?: boolean | null;
+            /** Say */
+            say?: string | null;
         };
         /** WebSettings */
         WebSettings: {
@@ -11326,6 +11477,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DictationSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_voice_settings_api_settings_voice_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoiceSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceSettings"];
                 };
             };
             /** @description Validation Error */
@@ -20054,6 +20240,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RowsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_turn_api_voice_turns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_turn_api_voice_turns_post"];
+            };
+        };
+        responses: {
+            /** @description Cancelled, or something to say */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTurnOut"];
+                };
+            };
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_reply_api_voice_replies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_reply_api_voice_replies_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceReplyOut"];
                 };
             };
             /** @description Validation Error */
