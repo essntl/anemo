@@ -136,9 +136,6 @@ Any other failure has the same `{"error": {"code", "message"}}` shape (for examp
 shows `message` and doesn't need to know the code. Whenever a 200 carries `say`, the
 phone speaks it.
 
-```
-```
-
 ### `POST /api/voice/replies` (multipart)
 
 | field | |
