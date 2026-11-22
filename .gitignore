@@ -43,3 +43,9 @@ e2e/.tmp/
 desktop/**/bin/
 desktop/**/obj/
 desktop/publish/
+# Android app (android/): build output, the local SDK path, Gradle's caches
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/.kotlin/
