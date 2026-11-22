@@ -147,11 +147,8 @@ test('a phone has no trust level to choose', async ({ page }) => {
   }
 })
 
-// Fails today: the server answers a wrong password with 401 (`wrong_password`), and the
-// app treats any 401 as "the session is gone" (frontend/src/api/client.ts, unwrap) and
-// shows the login page instead of saying "Wrong password" in the dialog. Not part of the
-// devices work; reported. Remove `test.fail` once it is fixed. It is called just before
-// the last check, so everything before it still fails the test as usual.
+// A wrong password is a 401 (`wrong_password`) from a session that is still there: the
+// dialog says so, and the app must not take it for a lost session and show the login page.
 test('a wrong password in the password dialog is said there', async ({ page }) => {
   await login(page)
   const name = `E2E PC ${suffix()}`
@@ -165,7 +162,6 @@ test('a wrong password in the password dialog is said there', async ({ page }) =
     await expect(dialog).toBeVisible()
     await dialog.getByLabel('Password').fill('not the password')
     await dialog.getByRole('button', { name: 'Confirm' }).click()
-    test.fail(true, 'a wrong password in the re-authentication dialog signs the user out')
     await expect(dialog).toContainText('Wrong password', { timeout: 5000 })
     await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0)
   } finally {
