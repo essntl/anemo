@@ -28,8 +28,8 @@ Claude Opus 5.5 (`model: "opus"`).
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | **merged** (8cd3db2) after review fixes (1ad78c6); two one-line conflicts with D1 resolved, schema regenerated |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | **merged** (1c652ce) after review fixes; 222 tests on the integration branch. WGC capture never run; Linux CI build unverified |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | **merged** (e3e0d1b) after review fixes (ab9cea3, 5f4f144); on the integration branch: 129 JVM tests (3 skipped: need the wake word models), debug APK builds. Never run on a phone |
-| 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | built (35673a6…1d75eba; 22 end-to-end tests, 1426 backend tests; Playwright: 4 passed + 1 expected failure); in review (Opus 5.5) |
-| 3 | integration, final report | `integrate/devices` | orchestrator | in progress: migrations and artefacts done (see "Wave 3"); waiting for X1 |
+| 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | **merged** (bc0cfdc) after review fixes (d40bbb4): 22 end-to-end tests, Playwright specs for both Settings pages, docs |
+| 3 | integration, final report | `integrate/devices` | orchestrator | done 2026-11-22: final run below; the report was given to the user |
 
 Merge order, whatever order they finish in: D1, V1, D2, W1, A1. After D1 merges, D2's
 tests run against the real relay before D2 merges. Full suite after every merge. Every
@@ -175,3 +175,21 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   "Confirm it's you" dialog shows the login page (any 401 is treated as a lost session:
   `frontend/src/api/client.ts` `unwrap`, `features/auth/router.py` answers 401
   `wrong_password`). Older code; covered by a Playwright test marked `test.fail`.
+- **Password dialog fixed at the user's request, as its own commit (9238b2c):**
+  `frontend/src/api/client.ts` no longer takes a 401 `wrong_password` for a lost session;
+  unit test `src/api/client.test.ts`; the Playwright test no longer expects to fail.
+- **Final run on `integrate/devices`:** backend lint, types, import rules clean, 1426
+  tests, `alembic check` clean; frontend typecheck, lint, import rules clean, 571 tests,
+  build ok; `desktop/` 222 tests; `android/` 129 JVM tests (3 skipped) and a debug APK;
+  Playwright Devices + Voice: 5 passed.
+- **Full Playwright suite (99 tests) on this Windows machine:** 89 passed, 4 failed, 5 did
+  not run, 1 skipped. Rerun alone, `files`, `setup` and one `mobile` test pass (load in
+  the full run). `mobile.spec.ts:217` ("a bottom sheet pulls down to close…") fails
+  alone too, **and fails the same way on `main`**: not from this work. Whether it fails
+  on Linux CI is unknown.
+- **Not verified anywhere:** the two new CI jobs on Linux (`desktop`, `android`); the exe
+  and the APK have never been started; `Windows.Graphics.Capture` has never run.
+- **Open for the user:** GPL v2 of the repo vs the Apache-2.0 libraries in the APK (only
+  matters when the APK is distributed); the phone fetches nothing after `missed: true`;
+  revoking a device's token from the tokens card disconnects within a minute, not at
+  once; `mobile.spec.ts:217` on `main`.
