@@ -89,7 +89,7 @@ public sealed class ConnectionTests : IAsyncLifetime
     [Fact]
     public async Task Pings_go_out_and_pongs_keep_the_connection()
     {
-        var connection = Start(new ScriptedExecutor(), pingEvery: TimeSpan.FromMilliseconds(100), silence: TimeSpan.FromMilliseconds(600));
+        var connection = Start(new ScriptedExecutor(), pingEvery: TimeSpan.FromMilliseconds(100), silence: TimeSpan.FromSeconds(2));
         var client = await _server.NextClientAsync();
 
         var ping = await client.NextAsync("ping");

@@ -80,7 +80,8 @@ internal sealed class TrayApp : ApplicationContext
 
         if (!_agent.HasToken)
         {
-            OnUi(ShowSettings);
+            // After Application.Run has started, not inside this constructor.
+            _ui.BeginInvoke(ShowSettings);
         }
     }
 
