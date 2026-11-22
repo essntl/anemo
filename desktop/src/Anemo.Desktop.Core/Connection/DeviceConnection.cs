@@ -59,6 +59,10 @@ public sealed class DeviceConnection
     private CancellationTokenSource? _sessionCts;
     private Session? _session;
     private string? _cursor;
+    private int _badHellos;
+
+    /// <summary>How many 4400 closes in a row before the client stops retrying.</summary>
+    private const int MaxBadHellos = 3;
 
     public DeviceConnection(
         Func<ConnectionSettings?> settings,
@@ -118,14 +122,18 @@ public sealed class DeviceConnection
                 if (end.Kicked)
                 {
                     backoff.Reset();
+                    _badHellos = 0;
                     continue;
                 }
 
-                if (CloseCodes.FinalMessage(end.CloseCode) is { } final)
+                // A 4400 can follow a hello that merely arrived late: retried a few times.
+                var retryBadHello = end.CloseCode == CloseCodes.BadFirstMessage && ++_badHellos < MaxBadHellos;
+                if (!retryBadHello && CloseCodes.FinalMessage(end.CloseCode) is { } final)
                 {
                     SetStatus(new ConnectionStatus(ConnectionPhase.Refused, final));
                     await WaitAsync(Timeout.InfiniteTimeSpan, ct);
                     backoff.Reset();
+                    _badHellos = 0;
                     continue;
                 }
 
@@ -162,7 +170,17 @@ public sealed class DeviceConnection
     /// <summary>Sends an offer now (PowerShell switched on or off).</summary>
     public void OfferNow() => _ = _session?.SendOfferAsync();
 
-    private void OnControlChanged() => OfferNow();
+    /// <summary>
+    /// After a stop the offer goes out from the stop path, after the result and
+    /// <c>device.stopped</c>, so the order on the wire is always result, stopped, offer.
+    /// </summary>
+    private void OnControlChanged()
+    {
+        if (_session is { StopPending: false } session)
+        {
+            _ = session.SendOfferAsync();
+        }
+    }
 
     private void OnStopRequested() => _ = _session?.StopAsync();
 
@@ -236,6 +254,7 @@ public sealed class DeviceConnection
                 }
 
                 Device = welcome;
+                _badHellos = 0;
                 live = session;
                 _session = session;
                 _log.Info($"connected as {welcome.Name} ({welcome.Trust})");
@@ -311,6 +330,7 @@ public sealed class DeviceConnection
         private readonly object _lock = new();
         private CancellationTokenSource? _current;
         private bool _stopping;
+        private volatile bool _stopPending;
         private long _lastHeardTicks = DateTimeOffset.UtcNow.UtcTicks;
 
         public Session(DeviceConnection owner, ClientWebSocket ws, CancellationToken ct)
@@ -346,9 +366,13 @@ public sealed class DeviceConnection
             }
         }
 
+        /// <summary>A stop is being answered; its own offer comes last.</summary>
+        public bool StopPending => _stopPending;
+
         /// <summary>The user stopped control: cancel the running command, or say so at once.</summary>
         public async Task StopAsync()
         {
+            _stopPending = true;
             lock (_lock)
             {
                 if (_current is not null)
@@ -514,10 +538,12 @@ public sealed class DeviceConnection
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
             {
+                _stopPending = false;
                 return;
             }
 
             await SendOfferAsync();
+            _stopPending = false;
         }
 
         private async Task PingAsync(CancellationToken ct)

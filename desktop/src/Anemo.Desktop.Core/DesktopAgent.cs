@@ -35,6 +35,11 @@ public sealed class DesktopAgent
     {
         _parts = parts;
         _settings = parts.Store.Load();
+        StartupProblem = parts.Store.LoadProblem;
+        if (StartupProblem is not null)
+        {
+            parts.Log.Info("settings file unreadable; control starts off");
+        }
         Control = new ControlState(parts.Time, _settings.AllowControl, _settings.PausedUntil);
         Control.Changed += SaveControlState;
         Processor = new CommandProcessor(
@@ -73,6 +78,9 @@ public sealed class DesktopAgent
 
     public bool HasToken => ConnectionSettings() is not null;
 
+    /// <summary>A sentence for the tray when the settings file couldn't be read at start.</summary>
+    public string? StartupProblem { get; }
+
     public Task RunAsync(CancellationToken ct)
     {
         _parts.CommandLog.Prune();
@@ -83,6 +91,7 @@ public sealed class DesktopAgent
     /// Saves new settings from the Settings window. <paramref name="newToken"/> null keeps
     /// the saved token. Reconnects when the address or token changed.
     /// </summary>
+    /// <exception cref="SettingsSaveException">With a sentence for the Settings window.</exception>
     public void Save(DesktopSettings settings, string? newToken)
     {
         DesktopSettings old;
@@ -90,8 +99,9 @@ public sealed class DesktopAgent
         {
             old = _settings;
             var updated = newToken is null ? settings with { ProtectedToken = old.ProtectedToken } : _parts.Store.WithToken(settings, newToken);
-            _settings = updated with { AllowControl = Control.AllowControl, PausedUntil = Control.PausedUntil };
-            _parts.Store.Save(_settings);
+            updated = updated with { AllowControl = Control.AllowControl, PausedUntil = Control.PausedUntil };
+            _parts.Store.Save(updated); // throws SettingsSaveException: nothing changes then
+            _settings = updated;
         }
 
         if (old.Address != settings.Address || newToken is not null)
@@ -122,6 +132,11 @@ public sealed class DesktopAgent
         {
             return new ShareResult(false, e.Message);
         }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _parts.Log.Info($"screen not read: {e.GetType().Name}");
+            return new ShareResult(false, "The screen couldn't be read; it wasn't shared.");
+        }
 
         var result = await _sharedScreen.ShareAsync(settings, content, ct);
         _parts.Log.Info(result.Ok ? "screen shared" : "screen not shared");
@@ -143,12 +158,23 @@ public sealed class DesktopAgent
         return address is null || string.IsNullOrWhiteSpace(token) ? null : new ConnectionSettings(address, token);
     }
 
+    /// <summary>
+    /// Keeps "Allow control" and the pause in the file. A file that can't be written is
+    /// logged, never thrown: the stop has to happen whatever the disk does.
+    /// </summary>
     private void SaveControlState()
     {
         lock (_lock)
         {
             _settings = _settings with { AllowControl = Control.AllowControl, PausedUntil = Control.PausedUntil };
-            _parts.Store.Save(_settings);
+            try
+            {
+                _parts.Store.Save(_settings);
+            }
+            catch (SettingsSaveException e)
+            {
+                _parts.Log.Info($"control state not saved: {e.InnerException?.GetType().Name}");
+            }
         }
     }
 }

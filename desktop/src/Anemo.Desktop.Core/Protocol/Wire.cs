@@ -22,6 +22,17 @@ public static class Wire
 {
     public const int MaxErrorLength = 500;
 
+    /// <summary>The largest result the server takes (12 MB); a larger one is answered as failed.</summary>
+    public const int MaxResultBytes = 12 * 1024 * 1024;
+
+    public const string TooLargeMessage = "The answer was too large";
+
+    /// <summary>Plain JSON: base64 and non-ASCII text are not turned into escapes.</summary>
+    private static readonly JsonSerializerOptions Relaxed = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     public static string Hello(string token, string version, string? lastId) => Json(new JsonObject
     {
         ["type"] = "hello",
@@ -56,7 +67,13 @@ public static class Wire
             msg["code"] = outcome.Code ?? "failed";
         }
 
-        return Json(msg);
+        var text = Json(msg);
+        if (outcome.Ok && System.Text.Encoding.UTF8.GetByteCount(text) > MaxResultBytes)
+        {
+            return Result(id, CommandOutcome.Fail("failed", TooLargeMessage));
+        }
+
+        return text;
     }
 
     /// <summary>A server message, or null when it isn't a JSON object with a string <c>type</c>.</summary>
@@ -122,5 +139,5 @@ public static class Wire
         return v.TryGetValue<decimal>(out var m) ? (double)m : null;
     }
 
-    private static string Json(JsonNode node) => node.ToJsonString();
+    private static string Json(JsonNode node) => node.ToJsonString(Relaxed);
 }

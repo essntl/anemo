@@ -23,7 +23,7 @@ public sealed class ControlState
     /// <summary>Allow, pause or resume changed (save the settings, send an offer).</summary>
     public event Action? Changed;
 
-    /// <summary>The user stopped control: cancel what runs and tell Anemo.</summary>
+    /// <summary>The user stopped control: cancel what runs and tell Anemo. Raised before <see cref="Changed"/>.</summary>
     public event Action? StopRequested;
 
     public bool AllowControl
@@ -78,11 +78,14 @@ public sealed class ControlState
             _allow = allow;
         }
 
-        Changed?.Invoke();
+        // The stop first: a failing Changed handler (saving the settings) must not keep
+        // a command running.
         if (!allow)
         {
             StopRequested?.Invoke();
         }
+
+        Changed?.Invoke();
     }
 
     /// <summary>The stop hotkey, the indicator's Stop button and "Pause control for 1 hour".</summary>
@@ -93,8 +96,8 @@ public sealed class ControlState
             _pausedUntil = _time.GetUtcNow() + PauseLength;
         }
 
-        Changed?.Invoke();
         StopRequested?.Invoke();
+        Changed?.Invoke();
     }
 
     /// <summary>Ends a pause early.</summary>

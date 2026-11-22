@@ -29,6 +29,9 @@ public sealed partial class CommandProcessor : ICommandExecutor
 {
     public const string PasswordMessage = "That is a password field: ask the user to type it.";
 
+    public const string UnknownFocusMessage =
+        "Anemo Desktop can't tell which control has the focus, so it doesn't type there. Give the control's ref, or click into it first.";
+
     public const string OwnWindowMessage =
         "That is Anemo Desktop's own window, which the agent can't use. Ask the user to close it.";
 
@@ -84,10 +87,18 @@ public sealed partial class CommandProcessor : ICommandExecutor
         {
             outcome = CommandOutcome.Fail(ResultCodes.Failed, ControlRefs.StaleMessage);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             _log?.Write(CommandSummary.Action(command), CommandSummary.For(command), false, ResultCodes.Stopped);
             throw;
+        }
+        catch (Exception e)
+        {
+            // Anything a platform call threw: a sentence for the agent, never the exception's
+            // message (it could hold window text).
+            outcome = e is UnauthorizedAccessException or TimeoutException
+                ? CommandOutcome.Fail(ResultCodes.Unavailable, $"Windows didn't allow that right now ({e.GetType().Name}).")
+                : CommandOutcome.Fail(ResultCodes.Failed, $"Anemo Desktop ran into an error doing that ({e.GetType().Name}).");
         }
 
         _log?.Write(CommandSummary.Action(command), CommandSummary.For(command), outcome.Ok, outcome.Code);

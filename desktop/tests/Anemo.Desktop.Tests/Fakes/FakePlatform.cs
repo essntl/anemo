@@ -146,7 +146,24 @@ public sealed class FakeInput : IInput
     /// <summary>Called for each typed character (to stop in the middle of typing in a test).</summary>
     public Action<int>? OnTypedChar { get; set; }
 
-    public void Click(ScreenPoint at, MouseButton button, int count) => Events.Add($"click:{at.X},{at.Y}:{button}:{count}");
+    /// <summary>Called after each piece of typed text (to move the focus as a Tab would).</summary>
+    public Action<string>? AfterType { get; set; }
+
+    /// <summary>Called after each key combo.</summary>
+    public Action<KeyCombo>? AfterPress { get; set; }
+
+    /// <summary>Thrown by every call when set (a platform call that breaks).</summary>
+    public Exception? Throw { get; set; }
+
+    public void Click(ScreenPoint at, MouseButton button, int count)
+    {
+        if (Throw is not null)
+        {
+            throw Throw;
+        }
+
+        Events.Add($"click:{at.X},{at.Y}:{button}:{count}");
+    }
 
     public void TypeText(string text, CancellationToken ct)
     {
@@ -156,11 +173,20 @@ public sealed class FakeInput : IInput
             OnTypedChar?.Invoke(i);
         }
 
+        if (Throw is not null)
+        {
+            throw Throw;
+        }
+
         Events.Add("type:" + text);
+        AfterType?.Invoke(text);
     }
 
-    public void Press(KeyCombo combo) =>
+    public void Press(KeyCombo combo)
+    {
         Events.Add($"press:{string.Join("+", combo.Modifiers.Select(m => m.ToString("X2")))}|{combo.Key:X2}");
+        AfterPress?.Invoke(combo);
+    }
 
     public void Scroll(ScreenPoint? at, ScrollDirection direction, int amount) =>
         Events.Add($"scroll:{at?.X},{at?.Y}:{direction}:{amount}");

@@ -108,6 +108,48 @@ public sealed class DesktopAgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Stop_cancels_the_command_even_when_settings_json_cannot_be_written()
+    {
+        var agent = Configured();
+        _platform.Desktop.Focused = new FakeElement();
+        var typing = new TaskCompletionSource();
+        _platform.Input.OnTypedChar = _ =>
+        {
+            typing.TrySetResult();
+            Thread.Sleep(20);
+        };
+        _running = agent.RunAsync(_stop.Token);
+        var client = await _server.NextClientAsync();
+        await client.NextAsync("device.offer");
+
+        // From now on the settings file can't be written.
+        File.Delete(_store.Path);
+        Directory.CreateDirectory(_store.Path);
+        File.WriteAllText(Path.Combine(_store.Path, "x"), "");
+
+        await client.CommandAsync("t1", "type", new JsonObject { ["text"] = new string('a', 2000) });
+        await typing.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        agent.Control.Stop();
+
+        var result = await client.NextAsync("device.result");
+        Assert.Equal("stopped", (string?)result["code"]);
+        await client.NextAsync("device.stopped");
+        Assert.False(agent.Control.Effective);
+    }
+
+    [Fact]
+    public void A_damaged_settings_file_starts_with_control_off()
+    {
+        Directory.CreateDirectory(_folder);
+        File.WriteAllText(_store.Path, "{ broken");
+
+        var agent = Create();
+
+        Assert.False(agent.Control.AllowControl);
+        Assert.NotNull(agent.StartupProblem);
+    }
+
+    [Fact]
     public async Task Share_this_screen_puts_the_screenshot_and_window_text_with_the_bearer_token()
     {
         var agent = Configured();

@@ -195,13 +195,85 @@ public sealed class ConnectionTests : IAsyncLifetime
         await executor.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         _control.Stop();
 
-        var result = await client.NextAsync("device.result");
+        // Strictly in this order, nothing in between: result, device.stopped, offer.
+        var result = await client.NextAsync();
+        Assert.Equal("device.result", (string?)result["type"]);
         Assert.Equal("cmd-long", (string?)result["id"]);
         Assert.False((bool)result["ok"]!);
         Assert.Equal(ResultCodes.Stopped, (string?)result["code"]);
-        await client.NextAsync("device.stopped");
-        var offer = await client.NextAsync("device.offer");
+        Assert.Equal("device.stopped", (string?)(await client.NextAsync())["type"]);
+        var offer = await client.NextAsync();
+        Assert.Equal("device.offer", (string?)offer["type"]);
         Assert.False((bool)offer["control"]!);
+    }
+
+    [Fact]
+    public async Task Stop_still_cancels_when_its_other_listeners_fail()
+    {
+        _control.Changed += () => throw new IOException("settings.json is locked");
+        var executor = new ScriptedExecutor { WaitForCancel = true };
+        Start(executor);
+        var client = await _server.NextClientAsync();
+        await client.NextAsync("device.offer");
+        await client.CommandAsync("cmd-1", "type", new JsonObject { ["text"] = "x" });
+        await executor.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Throws<IOException>(() => _control.Stop());
+
+        var result = await client.NextAsync("device.result");
+        Assert.Equal(ResultCodes.Stopped, (string?)result["code"]);
+    }
+
+    [Fact]
+    public async Task A_trust_change_closes_with_1012_and_the_next_welcome_has_the_new_trust()
+    {
+        var executor = new ScriptedExecutor();
+        var connection = Start(executor);
+        var first = await _server.NextClientAsync();
+        await first.NextAsync("device.offer");
+        Assert.Equal("watched", connection.Device!.Trust);
+
+        _server.Trust = "trusted";
+        await first.CloseAsync(1012);
+
+        var second = await _server.NextClientAsync();
+        await second.NextAsync("device.offer");
+        await second.CommandAsync("cmd-1", "look");
+        await second.NextAsync("device.result");
+        Assert.Equal("trusted", executor.Devices.Last().Trust);
+        Assert.Equal(ConnectionPhase.Connected, connection.Status.Phase);
+    }
+
+    [Fact]
+    public async Task A_result_over_12_MB_is_answered_as_too_large()
+    {
+        var executor = new ScriptedExecutor
+        {
+            Answer = _ => CommandOutcome.Success(new JsonObject { ["screenshot"] = new string('A', 13 * 1024 * 1024) }),
+        };
+        Start(executor);
+        var client = await _server.NextClientAsync();
+
+        await client.CommandAsync("big", "look");
+        var result = await client.NextAsync("device.result");
+
+        Assert.False((bool)result["ok"]!);
+        Assert.Equal(Wire.TooLargeMessage, (string?)result["error"]);
+    }
+
+    [Fact]
+    public async Task The_server_ignores_a_result_for_an_id_it_never_sent()
+    {
+        Start(new ScriptedExecutor());
+        var client = await _server.NextClientAsync();
+
+        // Sent behind the fake's back: the server didn't send "ghost".
+        await client.SendAsync(new JsonObject { ["type"] = "device.command", ["id"] = "ghost", ["action"] = "look" });
+        await client.CommandAsync("real", "look");
+
+        var result = await client.NextAsync("device.result");
+        Assert.Equal("real", (string?)result["id"]);
+        Assert.Contains(client.Dropped, d => d.Contains("ghost", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -282,9 +354,12 @@ public sealed class ConnectionTests : IAsyncLifetime
         _server.Kind = "phone";
         var connection = Start(new ScriptedExecutor());
 
-        await _server.NextClientAsync();
+        // Retried a few times (a hello can just have been late), then given up.
         await WaitUntil(() => connection.Status.Phase == ConnectionPhase.Refused);
         Assert.Equal(CloseCodes.FinalMessage(4400), connection.Status.Message);
+        Assert.Equal(3, _server.Connections);
+        await Task.Delay(800);
+        Assert.Equal(3, _server.Connections);
     }
 
     [Fact]

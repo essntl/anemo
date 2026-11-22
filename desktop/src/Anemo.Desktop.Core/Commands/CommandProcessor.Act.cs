@@ -112,25 +112,63 @@ public sealed partial class CommandProcessor
             element.Focus();
         }
 
-        // Typing goes where the focus is: check that it isn't a password field.
-        GuardKeyboard();
-        if (FocusIsPassword())
+        // Typing goes where the focus is. A Tab or Enter can move the focus, so the text
+        // is typed in pieces that end after each of them, and the focus is checked before
+        // every piece.
+        foreach (var piece in TypingPieces(text))
         {
-            throw CommandException.Refused(PasswordMessage);
+            GuardKeyboard();
+            GuardPasswordFocus();
+            _platform.Input.TypeText(piece, ct);
         }
-
-        _platform.Input.TypeText(text, ct);
     }
 
-    private bool FocusIsPassword()
+    /// <summary>The text cut after every Tab and line break.</summary>
+    internal static IEnumerable<string> TypingPieces(string text)
     {
+        const char Tab = (char)9;
+        const char LineBreak = (char)10;
+        var start = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] is Tab or LineBreak)
+            {
+                yield return text[start..(i + 1)];
+                start = i + 1;
+            }
+        }
+
+        if (start < text.Length)
+        {
+            yield return text[start..];
+        }
+    }
+
+    /// <summary>
+    /// Refuses when the focus is a password field, and also when the focused control
+    /// can't be read: fail closed.
+    /// </summary>
+    private void GuardPasswordFocus()
+    {
+        bool password;
         try
         {
-            return Desktop.FocusedElement()?.IsPassword ?? false;
+            var focused = Desktop.FocusedElement();
+            if (focused is null)
+            {
+                throw CommandException.Refused(UnknownFocusMessage);
+            }
+
+            password = focused.IsPassword;
         }
         catch (ElementGoneException)
         {
-            return false;
+            throw CommandException.Refused(UnknownFocusMessage);
+        }
+
+        if (password)
+        {
+            throw CommandException.Refused(PasswordMessage);
         }
     }
 
@@ -138,12 +176,42 @@ public sealed partial class CommandProcessor
     {
         // Every key is checked before any is pressed.
         var combos = args.StringList("keys", 1, 10).Select(KeyParser.Parse).ToList();
-        GuardKeyboard();
+        foreach (var combo in combos)
+        {
+            if (IsOwnHotkey(combo))
+            {
+                throw CommandException.Refused($"“{combo.Text}” is Anemo Desktop's own stop or share key.");
+            }
+        }
+
         foreach (var combo in combos)
         {
             ct.ThrowIfCancellationRequested();
+
+            // Checked before every key: the one before may have moved the focus.
+            GuardKeyboard();
+            if (KeyParser.EntersText(combo))
+            {
+                GuardPasswordFocus();
+            }
+
             _platform.Input.Press(combo);
         }
+    }
+
+    private bool IsOwnHotkey(KeyCombo combo)
+    {
+        var settings = _settings();
+        foreach (var text in new[] { settings.StopHotkey, settings.ShareHotkey })
+        {
+            if (Control.Hotkey.Parse(text) is { } hotkey && hotkey.Key == combo.Key
+                && hotkey.Modifiers == KeyParser.HotkeyModifiersOf(combo))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void Scroll(Args args, IReadOnlyDictionary<string, IUiElement> refs)

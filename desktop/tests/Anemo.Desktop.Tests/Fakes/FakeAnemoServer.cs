@@ -26,6 +26,10 @@ public sealed class FakeAnemoServer : IAsyncDisposable
 {
     public const string Token = "anemo_TestToken_abc123";
 
+    /// <summary>The real server's limits (backend/app/features/devices/ws.py).</summary>
+    public const int MaxMessage = 4096;
+    public const int MaxResult = 12 * 1024 * 1024;
+
     private readonly WebApplication _app;
     private readonly Channel<FakeClient> _clients = Channel.CreateUnbounded<FakeClient>();
     private int _connections;
@@ -134,13 +138,18 @@ public sealed class FakeAnemoServer : IAsyncDisposable
         using var helloCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var hello = await client.ReceiveRawAsync(helloCts.Token);
         client.Hello = hello;
-        if (hello is null || (string?)hello["type"] != "hello" || (string?)hello["kind"] != Kind)
+        // As the real server: a bad hello first, then the token, then the kind.
+        if (hello is null || client.LastLength > MaxMessage || (string?)hello["type"] != "hello")
         {
             await client.CloseAsync(4400);
         }
         else if ((string?)hello["token"] != Token)
         {
             await client.CloseAsync(4401);
+        }
+        else if ((string?)hello["kind"] != Kind)
+        {
+            await client.CloseAsync(4400);
         }
         else if (!Mute)
         {
@@ -206,6 +215,15 @@ public sealed class FakeAnemoServer : IAsyncDisposable
 
         public JsonObject? Hello { get; set; }
 
+        /// <summary>The length of the last text message received, in characters.</summary>
+        public int LastLength { get; private set; }
+
+        /// <summary>Results for these ids only reach the test; others are ignored, as on the real server.</summary>
+        public ConcurrentDictionary<string, bool> SentIds { get; } = new();
+
+        /// <summary>Messages the server dropped (too large, or a result for an id it didn't send).</summary>
+        public ConcurrentQueue<string> Dropped { get; } = new();
+
         /// <summary>The close code the client sent, once it closed.</summary>
         public Task<int?> Closed => _closed.Task;
 
@@ -252,6 +270,7 @@ public sealed class FakeAnemoServer : IAsyncDisposable
 
         public Task CommandAsync(string id, string action, JsonObject? fields = null)
         {
+            SentIds[id] = true;
             var msg = new JsonObject { ["type"] = "device.command", ["id"] = id, ["action"] = action };
             foreach (var (key, value) in fields ?? new JsonObject())
             {
@@ -301,7 +320,9 @@ public sealed class FakeAnemoServer : IAsyncDisposable
                 message.Write(buffer, 0, result.Count);
                 if (result.EndOfMessage)
                 {
-                    return JsonNode.Parse(Encoding.UTF8.GetString(message.ToArray())) as JsonObject;
+                    var text = Encoding.UTF8.GetString(message.ToArray());
+                    LastLength = text.Length;
+                    return JsonNode.Parse(text) as JsonObject;
                 }
             }
         }
@@ -316,7 +337,23 @@ public sealed class FakeAnemoServer : IAsyncDisposable
                     break;
                 }
 
-                if ((string?)msg["type"] == "ping" && _server.AnswerPings)
+                var type = (string?)msg["type"];
+                if (type == "device.result")
+                {
+                    var id = (string?)msg["id"];
+                    if (LastLength > MaxResult || id is null || !SentIds.TryRemove(id, out _))
+                    {
+                        Dropped.Enqueue(msg.ToJsonString());
+                        continue;
+                    }
+                }
+                else if (LastLength > MaxMessage)
+                {
+                    Dropped.Enqueue(type ?? "?");
+                    continue;
+                }
+
+                if (type == "ping" && _server.AnswerPings)
                 {
                     await SendAsync(new JsonObject { ["type"] = "pong" });
                 }

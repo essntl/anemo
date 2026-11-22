@@ -37,6 +37,9 @@ public sealed class ProcessorFixture : IDisposable
             new UiNode(1, "edit", "Password", "hunter2", true, true, true, Pass),
             new UiNode(1, "text", "Welcome back", null, true, false, false, null),
         ], false);
+
+        // An ordinary field has the focus unless a test says otherwise.
+        Platform.Desktop.Focused = Name;
     }
 
     public FakePlatform Platform { get; } = new();

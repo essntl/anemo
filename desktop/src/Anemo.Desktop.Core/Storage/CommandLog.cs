@@ -49,7 +49,7 @@ public sealed class CommandLog
                 File.AppendAllText(FileFor(DateOnly.FromDateTime(now.UtcDateTime)), line + "\n");
                 PruneOncePerDay(now);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 // The log is a convenience; a full disk must not fail the command.
             }

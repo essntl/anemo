@@ -19,6 +19,10 @@ public static class KeyParser
     public const ushort VkAlt = 0x12;
     public const ushort VkWin = 0x5B;
     public const ushort VkDelete = 0x2E;
+    public const ushort VkEnd = 0x23;
+    public const ushort VkSpace = 0x20;
+    public const ushort VkInsert = 0x2D;
+    public const ushort VkV = 0x56;
 
     private static readonly Dictionary<string, ushort> Named = new(StringComparer.Ordinal)
     {
@@ -73,12 +77,49 @@ public static class KeyParser
         }
 
         var key = KeyCode(parts[^1]) ?? throw CommandException.Failed($"Unknown key “{parts[^1]}” in “{text}”.");
-        if (key == VkDelete && modifiers.Contains(VkControl) && modifiers.Contains(VkAlt))
+        // Ctrl+Alt+End is Ctrl+Alt+Del inside a remote desktop session.
+        if (key is VkDelete or VkEnd && modifiers.Contains(VkControl) && modifiers.Contains(VkAlt))
         {
-            throw CommandException.Refused("Ctrl+Alt+Del can't be pressed by the agent.");
+            throw CommandException.Refused("Ctrl+Alt+Del (or Ctrl+Alt+End) can't be pressed by the agent.");
         }
 
         return new KeyCombo(modifiers, key, text);
+    }
+
+    /// <summary>
+    /// True when the combo puts text into a field: a letter or digit (Shift allowed, no
+    /// Control, Alt or Win), Space, or a paste (Control+v, Shift+Insert).
+    /// </summary>
+    public static bool EntersText(KeyCombo combo)
+    {
+        var commandModifier = combo.Modifiers.Any(m => m is VkControl or VkAlt or VkWin);
+        var letterOrDigit = combo.Key is (>= 0x41 and <= 0x5A) or (>= 0x30 and <= 0x39);
+        if ((letterOrDigit || combo.Key == VkSpace) && !commandModifier)
+        {
+            return true;
+        }
+
+        var paste = (combo.Key == VkV && combo.Modifiers.Contains(VkControl))
+            || (combo.Key == VkInsert && combo.Modifiers.Contains(VkShift));
+        return paste;
+    }
+
+    /// <summary>The combo's modifiers as hotkey flags (to compare with the client's own keys).</summary>
+    public static Control.HotkeyModifiers HotkeyModifiersOf(KeyCombo combo)
+    {
+        var flags = Control.HotkeyModifiers.None;
+        foreach (var m in combo.Modifiers)
+        {
+            flags |= m switch
+            {
+                VkControl => Control.HotkeyModifiers.Control,
+                VkAlt => Control.HotkeyModifiers.Alt,
+                VkShift => Control.HotkeyModifiers.Shift,
+                _ => Control.HotkeyModifiers.Win,
+            };
+        }
+
+        return flags;
     }
 
     private static ushort? KeyCode(string name)

@@ -43,7 +43,7 @@ public sealed partial class DiagnosticLog : IDiagnosticLog
                     }
                 }
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 // Logging must never break the client.
             }

@@ -18,7 +18,7 @@ public sealed partial class CommandProcessor
     public static ShellStart ShellStartFor(string program, string command, string workFolder)
     {
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(ShellPrelude + command));
-        return new ShellStart(program, ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], workFolder);
+        return new ShellStart(program, ["-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand", encoded], workFolder);
     }
 
     private async Task<JsonNode> ShellAsync(Args args, CancellationToken ct)

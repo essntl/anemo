@@ -259,10 +259,65 @@ public sealed class SettingsStoreTests : IDisposable
         var path = Path.Combine(_folder, "settings.json");
         File.WriteAllText(path, "{ not json");
 
-        var settings = new SettingsStore(path, new FakeProtector()).Load();
+        var store = new SettingsStore(path, new FakeProtector());
+        var settings = store.Load();
 
-        Assert.True(settings.AllowControl);
+        Assert.False(settings.AllowControl);
+        Assert.Contains("control switched off", store.LoadProblem);
         Assert.True(File.Exists(path + ".broken"));
+    }
+
+    [Fact]
+    public void An_unreadable_file_starts_with_control_off()
+    {
+        // A folder where the file should be: reading it fails with an access or IO error.
+        var path = Path.Combine(_folder, "settings.json");
+        Directory.CreateDirectory(path);
+        File.WriteAllText(Path.Combine(path, "x"), "");
+
+        var store = new SettingsStore(path, new FakeProtector());
+        var settings = store.Load();
+
+        Assert.False(settings.AllowControl);
+        Assert.NotNull(store.LoadProblem);
+    }
+
+    [Fact]
+    public void No_file_yet_is_not_a_problem()
+    {
+        var store = new SettingsStore(Path.Combine(_folder, "settings.json"), new FakeProtector());
+
+        Assert.True(store.Load().AllowControl);
+        Assert.Null(store.LoadProblem);
+    }
+
+    [Fact]
+    public void A_file_that_cannot_be_written_says_so()
+    {
+        Directory.CreateDirectory(_folder);
+        var blocker = Path.Combine(_folder, "not-a-folder");
+        File.WriteAllText(blocker, "");
+        var store = new SettingsStore(Path.Combine(blocker, "settings.json"), new FakeProtector());
+
+        var e = Assert.Throws<SettingsSaveException>(() => store.Save(new DesktopSettings()));
+        Assert.Contains("couldn't be saved", e.Message);
+    }
+
+    [Fact]
+    public void A_token_Windows_cannot_protect_gives_a_sentence()
+    {
+        var store = new SettingsStore(Path.Combine(_folder, "settings.json"), new ThrowingProtector());
+
+        var e = Assert.Throws<SettingsSaveException>(() => store.WithToken(new DesktopSettings(), "anemo_x"));
+        Assert.Contains("protect the token", e.Message);
+        Assert.DoesNotContain("anemo_x", e.Message);
+    }
+
+    private sealed class ThrowingProtector : Anemo.Desktop.Core.Platform.ITokenProtector
+    {
+        public string Protect(string token) => throw new System.Security.Cryptography.CryptographicException("no profile");
+
+        public string? Unprotect(string protectedToken) => null;
     }
 
     [Fact]
@@ -308,6 +363,20 @@ public sealed class ControlStateTests
         control.Resume();
 
         Assert.True(control.Effective);
+    }
+
+    [Fact]
+    public void The_stop_is_raised_before_the_change()
+    {
+        var control = new ControlState(new ManualTime(), true, null);
+        var order = new List<string>();
+        control.StopRequested += () => order.Add("stop");
+        control.Changed += () => order.Add("changed");
+
+        control.Stop();
+        control.SetAllow(false);
+
+        Assert.Equal(["stop", "changed", "stop", "changed"], order);
     }
 
     [Fact]
@@ -374,6 +443,26 @@ public sealed class WireTests
         Assert.Equal("""{"type":"device.stopped"}""", Wire.Stopped());
         Assert.Equal("""{"type":"device.result","id":"1","ok":true,"state":{}}""", Wire.Result("1", CommandOutcome.Success(new JsonObject())));
         Assert.Equal("""{"type":"device.result","id":"2","ok":false,"error":"No.","code":"refused"}""", Wire.Result("2", CommandOutcome.Fail("refused", "No.")));
+    }
+
+    [Fact]
+    public void Base64_and_text_are_not_escaped()
+    {
+        var text = Wire.Result("1", CommandOutcome.Success(new JsonObject { ["screenshot"] = "iVBO+w/==", ["title"] = "Grüße “x”" }));
+
+        Assert.Contains("iVBO+w/==", text);
+        Assert.Contains("Grüße “x”", text);
+    }
+
+    [Fact]
+    public void A_result_over_12_MB_becomes_a_failure()
+    {
+        var text = Wire.Result("1", CommandOutcome.Success(new JsonObject { ["screenshot"] = new string('A', Wire.MaxResultBytes) }));
+
+        var msg = JsonNode.Parse(text)!;
+        Assert.False((bool)msg["ok"]!);
+        Assert.Equal("failed", (string?)msg["code"]);
+        Assert.Equal(Wire.TooLargeMessage, (string?)msg["error"]);
     }
 
     [Fact]

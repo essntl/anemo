@@ -22,8 +22,8 @@ public sealed class ShellTests : IDisposable
 
         var start = Assert.Single(_f.Platform.Shell.Started);
         Assert.Equal(@"C:\Program Files\PowerShell\7\pwsh.exe", start.FileName);
-        Assert.Equal(["-NoProfile", "-NonInteractive", "-EncodedCommand"], start.Arguments.Take(3));
-        var script = Encoding.Unicode.GetString(Convert.FromBase64String(start.Arguments[3]));
+        Assert.Equal(["-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand"], start.Arguments.Take(5));
+        var script = Encoding.Unicode.GetString(Convert.FromBase64String(start.Arguments[5]));
         Assert.EndsWith("Get-ChildItem | Select -First 3", script);
         Assert.Equal(@"C:\Users\me\AnemoWork", start.WorkingDirectory);
         Assert.Equal([@"C:\Users\me\AnemoWork"], _f.Platform.Shell.Folders);
@@ -165,8 +165,8 @@ public sealed class ShellTests : IDisposable
     {
         var start = CommandProcessor.ShellStartFor("powershell.exe", "Write-Output \"a\" ; 'b' `\"", @"C:\W");
 
-        Assert.Equal(4, start.Arguments.Count);
-        var script = Encoding.Unicode.GetString(Convert.FromBase64String(start.Arguments[3]));
+        Assert.Equal(6, start.Arguments.Count);
+        var script = Encoding.Unicode.GetString(Convert.FromBase64String(start.Arguments[5]));
         Assert.Equal(CommandProcessor.ShellPrelude + "Write-Output \"a\" ; 'b' `\"", script);
     }
 }
