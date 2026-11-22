@@ -21,6 +21,8 @@ from app.features.calendar.router import router as calendar_router
 from app.features.capture.router import router as capture_router
 from app.features.conversations.router import router as conversations_router
 from app.features.daily_notes.router import router as daily_notes_router
+from app.features.devices.router import router as devices_router
+from app.features.devices.ws import router as devices_ws_router
 from app.features.dictation.router import router as dictation_router
 from app.features.documents.router import router as documents_router
 from app.features.extension.http_router import router as extension_http_router
@@ -64,6 +66,7 @@ api_router.include_router(auth_router)  # endpoints declare their own session re
 api_router.include_router(shares_public_router)  # read-only, by secret link
 api_router.include_router(push_public_router)  # one-time approval buttons, by secret token
 api_router.include_router(extension_router)  # WebSocket; authenticates with an API token
+api_router.include_router(devices_ws_router)  # WebSocket; authenticates with a device's token
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
@@ -96,6 +99,7 @@ protected.include_router(extension_http_router)
 protected.include_router(capture_router)
 protected.include_router(inline_router)
 protected.include_router(dictation_router)
+protected.include_router(devices_router)
 protected.include_router(research_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)
