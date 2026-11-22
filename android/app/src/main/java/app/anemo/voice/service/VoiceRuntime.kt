@@ -40,7 +40,8 @@ import java.util.concurrent.TimeUnit
 object VoiceRuntime {
     private const val NO_SPEECH =
         "Android's text-to-speech could not be started, so answers are not spoken. " +
-            "Check Settings → System → Text-to-speech output on this phone."
+            "Check the preferred engine under Text-to-speech output in the phone's settings " +
+            "(and allow that engine to start by itself); the next answer tries again."
 
     fun build(
         context: Context,
@@ -95,6 +96,7 @@ object VoiceRuntime {
             context, settings.ttsVoice, settings.ttsSpeed,
             post = { voice.execute(it) },
             onUnavailable = { onStatus { it.copy(notice = NO_SPEECH) } },
+            onAvailable = { onStatus { if (it.notice == NO_SPEECH) it.copy(notice = null) else it } },
         )
         made += { speaker.shutdown() }
         val audio = context.getSystemService(AudioManager::class.java)
