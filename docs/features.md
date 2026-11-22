@@ -763,7 +763,8 @@ agent request. When the run finishes, the phone reads the answer out.
   move it to Friday" knows what "it" is.
 - **What is spoken.** The final answer without Markdown, cut at a sentence end near 600
   characters, then "The rest is in the chat." A failed or stopped run says so in one
-  sentence. The phone speaks with Android's own text-to-speech.
+  sentence. The phone speaks with Android's own text-to-speech: the engine chosen in
+  the phone's settings, which must have a voice for the language of the answers.
 - **Questions and approvals by voice.** When the agent asks something (`ask_user`), the
   phone reads the question and its options and listens for your answer; "up to you"
   leaves the choice to the agent. For an approval it reads what the agent wants to do and
@@ -777,7 +778,9 @@ agent request. When the run finishes, the phone reads the answer out.
 - A phone only hears about the runs it started itself. The run's page says "Asked by
   voice from ‹phone›".
 
-**Settings → Voice**: the agent profile for voice requests, the follow-up window (0
+**Settings → Voice**: the agent profile for voice requests, the model that answers them
+(a small, fast one keeps spoken answers quick and cheap; by default the agent's own,
+and a Voice chat keeps its model for its follow-ups), the follow-up window (0
 turns follow-ups off), the longest answer read out (100 to 2000 characters), whether
 approvals and plan reviews may be decided by voice (questions are always answered by
 voice), and one Voice chat a day or one that keeps going. The wake word, the voice the

@@ -37,6 +37,13 @@ What only a phone can check is in `MANUAL-TESTS.md`.
    "Anemo is listening for ‹wake word›" stays while it listens; a quick-settings tile
    (edit your quick settings to add "Anemo Voice") switches it on and off.
 
+Answers are spoken with the text-to-speech engine chosen in the phone's settings
+(*Text-to-speech output*). It needs a voice for the language of the answers: on a phone
+without Google's speech services (a Chinese Xiaomi ROM, for example) install another
+engine such as RHVoice, download a voice in it, choose it as the preferred engine and
+allow it to start by itself (*Autostart* on Xiaomi). When no engine can be started the
+app says so on its main screen, and tries again for the next answer.
+
 After a reboot, open the app or tap the tile once: Android doesn't let an app start the
 microphone from the background, and the app doesn't try to get around that.
 

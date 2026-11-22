@@ -193,3 +193,14 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   matters when the APK is distributed); the phone fetches nothing after `missed: true`;
   revoking a device's token from the tokens card disconnects within a minute, not at
   once; `mobile.spec.ts:217` on `main`.
+
+## After the first use on real hardware (2026-11-22)
+
+- Merged into `main` as essntl/anemo#62 (the CI job for Android uses the runner's own
+  SDK: `android-actions/setup-android@v3` fails on the current image).
+- essntl/anemo#63: Anemo Voice declares Android's speech engine (`TTS_SERVICE` query;
+  without it nothing was spoken on Android 11+) and retries a failed engine for the next
+  answer; Settings → Voice gets "Model for voice requests" (`VoiceSettings.model_id`).
+- Confirmed by the user on a Xiaomi phone with a Chinese ROM: the whole voice flow works
+  once RHVoice is the preferred text-to-speech engine (the ROM's own engine did not
+  speak). The Windows client's manual tests are still open.
