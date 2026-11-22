@@ -28,7 +28,7 @@ Claude Opus 5.5 (`model: "opus"`).
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | **merged** (8cd3db2) after review fixes (1ad78c6); two one-line conflicts with D1 resolved, schema regenerated |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | **merged** (1c652ce) after review fixes; 222 tests on the integration branch. WGC capture never run; Linux CI build unverified |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | **merged** (e3e0d1b) after review fixes (ab9cea3, 5f4f144); on the integration branch: 129 JVM tests (3 skipped: need the wake word models), debug APK builds. Never run on a phone |
-| 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | building since 2026-11-22, from 1c652ce |
+| 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | built (35673a6…1d75eba; 22 end-to-end tests, 1426 backend tests; Playwright: 4 passed + 1 expected failure); in review (Opus 5.5) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | in progress: migrations and artefacts done (see "Wave 3"); waiting for X1 |
 
 Merge order, whatever order they finish in: D1, V1, D2, W1, A1. After D1 merges, D2's
@@ -171,3 +171,7 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   `desktop/` or `android/` (they shouldn't).
 - **Merge glue for W1 + A1:** both appended a job to `ci.yml` and lines to `.gitignore`;
   both kept.
+- **Found by X1, not part of this work (for the final report):** a wrong password in the
+  "Confirm it's you" dialog shows the login page (any 401 is treated as a lost session:
+  `frontend/src/api/client.ts` `unwrap`, `features/auth/router.py` answers 401
+  `wrong_password`). Older code; covered by a Playwright test marked `test.fail`.
