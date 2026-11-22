@@ -27,6 +27,7 @@ const messages: Messages = {
   "last seen {when}": "востаннє в мережі {when}",
   "never connected": "ще не під’єднувався",
   "Trust of “{name}”": "Довіра до «{name}»",
+  "The token could not be copied. Select it and copy it yourself.": "Не вдалося скопіювати токен. Виділіть його й скопіюйте самостійно.",
 }
 
 export default messages

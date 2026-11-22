@@ -12,11 +12,14 @@ The interface (`Offer`, `DeviceInfo`, the four exceptions, `online`, `list_onlin
 permission: the tools do that before they call `send`.
 
 Keys (nobody outside features/devices reads them):
-  devices:online:<device_id>   the device's connection: {"conn", "control", "shell",
-                               "offered_at"} (90 s; renewed by the client's pings and
-                               offers). The offer counts for OFFER_TTL_S after offered_at.
-  devices:cmd:<conn>           pub/sub: commands for that connection, and "replaced" /
-                               "revoked" to close it
+  devices:online:<device_id>   a hash: the device's connection (`conn`) and its last offer
+                               (`control`, `shell`, `offered_at`); 90 s, renewed by the
+                               client's pings and offers. The offer counts for OFFER_TTL_S
+                               after offered_at. Changed only by the Lua scripts below,
+                               which compare `conn` first, so a late message of a replaced
+                               connection can't write itself back or delete the new one.
+  devices:cmd:<conn>           pub/sub: commands for that connection, and "replaced",
+                               "revoked", "trust_changed" to close it
   devices:res:<command_id>     the answer to one command (kept 2 minutes)
   devices:lock:<device_id>     one command at a time per device
 """
@@ -27,8 +30,9 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
+from redis.asyncio.client import PubSub
 from redis.exceptions import LockError, RedisError
 from sqlalchemy import select
 
@@ -43,6 +47,11 @@ SEND_TIMEOUT_S = 90
 ENTRY_TTL_S = 90
 RESULT_TTL_S = 120
 MAX_ERROR = 500
+# A command is only sent when at least this much of the caller's time is left after
+# waiting for its turn (or half of its whole time, for a short one): a command that would
+# time out right after reaching the device would still be carried out there, and the
+# agent's retry would do it twice.
+MIN_TURN_S = 5.0
 
 
 @dataclass(frozen=True)
@@ -97,36 +106,107 @@ def _lock_key(device_id: uuid.UUID) -> str:
     return f"devices:lock:{device_id}"
 
 
-async def _entry(device_id: uuid.UUID) -> dict[str, Any] | None:
-    raw = await get_redis().get(_online_key(device_id))
-    if not raw:
-        return None
+# KEYS[1] the online key. ARGV: conn, ttl. Takes the device for this connection; returns
+# the connection that had it.
+_CONNECT = """
+local old = redis.call('HGET', KEYS[1], 'conn')
+redis.call('DEL', KEYS[1])
+redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'offered_at', '')
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return old
+"""
+
+# ARGV: conn, ttl, has_offer ('1'/'0'), control, shell, offered_at. 0 when another
+# connection has the device.
+_RENEW = """
+local cur = redis.call('HGET', KEYS[1], 'conn')
+if cur and cur ~= ARGV[1] then return 0 end
+if not cur then
+  redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'offered_at', '')
+end
+if ARGV[3] == '1' then
+  redis.call('HSET', KEYS[1], 'control', ARGV[4], 'shell', ARGV[5], 'offered_at', ARGV[6])
+end
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return 1
+"""
+
+# ARGV: conn. Control off (the TTL stays), if this connection has the device.
+_STOPPED = """
+if redis.call('HGET', KEYS[1], 'conn') == ARGV[1] then
+  redis.call('HSET', KEYS[1], 'control', '0')
+end
+return 1
+"""
+
+# ARGV: conn. Forget the device's connection, if it is this one.
+_DISCONNECT = """
+if redis.call('HGET', KEYS[1], 'conn') == ARGV[1] then redis.call('DEL', KEYS[1]) end
+return 1
+"""
+
+
+async def _script(lua: str, device_id: uuid.UUID, *args: str | int | float) -> Any:
+    script = get_redis().register_script(lua)
+    return await script(keys=[_online_key(device_id)], args=list(args))
+
+
+async def _entry(device_id: uuid.UUID) -> dict[str, str] | None:
+    value = await get_redis().hgetall(_online_key(device_id))
+    entry = cast(dict[str, str], value)
+    return entry if entry and entry.get("conn") else None
+
+
+def _fresh_offer(entry: dict[str, str]) -> Offer | None:
     try:
-        value = json.loads(raw)
+        offered_at = float(entry.get("offered_at") or "")
     except ValueError:
         return None
-    return value if isinstance(value, dict) and isinstance(value.get("conn"), str) else None
-
-
-def _fresh_offer(entry: dict[str, Any]) -> Offer | None:
-    offered_at = entry.get("offered_at")
-    if not isinstance(offered_at, int | float) or time.time() - offered_at > OFFER_TTL_S:
+    if time.time() - offered_at > OFFER_TTL_S:
         return None
-    return Offer(control=bool(entry.get("control")), shell=bool(entry.get("shell")))
+    return Offer(control=entry.get("control") == "1", shell=entry.get("shell") == "1")
 
 
 # -- the connection's side (features/devices/ws.py) ---------------------------------------
 
 
+async def subscribe(conn: str) -> PubSub:
+    """Listen for what this connection is told. Done before `connect`, so a command sent
+    right after the device comes online has a listener."""
+    pubsub = get_redis().pubsub()
+    await pubsub.subscribe(_channel(conn))
+    return pubsub
+
+
+async def unsubscribe(pubsub: PubSub) -> None:
+    try:
+        await pubsub.unsubscribe()
+        await pubsub.aclose()
+    except (RedisError, OSError):
+        pass
+
+
+async def messages(pubsub: PubSub) -> AsyncIterator[dict[str, Any]]:
+    """What the API process holding a connection is told: commands for the device
+    ({"type": "command", "id", "action", "fields"}), and "replaced", "revoked" and
+    "trust_changed", which close the connection."""
+    async for message in pubsub.listen():
+        if message.get("type") != "message":
+            continue
+        try:
+            data = json.loads(message["data"])
+        except (ValueError, TypeError):
+            continue
+        if isinstance(data, dict):
+            yield data
+
+
 async def connect(device_id: uuid.UUID, conn: str) -> None:
     """This connection is now the device's; an older one is told it was replaced."""
     try:
-        redis = get_redis()
-        old = await _entry(device_id)
-        entry = {"conn": conn, "control": False, "shell": False, "offered_at": None}
-        await redis.set(_online_key(device_id), json.dumps(entry), ex=ENTRY_TTL_S)
-        if old is not None and old["conn"] != conn:
-            await redis.publish(_channel(old["conn"]), json.dumps({"type": "replaced"}))
+        old = await _script(_CONNECT, device_id, conn, ENTRY_TTL_S)
+        if old and old != conn:
+            await get_redis().publish(_channel(str(old)), json.dumps({"type": "replaced"}))
     except (RedisError, OSError):
         log.warning("device connection not recorded", extra={"ctx": {"device_id": str(device_id)}})
 
@@ -134,28 +214,20 @@ async def connect(device_id: uuid.UUID, conn: str) -> None:
 async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> bool:
     """The connection is alive (a ping), or sent a new offer. False when a newer
     connection of the same device replaced this one."""
+    args: list[str | int | float] = [conn, ENTRY_TTL_S, "0", "0", "0", ""]
+    if offer is not None:
+        args[2:] = ["1", "1" if offer.control else "0", "1" if offer.shell else "0", time.time()]
     try:
-        redis = get_redis()
-        entry = await _entry(device_id)
-        if entry is not None and entry["conn"] != conn:
-            return False
-        if entry is None:  # expired (or Valkey restarted): this connection is still the one
-            entry = {"conn": conn, "control": False, "shell": False, "offered_at": None}
-        if offer is not None:
-            entry.update(control=offer.control, shell=offer.shell, offered_at=time.time())
-        await redis.set(_online_key(device_id), json.dumps(entry), ex=ENTRY_TTL_S)
+        return bool(await _script(_RENEW, device_id, *args))
     except (RedisError, OSError):
         log.warning("device connection not renewed", extra={"ctx": {"device_id": str(device_id)}})
-    return True
+        return True
 
 
-async def stopped(device_id: uuid.UUID) -> None:
+async def stopped(device_id: uuid.UUID, conn: str) -> None:
     """The user took control away: no control until the next offer with control on."""
     try:
-        entry = await _entry(device_id)
-        if entry is not None:
-            entry["control"] = False
-            await get_redis().set(_online_key(device_id), json.dumps(entry), keepttl=True)
+        await _script(_STOPPED, device_id, conn)
     except (RedisError, OSError):
         log.warning("device stop not recorded", extra={"ctx": {"device_id": str(device_id)}})
 
@@ -163,24 +235,29 @@ async def stopped(device_id: uuid.UUID) -> None:
 async def disconnect(device_id: uuid.UUID, conn: str) -> None:
     """The connection closed: the device is offline, unless a newer connection has it."""
     try:
-        entry = await _entry(device_id)
-        if entry is not None and entry["conn"] == conn:
-            await get_redis().delete(_online_key(device_id))
+        await _script(_DISCONNECT, device_id, conn)
     except (RedisError, OSError):
         log.warning("device disconnect not recorded", extra={"ctx": {"device_id": str(device_id)}})
 
 
-async def close(device_id: uuid.UUID) -> None:
-    """Close the device's connection now (it was deleted)."""
+async def tell(device_id: uuid.UUID, what: Literal["revoked", "trust_changed"]) -> None:
+    """Close the device's connection now: "revoked" (the device was deleted) or
+    "trust_changed" (it reconnects and reads the new trust level from `welcome`)."""
     try:
         entry = await _entry(device_id)
         if entry is not None:
-            redis = get_redis()
-            await redis.publish(_channel(entry["conn"]), json.dumps({"type": "revoked"}))
-            await redis.delete(_online_key(device_id))
+            await get_redis().publish(_channel(entry["conn"]), json.dumps({"type": what}))
+            if what == "revoked":
+                await _script(_DISCONNECT, device_id, entry["conn"])
     except (RedisError, OSError):
-        # The connection still closes within a minute, when its token is checked again.
-        log.warning("device connection not closed", extra={"ctx": {"device_id": str(device_id)}})
+        # A deleted device's connection still closes within a minute (its token is checked
+        # again); a trust change reaches the client on its next connection.
+        log.warning("device connection not told", extra={"ctx": {"device_id": str(device_id)}})
+
+
+async def close(device_id: uuid.UUID) -> None:
+    """Close the device's connection now (it was deleted)."""
+    await tell(device_id, "revoked")
 
 
 async def answer(command_id: str, payload: dict[str, Any]) -> None:
@@ -192,26 +269,6 @@ async def answer(command_id: str, payload: dict[str, Any]) -> None:
         await redis.expire(key, RESULT_TTL_S)
     except (RedisError, OSError):
         log.warning("device answer lost")
-
-
-async def messages(conn: str) -> AsyncIterator[dict[str, Any]]:
-    """What the API process holding this connection is told: commands for the device
-    ({"type": "command", "id", "action", "fields"}), "replaced" and "revoked"."""
-    pubsub = get_redis().pubsub()
-    await pubsub.subscribe(_channel(conn))
-    try:
-        async for message in pubsub.listen():
-            if message.get("type") != "message":
-                continue
-            try:
-                data = json.loads(message["data"])
-            except (ValueError, TypeError):
-                continue
-            if isinstance(data, dict):
-                yield data
-    finally:
-        await pubsub.unsubscribe(_channel(conn))
-        await pubsub.aclose()
 
 
 # -- the worker's side (CONTRACTS-devices.md §1) ------------------------------------------
@@ -233,16 +290,15 @@ async def list_online() -> list[DeviceInfo]:
     if not devices:
         return []
     try:
-        raws = await get_redis().mget([_online_key(d.id) for d in devices])
+        async with get_redis().pipeline(transaction=False) as pipe:
+            for device in devices:
+                pipe.hgetall(_online_key(device.id))
+            entries = await pipe.execute()
     except (RedisError, OSError):
         return []
     found: list[DeviceInfo] = []
-    for device, raw in zip(devices, raws, strict=True):
-        if not raw:
-            continue
-        try:
-            entry = json.loads(raw)
-        except ValueError:
+    for device, entry in zip(devices, entries, strict=True):
+        if not entry or not entry.get("conn"):
             continue
         offer = _fresh_offer(entry) if device.kind == "computer" else None
         found.append(
@@ -275,7 +331,13 @@ async def send(
 ) -> dict[str, Any]:
     """Send one command and wait for its answer: the client's `state`. One command at a
     time per device. Raises Unavailable, Stopped, Refused or ActionFailed; the message is
-    the sentence to show the agent."""
+    the sentence to show the agent.
+
+    After a timeout the device may still be carrying the command out, or answer it late:
+    that answer goes to the command's own key and is never read (it expires). The lock is
+    released, so the next command is sent at once; the client runs commands one at a time
+    in order, so it starts only after the late one, and that wait counts against the next
+    command's own timeout."""
     deadline = time.monotonic() + timeout_s
     redis = get_redis()
     lock = redis.lock(_lock_key(device_id), timeout=timeout_s + 5, blocking_timeout=timeout_s)
@@ -285,6 +347,9 @@ async def send(
     except (RedisError, OSError) as exc:
         raise Unavailable("Valkey is unavailable") from exc
     try:
+        remaining = deadline - time.monotonic()
+        if remaining < min(MIN_TURN_S, timeout_s / 2):
+            raise Unavailable("The device is still busy with another command")
         try:
             entry = await _entry(device_id)
             if entry is None:

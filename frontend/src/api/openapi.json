@@ -14211,6 +14211,7 @@
           "devices"
         ],
         "summary": "Rename Device",
+        "description": "Rename the device. Needs a browser login: the agent finds devices by name, so a\ndevice's token must not be able to rename (or swap) them.",
         "operationId": "rename_device_api_devices__device_id__patch",
         "parameters": [
           {
@@ -21932,7 +21933,6 @@
             "type": "string",
             "maxLength": 100,
             "minLength": 1,
-            "pattern": "\\S",
             "title": "Name"
           },
           "kind": {
@@ -22049,7 +22049,6 @@
             "type": "string",
             "maxLength": 100,
             "minLength": 1,
-            "pattern": "\\S",
             "title": "Name"
           }
         },

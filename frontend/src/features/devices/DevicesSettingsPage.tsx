@@ -27,8 +27,12 @@ const TRUST = [
 function NewDevice({ name, kind, token, onDone }: { name: string; kind: DeviceKind; token: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
-    await navigator.clipboard.writeText(token)
-    setCopied(true)
+    try {
+      await navigator.clipboard.writeText(token)
+      setCopied(true)
+    } catch {
+      toast({ message: t('The token could not be copied. Select it and copy it yourself.') })
+    }
   }
   return (
     <div className="flex flex-col gap-2 rounded-control border border-border bg-surface-2 p-3" role="status">

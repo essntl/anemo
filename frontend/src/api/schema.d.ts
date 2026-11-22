@@ -3424,7 +3424,11 @@ export interface paths {
         delete: operations["delete_device_api_devices__device_id__delete"];
         options?: never;
         head?: never;
-        /** Rename Device */
+        /**
+         * Rename Device
+         * @description Rename the device. Needs a browser login: the agent finds devices by name, so a
+         *     device's token must not be able to rename (or swap) them.
+         */
         patch: operations["rename_device_api_devices__device_id__patch"];
         trace?: never;
     };

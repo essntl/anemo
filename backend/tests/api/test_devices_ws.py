@@ -432,3 +432,113 @@ async def test_a_computer_gets_no_events(authed):
     await bus.publish_global("run.status", {"run_id": str(run), "status": "running"})
     await roundtrip(ws)
     await ws.disconnect()
+
+
+# -- review fixes ------------------------------------------------------------------------------
+
+
+async def test_a_trust_change_closes_the_connection_so_the_client_reads_it_again(authed):
+    vm = await add(authed, "VM")
+    ws, welcome = await welcomed(vm["token"])
+    assert welcome["device"]["trust"] == "watched"
+    r = await authed.put(f"/api/devices/{vm['id']}/trust", json={"trust": "trusted"})
+    assert r.status_code == 200
+    assert await ws.closed_with(within=3) == dws.CLOSE_TRUST_CHANGED == 1012
+    again, welcome = await welcomed(vm["token"])
+    assert welcome["device"]["trust"] == "trusted"
+    # The same level again changes nothing: the connection stays.
+    await authed.put(f"/api/devices/{vm['id']}/trust", json={"trust": "trusted"})
+    await roundtrip(again)
+    await again.disconnect()
+
+
+async def test_no_command_is_sent_when_too_little_time_is_left(authed, monkeypatch):
+    monkeypatch.setattr(relay, "MIN_TURN_S", 1.0)
+    vm = await add(authed)
+    device_id = uuid.UUID(vm["id"])
+    ws, _ = await welcomed(vm["token"])
+    first = asyncio.create_task(relay.send(device_id, "look", {}, timeout_s=5))
+    one = await ws.json()
+    second = asyncio.create_task(relay.send(device_id, "click", {"ref": "c1"}, timeout_s=2))
+    await asyncio.sleep(1.3)  # the second waits its turn until less than 1 s is left
+    await ws.send({"type": "device.result", "id": one["id"], "ok": True, "state": {}})
+    assert await first == {}
+    with pytest.raises(relay.Unavailable, match="busy"):
+        await second
+    with pytest.raises(TimeoutError):
+        await ws.json(within=0.3)  # the click never reached the device
+    await ws.disconnect()
+
+
+async def test_an_answer_too_large_fails_the_command_at_once(authed, monkeypatch):
+    monkeypatch.setattr(dws, "MAX_RESULT", 6000)
+    vm = await add(authed)
+    ws, _ = await welcomed(vm["token"])
+    sending = asyncio.create_task(relay.send(uuid.UUID(vm["id"]), "look", {}, timeout_s=10))
+    command = await ws.json()
+    huge = {"x": "y" * 7000}
+    await ws.send({"type": "device.result", "id": command["id"], "ok": True, "state": huge})
+    with pytest.raises(relay.ActionFailed, match="too large"):
+        await asyncio.wait_for(sending, 3)
+    # Under the computer limit (though over the small one) it goes through.
+    sending = asyncio.create_task(relay.send(uuid.UUID(vm["id"]), "look", {}, timeout_s=10))
+    command = await ws.json()
+    big = {"x": "y" * 5000}
+    await ws.send({"type": "device.result", "id": command["id"], "ok": True, "state": big})
+    assert await asyncio.wait_for(sending, 3) == big
+    await ws.disconnect()
+
+
+async def test_a_phone_has_the_small_limit(authed):
+    phone = await add(authed, "Phone", kind="phone")
+    ws, _ = await welcomed(phone["token"], kind="phone")
+    await ws.send({"type": "device.result", "id": "x", "ok": True, "state": {"x": "y" * 5000}})
+    await roundtrip(ws)  # dropped, and the connection goes on
+    await ws.disconnect()
+
+
+async def test_a_late_message_of_a_replaced_connection_changes_nothing(authed):
+    vm = await add(authed)
+    device_id = uuid.UUID(vm["id"])
+    await relay.connect(device_id, "old")
+    await relay.connect(device_id, "new")
+    assert await relay.renew(device_id, "old", relay.Offer(control=True, shell=True)) is False
+    await relay.disconnect(device_id, "old")
+    await relay.stopped(device_id, "old")
+    assert await relay.renew(device_id, "new", relay.Offer(control=True, shell=False)) is True
+    assert await relay.online(device_id) == relay.Offer(control=True, shell=False)
+    await relay.disconnect(device_id, "new")
+    assert await relay.list_online() == []
+
+
+async def test_a_failed_welcome_leaves_the_device_offline(authed, monkeypatch):
+    async def broken() -> str:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(dws, "_head", broken)
+    vm = await add(authed)
+    ws = await hello(vm["token"])
+    with pytest.raises(RuntimeError):
+        await asyncio.wait_for(ws.task, 5)
+    assert await relay.list_online() == []
+
+
+async def test_the_hello_must_be_one_small_text_frame(authed):
+    vm = await add(authed)
+    ws = WsClient(PATH, {})
+    await ws.connect()
+    await ws.inbox.put({"type": "websocket.receive", "bytes": b'{"type": "hello"}'})
+    assert await ws.closed_with() == dws.CLOSE_BAD_HELLO
+    ws = WsClient(PATH, {})
+    await ws.connect()
+    await ws.send({"type": "hello", "token": vm["token"], "kind": "computer", "pad": "x" * 5000})
+    assert await ws.closed_with() == dws.CLOSE_BAD_HELLO
+
+
+async def test_a_malformed_cursor_counts_as_none(authed):
+    phone = await add(authed, "Phone", kind="phone")
+    head = await bus.latest_global_id()
+    for bad in ("nonsense", "1-2-3", "-1"):
+        ws, welcome = await welcomed(phone["token"], kind="phone", last_id=bad)
+        assert welcome["missed"] is False and welcome["cursor"] == (head or "0-0")
+        await ws.disconnect()

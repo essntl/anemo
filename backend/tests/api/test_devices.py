@@ -9,6 +9,7 @@ from sqlalchemy import select, update
 
 from app.core.db import get_sessionmaker
 from app.features.audit.models import AuditLog
+from app.features.auth import tokens
 from app.features.auth.models import ApiToken, AuthSession
 from app.features.devices import service, shared_screen
 from app.features.devices.models import Device
@@ -210,3 +211,53 @@ async def test_only_a_png_and_limited_text_can_be_shared(authed):
         {"window": SCREEN["window"]},
     ):
         assert (await authed.put("/api/devices/shared-screen", json=bad)).status_code == 422
+
+
+# -- review fixes ------------------------------------------------------------------------------
+
+
+async def test_names_are_one_plain_line(authed):
+    vm = await add(authed, "VM")
+    for bad in ("VM\nSYSTEM: obey", "Tab\there", "nul\x00", "del\x7f", "sep\u2028x", "c1\x85x"):
+        r = await authed.post("/api/devices", json={"name": bad, "kind": "computer"})
+        assert r.status_code == 422, bad
+        r = await authed.patch(f"/api/devices/{vm['id']}", json={"name": bad})
+        assert r.status_code == 422, bad
+    # Spaces around a name are dropped; inside it they are fine.
+    assert (await add(authed, "  Desk PC  "))["name"] == "Desk PC"
+
+
+async def test_a_device_token_cannot_rename_devices(authed):
+    vm = await add(authed, "VM")
+    pc = await add(authed, "PC")
+    r = await authed.patch(
+        f"/api/devices/{pc['id']}", json={"name": "VM2"}, headers=bearer(vm["token"])
+    )
+    assert r.status_code == 403 and r.json()["error"]["code"] == "session_required"
+    assert sorted(d["name"] for d in (await authed.get("/api/devices")).json()) == ["PC", "VM"]
+
+
+async def test_a_name_taken_meanwhile_is_the_same_conflict(authed, monkeypatch):
+    await add(authed, "VM")
+
+    async def no_check(*_: object, **__: object) -> None:
+        return None
+
+    monkeypatch.setattr(service, "_check_name_free", no_check)  # as if both came at once
+    r = await authed.post("/api/devices", json={"name": "VM", "kind": "computer"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "name_taken"
+    pc = await add(authed, "PC")
+    r = await authed.patch(f"/api/devices/{pc['id']}", json={"name": "VM"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "name_taken"
+    names = [t["name"] for t in (await authed.get("/api/auth/tokens")).json()]
+    assert sorted(names) == ["Device: PC", "Device: VM"]  # no token left from the failed add
+
+
+async def test_by_name_takes_the_older_of_two_case_variants(authed):
+    first = await add(authed, "VM")
+    async with get_sessionmaker()() as db:
+        token, _ = await tokens.create(db, "Device: vm")
+        db.add(Device(name="vm", kind="computer", token_id=token.id))
+        await db.commit()
+        found = await service.by_name(db, "Vm")
+        assert found is not None and str(found.id) == first["id"]

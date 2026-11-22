@@ -3,11 +3,13 @@
 The device's own connection is features/devices/ws.py.
 """
 
+import re
 import uuid
 from datetime import datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field
 
 from app.api.deps import BrowserSession, CurrentSession, Db, RecentAuth, client_ip
 from app.features.devices import relay, service, shared_screen
@@ -16,14 +18,33 @@ from app.features.devices.models import Device, Kind, Trust
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 
+# Control characters (line breaks included) and line/paragraph separators. A name reaches
+# the agent's turn context, so it must stay one plain line.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
+
+
+def _plain_name(value: str) -> str:
+    if _CONTROL.search(value):
+        raise ValueError("must be one line without control characters")
+    return value
+
+
+DeviceName = Annotated[
+    str,
+    BeforeValidator(lambda v: v.strip() if isinstance(v, str) else v),
+    Field(min_length=1, max_length=100),
+    AfterValidator(_plain_name),
+]
+
+
 class DeviceIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100, pattern=r"\S")
+    name: DeviceName
     kind: Kind
     trust: Trust = "watched"
 
 
 class DeviceRenameIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100, pattern=r"\S")
+    name: DeviceName
 
 
 class DeviceTrustIn(BaseModel):
@@ -132,8 +153,10 @@ async def add_device(body: DeviceIn, request: Request, _: RecentAuth, db: Db) ->
 
 @router.patch("/{device_id}", response_model=DeviceOut)
 async def rename_device(
-    device_id: uuid.UUID, body: DeviceRenameIn, request: Request, db: Db
+    device_id: uuid.UUID, body: DeviceRenameIn, request: Request, _: BrowserSession, db: Db
 ) -> DeviceOut:
+    """Rename the device. Needs a browser login: the agent finds devices by name, so a
+    device's token must not be able to rename (or swap) them."""
     device = await service.rename(db, device_id, body.name, ip=client_ip(request))
     return (await _out([device]))[0]
 

@@ -34,6 +34,8 @@ vi.mock('./api', () => ({
   useSetTrust: () => ({ mutate: setTrust, isPending: false }),
   useDeleteDevice: () => ({ mutate: remove }),
 }))
+const toastMessages = vi.hoisted(() => [] as string[])
+vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string }) => toastMessages.push(o.message) }))
 const confirm = vi.fn()
 const prompt = vi.fn()
 vi.mock('@/components/ui/dialogs', () => ({
@@ -42,6 +44,9 @@ vi.mock('@/components/ui/dialogs', () => ({
 }))
 
 const { DevicesSettingsPage } = await import('./DevicesSettingsPage')
+
+// The trust menu (Radix Select) scrolls to the chosen option, which jsdom can't do.
+Element.prototype.scrollIntoView ??= () => {}
 
 const row = (name: string) => screen.getAllByTestId('device-row').find((r) => r.textContent?.includes(name))!
 
@@ -92,5 +97,23 @@ describe('Settings → Devices', () => {
     confirm.mockResolvedValueOnce(true)
     await userEvent.click(within(row('Desk PC')).getByRole('button', { name: 'Delete' }))
     expect(remove).toHaveBeenCalledWith('d2', expect.anything())
+  })
+
+  it('changes the trust level through its menu', async () => {
+    render(<DevicesSettingsPage />)
+    within(row('Desk PC')).getByRole('combobox', { name: 'Trust of “Desk PC”' }).focus()
+    await userEvent.keyboard('{Enter}')
+    await userEvent.click(await screen.findByRole('option', { name: 'Trusted' }))
+    expect(setTrust).toHaveBeenCalledWith({ id: 'd2', trust: 'trusted' }, expect.anything())
+  })
+
+  it('says so when the token cannot be copied', async () => {
+    render(<DevicesSettingsPage />)
+    await userEvent.type(screen.getByLabelText('Name'), 'Laptop')
+    await userEvent.click(screen.getByRole('button', { name: 'Add device' }))
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('denied')) } })
+    await userEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    expect(toastMessages).toContain('The token could not be copied. Select it and copy it yourself.')
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
   })
 })
