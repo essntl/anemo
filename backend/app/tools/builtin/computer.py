@@ -45,6 +45,7 @@ from app.tools.builtin.web import UNTRUSTED
 SEE = "computer.see"
 ACT = "computer.act"
 SHELL = "computer.shell"
+COMPUTER_CAPS = (SEE, ACT, SHELL)
 
 # How long the worker waits for an answer (CONTRACTS-devices.md §1): 90 s, and for
 # PowerShell the command's own timeout plus 15 s.
