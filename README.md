@@ -6,7 +6,8 @@
 
 <p align="center">
   <b>A self-hosted AI workspace for one person: chat, agents that ask before they act,
-  and your own documents, files, tasks and calendar for them to work on.</b>
+  and your own documents, files, tasks and calendar for them to work on. Talk to it
+  from your phone, and let it use your computers.</b>
 </p>
 
 <p align="center">
@@ -14,6 +15,15 @@
   <a href="LICENSE"><img alt="License: GPL-2.0" src="https://img.shields.io/github/license/essntl/anemo"></a>
   <a href="https://github.com/essntl/anemo/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/essntl/anemo"></a>
 </p>
+
+- **Chat and agents** with the models you choose, yours by API key, local, or your Claude
+  subscription.
+- **A workspace you share with them**: Markdown documents, files, tasks, a calendar.
+- **Permissions on every tool call**: an agent asks before it does what you haven't
+  allowed.
+- **Automations** that run prompts on a schedule, and notifications when they need you.
+- **Voice and devices**: say a wake word to your Android phone and hear the answer; let
+  the agent see and use your Windows computers, each with its own trust level.
 
 Anemo runs on your own server (a homelab box, a NAS, ZimaOS) with Docker Compose. You
 bring the models: an API key for OpenAI, Anthropic or OpenRouter, a local model in
@@ -89,7 +99,8 @@ person, run a second copy.
 
 - **Voice from your phone** (Anemo Voice, Android): say the wake word and what you want;
   it runs as an agent request and the phone reads the answer out. Questions and
-  approvals are answered by voice, except dangerous actions, which need a tap.
+  approvals are answered by voice, except dangerous actions, which need a tap. Voice
+  requests can have a small, fast model of their own (**Settings → Voice**).
 - **Your Windows computers** (Anemo Desktop): a tray program that lets the agent look at
   the screen, click, type, open programs and, on a trusted computer, run PowerShell.
   Each computer has its own trust level: on your own PC every action asks; the agent's
@@ -135,6 +146,14 @@ Fill in the `CHANGE_ME`s in
 Use the terminal rather than the ZimaOS app import, which rewrites the file:
 [why](docs/deployment.md#zimaos--casaos).
 
+**The apps for your devices**
+
+Anemo Desktop (Windows) and Anemo Voice (Android) are built from this repository:
+[`desktop/`](desktop/README.md) gives one `.exe` with nothing to install, and
+[`android/`](android/README.md) an APK you copy to the phone. Add each device in
+**Settings → Devices** and paste its token into the app:
+[step by step](docs/deployment.md#anemo-desktop-and-anemo-voice).
+
 Then: [HTTPS behind Nginx Proxy Manager](docs/deployment.md#behind-nginx-proxy-manager) ·
 [backups](docs/backup.md) · [updates](docs/deployment.md#updating) ·
 [more than one copy](docs/deployment.md#more-than-one-copy-on-a-server).
@@ -146,7 +165,8 @@ Then: [HTTPS behind Nginx Proxy Manager](docs/deployment.md#behind-nginx-proxy-m
 - [Backup and restore](docs/backup.md)
 - [Security and permissions](docs/security.md)
 - [Claude subscription](docs/claude-code.md)
-- [Browser extension](extension/README.md)
+- [Browser extension](extension/README.md) · [Windows client](desktop/README.md) ·
+  [Android app](android/README.md)
 - [Architecture](docs/architecture.md) · [Development](docs/development.md) ·
   [Roadmap](docs/roadmap.md)
 

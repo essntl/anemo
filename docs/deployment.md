@@ -275,6 +275,15 @@ token from the general token list closes the connection within a minute.
 - The wake word models are not in the APK: in the app's settings, choose a word and tap
   **Download the wake word models** (from openWakeWord's release on GitHub, checked
   against pinned hashes).
+- Answers are spoken by the phone's own text-to-speech engine (the phone's settings →
+  *Text-to-speech output*). Tap **Play** there: if nothing is said in your language, as
+  on phones without Google's speech services (a Chinese Xiaomi ROM, for example),
+  install another engine such as RHVoice, download a voice in it and choose it as the
+  preferred engine. On Xiaomi, also allow that engine to start by itself (*Autostart*).
+  If the engine can't be started, the app says so on its main screen.
+- Voice requests run with the Agent model unless you choose another under **Settings →
+  Voice → Model for voice requests**; a small, fast model that handles tools is enough
+  for most spoken requests.
 - After a reboot, open the app or tap its quick-settings tile once: Android doesn't let
   an app start the microphone from the background.
 
