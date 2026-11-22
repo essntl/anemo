@@ -257,3 +257,10 @@ sh ../anemo-progress/backend.sh <id> fmt                    ruff --fix and forma
 
 Frontend checks: `cd frontend && npm ci && npm run typecheck && npm run lint && npm run
 lint:imports && npm test`.
+
+Clients on this machine: W1 builds with the .NET 8 SDK on `PATH`. A1 sets
+`JAVA_HOME=C:/Program Files/Java/jdk-17`, writes `android/local.properties` with
+`sdk.dir=C:/Users/user/AppData/Local/Android/Sdk` (forward slashes; never committed) and
+creates the wrapper with `C:/Users/user/AppData/Local/Gradle/gradle-8.14.3/bin/gradle
+wrapper`. Installed: `platforms;android-35`, `build-tools;35.0.0`; a build that needs
+another SDK package downloads it itself (the licences are accepted).

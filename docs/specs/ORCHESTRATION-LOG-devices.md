@@ -48,7 +48,8 @@ package is reviewed by a fresh Opus 5.5 sub-agent that didn't build it.
 |---|---|
 | .NET SDK 8.0.428 | installed; see "Baseline" for the Windows-targeted publish check |
 | JDK 17.0.12 | installed at `C:\Program Files\Java\jdk-17`, not on `PATH` and no `JAVA_HOME`: A1 sets `JAVA_HOME` itself |
-| Android SDK, Gradle | **not installed** (the user's choice so far) |
+| Android SDK | installed by the orchestrator with the user's OK (licences accepted) at `C:/Users/user/AppData/Local/Android/Sdk`: command-line tools, `platform-tools`, `platforms;android-35`, `build-tools;35.0.0`. No `ANDROID_HOME` is set: `android/local.properties` (not committed) names it |
+| Gradle 8.14.3 | at `C:/Users/user/AppData/Local/Gradle/gradle-8.14.3` (only to create the wrapper). A probe app (AGP 8.7.3, Kotlin 2.0.21, compileSdk 35) passed `./gradlew test assembleDebug` |
 | `make` | not installed; `../anemo-progress/backend.sh` runs the same commands |
 | Docker, Python, uv, Node 24 | present |
 
@@ -84,7 +85,6 @@ package is reviewed by a fresh Opus 5.5 sub-agent that didn't build it.
 2. **Approvals that expire** (the run ended while one was pending) publish nothing, so a
    phone stops asking only on the run's terminal `run.status`. Fine unless you want an
    explicit `approval.decided` with a third value, which would be a wire change.
-3. **Android SDK**: see the summary given to the user at the end of wave 0.
 
 ## Decisions during the waves
 
