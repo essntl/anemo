@@ -24,10 +24,10 @@ Claude Opus 5.5 (`model: "opus"`).
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | **merged** (d9c72f4) after review fixes (5c057ef); suite on the integration branch: see below |
-| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | reviewed (Opus 5.5): no blockers; PowerShell rating gaps, `open` filter, grant scope + notes; sent back to its builder |
-| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | review fixes in (1ad78c6; 1270 backend tests); ready to merge after D1 (orchestrator checks the fix diff first) |
+| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | review fixes in (fb247b4, 7bf81a3; 1313 backend tests); next to merge, after its tests run against the real relay |
+| 1 | V1 voice backend | `feat/v1` | Opus 5.5 | **merged** (8cd3db2) after review fixes (1ad78c6); two one-line conflicts with D1 resolved, schema regenerated |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (password fields reachable through `press`, paste and Tab) + fixes; sent back to its builder |
-| 1 | A1 Android app | `feat/a1` | Opus 5.5 | built (1e09bda; 96 JVM tests, debug APK ~43 MB; never run on a phone); in review (Opus 5.5) |
+| 1 | A1 Android app | `feat/a1` | Opus 5.5 | reviewed (Opus 5.5): no blockers, 8 should-fix (crash after Stop, unbounded reply listening, error messages, notices…); sent back to its builder |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
 
@@ -93,6 +93,12 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   it reports, and wire `computer.current_shared_screen` at D2's merge.
 - **D2 notes to check in review:** clicks/typing/keys set `contacts_people` (automations
   ask), beyond the spec's wording; PowerShell rules added on top of `shell_risk`.
+- **A1 review (orchestrator).** Sent back: the eight should-fix items and the notes. The
+  phone now always sends the last `conversation_id` (the server enforces the window).
+  Spec 05 corrected: openWakeWord's models are CC BY-NC-SA, downloaded, not shipped.
+  **For the owner (final report):** the repo is GPL v2; the APK links Apache-2.0
+  libraries, which the FSF considers incompatible with GPLv2-only.
+- **Suite after D1's merge:** 1268 backend, 565 frontend, `alembic check` clean.
 - **A1 points:** openWakeWord's models are not bundled (CC BY-NC-SA; downloaded with one
   tap in Settings from the official release); a Status button instead of a spoken
   "status" (the server does answer a recording that is only "status"); nothing is fetched

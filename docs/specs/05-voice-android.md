@@ -102,7 +102,9 @@ Kotlin, one module, no Google Play services needed. Package `app.anemo.voice`.
   at 16 kHz mono 16-bit, 80 ms frames into the wake word detector. On a Bluetooth headset
   it routes input with `AudioManager.setCommunicationDevice` (Android 12+) or SCO before
   that.
-- **Wake word**: openWakeWord models (Apache 2.0) run with ONNX Runtime for Android. A
+- **Wake word**: openWakeWord (code Apache 2.0) run with ONNX Runtime for Android. Its
+  pre-trained models are CC BY-NC-SA 4.0, so they are not shipped in the app: it downloads
+  them from openWakeWord's release when you choose a word in Settings. A
   pre-trained word to start; a custom one ("Hey Anemo") can be trained with openWakeWord's
   notebook and dropped into the app as a `.onnx` file. Porcupine is the alternative if
   openWakeWord's false wakes are too many; it needs a Picovoice access key.
