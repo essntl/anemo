@@ -73,6 +73,8 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
     // Real org.json on the JVM (android.jar only has stubs).
     testImplementation("org.json:json:20240303")
+    // Runs the history DAO's SQL on SQLite on the JVM.
+    testImplementation("org.xerial:sqlite-jdbc:3.46.1.3")
     // The desktop ONNX Runtime has the same Java API as the Android one and runs the
     // bundled models on the JVM; the Android artefact is taken off the test classpath below.
     testRuntimeOnly("com.microsoft.onnxruntime:onnxruntime:$onnxVersion")
