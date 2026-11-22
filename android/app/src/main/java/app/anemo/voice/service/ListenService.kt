@@ -5,6 +5,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.service.quicksettings.TileService
 import android.content.ComponentName
@@ -50,11 +51,12 @@ class ListenService : Service() {
         // The notification first: never a microphone without it.
         val first = Status(listen = ListenState.Listening, connection = Connection.Connecting)
         StatusBus.update { first }
-        startForeground(
-            ListenNotification.ID,
-            ListenNotification.build(this, first, settings.wakeWordName),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
-        )
+        val notification = ListenNotification.build(this, first, settings.wakeWordName)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            startForeground(ListenNotification.ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+        } else {
+            startForeground(ListenNotification.ID, notification)
+        }
         StatusBus.observe(statusListener)
         try {
             runtime = VoiceRuntime(this, settings, StatusBus::update).also { it.start() }

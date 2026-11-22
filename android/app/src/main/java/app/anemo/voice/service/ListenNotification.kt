@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import app.anemo.voice.R
 import app.anemo.voice.core.ListenState
 import app.anemo.voice.ui.MainActivity
@@ -28,7 +29,7 @@ object ListenNotification {
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
-        return Notification.Builder(context, CHANNEL)
+        val builder = Notification.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title(status, wakeWord))
             .setContentText(detail(status))
@@ -36,11 +37,13 @@ object ListenNotification {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
-            .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
             .addAction(action(context, if (paused) "Resume" else "Pause", if (paused) ListenService.RESUME else ListenService.PAUSE, 1))
             .addAction(action(context, "Status", ListenService.STATUS, 2))
             .addAction(action(context, "Stop", ListenService.STOP, 3))
-            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+        }
+        return builder.build()
     }
 
     /** The title, as spec 05 words it while listening. */
