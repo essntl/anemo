@@ -17,7 +17,17 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 - [ ] Pause: the microphone indicator goes away; Resume brings it back. Stop: notification
       and indicator go away.
 - [ ] Quick-settings tile: add it, switch on and off; its state follows the app.
+- [ ] Android 14+: swipe the app away, then tap the tile: it either starts listening or
+      opens the app, and never crashes.
 - [ ] Anemo's Settings → Devices shows the phone as connected (WebSocket through NPM).
+- [ ] While listening, block the "Listening" channel in Android's app settings: listening
+      stops and a "stopped listening" notification says why.
+- [ ] While listening, turn all of Anemo Voice's notifications off: listening stops.
+- [ ] Android 14+: swipe the listening notification away: listening stops.
+- [ ] With the channel blocked, Start listening refuses and says why.
+- [ ] Android 15: the main screen, Settings (the Save button) and About are not under the
+      status or navigation bar.
+- [ ] About and licences shows the notices; "ONNX Runtime notices" too.
 
 ## Wake word and recording
 
@@ -38,11 +48,12 @@ Settings → Devices. Write down the phone, the Android version and what you saw
       answer is spoken, and the history shows heard / request / answer; tapping it opens
       the chat in the browser.
 - [ ] Music playing: it ducks while the answer is spoken, and comes back after.
-- [ ] Within 5 minutes: "and move it to Friday" continues the same chat. After 5 minutes a
-      new turn starts.
+- [ ] Within Anemo's follow-up window (Settings → Voice, 5 minutes by default): "and move it
+      to Friday" continues the same chat. After it, a new turn starts.
 - [ ] The **Status** button (app or notification) speaks what is running.
-- [ ] Anemo without a transcription model: the phone says so and names *Transcription*
-      in *Settings, Providers and Models*.
+- [ ] Anemo without a transcription model: the phone speaks Anemo's message, which names
+      the setting.
+- [ ] Wake word, then a cough only: Anemo's "Sorry, I didn't catch that." is spoken.
 - [ ] TTS voice and speed from Settings are used (try a different voice and 1.5×).
 
 ## Questions, approvals and plans by voice
@@ -60,6 +71,11 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 - [ ] Plan review on: "Here is the plan", up to six steps, "and N more", "Go ahead?" →
       "yes" accepts the plan.
 - [ ] Decide an approval in the web app while the phone is asking: the phone stops.
+- [ ] Two approvals at once: they are asked one after the other, each with the reply
+      sound (also with "Start and stop sounds" off).
+- [ ] An answer (voice.say) that arrives while you are speaking a request: it is spoken
+      after the recording ends.
+- [ ] A reply that goes on: it stops 15 s after you started speaking.
 
 ## Connection
 
@@ -71,6 +87,18 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 - [ ] A second phone install with the same token: the older one says "Another connection
       of this phone took over".
 - [ ] A plain `http://` address is refused in Settings.
+- [ ] Change the phone's trust level in Anemo while listening: it reconnects at once
+      (close code 1012) and keeps working.
+- [ ] A recording over the proxy's upload limit (if NPM has one): "Anemo did not accept
+      the recording" (not "could not reach").
+
+## The microphone taken away
+
+- [ ] A phone call during listening: listening survives or recovers after the call; no
+      speech is spoken over the call.
+- [ ] Another app records (a voice recorder, a video call): the notification says when
+      Anemo Voice stops, or it recovers afterwards; it never crashes.
+- [ ] The answer is being spoken when a call comes in: speech stops.
 
 ## Bluetooth headset
 
@@ -78,9 +106,11 @@ Settings → Devices. Write down the phone, the Android version and what you saw
       works through the headset microphone (Android 12+: `setCommunicationDevice`; Android
       10–11: SCO). Answers play in the headset.
 - [ ] Connect and disconnect the headset while listening: input follows it.
+- [ ] Disconnect the headset in the middle of a recording: the recording ends or is
+      dropped, listening continues on the phone's microphone.
+- [ ] Music quality in the headset while listening with the headset microphone (HFP is
+      mono and narrow-band): note it; turn the setting off if it is too bad.
 - [ ] Setting off: the phone's own microphone is used even with a headset connected.
-- [ ] Note the effect on music quality while listening through the headset (SCO/HFP is
-      mono, narrow-band).
 
 ## Reboot and battery
 

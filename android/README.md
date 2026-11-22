@@ -16,9 +16,8 @@ cd android
 
 The debug-signed APK is `app/build/outputs/apk/debug/app-debug.apk`. It needs JDK 17 and
 the Android SDK (platform 35, build-tools 35.0.0): set `ANDROID_HOME`, or write
-`android/local.properties` with `sdk.dir=…` (never committed). On the maintainer's Windows
-machine: `JAVA_HOME="C:/Program Files/Java/jdk-17"` and
-`sdk.dir=C:/Users/user/AppData/Local/Android/Sdk`.
+`android/local.properties` with `sdk.dir=<your SDK path>` (forward slashes on Windows;
+never committed).
 
 `./gradlew test` runs everything on the JVM, against a fake Anemo (OkHttp's
 MockWebServer, `app/src/test/.../net/FakeAnemo.kt`) that speaks the device contract. The
@@ -46,8 +45,10 @@ microphone from the background, and the app doesn't try to get around that.
 ```
 app/src/main/java/app/anemo/voice/
   core/      the logic, plain Kotlin: VoiceController (listen → record → upload → speak →
-             reply), Endpointer (end of speech), Wav, FollowUpWindow, Phrases (what the
-             phone says itself), Ports (the interfaces the platform implements)
+             reply), VoiceSession (microphone, connection and loop started and stopped
+             together, microphone recovery), Endpointer (end of speech), ReplyBudget, Wav,
+             Phrases (what the phone says itself), Ports (the interfaces the platform
+             implements)
   net/       Address, VoiceApi (POST /api/voice/turns and /replies), DeviceSocket (the
              WebSocket: hello, ping, reconnect with back-off, last_id), Protocol (JSON)
   ml/        OpenWakeWord and SileroVad on ONNX Runtime, ModelFiles (download / import)
@@ -57,18 +58,35 @@ app/src/main/java/app/anemo/voice/
   settings/  VoiceSettings, the store (token in EncryptedSharedPreferences), Readiness
   service/   ListenService (foreground, microphone), its notification, the tile,
              VoiceRuntime (wires the platform to the core)
-  ui/        MainActivity (status, history), SettingsActivity
+  ui/        MainActivity (status, history), SettingsActivity, AboutActivity (licences)
 ```
 
 ## What it never does
 
 - Record without its notification showing: the service puts the notification up before
-  it opens the microphone, and listening doesn't start while notifications are off.
+  it opens the microphone; it doesn't start, and stops, when notifications are off, the
+  Listening channel is blocked or the notification is swiped away.
 - Upload anything but a recording that followed the wake word, a reply it asked for
-  (after speaking a question, an approval or a plan), or the status command.
+  (after speaking a question, an approval or a plan), or the status command (which sends
+  no audio).
+- Let a run turn it into a listening device: it listens for a reply only after reading
+  something out, always with the reply sound, for at most 8 s until you start and 15 s
+  once you did, at most 3 times per run and 6 times in all per 5 minutes. A dangerous
+  action, or an action that comes without a risk, is never asked by voice.
 - Put the token in a URL or a log (nothing in the app logs; `PrivacyRulesTest` checks).
 - Write audio or transcripts to storage: recordings stay in memory; the history keeps
   only what was heard, the request, the spoken answer and the chat link.
+
+## Talking to Anemo
+
+- Every request asks to continue the chat of the last spoken answer
+  (`conversation_id`); Anemo decides with its own follow-up window (Settings → Voice)
+  whether it does.
+- When Anemo answers with an error, the phone speaks Anemo's own `message`; its own
+  phrases are only for no answer at all ("I could not reach Anemo") and for answers
+  without a message, such as a proxy's error page ("Anemo did not accept the recording").
+- **Status** (in the app and on the notification) asks what is running; a recording that
+  is only "status" is a normal request, which Anemo answers the same way.
 
 ## Models and their licences
 
@@ -80,9 +98,14 @@ app/src/main/java/app/anemo/voice/
 openWakeWord's pre-trained models are CC BY-NC-SA 4.0 (non-commercial), which can't be
 shipped inside a GPL-2.0 program, so the APK doesn't contain them. The app downloads
 them from openWakeWord's own release when the user taps **Download the wake word models**
-(Settings), into its private storage (`files/models/`). A custom word ("Hey Anemo"),
-trained with openWakeWord's notebook, is imported as a `.onnx` file with **Import your own
-word**; it still uses the downloaded melspectrogram and embedding models.
+(Settings), into its private storage (`files/models/`), and refuses any file whose
+sha256 isn't the one pinned in `ml/ModelFiles.kt`. A custom word ("Hey Anemo"), trained
+with openWakeWord's notebook, is imported as a `.onnx` file with **Import your own word**;
+the import opens it and checks its shapes (N embeddings of 96 in, one score out), and it
+still uses the downloaded melspectrogram and embedding models.
+
+The APK carries the notices of everything it includes in
+`app/src/main/assets/licenses/` (shown under **About and licences** in the app).
 
 Silero VAD's licence:
 
