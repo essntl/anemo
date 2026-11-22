@@ -42,7 +42,7 @@ class CoreUnitsTest {
     }
 
     @Test
-    fun `endpointer: between the thresholds is neither speech nor silence`() {
+    fun `endpointer, between the thresholds is neither speech nor silence`() {
         val e = Endpointer(silenceMs = 160)
         e.update(0.9f)
         repeat(10) { assertEquals(Endpointer.Result.Continue, e.update(0.4f)) }
