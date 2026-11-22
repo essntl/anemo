@@ -87,6 +87,23 @@ class OnnxModelsTest {
         }
     }
 
+    @Test
+    fun `a model that is not a wake word model is refused on import`() {
+        val e = runCatching {
+            OpenWakeWord.checkWordModel(env, File("src/main/assets/${SileroVad.ASSET}").readBytes())
+        }.exceptionOrNull()
+        assertTrue(e.toString(), e is IllegalArgumentException)
+        val junk = runCatching { OpenWakeWord.checkWordModel(env, ByteArray(4_096) { 7 }) }.exceptionOrNull()
+        assertTrue(junk?.message, junk?.message == "This file is not an ONNX model.")
+    }
+
+    @Test
+    fun `a real wake word model passes the import check`() {
+        val dir = modelsDir
+        assumeTrue("set anemo.models to run", dir != null && File(dir, "hey_jarvis_v0.1.onnx").exists())
+        OpenWakeWord.checkWordModel(env, File(dir, "hey_jarvis_v0.1.onnx").readBytes())
+    }
+
     private fun maxScore(oww: OpenWakeWord, samples: ShortArray): Float =
         frames(samples).maxOf { oww.process(it); oww.lastScore }
 

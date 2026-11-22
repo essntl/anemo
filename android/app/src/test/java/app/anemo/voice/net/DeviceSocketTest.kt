@@ -257,4 +257,49 @@ class DeviceSocketTest {
         assertEquals(1, fake.connectionCount.get())
         assertTrue(seen.isEmpty())
     }
+
+    @Test
+    fun `a trust change (1012) reconnects`() {
+        open()
+        next()
+        fake.nextConnection().socket.close(1012, "trust changed")
+        assertTrue(next() is Disconnected)
+        assertEquals(Connected("Pixel", false), next())
+        assertEquals(2, fake.connectionCount.get())
+    }
+
+    @Test
+    fun `replaced in the middle of a connection stops for good`() {
+        open()
+        next()
+        fake.nextConnection().socket.close(4409, "replaced")
+        assertEquals(Stopped(DeviceSocket.StopReason.Replaced), next())
+        Thread.sleep(300)
+        assertEquals(1, fake.connectionCount.get())
+    }
+
+    @Test
+    fun `a revoked token in the middle of a connection stops for good`() {
+        open()
+        next()
+        fake.nextConnection().socket.close(4401, "revoked")
+        assertEquals(Stopped(DeviceSocket.StopReason.BadToken), next())
+    }
+
+    @Test
+    fun `a hello longer than the server reads is refused`() =
+        stopsWith(DeviceSocket.StopReason.BadHello) { open(token = "anemo_" + "x".repeat(FakeAnemo.MAX_HELLO)) }
+
+    @Test
+    fun `an action without a risk arrives without one, and JSON nulls are absent`() {
+        open()
+        next()
+        val conn = fake.nextConnection()
+        conn.event("e1", "approval.requested", JSONObject().put("approval_id", "a1").put("run_id", "r1").put("kind", "action").put("summary", "Delete"))
+        val a = (next() as DeviceEvent.ApprovalRequested).approval
+        assertNull(a.risk)
+        assertTrue(a.dangerous)
+        conn.event("e2", "voice.say", JSONObject().put("run_id", "r1").put("conversation_id", JSONObject.NULL).put("text", "Failed."))
+        assertEquals(DeviceEvent.VoiceSay("r1", null, "Failed.", false), next())
+    }
 }

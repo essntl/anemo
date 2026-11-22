@@ -33,6 +33,10 @@ class FakeChimes : Chimes {
     override fun stop() {
         played += "stop"
     }
+
+    override fun reply() {
+        played += "reply"
+    }
 }
 
 class FakeSpeaker : Speaker {
@@ -63,13 +67,13 @@ class FakeSpeaker : Speaker {
 }
 
 class FakeBackend : VoiceBackend {
-    data class Turn(val wav: ByteArray, val conversationId: String?, val status: Boolean, val onResult: (TurnResult) -> Unit)
+    data class Turn(val wav: ByteArray?, val conversationId: String?, val status: Boolean, val onResult: (TurnResult) -> Unit)
     data class Reply(val wav: ByteArray, val approvalId: String, val onResult: (ReplyResult) -> Unit)
 
     val turns = mutableListOf<Turn>()
     val replies = mutableListOf<Reply>()
 
-    override fun sendTurn(wav: ByteArray, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit) {
+    override fun sendTurn(wav: ByteArray?, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit) {
         turns += Turn(wav, conversationId, status, onResult)
     }
 
@@ -96,4 +100,32 @@ class MemoryHistory : HistoryStore {
 
 class FakeClock(var now: Long = 1_000_000) : Clock {
     override fun nowMillis() = now
+}
+
+/** Time that moves only when the test says so; due actions run then. */
+class FakeTimer : Timer {
+    private class Task(val at: Long, val action: () -> Unit) {
+        var cancelled = false
+    }
+
+    var now = 0L
+        private set
+    private val tasks = mutableListOf<Task>()
+
+    override fun schedule(delayMs: Long, action: () -> Unit): Cancellable {
+        val t = Task(now + delayMs, action)
+        tasks += t
+        return Cancellable { t.cancelled = true }
+    }
+
+    val pending: Int get() = tasks.count { !it.cancelled }
+
+    fun advance(ms: Long) {
+        now += ms
+        while (true) {
+            val due = tasks.filter { !it.cancelled && it.at <= now }.minByOrNull { it.at } ?: return
+            tasks.remove(due)
+            due.action()
+        }
+    }
 }

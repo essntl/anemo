@@ -27,6 +27,10 @@ class AndroidSpeaker(
         .build()
     private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         .setAudioAttributes(attributes)
+        .setOnAudioFocusChangeListener { change ->
+            // a call or another app took the audio: stop speaking (the loop moves on)
+            if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) tts.stop()
+        }
         .build()
 
     private val lock = Any()
@@ -79,7 +83,10 @@ class AndroidSpeaker(
                 true -> "anemo-${nextId++}".also { callbacks[it] = onDone }
             }
         }
-        audio.requestAudioFocus(focus)
+        if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            finish(id, false) // in a call, for example: don't talk over it
+            return
+        }
         if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) finish(id, false)
     }
 

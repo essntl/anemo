@@ -55,6 +55,7 @@ class MainActivity : Activity() {
         }
         val status = button("Status") { Launcher.send(this, ListenService.STATUS) }
         val settings = button("Settings") { startActivity(Intent(this, SettingsActivity::class.java)) }
+        val about = button("About and licences") { startActivity(Intent(this, AboutActivity::class.java)) }
 
         val header = column().apply {
             addView(title)
@@ -62,6 +63,7 @@ class MainActivity : Activity() {
             addView(problem)
             addView(row(toggle, pause))
             addView(row(status, settings))
+            addView(about)
             addView(heading("Recent requests"))
         }
         val list = ListView(this).apply {
@@ -71,9 +73,23 @@ class MainActivity : Activity() {
                 (getItemAtPosition(position) as? HistoryEntry)?.let { openChat(it.chatLink) }
             }
         }
+        list.clipToPadding = false
+        list.padForSystemBars()
         setContentView(list)
-        if (intent.getBooleanExtra(EXTRA_START, false)) askPermissionsThenStart()
+        if (startedFromTile(intent)) askPermissionsThenStart()
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (startedFromTile(intent)) askPermissionsThenStart()
+    }
+
+    /**
+     * Only the tile may ask the app to start listening when it opens: it goes through the
+     * non-exported alias [TILE_ALIAS], which no other app can open.
+     */
+    private fun startedFromTile(intent: Intent?): Boolean =
+        intent?.component?.className == TILE_ALIAS && intent.getBooleanExtra(EXTRA_START, false)
 
     override fun onResume() {
         super.onResume()
@@ -181,6 +197,7 @@ class MainActivity : Activity() {
 
     companion object {
         const val EXTRA_START = "start"
+        const val TILE_ALIAS = "app.anemo.voice.ui.StartFromTile"
         private const val REQUEST_PERMISSIONS = 1
     }
 }

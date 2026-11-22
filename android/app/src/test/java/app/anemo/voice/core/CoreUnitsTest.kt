@@ -2,7 +2,7 @@ package app.anemo.voice.core
 
 import app.anemo.voice.net.Backoff
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
@@ -59,17 +59,29 @@ class CoreUnitsTest {
     }
 
     @Test
-    fun `follow-up window`() {
-        val clock = FakeClock(0)
-        val w = FollowUpWindow(clock, 1_000)
-        assertNull(w.conversationForNewRequest())
-        w.answered("c1")
-        clock.now = 1_000
-        assertEquals("c1", w.conversationForNewRequest())
-        clock.now = 1_001
-        assertNull(w.conversationForNewRequest())
-        w.answered("c2")
-        assertEquals("c2", w.conversationForNewRequest())
+    fun `endpointer caps speech after it began, and the whole recording`() {
+        val e = Endpointer(silenceMs = 1_000, maxMs = 1_000, maxSpeechMs = 400, noSpeechMs = 800)
+        repeat(3) { e.update(0.1f) } // 240 ms
+        repeat(4) { assertEquals(Endpointer.Result.Continue, e.update(0.9f)) } // 320 ms of speech
+        assertEquals(Endpointer.Result.End, e.update(0.9f)) // 400 ms
+        val quiet = Endpointer(maxMs = 400, noSpeechMs = 10_000)
+        repeat(4) { quiet.update(0.1f) }
+        assertEquals(Endpointer.Result.NoSpeech, quiet.update(0.1f))
+    }
+
+    @Test
+    fun `server errors, its message, else a phrase`() {
+        assertEquals("Too long.", Phrases.refused(ServerError(422, "audio_too_large", " Too long. ")))
+        assertEquals(Phrases.NO_TRANSCRIPTION_MODEL, Phrases.refused(ServerError(409, "no_transcription_model", null)))
+        assertEquals(Phrases.REFUSED, Phrases.refused(ServerError(413, null, "")))
+    }
+
+    @Test
+    fun `an action without a risk is dangerous, a question without one is not`() {
+        assertTrue(Approval("a", "r", Approval.Kind.Action, "x", null).dangerous)
+        assertTrue(Approval("a", "r", Approval.Kind.Action, "x", "dangerous").dangerous)
+        assertFalse(Approval("a", "r", Approval.Kind.Action, "x", "normal").dangerous)
+        assertFalse(Approval("a", "r", Approval.Kind.Question, "x", null).dangerous)
     }
 
     @Test

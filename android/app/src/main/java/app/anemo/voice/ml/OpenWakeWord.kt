@@ -146,5 +146,38 @@ class OpenWakeWord(
 
         private fun inputShape(s: OrtSession): LongArray =
             (s.inputInfo.values.first().info as TensorInfo).shape
+
+        /**
+         * Checks that [model] is an openWakeWord word model: one input of N embeddings of 96
+         * values, a single score out, and it runs. Throws [IllegalArgumentException] saying
+         * what is wrong, so an imported file never becomes a wake word that never fires.
+         */
+        fun checkWordModel(env: OrtEnvironment, model: ByteArray) {
+            val session = try {
+                env.createSession(model, singleThreaded())
+            } catch (e: Exception) {
+                throw IllegalArgumentException("This file is not an ONNX model.")
+            }
+            session.use { s ->
+                require(s.inputInfo.size == 1) { "This model takes ${s.inputInfo.size} inputs; a wake word model takes one." }
+                val input = (s.inputInfo.values.first().info as? TensorInfo)?.shape
+                require(input != null && input.size == 3 && input[2] == EMBEDDING.toLong() && input[1] != 0L) {
+                    "This model's input is ${input?.contentToString()}; a wake word model takes [1, N, 96]."
+                }
+                val output = (s.outputInfo.values.first().info as? TensorInfo)?.shape
+                require(output != null && output.isNotEmpty() && output.last() == 1L) {
+                    "This model's output is ${output?.contentToString()}; a wake word model gives one score."
+                }
+                val frames = input[1].takeIf { it > 0 } ?: 16
+                val zeros = FloatArray((frames * EMBEDDING).toInt())
+                OnnxTensor.createTensor(env, FloatBuffer.wrap(zeros), longArrayOf(1, frames, EMBEDDING.toLong())).use { x ->
+                    try {
+                        s.run(mapOf(s.inputNames.first() to x)).close()
+                    } catch (e: Exception) {
+                        throw IllegalArgumentException("This model doesn't run: ${e.message}")
+                    }
+                }
+            }
+        }
     }
 }

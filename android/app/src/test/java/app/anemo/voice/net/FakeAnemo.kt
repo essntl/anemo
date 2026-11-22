@@ -43,6 +43,7 @@ class FakeAnemo : Closeable {
     val uploads = LinkedBlockingQueue<Upload>()
     @Volatile var turnResponse: MockResponse = json(202, TURN_STARTED)
     @Volatile var replyResponse: MockResponse = json(200, """{"decided":"approve","heard":"yes"}""")
+    @Volatile var statusSay = "Nothing is running."
 
     data class Upload(val path: String, val url: String, val headers: Headers, val parts: Map<String, Part>)
     data class Part(val filename: String?, val contentType: String?, val bytes: ByteArray) {
@@ -63,7 +64,7 @@ class FakeAnemo : Closeable {
             val m = JSONObject(text)
             received.add(m)
             when (m.optString("type")) {
-                "hello" -> onHello(webSocket, m)
+                "hello" -> if (text.length > MAX_HELLO) webSocket.close(4400, "hello too long") else onHello(webSocket, m)
                 "ping" -> if (answerPings) webSocket.send("""{"type":"pong"}""")
             }
         }
@@ -129,7 +130,13 @@ class FakeAnemo : Closeable {
                 parts[name] = Part(filename, part.headers["Content-Type"], part.body.readByteArray())
             }
         }
-        uploads.add(Upload(request.requestUrl!!.encodedPath, request.requestUrl.toString(), request.headers, parts))
+        val path = request.requestUrl!!.encodedPath
+        uploads.add(Upload(path, request.requestUrl.toString(), request.headers, parts))
+        // as the server does: the status command needs no audio; anything else does
+        if (path == "/api/voice/turns" && parts["status"]?.text == "true") {
+            return json(200, JSONObject().put("say", statusSay).toString())
+        }
+        if (parts["audio"] == null) return error(422, "empty_audio", "The recording is empty.")
         return response
     }
 
@@ -145,6 +152,15 @@ class FakeAnemo : Closeable {
     companion object {
         const val TURN_STARTED =
             """{"run_id":"r1","conversation_id":"c1","heard":"uh mail tom no tim","request":"Email Tim."}"""
+
+        /** The longest hello the server reads. */
+        const val MAX_HELLO = 4096
+
+        /** The server's error shape: `{"error": {"code", "message"}}`. */
+        fun error(status: Int, code: String, message: String): MockResponse = json(
+            status,
+            JSONObject().put("error", JSONObject().put("code", code).put("message", message)).toString(),
+        )
 
         fun json(code: Int, body: String): MockResponse =
             MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(body)

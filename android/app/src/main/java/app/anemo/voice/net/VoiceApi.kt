@@ -1,6 +1,7 @@
 package app.anemo.voice.net
 
 import app.anemo.voice.core.ReplyResult
+import app.anemo.voice.core.ServerError
 import app.anemo.voice.core.TurnResult
 import app.anemo.voice.core.VoiceBackend
 import okhttp3.Call
@@ -25,13 +26,13 @@ class VoiceApi(
     private val token: String,
 ) : VoiceBackend {
 
-    override fun sendTurn(wav: ByteArray, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit) {
+    override fun sendTurn(wav: ByteArray?, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit) {
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
-            .addFormDataPart("audio", "recording.wav", wav.toRequestBody(WAV))
+            .apply { if (wav != null) addFormDataPart("audio", "recording.wav", wav.toRequestBody(WAV)) }
             .apply { if (conversationId != null) addFormDataPart("conversation_id", conversationId) }
             .apply { if (status) addFormDataPart("status", "true") }
             .build()
-        post("voice/turns", body, onError = { onResult(TurnResult.Failed(null)) }) { code, json ->
+        post("voice/turns", body, onError = { onResult(TurnResult.Unreachable) }) { code, json ->
             onResult(turnResult(code, json))
         }
     }
@@ -41,10 +42,13 @@ class VoiceApi(
             .addFormDataPart("audio", "reply.wav", wav.toRequestBody(WAV))
             .addFormDataPart("approval_id", approvalId)
             .build()
-        post("voice/replies", body, onError = { onResult(ReplyResult.Failed(null)) }) { code, json ->
+        post("voice/replies", body, onError = { onResult(ReplyResult.Unreachable) }) { code, json ->
             onResult(replyResult(code, json))
         }
     }
+
+    /** Cancels every call in flight (the service stops). */
+    fun cancelAll() = client.dispatcher.cancelAll()
 
     private fun post(
         path: String,
@@ -67,7 +71,7 @@ class VoiceApi(
                     } catch (e: IOException) {
                         null
                     } catch (e: JSONException) {
-                        null
+                        null // not JSON: a proxy's error page, for example
                     }
                 }
                 onResponse(response.code, json)
@@ -79,36 +83,36 @@ class VoiceApi(
         private val WAV = "audio/wav".toMediaType()
         private const val UNCLEAR = "Sorry, I didn't get that. Could you say it again?"
 
-        fun turnResult(code: Int, json: JSONObject?): TurnResult = when {
-            code == 202 && json != null && json.has("run_id") -> TurnResult.Started(
-                runId = json.getString("run_id"),
-                conversationId = json.optString("conversation_id"),
-                heard = json.optString("heard"),
-                request = json.optString("request"),
-            )
-            code == 200 && json?.optBoolean("cancelled") == true -> TurnResult.Cancelled
-            code == 200 && json?.has("say") == true -> TurnResult.Say(json.optString("say"))
-            code == 409 && errorCode(json) == "no_transcription_model" -> TurnResult.NoTranscriptionModel
-            code == 422 -> TurnResult.UnsupportedAudio
-            code == 401 -> TurnResult.Unauthorized
-            else -> TurnResult.Failed(code)
+        fun turnResult(code: Int, json: JSONObject?): TurnResult {
+            val say = json?.stringOrNull("say")
+            return when {
+                code == 202 && json?.stringOrNull("run_id") != null -> TurnResult.Started(
+                    runId = json.getString("run_id"),
+                    conversationId = json.stringOrNull("conversation_id"),
+                    heard = json.stringOrNull("heard").orEmpty(),
+                    request = json.stringOrNull("request").orEmpty(),
+                )
+                code == 200 && json?.optBoolean("cancelled") == true -> TurnResult.Cancelled
+                code in 200..299 && !say.isNullOrBlank() -> TurnResult.Say(say)
+                code == 401 -> TurnResult.Unauthorized(error(code, json))
+                else -> TurnResult.Refused(error(code, json))
+            }
         }
 
         fun replyResult(code: Int, json: JSONObject?): ReplyResult = when {
             code == 200 && json != null && json.has("decided") && !json.isNull("decided") ->
-                ReplyResult.Decided(json.getString("decided"), json.optString("heard"))
+                ReplyResult.Decided(json.getString("decided"), json.stringOrNull("heard").orEmpty(), json.stringOrNull("say"))
             code == 200 && json != null && json.has("decided") ->
-                ReplyResult.Unclear(json.optString("heard"), json.optString("say").ifBlank { UNCLEAR })
-            code == 409 -> when (errorCode(json)) {
-                "needs_tap" -> ReplyResult.NeedsTap
-                "already_decided" -> ReplyResult.AlreadyDecided
-                "no_transcription_model" -> ReplyResult.NoTranscriptionModel
-                else -> ReplyResult.Failed(code)
-            }
-            code == 401 -> ReplyResult.Unauthorized
-            else -> ReplyResult.Failed(code)
+                ReplyResult.Unclear(json.stringOrNull("heard").orEmpty(), json.stringOrNull("say")?.ifBlank { null } ?: UNCLEAR)
+            code == 409 && error(code, json).code == "needs_tap" -> ReplyResult.NeedsTap
+            code == 409 && error(code, json).code == "already_decided" -> ReplyResult.AlreadyDecided
+            code == 401 -> ReplyResult.Unauthorized(error(code, json))
+            else -> ReplyResult.Refused(error(code, json))
         }
 
-        private fun errorCode(json: JSONObject?): String? = json?.optJSONObject("error")?.optString("code")
+        private fun error(code: Int, json: JSONObject?): ServerError {
+            val e = json?.optJSONObject("error")
+            return ServerError(code, e?.stringOrNull("code"), e?.stringOrNull("message"))
+        }
     }
 }

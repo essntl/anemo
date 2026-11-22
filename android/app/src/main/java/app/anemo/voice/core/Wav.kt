@@ -33,9 +33,6 @@ object Wav {
         for (s in samples) buf.putShort(s)
         return buf.array()
     }
-
-    /** A short stretch of silence, for the status command (see [VoiceBackend.sendTurn]). */
-    fun silence(ms: Int): ByteArray = encode(ShortArray(AudioFormat16k.SAMPLE_RATE * ms / 1000))
 }
 
 /** Collects frames of one recording in memory. */

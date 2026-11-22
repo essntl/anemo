@@ -1,8 +1,10 @@
 package app.anemo.voice.ui
 
 import android.content.Context
+import android.os.Build
 import android.util.TypedValue
 import android.view.View
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -32,6 +34,31 @@ internal fun Context.label(text: String, sizeSp: Float = 14f): TextView = TextVi
     this.text = text
     setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
     setPadding(0, dp(4), 0, dp(4))
+}
+
+/**
+ * Keeps [this] view's content out from under the status and navigation bars (Android 15
+ * draws apps edge to edge).
+ */
+internal fun View.padForSystemBars() {
+    val left = paddingLeft
+    val top = paddingTop
+    val right = paddingRight
+    val bottom = paddingBottom
+    setOnApplyWindowInsetsListener { v, insets ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
+            v.setPadding(left + bars.left, top + bars.top, right + bars.right, bottom + bars.bottom)
+        } else {
+            @Suppress("DEPRECATION")
+            v.setPadding(
+                left + insets.systemWindowInsetLeft, top + insets.systemWindowInsetTop,
+                right + insets.systemWindowInsetRight, bottom + insets.systemWindowInsetBottom,
+            )
+        }
+        insets
+    }
+    requestApplyInsets()
 }
 
 internal fun Context.button(text: String, onClick: () -> Unit): Button = Button(this).apply {

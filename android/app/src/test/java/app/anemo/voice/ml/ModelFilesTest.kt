@@ -27,7 +27,7 @@ class ModelFilesTest {
                 val path = request.requestUrl!!.encodedPath
                 synchronized(paths) { paths += path }
                 return if (path.endsWith(".onnx")) {
-                    MockResponse().setBody(Buffer().write(ByteArray(4_096) { 1 }))
+                    MockResponse().setBody(Buffer().write(body))
                 } else {
                     MockResponse().setResponseCode(404)
                 }
@@ -39,7 +39,15 @@ class ModelFilesTest {
     @After
     fun tearDown() = server.shutdown()
 
-    private fun files() = ModelFiles(tmp.root, OkHttpClient(), server.url("/release/"))
+    /** What the fake release serves for every .onnx file, and its sha256. */
+    private val body = ByteArray(4_096) { 1 }
+    private val sha = java.security.MessageDigest.getInstance("SHA-256").digest(body).joinToString("") { "%02x".format(it) }
+    private val pins = ModelFiles.SHA256.mapValues { sha }
+
+    private fun files(
+        pins: Map<String, String> = this.pins,
+        check: (java.io.File) -> Unit = {},
+    ) = ModelFiles(tmp.root, OkHttpClient(), server.url("/release/"), pins, check)
 
     @Test
     fun `downloads the shared models and the word once`() {
@@ -70,5 +78,29 @@ class ModelFilesTest {
     @Test(expected = IOException::class)
     fun `a tiny file is not a model`() {
         files().importCustom(ByteArray(10).inputStream())
+    }
+
+    @Test
+    fun `a download with the wrong checksum is refused and not kept`() {
+        val f = files(pins = pins + (ModelFiles.EMBEDDING to "0".repeat(64)))
+        val e = runCatching { f.download(WakeWord.HeyJarvis) }.exceptionOrNull()
+        assertTrue(e is IOException && e.message!!.contains("checksum"))
+        assertFalse(f.embedding.exists())
+        assertTrue(tmp.root.listFiles()!!.none { it.name.endsWith(".part") })
+    }
+
+    @Test
+    fun `the release files are pinned`() {
+        assertEquals(5, ModelFiles.SHA256.size)
+        assertTrue(ModelFiles.SHA256.values.all { it.matches(Regex("[0-9a-f]{64}")) })
+        WakeWord.entries.filter { it != WakeWord.Custom }.forEach { assertTrue(it.file in ModelFiles.SHA256) }
+    }
+
+    @Test
+    fun `an imported word that fails the check is not kept`() {
+        val f = files(check = { throw IOException("This model's input is [1, 576]") })
+        val e = runCatching { f.importCustom(ByteArray(2_048).inputStream()) }.exceptionOrNull()
+        assertEquals("This model's input is [1, 576]", e?.message)
+        assertFalse(f.word(WakeWord.Custom).exists())
     }
 }

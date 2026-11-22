@@ -20,8 +20,17 @@ interface VoiceActivityDetector {
 
 /** The short sounds that say "I'm listening" and "I stopped". */
 interface Chimes {
+    /** Before a request recording (may be switched off in the settings). */
     fun start()
+
+    /** After any recording (may be switched off in the settings). */
     fun stop()
+
+    /**
+     * Before a reply recording, which starts without a wake word: always plays, whatever
+     * the settings say, so the microphone never opens for a reply unannounced.
+     */
+    fun reply()
 }
 
 /** Text to speech. [onDone] gets true when the text was spoken to the end. */
@@ -33,10 +42,11 @@ interface Speaker {
 /** Anemo's voice REST (device-contracts.md §4). */
 interface VoiceBackend {
     /**
-     * A request ([status] false) or the status command ([status] true). [conversationId]
-     * continues a chat within the follow-up window.
+     * A request ([status] false, with its recording) or the status command ([status] true,
+     * [wav] null: no audio is sent). [conversationId] asks to continue that chat; the server
+     * decides whether it is still within its follow-up window.
      */
-    fun sendTurn(wav: ByteArray, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit)
+    fun sendTurn(wav: ByteArray?, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit)
 
     fun sendReply(wav: ByteArray, approvalId: String, onResult: (ReplyResult) -> Unit)
 }
@@ -65,4 +75,13 @@ interface HistoryStore {
 
 fun interface Clock {
     fun nowMillis(): Long
+}
+
+/** Runs something later on the controller's thread. */
+fun interface Timer {
+    fun schedule(delayMs: Long, action: () -> Unit): Cancellable
+}
+
+fun interface Cancellable {
+    fun cancel()
 }

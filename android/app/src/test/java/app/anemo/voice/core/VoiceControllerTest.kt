@@ -14,13 +14,15 @@ class VoiceControllerTest {
     private val backend = FakeBackend()
     private val history = MemoryHistory()
     private val clock = FakeClock()
+    private val mono = FakeClock(0)
+    private val timer = FakeTimer()
     private val states = mutableListOf<ListenState>()
     private lateinit var c: VoiceController
 
     @Before
     fun setUp() {
         c = VoiceController(
-            wake, FakeVad(), chimes, speaker, backend, history, clock,
+            wake, FakeVad(), chimes, speaker, backend, history, clock, mono, timer,
             chatLink = { "https://anemo.test/c/$it" },
             listener = object : VoiceController.Listener {
                 override fun onStateChanged(state: ListenState) {
@@ -47,8 +49,13 @@ class VoiceControllerTest {
     private fun started(run: String = "r1", conv: String = "c1") =
         TurnResult.Started(run, conv, "uh mail tom no tim", "Email Tim.")
 
-    private fun approval(kind: Approval.Kind, id: String = "a1", risk: String = "safe", steps: List<String> = emptyList()) =
-        Approval(id, "r1", kind, "Send an email to Tim", risk, "Which day?", listOf("Monday", "Friday"), steps)
+    private fun approval(
+        kind: Approval.Kind,
+        id: String = "a1",
+        risk: String? = "safe",
+        steps: List<String> = emptyList(),
+        run: String = "r1",
+    ) = Approval(id, run, kind, "Send an email to Tim", risk, "Which day?", listOf("Monday", "Friday"), steps)
 
     // --- wake word, recording, upload -------------------------------------------------
 
@@ -74,9 +81,9 @@ class VoiceControllerTest {
         val turn = backend.turns[0]
         assertFalse(turn.status)
         assertNull(turn.conversationId)
-        assertEquals("RIFF", String(turn.wav, 0, 4))
+        assertEquals("RIFF", String(turn.wav!!, 0, 4))
         // 6 speech + 13 silence frames, 2 bytes each, after the 44-byte header
-        assertEquals(44 + 19 * AudioFormat16k.FRAME_SAMPLES * 2, turn.wav.size)
+        assertEquals(44 + 19 * AudioFormat16k.FRAME_SAMPLES * 2, turn.wav!!.size)
         assertEquals(ListenState.Listening, c.state)
     }
 
@@ -87,7 +94,7 @@ class VoiceControllerTest {
         assertTrue(backend.turns.isEmpty())
         c.onFrame(Frames.speech())
         assertEquals(1, backend.turns.size)
-        assertEquals(44 + 60 * 16_000 * 2, backend.turns[0].wav.size)
+        assertEquals(44 + 60 * 16_000 * 2, backend.turns[0].wav!!.size)
     }
 
     @Test
@@ -156,20 +163,34 @@ class VoiceControllerTest {
     @Test
     fun `no transcription model is spoken with the setting's name`() {
         sayRequest()
-        backend.turns[0].onResult(TurnResult.NoTranscriptionModel)
+        backend.turns[0].onResult(TurnResult.Refused(ServerError(409, "no_transcription_model", null)))
         assertTrue(speaker.spoken.single().contains("Transcription"))
         assertTrue(speaker.spoken.single().contains("Providers and Models"))
     }
 
     @Test
-    fun `bad audio, a refused token and no connection are said`() {
+    fun `the server's message is said, the phone's own phrase only without one`() {
         sayRequest()
-        backend.turns[0].onResult(TurnResult.UnsupportedAudio)
+        val result = backend.turns[0].onResult
+        result(TurnResult.Refused(ServerError(422, "audio_too_large", "That recording is too long.")))
         speaker.finish()
-        backend.turns[0].onResult(TurnResult.Unauthorized)
+        result(TurnResult.Refused(ServerError(409, "no_transcription_model", "Choose a Transcription model first.")))
         speaker.finish()
-        backend.turns[0].onResult(TurnResult.Failed(null))
-        assertEquals(listOf(Phrases.UNSUPPORTED_AUDIO, Phrases.UNAUTHORIZED, Phrases.UNREACHABLE), speaker.spoken)
+        result(TurnResult.Refused(ServerError(413, null, null))) // a proxy's HTML page
+        speaker.finish()
+        result(TurnResult.Unauthorized(ServerError(401, "unauthorized", "Not signed in")))
+        speaker.finish()
+        result(TurnResult.Unreachable)
+        assertEquals(
+            listOf(
+                "That recording is too long.",
+                "Choose a Transcription model first.",
+                Phrases.REFUSED,
+                Phrases.UNAUTHORIZED,
+                Phrases.UNREACHABLE,
+            ),
+            speaker.spoken,
+        )
     }
 
     @Test
@@ -177,6 +198,7 @@ class VoiceControllerTest {
         c.requestStatus()
         val turn = backend.turns.single()
         assertTrue(turn.status)
+        assertNull(turn.wav) // no audio with the status command
         assertNull(turn.conversationId)
         turn.onResult(TurnResult.Say("Two runs are working."))
         assertEquals(listOf("Two runs are working."), speaker.spoken)
@@ -200,21 +222,18 @@ class VoiceControllerTest {
     // --- follow-up window --------------------------------------------------------------
 
     @Test
-    fun `a request within five minutes of an answer continues the chat`() {
+    fun `every request sends the chat of the last answer, the server applies its window`() {
+        sayRequest()
+        assertNull(backend.turns[0].conversationId)
         c.onEvent(DeviceEvent.VoiceSay("r1", "c1", "Moved.", false))
         speaker.finish()
-        clock.now += 5 * 60 * 1000
+        clock.now += 60 * 60 * 1000
         sayRequest()
-        assertEquals("c1", backend.turns.single().conversationId)
-    }
-
-    @Test
-    fun `a request after the window starts a new chat`() {
-        c.onEvent(DeviceEvent.VoiceSay("r1", "c1", "Moved.", false))
+        assertEquals("c1", backend.turns[1].conversationId)
+        c.onEvent(DeviceEvent.VoiceSay("r2", null, "Failed.", false)) // no chat: keeps the last one
         speaker.finish()
-        clock.now += 5 * 60 * 1000 + 1
         sayRequest()
-        assertNull(backend.turns.single().conversationId)
+        assertEquals("c1", backend.turns[2].conversationId)
     }
 
     // --- speech queue ------------------------------------------------------------------
@@ -249,7 +268,7 @@ class VoiceControllerTest {
     fun `run status is counted, never spoken`() {
         var active = -1
         c = VoiceController(
-            wake, FakeVad(), chimes, speaker, backend, history, clock, { it },
+            wake, FakeVad(), chimes, speaker, backend, history, clock, mono, timer, { it },
             listener = object : VoiceController.Listener {
                 override fun onActiveRunsChanged(count: Int) {
                     active = count
@@ -399,13 +418,145 @@ class VoiceControllerTest {
         c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Question)))
         speaker.finish()
         speakThenStop()
-        backend.replies[0].onResult(ReplyResult.Failed(500))
-        assertTrue(speaker.spoken.last().contains(Phrases.USE_NOTIFICATION))
+        backend.replies[0].onResult(ReplyResult.Unreachable)
+        assertEquals("${Phrases.UNREACHABLE} ${Phrases.USE_NOTIFICATION}", speaker.spoken.last())
+        speaker.finish()
+        backend.replies[0].onResult(ReplyResult.Refused(ServerError(400, "transcription_failed", "The speech-to-text model didn't answer.")))
+        assertEquals("The speech-to-text model didn't answer. ${Phrases.USE_NOTIFICATION}", speaker.spoken.last())
     }
 
     @Test
     fun `states are reported`() {
         sayRequest()
         assertEquals(listOf(ListenState.Listening, ListenState.Recording, ListenState.Listening), states)
+    }
+
+    // --- a run can't turn the phone into a listening device -----------------------------
+
+    @Test
+    fun `an approval with nothing to read is not listened for`() {
+        val blank = Approval("q", "r1", Approval.Kind.Question, " ", "safe", question = "")
+        c.onEvent(DeviceEvent.ApprovalRequested(blank))
+        assertEquals(listOf(Phrases.NOTHING_TO_READ), speaker.spoken)
+        speaker.finish()
+        assertEquals(ListenState.Listening, c.state)
+        val action = Approval("a", "r1", Approval.Kind.Action, "", "safe")
+        c.onEvent(DeviceEvent.ApprovalRequested(action))
+        speaker.finish()
+        val plan = Approval("p", "r1", Approval.Kind.Plan, "", "safe", steps = listOf(" "))
+        c.onEvent(DeviceEvent.ApprovalRequested(plan))
+        speaker.finish()
+        assertEquals(List(3) { Phrases.NOTHING_TO_READ }, speaker.spoken)
+        assertFalse(chimes.played.contains("reply"))
+    }
+
+    @Test
+    fun `a blank unclear prompt is not listened after`() {
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Action)))
+        speaker.finish()
+        speakThenStop()
+        backend.replies[0].onResult(ReplyResult.Unclear("hmm", " "))
+        speaker.finish()
+        assertEquals(ListenState.Listening, c.state)
+    }
+
+    @Test
+    fun `the reply sound always plays before a reply recording`() {
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Action)))
+        speaker.finish()
+        assertEquals(listOf("reply"), chimes.played)
+        assertEquals(ListenState.Recording, c.state)
+    }
+
+    @Test
+    fun `a reply lasts at most fifteen seconds once speech began`() {
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Action)))
+        speaker.finish()
+        frames(Frames::silence, 50) // 4 s before the reply begins
+        frames(Frames::speech, 187) // 14 960 ms of speech
+        assertEquals(ListenState.Recording, c.state)
+        c.onFrame(Frames.speech()) // 15 040 ms
+        assertEquals(ListenState.Listening, c.state)
+        val wav = backend.replies.single().wav
+        assertEquals(44 + (50 + 188) * AudioFormat16k.FRAME_SAMPLES * 2, wav.size)
+    }
+
+    @Test
+    fun `at most three reply windows per run in five minutes`() {
+        repeat(3) { i ->
+            c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Question, id = "q$i")))
+            speaker.finish()
+            assertEquals(ListenState.Recording, c.state)
+            speakThenStop()
+        }
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Question, id = "q3")))
+        speaker.finish()
+        assertEquals(Phrases.USE_NOTIFICATION, speaker.spoken.last())
+        assertEquals(3, backend.replies.size)
+        speaker.finish()
+        assertEquals(ListenState.Listening, c.state)
+        // another run still may; and after five minutes this one may again
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Question, id = "x", run = "r2")))
+        speaker.finish()
+        assertEquals(ListenState.Recording, c.state)
+        speakThenStop()
+        mono.now += 5 * 60 * 1000
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Question, id = "q4")))
+        speaker.finish()
+        assertEquals(ListenState.Recording, c.state)
+    }
+
+    @Test
+    fun `at most six reply windows in all in five minutes`() {
+        repeat(6) { i ->
+            c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Question, id = "q$i", run = "run$i")))
+            speaker.finish()
+            assertEquals(ListenState.Recording, c.state)
+            speakThenStop()
+        }
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Question, id = "q6", run = "run6")))
+        speaker.finish()
+        assertEquals(Phrases.USE_NOTIFICATION, speaker.spoken.last())
+        assertEquals(6, backend.replies.size)
+    }
+
+    @Test
+    fun `an action without a risk needs a tap`() {
+        c.onEvent(DeviceEvent.ApprovalRequested(approval(Approval.Kind.Action, risk = null)))
+        assertEquals(listOf("Send an email to Tim. That one needs a tap."), speaker.spoken)
+        speaker.finish()
+        assertEquals(ListenState.Listening, c.state)
+    }
+
+    // --- nothing hangs -----------------------------------------------------------------
+
+    @Test
+    fun `speech that never reports back is given up`() {
+        c.onEvent(DeviceEvent.VoiceSay("r1", "c1", "Done.", false))
+        c.onEvent(DeviceEvent.VoiceSay("r2", "c2", "Next.", false))
+        timer.advance(19_999 + 5 * 120)
+        assertEquals(ListenState.Speaking, c.state)
+        timer.advance(1)
+        assertEquals(1, speaker.stops)
+        assertEquals(listOf("Done.", "Next."), speaker.spoken) // moved on to the next
+    }
+
+    @Test
+    fun `a recording that gets no frames is given up`() {
+        c.onFrame(Frames.wake())
+        assertEquals(ListenState.Recording, c.state)
+        timer.advance(63_000)
+        assertEquals(ListenState.Listening, c.state)
+        assertTrue(backend.turns.isEmpty())
+        assertEquals(listOf("start", "stop"), chimes.played)
+    }
+
+    @Test
+    fun `a watchdog never fires after its state ended`() {
+        c.onEvent(DeviceEvent.VoiceSay("r1", "c1", "Done.", false))
+        speaker.finish()
+        assertEquals(0, timer.pending)
+        timer.advance(100_000)
+        assertEquals(0, speaker.stops)
     }
 }

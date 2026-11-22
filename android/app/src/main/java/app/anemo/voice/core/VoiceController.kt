@@ -18,7 +18,11 @@ class VoiceController(
     private val speaker: Speaker,
     private val backend: VoiceBackend,
     private val history: HistoryStore,
+    /** Wall-clock time, for the history. */
     private val clock: Clock,
+    /** Monotonic time (`SystemClock.elapsedRealtime`), for the reply budget. */
+    private val monotonic: Clock,
+    private val timer: Timer,
     private val chatLink: (conversationId: String) -> String,
     private val listener: Listener = object : Listener {},
     private val timing: Timing = Timing(),
@@ -33,8 +37,15 @@ class VoiceController(
         val silenceMs: Int = 1_000,
         val maxRecordingMs: Int = 60_000,
         val requestNoSpeechMs: Int = 5_000,
+        /** How long the phone waits for a reply to begin. */
         val replyNoSpeechMs: Int = 8_000,
-        val followUpMs: Long = FollowUpWindow.FIVE_MINUTES,
+        /** How long a reply may last once it began. */
+        val maxReplyMs: Int = 15_000,
+        /** Extra time before a recording that gets no frames is given up (microphone dead). */
+        val recordingGraceMs: Long = 3_000,
+        /** Speech that never reports back is given up after this plus [speakingPerCharMs] a character. */
+        val speakingBaseMs: Long = 20_000,
+        val speakingPerCharMs: Long = 120,
     )
 
     private sealed interface Purpose {
@@ -58,8 +69,15 @@ class VoiceController(
     }
 
     private var mode: Mode = Mode.Stopped
+    private var watchdog: Cancellable? = null
     private val queue = ArrayDeque<Utterance>()
-    private val followUp = FollowUpWindow(clock, timing.followUpMs)
+    private val replyBudget = ReplyBudget(monotonic)
+
+    /**
+     * The chat of the last answer: every new request asks to continue it, and the server
+     * decides by its own follow-up window (Settings → Voice) whether it does.
+     */
+    private var lastConversation: String? = null
     private val seenApprovals = LinkedHashSet<String>()
     private val decidedApprovals = LinkedHashSet<String>()
     private val activeRuns = HashMap<String, String>()
@@ -110,16 +128,27 @@ class VoiceController(
     }
 
     private fun startRecording(purpose: Purpose) {
-        val noSpeech = if (purpose is Purpose.Reply) timing.replyNoSpeechMs else timing.requestNoSpeechMs
-        val endpointer = Endpointer(
-            silenceMs = timing.silenceMs,
-            maxMs = timing.maxRecordingMs,
-            noSpeechMs = noSpeech,
-        )
-        val maxSamples = AudioFormat16k.SAMPLE_RATE / 1000 * timing.maxRecordingMs
+        val endpointer = if (purpose is Purpose.Reply) {
+            Endpointer(
+                silenceMs = timing.silenceMs,
+                maxMs = timing.replyNoSpeechMs + timing.maxReplyMs,
+                maxSpeechMs = timing.maxReplyMs,
+                noSpeechMs = timing.replyNoSpeechMs,
+            )
+        } else {
+            Endpointer(silenceMs = timing.silenceMs, maxMs = timing.maxRecordingMs, noSpeechMs = timing.requestNoSpeechMs)
+        }
+        val maxSamples = AudioFormat16k.SAMPLE_RATE / 1000 * endpointer.maxTotalMs
         vad.reset()
-        chimes.start()
-        setMode(Mode.Recording(purpose, RecordingBuffer(maxSamples), endpointer))
+        if (purpose is Purpose.Reply) chimes.reply() else chimes.start()
+        val recording = Mode.Recording(purpose, RecordingBuffer(maxSamples), endpointer)
+        setMode(recording)
+        // frames stop coming (microphone gone): don't stay "recording" for ever
+        guard(recording, endpointer.maxTotalMs + timing.recordingGraceMs) {
+            chimes.stop()
+            recording.buffer.clear()
+            backToWaiting()
+        }
     }
 
     private fun record(m: Mode.Recording, frame: ShortArray) {
@@ -144,16 +173,16 @@ class VoiceController(
     private fun upload(purpose: Purpose, wav: ByteArray) {
         when (purpose) {
             Purpose.Request ->
-                backend.sendTurn(wav, followUp.conversationForNewRequest(), status = false, ::onTurnResult)
+                backend.sendTurn(wav, lastConversation, status = false, ::onTurnResult)
             is Purpose.Reply ->
                 backend.sendReply(wav, purpose.approval.id) { onReplyResult(purpose, it) }
         }
     }
 
-    /** The status command: asks Anemo what is running. No recording of the user is sent. */
+    /** The status command: asks Anemo what is running. No audio is sent. */
     fun requestStatus() {
         if (mode == Mode.Stopped) return
-        backend.sendTurn(Wav.silence(STATUS_SILENCE_MS), conversationId = null, status = true, ::onTurnResult)
+        backend.sendTurn(wav = null, conversationId = null, status = true, ::onTurnResult)
     }
 
     // --- answers from the REST calls -------------------------------------------------
@@ -164,11 +193,11 @@ class VoiceController(
                 history.add(
                     HistoryEntry(
                         runId = result.runId,
-                        conversationId = result.conversationId,
+                        conversationId = result.conversationId.orEmpty(),
                         heard = result.heard,
                         request = result.request,
                         answer = null,
-                        chatLink = chatLink(result.conversationId),
+                        chatLink = result.conversationId?.let(chatLink).orEmpty(),
                         createdAt = clock.nowMillis(),
                     ),
                 )
@@ -176,17 +205,19 @@ class VoiceController(
             }
             TurnResult.Cancelled -> Unit
             is TurnResult.Say -> say(result.text)
-            TurnResult.NoTranscriptionModel -> say(Phrases.NO_TRANSCRIPTION_MODEL)
-            TurnResult.UnsupportedAudio -> say(Phrases.UNSUPPORTED_AUDIO)
-            TurnResult.Unauthorized -> say(Phrases.UNAUTHORIZED)
-            is TurnResult.Failed -> say(Phrases.UNREACHABLE)
+            is TurnResult.Unauthorized -> say(Phrases.UNAUTHORIZED)
+            is TurnResult.Refused -> say(Phrases.refused(result.error))
+            TurnResult.Unreachable -> say(Phrases.UNREACHABLE)
         }
     }
 
     private fun onReplyResult(purpose: Purpose.Reply, result: ReplyResult) {
         val approval = purpose.approval
         when (result) {
-            is ReplyResult.Decided -> markDecided(approval.id)
+            is ReplyResult.Decided -> {
+                markDecided(approval.id)
+                result.say?.let(::say)
+            }
             is ReplyResult.Unclear -> when {
                 approval.id in decidedApprovals -> Unit
                 purpose.attempt == 1 -> enqueue(Utterance.Ask(approval, result.say, attempt = 2))
@@ -194,9 +225,9 @@ class VoiceController(
             }
             ReplyResult.NeedsTap -> say(Phrases.NEEDS_TAP)
             ReplyResult.AlreadyDecided -> markDecided(approval.id)
-            ReplyResult.NoTranscriptionModel -> say(Phrases.NO_TRANSCRIPTION_MODEL)
-            ReplyResult.Unauthorized -> say(Phrases.UNAUTHORIZED)
-            is ReplyResult.Failed -> say("${Phrases.UNREACHABLE} ${Phrases.USE_NOTIFICATION}")
+            is ReplyResult.Unauthorized -> say(Phrases.UNAUTHORIZED)
+            is ReplyResult.Refused -> say("${Phrases.refused(result.error)} ${Phrases.USE_NOTIFICATION}")
+            ReplyResult.Unreachable -> say("${Phrases.UNREACHABLE} ${Phrases.USE_NOTIFICATION}")
         }
     }
 
@@ -211,7 +242,7 @@ class VoiceController(
             is DeviceEvent.VoiceSay -> {
                 activeRuns.remove(event.runId)
                 listener.onActiveRunsChanged(activeRuns.size)
-                followUp.answered(event.conversationId)
+                event.conversationId?.let { lastConversation = it }
                 history.setAnswer(event.runId, event.text)
                 listener.onHistoryChanged()
                 say(event.text)
@@ -225,6 +256,8 @@ class VoiceController(
         if (approval.id in decidedApprovals || !remember(seenApprovals, approval.id)) return
         if (approval.dangerous) {
             say(Phrases.dangerous(approval))
+        } else if (Phrases.nothingToRead(approval)) {
+            say(Phrases.NOTHING_TO_READ) // never listen after saying nothing
         } else {
             enqueue(Utterance.Ask(approval, Phrases.ask(approval), attempt = 1))
         }
@@ -267,16 +300,26 @@ class VoiceController(
         val item = queue.removeFirstOrNull() ?: return
         val speaking = Mode.Speaking(item)
         setMode(speaking)
+        // the speech engine never reports back: give up on it rather than hang
+        guard(speaking, timing.speakingBaseMs + timing.speakingPerCharMs * item.text.length) {
+            setMode(Mode.Waiting)
+            speaker.stop()
+            backToWaiting()
+        }
         speaker.speak(item.text) { completed -> onSpoken(speaking, completed) }
     }
 
     private fun onSpoken(speaking: Mode.Speaking, completed: Boolean) {
         if (mode !== speaking) return // stopped, paused or decided meanwhile
         val item = speaking.item
-        if (completed && item is Utterance.Ask && item.approval.id !in decidedApprovals) {
-            startRecording(Purpose.Reply(item.approval, item.attempt))
-        } else {
-            backToWaiting()
+        when {
+            !completed || item !is Utterance.Ask || item.approval.id in decidedApprovals -> backToWaiting()
+            item.text.isBlank() -> backToWaiting()
+            replyBudget.take(item.approval.runId) -> startRecording(Purpose.Reply(item.approval, item.attempt))
+            else -> {
+                backToWaiting()
+                say(Phrases.USE_NOTIFICATION)
+            }
         }
     }
 
@@ -287,9 +330,16 @@ class VoiceController(
     }
 
     private fun setMode(m: Mode) {
+        watchdog?.cancel()
+        watchdog = null
         val before = state
         mode = m
         if (state != before) listener.onStateChanged(state)
+    }
+
+    /** Runs [onTimeout] after [ms] if the phone is still in [m] then. */
+    private fun guard(m: Mode, ms: Long, onTimeout: () -> Unit) {
+        watchdog = timer.schedule(ms) { if (mode === m) onTimeout() }
     }
 
     private fun remember(set: LinkedHashSet<String>, id: String): Boolean {
@@ -300,7 +350,6 @@ class VoiceController(
 
     companion object {
         private const val REMEMBERED = 200
-        private const val STATUS_SILENCE_MS = 200
         private val TERMINAL = setOf("completed", "failed", "cancelled")
     }
 }

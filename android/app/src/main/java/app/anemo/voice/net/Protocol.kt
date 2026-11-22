@@ -36,7 +36,7 @@ object Protocol {
         val o = JSONObject(text)
         when (o.optString("type")) {
             "welcome" -> ServerMessage.Welcome(
-                deviceName = o.optJSONObject("device")?.optString("name").orEmpty(),
+                deviceName = o.optJSONObject("device")?.stringOrNull("name").orEmpty(),
                 missed = o.optBoolean("missed", false),
                 cursor = o.stringOrNull("cursor"),
             )
@@ -45,7 +45,7 @@ object Protocol {
                 id = o.getString("id"),
                 event = event(o.getString("event"), o.optJSONObject("data") ?: JSONObject()),
             )
-            "notice" -> ServerMessage.Notice(o.optString("text"))
+            "notice" -> ServerMessage.Notice(o.stringOrNull("text").orEmpty())
             else -> ServerMessage.Unknown
         }
     } catch (e: JSONException) {
@@ -56,12 +56,12 @@ object Protocol {
         "run.status" -> DeviceEvent.RunStatus(d.getString("run_id"), d.getString("status"))
         "voice.say" -> DeviceEvent.VoiceSay(
             runId = d.getString("run_id"),
-            conversationId = d.getString("conversation_id"),
-            text = d.getString("text"),
+            conversationId = d.stringOrNull("conversation_id"),
+            text = d.stringOrNull("text").orEmpty(),
             more = d.optBoolean("more", false),
         )
         "approval.requested" -> approval(d)?.let { DeviceEvent.ApprovalRequested(it) }
-        "approval.decided" -> DeviceEvent.ApprovalDecided(d.getString("approval_id"), d.optString("decision"))
+        "approval.decided" -> DeviceEvent.ApprovalDecided(d.getString("approval_id"), d.stringOrNull("decision").orEmpty())
         else -> null
     }
 
@@ -74,18 +74,15 @@ object Protocol {
         }
         return Approval(
             id = d.getString("approval_id"),
-            runId = d.optString("run_id"),
+            runId = d.stringOrNull("run_id").orEmpty(),
             kind = kind,
-            summary = d.optString("summary"),
-            risk = d.stringOrNull("risk") ?: "safe",
+            summary = d.stringOrNull("summary").orEmpty(),
+            risk = d.stringOrNull("risk"), // missing: an action then needs a tap (Approval.dangerous)
             question = d.stringOrNull("question"),
             options = d.optJSONArray("options").strings(),
             steps = d.optJSONArray("steps").strings(),
         )
     }
-
-    private fun JSONObject.stringOrNull(key: String): String? =
-        if (!has(key) || isNull(key)) null else optString(key)
 
     private fun JSONArray?.strings(): List<String> {
         if (this == null) return emptyList()

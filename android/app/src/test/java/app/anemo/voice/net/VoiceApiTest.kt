@@ -1,9 +1,11 @@
 package app.anemo.voice.net
 
 import app.anemo.voice.core.ReplyResult
+import app.anemo.voice.core.ServerError
 import app.anemo.voice.core.TurnResult
 import app.anemo.voice.core.Wav
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -57,10 +59,14 @@ class VoiceApiTest {
     }
 
     @Test
-    fun `the status command sends status true and gets something to say`() {
-        fake.turnResponse = FakeAnemo.json(200, """{"say":"Two runs are working."}""")
-        assertEquals(TurnResult.Say("Two runs are working."), turn(status = true))
-        assertEquals("true", fake.nextUpload().parts.getValue("status").text)
+    fun `the status command sends status true and no audio`() {
+        fake.statusSay = "Two runs are working."
+        val q = LinkedBlockingQueue<TurnResult>()
+        api.sendTurn(null, null, status = true) { q.add(it) }
+        assertEquals(TurnResult.Say("Two runs are working."), q.poll(5, TimeUnit.SECONDS))
+        val up = fake.nextUpload()
+        assertEquals("true", up.parts.getValue("status").text)
+        assertFalse(up.parts.containsKey("audio"))
     }
 
     @Test
@@ -70,29 +76,59 @@ class VoiceApiTest {
     }
 
     @Test
-    fun `no transcription model`() {
-        fake.turnResponse = FakeAnemo.json(409, """{"error":{"code":"no_transcription_model","message":"No model"}}""")
-        assertEquals(TurnResult.NoTranscriptionModel, turn())
+    fun `nothing heard comes back as something to say`() {
+        fake.turnResponse = FakeAnemo.json(200, """{"say":"Sorry, I didn't catch that."}""")
+        assertEquals(TurnResult.Say("Sorry, I didn't catch that."), turn())
     }
 
     @Test
-    fun `unsupported audio`() {
-        fake.turnResponse = FakeAnemo.json(422, """{"error":{"code":"unsupported_audio","message":"Not audio"}}""")
-        assertEquals(TurnResult.UnsupportedAudio, turn())
+    fun `no transcription model carries the server's message`() {
+        fake.turnResponse = FakeAnemo.error(409, "no_transcription_model", "Choose a Transcription model in Settings.")
+        assertEquals(
+            TurnResult.Refused(ServerError(409, "no_transcription_model", "Choose a Transcription model in Settings.")),
+            turn(),
+        )
+    }
+
+    @Test
+    fun `the three 422 codes carry their message`() {
+        for (code in listOf("empty_audio", "audio_too_large", "unsupported_audio")) {
+            fake.turnResponse = FakeAnemo.error(422, code, "Message for $code")
+            assertEquals(TurnResult.Refused(ServerError(422, code, "Message for $code")), turn())
+        }
+    }
+
+    @Test
+    fun `any other error carries its message`() {
+        fake.turnResponse = FakeAnemo.error(400, "transcription_failed", "The speech-to-text model didn't answer.")
+        assertEquals(
+            TurnResult.Refused(ServerError(400, "transcription_failed", "The speech-to-text model didn't answer.")),
+            turn(),
+        )
+    }
+
+    @Test
+    fun `a proxy's error page has no message`() {
+        fake.turnResponse = MockResponse().setResponseCode(413).setBody("<html><body>413 Request Entity Too Large</body></html>")
+        assertEquals(TurnResult.Refused(ServerError(413, null, null)), turn())
     }
 
     @Test
     fun `a wrong token is unauthorized`() {
         val wrong = VoiceApi(client, fake.address, "anemo_wrong")
-        assertEquals(TurnResult.Unauthorized, turn(api = wrong))
+        assertEquals(TurnResult.Unauthorized(ServerError(401, "unauthorized", "Bad token")), turn(api = wrong))
     }
 
     @Test
-    fun `a server error and no server are failures`() {
-        fake.turnResponse = FakeAnemo.json(500, "oops")
-        assertEquals(TurnResult.Failed(500), turn())
+    fun `no server is unreachable`() {
         fake.close()
-        assertEquals(TurnResult.Failed(null), turn())
+        assertEquals(TurnResult.Unreachable, turn())
+    }
+
+    @Test
+    fun `JSON nulls are absent, not the text null`() {
+        fake.turnResponse = FakeAnemo.json(202, """{"run_id":"r1","conversation_id":null,"heard":null,"request":"Hi."}""")
+        assertEquals(TurnResult.Started("r1", null, "", "Hi."), turn())
     }
 
     @Test
@@ -123,6 +159,16 @@ class VoiceApiTest {
         assertEquals(ReplyResult.NeedsTap, reply())
         fake.replyResponse = FakeAnemo.json(409, """{"error":{"code":"already_decided"}}""")
         assertEquals(ReplyResult.AlreadyDecided, reply())
+    }
+
+    @Test
+    fun `reply errors carry the server's message`() {
+        fake.replyResponse = FakeAnemo.error(422, "audio_too_large", "Too long.")
+        assertEquals(ReplyResult.Refused(ServerError(422, "audio_too_large", "Too long.")), reply())
+        fake.replyResponse = FakeAnemo.error(409, "no_transcription_model", "No model.")
+        assertEquals(ReplyResult.Refused(ServerError(409, "no_transcription_model", "No model.")), reply())
+        fake.close()
+        assertEquals(ReplyResult.Unreachable, reply())
     }
 
     @Test

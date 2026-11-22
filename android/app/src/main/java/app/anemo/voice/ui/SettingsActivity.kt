@@ -120,7 +120,11 @@ class SettingsActivity : Activity() {
             addView(message)
             addView(button("Save") { save() })
         }
-        setContentView(ScrollView(this).apply { addView(form) })
+        setContentView(ScrollView(this).apply {
+            addView(form)
+            clipToPadding = false
+            padForSystemBars()
+        })
         wakeWord.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: android.view.View?, pos: Int, id: Long) = showModels()
             override fun onNothingSelected(p: AdapterView<*>?) = Unit

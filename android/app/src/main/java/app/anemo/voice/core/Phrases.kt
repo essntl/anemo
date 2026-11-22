@@ -8,9 +8,26 @@ object Phrases {
     const val USE_NOTIFICATION = "Please answer on the notification."
     const val NO_TRANSCRIPTION_MODEL =
         "Anemo has no speech-to-text model yet. Choose one for Transcription in Settings, Providers and Models."
-    const val UNSUPPORTED_AUDIO = "Anemo could not use that recording."
+    const val REFUSED = "Anemo did not accept the recording."
     const val UNAUTHORIZED = "Anemo refused the token. Check it in the app's settings."
     const val UNREACHABLE = "I could not reach Anemo."
+
+    /** Said instead of asking when a question or approval has no text to read out. */
+    const val NOTHING_TO_READ = "Anemo is waiting for your answer. $USE_NOTIFICATION"
+
+    /** The server's own sentence when it sent one, else the phone's. */
+    fun refused(error: ServerError, fallback: String = REFUSED): String = when {
+        !error.message.isNullOrBlank() -> error.message.trim()
+        error.code == "no_transcription_model" -> NO_TRANSCRIPTION_MODEL
+        else -> fallback
+    }
+
+    /** True when there is nothing meaningful to read out before listening for a reply. */
+    fun nothingToRead(approval: Approval): Boolean = when (approval.kind) {
+        Approval.Kind.Action -> approval.summary.isBlank()
+        Approval.Kind.Question -> approval.question.isNullOrBlank() && approval.summary.isBlank()
+        Approval.Kind.Plan -> approval.steps.none { it.isNotBlank() } && approval.summary.isBlank()
+    }
 
     /** What is said to ask for an approval, a question or a plan review by voice. */
     fun ask(approval: Approval): String = when (approval.kind) {

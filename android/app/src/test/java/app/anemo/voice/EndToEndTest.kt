@@ -1,6 +1,7 @@
 package app.anemo.voice
 
 import app.anemo.voice.core.Chimes
+import app.anemo.voice.core.ExecutorTimer
 import app.anemo.voice.core.DeviceEvent
 import app.anemo.voice.core.FakeVad
 import app.anemo.voice.core.FakeWake
@@ -54,11 +55,14 @@ class EndToEndTest {
         FakeWake(), FakeVad(), object : Chimes {
             override fun start() = Unit
             override fun stop() = Unit
+            override fun reply() = Unit
         },
         speaker,
         PostingBackend(VoiceApi(client, fake.address, fake.token), voice),
         history,
         clock = { System.currentTimeMillis() },
+        monotonic = { System.nanoTime() / 1_000_000 },
+        timer = ExecutorTimer(voice),
         chatLink = fake.address::chat,
     )
 
@@ -146,10 +150,42 @@ class EndToEndTest {
     }
 
     @Test
-    fun `no transcription model is said with the setting's name`() {
-        fake.turnResponse = FakeAnemo.json(409, """{"error":{"code":"no_transcription_model","message":"No model"}}""")
+    fun `no transcription model, the server's message is said`() {
+        fake.turnResponse = FakeAnemo.error(409, "no_transcription_model", "Choose a Transcription model in Settings, Providers and Models.")
         request()
-        assertEquals(Phrases.NO_TRANSCRIPTION_MODEL, nextSpoken())
+        assertEquals("Choose a Transcription model in Settings, Providers and Models.", nextSpoken())
+    }
+
+    @Test
+    fun `a 422 is said in the server's words`() {
+        fake.turnResponse = FakeAnemo.error(422, "audio_too_large", "That recording is too long.")
+        request()
+        assertEquals("That recording is too long.", nextSpoken())
+    }
+
+    @Test
+    fun `nothing heard is said`() {
+        fake.turnResponse = FakeAnemo.json(200, """{"say":"Sorry, I didn't catch that."}""")
+        request()
+        assertEquals("Sorry, I didn't catch that.", nextSpoken())
+    }
+
+    @Test
+    fun `an answer after stop is dropped, not a crash`() {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        fake.turnResponse = FakeAnemo.json(202, FakeAnemo.TURN_STARTED).setBodyDelay(300, TimeUnit.MILLISECONDS)
+        val errors = mutableListOf<Throwable>()
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { _, e -> synchronized(errors) { errors += e } }
+        try {
+            request()
+            fake.nextUpload()
+            voice.shutdown() // the service stopped while the upload was in flight
+            latch.await(800, TimeUnit.MILLISECONDS)
+            assertTrue(errors.toString(), errors.isEmpty())
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previous)
+        }
     }
 
     @Test
@@ -237,9 +273,11 @@ class EndToEndTest {
 
     @Test
     fun `the status command`() {
-        fake.turnResponse = FakeAnemo.json(200, """{"say":"One run is working: the email to Tim."}""")
+        fake.statusSay = "One run is working: the email to Tim."
         onVoice { controller.requestStatus() }
-        assertEquals("true", fake.nextUpload().parts.getValue("status").text)
+        val up = fake.nextUpload()
+        assertEquals("true", up.parts.getValue("status").text)
+        assertFalse(up.parts.containsKey("audio"))
         assertEquals("One run is working: the email to Tim.", nextSpoken())
     }
 }
