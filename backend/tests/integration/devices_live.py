@@ -34,12 +34,43 @@ WAV = b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\0" * 64  # the fake model doesn't lis
 WAIT_S = 20.0
 
 
+class Server:
+    """The API app served by uvicorn on one local port; it can be restarted on it."""
+
+    def __init__(self) -> None:
+        probe = _bind(0)
+        self.port: int = probe.getsockname()[1]
+        probe.close()
+        self._server: uvicorn.Server | None = None
+        self._serving: asyncio.Task[None] | None = None
+
+    async def start(self) -> None:
+        from app.main_api import create_app
+
+        # No lifespan: its shutdown closes the engine and Valkey client the test shares.
+        config = uvicorn.Config(create_app(), lifespan="off", log_level="warning")
+        self._server = uvicorn.Server(config)
+        self._serving = asyncio.create_task(self._server.serve(sockets=[_bind(self.port)]))
+        deadline = time.monotonic() + 10
+        while not self._server.started:
+            if self._serving.done() or time.monotonic() > deadline:
+                raise RuntimeError("uvicorn did not start")
+            await asyncio.sleep(0.02)
+
+    async def stop(self) -> None:
+        if self._server is not None and self._serving is not None:
+            self._server.should_exit = True
+            await asyncio.wait_for(self._serving, 15)
+        self._server = self._serving = None
+
+
 @dataclass
 class Live:
     """The running app: its address, and a browser-like client that is logged in."""
 
     base: str
     api: httpx.AsyncClient
+    server: Server
     clients: list[httpx.AsyncClient] = field(default_factory=list)
 
     @property
@@ -54,11 +85,16 @@ class Live:
         self.clients.append(client)
         return client
 
+    async def restart(self) -> None:
+        """Anemo's API restarts (an update, `docker compose up -d`): its connections drop."""
+        await self.server.stop()
+        await self.server.start()
 
-def _free_socket() -> socket.socket:
+
+def _bind(port: int) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("127.0.0.1", 0))
+    sock.bind(("127.0.0.1", port))
     return sock
 
 
@@ -68,30 +104,19 @@ async def _run_execute(payload: dict[str, Any]) -> None:
 
 @pytest.fixture
 async def live(db_clean: None) -> AsyncIterator[Live]:
-    from app.main_api import create_app
-
-    sock = _free_socket()
-    port = sock.getsockname()[1]
-    # No lifespan: its shutdown closes the engine and Valkey client the test shares.
-    config = uvicorn.Config(create_app(), lifespan="off", log_level="warning")
-    server = uvicorn.Server(config)
-    serving = asyncio.create_task(server.serve(sockets=[sock]))
-    deadline = time.monotonic() + 10
-    while not server.started:
-        if serving.done() or time.monotonic() > deadline:
-            raise RuntimeError("uvicorn did not start")
-        await asyncio.sleep(0.02)
+    server = Server()
+    await server.start()
 
     # The worker side: claims run.execute jobs from the queue as the worker does.
     stop = asyncio.Event()
     runner = JobRunner("e2e-worker", 4, handlers={"run.execute": _run_execute}, give_ups={})
     working = asyncio.create_task(runner.run(stop))
 
-    base = f"http://127.0.0.1:{port}"
+    base = f"http://127.0.0.1:{server.port}"
     async with httpx.AsyncClient(base_url=base, timeout=30) as api:
         r = await api.post("/api/auth/login", json={"username": "admin", "password": TEST_PASSWORD})
         assert r.status_code == 200, r.text
-        app = Live(base, api)
+        app = Live(base, api, server)
         try:
             yield app
         finally:
@@ -99,8 +124,7 @@ async def live(db_clean: None) -> AsyncIterator[Live]:
                 await client.aclose()
             stop.set()
             await asyncio.wait_for(working, 30)
-            server.should_exit = True
-            await asyncio.wait_for(serving, 15)
+            await server.stop()
 
 
 # -- set-up through the API, as the user does in Settings ---------------------------------
@@ -208,7 +232,7 @@ class Device:
             self.url,
             origin=origin,
             open_timeout=5,
-            ping_interval=None,  # type: ignore[arg-type]
+            ping_interval=None,
         )
         hello = {
             "type": "hello",

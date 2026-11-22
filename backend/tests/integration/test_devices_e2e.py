@@ -18,6 +18,8 @@ from typing import Any
 import pytest
 
 from app.core.config import get_settings
+from app.core.redis import get_redis
+from app.features.devices import shared_screen
 from app.features.devices import ws as dws
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
@@ -160,6 +162,27 @@ async def test_deleting_the_device_closes_its_connection_and_its_token(live: Liv
     assert (await own.get("/api/devices")).status_code == 401
     await desk.connect()
     assert await desk.closed_with() == 4401
+
+
+async def test_a_computer_reconnects_after_anemo_restarts_and_is_usable_again(live: Live):
+    await models(live.api)
+    desk, _ = await computer(live, "Desk PC")
+    await live.restart()
+    assert await desk.closed_with() is not None  # dropped with the server
+    # Anemo Desktop reconnects as after any drop: hello, then its offer.
+    welcome = await desk.hello()
+    assert welcome["device"]["name"] == "Desk PC"
+    await desk.offer()
+    assert (await devices(live))["Desk PC"]["online"] is True
+    script(
+        "Look at my PC.",
+        [call("computer_look", device="Desk PC"), Done("tool_use")],
+        [TextDelta("Notepad is open."), Done("end")],
+    )
+    run_id = await agent_turn(live.api, "Look at my PC.")
+    await wait_status(live.api, run_id, "completed")
+    assert desk.actions == ["look"]  # the command reached the new connection
+    await desk.close()
 
 
 # -- what the agent does on a watched and a trusted computer -----------------------------
@@ -395,6 +418,9 @@ async def test_a_shared_screen_reaches_the_agent_and_is_forgotten_when_stopped(l
     assert "from Desk PC" in seen["result"] and tools.UNTRUSTED in seen["result"]
     assert desk.commands == []  # a copy: nothing was asked of the computer
 
+    # Kept for 12 hours, then forgotten.
+    ttl = await get_redis().ttl(shared_screen.KEY)
+    assert 12 * 3600 - 60 < ttl <= 12 * 3600
     assert (await own.delete("/api/devices/shared-screen")).status_code == 204
     assert (await live.api.get("/api/devices/shared-screen")).json() == {"screen": None}
     script(
@@ -406,4 +432,15 @@ async def test_a_shared_screen_reaches_the_agent_and_is_forgotten_when_stopped(l
     await wait_status(live.api, run_id, "completed")
     [gone] = (await timeline(live.api, run_id))["tool_calls"]
     assert gone["is_error"] and "Share this screen with Anemo" in gone["result"]
+    await desk.close()
+
+
+async def test_a_shared_screen_expires(live: Live):
+    desk, made = await computer(live, "Desk PC")
+    own = live.device_client(made["token"])
+    body = {"screenshot": png(), "window": {"title": "Mail", "app": "OUTLOOK.EXE"}}
+    assert (await own.put("/api/devices/shared-screen", json=body)).status_code == 200
+    await get_redis().expire(shared_screen.KEY, 1)  # as if 12 hours had passed
+    await asyncio.sleep(1.5)
+    assert (await live.api.get("/api/devices/shared-screen")).json() == {"screen": None}
     await desk.close()
