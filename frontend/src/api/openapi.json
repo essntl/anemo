@@ -13944,6 +13944,457 @@
         }
       }
     },
+    "/api/devices/shared-screen": {
+      "put": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Share Screen",
+        "description": "\"Share this screen with Anemo\": the client sends a screenshot and the window's\ntext when the user asks. It replaces what was shared before; the assistant reads it\nwith computer_shared_screen. Kept 12 hours.",
+        "operationId": "share_screen_api_devices_shared_screen_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedScreenIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedScreenSaved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Get Shared Screen",
+        "description": "Which screen is shared now (device, window and time; never its content).",
+        "operationId": "get_shared_screen_api_devices_shared_screen_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedScreenState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Stop Sharing Screen",
+        "description": "Forget the shared screen.",
+        "operationId": "stop_sharing_screen_api_devices_shared_screen_delete",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "List Devices",
+        "description": "Every device, with whether it is connected now.",
+        "operationId": "list_devices_api_devices_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceOut"
+                  },
+                  "title": "Response List Devices Api Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Add Device",
+        "description": "A new device and its token, shown once. Needs the password confirmed recently\n(the token is a login that lasts until the device is deleted).",
+        "operationId": "add_device_api_devices_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewDeviceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{device_id}": {
+      "patch": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Rename Device",
+        "operationId": "rename_device_api_devices__device_id__patch",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRenameIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Delete Device",
+        "description": "Delete the device: its token stops working and its connection closes at once.",
+        "operationId": "delete_device_api_devices__device_id__delete",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{device_id}/trust": {
+      "put": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Set Trust",
+        "description": "Watched (every action asks) or trusted (as the permissions say). Needs the\npassword confirmed recently, so a device's own token can't change it.",
+        "operationId": "set_trust_api_devices__device_id__trust_put",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTrustIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/research/sessions": {
       "get": {
         "tags": [
@@ -21475,6 +21926,156 @@
         "type": "object",
         "title": "DestinationPatch"
       },
+      "DeviceIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "computer"
+            ],
+            "title": "Kind"
+          },
+          "trust": {
+            "type": "string",
+            "enum": [
+              "watched",
+              "trusted"
+            ],
+            "title": "Trust",
+            "default": "watched"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "DeviceIn"
+      },
+      "DeviceOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "computer"
+            ],
+            "title": "Kind"
+          },
+          "trust": {
+            "type": "string",
+            "enum": [
+              "watched",
+              "trusted"
+            ],
+            "title": "Trust"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "client_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Version"
+          },
+          "online": {
+            "type": "boolean",
+            "title": "Online",
+            "default": false
+          },
+          "control": {
+            "type": "boolean",
+            "title": "Control",
+            "default": false
+          },
+          "shell": {
+            "type": "boolean",
+            "title": "Shell",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "trust",
+          "created_at",
+          "last_seen_at",
+          "client_version"
+        ],
+        "title": "DeviceOut"
+      },
+      "DeviceRenameIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "DeviceRenameIn"
+      },
+      "DeviceTrustIn": {
+        "properties": {
+          "trust": {
+            "type": "string",
+            "enum": [
+              "watched",
+              "trusted"
+            ],
+            "title": "Trust"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trust"
+        ],
+        "title": "DeviceTrustIn"
+      },
       "DictationOut": {
         "properties": {
           "text": {
@@ -25324,6 +25925,94 @@
         "type": "object",
         "title": "NavigationSettings",
         "description": "Where each page of the app goes (Settings > Pages): in the sidebar's list, behind\n\"More\", or off. A page that is off is not in any menu or in search, and the agents\ndon't get its tools (tools/registry.py: FEATURE_TOOLS). A page in none of the lists\n(one added in a later version) is shown under \"More\"."
+      },
+      "NewDeviceOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "computer"
+            ],
+            "title": "Kind"
+          },
+          "trust": {
+            "type": "string",
+            "enum": [
+              "watched",
+              "trusted"
+            ],
+            "title": "Trust"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "client_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Version"
+          },
+          "online": {
+            "type": "boolean",
+            "title": "Online",
+            "default": false
+          },
+          "control": {
+            "type": "boolean",
+            "title": "Control",
+            "default": false
+          },
+          "shell": {
+            "type": "boolean",
+            "title": "Shell",
+            "default": false
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "trust",
+          "created_at",
+          "last_seen_at",
+          "client_version",
+          "token"
+        ],
+        "title": "NewDeviceOut"
       },
       "NewDocument": {
         "properties": {
@@ -30321,6 +31010,108 @@
         "type": "object",
         "title": "SharedProject"
       },
+      "SharedScreenIn": {
+        "properties": {
+          "screenshot": {
+            "type": "string",
+            "maxLength": 12000000,
+            "minLength": 1,
+            "title": "Screenshot",
+            "description": "base64 PNG"
+          },
+          "window": {
+            "$ref": "#/components/schemas/SharedWindow"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 40000,
+            "title": "Text",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "screenshot"
+        ],
+        "title": "SharedScreenIn",
+        "description": "What the client sends (docs/device-contracts.md \u00a75)."
+      },
+      "SharedScreenOut": {
+        "properties": {
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "window": {
+            "$ref": "#/components/schemas/SharedWindow"
+          },
+          "shared_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Shared At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device",
+          "window",
+          "shared_at"
+        ],
+        "title": "SharedScreenOut",
+        "description": "The shared screen without its content (the content only goes to the assistant)."
+      },
+      "SharedScreenSaved": {
+        "properties": {
+          "shared_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Shared At"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shared_at",
+          "device"
+        ],
+        "title": "SharedScreenSaved"
+      },
+      "SharedScreenState": {
+        "properties": {
+          "screen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharedScreenOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "screen"
+        ],
+        "title": "SharedScreenState"
+      },
       "SharedTabIn": {
         "properties": {
           "url": {
@@ -30490,6 +31281,24 @@
           "status"
         ],
         "title": "SharedTask"
+      },
+      "SharedWindow": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Title",
+            "default": ""
+          },
+          "app": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "App",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "SharedWindow"
       },
       "SkillIn": {
         "properties": {

@@ -22,11 +22,11 @@ class DeviceIn(BaseModel):
     trust: Trust = "watched"
 
 
-class RenameIn(BaseModel):
+class DeviceRenameIn(BaseModel):
     name: str = Field(min_length=1, max_length=100, pattern=r"\S")
 
 
-class TrustIn(BaseModel):
+class DeviceTrustIn(BaseModel):
     trust: Trust
 
 
@@ -74,21 +74,21 @@ class SharedScreenState(BaseModel):
     screen: SharedScreenOut | None  # None: nothing is shared
 
 
-class SharedOut(BaseModel):
+class SharedScreenSaved(BaseModel):
     shared_at: datetime
     device: str | None
 
 
-@router.put("/shared-screen", response_model=SharedOut)
+@router.put("/shared-screen", response_model=SharedScreenSaved)
 async def share_screen(
     body: shared_screen.SharedScreenIn, session: CurrentSession, db: Db
-) -> SharedOut:
+) -> SharedScreenSaved:
     """ "Share this screen with Anemo": the client sends a screenshot and the window's
     text when the user asks. It replaces what was shared before; the assistant reads it
     with computer_shared_screen. Kept 12 hours."""
     device = await service.by_token_id(db, session.token_id) if session.token_id else None
     screen = await shared_screen.share(body, device.name if device else None)
-    return SharedOut(shared_at=screen.shared_at, device=screen.device)
+    return SharedScreenSaved(shared_at=screen.shared_at, device=screen.device)
 
 
 @router.get("/shared-screen", response_model=SharedScreenState)
@@ -132,7 +132,7 @@ async def add_device(body: DeviceIn, request: Request, _: RecentAuth, db: Db) ->
 
 @router.patch("/{device_id}", response_model=DeviceOut)
 async def rename_device(
-    device_id: uuid.UUID, body: RenameIn, request: Request, db: Db
+    device_id: uuid.UUID, body: DeviceRenameIn, request: Request, db: Db
 ) -> DeviceOut:
     device = await service.rename(db, device_id, body.name, ip=client_ip(request))
     return (await _out([device]))[0]
@@ -140,7 +140,7 @@ async def rename_device(
 
 @router.put("/{device_id}/trust", response_model=DeviceOut)
 async def set_trust(
-    device_id: uuid.UUID, body: TrustIn, request: Request, _: RecentAuth, db: Db
+    device_id: uuid.UUID, body: DeviceTrustIn, request: Request, _: RecentAuth, db: Db
 ) -> DeviceOut:
     """Watched (every action asks) or trusted (as the permissions say). Needs the
     password confirmed recently, so a device's own token can't change it."""
