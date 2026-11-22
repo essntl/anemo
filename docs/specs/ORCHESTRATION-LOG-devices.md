@@ -27,7 +27,7 @@ Claude Opus 5.5 (`model: "opus"`).
 | 1 | D2 computer tools | `feat/d2` | Opus 5.5 | reviewed (Opus 5.5): no blockers; PowerShell rating gaps, `open` filter, grant scope + notes; sent back to its builder |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | review fixes in (1ad78c6; 1270 backend tests); ready to merge after D1 (orchestrator checks the fix diff first) |
 | 1 | W1 Windows client | `feat/w1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (password fields reachable through `press`, paste and Tab) + fixes; sent back to its builder |
-| 1 | A1 Android app | `feat/a1` | Opus 5.5 | building since 2026-11-22 (took D2's slot) |
+| 1 | A1 Android app | `feat/a1` | Opus 5.5 | built (1e09bda; 96 JVM tests, debug APK ~43 MB; never run on a phone); in review (Opus 5.5) |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
 
@@ -93,6 +93,10 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   it reports, and wire `computer.current_shared_screen` at D2's merge.
 - **D2 notes to check in review:** clicks/typing/keys set `contacts_people` (automations
   ask), beyond the spec's wording; PowerShell rules added on top of `shell_risk`.
+- **A1 points:** openWakeWord's models are not bundled (CC BY-NC-SA; downloaded with one
+  tap in Settings from the official release); a Status button instead of a spoken
+  "status" (the server does answer a recording that is only "status"); nothing is fetched
+  when `missed` is true (the contract names no call for it): for the final report.
 - **W1 review (orchestrator).** Sent back: the password bypasses, stop when settings
   can't be saved, catch-all in the command processor, start-up robustness, the own-window
   guard per key, manual-test gaps, `Windows.Graphics.Capture` as the spec says if the
