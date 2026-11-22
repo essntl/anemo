@@ -50,6 +50,7 @@ from app.runtime.chat import (
     SYSTEM_PROMPT as CHAT_SYSTEM_PROMPT,
 )
 from app.tools import mcp_tool
+from app.tools.builtin import computer
 from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
 
@@ -144,6 +145,17 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     # An automation run also learns its state note, what earlier runs wait for, and what
     # the change check found.
     extra = await automation_context.run_context(db, run, general.timezone)
+    # Computers that run Anemo Desktop: offered when one is online, and to an unattended
+    # run only when its automation lists a computer tool. One line per online device.
+    listed = ((automation and automation.tool_allowlist) or (inherited or {}).get("tools")) or []
+    may_use_computers = not chat and (
+        (automation is None and not inherited) or bool(computer.COMPUTER_TOOL_NAMES & set(listed))
+    )
+    online_devices = await computer.online_devices() if may_use_computers else []
+    has_computer = any(d.kind == "computer" for d in online_devices)
+    if has_computer:
+        device_lines = computer.turn_context_section([computer.line(d) for d in online_devices])
+        extra = "\n\n".join(p for p in (extra, device_lines) if p)
     used = await _add_turn_context(
         db, run, transcript, general.timezone, memory_settings, extra=extra
     )
@@ -166,6 +178,8 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         # Browser tools are only offered when the browser container is running.
         "browser": has_browser,
         "my_browser": my_browser,
+        # A computer that runs Anemo Desktop was online (and may be used by this run).
+        "computer": has_computer,
         # Sub-agents inherit this (runtime/subagents.py): the same tools, the same rule
         # for tools that reach other people.
         "automation": {

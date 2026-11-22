@@ -12,6 +12,7 @@ from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.ask import AskUser
 from app.tools.builtin.automation import AUTOMATION_TOOLS, STATE_ALIASES
 from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
+from app.tools.builtin.computer import COMPUTER_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.file_exchange import FILE_EXCHANGE_TOOLS
@@ -57,6 +58,7 @@ BUILTIN_TOOLS: list[Tool] = [
     HttpRequest(),
     *BROWSER_TOOLS,
     BrowserCurrentTab(),
+    *COMPUTER_TOOLS,
     *TASK_TOOLS,
     *PROJECT_TOOLS,
     *EVENT_TOOLS,
@@ -127,6 +129,7 @@ def toolset_for(
     is_automation: bool = False,
     unattended: bool = False,
     has_browser: bool = False,
+    has_computer: bool = False,
     can_spawn: bool = False,
     can_ask: bool = False,
     has_chat: bool = False,
@@ -140,7 +143,9 @@ def toolset_for(
     `can_ask`: someone is there to answer questions (not an automation or a sub-agent).
     `has_chat`: the run answers in a chat, so it can use the chat's attachments and
     attach files to the answer. `off`: the parts of the app the user turned off
-    (Settings > Pages); their tools are not offered."""
+    (Settings > Pages); their tools are not offered. `has_computer`: a computer that
+    runs Anemo Desktop is online (for an unattended run: and the automation lists one of
+    the computer tools)."""
     offered = []
     turned_off = tools_of(off)
     for tool in BUILTIN_TOOLS:
@@ -157,6 +162,7 @@ def toolset_for(
             or (tool in BROWSER_TOOLS and not has_browser)
             # A tab the user shared from their Chrome: not for unattended runs.
             or (tool.name == "browser_current_tab" and unattended)
+            or (tool in COMPUTER_TOOLS and not has_computer)
             or (tool.name == "run_subagent" and not can_spawn)
             or (tool.name == "ask_user" and not can_ask)
             or (tool.name in CHAT_FILE_TOOLS and not has_chat)
