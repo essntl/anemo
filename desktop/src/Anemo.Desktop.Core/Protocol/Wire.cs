@@ -96,5 +96,31 @@ public static class Wire
     public static string? Str(JsonObject obj, string key) =>
         obj[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
+    /// <summary>A number field (parsed or built in code), or null when it is missing or not a number.</summary>
+    public static double? Number(JsonNode? node)
+    {
+        if (node is not JsonValue v)
+        {
+            return null;
+        }
+
+        if (v.TryGetValue<double>(out var d))
+        {
+            return d;
+        }
+
+        if (v.TryGetValue<long>(out var l))
+        {
+            return l;
+        }
+
+        if (v.TryGetValue<int>(out var i))
+        {
+            return i;
+        }
+
+        return v.TryGetValue<decimal>(out var m) ? (double)m : null;
+    }
+
     private static string Json(JsonNode node) => node.ToJsonString();
 }

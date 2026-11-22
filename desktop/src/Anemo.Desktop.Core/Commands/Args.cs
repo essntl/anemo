@@ -48,7 +48,7 @@ internal sealed class Args
             return null;
         }
 
-        if (node is JsonValue v && v.TryGetValue<double>(out var d) && double.IsFinite(d))
+        if (Protocol.Wire.Number(node) is { } d && double.IsFinite(d))
         {
             return d;
         }

@@ -15,7 +15,7 @@ public static class CommandSummary
         string? Str(string key) => Wire.Str(command, key);
         int Length(string key) => Str(key)?.Length ?? 0;
         string Target() => Str("ref") is { } r ? $"control {Short(r)}" : $"at {Num("x")}, {Num("y")}";
-        string Num(string key) => command[key] is JsonValue v && v.TryGetValue<double>(out var d) ? d.ToString("0.#") : "?";
+        string Num(string key) => Wire.Number(command[key]) is { } d ? d.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) : "?";
 
         return action switch
         {

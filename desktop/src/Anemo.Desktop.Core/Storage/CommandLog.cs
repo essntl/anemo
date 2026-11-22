@@ -13,6 +13,11 @@ public sealed class CommandLog
     public static readonly TimeSpan KeepFor = TimeSpan.FromDays(7);
 
     private const string Prefix = "commands-";
+    private static readonly JsonSerializerOptions Readable = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     private readonly string _folder;
     private readonly TimeProvider _time;
     private readonly object _lock = new();
@@ -34,7 +39,7 @@ public sealed class CommandLog
             ["summary"] = summary,
             ["ok"] = ok,
             ["code"] = code,
-        }.ToJsonString();
+        }.ToJsonString(Readable);
 
         lock (_lock)
         {

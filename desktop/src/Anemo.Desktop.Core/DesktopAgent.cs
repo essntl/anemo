@@ -42,7 +42,7 @@ public sealed class DesktopAgent
             Control,
             () => Settings,
             parts.CommandLog,
-            parts.CommandOptions ?? new CommandOptions { DefaultWorkFolder = parts.DefaultWorkFolder });
+            WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder));
         Connection = new DeviceConnection(
             ConnectionSettings,
             Control,
@@ -127,6 +127,13 @@ public sealed class DesktopAgent
         _parts.Log.Info(result.Ok ? "screen shared" : "screen not shared");
         return result;
     }
+
+    private static CommandOptions WithWorkFolder(CommandOptions options, string folder) => new()
+    {
+        SettleDelay = options.SettleDelay,
+        OpenDelay = options.OpenDelay,
+        DefaultWorkFolder = folder,
+    };
 
     private ConnectionSettings? ConnectionSettings()
     {
