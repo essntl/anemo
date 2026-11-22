@@ -48,7 +48,7 @@ dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r win-x64   -p
 dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r win-arm64 -p:EnableWindowsTargeting=true -o publish/win-arm64
 ```
 
-Each gives `publish/<rid>/Anemo Desktop.exe` (about 70 MB, the .NET runtime included; no
+Each gives `publish/<rid>/Anemo Desktop.exe` (about 75 MB, the .NET runtime included; no
 install, no admin rights). `publish/` is not committed. The exe is not signed: Windows
 SmartScreen asks once before the first start.
 
@@ -62,11 +62,16 @@ SmartScreen asks once before the first start.
 3. The tray icon turns from grey to normal when it is connected. It adds itself to the
    Startup folder ("Start with Windows", on by default).
 
+**The VM needs a console session.** Windows has no desktop to see or act on in a
+disconnected RDP session: use the hypervisor's console, keep the RDP window open, or
+move the session to the console (`tscon <id> /dest:console`) before you disconnect.
+Windows 10 1903 or later is needed (Windows.Graphics.Capture).
+
 ## Files on the computer
 
 | What | Where |
 |---|---|
-| Settings | `%APPDATA%\Anemo Desktop\settings.json` (the token DPAPI-protected for the Windows user) |
+| Settings | `%APPDATA%\Anemo Desktop\settings.json` (the token DPAPI-protected for the Windows user); a damaged or unreadable file starts the client with control off |
 | Command log | `%APPDATA%\Anemo Desktop\logs\commands-<day>.jsonl`: action, a short summary and the outcome; never screenshots, typed or clipboard text, PowerShell commands or their output; 7 days |
 | Connection log | `%APPDATA%\Anemo Desktop\logs\connection-<day>.log`: connects, drops, close codes; tokens are redacted; 7 days |
 | Startup | `shell:startup\Anemo Desktop.lnk` |
@@ -78,8 +83,12 @@ SmartScreen asks once before the first start.
   on and control isn't paused; looking still works.
 - PowerShell only when the device is **trusted** (from `welcome`) *and* PowerShell is switched
   on in Settings *and* control is allowed.
-- Never typing into a password field; never Ctrl+Alt+Del; nothing on the secure desktop
-  (UAC prompts, lock screen): it says so instead.
+- Never typing into a password field: `type` checks the focus before the text and again
+  after every Tab or line break; `press` refuses letters, digits, Space and pastes while a
+  password field has the focus; when the focus can't be read, both refuse. Never Ctrl+Alt+Del
+  (or Ctrl+Alt+End); never the client's own stop and share keys. Nothing on the secure
+  desktop (UAC prompts, lock screen): it says so instead.
+- PowerShell runs in a job object that ends it (and its children) when the client exits.
 - The agent can't use Anemo Desktop's own windows (Settings, the Stop button).
 - **Stop** (Ctrl+Alt+Shift+S by default, the indicator's button, or *Pause control for 1
   hour*): control is paused for an hour, the running command is cancelled and answered
