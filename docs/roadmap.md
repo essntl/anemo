@@ -12,6 +12,11 @@ order they are built.
 | 4 | [Real push notifications](#4-real-push-notifications) | medium | 1 |
 | 5 | [First-run setup and update notice](#5-first-run-setup-and-update-notice) | medium | 3 |
 | 6 | [Diagrams, charts and math](#6-diagrams-charts-and-math) | medium | 2 |
+| 7 | [Voice from your phone (Anemo Voice)](#7-voice-from-your-phone-anemo-voice) | large | devices |
+| 8 | [Devices: Anemo Desktop on your Windows computers](#8-devices-anemo-desktop-on-your-windows-computers) | large | devices |
+
+Features 7 and 8 were built together after the waves below, as separate packages (see
+`docs/specs/ORCHESTRATION-LOG-devices.md`).
 
 ## Build order
 
@@ -214,3 +219,42 @@ Markdown tools still read them, and agents need no new tool to make them:
 Diagrams can be written from untrusted content (a web page the agent read), so Mermaid
 runs in its strict mode: no HTML or scripts in labels, no links that run code, and
 nothing loaded from other sites. Charts are drawn from data only.
+
+## 7. Voice from your phone (Anemo Voice)
+
+**Status: built.** The server side and Settings → Voice are in; the Android app
+(`android/`) is built and reviewed on its own branch and joins when it is merged. Design:
+[docs/specs/05-voice-android.md](specs/05-voice-android.md); what it does:
+[features.md](features.md#voice-from-your-phone).
+
+Say the wake word near your Android phone, say what you want, and Anemo runs it as an
+agent request in a Voice chat and the phone reads the answer out. Questions, approvals
+and plan reviews come back to the phone and are answered by voice; a dangerous action
+always needs a tap.
+
+**Later**
+
+- A realtime voice model for real back-and-forth (interrupting, quick clarifications).
+  Its tools would be "start a run" and "check a run", and Anemo would give the phone a
+  short-lived key.
+- Voice notes without a run: "note: …" goes straight to the daily note.
+- A Wear OS tile as a push-to-talk button.
+
+## 8. Devices: Anemo Desktop on your Windows computers
+
+**Status: built.** Settings → Devices, the device connection, the computer tools and
+the Windows client (`desktop/`). Design:
+[docs/specs/06-desktop-client.md](specs/06-desktop-client.md); what it does:
+[features.md](features.md#devices-your-windows-computers).
+
+A tray program on each Windows computer you want Anemo to reach (the agent's own VM,
+your PC, your laptop) lets the agent look at the screen, click, type, open programs
+and, on a trusted computer, run PowerShell. Each computer is a device with its own
+token and trust level: on a watched one every action asks, on a trusted one the
+permissions decide.
+
+**Later**
+
+- macOS and Linux clients on the same protocol.
+- Files between Anemo's workspace and a device (`device_file_get` / `device_file_put`).
+- Watching a window over time (with your say-so) for longer tasks on the VM.

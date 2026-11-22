@@ -205,13 +205,73 @@ Then in `.env`: `PUBLIC_URL=https://your.domain`, `COOKIE_SECURE=true`, and
 client address.
 
 The web app needs no WebSockets. The browser extension (Anemo Companion, `extension/`)
-does: its live connection is one WebSocket at `/api/extension/ws`. If you use the
-extension, switch on **Websockets Support** for the proxy host in Nginx Proxy Manager.
-Cloudflare passes WebSockets through on every plan; the extension sends a ping every 20 s,
-well inside Cloudflare's 100-second idle limit.
+and the devices (Anemo Desktop and Anemo Voice, below) do: each keeps one WebSocket open,
+at `/api/extension/ws` and `/api/devices/ws`. If you use any of them, switch on
+**Websockets Support** for the proxy host in Nginx Proxy Manager. Without it the proxy
+drops the `Upgrade` header, the connection can't be opened, and the extension or device
+keeps retrying and shows as offline in Settings → Devices. Cloudflare passes WebSockets
+through on every plan; the clients send a ping every 20 s, well inside Cloudflare's
+100-second idle limit.
+
+**Upload size.** A phone sends each recording in one request (at most 25 MB; a minute of
+speech is about 2 MB), and Anemo Desktop sends a shared screen as one request of a few
+MB. Nginx's own limit is 1 MB unless it is raised; set it in the proxy host's custom
+configuration so it doesn't depend on the proxy's defaults:
+
+```nginx
+client_max_body_size 30m;
+```
+
+A request over the proxy's limit is answered by the proxy itself (413), not by Anemo,
+so the phone says Anemo didn't accept the recording.
 
 Anemo has one user and one password. Do not expose it to the internet without
 HTTPS; an extra access list or VPN in front is a good idea.
+
+## Anemo Desktop and Anemo Voice
+
+Both apps are *devices*: each logs in with its own token and keeps one WebSocket to
+Anemo through the address the web app uses (see the proxy notes above: **Websockets
+Support** on, and the upload size). What they do: [features.md](features.md#voice-from-your-phone).
+
+**Adding a device.** In **Settings → Devices**, *Add a device*: a short name (the agent
+uses it: "VM", "Desk PC", "Pixel"), the kind (computer or phone) and, for a computer, the
+trust level. Anemo shows the token once (`anemo_…`); paste it into the app's settings
+together with Anemo's address (the `https://…` address you open Anemo with). The token is
+a login: anyone who has it can use your Anemo, except for changes that need your password.
+Deleting the device deletes the token and closes its connection.
+
+**Anemo Desktop** (Windows 10 1903 or later, 11; x64 and ARM64):
+
+- It is one `Anemo Desktop.exe`, built from `desktop/` with `dotnet publish` (see
+  [desktop/README.md](../desktop/README.md)). No installer and no admin rights: put it
+  somewhere permanent, such as `%LOCALAPPDATA%\Programs\Anemo Desktop\`, and start it.
+  It adds itself to the Startup folder.
+- The exe is not signed, so Windows SmartScreen asks once before the first start (*More
+  info* → *Run anyway*).
+- The trust level is per computer and set in Anemo, not in the client: **Trusted** for
+  the agent's own VM, **Watched** (asks before every action, no PowerShell) for your own
+  PC and laptop. PowerShell also has to be switched on in the client's settings, and
+  *Allow control* in its tray menu makes any computer look-only.
+- **The VM needs a console session.** In a disconnected RDP session Windows has no
+  desktop to see or act on. Use the hypervisor's console, keep the RDP window open, or
+  move the session to the console before you disconnect (`tscon <id> /dest:console`).
+
+**Anemo Voice** (Android 10 or later):
+
+- It is installed as a sideloaded APK, the debug build of `android/`
+  (`./gradlew assembleDebug`, see `android/README.md`): copy it to the phone and allow
+  installs from the file manager or browser you open it with.
+- Choose a **Transcription** model in **Settings → Providers & Models** first (any model
+  with speech to text: OpenAI's `gpt-4o-transcribe` or `whisper-1`, Groq, a local
+  speaches server, …). Without one the phone answers every request with "No
+  speech-to-text model yet". The *Dictation clean-up* model (unset: the chat model)
+  turns what was heard into the request.
+- The wake word models are not in the APK: in the app's settings, choose a word and tap
+  **Download the wake word models** (from openWakeWord's release on GitHub, checked
+  against pinned hashes).
+- After a reboot, open the app or tap its quick-settings tile once: Android doesn't let
+  an app start the microphone from the background.
 
 ## Checking that it is healthy
 
@@ -273,6 +333,8 @@ version after the database was upgraded means restoring that backup.
 | Database | The app answers with errors until it is back. No state is lost. |
 | Model provider | The call is retried, then fallback models are tried, then the run fails with a clear message and a retry button. |
 | Browser / MCP host / SearXNG | Only the tools that need them fail, with a message that says why. |
+| A computer (Anemo Desktop) | Its tools are not offered while no computer is connected. A command it doesn't answer fails after 90 s (PowerShell: its own timeout plus 15 s), and the agent is told why. The client reconnects by itself after Anemo or the network comes back. |
+| The app restarts while a phone waits | The phone reconnects and catches up on what it missed (the run's answer, a question) from where it left off. |
 | Nobody answers an approval | It expires after 24 hours and counts as denied; the agent carries on without that action. |
 
 ## Services

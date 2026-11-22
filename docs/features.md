@@ -36,6 +36,8 @@ adapter), and searching inside workspace files that are not documents.
 - [Files](#files)
 - [On your phone](#on-your-phone)
 - [Browser extension](#browser-extension)
+- [Voice from your phone](#voice-from-your-phone)
+- [Devices: your Windows computers](#devices-your-windows-computers)
 
 ## Chat vs. Agent mode
 
@@ -737,3 +739,118 @@ Chrome with your logins: reading and following links are free, every other click
 all typing wait for your approval. It is a thin client:
 models, memories, documents and tools all stay on your server. Installing it, the
 permissions it asks for and why: [extension/README.md](../extension/README.md).
+
+## Voice from your phone
+
+**Anemo Voice** is an Android app (Android 10 or later): say its wake word near the phone
+(or into a Bluetooth headset paired with it), say what you want, and Anemo does it as an
+agent request. When the run finishes, the phone reads the answer out.
+
+- **Setting up.** Add a phone in **Settings → Devices** and paste its token into the
+  app with Anemo's address. Voice needs a **Transcription** model (Settings → Providers &
+  Models), as dictation does; without one the phone says so and names that setting.
+- **What happens to a recording.** It is transcribed, then the *Dictation clean-up*
+  model turns what you said into one clear instruction ("uh, mail Tom, no, Tim, about
+  Friday's thing" becomes "Email Tim about Friday's meeting."). That instruction starts
+  an agent run in the **Voice** chat. The agent is told you are listening, so it answers
+  in one to three plain sentences and puts anything longer in a document or task. The
+  word list from Settings → Dictation applies. The recording and the transcript are not
+  kept; the instruction is saved as your message, as any message is.
+- **"Cancel"** or **"never mind"** as the whole recording throws it away; **"status"**
+  (or the Status button in the app) asks what is running. When nothing was heard,
+  nothing starts.
+- **Follow-ups.** A request within 5 minutes of an answer continues that chat, so "and
+  move it to Friday" knows what "it" is.
+- **What is spoken.** The final answer without Markdown, cut at a sentence end near 600
+  characters, then "The rest is in the chat." A failed or stopped run says so in one
+  sentence. The phone speaks with Android's own text-to-speech.
+- **Questions and approvals by voice.** When the agent asks something (`ask_user`), the
+  phone reads the question and its options and listens for your answer; "up to you"
+  leaves the choice to the agent. For an approval it reads what the agent wants to do and
+  asks "Allow?": yes or no decide it, anything else asks once more and then leaves it to
+  the notification. A **plan review** is read out (the first six steps) and "Go ahead?"
+  accepts it as proposed; changing the steps is done in the app. An action rated
+  **dangerous** is never decided by voice: the phone says it needs a tap, and the push
+  notification's buttons or the app decide it. Decisions made by voice are in the
+  security log, marked as coming from voice. When you decide in the app instead, the
+  phone stops asking.
+- A phone only hears about the runs it started itself. The run's page says "Asked by
+  voice from ‹phone›".
+
+**Settings → Voice**: the agent profile for voice requests, the follow-up window (0
+turns follow-ups off), the longest answer read out (100 to 2000 characters), whether
+approvals and plan reviews may be decided by voice (questions are always answered by
+voice), and one Voice chat a day or one that keeps going. The wake word, the voice the
+phone speaks with, its speed and the headset are set in the app.
+
+The app is installed from its APK; see
+[deployment.md](deployment.md#anemo-desktop-and-anemo-voice). openWakeWord's wake word
+models are not part of the app (their licence doesn't allow it): the app downloads them
+from openWakeWord's own release when you choose a word. Design:
+[docs/specs/05-voice-android.md](specs/05-voice-android.md).
+
+## Devices: your Windows computers
+
+**Anemo Desktop** is a small tray program for Windows 10 and 11 that lets the agent see
+and use a computer: take a screenshot, read the window in front, click, type, press keys,
+open programs and, where you allow it, run PowerShell. Put it on the agent's own VM, your
+main PC or your laptop; each one is a **device** with its own name, token and trust
+level. It only connects out to Anemo (one WebSocket, through the address the web app
+uses); no port is opened on the computer.
+
+**Settings → Devices** lists your computers and phones, whether they are connected now,
+the client's version and, for a computer, whether *Allow control* is on. **Add a
+device** with a name ("VM", "Desk PC"), the kind and, for a computer, the trust level.
+Anemo shows the device's token once: paste it into the client with Anemo's address.
+Rename a device (the agent finds it by name), change its trust level (this asks for your
+password), or delete it: its token stops working and its connection closes at once.
+
+**Trust levels**, per computer:
+
+| Level | Looking (screenshot, window text) | Acting (click, type, keys, open) | PowerShell |
+|---|---|---|---|
+| **Watched** (the default; your own PC and laptop) | as the permission says | asked every time | not offered |
+| **Trusted** (the agent's own VM) | as the permission says | as the permission says | as the permission says |
+
+"As the permission says" means the three categories in **Settings → Agent
+Permissions**: *See your computers* (looking is a safe action, so the default lets it go
+ahead), *Use your computers* (asks by default) and *Commands on your computers* (asks by
+default). So on the VM you can make acting fully autonomous while your PC always asks;
+on a watched computer even *Allow for this run* doesn't cover the next click. Changing a
+computer's trust level makes its client reconnect, so it reads the new level at once.
+
+**What the agent can do.** The tools are offered only while a computer is connected, and
+the agent sees which ones are, with their trust level, in its turn context.
+
+| Tool | Does |
+|---|---|
+| `computer_look` | A screenshot of the screen or of one window, and the window's controls as a numbered list (role, name, value); or the list of open windows |
+| `computer_act` | One action: click, double or right click (a control or a point), type, press keys, scroll, bring a window to the front, open a program by its Start menu name or a web address, put text on the clipboard. It answers with the new state |
+| `computer_shell` | One PowerShell command on a trusted computer with PowerShell switched on in the client, with a timeout (60 s by default, at most 10 minutes) |
+| `computer_shared_screen` | What you shared last with *Share this screen with Anemo* |
+
+PowerShell commands are rated like shell commands: one that deletes, formats, changes
+users, services, the firewall or the registry, or downloads and runs something, is
+dangerous; one that uses the network counts as reaching people. Each action's
+screenshot is kept in the run's timeline.
+
+**On the computer.** The tray icon is grey while not connected and red while the agent
+is acting, and a small border in the corner says "Anemo is using this computer" with a
+Stop button. **Stop** (Ctrl+Alt+Shift+S) takes control away for an hour and cancels the
+command that is running: the agent's tool call fails with "The user stopped control",
+and nothing more is sent until control is allowed again. *Allow control* off makes the
+computer look-only without touching Anemo. The client never types into a password field
+(the agent is told to ask you to type it), never acts on the secure desktop (UAC
+prompts, the lock screen), and runs PowerShell only when the computer is trusted *and*
+PowerShell is switched on in the client.
+
+**Share this screen** (tray menu or Ctrl+Alt+Shift+A) sends a screenshot and the text of
+the window in front once, like *Share this tab* in the browser extension. The agent reads
+it with `computer_shared_screen`; it is forgotten after 12 hours or when you stop
+sharing, and the API never returns its content.
+
+Automations get the computer tools only when the automation lists them. What a screen
+shows is untrusted content for the model, like a web page. Installing the client:
+[deployment.md](deployment.md#anemo-desktop-and-anemo-voice). Design:
+[docs/specs/06-desktop-client.md](specs/06-desktop-client.md); the protocol both apps
+use: [docs/device-contracts.md](device-contracts.md).
