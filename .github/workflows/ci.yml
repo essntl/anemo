@@ -129,3 +129,17 @@ jobs:
       - name: Install the test browser
         run: sh ../.github/scripts/install-test-browser.sh
       - run: npm run e2e
+
+  desktop:
+    name: Windows client (build, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet build -c Release -p:EnableWindowsTargeting=true
+      - run: dotnet test -c Release -p:EnableWindowsTargeting=true

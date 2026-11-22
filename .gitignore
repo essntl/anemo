@@ -38,3 +38,8 @@ e2e/.tmp/
 
 # A filled-in compose file for your own server (contains passwords).
 *.local.yml
+
+# Windows client (desktop/): build and publish output
+desktop/**/bin/
+desktop/**/obj/
+desktop/publish/
