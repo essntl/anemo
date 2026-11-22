@@ -24,9 +24,9 @@ Claude Opus 5.5 (`model: "opus"`).
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
 | 1 | D1 devices core | `feat/d1` | Opus 5.5 | built (37be406, c793bcf; 1256 backend, 561 frontend tests; 0072 rolls back); in review (Opus 5.5) |
-| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | built (278351f, d867da3; 1263 backend tests); review pending; merges after D1 and V1 |
+| 1 | D2 computer tools | `feat/d2` | Opus 5.5 | built (278351f, d867da3; 1263 backend tests); in review (Opus 5.5); merges after D1 and V1 |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | built (1265 backend, 559 frontend tests); in review (Opus 5.5) |
-| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | building since 2026-11-22 (briefing: the template in the plan, filled in) |
+| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | built (b4dfd60; 186 tests; both publishes work; Linux CI job not run here); review pending |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | building since 2026-11-22 (took D2's slot) |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
@@ -97,6 +97,10 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   (`empty_audio`, `audio_too_large`, `unsupported_audio`) where the wire contract names
   one; an empty transcript answers 200 `{say}`; `runs.options["device_name"]` is an extra
   key. A1 was briefed before these were known: check its handling of 422 and `say`.
+- **W1 points:** `Windows.Graphics.Capture` not used (GDI only; the spec allows the
+  fallback); a trust change reaches a connected client only on reconnect (W1 suggests D1
+  closes the connection on a trust change; the server-side check holds meanwhile): decide
+  after D1's review. NPM body size for the shared-screen PUT goes into the deploy notes.
 - **Expired approvals (the user's decision):** no extra event; the phone stops asking on
   the run's terminal `run.status`.
 
