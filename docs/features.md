@@ -784,9 +784,12 @@ voice), and one Voice chat a day or one that keeps going. The wake word, the voi
 phone speaks with, its speed and the headset are set in the app.
 
 The app is installed from its APK; see
-[deployment.md](deployment.md#anemo-desktop-and-anemo-voice). openWakeWord's wake word
-models are not part of the app (their licence doesn't allow it): the app downloads them
-from openWakeWord's own release when you choose a word. Design:
+[deployment.md](deployment.md#anemo-desktop-and-anemo-voice). openWakeWord's pre-trained
+wake word models are licensed CC BY-NC-SA 4.0 (non-commercial use only), so they are not
+part of the app: it downloads them from openWakeWord's own release when you choose a
+word. A wake word model you train yourself has no such limit. A spoken yes or no is
+recognised in English, Ukrainian and Russian; in another language it counts as unclear
+and the notification decides. Design:
 [docs/specs/05-voice-android.md](specs/05-voice-android.md).
 
 ## Devices: your Windows computers
@@ -804,6 +807,8 @@ device** with a name ("VM", "Desk PC"), the kind and, for a computer, the trust 
 Anemo shows the device's token once: paste it into the client with Anemo's address.
 Rename a device (the agent finds it by name), change its trust level (this asks for your
 password), or delete it: its token stops working and its connection closes at once.
+(Revoking a device's token from the general token list instead closes its connection
+within a minute.)
 
 **Trust levels**, per computer:
 
@@ -838,11 +843,18 @@ screenshot is kept in the run's timeline.
 is acting, and a small border in the corner says "Anemo is using this computer" with a
 Stop button. **Stop** (Ctrl+Alt+Shift+S) takes control away for an hour and cancels the
 command that is running: the agent's tool call fails with "The user stopped control",
-and nothing more is sent until control is allowed again. *Allow control* off makes the
-computer look-only without touching Anemo. The client never types into a password field
-(the agent is told to ask you to type it), never acts on the secure desktop (UAC
-prompts, the lock screen), and runs PowerShell only when the computer is trusted *and*
-PowerShell is switched on in the client.
+and no action is sent until control is allowed again. *Allow control* off makes the
+computer look-only without touching Anemo. Neither stops looking: with the default
+levels the agent takes screenshots of any connected computer, a watched one too, without
+asking, and they are kept in the run's timeline. To have looking asked about, set *See
+your computers* to *Always ask* (or *Never*), or quit Anemo Desktop. The client never
+types into a password field (the agent is told to ask you to type it), never acts on the
+secure desktop (UAC prompts, the lock screen), and runs the PowerShell tool only when the
+computer is trusted *and* PowerShell is switched on in the client. Switching PowerShell
+off takes away only that tool: while control is allowed, the agent can still open a
+terminal from the Start menu or with Win+R and type into it, as an ordinary action
+(asked every time on a watched computer, decided by *Use your computers* on a trusted
+one). The hard boundaries are a watched computer, *Allow control* off and Stop.
 
 **Share this screen** (tray menu or Ctrl+Alt+Shift+A) sends a screenshot and the text of
 the window in front once, like *Share this tab* in the browser extension. The agent reads

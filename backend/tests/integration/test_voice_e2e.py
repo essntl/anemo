@@ -7,6 +7,7 @@ connection. The agent runs in the job runner (tests/integration/devices_live.py)
 the scripted fake model; nothing between the phone and the worker is replaced.
 """
 
+import shutil
 import uuid
 from pathlib import Path
 from typing import Any
@@ -30,19 +31,23 @@ from tests.integration.devices_live import (
 
 pytestmark = requires_db
 
+FOLDER = "voice-e2e"
+
 
 @pytest.fixture(autouse=True)
 def _fake_model() -> Any:
-    root = Path(get_settings().workspace_path)
-    (root / "notes" / "old").mkdir(parents=True, exist_ok=True)
-    (root / "notes" / "todo.md").write_text("- buy milk\n")
-    (root / "notes" / "old" / "draft.md").write_text("old draft")
+    # A folder of its own in the shared test workspace, removed afterwards.
+    root = Path(get_settings().workspace_path) / FOLDER
+    (root / "old").mkdir(parents=True, exist_ok=True)
+    (root / "todo.md").write_text("- buy milk\n")
+    (root / "old" / "draft.md").write_text("old draft")
     FakeAdapter.scripts.clear()
     FakeAdapter.requests = []
     FakeAdapter.transcribed = []
     yield
     FakeAdapter.scripts.clear()
     FakeAdapter.transcript = "Um, so, uh, please add milk to my shopping list."
+    shutil.rmtree(root, ignore_errors=True)
 
 
 def script(request: str, *turns: list) -> None:
@@ -170,14 +175,14 @@ async def test_an_action_is_allowed_by_voice(live: Live):
     pixel = await phone(live)
     script(
         "Read my todo list.",
-        [call("read_file", path="notes/todo.md"), Done("tool_use")],
+        [call("read_file", path=f"{FOLDER}/todo.md"), Done("tool_use")],
         [TextDelta("You need to buy milk."), Done("end")],
     )
     run_id = (await ask(pixel, "Read my todo list."))["run_id"]
     events = await pixel.events_until("approval.requested", run_id)
     action = events[-1]["data"]
     assert action["kind"] == "action" and action["risk"] != "dangerous"
-    assert "notes/todo.md" in action["summary"]
+    assert f"{FOLDER}/todo.md" in action["summary"]
     assert "question" not in action and "steps" not in action
 
     said("Yes, go ahead.")
@@ -199,7 +204,7 @@ async def test_a_dangerous_action_needs_a_tap_and_a_decision_in_the_app_reaches_
     pixel = await phone(live)
     script(
         "Clear out my old notes.",
-        [call("delete_path", path="notes/old"), Done("tool_use")],
+        [call("delete_path", path=f"{FOLDER}/old"), Done("tool_use")],
         [TextDelta("I left them alone."), Done("end")],
     )
     run_id = (await ask(pixel, "Clear out my old notes."))["run_id"]
@@ -222,7 +227,7 @@ async def test_a_dangerous_action_needs_a_tap_and_a_decision_in_the_app_reaches_
     decided = [e["data"] for e in events if e["event"] == "approval.decided"]
     assert decided == [{"approval_id": action["approval_id"], "decision": "deny"}]
     assert events[-1]["data"]["text"] == "I left them alone."
-    assert (Path(get_settings().workspace_path) / "notes" / "old" / "draft.md").exists()
+    assert (Path(get_settings().workspace_path) / FOLDER / "old" / "draft.md").exists()
     await pixel.close()
 
 

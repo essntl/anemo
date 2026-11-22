@@ -38,9 +38,12 @@ class Server:
     """The API app served by uvicorn on one local port; it can be restarted on it."""
 
     def __init__(self) -> None:
-        probe = _bind(0)
-        self.port: int = probe.getsockname()[1]
-        probe.close()
+        # One listening socket for the whole test: each start serves a duplicate of it
+        # (uvicorn closes the one it is given on shutdown), so a restart never has to bind
+        # the port again.
+        self._sock = _bind(0)
+        self._sock.listen(128)
+        self.port: int = self._sock.getsockname()[1]
         self._server: uvicorn.Server | None = None
         self._serving: asyncio.Task[None] | None = None
 
@@ -50,7 +53,7 @@ class Server:
         # No lifespan: its shutdown closes the engine and Valkey client the test shares.
         config = uvicorn.Config(create_app(), lifespan="off", log_level="warning")
         self._server = uvicorn.Server(config)
-        self._serving = asyncio.create_task(self._server.serve(sockets=[_bind(self.port)]))
+        self._serving = asyncio.create_task(self._server.serve(sockets=[self._sock.dup()]))
         deadline = time.monotonic() + 10
         while not self._server.started:
             if self._serving.done() or time.monotonic() > deadline:
@@ -62,6 +65,9 @@ class Server:
             self._server.should_exit = True
             await asyncio.wait_for(self._serving, 15)
         self._server = self._serving = None
+
+    def close(self) -> None:
+        self._sock.close()
 
 
 @dataclass
@@ -125,6 +131,7 @@ async def live(db_clean: None) -> AsyncIterator[Live]:
             stop.set()
             await asyncio.wait_for(working, 30)
             await server.stop()
+            server.close()
 
 
 # -- set-up through the API, as the user does in Settings ---------------------------------
@@ -327,6 +334,9 @@ class FakeComputer(Device):
     kind: str = "computer"
     commands: list[dict[str, Any]] = field(default_factory=list)
     answer: Answer | None = None
+    # Messages the client sends right after its result to a command (e.g. the real client
+    # after the stop hotkey: `device.stopped`, then an offer with control off).
+    after: Callable[[dict[str, Any]], list[dict[str, Any]]] | None = None
 
     async def offer(self, control: bool = True, shell: bool = False) -> None:
         await self.send({"type": "device.offer", "control": control, "shell": shell})
@@ -344,6 +354,8 @@ class FakeComputer(Device):
         if not isinstance(result, dict):
             result = await result
         await self.send({"type": "device.result", "id": message["id"], **result})
+        for follow_up in self.after(message) if self.after is not None else []:
+            await self.send(follow_up)
         return True
 
     @property

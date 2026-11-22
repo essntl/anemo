@@ -214,16 +214,15 @@ through on every plan; the clients send a ping every 20 s, well inside Cloudflar
 100-second idle limit.
 
 **Upload size.** A phone sends each recording in one request (at most 25 MB; a minute of
-speech is about 2 MB), and Anemo Desktop sends a shared screen as one request of a few
-MB. Nginx's own limit is 1 MB unless it is raised; set it in the proxy host's custom
-configuration so it doesn't depend on the proxy's defaults:
-
-```nginx
-client_max_body_size 30m;
-```
-
-A request over the proxy's limit is answered by the proxy itself (413), not by Anemo,
-so the phone says Anemo didn't accept the recording.
+speech is about 2 MB), Anemo Desktop sends a shared screen as one request of a few MB,
+and files uploaded in the app can be up to 200 MB. Nginx Proxy Manager's own
+configuration already allows large uploads, so nothing needs to be set. Only if you (or
+another proxy in front of it) set a lower `client_max_body_size` does it matter: it must
+then be at least `210m` for Anemo. In Nginx Proxy Manager that line goes in the proxy
+host's **Advanced** tab, *Custom Nginx Configuration*, and applies to the whole host. A
+request over such a limit is answered by the proxy itself with 413, not by Anemo: when a
+recording or a shared screen gets a 413 (the phone then says Anemo didn't accept the
+recording), look for that limit.
 
 Anemo has one user and one password. Do not expose it to the internet without
 HTTPS; an extra access list or VPN in front is a good idea.
@@ -239,7 +238,8 @@ uses it: "VM", "Desk PC", "Pixel"), the kind (computer or phone) and, for a comp
 trust level. Anemo shows the token once (`anemo_…`); paste it into the app's settings
 together with Anemo's address (the `https://…` address you open Anemo with). The token is
 a login: anyone who has it can use your Anemo, except for changes that need your password.
-Deleting the device deletes the token and closes its connection.
+Deleting the device deletes the token and closes its connection at once; revoking its
+token from the general token list closes the connection within a minute.
 
 **Anemo Desktop** (Windows 10 1903 or later, 11; x64 and ARM64):
 
@@ -250,9 +250,14 @@ Deleting the device deletes the token and closes its connection.
 - The exe is not signed, so Windows SmartScreen asks once before the first start (*More
   info* → *Run anyway*).
 - The trust level is per computer and set in Anemo, not in the client: **Trusted** for
-  the agent's own VM, **Watched** (asks before every action, no PowerShell) for your own
-  PC and laptop. PowerShell also has to be switched on in the client's settings, and
-  *Allow control* in its tray menu makes any computer look-only.
+  the agent's own VM, **Watched** (asks before every action, no PowerShell tool) for your
+  own PC and laptop. The PowerShell tool also has to be switched on in the client's
+  settings. Switching it off takes away only that tool: with control allowed, the agent
+  can still open a terminal and type into it as an ordinary action (asked every time on
+  a watched computer). *Allow control* off in the tray menu makes any computer
+  look-only. Looking (screenshots, the window in front) goes ahead without asking by
+  default, on a watched computer too; set *See your computers* to *Always ask* in Agent
+  Permissions to change that.
 - **The VM needs a console session.** In a disconnected RDP session Windows has no
   desktop to see or act on. Use the hypervisor's console, keep the RDP window open, or
   move the session to the console before you disconnect (`tscon <id> /dest:console`).
@@ -334,7 +339,7 @@ version after the database was upgraded means restoring that backup.
 | Model provider | The call is retried, then fallback models are tried, then the run fails with a clear message and a retry button. |
 | Browser / MCP host / SearXNG | Only the tools that need them fail, with a message that says why. |
 | A computer (Anemo Desktop) | Its tools are not offered while no computer is connected. A command it doesn't answer fails after 90 s (PowerShell: its own timeout plus 15 s), and the agent is told why. The client reconnects by itself after Anemo or the network comes back. |
-| The app restarts while a phone waits | The phone reconnects and catches up on what it missed (the run's answer, a question) from where it left off. |
+| The app restarts while a phone waits | The phone reconnects and catches up on what it missed (the run's answer, a question) from where it left off, as long as Anemo still has those events. After a long gap it doesn't fetch what it missed: pending approvals are in the app and on the push notification. |
 | Nobody answers an approval | It expires after 24 hours and counts as denied; the agent carries on without that action. |
 
 ## Services

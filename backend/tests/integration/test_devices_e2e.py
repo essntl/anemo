@@ -285,15 +285,24 @@ async def test_the_stop_hotkey_fails_the_call_and_blocks_acting_until_control_is
     await models(live.api, **AUTONOMOUS)
     vm, _ = await computer(live, "VM", "trusted")
 
-    async def stopped_during_the_click(command: dict[str, Any]) -> dict[str, Any]:
+    def stopped_during_the_click(command: dict[str, Any]) -> dict[str, Any]:
         if command["action"] != "click":
             return default_answer(command)
-        # The user presses Ctrl+Alt+Shift+S while the command runs: the client cancels
-        # it, says so in the result and tells the server control is off.
-        await vm.send({"type": "device.stopped"})
+        # The user presses Ctrl+Alt+Shift+S while the command runs: the client cancels it
+        # and answers `stopped` ...
         return failed("stopped", "The user pressed the stop hotkey.")
 
+    def then_control_off(command: dict[str, Any]) -> list[dict[str, Any]]:
+        # ... then says so, and from now on offers control off (paused for an hour).
+        if command["action"] != "click":
+            return []
+        return [
+            {"type": "device.stopped"},
+            {"type": "device.offer", "control": False, "shell": False},
+        ]
+
     vm.answer = stopped_during_the_click
+    vm.after = then_control_off
     script(
         "Click save on the VM.",
         [call("computer_act", device="VM", action="click", ref="c1"), Done("tool_use")],
@@ -304,14 +313,28 @@ async def test_the_stop_hotkey_fails_the_call_and_blocks_acting_until_control_is
     await wait_status(live.api, run_id, "completed")
     assert vm.actions == ["click"]  # the press was never sent
     clicked, pressed = (await timeline(live.api, run_id))["tool_calls"]
-    assert clicked["is_error"] and clicked["result"] == tools.STOPPED
+    # The sentence is the contract's (docs/device-contracts.md §3).
+    assert clicked["is_error"] and clicked["result"] == "The user stopped control"
     assert pressed["decision"] == "deny" and pressed["is_error"]
     assert "Allow control" in (pressed["decision_reason"] or pressed["result"])
+
+    # Pings renew the connection, not control: it stays off, and a new run can't act.
+    await vm.roundtrip()
     assert (await devices(live))["VM"]["control"] is False
+    vm.answer = vm.after = None
+    script(
+        "Press enter on the VM.",
+        [call("computer_act", device="VM", action="press", keys=["Enter"]), Done("tool_use")],
+        [TextDelta("Control is off."), Done("end")],
+    )
+    run_id = await agent_turn(live.api, "Press enter on the VM.")
+    await wait_status(live.api, run_id, "completed")
+    [denied] = (await timeline(live.api, run_id))["tool_calls"]
+    assert denied["decision"] == "deny" and vm.actions == ["click"]
 
     # Acting is back once the client offers control again.
     await vm.offer(control=True)
-    vm.answer = None
+    assert (await devices(live))["VM"]["control"] is True
     script(
         "Click save again.",
         [call("computer_act", device="VM", action="click", ref="c1"), Done("tool_use")],

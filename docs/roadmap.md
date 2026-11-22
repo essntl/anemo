@@ -222,8 +222,8 @@ nothing loaded from other sites. Charts are drawn from data only.
 
 ## 7. Voice from your phone (Anemo Voice)
 
-**Status: built.** The server side and Settings → Voice are in; the Android app
-(`android/`) is built and reviewed on its own branch and joins when it is merged. Design:
+**Status: built.** The server side, Settings → Voice and the Android app (`android/`).
+Design:
 [docs/specs/05-voice-android.md](specs/05-voice-android.md); what it does:
 [features.md](features.md#voice-from-your-phone).
 

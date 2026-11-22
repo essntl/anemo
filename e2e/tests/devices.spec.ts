@@ -59,6 +59,7 @@ test('a computer is added with its token shown once, renamed, made trusted with 
   const name = `E2E PC ${suffix()}`
   const renamed = `${name} renamed`
   // A client that has only the token, as Anemo Desktop does.
+  let device: APIRequestContext | undefined
   const asDevice = (token: string) =>
     playwright.request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${token}` } })
   try {
@@ -77,7 +78,7 @@ test('a computer is added with its token shown once, renamed, made trusted with 
     await expect(row.getByRole('combobox', { name: `Trust of “${name}”` })).toHaveText('Watched')
 
     // The token is a login for the REST API.
-    const device = await asDevice(token)
+    device = await asDevice(token)
     expect((await device.get('/api/devices')).status()).toBe(200)
 
     // Done hides it, and it is never shown again: not after a reload either.
@@ -118,8 +119,8 @@ test('a computer is added with its token shown once, renamed, made trusted with 
     await confirmWith(page, 'Delete')
     await expect(page.getByTestId('device-row').filter({ hasText: renamed })).toHaveCount(0)
     expect((await device.get('/api/devices')).status()).toBe(401)
-    await device.dispose()
   } finally {
+    await device?.dispose()
     await deleteNamed(page.request, name, renamed)
   }
 })
@@ -149,9 +150,9 @@ test('a phone has no trust level to choose', async ({ page }) => {
 // Fails today: the server answers a wrong password with 401 (`wrong_password`), and the
 // app treats any 401 as "the session is gone" (frontend/src/api/client.ts, unwrap) and
 // shows the login page instead of saying "Wrong password" in the dialog. Not part of the
-// devices work; reported. Remove `test.fail` once it is fixed.
+// devices work; reported. Remove `test.fail` once it is fixed. It is called just before
+// the last check, so everything before it still fails the test as usual.
 test('a wrong password in the password dialog is said there', async ({ page }) => {
-  test.fail(true, 'a wrong password in the re-authentication dialog signs the user out')
   await login(page)
   const name = `E2E PC ${suffix()}`
   try {
@@ -161,8 +162,10 @@ test('a wrong password in the password dialog is said there', async ({ page }) =
     await page.getByRole('combobox', { name: `Trust of “${name}”` }).click()
     await page.getByRole('option', { name: 'Trusted' }).click()
     const dialog = page.getByRole('dialog', { name: "Confirm it's you" })
+    await expect(dialog).toBeVisible()
     await dialog.getByLabel('Password').fill('not the password')
     await dialog.getByRole('button', { name: 'Confirm' }).click()
+    test.fail(true, 'a wrong password in the re-authentication dialog signs the user out')
     await expect(dialog).toContainText('Wrong password', { timeout: 5000 })
     await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0)
   } finally {
