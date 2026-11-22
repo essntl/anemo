@@ -205,17 +205,20 @@ class Device:
 
     async def connect(self, last_id: str | None = None, origin: str | None = None) -> None:
         self.ws = await connect(
-            self.url, origin=origin, open_timeout=5, ping_interval=None  # type: ignore[arg-type]
+            self.url,
+            origin=origin,
+            open_timeout=5,
+            ping_interval=None,  # type: ignore[arg-type]
         )
-        await self.send(
-            {
-                "type": "hello",
-                "token": self.token,
-                "kind": self.kind,
-                "version": self.version,
-                "last_id": last_id,
-            }
-        )
+        hello = {
+            "type": "hello",
+            "token": self.token,
+            "kind": self.kind,
+            "version": self.version,
+            "last_id": last_id,
+        }
+        with contextlib.suppress(ConnectionClosed):  # e.g. refused at once for its Origin
+            await self.send(hello)
         self._closed = asyncio.Event()
         self.close_code = None
         self._reader = asyncio.create_task(self._read())
