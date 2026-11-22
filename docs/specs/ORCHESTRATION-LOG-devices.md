@@ -23,10 +23,10 @@ Claude Opus 5.5 (`model: "opus"`).
 | Wave | Package | Branch | Model | Status |
 |---|---|---|---|---|
 | 0 | contracts, stubs, plan | `integrate/devices` | orchestrator (Claude Fable 5.2) | done; the user gave the OK for wave 1 |
-| 1 | D1 devices core | `feat/d1` | Opus 5.5 | reviewed (Opus 5.5): no blockers, 5 should-fix + notes; sent back to its builder |
+| 1 | D1 devices core | `feat/d1` | Opus 5.5 | **merged** (d9c72f4) after review fixes (5c057ef); suite on the integration branch: see below |
 | 1 | D2 computer tools | `feat/d2` | Opus 5.5 | reviewed (Opus 5.5): no blockers; PowerShell rating gaps, `open` filter, grant scope + notes; sent back to its builder |
 | 1 | V1 voice backend | `feat/v1` | Opus 5.5 | review fixes in (1ad78c6; 1270 backend tests); ready to merge after D1 (orchestrator checks the fix diff first) |
-| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | built (b4dfd60; 186 tests; both publishes work; Linux CI job not run here); in review (Opus 5.5) |
+| 1 | W1 Windows client | `feat/w1` | Opus 5.5 | reviewed (Opus 5.5): 1 blocker (password fields reachable through `press`, paste and Tab) + fixes; sent back to its builder |
 | 1 | A1 Android app | `feat/a1` | Opus 5.5 | building since 2026-11-22 (took D2's slot) |
 | 2 | X1 end to end, docs | `feat/x1` | Opus 5.5 | not started (needs D1, D2, V1 merged) |
 | 3 | integration, final report | `integrate/devices` | orchestrator | not started |
@@ -93,6 +93,13 @@ None open (both wave-0 questions are answered under "Decisions during the waves"
   it reports, and wire `computer.current_shared_screen` at D2's merge.
 - **D2 notes to check in review:** clicks/typing/keys set `contacts_people` (automations
   ask), beyond the spec's wording; PowerShell rules added on top of `shell_risk`.
+- **W1 review (orchestrator).** Sent back: the password bypasses, stop when settings
+  can't be saved, catch-all in the command processor, start-up robustness, the own-window
+  guard per key, manual-test gaps, `Windows.Graphics.Capture` as the spec says if the
+  build constraints allow (else the user decides), smaller notes.
+- **D1 leftover, accepted:** revoking a device's token from the tokens card closes its
+  connection at the next one-minute re-check, not at once (would need a change in
+  `features/auth`).
 - **D2 review (orchestrator).** No path found where a watched device acts unasked. Sent
   back: PowerShell commands rated too low (call-operator and alias tricks, registry
   aliases, `-enc` prefixes, download-then-run), `open` accepting paths, one grant covering
