@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict, NotFound
 from app.features.conversations import service as conversations
-from app.features.conversations.models import Conversation
+from app.features.conversations.models import ChatMessage, Conversation
 from app.features.devices import service as devices
 from app.features.dictation import service as dictation
 from app.features.profiles.models import AgentProfile
@@ -39,6 +39,18 @@ STATUS_WORDS = frozenset({"status"})
 # A question's answer that leaves the choice to the agent (as "deny" does in the chat).
 UP_TO_YOU = frozenset(
     {"up to you", "its up to you", "thats up to you", "you decide", "you choose", "your call"}
+)
+
+# A yes or no from the classifier counts only when the reply itself has such a word, so
+# speech that merely talks about something can't decide an approval (en, uk, ru).
+YES_WORDS = frozenset(
+    "yes yeah yep yup sure ok okay alright fine go ahead allow approve approved do "
+    "proceed correct absolutely certainly так звісно добре гаразд дозволяю "
+    "давай да конечно хорошо ладно разрешаю окей ага".split()
+)
+NO_WORDS = frozenset(
+    "no nope nah not dont stop deny denied cancel never wait hold reject ні не стоп "
+    "відхилити скасуй нет отмена отклонить".split()
 )
 
 NOT_HEARD = "Sorry, I didn't catch that."
@@ -152,26 +164,38 @@ async def _follow_up(
 
 
 async def _voice_chat(db: AsyncSession, settings: VoiceSettings) -> Conversation:
-    """The Voice chat: the one the latest voice request went to, while it is today's
-    (or always, with one chat that keeps going). A new one when there is none, or when
-    it is still answering an earlier request (a new request doesn't wait for it)."""
+    """The Voice chat: the oldest chat started by a voice request (today's, or any with
+    one chat that keeps going) that isn't answering something. A new request doesn't
+    wait for a busy one: only when every one is busy does another one start, and the
+    first is used again as soon as it is idle."""
     tz = ZoneInfo(await settings_service.user_timezone(db))
-    today = datetime.now(tz).date()
-    latest = await db.scalar(
-        select(Conversation)
-        .join(Run, Run.conversation_id == Conversation.id)
-        .where(Run.options["source"].astext == "voice", Run.parent_run_id.is_(None))
-        .order_by(Run.created_at.desc())
-        .limit(1)
+    now = datetime.now(tz)
+    today = now.date()
+    started_by_voice = (
+        select(Run.conversation_id)
+        .join(ChatMessage, ChatMessage.id == Run.user_message_id)
+        .where(
+            Run.options["source"].astext == "voice",
+            Run.parent_run_id.is_(None),
+            ChatMessage.seq == 1,
+        )
     )
-    if (
-        latest is not None
-        and _usable(latest)
-        and (settings.chat == "single" or latest.created_at.astimezone(tz).date() == today)
-        and not await _busy(db, latest.id)
-    ):
-        return latest
+    query = select(Conversation).where(
+        Conversation.id.in_(started_by_voice),
+        Conversation.automation_id.is_(None),
+        Conversation.archived.is_(False),
+        Conversation.temporary.is_(False),
+    )
+    if settings.chat == "daily":
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        query = query.where(Conversation.created_at >= midnight)
+    chats = list(await db.scalars(query.order_by(Conversation.created_at)))
+    for chat in chats:
+        if not await _busy(db, chat.id):
+            return chat
     title = "Voice" if settings.chat == "single" else f"Voice · {today.isoformat()}"
+    if chats:
+        title += f" ({len(chats) + 1})"
     conv = await conversations.create_conversation(db, title, None, None)
     conv.default_mode = "agent"
     return conv
@@ -305,9 +329,20 @@ async def reply(
             body = DecisionIn(decision="approve", answer=heard[:MAX_ANSWER_CHARS])
     else:
         verdict = await dictation.classify_reply(db, heard)
+        spoken = set(words(heard).split())
+        if (verdict == "yes" and not spoken & YES_WORDS) or (
+            verdict == "no" and not spoken & NO_WORDS
+        ):
+            verdict = "unclear"
         if verdict == "unclear":
             return VoiceReply(None, heard, UNCLEAR)
         # A plan: yes accepts it as proposed (no `plan`), no rejects it.
         body = DecisionIn(decision="approve" if verdict == "yes" else "deny", scope="once")
-    await decide_approval(db, approval_id, body, ip=ip, via="voice")  # commits
+    try:
+        await decide_approval(db, approval_id, body, ip=ip, via="voice")  # commits
+    except Conflict as exc:
+        if exc.code != "run_not_waiting":
+            raise
+        # Decided elsewhere while the reply was being heard (the run went on).
+        raise Conflict("This request was already answered", code="already_decided") from None
     return VoiceReply(body.decision, heard)

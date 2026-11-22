@@ -17,7 +17,7 @@ from app.core.redis import get_redis
 from app.events import bus
 from app.features.audit.models import AuditLog
 from app.features.conversations.models import ChatMessage, Conversation
-from app.features.runs.models import Run, ToolCall
+from app.features.runs.models import Approval, Run, ToolCall
 from app.features.usage.models import UsageRecord
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
@@ -187,10 +187,11 @@ async def test_a_long_answer_is_shortened_and_a_failed_run_says_so(authed):
 
 async def test_a_failed_clean_up_sends_the_request_as_heard(authed):
     await _models(authed)
-    FakeAdapter.transcript = "Tell the provider it may fail."
+    FakeAdapter.transcript = "Um, tell the provider it may fail."
     r = await _speak(authed)
     assert r.status_code == 202, r.text
-    assert r.json()["request"] == r.json()["heard"] == "Tell the provider it may fail."
+    # Not tidied: the fillers are still there.
+    assert r.json()["request"] == r.json()["heard"] == "Um, tell the provider it may fail."
 
 
 async def test_without_a_speech_to_text_model_it_names_the_setting(authed):
@@ -332,6 +333,33 @@ async def test_a_new_request_does_not_wait_for_a_busy_voice_chat(authed):
     second = await _speak(authed)
     assert second.status_code == 202
     assert second.json()["conversation_id"] != first["conversation_id"]
+    titles = {
+        c["id"]: c["title"]
+        for c in [
+            (await authed.get(f"/api/conversations/{r['conversation_id']}")).json()
+            for r in (first, second.json())
+        ]
+    }
+    today = titles[first["conversation_id"]]
+    assert titles[second.json()["conversation_id"]] == f"{today} (2)"
+    # As soon as the first chat is idle again, requests go back to it.
+    await _finish(first["run_id"])
+    third = (await _speak(authed)).json()
+    assert third["conversation_id"] == first["conversation_id"]
+    await _finish(third["run_id"])
+    await _finish(second.json()["run_id"])
+    assert (await _speak(authed)).json()["conversation_id"] == first["conversation_id"]
+
+
+async def test_a_chat_continued_by_voice_is_not_a_voice_chat(authed):
+    await _models(authed)
+    typed = (await authed.post("/api/conversations", json={})).json()["id"]
+    r = await authed.post(f"/api/conversations/{typed}/turns", json={"text": "hi"})
+    await _finish(r.json()["run_id"])
+    follow_up = (await _speak(authed, conversation_id=typed)).json()
+    assert follow_up["conversation_id"] == typed
+    await _finish(follow_up["run_id"])
+    assert (await _speak(authed)).json()["conversation_id"] != typed
 
 
 async def test_the_profile_from_settings_runs_the_request(authed):
@@ -615,3 +643,104 @@ async def test_neither_audio_nor_transcript_is_kept(authed):
     # Only the request is kept, as the chat message; what was heard is nowhere.
     assert texts == ["Remind me about the zebra sandwich.", ""]
     assert not any("Uh," in t for t in texts + audit)
+
+
+async def test_no_rejects_a_plan(authed):
+    await authed.put("/api/settings/permissions", json={"plan_review": "always"})
+    plan = [{"title": "List notes"}]
+    run_id, approval = await _waiting(
+        authed,
+        "Sum up my notes.",
+        [_call("update_plan", steps=plan), Done("tool_use")],
+        [TextDelta("Fine, I won't."), Done("end")],
+    )
+    assert approval["kind"] == "plan"
+    r = await _reply(authed, approval["id"], "No, don't.")
+    assert r.json() == {"decided": "deny", "heard": "No, don't."}
+    [details] = await _audit_details("approval.denied")
+    assert details["source"] == "voice"
+
+
+async def _make_dangerous(run_id: str) -> None:
+    async with get_sessionmaker()() as db:
+        await db.execute(
+            update(ToolCall).where(ToolCall.run_id == uuid.UUID(run_id)).values(risk="dangerous")
+        )
+        await db.commit()
+
+
+async def test_a_dangerous_plan_or_question_needs_a_tap(authed):
+    await authed.put("/api/settings/permissions", json={"plan_review": "always"})
+    run_id, approval = await _waiting(
+        authed,
+        "Sum up my notes.",
+        [_call("update_plan", steps=[{"title": "List notes"}]), Done("tool_use")],
+    )
+    await _make_dangerous(run_id)
+    r = await _reply(authed, approval["id"], "Yes.")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "needs_tap"
+    await authed.post(f"/api/runs/{run_id}/cancel")
+    await authed.put("/api/settings/permissions", json={"plan_review": "never"})
+
+    FakeAdapter.transcript = "Write a report."
+    _script("Write a report.", [_call("ask_user", question="Short or long?"), Done("tool_use")])
+    run_id = (await _speak(authed)).json()["run_id"]
+    await execute_run(uuid.UUID(run_id))
+    [question] = (await authed.get("/api/approvals")).json()
+    assert question["kind"] == "question"
+    await _make_dangerous(run_id)
+    FakeAdapter.transcribed = []
+    r = await _reply(authed, question["id"], "Long.")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "needs_tap"
+    assert FakeAdapter.transcribed == []
+
+
+async def test_decided_elsewhere_while_listening_is_already_decided(authed, monkeypatch):
+    from app.features.dictation import service as dictation
+
+    run_id, approval = await _waiting(
+        authed,
+        "Read my todo list.",
+        [_call("read_file", path="notes/todo.md"), Done("tool_use")],
+        **{"fs.read": "ask"},
+    )
+
+    async def transcribe(db, audio, content_type, settings):  # type: ignore[no-untyped-def]
+        # The app's button is pressed while the reply is being transcribed.
+        r = await authed.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"})
+        assert r.status_code == 200
+        # ... and the run goes on to wait for its next approval meanwhile.
+        async with get_sessionmaker()() as other:
+            await other.execute(
+                update(Run).where(Run.id == uuid.UUID(run_id)).values(status="waiting_approval")
+            )
+            await other.commit()
+        return "No."
+
+    monkeypatch.setattr(dictation, "transcribe", transcribe)
+    r = await _reply(authed, approval["id"], "No.")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "already_decided"
+    async with get_sessionmaker()() as db:
+        row = await db.get(Approval, uuid.UUID(approval["id"]))
+        assert row is not None and row.status == "approved"
+    assert [d["decision"] for d in await _global("approval.decided")] == ["approve"]
+
+
+async def test_a_yes_needs_a_yes_word_in_the_reply(authed, monkeypatch):
+    from app.features.dictation import service as dictation
+
+    run_id, approval = await _waiting(
+        authed,
+        "Read my todo list.",
+        [_call("read_file", path="notes/todo.md"), Done("tool_use")],
+        **{"fs.read": "ask"},
+    )
+
+    async def always_yes(db, raw):  # type: ignore[no-untyped-def]
+        return "yes"
+
+    monkeypatch.setattr(dictation, "classify_reply", always_yes)
+    r = await _reply(authed, approval["id"], "The weather is lovely today.")
+    assert r.json()["decided"] is None and r.json()["say"] == "Sorry, was that a yes?"
+    r = await _reply(authed, approval["id"], "Sure, do it.")
+    assert r.json()["decided"] == "approve"

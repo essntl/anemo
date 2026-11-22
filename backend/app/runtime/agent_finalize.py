@@ -138,6 +138,7 @@ async def say_answer(db: AsyncSession, run: Run, status: str) -> None:
         )
     except Exception:  # noqa: BLE001 - speaking the answer is best-effort
         log.exception("voice answer not published", extra={"ctx": {"run_id": str(run.id)}})
+        await db.rollback()
 
 
 async def give_up(db: AsyncSession, run: Run, error: str) -> None:

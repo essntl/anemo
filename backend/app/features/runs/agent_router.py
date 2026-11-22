@@ -195,7 +195,14 @@ async def decide_approval(
     The one place an approval is decided: the app's approval cards, the buttons on
     push notifications (`via="push"`) and spoken replies (`via="voice"`) all come
     through here. Everyone listening (a phone that asks too) hears that it was decided."""
-    approval = await db.scalar(select(Approval).where(Approval.id == approval_id).with_for_update())
+    # Read again under the lock (populate_existing): a caller may hold this approval from
+    # before someone else decided it (a spoken reply is transcribed first).
+    approval = await db.scalar(
+        select(Approval)
+        .where(Approval.id == approval_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if approval is None:
         raise NotFound("Approval not found")
     if approval.status != "pending":
