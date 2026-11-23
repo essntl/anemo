@@ -651,9 +651,9 @@ async def started(device_id: uuid.UUID, start: Started) -> CodeJob:
             if job is None:
                 raise RuntimeError("the job row just made is gone")
         # The client's code.job may have come first (its scan found the folder before
-        # this answer arrived): it keeps what it said; the starter is added.
-        if job.state == "running":
-            job.seen_running = True
+        # this answer arrived): it keeps what it said; the starter is added. Anemo
+        # started it, so it was running: its end notifies even if that came first.
+        job.seen_running = True
         job.conversation_id = job.conversation_id or start.conversation_id
         job.run_id = job.run_id or start.run_id
         changes.thread_changed = await _join_parent(db, job)

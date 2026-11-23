@@ -573,3 +573,26 @@ async def test_a_busy_computer_is_not_an_offline_one(authed, monkeypatch):
     assert (r.status_code, error_code(r)) == (409, "device_busy")
     assert "busy" in r.json()["error"]["message"]
     await ws.disconnect()
+
+
+async def test_a_started_job_that_ended_before_the_answer_still_notifies(authed, device_side):
+    # The client's scan found the job and saw it end before the start's answer came: a
+    # job Anemo started was seen running all the same, so its end notifies once (§12.5).
+    device, ws = await computer(authed)
+    await announce(ws, KEY, prompt="Quick one", state="done")
+    await send(ws, (1, init()), (2, result()), key=KEY)
+    assert list(await notification_titles()) == []
+    async with get_sessionmaker()() as db:
+        job = await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="anemo", prompt="Quick one"
+        )
+    assert job.state == "done"
+    assert await notification_titles() == ["Claude Code job finished: Quick one"]
+    await announce(ws, KEY, prompt="Quick one", state="done")
+    assert len(await notification_titles()) == 1
+    await ws.disconnect()
+
+
+async def notification_titles() -> list[str]:
+    async with get_sessionmaker()() as db:
+        return list(await db.scalars(select(Notification.title)))
