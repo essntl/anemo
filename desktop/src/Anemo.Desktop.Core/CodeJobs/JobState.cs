@@ -33,6 +33,21 @@ public static class JobState
         return null;
     }
 
+    /// <summary>
+    /// The job counts as running: its process lives (<see cref="ProcessLiveness"/>), or Anemo
+    /// Desktop is still cloning or making its project (a <c>starting</c> file, no pid yet), for
+    /// at most 15 minutes after the job was made (§12.5).
+    /// </summary>
+    public static bool IsAlive(string folder, JobMeta meta, IProcessProbe probe, DateTimeOffset now)
+    {
+        if (meta.Pid is null)
+        {
+            return File.Exists(Path.Combine(folder, JobFolder.Starting)) && now - meta.Started <= CodeJobLimits.StartingFor;
+        }
+
+        return ProcessLiveness.IsAlive(probe, meta.Pid, meta.Started, JobFolder.LastOutputAt(folder), now);
+    }
+
     /// <summary>The state now, reading the whole <c>out.jsonl</c> (for one look, not for a loop).</summary>
     public static string Read(string folder, JobMeta meta, IProcessProbe probe, DateTimeOffset now)
     {
@@ -41,7 +56,7 @@ public static class JobState
             return JobStates.Cancelled;
         }
 
-        var alive = ProcessLiveness.IsAlive(probe, meta.Pid, meta.Started, JobFolder.LastOutputAt(folder), now);
+        var alive = IsAlive(folder, meta, probe, now);
         bool? failed = null;
         JsonlTail.Each(Path.Combine(folder, JobFolder.Out), LinePosition.Start, line =>
         {

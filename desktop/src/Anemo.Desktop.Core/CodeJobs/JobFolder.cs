@@ -29,6 +29,9 @@ public static partial class JobFolder
     public const string Err = "err.txt";
     public const string Cancelled = "cancelled";
 
+    /// <summary>The job folder is made and Anemo Desktop is still cloning or making its project (§12.5).</summary>
+    public const string Starting = "starting";
+
     public static bool IsJobId(string name) => IdPattern().IsMatch(name) && IdTime(name) is not null;
 
     /// <summary>

@@ -35,10 +35,13 @@ public sealed class FakeCodeHost : ICodeHost
 
     public string? FindOnPath(string program) => OnPath.TryGetValue(program, out var path) ? path : null;
 
+    /// <summary>Instead of <see cref="Answer"/>: a run that takes its time (and can be cancelled).</summary>
+    public Func<ToolRun, CancellationToken, Task<ToolResult>>? AnswerAsync { get; set; }
+
     public Task<ToolResult> RunAsync(ToolRun run, TimeSpan timeout, CancellationToken ct)
     {
         Runs.Enqueue(run);
-        return Task.FromResult(Answer(run));
+        return AnswerAsync is { } answer ? answer(run, ct) : Task.FromResult(Answer(run));
     }
 
     public int StartDetached(DetachedStart start)

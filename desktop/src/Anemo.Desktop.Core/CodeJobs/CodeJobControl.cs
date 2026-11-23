@@ -20,6 +20,9 @@ public sealed class CodeJobControlOptions
     /// <summary><c>git init</c> of a new project gets this long.</summary>
     public TimeSpan InitTimeout { get; init; } = TimeSpan.FromSeconds(60);
 
+    /// <summary>How long a cancel waits for a stopped clone to end before it answers.</summary>
+    public TimeSpan CancelWait { get; init; } = TimeSpan.FromSeconds(20);
+
     /// <summary>The 4 characters after the time in a new job's id (random by default).</summary>
     public Func<string>? NewIdSuffix { get; init; }
 }
@@ -63,6 +66,7 @@ public sealed partial class CodeJobControl
     private readonly IProcessProbe _probe;
     private readonly TimeProvider _time;
     private readonly CodeJobControlOptions _options;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Starting> _starting = new(StringComparer.Ordinal);
 
     public CodeJobControl(
         Func<DesktopSettings> settings,
@@ -126,10 +130,10 @@ public sealed partial class CodeJobControl
                 return await ProjectsAsync(ct);
             case "code_start":
                 RequireStart(device);
-                return await StartAsync(args, ct);
+                return Start(args);
             case "code_cancel":
                 RequireStart(device);
-                return Cancel(args);
+                return await CancelAsync(args);
             default:
                 throw CommandException.Failed($"Unknown action “{action}”");
         }
@@ -238,7 +242,7 @@ public sealed partial class CodeJobControl
 
     // -- code_start ----------------------------------------------------------------------
 
-    private async Task<JsonNode> StartAsync(Args args, CancellationToken ct)
+    private JsonNode Start(Args args)
     {
         // 1. Validate. A follow-up names its earlier job and runs in its folder: project is ignored.
         var follow = args.OptionalString("follow_job_id");
@@ -273,48 +277,65 @@ public sealed partial class CodeJobControl
             throw CommandException.Failed("The jobs folder's path has a \" or % in it, which a command line can't carry; choose another one in Anemo Desktop's settings.");
         }
 
-        // 2. Resolve the project (a follow-up never clones or makes one).
-        var dir = follow is not null ? FollowedFolder(jobs, follow) : await ResolveAsync(project!, isNew, ct);
+        // 2. Resolve the project at once when it is a folder already (a follow-up never clones
+        // or makes one); a clone or git init is planned for after the answer (§12.5).
+        var job = new PlannedJob(claude, prompt, resume, model, maxTurns);
+        string dir;
+        Func<CancellationToken, Task>? prepare = null;
+        if (follow is not null)
+        {
+            dir = FollowedFolder(jobs, follow);
+        }
+        else if (LocalFolder(project!) is { } local)
+        {
+            dir = local;
+        }
+        else
+        {
+            dir = PlanPrepare(project!, isNew, out var prepareFolder);
+            prepare = prepareFolder;
+        }
 
         // 3. The job folder and its prompt.
         var started = _time.GetLocalNow();
         var (id, folder) = NewJobFolder(jobs, started);
         File.WriteAllText(Path.Combine(folder, JobFolder.Prompt), prompt, new UTF8Encoding(false));
 
-        // 4. Start, then meta.json with the pid: the sharing loop takes the folder only once
-        // meta.json reads, so it never sees the job without its process.
-        int pid;
-        try
+        if (prepare is null)
         {
-            pid = _host.StartDetached(new DetachedStart("cmd.exe", CommandLine(claude, folder, resume, model, maxTurns), dir, StartEnvironment));
+            // 4. Start, then meta.json with the pid: the sharing loop takes the folder only once
+            // meta.json reads, so it never sees the job without its process.
+            try
+            {
+                Launch(id, folder, dir, started, job);
+            }
+            catch (CommandException)
+            {
+                TryDelete(folder);
+                throw;
+            }
         }
-        catch (Exception e) when (e is not OperationCanceledException)
+        else
         {
-            TryDelete(folder);
-            throw CommandException.Failed($"Windows couldn't start the job ({e.GetType().Name}).");
+            // 4'. A starting job: meta.json without a pid and a "starting" file (running for at
+            // most 15 minutes); the clone or git init and the start follow in the background.
+            File.WriteAllText(Path.Combine(folder, JobFolder.Starting), "");
+            WriteMeta(folder, Meta(id, null, dir, started, job));
+            var cts = new CancellationTokenSource();
+            var starting = new Starting(cts);
+            _starting[id] = starting;
+            starting.Task = Task.Run(() => PrepareAndLaunchAsync(id, folder, dir, job, prepare, cts.Token));
         }
-
-        WriteMeta(folder, new JsonObject
-        {
-            ["id"] = id,
-            ["pid"] = pid,
-            ["dir"] = dir,
-            ["resume"] = resume,
-            ["started"] = started.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffffzzz", CultureInfo.InvariantCulture),
-            ["prompt_preview"] = JobFolder.Cut(prompt, PreviewChars),
-            ["model"] = model,
-        });
 
         // 5. The answer; code.job follows from the sharing loop's next scan.
         return new JsonObject { ["job_id"] = id, ["dir"] = dir, ["project"] = Path.GetFileName(dir) };
     }
 
-    /// <summary>
-    /// The project's folder: <c>&lt;projects&gt;\&lt;project&gt;</c>; else a folder whose origin
-    /// is that repository; else a clone from GitHub; else, with <paramref name="isNew"/>, a new
-    /// folder with <c>git init</c>.
-    /// </summary>
-    private async Task<string> ResolveAsync(string project, bool isNew, CancellationToken ct)
+    /// <summary>Waits for every start still cloning or making its folder (for tests and shutdown).</summary>
+    public Task IdleAsync() => Task.WhenAll(_starting.Values.Select(s => s.Task ?? Task.CompletedTask));
+
+    /// <summary><c>&lt;projects&gt;\&lt;project&gt;</c>, else a folder whose origin is that repository; null when neither.</summary>
+    private string? LocalFolder(string project)
     {
         var projects = ProjectsFolder;
         var target = Path.Combine(projects, project);
@@ -323,27 +344,144 @@ public sealed partial class CodeJobControl
             return target;
         }
 
-        var byRemote = CodeProjects.Local(projects)
-            .FirstOrDefault(p => string.Equals(CodeProjects.RepositoryName(p.Remote), project, StringComparison.OrdinalIgnoreCase));
-        if (byRemote is not null)
+        return CodeProjects.Local(projects)
+            .FirstOrDefault(p => string.Equals(CodeProjects.RepositoryName(p.Remote), project, StringComparison.OrdinalIgnoreCase))
+            ?.Dir;
+    }
+
+    /// <summary>
+    /// The folder a clone (or, with <paramref name="isNew"/>, <c>git init</c>) will make, and the
+    /// work that makes it. Fails at once when nothing could make it (no owner, no gh or git).
+    /// </summary>
+    private string PlanPrepare(string project, bool isNew, out Func<CancellationToken, Task> prepare)
+    {
+        var projects = ProjectsFolder;
+        var target = Path.Combine(projects, project);
+        var ownerKnowable = OwnerSetting is { } set ? CodeProjects.IsOwner(set) : Tool("gh") is not null;
+        var canClone = ownerKnowable && (Tool("gh") is not null || Tool("git") is not null);
+        if (!canClone && !isNew)
         {
-            return byRemote.Dir;
+            throw CommandException.Failed(!ownerKnowable
+                ? NoOwnerToCloneMessage(project, projects)
+                : $"There is no project “{project}” in {projects}, and neither gh nor git is on this computer's PATH to clone it.");
         }
 
-        var owner = await OwnerAsync(ct);
-        if (owner is not null && await CloneAsync(owner, project, projects, target, ct))
+        if (!canClone && Tool("git") is null)
         {
-            return target;
+            throw CommandException.Failed("git isn't on this computer's PATH, so the new project can't be made.");
         }
 
-        if (isNew)
+        prepare = async ct =>
         {
-            return await CreateAsync(target, ct);
+            var owner = canClone ? await OwnerAsync(ct) : null;
+            if (owner is not null && await CloneAsync(owner, project, projects, target, ct))
+            {
+                return;
+            }
+
+            if (isNew)
+            {
+                await CreateAsync(target, ct);
+                return;
+            }
+
+            throw CommandException.Failed(owner is null
+                ? NoOwnerToCloneMessage(project, projects)
+                : $"There is no project “{project}” in {projects} or on GitHub ({owner}).");
+        };
+        return target;
+    }
+
+    private static string NoOwnerToCloneMessage(string project, string projects) =>
+        $"There is no project “{project}” in {projects}, and no GitHub owner is known to clone it from (sign in to gh with gh auth login, or set an owner in Anemo Desktop's settings).";
+
+    /// <summary>
+    /// The clone or git init, then the start, after the answer. A failure goes to
+    /// <c>err.txt</c>; without <c>starting</c> and a pid the job then ends as
+    /// <c>exited_without_result</c>, its stderr tail saying why.
+    /// </summary>
+    private async Task PrepareAndLaunchAsync(
+        string id, string folder, string dir, PlannedJob job, Func<CancellationToken, Task> prepare, CancellationToken ct)
+    {
+        try
+        {
+            await prepare(ct);
+            ct.ThrowIfCancellationRequested();
+            if (!JobFolder.IsCancelled(folder))
+            {
+                // started: now, when its process starts (the pid-reuse check compares the two).
+                Launch(id, folder, dir, _time.GetLocalNow(), job);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled: code_cancel wrote the marker.
+        }
+        catch (CommandException e)
+        {
+            WriteError(folder, e.Message);
+        }
+        catch (Exception e)
+        {
+            WriteError(folder, $"Anemo Desktop couldn't prepare the job's folder ({e.GetType().Name}).");
+        }
+        finally
+        {
+            TryDeleteFile(Path.Combine(folder, JobFolder.Starting));
+            _starting.TryRemove(id, out _);
+        }
+    }
+
+    /// <summary>Starts the job's cmd.exe and writes meta.json with its pid.</summary>
+    /// <exception cref="CommandException">Windows didn't start it.</exception>
+    private void Launch(string id, string folder, string dir, DateTimeOffset started, PlannedJob job)
+    {
+        int pid;
+        try
+        {
+            pid = _host.StartDetached(new DetachedStart(
+                "cmd.exe", CommandLine(job.Claude, folder, job.Resume, job.Model, job.MaxTurns), dir, StartEnvironment));
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            throw CommandException.Failed($"Windows couldn't start the job ({e.GetType().Name}).");
         }
 
-        throw CommandException.Failed(owner is null
-            ? $"There is no project “{project}” in {projects}, and no GitHub owner is known to clone it from (sign in to gh with gh auth login, or set an owner in Anemo Desktop's settings)."
-            : $"There is no project “{project}” in {projects} or on GitHub ({owner}).");
+        WriteMeta(folder, Meta(id, pid, dir, started, job));
+    }
+
+    private static JsonObject Meta(string id, int? pid, string dir, DateTimeOffset started, PlannedJob job) => new()
+    {
+        ["id"] = id,
+        ["pid"] = pid,
+        ["dir"] = dir,
+        ["resume"] = job.Resume,
+        ["started"] = started.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffffzzz", CultureInfo.InvariantCulture),
+        ["prompt_preview"] = JobFolder.Cut(job.Prompt, PreviewChars),
+        ["model"] = job.Model,
+    };
+
+    private static void WriteError(string folder, string message)
+    {
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, JobFolder.Err), message + "\n", new UTF8Encoding(false));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // The job still ends; only the reason is lost.
+        }
+    }
+
+    /// <summary>What the start of a job needs, all validated.</summary>
+    private sealed record PlannedJob(string Claude, string Prompt, string? Resume, string? Model, int? MaxTurns);
+
+    /// <summary>A start whose clone or git init runs after the answer.</summary>
+    private sealed class Starting(CancellationTokenSource cts)
+    {
+        public CancellationTokenSource Cts { get; } = cts;
+
+        public Task? Task { get; set; }
     }
 
     /// <summary>The folder recorded in the earlier job's <c>meta.json</c> (§12.5 follow-ups).</summary>
@@ -486,7 +624,7 @@ public sealed partial class CodeJobControl
 
     // -- code_cancel ---------------------------------------------------------------------
 
-    private JsonNode Cancel(Args args)
+    private async Task<JsonNode> CancelAsync(Args args)
     {
         var id = args.String("job_id", 100);
         var folder = Path.Combine(JobsFolder, id);
@@ -510,6 +648,28 @@ public sealed partial class CodeJobControl
         // (that would be "exited without result", which notifies).
         var marker = Path.Combine(folder, JobFolder.Cancelled);
         File.WriteAllText(marker, "");
+
+        if (meta.Pid is null)
+        {
+            // Still cloning or making its project: stop that; the job never starts.
+            if (_starting.TryGetValue(id, out var starting))
+            {
+                starting.Cts.Cancel();
+                if (starting.Task is { } task)
+                {
+                    await task.WaitAsync(_options.CancelWait).ConfigureAwait(false);
+                }
+            }
+
+            TryDeleteFile(Path.Combine(folder, JobFolder.Starting));
+            if (JobFolder.ReadMeta(folder, id) is not { Pid: { } launched })
+            {
+                return new JsonObject { ["job_id"] = id, ["state"] = JobStates.Cancelled };
+            }
+
+            meta = meta with { Pid = launched }; // it started just before the cancel: end it too
+        }
+
         if (!_host.KillTree(meta.Pid!.Value))
         {
             TryDeleteFile(marker);
