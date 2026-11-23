@@ -121,6 +121,25 @@ def classify_error(text: str, assistant_error: str | None, limit: dict[str, Any]
     return RunnerError(text or "Claude Code reported an error", "unknown", retryable=True)
 
 
+# What the CLI says when it cannot continue the session it was asked to resume. The
+# worker answers each of them the same way: a new session, with the history sent again.
+RESUME_FAILURE_MARKERS = (
+    "Resume rejected",
+    "No conversation found",  # the session's transcript is gone
+    # --resume-session-at names a message the transcript does not have: the CLI writes
+    # its transcript a moment after it reports a message, so a process that was ended
+    # in between has reported a uuid it never stored.
+    "No message found with message.uuid",
+)
+
+
+def start_error(text: str) -> RunnerError:
+    """Why the CLI did not start, as a kind the worker can act on."""
+    if any(marker in text for marker in RESUME_FAILURE_MARKERS):
+        return RunnerError(text[:500], "resume_failed")
+    return RunnerError(f"Claude Code did not start: {text[:500]}", "start", True)
+
+
 class Session:
     """One Claude Code session and (while warm) its CLI process."""
 
@@ -251,10 +270,7 @@ class Session:
         try:
             await client.connect()
         except Exception as exc:
-            text = str(exc)
-            if "Resume rejected" in text or "No conversation found" in text:
-                raise RunnerError(text[:500], "resume_failed") from exc
-            raise RunnerError(f"Claude Code did not start: {text[:500]}", "start", True) from exc
+            raise start_error(str(exc)) from exc
         self.client = client
         self.reader = asyncio.create_task(self._read(client))
         self.claude_session_id = new_id or resume
