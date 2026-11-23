@@ -8,7 +8,7 @@ export function ToastHost() {
   if (!toasts.length) return null
   const dismissLabel = t('Dismiss##close')
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-3"
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+var(--toast-lift,0px))] z-[60] flex flex-col items-center gap-2 px-3"
       role="status" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} data-leaving={t.leaving || undefined}

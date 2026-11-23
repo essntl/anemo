@@ -4,17 +4,17 @@
  * timeline and result, with a separator per follow-up. A running job follows its live
  * stream; the view sticks to the bottom until the user scrolls up.
  */
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import {
-  ArrowLeft, CheckCircle2, ChevronRight, Copy, GitBranch, GitPullRequest, Loader2, Monitor, Ban, TriangleAlert, XCircle, Folder,
+  ArrowDown, ArrowLeft, CheckCircle2, ChevronRight, Copy, GitBranch, GitPullRequest, Loader2, Monitor, Ban, TriangleAlert, XCircle, Folder,
 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Elapsed } from '@/components/ui/Elapsed'
 import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
-import { useStickToBottom } from '@/features/chat/useStickToBottom'
+import { DESKTOP } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
@@ -24,6 +24,7 @@ import { CancelJobButton, FollowUpBox, FromChat } from './controls'
 import { JobContext } from './jobContext'
 import { StateBadge, TodoChecklist } from './parts'
 import { type CodeJob, jobDurationMs, pullRequest, toThreads } from './threads'
+import { useFollowEnd } from './useFollowEnd'
 import { type ResultInfo, buildTimeline, num, resultOf, todoProgress, toTodos } from './timeline'
 
 function Fact({ icon, children, className }: { icon: ReactNode; children: ReactNode; className?: string }) {
@@ -107,12 +108,10 @@ function Prompt({ text }: { text: string }) {
 }
 
 /** One job of the thread: its prompt, its timeline (live while it runs) and its result. */
-function JobPart({ job, index, onSize }: { job: CodeJob; index: number; onSize?: (count: number) => void }) {
+function JobPart({ job, index }: { job: CodeJob; index: number }) {
   const running = job.state === 'running'
   const events = useCodeEvents(job.id, { live: running, lastSeq: job.last_seq })
   const items = useMemo(() => buildTimeline(events.data ?? []), [events.data])
-  const count = events.data?.length ?? 0
-  useEffect(() => onSize?.(count), [count, onSize])
   const view = useMemo(() => ({ job, running }), [job, running])
   return (
     <JobContext.Provider value={view}>
@@ -148,23 +147,31 @@ function JobPart({ job, index, onSize }: { job: CodeJob; index: number; onSize?:
   )
 }
 
+/** From the `md` width up (and where it can't be asked). */
+const roomy = () => typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP).matches
+
 function Todos({ job }: { job: CodeJob }) {
   const todos = useMemo(() => toTodos(job.todos), [job.todos])
   const running = job.state === 'running'
-  const [open, setOpen] = useState(false)
+  // Open while the job runs (folded on a phone, where the thread has little room) and
+  // folded after, until the user says otherwise.
+  const [chosen, setChosen] = useState<boolean | null>(null)
   if (!todos.length) return null
-  const shown = running || open
+  const open = chosen ?? (running && roomy())
+  const now = todos.find((x) => x.status === 'in_progress')
   return (
-    <div className={cn('z-10 mb-3 rounded-xl border border-border bg-surface/95 px-3 py-2 shadow-soft backdrop-blur', running && 'sticky top-0')}>
-      <button type="button" onClick={() => setOpen(!open)} disabled={running} aria-expanded={shown}
-        className="flex w-full items-center gap-2 text-left text-[12px] font-semibold uppercase tracking-wider text-subtle">
-        {t('Todo list')}
-        <span className="font-mono normal-case tracking-normal text-muted" aria-label={t('{done} of {total} done', { done: todos.filter((x) => x.status === 'completed').length, total: todos.length })}>
+    <div className={cn('z-10 mb-3 rounded-xl border border-border bg-surface px-3 py-2 shadow-soft', running && 'sticky top-0')}>
+      <button type="button" onClick={() => setChosen(!open)} aria-expanded={open}
+        className="-my-1 flex w-full min-w-0 items-center gap-2 py-1 text-left text-[12px] font-semibold uppercase tracking-wider text-subtle pointer-coarse:-my-2 pointer-coarse:py-3">
+        <span className="shrink-0">{t('Todo list')}</span>
+        <span className="shrink-0 font-mono normal-case tracking-normal text-muted" aria-label={t('{done} of {total} done', { done: todos.filter((x) => x.status === 'completed').length, total: todos.length })}>
           {todoProgress(todos)}
         </span>
-        {!running && <ChevronRight aria-hidden="true" className={cn('ml-auto h-3.5 w-3.5 transition-transform', open && 'rotate-90')} />}
+        {/* Folded: what is being done now is still in sight. */}
+        {!open && running && now && <span className="min-w-0 truncate font-normal normal-case tracking-normal text-muted">{now.activeForm ?? now.content}</span>}
+        <ChevronRight aria-hidden="true" className={cn('ml-auto h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-90')} />
       </button>
-      {shown && <div className="mt-1.5 max-h-[40vh] overflow-y-auto"><TodoChecklist todos={todos} running={running} /></div>}
+      {open && <div className="mt-1.5 max-h-[40vh] overflow-y-auto"><TodoChecklist todos={todos} running={running} /></div>}
     </div>
   )
 }
@@ -173,20 +180,14 @@ function Header({ thread }: { thread: CodeJob[] }) {
   const first = thread[0]
   const latest = thread[thread.length - 1]
   const summary = toThreads(thread)[0]
-  const running = latest.state === 'running'
   const device = latest.device
   const pr = pullRequest(thread.map((j) => j.pr_url).filter(Boolean).at(-1))
   const branch = latest.branch ?? thread.map((j) => j.branch).filter(Boolean).at(-1)
   const session = latest.session_id
   return (
     <header className="mb-4 px-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <StateBadge state={latest.state} />
-        {running && <Elapsed since={latest.started_at} className="text-[12.5px] text-muted" />}
-        <span className="text-[12px] text-muted">{formatWhen(first.started_at)}</span>
-        <span className="ml-auto"><CancelJobButton job={latest} /></span>
-      </div>
-      <h2 className="mt-2 break-words text-lg font-semibold">{first.title || t('(no title)')}</h2>
+      <h2 className="break-words text-lg font-semibold [overflow-wrap:anywhere]">{first.title || t('(no title)')}</h2>
+      <p className="mt-0.5 text-[12px] text-muted">{t('started {when}', { when: formatWhen(first.started_at) })}</p>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px] text-muted">
         <Fact icon={<Folder />}>
           <span className="font-medium text-text">{latest.project}</span>
@@ -236,7 +237,32 @@ function Header({ thread }: { thread: CodeJob[] }) {
   )
 }
 
-/** The thread of the job `jobId`. `backTo` is the list's address (phones show a back link). */
+/**
+ * The bar over the thread, always in sight: the way back to the list (where the list is
+ * a screen of its own), the state, the title and Cancel.
+ */
+function TopBar({ thread, backTo }: { thread: CodeJob[]; backTo: string }) {
+  const location = useLocation()
+  const latest = thread.at(-1)
+  return (
+    <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 md:px-4">
+      <Link to={backTo} state={location.state} aria-label={t('All jobs')} title={t('All jobs')}
+        className="-ml-1 inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-1 rounded-control px-1.5 text-[13px] pointer-coarse:h-10 pointer-coarse:min-w-10 text-muted hover:bg-surface-hover hover:text-text lg:hidden">
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" /><span className="max-sm:hidden">{t('All jobs')}</span>
+      </Link>
+      {latest && (
+        <>
+          <StateBadge state={latest.state} />
+          {latest.state === 'running' && <Elapsed since={latest.started_at} className="shrink-0 text-[12.5px] text-muted max-sm:hidden" />}
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{thread[0].title || t('(no title)')}</span>
+          <CancelJobButton job={latest} />
+        </>
+      )}
+    </div>
+  )
+}
+
+/** The thread of the job `jobId`. `backTo` is the list's address (narrow screens show a back link). */
 export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: string }) {
   const detail = useCodeJob(jobId)
   const data = detail.data
@@ -246,36 +272,43 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
     return toThreads(jobs)[0]?.jobs ?? jobs
   }, [data])
   const latest = thread.at(-1)
-  // How many events the latest job has loaded: the view follows them while it runs
-  // (scrolling up stops that), and once more when it ends (its result).
-  const [size, setSize] = useState(0)
-  const scroller = useStickToBottom(latest?.state === 'running' ? `${latest.id}:${size}` : latest?.id)
-  const location = useLocation()
+  // A thread opens on its latest result, a running one on what it does now, and both
+  // follow what comes until the user scrolls up.
+  const { scroller, content, away, toEnd } = useFollowEnd()
 
   return (
-    <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
-      <div className="mx-auto max-w-3xl px-2 pb-10 pt-2 md:px-6">
-        <Link to={backTo} state={location.state} className="mb-3 ml-2 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-text lg:hidden">
-          <ArrowLeft className="h-4 w-4" /> {t('All jobs')}
-        </Link>
-        {detail.isPending && <p className="p-2 text-[13px] text-muted">{t('Loading…')}</p>}
-        {detail.isError && (
-          <div className="p-2 text-[13px]">
-            <p className="text-error">{errorMessage(detail.error)}</p>
-            <Button size="sm" className="mt-2" onClick={() => void detail.refetch()}>{t('Try again')}</Button>
+    // The thread scrolls; the bar over it and the follow-up box under it stay.
+    <div className="flex h-full flex-col">
+      <TopBar thread={thread} backTo={backTo} />
+      <div className="relative min-h-0 flex-1">
+        <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
+          <div ref={content} className="mx-auto max-w-3xl px-2 pb-6 pt-4 md:px-6">
+            {detail.isPending && <p className="p-2 text-[13px] text-muted">{t('Loading…')}</p>}
+            {detail.isError && (
+              <div className="p-2 text-[13px]">
+                <p className="text-error">{errorMessage(detail.error)}</p>
+                <Button size="sm" className="mt-2" onClick={() => void detail.refetch()}>{t('Try again')}</Button>
+              </div>
+            )}
+            {latest && (
+              <>
+                <Header thread={thread} />
+                <Todos job={latest} />
+                <div className="flex flex-col">
+                  {thread.map((job, i) => <JobPart key={job.id} job={job} index={i} />)}
+                </div>
+              </>
+            )}
           </div>
-        )}
-        {latest && (
-          <>
-            <Header thread={thread} />
-            <Todos job={latest} />
-            <div className="flex flex-col">
-              {thread.map((job, i) => <JobPart key={job.id} job={job} index={i} onSize={i === thread.length - 1 ? setSize : undefined} />)}
-            </div>
-            <FollowUpBox job={latest} />
-          </>
+        </div>
+        {away && (
+          <Button size="sm" icon={<ArrowDown className="h-3.5 w-3.5" />} className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-border shadow-float"
+            onClick={() => toEnd(true)}>
+            {latest?.state === 'running' ? t('Jump to latest') : t('Jump to the end')}
+          </Button>
         )}
       </div>
+      {latest && <div className="shrink-0"><FollowUpBox job={latest} title={thread[0]?.title} onSent={toEnd} /></div>}
     </div>
   )
 }

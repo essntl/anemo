@@ -7,6 +7,7 @@ import { ReauthDialog } from '@/features/auth/ReauthDialog'
 import { MoveChatsDialog } from '@/features/chat/components/MoveChatsDialog'
 import { DictationHost } from '@/features/dictation/DictationHost'
 import { useAppEvents } from '@/features/chat/useAppEvents'
+import { CodeQueueRunner } from '@/features/code/CodeQueueRunner'
 import { useServiceWorkerLinks } from '@/features/notifications/useServiceWorkerLinks'
 import { Island } from '@/features/island/Island'
 import { CommandPalette } from '@/features/search/CommandPalette'
@@ -120,6 +121,7 @@ export function AppLayout() {
       <MoveChatsDialog />
       <ShareDialog />
       <ToastHost />
+      <CodeQueueRunner />
       <CommandPalette />
       <ShortcutSheet />
       <DictationHost />
