@@ -14675,7 +14675,7 @@
           "code"
         ],
         "summary": "Start Job",
-        "description": "Start a job on a computer (it may clone the project first: up to 11 minutes).",
+        "description": "Start a job on a computer. It answers at once; a project it must clone first is\ncloned after that (the job then runs, or ends without a result saying why).",
         "operationId": "start_job_api_code_jobs_post",
         "parameters": [
           {
@@ -21963,6 +21963,11 @@
           "start": {
             "type": "boolean",
             "title": "Start",
+            "default": false
+          },
+          "cancel": {
+            "type": "boolean",
+            "title": "Cancel",
             "default": false
           }
         },

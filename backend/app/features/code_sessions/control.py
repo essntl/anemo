@@ -31,9 +31,10 @@ from app.features.devices.models import Device
 
 log = logging.getLogger(__name__)
 
-# How long the relay waits for each answer (§12.2): a start may clone for 10 minutes.
+# How long the relay waits for each answer. A start answers within seconds: the computer
+# clones a project, when it must, after answering (§12.5).
 PROJECTS_TIMEOUT_S = 45.0
-START_TIMEOUT_S = 660.0
+START_TIMEOUT_S = 60.0
 CANCEL_TIMEOUT_S = 30.0
 
 MAX_LISTED = 500
@@ -70,6 +71,10 @@ class DeviceRefused(Forbidden):
     code = "device_refused"
 
 
+class DeviceBusy(Conflict):
+    code = "device_busy"
+
+
 # -- the computer ----------------------------------------------------------------------------
 
 
@@ -87,9 +92,9 @@ async def devices(db: AsyncSession) -> list[CodeDeviceOut]:
 
 
 async def _computer(
-    db: AsyncSession, device_id: uuid.UUID, *, need: str
+    db: AsyncSession, device_id: uuid.UUID, *, need: service.Need
 ) -> tuple[Device, relay.Offer]:
-    """The device, checked for an action that needs `need` ("code" or "code_start")."""
+    """The device, checked for an action that needs `need` (service.can)."""
     device = await db.get(Device, device_id)
     if device is None or device.kind != "computer":
         raise NotFound("Computer not found")
@@ -100,19 +105,24 @@ async def _computer(
     offer = await relay.online(device.id)
     if offer is None:
         raise DeviceOffline(f"“{device.name}” isn't connected to Anemo right now.")
-    if not offer.code or (need == "code_start" and not offer.code_start):
-        setting = (
-            "Let Anemo start Claude Code jobs"
-            if need == "code_start" and offer.code
-            else "Share Claude Code jobs with Anemo"
-        )
-        raise CodeStartOff(f"“{setting}” is off in Anemo Desktop on “{device.name}”.")
+    if not service.can(offer, need):
+        if not offer.code:
+            why = "“Share Claude Code jobs with Anemo” is off"
+        elif not offer.code_start:
+            why = "“Let Anemo start Claude Code jobs” is off"
+        else:
+            why = "control is off or paused (Allow control)"
+        raise CodeStartOff(f"On “{device.name}”, {why} in Anemo Desktop.")
     return device, offer
 
 
 async def _send(device: Device, action: str, fields: dict[str, Any], timeout_s: float) -> dict:
     try:
         return await relay.send(device.id, action, fields, timeout_s=timeout_s)
+    except relay.Busy as exc:
+        raise DeviceBusy(
+            f"“{device.name}” is busy with another command. Try again in a moment."
+        ) from exc
     except relay.Unavailable as exc:
         raise DeviceOffline(str(exc) or f"“{device.name}” didn't answer.") from exc
     except (relay.Refused, relay.Stopped) as exc:
@@ -127,7 +137,7 @@ def _text(value: Any, limit: int = MAX_TEXT) -> str:
 
 async def projects(db: AsyncSession, device_id: uuid.UUID) -> CodeProjectsOut:
     """The computer's projects and the owner's GitHub repositories not cloned there."""
-    device, _ = await _computer(db, device_id, need="code")
+    device, _ = await _computer(db, device_id, need="share")
     state = await _send(device, "code_projects", {}, PROJECTS_TIMEOUT_S)
     local = [p for p in state.get("projects") or [] if isinstance(p, dict) and p.get("name")]
     remote = [r for r in state.get("remote") or [] if isinstance(r, dict) and r.get("name")]
@@ -164,12 +174,21 @@ async def start_job(
     max_turns: int | None = None,
     conversation_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
+    follow_job_id: str | None = None,
 ) -> CodeJobOut:
     """Start a job on the computer and make its row at once (running, with the chat and
-    run that started it). Waits for the computer's answer (up to 11 minutes: it may
-    clone the project first)."""
-    device, _ = await _computer(db, device_id, need="code_start")
-    fields = {
+    run that started it). `follow_job_id`: the job (its key) whose folder the new one
+    runs in, the project then being ignored by the computer; when not given and
+    `resume_session` is, the computer's job that had that session."""
+    device, _ = await _computer(db, device_id, need="start")
+    if follow_job_id is None and resume_session:
+        follow_job_id = await db.scalar(
+            select(CodeJob.job_key)
+            .where(CodeJob.device_id == device.id, CodeJob.session_id == resume_session)
+            .order_by(CodeJob.started_at.desc(), CodeJob.id.desc())
+            .limit(1)
+        )
+    fields: dict[str, Any] = {
         "project": project,
         "prompt": prompt,
         "new": new,
@@ -177,7 +196,9 @@ async def start_job(
         "model": model,
         "max_turns": max_turns,
     }
-    await db.close()  # nothing is held while the computer works (minutes, for a clone)
+    if follow_job_id is not None:
+        fields["follow_job_id"] = follow_job_id
+    await db.close()  # nothing is held while the computer answers
     state = await _send(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
     if not isinstance(job_key, str) or not JOB_KEY.match(job_key):
@@ -237,6 +258,7 @@ async def follow_up(
         max_turns=max_turns,
         conversation_id=conversation_id,
         run_id=run_id,
+        follow_job_id=last.job_key,
     )
 
 
@@ -247,7 +269,7 @@ async def cancel_job(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut:
     """Cancel a running job. One that has ended is returned as it is."""
     job = await service.get(db, job_id)
     if job.state not in TERMINAL:
-        device, _ = await _computer(db, job.device_id, need="code_start")
+        device, _ = await _computer(db, job.device_id, need="cancel")
         await db.close()
         state = await _send(device, "code_cancel", {"job_id": job.job_key}, CANCEL_TIMEOUT_S)
         answered = state.get("state")

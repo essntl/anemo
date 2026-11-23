@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
+from app.core.redis import get_redis
 from app.features.code_sessions import control
 from app.features.code_sessions.models import CodeJob
 from app.features.devices import relay
@@ -17,7 +18,6 @@ from app.policy.presets import CATEGORY_BY_CAP
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
 from app.tools.builtin import code as code_tools
-from app.tools.builtin.web import UNTRUSTED
 from tests.api.test_agent import agent_turn, call, script, setup, timeline
 from tests.api.test_code_sessions import announce, init, result, say, send
 from tests.api.test_devices import add
@@ -32,19 +32,27 @@ STARTED = {"job_id": KEY, "dir": "C:\\dev\\anemo", "project": "anemo"}
 
 
 async def computer(  # type: ignore[no-untyped-def]
-    authed, name: str = "PC", trust: str = "trusted", *, share: bool = True, start: bool = True
+    authed,
+    name: str = "PC",
+    trust: str = "trusted",
+    *,
+    share: bool = True,
+    start: bool = True,
+    control: bool = True,
 ) -> tuple[dict, WsClient]:
     device = await add(authed, name, trust=trust)
     ws, _ = await welcomed(device["token"])
-    await offer(ws, share=share, start=start)
+    await offer(ws, share=share, start=start, control=control)
     return device, ws
 
 
-async def offer(ws: WsClient, *, share: bool = True, start: bool = True) -> None:
+async def offer(
+    ws: WsClient, *, share: bool = True, start: bool = True, control: bool = True
+) -> None:
     await ws.send(
         {
             "type": "device.offer",
-            "control": False,
+            "control": control,  # "Allow control" on and not paused
             "shell": False,
             "code": share,
             "code_start": start,
@@ -98,7 +106,7 @@ async def row(key: str = KEY) -> CodeJob:
 async def test_the_offer_says_whether_anemo_may_start_jobs(authed):
     device, ws = await computer(authed)
     offered = await relay.online(uuid.UUID(device["id"]))
-    assert offered == relay.Offer(control=False, shell=False, code=True, code_start=True)
+    assert offered == relay.Offer(control=True, shell=False, code=True, code_start=True)
     await ws.send({"type": "device.offer", "control": False, "shell": False, "code": True})
     await roundtrip(ws)  # an older client: no code_start, so off
     offered = await relay.online(uuid.UUID(device["id"]))
@@ -260,7 +268,7 @@ async def test_start_errors(authed, device_side):
         assert r.status_code == 422 and error_code(r) == "validation_error", bad
     assert (await authed.get("/api/code/jobs")).json()["jobs"] == []
     timeouts = {action: timeout for action, _, timeout in device_side.sent}
-    assert timeouts == {"code_start": 660.0}
+    assert timeouts == {"code_start": 60.0}
     await ws.disconnect()
 
 
@@ -324,6 +332,8 @@ async def test_follow_ups(authed, device_side):
         "s-first",
         "sonnet",
     )
+    # The computer runs it in the folder of the job it follows (§12.5).
+    assert fields["follow_job_id"] == first
     # A follow-up of the first job resumes the thread's last one: it is running now.
     r = await authed.post(f"/api/code/jobs/{job_id}/follow-up", json=body)
     assert (r.status_code, error_code(r)) == (409, "job_running")
@@ -383,17 +393,27 @@ def test_the_categories_and_their_defaults():
 
 def test_what_the_calls_would_do():
     ctx = code_tools.ToolContext(run_id=uuid.uuid4(), emit=None)  # type: ignore[arg-type]
-    ctx.state["computers"] = {"w": {"id": "x", "name": "W", "trust": "watched"}}
+    ctx.state["computers"] = {
+        "w": {"id": "x", "name": "W", "trust": "watched"},
+        "pc": {"id": "id-of-pc", "name": "PC", "trust": "trusted"},
+    }
     start = code_tools.CodeStart()
     (action,) = start.actions(
-        code_tools.StartInput(device="PC", project="anemo", prompt="x" * 300), ctx
+        code_tools.StartInput(device="pc", project="anemo", prompt="x" * 300), ctx
     )
+    # Scoped by the device's id, as the computer tools are: a name may hold "/".
     assert (action.capability, action.resource, action.risk) == (
         "code.run",
-        "device:PC/project:anemo",
+        "device:id-of-pc/project:anemo",
         "moderate",
     )
-    assert action.summary == f"Start a Claude Code job on PC in anemo: “{'x' * 119}…”"
+    (listing,) = code_tools.CodeProjects().actions(code_tools.ProjectsInput(device="PC"), ctx)
+    assert listing.resource == "device:id-of-pc"
+    (unknown,) = start.actions(
+        code_tools.StartInput(device="a/b", project="anemo", prompt="Hi"), ctx
+    )
+    assert unknown.resource == "device:unknown/project:anemo"
+    assert action.summary == f"Start a Claude Code job on pc in anemo: “{'x' * 119}…”"
     (watched,) = start.actions(code_tools.StartInput(device="w", project="anemo", prompt="Hi"), ctx)
     assert watched.summary.endswith("(refused: a watched computer)")
     (see,) = code_tools.CodeStatus().actions(code_tools.JobInput(job_id=KEY), ctx)
@@ -424,7 +444,7 @@ async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
     assert started["result_data"] == {"code_job_id": str(job.id)}
     assert str(job.id) in started["result"]
     assert status["result_data"] == {"code_job_id": str(job.id)}
-    assert UNTRUSTED in status["result"]
+    assert code_tools.FROM_JOB in status["result"]
 
     # Events arrive; the status shows a summary, never the whole log.
     await announce(ws, KEY, prompt="Fix the login bug")
@@ -446,7 +466,7 @@ async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
     run2 = await agent_turn(authed, cid, "how is it")
     (status,) = (await timeline(authed, run2))["tool_calls"]
     content = status["result"]
-    assert UNTRUSTED in content and "done" in content and "Wrote: xxx" in content
+    assert code_tools.FROM_JOB in content and "done" in content and "Wrote: xxx" in content
     assert secret_tail not in content and len(content) < 3000
     assert "Fixed in https://github.com/essntl/anemo/pull/9" in content
     assert "API-equivalent cost $1.25" in content
@@ -483,3 +503,199 @@ async def test_the_tools_go_with_the_page(authed):
     await agent_turn(authed, cid, "hello again")
     offered = {t.name for t in FakeAdapter.requests[-1].tools}
     assert not offered & set(code_tools.CODE_TOOL_NAMES)
+
+
+async def test_a_resumed_session_follows_the_job_that_had_it(authed, device_side):
+    device, ws = await computer(authed)
+    earlier = "20261120-090000-rs01"
+    await announce(ws, earlier, started="2026-11-20T09:00:00Z", state="done")
+    await send(ws, (1, init("s-known")), key=earlier)
+    async with get_sessionmaker()() as db:
+        await control.start_job(
+            db,
+            device_id=uuid.UUID(device["id"]),
+            project="anemo",
+            prompt="Go on",
+            resume_session="s-known",
+        )
+        _, fields, _ = device_side.sent[-1]
+        assert fields["follow_job_id"] == earlier and fields["resume_session"] == "s-known"
+        # A session no job of that computer had: no job to follow.
+        device_side.answers["code_start"] = {**STARTED, "job_id": "20261124-111500-rs02"}
+        await control.start_job(
+            db,
+            device_id=uuid.UUID(device["id"]),
+            project="anemo",
+            prompt="Go on",
+            resume_session="s-unknown",
+        )
+        _, fields, _ = device_side.sent[-1]
+        assert "follow_job_id" not in fields
+        # A new job: none either.
+        device_side.answers["code_start"] = {**STARTED, "job_id": "20261124-121500-rs03"}
+        await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="anemo", prompt="New"
+        )
+        _, fields, _ = device_side.sent[-1]
+        assert "follow_job_id" not in fields
+    await ws.disconnect()
+
+
+async def test_a_paused_computer_cancels_but_doesnt_start(authed, device_side):
+    # Control off or paused in Anemo Desktop: no new jobs, but a running one can be
+    # cancelled (§12.5).
+    device, ws = await computer(authed, control=False)
+    listed = (await authed.get("/api/code/devices")).json()
+    assert [(d["share"], d["start"], d["cancel"]) for d in listed] == [(True, False, True)]
+    body = {"device_id": device["id"], "project": "anemo", "prompt": "Hi"}
+    r = await authed.post("/api/code/jobs", json=body)
+    assert (r.status_code, error_code(r)) == (409, "code_start_off")
+    assert "Allow control" in r.json()["error"]["message"]
+    first = "20261120-090000-pz01"
+    await announce(ws, first, started="2026-11-20T09:00:00Z", state="done")
+    await send(ws, (1, init("s-p")), key=first)
+    job_id = (await authed.get("/api/code/jobs")).json()["jobs"][0]["id"]
+    r = await authed.post(f"/api/code/jobs/{job_id}/follow-up", json={"prompt": "More"})
+    assert (r.status_code, error_code(r)) == (409, "code_start_off")
+    running = "20261120-100000-pz02"
+    await announce(ws, running, started="2026-11-20T10:00:00Z")
+    jobs = (await authed.get("/api/code/jobs")).json()["jobs"]
+    running_id = next(j["id"] for j in jobs if j["job_key"] == running)
+    device_side.answers["code_cancel"] = {"job_id": running, "state": "cancelled"}
+    r = await authed.post(f"/api/code/jobs/{running_id}/cancel")
+    assert r.status_code == 200 and r.json()["state"] == "cancelled"
+    assert [action for action, _, _ in device_side.sent] == ["code_cancel"]
+    # Without "Let Anemo start Claude Code jobs" there is no cancelling either.
+    await offer(ws, start=False, control=False)
+    listed = (await authed.get("/api/code/devices")).json()
+    assert [(d["share"], d["start"], d["cancel"]) for d in listed] == [(True, False, False)]
+    await ws.disconnect()
+
+
+async def test_a_busy_computer_is_not_an_offline_one(authed, monkeypatch):
+    # Another command holds the computer (one at a time per device): device_busy.
+    device, ws = await computer(authed)
+    monkeypatch.setattr(control, "START_TIMEOUT_S", 0.5)
+    await get_redis().set(f"devices:lock:{device['id']}", "another command", ex=30)
+    body = {"device_id": device["id"], "project": "anemo", "prompt": "Hi"}
+    r = await authed.post("/api/code/jobs", json=body)
+    assert (r.status_code, error_code(r)) == (409, "device_busy")
+    assert r.json()["error"]["message"] == (
+        "“PC” is busy with another command. Try again in a moment."
+    )
+    await ws.disconnect()
+
+
+async def test_a_started_job_that_ended_before_the_answer_still_notifies(authed, device_side):
+    # The client's scan found the job and saw it end before the start's answer came: a
+    # job Anemo started was seen running all the same, so its end notifies once (§12.5).
+    device, ws = await computer(authed)
+    await announce(ws, KEY, prompt="Quick one", state="done")
+    await send(ws, (1, init()), (2, result()), key=KEY)
+    assert list(await notification_titles()) == []
+    async with get_sessionmaker()() as db:
+        job = await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="anemo", prompt="Quick one"
+        )
+    assert job.state == "done"
+    assert await notification_titles() == ["Claude Code job finished: Quick one"]
+    await announce(ws, KEY, prompt="Quick one", state="done")
+    assert len(await notification_titles()) == 1
+    await ws.disconnect()
+
+
+async def notification_titles() -> list[str]:
+    async with get_sessionmaker()() as db:
+        return list(await db.scalars(select(Notification.title)))
+
+
+async def test_status_marks_all_that_the_job_wrote(authed):
+    # Everything that came from the computer or the job is inside one untrusted block,
+    # marked as written by a Claude Code job (§12.5); only Anemo's own facts are outside.
+    _, ws = await computer(authed)
+    await announce(ws, KEY, project="proj-x", dir="C:\\dev\\proj-x", prompt="Task-T")
+    todo = {
+        "type": "tool_use",
+        "id": "t1",
+        "name": "TodoWrite",
+        "input": {"todos": [{"content": "Todo-Q", "status": "pending"}]},
+    }
+    await send(
+        ws,
+        (1, init()),
+        (2, {"type": "assistant", "message": {"content": [todo]}}),
+        (
+            3,
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "b",
+                            "name": "Bash",
+                            "input": {"command": "git checkout -b feat/zz"},
+                        }
+                    ]
+                },
+            },
+        ),
+        (4, say("Said-W")),
+        (5, result(result="Result-R https://github.com/o/r/pull/5")),
+        key=KEY,
+    )
+    status = code_tools.CodeStatus()
+    ctx = code_tools.ToolContext(run_id=uuid.uuid4(), emit=None)  # type: ignore[arg-type]
+    out = await status.run(code_tools.JobInput(job_id=KEY), ctx)
+    content = out.content
+    assert "from the web" not in content
+    assert "written by a Claude Code job" in content
+    head, _, rest = content.partition("<untrusted_data")
+    inside, _, after = rest.partition("</untrusted_data>")
+    for piece in (
+        "proj-x",
+        "C:\\dev\\proj-x",
+        "Task-T",
+        "feat/zz",
+        "Todo-Q",
+        "Said-W",
+        "Result-R",
+        "https://github.com/o/r/pull/5",
+    ):
+        assert piece in inside and piece not in head and piece not in after, piece
+    assert "done" in head and KEY in head and "/code/" in head
+    await ws.disconnect()
+
+
+async def test_a_job_that_clones_first(authed, device_side):
+    # Anemo Desktop answers before it clones (§12.5): the job is running with no pid;
+    # once the process runs, its code.job brings the pid and a later start time.
+    device, ws = await computer(authed)
+    async with get_sessionmaker()() as db:
+        job = await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="site", prompt="Clone and fix"
+        )
+    await announce(ws, KEY, prompt="Clone and fix", pid=None, started="2026-11-24T10:15:00Z")
+    stored = await row()
+    assert (stored.state, stored.pid) == ("running", None)
+    await announce(ws, KEY, prompt="Clone and fix", pid=4321, started="2026-11-24T10:17:30Z")
+    stored = await row()
+    assert stored.pid == 4321 and stored.started_at.isoformat() == "2026-11-24T10:17:30+00:00"
+    assert str(stored.id) == str(job.id)
+
+    # A clone that fails after the answer: the job ends without a result, the reason in
+    # its stderr tail, and it notifies (Anemo started it, so it was running).
+    failed = "20261124-121500-cl02"
+    device_side.answers["code_start"] = {**STARTED, "job_id": failed}
+    async with get_sessionmaker()() as db:
+        await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="site", prompt="Will fail"
+        )
+    reason = "Cloning essntl/site failed: repository not found."
+    await announce(
+        ws, failed, prompt="Will fail", pid=None, state="exited_without_result", stderr_tail=reason
+    )
+    gone = await row(failed)
+    assert gone.state == "exited_without_result" and gone.stderr_tail == reason
+    assert await notification_titles() == ["Claude Code job failed: Will fail"]
+    await ws.disconnect()

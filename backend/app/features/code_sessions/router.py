@@ -162,7 +162,8 @@ async def code_projects(device_id: uuid.UUID, db: Db) -> CodeProjectsOut:
 
 @router.post("/jobs", response_model=CodeJobOut, status_code=201)
 async def start_job(body: CodeJobIn, db: Db) -> CodeJobOut:
-    """Start a job on a computer (it may clone the project first: up to 11 minutes)."""
+    """Start a job on a computer. It answers at once; a project it must clone first is
+    cloned after that (the job then runs, or ends without a result saying why)."""
     return await control.start_job(
         db,
         device_id=body.device_id,

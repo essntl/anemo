@@ -10,6 +10,7 @@ import time
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy import and_, delete, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,6 +117,20 @@ def event_out(event: CodeJobEvent) -> CodeEventOut:
     )
 
 
+Need = Literal["share", "start", "cancel"]
+
+
+def can(offer: relay.Offer, need: Need) -> bool:
+    """What a computer's offer allows (§12.5): sharing jobs; cancelling them (with "Let
+    Anemo start Claude Code jobs"); starting them (also with control allowed and not
+    paused)."""
+    if need == "share":
+        return offer.code
+    if need == "cancel":
+        return offer.code and offer.code_start
+    return offer.code and offer.code_start and offer.control
+
+
 async def devices_out(
     db: AsyncSession, device_ids: Iterable[uuid.UUID], *, online: set[uuid.UUID] | None = None
 ) -> dict[uuid.UUID, CodeDeviceOut]:
@@ -138,8 +153,9 @@ async def devices_out(
             name=row.name,
             online=row.id in online,
             last_seen_at=row.last_seen_at,
-            share=bool(offer and offer.code),
-            start=bool(offer and offer.code and offer.code_start),
+            share=bool(offer and can(offer, "share")),
+            start=bool(offer and can(offer, "start")),
+            cancel=bool(offer and can(offer, "cancel")),
         )
     return out
 
