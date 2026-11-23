@@ -203,7 +203,7 @@ public sealed partial class CodeJobControl
             return ([], "The GitHub owner in Anemo Desktop's settings isn't a valid GitHub name, so only local projects are listed.");
         }
 
-        if (_host.FindOnPath("gh") is not { } gh)
+        if (Tool("gh") is not { } gh)
         {
             return ([], "GitHub's command line tool (gh) isn't on this computer's PATH, so only local projects are listed.");
         }
@@ -351,7 +351,7 @@ public sealed partial class CodeJobControl
             return CodeProjects.IsOwner(set) ? set : null;
         }
 
-        if (_host.FindOnPath("gh") is not { } gh)
+        if (Tool("gh") is not { } gh)
         {
             return null;
         }
@@ -373,11 +373,11 @@ public sealed partial class CodeJobControl
     private async Task<bool> CloneAsync(string owner, string project, string projects, string target, CancellationToken ct)
     {
         ToolRun run;
-        if (_host.FindOnPath("gh") is { } gh)
+        if (Tool("gh") is { } gh)
         {
             run = new ToolRun(gh, ["repo", "clone", $"{owner}/{project}", target], projects, QuietEnvironment);
         }
-        else if (_host.FindOnPath("git") is { } git)
+        else if (Tool("git") is { } git)
         {
             run = new ToolRun(git, ["clone", $"https://github.com/{owner}/{project}.git", target], projects, QuietEnvironment);
         }
@@ -410,7 +410,7 @@ public sealed partial class CodeJobControl
 
     private async Task<string> CreateAsync(string target, CancellationToken ct)
     {
-        if (_host.FindOnPath("git") is not { } git)
+        if (Tool("git") is not { } git)
         {
             throw CommandException.Failed("git isn't on this computer's PATH, so the new project can't be made.");
         }
@@ -510,6 +510,14 @@ public sealed partial class CodeJobControl
     }
 
     private static string? Setting(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// gh or git as found on PATH, but never a .cmd or .bat: Windows runs those through
+    /// cmd.exe, which would read %, &amp; and quotes in the arguments (a folder from Settings) its
+    /// own way. Such a gh or git counts as missing.
+    /// </summary>
+    private string? Tool(string name) =>
+        _host.FindOnPath(name) is { } path && Path.GetExtension(path).ToLowerInvariant() is not (".cmd" or ".bat") ? path : null;
 
     private static string WorkingFolder(string folder) => Directory.Exists(folder) ? folder : Path.GetTempPath();
 

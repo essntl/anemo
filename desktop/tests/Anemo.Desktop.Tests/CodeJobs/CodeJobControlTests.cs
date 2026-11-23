@@ -244,6 +244,21 @@ public sealed class CodeJobControlTests : IDisposable
     }
 
     [Fact]
+    public async Task A_gh_or_git_that_is_a_batch_file_is_never_run()
+    {
+        // cmd.exe would read %, & and quotes in their arguments (the projects folder from Settings).
+        _host.OnPath["gh"] = @"C:\tools\gh.cmd";
+        _host.OnPath["git"] = @"C:\tools\git.BAT";
+
+        var projects = (await RunAsync("code_projects")).State!;
+        var start = await RunAsync("code_start", StartFields("fresh", isNew: true));
+
+        Assert.Equal("GitHub's command line tool (gh) isn't on this computer's PATH, so only local projects are listed.", (string?)projects["note"]);
+        Assert.Equal("git isn't on this computer's PATH, so the new project can't be made.", start.Error);
+        Assert.Empty(_host.Runs);
+    }
+
+    [Fact]
     public async Task A_missing_projects_folder_is_said()
     {
         Directory.Delete(_projects);
