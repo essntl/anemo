@@ -680,3 +680,22 @@ async def test_a_lost_trust_change_is_found_by_the_recheck(authed, monkeypatch):
         await asyncio.sleep(0.05)
     assert message["type"] == "websocket.close"
     assert message["code"] == dws.CLOSE_TRUST_CHANGED
+
+
+async def test_paging_keeps_jobs_started_at_the_same_time(authed):
+    _, ws = await computer(authed)
+    same = "2026-11-20T09:00:00Z"
+    for key in ("20261120-090000-aaa1", "20261120-090000-aaa2", "20261120-090000-aaa3"):
+        await announce(ws, key, started=same)
+    seen: list[str] = []
+    params: dict[str, Any] = {"limit": 2}
+    while True:
+        page = (await authed.get("/api/code/jobs", params=params)).json()
+        seen += [j["job_key"] for j in page["jobs"]]
+        if not page["has_more"]:
+            break
+        last = page["jobs"][-1]
+        params = {"limit": 2, "before": last["started_at"], "before_id": last["id"]}
+    assert sorted(seen) == ["20261120-090000-aaa1", "20261120-090000-aaa2", "20261120-090000-aaa3"]
+    assert len(seen) == 3
+    await ws.disconnect()

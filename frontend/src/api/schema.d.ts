@@ -3496,7 +3496,8 @@ export interface paths {
         };
         /**
          * List Jobs
-         * @description Jobs on every computer, newest first, with every project that has jobs.
+         * @description Jobs on every computer, newest first, with every project that has jobs. The next
+         *     page: `before` and `before_id` of the last job shown.
          */
         get: operations["list_jobs_api_code_jobs_get"];
         put?: never;
@@ -18881,6 +18882,8 @@ export interface operations {
                 limit?: number;
                 /** @description started_at of the last job shown */
                 before?: string | null;
+                /** @description id of the last job shown */
+                before_id?: string | null;
             };
             header?: never;
             path?: never;

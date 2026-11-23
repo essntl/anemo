@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
@@ -153,8 +153,11 @@ async def list_jobs(
     device_id: uuid.UUID | None = None,
     limit: int = 200,
     before: datetime | None = None,
+    before_id: uuid.UUID | None = None,
 ) -> CodeJobListOut:
-    """Jobs, newest first; `before`: the started_at of the last row of the page before."""
+    """Jobs, newest first (by started_at, then id). The next page: `before` and
+    `before_id`, the started_at and id of the last job of the page before (`before`
+    alone: the jobs started before it, which skips others started at the same time)."""
     stmt = select(CodeJob)
     if project is not None:
         stmt = stmt.where(CodeJob.project == project)
@@ -162,7 +165,9 @@ async def list_jobs(
         stmt = stmt.where(CodeJob.state == state)
     if device_id is not None:
         stmt = stmt.where(CodeJob.device_id == device_id)
-    if before is not None:
+    if before is not None and before_id is not None:
+        stmt = stmt.where(tuple_(CodeJob.started_at, CodeJob.id) < tuple_(before, before_id))
+    elif before is not None:
         stmt = stmt.where(CodeJob.started_at < before)
     rows = list(
         await db.scalars(

@@ -48,10 +48,18 @@ async def list_jobs(
     device_id: uuid.UUID | None = None,
     limit: int = Query(200, ge=1, le=500),
     before: datetime | None = Query(None, description="started_at of the last job shown"),
+    before_id: uuid.UUID | None = Query(None, description="id of the last job shown"),
 ) -> CodeJobListOut:
-    """Jobs on every computer, newest first, with every project that has jobs."""
+    """Jobs on every computer, newest first, with every project that has jobs. The next
+    page: `before` and `before_id` of the last job shown."""
     return await service.list_jobs(
-        db, project=project, state=state, device_id=device_id, limit=limit, before=before
+        db,
+        project=project,
+        state=state,
+        device_id=device_id,
+        limit=limit,
+        before=before,
+        before_id=before_id,
     )
 
 

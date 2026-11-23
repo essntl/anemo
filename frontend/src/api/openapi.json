@@ -14520,7 +14520,7 @@
           "code"
         ],
         "summary": "List Jobs",
-        "description": "Jobs on every computer, newest first, with every project that has jobs.",
+        "description": "Jobs on every computer, newest first, with every project that has jobs. The next\npage: `before` and `before_id` of the last job shown.",
         "operationId": "list_jobs_api_code_jobs_get",
         "parameters": [
           {
@@ -14610,6 +14610,25 @@
               "title": "Before"
             },
             "description": "started_at of the last job shown"
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "id of the last job shown",
+              "title": "Before Id"
+            },
+            "description": "id of the last job shown"
           },
           {
             "name": "aiw_session",
