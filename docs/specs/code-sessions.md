@@ -484,8 +484,9 @@ makes those exact.
   while the thread's last job runs), `no_session` (409: nothing to resume),
   `device_failed` (422: the client answered `failed`; `message` is the client's
   sentence), `device_refused` (403).
-- Timeouts for `relay.send`: `code_projects` 45 s, `code_start` 660 s (a clone may take
-  10 minutes), `code_cancel` 30 s.
+- Timeouts for `relay.send`: `code_projects` 45 s, `code_start` 60 s (the desktop answers
+  at once and clones afterwards, §12.5; the `code_start` tool's own limit is 90 s),
+  `code_cancel` 30 s. A device busy with another command answers `device_busy` (409).
 - Starting creates (upserts) the row from the answer: `job_key`, `dir`, `project`,
   `prompt`, `title`, `resume_session`, `model`, state `running`, `seen_running`,
   `started_at` = now, `thread_id` by `resume_session` as usual, plus `conversation_id`
