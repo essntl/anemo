@@ -184,6 +184,7 @@ todos, PR, branch)).
 | pr_url | varchar(500) null | the last GitHub PR URL seen |
 | todos | jsonb | the last TodoWrite list: `[{content, status, activeForm?}]` |
 | todos_seq | int | the seq it came from (an older batch doesn't overwrite) |
+| pullout_seqs | jsonb | `{session_id, model, pr_url, branch, result}` → the seq each value came from; an older seq never overwrites a newer one (internal, not in the API) |
 | num_turns, duration_ms | int null | from `result` |
 | cost_usd | numeric(12,6) null | `total_cost_usd` from `result` |
 | result_text | text null | `result.result`, ≤ 16 000 characters |
@@ -244,15 +245,16 @@ with Pydantic (`Field` limits), open a session, do the work, commit, publish, ac
 ### 5.3 Retention
 
 Settings section `code` (`CodeSettings`): `keep_days: int = 30` (1–365). Scheduler task
-`code.prune` (gated to once every 10 minutes): delete jobs with `started_at` older than
-`keep_days` (events cascade). The client never re-announces a settled job, so pruned
+`code.prune` (gated to once every 10 minutes): delete jobs whose last activity
+(`greatest(started_at, last_event_at, ended_at)`) is older than `keep_days` (events
+cascade), except a `running` job of a computer that sent events within `keep_days`. The client never re-announces a settled job, so pruned
 jobs don't come back.
 
 ### 5.4 HTTP API (all under `protected`)
 
 | method, path | body / query | answer |
 |---|---|---|
-| `GET /api/code/jobs` | `project?`, `state?`, `device_id?`, `limit` (1–500, 200), `before?` (ISO, started_at of the last row) | `CodeJobListOut {jobs: CodeJobOut[], projects: string[], has_more}` |
+| `GET /api/code/jobs` | `project?`, `state?`, `device_id?`, `limit` (1–500, 200), `before?` + `before_id?` (`started_at` and `id` of the last row; rows strictly before `(started_at, id)`) | `CodeJobListOut {jobs: CodeJobOut[], projects: string[], has_more}` |
 | `GET /api/code/jobs/{id}` | | `CodeJobDetailOut {job: CodeJobOut, thread: CodeJobOut[]}` (thread in start order, includes the job) |
 | `GET /api/code/jobs/{id}/events` | `after_seq` (≥ 0, 0), `limit` (1–2000, 500) | `CodeEventsOut {events: CodeEventOut[], last_seq, has_more}` |
 | `GET /api/code/jobs/{id}/stream` | `Last-Event-ID` header | SSE: `: connected`, a `code.job` snapshot from the database (no `id:`), then every `code.events` / `code.job` published after the newest stream entry at connect (or after `Last-Event-ID`). It doesn't end by itself; with Valkey down it sends a snapshot every 5 s. The page refetches `events?after_seq=` when a `code.job`'s `last_seq` is past what it holds |
