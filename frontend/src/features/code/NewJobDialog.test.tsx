@@ -10,7 +10,8 @@ let projects: Record<string, CodeProjects> = {}
 const askedProjects: (string | null)[] = []
 const started: StartJobInput[] = []
 let fail: unknown = null
-vi.mock('./api', () => ({
+vi.mock('./api', async (importOriginal) => ({
+  startErrorMessage: (await importOriginal<typeof import('./api')>()).startErrorMessage,
   useCodeDevices: () => ({ data: devices, isSuccess: true, isPending: false, isError: false }),
   useCodeProjects: (id: string | null) => {
     askedProjects.push(id)
@@ -47,7 +48,7 @@ function show() {
 }
 
 const pc = (id: string, name: string, more: Partial<CodeDevice> = {}): CodeDevice =>
-  ({ id, name, online: true, last_seen_at: null, share: true, start: true, ...more }) as CodeDevice
+  ({ id, name, online: true, last_seen_at: null, share: true, start: true, cancel: true, ...more }) as CodeDevice
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -63,7 +64,7 @@ beforeEach(() => {
 })
 
 const dialog = () => screen.getByRole('dialog')
-const projectBox = () => within(dialog()).getByRole('combobox', { name: 'Project' })
+const projectBox = () => within(dialog()).getByRole('combobox', { name: /^Project/ })
 
 describe('New job', () => {
   it('offers only computers that let Anemo start jobs, and asks the chosen one for its projects', async () => {
@@ -125,8 +126,27 @@ describe('New job', () => {
     show()
     await userEvent.type(projectBox(), '..\\secrets')
     await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'x')
-    expect(within(dialog()).getByText('A folder name: letters, digits, dots, dashes and underscores.')).toBeInTheDocument()
+    expect(within(dialog()).getByText(/^A folder name: letters, digits/)).toBeInTheDocument()
     expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+  })
+
+  it('refuses a Windows device name and a name ending with a dot, as the computer does', async () => {
+    show()
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'x')
+    for (const name of ['nul.txt', 'COM3', 'site.', '...']) {
+      await userEvent.clear(projectBox())
+      await userEvent.type(projectBox(), name)
+      expect(within(dialog()).getByText(/^A folder name: letters, digits/)).toBeInTheDocument()
+      expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+      expect(within(dialog()).queryByRole('switch', { name: 'New project' })).not.toBeInTheDocument()
+    }
+  })
+
+  it('doesn’t offer "New project" for a name a local folder is a clone of', async () => {
+    projects.d1.projects.push({ name: 'anemo-main', dir: 'C:\\dev\\anemo-main', remote: 'https://github.com/essntl/anemo-core.git' })
+    show()
+    await userEvent.type(projectBox(), 'anemo-core')
+    expect(within(dialog()).queryByRole('switch', { name: 'New project' })).not.toBeInTheDocument()
   })
 
   it('shows the server’s message when starting fails, and stays open', async () => {
@@ -138,6 +158,74 @@ describe('New job', () => {
     expect(toasts).toEqual(['There is no project "x" in C:\\dev or on GitHub (essntl).'])
     expect(close).not.toHaveBeenCalled()
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/code$/)
+  })
+
+  it('keeps a picked computer that stops being usable, says why, and starts nothing', async () => {
+    const { rerender } = show()
+    const computer = () => within(dialog()).getByRole('combobox', { name: 'Computer' })
+    computer().focus()
+    await userEvent.keyboard('{Enter}')
+    await userEvent.click(await screen.findByRole('option', { name: 'Laptop' }))
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Go')
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeEnabled()
+
+    // A code.job notice refetched the computers: the laptop is paused now.
+    devices = devices.map((d) => (d.id === 'd2' ? { ...d, start: false } : d))
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(computer()).toHaveTextContent('Laptop')
+    expect(within(dialog()).getByText('Laptop doesn’t let Anemo start jobs right now.')).toBeInTheDocument()
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+
+    // Offline, then gone from the list altogether: still the laptop, never Desk PC.
+    devices = devices.map((d) => (d.id === 'd2' ? { ...d, online: false } : d))
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(within(dialog()).getByText('Laptop is offline now.')).toBeInTheDocument()
+    devices = devices.filter((d) => d.id !== 'd2')
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(computer()).toHaveTextContent('Laptop')
+    expect(within(dialog()).getByText('Laptop is no longer one of your trusted computers.')).toBeInTheDocument()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(started).toEqual([])
+  })
+
+  it('follows the first usable computer while none has been picked', () => {
+    const { rerender } = show()
+    expect(within(dialog()).getByRole('combobox', { name: 'Computer' })).toHaveTextContent('Desk PC')
+    devices = devices.filter((d) => d.id !== 'd1')
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(within(dialog()).getByRole('combobox', { name: 'Computer' })).toHaveTextContent('Laptop')
+  })
+
+  it('sends the prompt as typed, and refuses a blank one', async () => {
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    const prompt = within(dialog()).getByRole('textbox', { name: 'Prompt' })
+    await userEvent.type(prompt, '  {Enter}  ')
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+    await userEvent.type(prompt, '- keep the indent{Enter}')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(started[0].prompt).toBe('  \n  - keep the indent\n')
+  })
+
+  it('says the job may have started when no answer came, and doesn’t open anything', async () => {
+    fail = new ApiError(504, 'http_504', 'Gateway Timeout')
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Go')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(toasts).toEqual(['No answer came in time: the job may have started anyway. The list is being refreshed.'])
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/code$/)
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('shows the server’s message when the computer is busy', async () => {
+    fail = new ApiError(409, 'device_busy', 'Desk PC is busy with another command.')
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Go')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(toasts).toEqual(['Desk PC is busy with another command.'])
   })
 
   it('says how to allow starting when no computer does', () => {

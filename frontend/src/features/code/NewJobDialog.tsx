@@ -14,7 +14,8 @@ import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
 import { msg, t } from '@/lib/i18n'
-import { type CodeModel, useCodeDevices, useCodeProjects, useStartJob } from './api'
+import { type CodeDevice, type CodeModel, startErrorMessage, useCodeDevices, useCodeProjects, useStartJob } from './api'
+import { knownProject, validProjectName } from './projects'
 
 const MODELS: { value: '' | CodeModel; label: string }[] = [
   { value: '', label: msg('Default') },
@@ -23,16 +24,13 @@ const MODELS: { value: '' | CodeModel; label: string }[] = [
   { value: 'haiku', label: 'Haiku' },
 ]
 
-/** What Anemo Desktop accepts as a project: a folder name, not a path (§12.1). */
-const PROJECT_NAME = /^[A-Za-z0-9._-]{1,100}$/
-const validProject = (name: string) => PROJECT_NAME.test(name) && name !== '.' && name !== '..'
-
 export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const navigate = useNavigate()
   const listId = useId()
   const devices = useCodeDevices(open)
   const usable = useMemo(() => (devices.data ?? []).filter((d) => d.online && d.start), [devices.data])
-  const [deviceId, setDeviceId] = useState('')
+  // The computer picked in the list (kept as it was, should it leave the list).
+  const [picked, setPicked] = useState<CodeDevice | null>(null)
   const [project, setProject] = useState('')
   const [isNew, setNew] = useState(false)
   const [prompt, setPrompt] = useState('')
@@ -40,24 +38,29 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const start = useStartJob()
 
   // The first computer that can start jobs, until one is chosen.
-  const device = usable.find((d) => d.id === deviceId) ?? usable[0]
-  const projects = useCodeProjects(open && device ? device.id : null)
+  // The list is fetched again on every code.job notice: a picked computer that stops
+  // being usable stays picked (Start is off, one line says why); never another one.
+  const current = picked ? (devices.data ?? []).find((d) => d.id === picked.id) : undefined
+  const device = picked ? (current ?? picked) : usable[0]
+  const usableNow = Boolean(device && usable.some((d) => d.id === device.id))
+  const why = !picked || usableNow ? null
+    : !current ? t('{device} is no longer one of your trusted computers.', { device: picked.name })
+      : !current.online ? t('{device} is offline now.', { device: current.name })
+        : t('{device} doesn’t let Anemo start jobs right now.', { device: current.name })
+  const projects = useCodeProjects(open && device && usableNow ? device.id : null)
+  // The usable computers, and the picked one wherever it went.
+  const choices = picked && !usable.some((d) => d.id === picked.id) ? [...usable, device ?? picked] : usable
 
   const name = project.trim()
-  const known = useMemo(() => {
-    const p = projects.data
-    const lower = name.toLowerCase()
-    return Boolean(p && (p.projects.some((x) => x.name.toLowerCase() === lower) || p.remote.some((x) => x.name.toLowerCase() === lower)))
-  }, [projects.data, name])
-  // "New project" only means something for a name that is nowhere yet.
-  const offerNew = name !== '' && validProject(name) && projects.isSuccess && !known
-  const badName = name !== '' && !validProject(name)
-  const ready = Boolean(device) && validProject(name) && prompt.trim() !== '' && !start.isPending
+  // "New project" only means something for a name the computer can't resolve (§12.1, §12.5).
+  const offerNew = name !== '' && validProjectName(name) && projects.isSuccess && !knownProject(projects.data, name)
+  const badName = name !== '' && !validProjectName(name)
+  const ready = Boolean(device) && usableNow && validProjectName(name) && prompt.trim() !== '' && !start.isPending
 
   const submit = () => {
     if (!ready || !device) return
     start.mutate(
-      { device_id: device.id, project: name, prompt: prompt.trim(), new: offerNew && isNew, model: model || null },
+      { device_id: device.id, project: name, prompt, new: offerNew && isNew, model: model || null },
       {
         onSuccess: (job) => {
           onOpenChange(false)
@@ -66,7 +69,8 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           setNew(false)
           void navigate(`/code/${job.id}`)
         },
-        onError: (err) => toast({ message: errorMessage(err) }),
+        // A start that may have happened isn't followed: the refreshed list shows it if it did.
+        onError: (err) => toast({ message: startErrorMessage(err) }),
       },
     )
   }
@@ -83,20 +87,21 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit() }}>
         {devices.isError ? (
           <p className="text-[13px] text-error">{errorMessage(devices.error)}</p>
-        ) : devices.isSuccess && usable.length === 0 ? (
+        ) : devices.isSuccess && usable.length === 0 && !picked ? (
           <p data-testid="no-start-device" className="rounded-lg bg-surface-2 p-3 text-[13px] text-muted">
             {t('No computer lets Anemo start jobs now. In Anemo Desktop on a trusted computer, turn on “Share Claude Code jobs with Anemo” and “Let Anemo start Claude Code jobs”.')}
           </p>
         ) : (
-          <Field label={t('Computer')}>
-            <Select aria-label={t('Computer')} value={device?.id ?? ''} onValueChange={(v) => { setDeviceId(v); setProject('') }}
+          <Field label={t('Computer')} error={why ?? undefined}>
+            <Select aria-label={t('Computer')} value={device?.id ?? ''}
+              onValueChange={(v) => { setPicked(choices.find((d) => d.id === v) ?? null); setProject('') }}
               placeholder={devices.isPending ? t('Loading…') : undefined}
-              options={usable.map((d) => ({ value: d.id, label: d.name }))} />
+              options={choices.map((d) => ({ value: d.id, label: d.name }))} />
           </Field>
         )}
 
         <Field label={t('Project')}
-          error={badName ? t('A folder name: letters, digits, dots, dashes and underscores.') : projects.isError ? errorMessage(projects.error) : undefined}
+          error={badName ? t('A folder name: letters, digits, dots, dashes and underscores; not a Windows device name like CON or NUL, and no dot at the end.') : projects.isError ? errorMessage(projects.error) : undefined}
           hint={projects.isFetching ? t('Asking the computer for its projects…') : projects.data?.note ?? undefined}>
           <Input value={project} onChange={(e) => setProject(e.target.value)} list={listId} autoComplete="off" spellCheck={false}
             placeholder={t('A project folder or a GitHub repository')} disabled={!device} />

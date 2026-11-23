@@ -82,7 +82,7 @@ describe('a finished thread', () => {
         id: 'j2', thread_id: 'j1', title: 'Also the changelog', prompt: 'Now add it to the changelog', state: 'failed', resume_session: 'sess-1', session_id: 'sess-2',
         started_at: '2026-11-23T10:00:00Z', ended_at: '2026-11-23T10:01:00Z', num_turns: 3, cost_usd: 0.25, result_subtype: 'error_max_turns', is_error: true,
         branch: 'feat/version', pr_url: 'https://github.com/essntl/anemo/pull/68',
-        device: { id: 'dev-1', name: 'Desk PC', online: false, last_seen_at: '2026-11-23T10:02:00Z', share: false, start: false },
+        device: { id: 'dev-1', name: 'Desk PC', online: false, last_seen_at: '2026-11-23T10:02:00Z', share: false, start: false, cancel: false },
         todos: [{ content: 'Bump', status: 'completed' }, { content: 'Changelog', status: 'pending', activeForm: 'Writing the changelog' }],
       }),
     ]

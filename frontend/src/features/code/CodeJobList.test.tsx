@@ -42,7 +42,7 @@ function show(url = '/code', jobId?: string) {
 const JOBS = [
   codeJob({ id: 'a1', title: 'Bump the version', project: 'anemo', started_at: '2026-11-23T08:00:00Z', num_turns: 10, cost_usd: 1.25, branch: 'feat/version' }),
   codeJob({ id: 'a2', thread_id: 'a1', title: 'Also the changelog', project: 'anemo', started_at: '2026-11-23T09:00:00Z', num_turns: 2, cost_usd: 0.25, state: 'running', pr_url: 'https://github.com/essntl/anemo/pull/68' }),
-  codeJob({ id: 's1', title: 'Fix the footer', project: 'site', started_at: '2026-11-23T07:00:00Z', state: 'failed', device: { id: 'd2', name: 'Laptop', online: false, last_seen_at: null, share: false, start: false } }),
+  codeJob({ id: 's1', title: 'Fix the footer', project: 'site', started_at: '2026-11-23T07:00:00Z', state: 'failed', device: { id: 'd2', name: 'Laptop', online: false, last_seen_at: null, share: false, start: false, cancel: false } }),
   codeJob({ id: 'a3', title: 'Old cleanup', project: 'anemo', started_at: '2026-11-20T07:00:00Z' }),
 ]
 

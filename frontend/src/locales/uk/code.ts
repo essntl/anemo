@@ -68,7 +68,7 @@ const messages: Messages = {
   "Claude Code runs on the computer with every permission (bypassPermissions), in the project’s folder.": "Claude Code працює на комп’ютері з усіма дозволами (bypassPermissions) у теці проєкту.",
   "No computer lets Anemo start jobs now. In Anemo Desktop on a trusted computer, turn on “Share Claude Code jobs with Anemo” and “Let Anemo start Claude Code jobs”.": "Зараз жоден комп’ютер не дозволяє Anemo запускати Claude Code. В Anemo Desktop на довіреному комп’ютері увімкніть «Share Claude Code jobs with Anemo» і «Let Anemo start Claude Code jobs».",
   "A project folder or a GitHub repository": "Тека проєкту або репозиторій GitHub",
-  "A folder name: letters, digits, dots, dashes and underscores.": "Назва теки: літери, цифри, крапки, дефіси та підкреслення.",
+  "A folder name: letters, digits, dots, dashes and underscores; not a Windows device name like CON or NUL, and no dot at the end.": "Назва теки: літери, цифри, крапки, дефіси та підкреслення; не назва пристрою Windows на кшталт CON чи NUL і без крапки в кінці.",
   "Asking the computer for its projects…": "Запит проєктів у комп’ютера…",
   "On GitHub, not cloned": "На GitHub, не клоновано",
   "No folder or repository has this name: create an empty one (git init).": "Немає теки чи репозиторію з такою назвою: створити порожній (git init).",
@@ -86,6 +86,10 @@ const messages: Messages = {
   "Ctrl+Enter to send": "Ctrl+Enter – надіслати",
   "{device} is offline: a follow-up can be sent once it is back.": "{device} не в мережі: продовження можна буде надіслати, коли він повернеться.",
   "{device} doesn’t let Anemo start Claude Code jobs: turn on “Let Anemo start Claude Code jobs” in Anemo Desktop to send a follow-up.": "{device} не дозволяє Anemo запускати Claude Code: увімкніть «Let Anemo start Claude Code jobs» в Anemo Desktop, щоб надіслати продовження.",
+  "{device} is no longer one of your trusted computers.": "{device} більше не належить до ваших довірених комп’ютерів.",
+  "{device} is offline now.": "{device} зараз не в мережі.",
+  "{device} doesn’t let Anemo start jobs right now.": "{device} зараз не дозволяє Anemo запускати Claude Code.",
+  "No answer came in time: the job may have started anyway. The list is being refreshed.": "Відповідь не надійшла вчасно: можливо, запуск усе ж почався. Список оновлюється.",
 }
 
 export default messages
