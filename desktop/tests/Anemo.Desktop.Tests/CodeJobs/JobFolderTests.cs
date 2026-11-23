@@ -38,6 +38,8 @@ public sealed class JobFolderTests : IDisposable
     [InlineData("anemo.", false)]
     [InlineData("aux", false)]
     [InlineData("PRN.log", false)]
+    [InlineData("nul.tar.gz", false)] // the part before the first dot, as Windows reads it
+    [InlineData("CON.x.y", false)]
     [InlineData("LPT1", false)]
     [InlineData("anemo\n", false)]
     public void Project_names_follow_the_rules(string name, bool valid) => Assert.Equal(valid, CodeProjects.IsProjectName(name));
