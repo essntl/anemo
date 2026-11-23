@@ -581,7 +581,9 @@ async def test_a_busy_computer_is_not_an_offline_one(authed, monkeypatch):
     body = {"device_id": device["id"], "project": "anemo", "prompt": "Hi"}
     r = await authed.post("/api/code/jobs", json=body)
     assert (r.status_code, error_code(r)) == (409, "device_busy")
-    assert "busy" in r.json()["error"]["message"]
+    assert r.json()["error"]["message"] == (
+        "“PC” is busy with another command. Try again in a moment."
+    )
     await ws.disconnect()
 
 

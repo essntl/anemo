@@ -119,7 +119,9 @@ async def _send(device: Device, action: str, fields: dict[str, Any], timeout_s: 
     try:
         return await relay.send(device.id, action, fields, timeout_s=timeout_s)
     except relay.Busy as exc:
-        raise DeviceBusy(str(exc) or f"“{device.name}” is busy with another command.") from exc
+        raise DeviceBusy(
+            f"“{device.name}” is busy with another command. Try again in a moment."
+        ) from exc
     except relay.Unavailable as exc:
         raise DeviceOffline(str(exc) or f"“{device.name}” didn't answer.") from exc
     except (relay.Refused, relay.Stopped) as exc:
