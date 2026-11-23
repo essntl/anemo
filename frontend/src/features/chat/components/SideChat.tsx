@@ -60,7 +60,8 @@ function Column({ header, scroll, children, footer }: { header?: ReactNode; scro
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {header}
-      <div ref={scroll} className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      {/* relative: positioned bits of the messages stay in here instead of stretching the page. */}
+      <div ref={scroll} className="relative min-h-0 flex-1 overflow-y-auto">{children}</div>
       <div className="shrink-0 p-2 pt-1">{footer}</div>
     </div>
   )

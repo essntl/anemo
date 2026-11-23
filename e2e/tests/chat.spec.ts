@@ -38,6 +38,29 @@ test('chat streams a reply and survives a reload mid-stream', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Send' })).toBeVisible()
 })
 
+test('nothing in a long chat lets the page scroll away from it', async ({ page }) => {
+  await login(page)
+  const models = await fakeModels(page.request)
+  await newChat(page, 'Chat', models.echo)
+  await send(page, 'a long chat')
+  await expect(page).toHaveURL(/\/c\//)
+  await expect(page.getByText('You said: a long chat')).toBeVisible()
+  // A long history with something positioned at its end, as the sr-only label of a running
+  // tool's timer: it used to be placed on the page under the chat, which could then be
+  // scrolled into empty space below the message box.
+  const main = page.locator('main')
+  await page.getByText('You said: a long chat').evaluate((answer) => {
+    const tall = document.createElement('div')
+    tall.style.height = '3000px'
+    const label = document.createElement('span')
+    label.className = 'sr-only'
+    label.textContent = 'running since 10:00'
+    answer.append(tall, label)
+  })
+  expect(await main.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(0)
+  await page.request.delete(page.url().replace(/.*\/c\//, '/api/conversations/'))
+})
+
 test('stop cancels the answer and keeps partial text', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)

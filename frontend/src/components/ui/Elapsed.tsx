@@ -42,7 +42,8 @@ export function Elapsed({ since, minusMs = 0, className }: ElapsedProps) {
   }, [since, minusMs])
   const started = new Date(since).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' })
   return (
-    <span className={cn('tabular-nums', className)}>
+    // relative: the sr-only label (absolute) stays with the timer instead of stretching the page.
+    <span className={cn('relative tabular-nums', className)}>
       {/* Screen readers get a text that stays the same, not a new number every second. */}
       <span aria-hidden="true">{formatDuration(elapsedMs(since, minusMs, now) / 1000, { style: 'timer' })}</span>
       <span className="sr-only">{t('running since {time}', { time: started })}</span>
