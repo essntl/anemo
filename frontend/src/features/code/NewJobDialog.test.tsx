@@ -1,0 +1,149 @@
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/api/client'
+import type { CodeDevice, CodeProjects, StartJobInput } from './api'
+
+let devices: CodeDevice[] = []
+let projects: Record<string, CodeProjects> = {}
+const askedProjects: (string | null)[] = []
+const started: StartJobInput[] = []
+let fail: unknown = null
+vi.mock('./api', () => ({
+  useCodeDevices: () => ({ data: devices, isSuccess: true, isPending: false, isError: false }),
+  useCodeProjects: (id: string | null) => {
+    askedProjects.push(id)
+    const data = id ? projects[id] : undefined
+    return { data, isSuccess: Boolean(data), isFetching: false, isError: false }
+  },
+  useStartJob: () => ({
+    isPending: false,
+    mutate: (body: StartJobInput, cb: { onSuccess?: (job: { id: string }) => void; onError?: (e: unknown) => void }) => {
+      started.push(body)
+      if (fail) cb.onError?.(fail)
+      else cb.onSuccess?.({ id: 'new-job' })
+    },
+  }),
+}))
+const toasts = vi.hoisted(() => [] as string[])
+vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string }) => toasts.push(o.message) }))
+
+const { NewJobDialog } = await import('./NewJobDialog')
+
+// Radix Select scrolls to the chosen option, which jsdom can't do.
+Element.prototype.scrollIntoView ??= () => {}
+
+const close = vi.fn()
+function Where() {
+  return <output data-testid="where">{useLocation().pathname}</output>
+}
+function show() {
+  return render(
+    <MemoryRouter initialEntries={['/code']}>
+      <Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes>
+    </MemoryRouter>,
+  )
+}
+
+const pc = (id: string, name: string, more: Partial<CodeDevice> = {}): CodeDevice =>
+  ({ id, name, online: true, last_seen_at: null, share: true, start: true, ...more }) as CodeDevice
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  toasts.length = 0
+  started.length = 0
+  askedProjects.length = 0
+  fail = null
+  devices = [pc('d0', 'Watched PC', { start: false }), pc('d1', 'Desk PC'), pc('d2', 'Laptop'), pc('d3', 'Away PC', { online: false, start: false })]
+  projects = {
+    d1: { projects: [{ name: 'anemo', dir: 'C:\\dev\\anemo', remote: 'https://github.com/essntl/anemo' }], remote: [{ name: 'site', url: 'https://github.com/essntl/site' }], note: null },
+    d2: { projects: [], remote: [], note: 'gh isn’t installed on this computer.' },
+  }
+})
+
+const dialog = () => screen.getByRole('dialog')
+const projectBox = () => within(dialog()).getByRole('combobox', { name: 'Project' })
+
+describe('New job', () => {
+  it('offers only computers that let Anemo start jobs, and asks the chosen one for its projects', async () => {
+    show()
+    const computer = within(dialog()).getByRole('combobox', { name: 'Computer' })
+    expect(computer).toHaveTextContent('Desk PC')
+    expect(askedProjects.at(-1)).toBe('d1')
+    computer.focus()
+    await userEvent.keyboard('{Enter}')
+    const options = (await screen.findAllByRole('option')).map((o) => o.textContent)
+    expect(options).toEqual(['Desk PC', 'Laptop'])
+    await userEvent.click(screen.getByRole('option', { name: 'Laptop' }))
+    expect(askedProjects.at(-1)).toBe('d2')
+    // Why the repositories aren't listed.
+    expect(within(dialog()).getByText('gh isn’t installed on this computer.')).toBeInTheDocument()
+  })
+
+  it('lists local projects first, then the repositories not cloned', () => {
+    show()
+    const list = document.getElementById(projectBox().getAttribute('list')!)!
+    const options = [...list.querySelectorAll('option')].map((o) => [o.value, o.label])
+    expect(options).toEqual([['anemo', 'C:\\dev\\anemo'], ['site', 'On GitHub, not cloned']])
+  })
+
+  it('starts a job in a known project with a model, then opens it', async () => {
+    show()
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+    await userEvent.type(projectBox(), 'anemo')
+    // A known project: nothing to create.
+    expect(within(dialog()).queryByRole('switch', { name: 'New project' })).not.toBeInTheDocument()
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Bump the version')
+    within(dialog()).getByRole('combobox', { name: 'Model' }).focus()
+    await userEvent.keyboard('{Enter}')
+    await userEvent.click(await screen.findByRole('option', { name: 'Sonnet' }))
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(started).toEqual([{ device_id: 'd1', project: 'anemo', prompt: 'Bump the version', new: false, model: 'sonnet' }])
+    expect(close).toHaveBeenCalledWith(false)
+    expect(screen.getByTestId('where')).toHaveTextContent('/code/new-job')
+  })
+
+  it('offers "New project" for a name that is nowhere, and sends the default model as null', async () => {
+    show()
+    await userEvent.type(projectBox(), 'brand-new')
+    const toggle = within(dialog()).getByRole('switch', { name: 'New project' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await userEvent.click(toggle)
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Start it')
+    await userEvent.keyboard('{Control>}{Enter}{/Control}')
+    expect(started).toEqual([{ device_id: 'd1', project: 'brand-new', prompt: 'Start it', new: true, model: null }])
+  })
+
+  it('takes a repository that isn’t cloned yet without "New project"', async () => {
+    show()
+    await userEvent.type(projectBox(), 'Site')
+    expect(within(dialog()).queryByRole('switch', { name: 'New project' })).not.toBeInTheDocument()
+  })
+
+  it('refuses a name that is a path', async () => {
+    show()
+    await userEvent.type(projectBox(), '..\\secrets')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'x')
+    expect(within(dialog()).getByText('A folder name: letters, digits, dots, dashes and underscores.')).toBeInTheDocument()
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+  })
+
+  it('shows the server’s message when starting fails, and stays open', async () => {
+    fail = new ApiError(422, 'device_failed', 'There is no project "x" in C:\\dev or on GitHub (essntl).')
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Go')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(toasts).toEqual(['There is no project "x" in C:\\dev or on GitHub (essntl).'])
+    expect(close).not.toHaveBeenCalled()
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/code$/)
+  })
+
+  it('says how to allow starting when no computer does', () => {
+    devices = [pc('d0', 'Watched PC', { start: false })]
+    show()
+    expect(screen.getByTestId('no-start-device')).toHaveTextContent('Let Anemo start Claude Code jobs')
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+  })
+})
