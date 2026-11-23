@@ -13,6 +13,7 @@ import { localSkills, matchSkills, slashQuery, typedCommand } from '@/features/s
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
+import { LIST_MAX, type MenuPlacement, placeMenu, visibleArea } from '../menuPlacement'
 import { canReadClipboard, clipboardImages, isTextField, pastedFiles } from '../pastedFiles'
 import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
@@ -158,6 +159,26 @@ export function Composer({
   const menuOpen = query !== null && dismissed !== text && slashSkills.length > 0
   const menuId = useId()
   const chosen = skillsOn ? skill : null
+  // Above the box where it fits, else where there is room (the new chat screen has the box
+  // near the top): measured before it is painted, so it is never shown cut off.
+  const menuRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const [placement, setPlacement] = useState<MenuPlacement>({ below: false, listMax: LIST_MAX })
+  useLayoutEffect(() => {
+    if (!menuOpen) return
+    const place = () => {
+      const root = rootRef.current
+      const menu = menuRef.current
+      const list = listRef.current
+      const box = root?.getBoundingClientRect()
+      if (!root || !menu || !list || !box?.height) return // not laid out
+      const next = placeMenu(box, visibleArea(root), menu.offsetHeight - list.offsetHeight, list.scrollHeight)
+      setPlacement((p) => (p.below === next.below && p.listMax === next.listMax ? p : next))
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [menuOpen, matches.length])
 
   const chooseSkill = (next: Skill | null, rest = carried) => {
     setSkill(next)
@@ -358,12 +379,15 @@ export function Composer({
         </div>
       )}
       {menuOpen && (
-        <div className="pop absolute inset-x-0 bottom-full z-30 mb-2 overflow-hidden rounded-card border border-border bg-card shadow-float">
+        <div ref={menuRef} data-placement={placement.below ? 'below' : 'above'}
+          className={cn('pop absolute inset-x-0 z-30 overflow-hidden rounded-card border border-border bg-card shadow-float',
+            placement.below ? 'top-full mt-2' : 'bottom-full mb-2')}>
           <div className="flex items-center justify-between px-3 pb-1 pt-2.5 text-[11.5px] font-medium uppercase tracking-wide text-subtle">
             {t('Skills')}
             <span className="hidden normal-case tracking-normal md:inline">{t('↑↓ to choose · Enter to use · Esc to close')}</span>
           </div>
-          <div id={menuId} role="listbox" aria-label={t('Skills')} className="max-h-72 overflow-y-auto p-1.5 pt-0">
+          <div ref={listRef} id={menuId} role="listbox" aria-label={t('Skills')} className="overflow-y-auto p-1.5 pt-0"
+            style={{ maxHeight: placement.listMax }}>
             {matches.map((s, i) => (
               <div key={s.id} id={`${menuId}-${i}`} role="option" aria-selected={i === active}
                 onMouseDown={(e) => e.preventDefault()} // keep the focus in the text box

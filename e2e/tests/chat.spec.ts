@@ -61,6 +61,36 @@ test('nothing in a long chat lets the page scroll away from it', async ({ page }
   await page.request.delete(page.url().replace(/.*\/c\//, '/api/conversations/'))
 })
 
+test('the skills menu fits on the new chat screen, also in a short window', async ({ page }) => {
+  await login(page)
+  for (const height of [900, 600]) {
+    await page.setViewportSize({ width: 1280, height })
+    await page.goto('/')
+    const box = page.locator('main textarea').first()
+    await box.fill('/')
+    const menu = page.getByRole('listbox', { name: 'Skills' })
+    await expect(menu).toBeVisible()
+    // Not cut off by the page (its top was hidden above the page's edge): the whole menu,
+    // its heading to "Manage skills", is inside what the page shows.
+    const cut = await menu.evaluate((list) => {
+      const rect = list.parentElement!.getBoundingClientRect()
+      let top = 0
+      let bottom = window.innerHeight
+      for (let el = list.parentElement!.parentElement; el; el = el.parentElement) {
+        if (getComputedStyle(el).overflowY === 'visible') continue
+        const r = el.getBoundingClientRect()
+        top = Math.max(top, r.top)
+        bottom = Math.min(bottom, r.bottom)
+      }
+      return { above: top - rect.top, below: rect.bottom - bottom }
+    })
+    expect(cut.above).toBeLessThanOrEqual(0)
+    expect(cut.below).toBeLessThanOrEqual(0)
+    await expect(page.getByRole('link', { name: 'Manage skills' })).toBeInViewport()
+    await box.press('Escape')
+  }
+})
+
 test('stop cancels the answer and keeps partial text', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)
