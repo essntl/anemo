@@ -1,6 +1,7 @@
 """Claude Code jobs shared by computers: the WebSocket side (code.job / code.events →
 code.ack) and the Code page's API (docs/specs/code-sessions.md §5, device-contracts §7)."""
 
+import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from app.features.code_sessions import router as code_router
 from app.features.code_sessions.models import CodeJob, CodeJobEvent
 from app.features.devices import relay
 from app.features.devices import service as devices_service
+from app.features.devices import ws as dws
 from app.features.notifications.models import Notification
 from tests.api.test_devices import add
 from tests.api.test_devices_ws import roundtrip, welcomed
@@ -654,3 +656,27 @@ async def test_unstorable_characters_in_a_job_are_replaced(authed):
     events = (await authed.get(f"/api/code/jobs/{shared['id']}/events")).json()["events"]
     assert events[0]["event"] == {"type": "raw", "text": "x��", "k�": 1}
     await ws.disconnect()
+
+
+async def test_a_lost_trust_change_is_found_by_the_recheck(authed, monkeypatch):
+    # The relay's "trust_changed" message is lost (Valkey hiccup): the minute's recheck
+    # still closes the connection, so a computer no longer trusted stops sharing.
+    monkeypatch.setattr(dws, "RECHECK_S", 0.1)
+
+    async def lost(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(relay, "tell", lost)
+    device, ws = await computer(authed)
+    assert await announce(ws) == 0
+    async with get_sessionmaker()() as db:
+        await devices_service.set_trust(db, uuid.UUID(device["id"]), "watched", ip=None)
+    for _ in range(40):  # pongs while it is open (2 s at most), then the close
+        await ws.send({"type": "ping"})
+        message = await ws.next(within=5)
+        if message["type"] == "websocket.close":
+            break
+        assert json.loads(message["text"]) == {"type": "pong"}
+        await asyncio.sleep(0.05)
+    assert message["type"] == "websocket.close"
+    assert message["code"] == dws.CLOSE_TRUST_CHANGED
