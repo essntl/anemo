@@ -185,6 +185,51 @@ async def test_an_edited_message_forks_the_session_at_the_last_matching_turn(
     assert "diverged" in usage.meta["expected_miss"]
 
 
+RESUME_FAILED = {
+    "type": "error",
+    "kind": "resume_failed",
+    "retryable": False,
+    "message": "Claude Code returned an error result: No message found with message.uuid "
+    "of: d91ba1ad-0000-4000-8000-000000000000 (exit code: 1)",
+}
+
+
+async def test_a_refused_fork_is_retried_once_with_a_new_session(fake: FakeRunner) -> None:
+    """Claude Code does not have the message the fork starts from (its process was ended
+    before it stored it): the request is sent again as a new session with the history."""
+    await run(req([user("one")]))
+    await run(req([user("one"), Message.assistant("ok"), user("two")]))
+    sid = fake.bodies[-1]["claude_session_id"]
+    fake.fail_starts.append(RESUME_FAILED)
+    events = await run(req([user("one"), Message.assistant("ok"), user("two, edited")]))
+    refused, retried = fake.bodies[2:]  # one retry, no more
+    assert refused["fork"] is not None and refused["claude_session_id"] == sid
+    assert retried["fork"] is None and retried["claude_session_id"] is None
+    # The new session gets the earlier turn as text, then the message.
+    text = fake.last_text()
+    assert text.startswith("<earlier_conversation>") and "one" in text and "ok" in text
+    assert text.endswith("two, edited\n<turn_context>\nnow\n</turn_context>")
+    assert isinstance(events[-1], Done)
+    usage = next(e for e in events if isinstance(e, Usage))
+    assert "could not be resumed" in usage.meta["expected_miss"]
+    # The conversation continues in the new session.
+    edited = [user("one"), Message.assistant("ok"), user("two, edited"), Message.assistant("ok")]
+    await run(req([*edited, user("three")]))
+    assert fake.bodies[-1]["claude_session_id"] == usage.meta["claude_session_id"] != sid
+    assert fake.bodies[-1]["fork"] is None
+    assert fake.last_text() == "three\n<turn_context>\nnow\n</turn_context>"
+
+
+async def test_a_new_session_that_is_refused_too_is_an_error(fake: FakeRunner) -> None:
+    await run(req([user("one")]))
+    await run(req([user("one"), Message.assistant("ok"), user("two")]))
+    fake.fail_starts.extend([RESUME_FAILED, RESUME_FAILED])
+    with pytest.raises(ProviderError) as info:
+        await run(req([user("one"), Message.assistant("ok"), user("two, edited")]))
+    assert not info.value.retryable
+    assert len(fake.bodies) == 4  # the fork and one new session, then it gives up
+
+
 async def test_divergence_at_the_first_message_starts_a_new_seeded_session(
     fake: FakeRunner,
 ) -> None:

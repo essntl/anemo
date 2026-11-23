@@ -52,6 +52,9 @@ class FakeRunner:
         self.oneshots: list[dict[str, Any]] = []
         self.read = 1000  # cache read tokens reported per request (after the first)
         self.fail_next: dict[str, Any] | None = None
+        # Error events for requests the CLI refuses to start for (one per request, in
+        # order): like the real runner, nothing else is sent and no session exists.
+        self.fail_starts: deque[dict[str, Any]] = deque()
 
     def evict_all(self) -> None:
         """Like the idle window passing: processes end, parked calls are gone."""
@@ -60,6 +63,9 @@ class FakeRunner:
     async def turn(self, key: str, body: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         self.bodies.append(body)
         self.keys.append(key)
+        if self.fail_starts:
+            yield self.fail_starts.popleft()
+            return
         sid = body.get("claude_session_id")
         if body.get("fork"):
             start, sid = "fork", str(uuid.uuid4())
