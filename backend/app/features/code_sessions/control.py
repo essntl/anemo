@@ -164,12 +164,21 @@ async def start_job(
     max_turns: int | None = None,
     conversation_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
+    follow_job_id: str | None = None,
 ) -> CodeJobOut:
     """Start a job on the computer and make its row at once (running, with the chat and
-    run that started it). Waits for the computer's answer (up to 11 minutes: it may
-    clone the project first)."""
+    run that started it). `follow_job_id`: the job (its key) whose folder the new one
+    runs in, the project then being ignored by the computer; when not given and
+    `resume_session` is, the computer's job that had that session."""
     device, _ = await _computer(db, device_id, need="code_start")
-    fields = {
+    if follow_job_id is None and resume_session:
+        follow_job_id = await db.scalar(
+            select(CodeJob.job_key)
+            .where(CodeJob.device_id == device.id, CodeJob.session_id == resume_session)
+            .order_by(CodeJob.started_at.desc(), CodeJob.id.desc())
+            .limit(1)
+        )
+    fields: dict[str, Any] = {
         "project": project,
         "prompt": prompt,
         "new": new,
@@ -177,6 +186,8 @@ async def start_job(
         "model": model,
         "max_turns": max_turns,
     }
+    if follow_job_id is not None:
+        fields["follow_job_id"] = follow_job_id
     await db.close()  # nothing is held while the computer works (minutes, for a clone)
     state = await _send(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
@@ -237,6 +248,7 @@ async def follow_up(
         max_turns=max_turns,
         conversation_id=conversation_id,
         run_id=run_id,
+        follow_job_id=last.job_key,
     )
 
 

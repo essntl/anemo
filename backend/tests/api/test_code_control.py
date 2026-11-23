@@ -324,6 +324,8 @@ async def test_follow_ups(authed, device_side):
         "s-first",
         "sonnet",
     )
+    # The computer runs it in the folder of the job it follows (§12.5).
+    assert fields["follow_job_id"] == first
     # A follow-up of the first job resumes the thread's last one: it is running now.
     r = await authed.post(f"/api/code/jobs/{job_id}/follow-up", json=body)
     assert (r.status_code, error_code(r)) == (409, "job_running")
@@ -483,3 +485,39 @@ async def test_the_tools_go_with_the_page(authed):
     await agent_turn(authed, cid, "hello again")
     offered = {t.name for t in FakeAdapter.requests[-1].tools}
     assert not offered & set(code_tools.CODE_TOOL_NAMES)
+
+
+async def test_a_resumed_session_follows_the_job_that_had_it(authed, device_side):
+    device, ws = await computer(authed)
+    earlier = "20261120-090000-rs01"
+    await announce(ws, earlier, started="2026-11-20T09:00:00Z", state="done")
+    await send(ws, (1, init("s-known")), key=earlier)
+    async with get_sessionmaker()() as db:
+        await control.start_job(
+            db,
+            device_id=uuid.UUID(device["id"]),
+            project="anemo",
+            prompt="Go on",
+            resume_session="s-known",
+        )
+        _, fields, _ = device_side.sent[-1]
+        assert fields["follow_job_id"] == earlier and fields["resume_session"] == "s-known"
+        # A session no job of that computer had: no job to follow.
+        device_side.answers["code_start"] = {**STARTED, "job_id": "20261124-111500-rs02"}
+        await control.start_job(
+            db,
+            device_id=uuid.UUID(device["id"]),
+            project="anemo",
+            prompt="Go on",
+            resume_session="s-unknown",
+        )
+        _, fields, _ = device_side.sent[-1]
+        assert "follow_job_id" not in fields
+        # A new job: none either.
+        device_side.answers["code_start"] = {**STARTED, "job_id": "20261124-121500-rs03"}
+        await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="anemo", prompt="New"
+        )
+        _, fields, _ = device_side.sent[-1]
+        assert "follow_job_id" not in fields
+    await ws.disconnect()
