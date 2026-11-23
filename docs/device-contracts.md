@@ -248,7 +248,7 @@ server → {"type": "code.ack", "job_id": "<job id>", "seq": <int ≥ 0>}
 `cancelled` when the `cancelled` file exists; else `done` / `failed` when a `result`
 event was written (`failed` when `is_error` or a `subtype` other than `success`); else
 `running` while the process with `pid` lives (and started within a minute of
-`started`); else `exited_without_result`. The server also makes a job `done` / `failed`
+`started`); else `exited_without_result`. A process that can't be read counts as alive only while `out.jsonl` or `err.txt` was written in the last 30 minutes. The server also makes a job `done` / `failed`
 when it stores a `result` event.
 
 ### 7.3 Privacy

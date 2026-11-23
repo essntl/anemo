@@ -126,7 +126,7 @@ small interface implemented in `Anemo.Desktop/Platform/`).
   `is_error` is true or `subtype` isn't `success`, else `done`; else the process is
   alive → `running`; else (the process is gone, the file read to its end once more,
   still no result) → `exited_without_result`. "Alive": a process with that pid exists
-  and started no later than one minute after `meta.started` (guards against pid reuse).
+  and started no later than one minute after `meta.started` (guards against pid reuse). A process whose state or start time can't be read (another user's, or elevated) counts as alive only while `out.jsonl` or `err.txt` was written in the last 30 minutes.
 - **Persisted state**: `%APPDATA%\Anemo Desktop\code-jobs.json`: `shared_since` (the
   first scan after sharing was switched on; cleared when it is switched off; a "new
   folder" is one started no earlier than `shared_since` minus 3 days, and folders older
