@@ -25,7 +25,7 @@ from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.features.code_sessions import control, ingest, service
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent
-from app.features.code_sessions.schemas import MODEL, PROJECT, CodeJobOut
+from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName
 from app.features.devices import service as devices
 from app.features.devices.models import Device
 from app.policy.models import Action
@@ -154,8 +154,7 @@ class CodeProjects(Tool):
 
 class StartInput(BaseModel):
     device: str = Field(min_length=1, max_length=100, description=DEVICE_DESCRIPTION)
-    project: str = Field(
-        pattern=PROJECT,
+    project: ProjectName = Field(
         description="The project's folder name (see code_projects); a GitHub repository "
         "not cloned yet is cloned first",
     )
