@@ -70,6 +70,10 @@ class DeviceRefused(Forbidden):
     code = "device_refused"
 
 
+class DeviceBusy(Conflict):
+    code = "device_busy"
+
+
 # -- the computer ----------------------------------------------------------------------------
 
 
@@ -114,6 +118,8 @@ async def _computer(
 async def _send(device: Device, action: str, fields: dict[str, Any], timeout_s: float) -> dict:
     try:
         return await relay.send(device.id, action, fields, timeout_s=timeout_s)
+    except relay.Busy as exc:
+        raise DeviceBusy(str(exc) or f"“{device.name}” is busy with another command.") from exc
     except relay.Unavailable as exc:
         raise DeviceOffline(str(exc) or f"“{device.name}” didn't answer.") from exc
     except (relay.Refused, relay.Stopped) as exc:

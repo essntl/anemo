@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
+from app.core.redis import get_redis
 from app.features.code_sessions import control
 from app.features.code_sessions.models import CodeJob
 from app.features.devices import relay
@@ -559,4 +560,16 @@ async def test_a_paused_computer_cancels_but_doesnt_start(authed, device_side):
     await offer(ws, start=False, control=False)
     listed = (await authed.get("/api/code/devices")).json()
     assert [(d["share"], d["start"], d["cancel"]) for d in listed] == [(True, False, False)]
+    await ws.disconnect()
+
+
+async def test_a_busy_computer_is_not_an_offline_one(authed, monkeypatch):
+    # Another command holds the computer (one at a time per device): device_busy.
+    device, ws = await computer(authed)
+    monkeypatch.setattr(control, "START_TIMEOUT_S", 0.5)
+    await get_redis().set(f"devices:lock:{device['id']}", "another command", ex=30)
+    body = {"device_id": device["id"], "project": "anemo", "prompt": "Hi"}
+    r = await authed.post("/api/code/jobs", json=body)
+    assert (r.status_code, error_code(r)) == (409, "device_busy")
+    assert "busy" in r.json()["error"]["message"]
     await ws.disconnect()

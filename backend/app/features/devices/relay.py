@@ -81,6 +81,11 @@ class Unavailable(Exception):
     """The device can't be used now (not connected, no offer, no answer in time)."""
 
 
+class Busy(Unavailable):
+    """The device is carrying out another command (one at a time per device) and wasn't
+    free in time. An Unavailable, so callers that don't tell the two apart needn't."""
+
+
 class Stopped(Exception):
     """The user took control away (the stop hotkey, or Pause) while the command ran."""
 
@@ -385,8 +390,8 @@ async def send(
     device_id: uuid.UUID, action: str, fields: dict[str, Any], timeout_s: float = SEND_TIMEOUT_S
 ) -> dict[str, Any]:
     """Send one command and wait for its answer: the client's `state`. One command at a
-    time per device. Raises Unavailable, Stopped, Refused or ActionFailed; the message is
-    the sentence to show the agent.
+    time per device. Raises Unavailable (Busy when another command held the device too
+    long), Stopped, Refused or ActionFailed; the message is the sentence to show the agent.
 
     After a timeout the device may still be carrying the command out, or answer it late:
     that answer goes to the command's own key and is never read (it expires). The lock is
@@ -398,13 +403,13 @@ async def send(
     lock = redis.lock(_lock_key(device_id), timeout=timeout_s + 5, blocking_timeout=timeout_s)
     try:
         if not await lock.acquire():
-            raise Unavailable("The device is still busy with another command")
+            raise Busy("The device is still busy with another command")
     except (RedisError, OSError) as exc:
         raise Unavailable("Valkey is unavailable") from exc
     try:
         remaining = deadline - time.monotonic()
         if remaining < min(MIN_TURN_S, timeout_s / 2):
-            raise Unavailable("The device is still busy with another command")
+            raise Busy("The device is still busy with another command")
         try:
             entry = await _entry(device_id)
             if entry is None:
