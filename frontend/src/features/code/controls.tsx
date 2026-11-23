@@ -15,10 +15,10 @@ import { t } from '@/lib/i18n'
 import { useCancelJob, useFollowUp } from './api'
 import type { CodeJob } from './threads'
 
-/** Cancel: while the job runs on a computer that lets Anemo start (and so stop) jobs. */
+/** Cancel: while the job runs on a computer that lets Anemo stop jobs (`cancel`; it needs no control, §12.5). */
 export function CancelJobButton({ job }: { job: CodeJob }) {
   const cancel = useCancelJob()
-  if (job.state !== 'running' || !job.device.start) return null
+  if (job.state !== 'running' || !job.device.cancel) return null
   const run = async () => {
     const ok = await confirmDialog({
       title: t('Cancel this job?'),

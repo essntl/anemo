@@ -21,7 +21,7 @@ vi.mock('@/components/ui/dialogs', () => ({ confirmDialog: (...a: unknown[]) => 
 
 const { CancelJobButton, FollowUpBox, FromChat } = await import('./controls')
 
-const device = (more: object = {}) => ({ id: 'dev-1', name: 'Desk PC', online: true, last_seen_at: null, share: true, start: true, ...more })
+const device = (more: object = {}) => ({ id: 'dev-1', name: 'Desk PC', online: true, last_seen_at: null, share: true, start: true, cancel: true, ...more })
 const show = (ui: ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>)
 
 beforeEach(() => {
@@ -54,11 +54,16 @@ describe('Cancel', () => {
     expect(toasts).toEqual(['Desk PC is offline.'])
   })
 
-  it('is only there while the job runs on a computer that allows starting', () => {
+  it('is only there while the job runs on a computer that allows cancelling', () => {
     const { rerender } = show(<CancelJobButton job={codeJob({ state: 'done' })} />)
     expect(screen.queryByRole('button', { name: 'Cancel job' })).not.toBeInTheDocument()
-    rerender(<MemoryRouter><CancelJobButton job={codeJob({ state: 'running', device: device({ start: false }) })} /></MemoryRouter>)
+    rerender(<MemoryRouter><CancelJobButton job={codeJob({ state: 'running', device: device({ cancel: false }) })} /></MemoryRouter>)
     expect(screen.queryByRole('button', { name: 'Cancel job' })).not.toBeInTheDocument()
+  })
+
+  it('needs cancel, not start: a paused computer can still cancel', () => {
+    show(<CancelJobButton job={codeJob({ state: 'running', device: device({ start: false, cancel: true }) })} />)
+    expect(screen.getByRole('button', { name: 'Cancel job' })).toBeInTheDocument()
   })
 })
 

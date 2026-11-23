@@ -47,7 +47,7 @@ function show() {
 }
 
 const pc = (id: string, name: string, more: Partial<CodeDevice> = {}): CodeDevice =>
-  ({ id, name, online: true, last_seen_at: null, share: true, start: true, ...more }) as CodeDevice
+  ({ id, name, online: true, last_seen_at: null, share: true, start: true, cancel: true, ...more }) as CodeDevice
 
 beforeEach(() => {
   vi.clearAllMocks()
