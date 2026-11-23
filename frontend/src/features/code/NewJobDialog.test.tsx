@@ -93,6 +93,18 @@ describe('New job', () => {
     expect(screen.getByText('On GitHub, not cloned')).toBeInTheDocument()
   })
 
+  it('lets the list scroll by wheel and touch, though the dialog locks scrolling outside it', async () => {
+    show()
+    await userEvent.click(projectBox())
+    const option = within(screen.getByRole('listbox', { name: 'Projects' })).getAllByRole('option')[1]
+    const wheel = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })
+    option.dispatchEvent(wheel)
+    expect(wheel.defaultPrevented).toBe(false)
+    const touch = new Event('touchmove', { bubbles: true, cancelable: true })
+    option.dispatchEvent(touch)
+    expect(touch.defaultPrevented).toBe(false)
+  })
+
   it('narrows the list by what is typed, and takes a project by click or by arrows and Enter', async () => {
     show()
     await userEvent.type(projectBox(), 'si')

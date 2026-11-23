@@ -107,7 +107,10 @@ export function ProjectPicker({ value, onChange, projects, loading, disabled, re
           onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           className="pop z-50 w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-card border border-border bg-card shadow-float">
+          {/* The list is portaled out of the dialog, whose scroll lock cancels wheel and
+              touch scrolling outside it at the document: they stop at the list. */}
           <ul id={listId} role="listbox" aria-label={t('Projects')}
+            onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}
             className="max-h-[min(17rem,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain p-1.5">
             {loading && options.length === 0 && <li role="presentation" className="px-2.5 py-2 text-[13px] text-muted">{t('Asking the computer for its projects…')}</li>}
             {local.length > 0 && heading(t('On this computer'))}
