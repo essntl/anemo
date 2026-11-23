@@ -782,3 +782,34 @@ async def test_a_code_frame_cant_borrow_the_answers_limit(authed):
     await no_answer(ws, json.dumps(big_job))
     assert (await only_job(authed))["event_count"] == 0
     await ws.disconnect()
+
+
+async def test_the_global_notice_is_throttled_unless_the_state_changes(authed, monkeypatch):
+    _, ws = await computer(authed)
+    await announce(ws)  # new: a notice
+    await send(ws, (1, init()))
+    await send(ws, (2, say("a")))
+    assert [n["state"] for n in await global_notices()] == ["running"]  # within 5 s
+    await send(ws, (3, result()))  # a state change: at once
+    assert [n["state"] for n in await global_notices()] == ["running", "done"]
+    monkeypatch.setattr(ingest, "GLOBAL_EVERY_S", 0.0)  # 5 s later
+    await send(ws, (4, say("after")))
+    assert [n["state"] for n in await global_notices()] == ["running", "done", "done"]
+    await ws.disconnect()
+
+
+async def test_nothing_is_published_for_a_device_deleted_meanwhile(authed, monkeypatch):
+    _, ws = await computer(authed)
+    await announce(ws)
+    job_id = (await only_job(authed))["id"]
+    key = service.stream_key(job_id)
+    before = len((await bus.read({key: "0-0"}, None, 1000))[0][1])
+
+    async def gone(*args: Any, **kwargs: Any) -> dict:
+        return {}  # the device's row went between the commit and the publishing
+
+    monkeypatch.setattr(ingest.service, "devices_out", gone)
+    assert await send(ws, (1, init())) == 1  # stored and acked all the same
+    assert len((await bus.read({key: "0-0"}, None, 1000))[0][1]) == before
+    assert len(await global_notices()) == 1  # only the first announcement's
+    await ws.disconnect()
