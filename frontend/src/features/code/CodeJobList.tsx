@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { GitBranch, GitPullRequest, Plus, SquareTerminal } from 'lucide-react'
+import { Clock, GitBranch, GitPullRequest, Plus, SquareTerminal, TriangleAlert } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Elapsed } from '@/components/ui/Elapsed'
@@ -18,6 +18,7 @@ import { msg, plural, t } from '@/lib/i18n'
 import { type CodeFilters, useCodeJobs } from './api'
 import { NewJobDialog } from './NewJobDialog'
 import { StateBadge } from './parts'
+import { useCodeQueue } from './queueStore'
 import { type CodeJobState, type CodeThread, JOB_STATES, groupByProject, jobDurationMs, pullRequest, toThreads } from './threads'
 
 const STATE_FILTER: Record<CodeJobState, string> = {
@@ -44,6 +45,7 @@ function ThreadRow({ thread, selected, search }: { thread: CodeThread; selected:
   const pr = pullRequest(job.pr_url ?? thread.jobs.map((j) => j.pr_url).filter(Boolean).at(-1))
   const branch = job.branch
   const followUps = thread.jobs.length - 1
+  const queued = useCodeQueue((s) => s.byThread[thread.id])
   return (
     <li>
       <Link to={`/code/${job.id}${search}`} aria-current={selected ? 'page' : undefined} data-testid="code-thread"
@@ -66,7 +68,7 @@ function ThreadRow({ thread, selected, search }: { thread: CodeThread; selected:
             </span>
           )}
         </div>
-        {(branch || pr || followUps > 0) && (
+        {(branch || pr || followUps > 0 || queued) && (
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
             {branch && (
               <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-muted">
@@ -76,6 +78,12 @@ function ThreadRow({ thread, selected, search }: { thread: CodeThread; selected:
             {pr && (
               <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-muted">
                 <GitPullRequest aria-hidden="true" className="h-3 w-3 shrink-0" />#{pr.number}
+              </span>
+            )}
+            {queued && (
+              <span data-testid="thread-queued" className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5', queued.held ? 'bg-warning/12 text-warning' : 'bg-surface-2 text-muted')}>
+                {queued.held ? <TriangleAlert aria-hidden="true" className="h-3 w-3 shrink-0" /> : <Clock aria-hidden="true" className="h-3 w-3 shrink-0" />}
+                {queued.held ? t('Message not sent') : t('Message queued')}
               </span>
             )}
             {followUps > 0 && <span className="text-subtle">{plural(followUps, '{n} follow-up', '{n} follow-ups')}</span>}
@@ -124,14 +132,18 @@ export function CodeJobList({ jobId }: { jobId?: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 flex-wrap gap-2 border-b border-border px-3 py-2">
-        <Select variant="pill" aria-label={t('Project')} value={filters.project ?? ''} onValueChange={(v) => setFilter('project', v)}
-          options={[{ value: '', label: t('All projects') }, ...projects.map((p) => ({ value: p, label: p }))]} />
-        <Select variant="pill" aria-label={t('State')} value={filters.state ?? ''} onValueChange={(v) => setFilter('state', v)}
-          options={[{ value: '', label: t('All states') }, ...JOB_STATES.map((s) => ({ value: s, label: t(STATE_FILTER[s]) }))]} />
-        <Button size="sm" variant="primary" className="ml-auto" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setStarting(true)}>
-          {t('New job')}
-        </Button>
+      {/* By its own width, not the screen's: stacked in the narrow column (New job across
+          the top, the filters sharing the row under it), one row where there is room. */}
+      <div className="@container shrink-0 border-b border-border px-3 py-2">
+        <div className="grid grid-cols-2 gap-2 @md:flex @md:items-center">
+          <Button size="sm" variant="primary" className="col-span-2 justify-center @md:order-last @md:ml-auto" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setStarting(true)}>
+            {t('New job')}
+          </Button>
+          <Select variant="pill" className="w-full max-w-none @md:w-auto @md:max-w-[11rem]" aria-label={t('Project')} value={filters.project ?? ''} onValueChange={(v) => setFilter('project', v)}
+            options={[{ value: '', label: t('All projects') }, ...projects.map((p) => ({ value: p, label: p }))]} />
+          <Select variant="pill" className="w-full max-w-none @md:w-auto @md:max-w-[11rem]" aria-label={t('State')} value={filters.state ?? ''} onValueChange={(v) => setFilter('state', v)}
+            options={[{ value: '', label: t('All states') }, ...JOB_STATES.map((s) => ({ value: s, label: t(STATE_FILTER[s]) }))]} />
+        </div>
         {/* Mounted only while open (and while it animates out): its queries run only then. */}
         <Lingering value={starting}>{() => <NewJobDialog open={starting} onOpenChange={setStarting} />}</Lingering>
       </div>

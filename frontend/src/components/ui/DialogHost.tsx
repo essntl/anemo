@@ -72,7 +72,8 @@ function AskDialog({ request }: { request: Exclude<Request, { kind: 'choose' }> 
   const focusFirst = () => {
     const input = inputRef.current
     if (!input) {
-      formRef.current?.querySelector<HTMLButtonElement>('button[type=submit]')?.focus()
+      const safe = request.kind === 'confirm' && request.focusCancel
+      formRef.current?.querySelector<HTMLButtonElement>(safe ? 'button[data-no]' : 'button[type=submit]')?.focus()
       return
     }
     input.focus()
@@ -101,7 +102,7 @@ function AskDialog({ request }: { request: Exclude<Request, { kind: 'choose' }> 
           </label>
         )}
         <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" onClick={() => finish(false)}>{t('Cancel')}</Button>
+          <Button variant="ghost" data-no onClick={() => finish(false)}>{(request.kind === 'confirm' && request.cancelLabel) || t('Cancel')}</Button>
           <Button type="submit" variant={request.kind === 'confirm' && request.danger ? 'danger' : 'primary'}
             disabled={request.kind === 'prompt' && !value.trim() && !request.allowEmpty}>
             {confirmLabel}
