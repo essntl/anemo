@@ -105,6 +105,10 @@ person, run a second copy.
   the screen, click, type, open programs and, on a trusted computer, run PowerShell.
   Each computer has its own trust level: on your own PC every action asks; the agent's
   own VM can be left to work on its own. A stop hotkey takes control away at once.
+- **Claude Code jobs** (the Code page): follow every Claude Code job on your computers
+  live, with its todo list, tool calls, diffs, result, branch and PR, and a notification
+  when it ends. Start a job, send a follow-up that resumes its session, or cancel it, from
+  the page or by asking an agent. Turned on per computer in Anemo Desktop's settings.
 - Both connect out to Anemo through the address the web app uses; no port is opened on
   the computer or phone. Set up in **Settings → Devices**; the proxy needs
   [Websockets Support](docs/deployment.md#behind-nginx-proxy-manager).
@@ -148,11 +152,17 @@ Use the terminal rather than the ZimaOS app import, which rewrites the file:
 
 **The apps for your devices**
 
-Anemo Desktop (Windows) and Anemo Voice (Android) are built from this repository:
-[`desktop/`](desktop/README.md) gives one `.exe` with nothing to install, and
-[`android/`](android/README.md) an APK you copy to the phone. Add each device in
-**Settings → Devices** and paste its token into the app:
-[step by step](docs/deployment.md#anemo-desktop-and-anemo-voice).
+Download them from [Releases](https://github.com/essntl/anemo/releases):
+
+- **Anemo Desktop** (Windows 10 version 1903 or later, Windows 11), a `desktop-v…` release:
+  `Anemo-Desktop-win-x64.exe` for Intel and AMD PCs, `Anemo-Desktop-win-arm64.exe` for
+  ARM PCs. One exe with nothing to install; SmartScreen asks once, as it isn't signed.
+- **Anemo Voice** (Android 10 or later), a `voice-v…` release: `Anemo-Voice.apk`, to
+  install on the phone (allow installs from your browser or file manager).
+
+Add each device in **Settings → Devices** and paste its token into the app:
+[step by step](docs/deployment.md#anemo-desktop-and-anemo-voice). To build them yourself
+instead, see [`desktop/`](desktop/README.md) and [`android/`](android/README.md).
 
 Then: [HTTPS behind Nginx Proxy Manager](docs/deployment.md#behind-nginx-proxy-manager) ·
 [backups](docs/backup.md) · [updates](docs/deployment.md#updating) ·
