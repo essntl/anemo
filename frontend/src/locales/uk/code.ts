@@ -86,6 +86,9 @@ const messages: Messages = {
   "Ctrl+Enter to send": "Ctrl+Enter – надіслати",
   "{device} is offline: a follow-up can be sent once it is back.": "{device} не в мережі: продовження можна буде надіслати, коли він повернеться.",
   "{device} doesn’t let Anemo start Claude Code jobs: turn on “Let Anemo start Claude Code jobs” in Anemo Desktop to send a follow-up.": "{device} не дозволяє Anemo запускати Claude Code: увімкніть «Let Anemo start Claude Code jobs» в Anemo Desktop, щоб надіслати продовження.",
+  "{device} is no longer one of your trusted computers.": "{device} більше не належить до ваших довірених комп’ютерів.",
+  "{device} is offline now.": "{device} зараз не в мережі.",
+  "{device} doesn’t let Anemo start jobs right now.": "{device} зараз не дозволяє Anemo запускати Claude Code.",
 }
 
 export default messages

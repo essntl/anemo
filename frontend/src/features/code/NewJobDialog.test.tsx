@@ -142,7 +142,7 @@ describe('New job', () => {
   })
 
   it('doesn’t offer "New project" for a name a local folder is a clone of', async () => {
-    projects.d1.projects.push({ name: 'anemo-main', dir: 'C:\dev\anemo-main', remote: 'https://github.com/essntl/anemo-core.git' })
+    projects.d1.projects.push({ name: 'anemo-main', dir: 'C:\\dev\\anemo-main', remote: 'https://github.com/essntl/anemo-core.git' })
     show()
     await userEvent.type(projectBox(), 'anemo-core')
     expect(within(dialog()).queryByRole('switch', { name: 'New project' })).not.toBeInTheDocument()
@@ -157,6 +157,43 @@ describe('New job', () => {
     expect(toasts).toEqual(['There is no project "x" in C:\\dev or on GitHub (essntl).'])
     expect(close).not.toHaveBeenCalled()
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/code$/)
+  })
+
+  it('keeps a picked computer that stops being usable, says why, and starts nothing', async () => {
+    const { rerender } = show()
+    const computer = () => within(dialog()).getByRole('combobox', { name: 'Computer' })
+    computer().focus()
+    await userEvent.keyboard('{Enter}')
+    await userEvent.click(await screen.findByRole('option', { name: 'Laptop' }))
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Go')
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeEnabled()
+
+    // A code.job notice refetched the computers: the laptop is paused now.
+    devices = devices.map((d) => (d.id === 'd2' ? { ...d, start: false } : d))
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(computer()).toHaveTextContent('Laptop')
+    expect(within(dialog()).getByText('Laptop doesn’t let Anemo start jobs right now.')).toBeInTheDocument()
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+
+    // Offline, then gone from the list altogether: still the laptop, never Desk PC.
+    devices = devices.map((d) => (d.id === 'd2' ? { ...d, online: false } : d))
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(within(dialog()).getByText('Laptop is offline now.')).toBeInTheDocument()
+    devices = devices.filter((d) => d.id !== 'd2')
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(computer()).toHaveTextContent('Laptop')
+    expect(within(dialog()).getByText('Laptop is no longer one of your trusted computers.')).toBeInTheDocument()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(started).toEqual([])
+  })
+
+  it('follows the first usable computer while none has been picked', () => {
+    const { rerender } = show()
+    expect(within(dialog()).getByRole('combobox', { name: 'Computer' })).toHaveTextContent('Desk PC')
+    devices = devices.filter((d) => d.id !== 'd1')
+    rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
+    expect(within(dialog()).getByRole('combobox', { name: 'Computer' })).toHaveTextContent('Laptop')
   })
 
   it('says how to allow starting when no computer does', () => {
