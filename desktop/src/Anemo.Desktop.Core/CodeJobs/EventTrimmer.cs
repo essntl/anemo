@@ -17,7 +17,14 @@ public static class EventTrimmer
 {
     public const string TooLarge = "too large";
 
-    private const int LongString = 2000;
+    /// <summary>Step 2: strings longer than 2000 code points keep their first 1500 and last 400.</summary>
+    public static readonly (int LongerThan, int Head, int Tail) LongCut = (2000, 1500, 400);
+
+    /// <summary>Step 3 (from step 1's event): strings longer than 600 keep their first 400 and last 100.</summary>
+    public static readonly (int LongerThan, int Head, int Tail) ShortCut = (600, 400, 100);
+
+    /// <summary><c>tool_use_result.type</c> of a Write, whose <c>content</c> is also in the call's input.</summary>
+    private static readonly string[] WriteResultTypes = ["create", "update"];
 
     /// <summary>A line of <c>out.jsonl</c>: its JSON object trimmed, or a <c>raw</c> event.</summary>
     public static PreparedEvent FromLine(string line, int limit = CodeJobLimits.MaxEventBytes)
@@ -51,9 +58,9 @@ public static class EventTrimmer
         }
 
         // 2. and 3. Long strings cut to their head and tail; each step starts from step 1's event.
-        foreach (var (head, tail) in new[] { (1500, 400), (400, 100) })
+        foreach (var (longerThan, head, tail) in new[] { LongCut, ShortCut })
         {
-            var cut = CutStrings(work.DeepClone(), head, tail);
+            var cut = CutStrings(work.DeepClone(), longerThan, head, tail);
             if (CompactSize(cut) <= limit)
             {
                 return new PreparedEvent((JsonObject)cut!, true);
@@ -112,17 +119,18 @@ public static class EventTrimmer
 
     /// <summary>
     /// <paramref name="text"/> cut to its first <paramref name="head"/> and last
-    /// <paramref name="tail"/> code points when it is longer than 2000 code points.
+    /// <paramref name="tail"/> code points when it is longer than
+    /// <paramref name="longerThan"/> code points; the same instance otherwise.
     /// </summary>
-    public static string CutString(string text, int head, int tail)
+    public static string CutString(string text, int longerThan, int head, int tail)
     {
-        if (text.Length <= LongString)
+        if (text.Length <= longerThan)
         {
             return text; // UTF-16 length ≥ code points
         }
 
         var points = CodePoints(text);
-        if (points <= LongString)
+        if (points <= longerThan)
         {
             return text;
         }
@@ -140,30 +148,35 @@ public static class EventTrimmer
         }
 
         var removed = result.Remove("originalFile");
-        removed |= result.Remove("content");
         if (result["file"] is JsonObject file)
         {
-            removed |= file.Remove("content");
+            removed |= file.Remove("content"); // Read
+        }
+
+        if (result["type"] is JsonValue type && type.GetValueKind() == JsonValueKind.String
+            && WriteResultTypes.Contains(type.GetValue<string>()))
+        {
+            removed |= result.Remove("content"); // Write
         }
 
         return removed;
     }
 
     /// <summary>Cuts every long string in place (a node keeps its parent, so only cut strings are replaced).</summary>
-    private static JsonNode? CutStrings(JsonNode? node, int head, int tail)
+    private static JsonNode? CutStrings(JsonNode? node, int longerThan, int head, int tail)
     {
         switch (node)
         {
             case JsonObject obj:
                 foreach (var key in obj.Select(p => p.Key).ToList())
                 {
-                    if (Replacement(obj[key], head, tail) is { } cut)
+                    if (Replacement(obj[key], longerThan, head, tail) is { } cut)
                     {
                         obj[key] = cut;
                     }
                     else
                     {
-                        CutStrings(obj[key], head, tail);
+                        CutStrings(obj[key], longerThan, head, tail);
                     }
                 }
 
@@ -171,13 +184,13 @@ public static class EventTrimmer
             case JsonArray array:
                 for (var i = 0; i < array.Count; i++)
                 {
-                    if (Replacement(array[i], head, tail) is { } cut)
+                    if (Replacement(array[i], longerThan, head, tail) is { } cut)
                     {
                         array[i] = cut;
                     }
                     else
                     {
-                        CutStrings(array[i], head, tail);
+                        CutStrings(array[i], longerThan, head, tail);
                     }
                 }
 
@@ -188,7 +201,7 @@ public static class EventTrimmer
     }
 
     /// <summary>A new value when <paramref name="node"/> is a string that gets cut, else null.</summary>
-    private static JsonValue? Replacement(JsonNode? node, int head, int tail)
+    private static JsonValue? Replacement(JsonNode? node, int longerThan, int head, int tail)
     {
         if (node is not JsonValue value || value.GetValueKind() != JsonValueKind.String)
         {
@@ -196,7 +209,7 @@ public static class EventTrimmer
         }
 
         var text = value.GetValue<string>();
-        var cut = CutString(text, head, tail);
+        var cut = CutString(text, longerThan, head, tail);
         return ReferenceEquals(cut, text) ? null : JsonValue.Create(cut);
     }
 
@@ -216,7 +229,16 @@ public static class EventTrimmer
             {
                 if (block["type"] is JsonValue t && t.GetValueKind() == JsonValueKind.String && t.GetValue<string>() == "tool_use")
                 {
-                    calls.Add(new JsonObject { ["type"] = "tool_use", ["name"] = block["name"]?.DeepClone(), ["id"] = block["id"]?.DeepClone() });
+                    var call = new JsonObject();
+                    foreach (var key in new[] { "type", "name", "id" })
+                    {
+                        if (block.ContainsKey(key))
+                        {
+                            call[key] = block[key]?.DeepClone();
+                        }
+                    }
+
+                    calls.Add(call);
                 }
             }
 

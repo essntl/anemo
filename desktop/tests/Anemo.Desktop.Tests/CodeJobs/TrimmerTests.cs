@@ -26,20 +26,38 @@ public sealed class TrimmerTests
     {
         var read = JsonNode.Parse(CodeEvents.ReadResult("toolu_1", "# Anemo\nshort"))!.AsObject();
         read["tool_use_result"]!["originalFile"] = "old text";
-        read["tool_use_result"]!["content"] = "written text";
 
         var prepared = EventTrimmer.Trim(read);
 
         Assert.True(prepared.Trimmed);
         var result = prepared.Event["tool_use_result"]!.AsObject();
         Assert.False(result.ContainsKey("originalFile"));
-        Assert.False(result.ContainsKey("content"));
         Assert.False(result["file"]!.AsObject().ContainsKey("content"));
         Assert.Equal("C:\\dev\\anemo\\README.md", (string?)result["file"]!["filePath"]);
         // The tool result itself is kept.
         Assert.Equal("# Anemo\nshort", (string?)prepared.Event["message"]!["content"]![0]!["content"]);
         // The original is untouched.
         Assert.True(read["tool_use_result"]!.AsObject().ContainsKey("originalFile"));
+    }
+
+    [Theory]
+    [InlineData("create", true)]
+    [InlineData("update", true)]
+    [InlineData("text", false)]
+    [InlineData(null, false)]
+    public void Step_1_removes_the_content_of_a_Write_result_only(string? type, bool removed)
+    {
+        // A Write's content is also in its tool call's input; a Task's content is the sub-agent's answer.
+        var result = new JsonObject { ["filePath"] = "C:\\dev\\anemo\\x.md", ["content"] = "the text" };
+        if (type is not null)
+        {
+            result["type"] = type;
+        }
+
+        var prepared = EventTrimmer.Trim(new JsonObject { ["type"] = "user", ["tool_use_result"] = result });
+
+        Assert.Equal(removed, prepared.Trimmed);
+        Assert.Equal(!removed, prepared.Event["tool_use_result"]!.AsObject().ContainsKey("content"));
     }
 
     [Fact]
@@ -80,7 +98,7 @@ public sealed class TrimmerTests
         }
 
         // Cut to 1500 + 400 each, the twelve strings would still be over 16 000 bytes.
-        Assert.True(12 * EventTrimmer.CutString(text, 1500, 400).Length > CodeJobLimits.MaxEventBytes);
+        Assert.True(12 * EventTrimmer.CutString(text, 2000, 1500, 400).Length > CodeJobLimits.MaxEventBytes);
         var prepared = EventTrimmer.Trim(ev);
 
         Assert.True(prepared.Trimmed);
@@ -90,13 +108,28 @@ public sealed class TrimmerTests
     }
 
     [Fact]
+    public void Step_3_also_cuts_strings_of_600_to_2000_characters_that_step_2_leaves()
+    {
+        var text = Numbered(1000);
+        var ev = new JsonObject { ["type"] = "user", ["parts"] = new JsonArray(Enumerable.Range(0, 20).Select(_ => (JsonNode)text).ToArray()) };
+
+        var prepared = EventTrimmer.Trim(ev);
+
+        Assert.True(prepared.Trimmed);
+        var expected = text[..400] + string.Format(Marker, 500) + text[^100..];
+        Assert.All(prepared.Event["parts"]!.AsArray(), p => Assert.Equal(expected, (string?)p));
+        var exactly600 = text[..600];
+        Assert.Same(exactly600, EventTrimmer.CutString(exactly600, 600, 400, 100));
+    }
+
+    [Fact]
     public void Step_4_leaves_a_stub_with_the_tool_calls()
     {
-        // Many strings under 2000 characters: steps 2 and 3 cut nothing.
+        // Many strings of at most 600 characters: steps 2 and 3 cut nothing.
         var input = new JsonObject();
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < 40; i++)
         {
-            input[$"f{i}"] = new string('y', 1500);
+            input[$"f{i}"] = new string('y', 500);
         }
 
         var ev = new JsonObject
@@ -122,7 +155,7 @@ public sealed class TrimmerTests
     [Fact]
     public void The_stub_has_no_subtype_or_message_when_the_event_had_none()
     {
-        var ev = new JsonObject { ["type"] = "user", ["big"] = new JsonArray(Enumerable.Range(0, 20).Select(_ => (JsonNode)new string('z', 1500)).ToArray()) };
+        var ev = new JsonObject { ["type"] = "user", ["big"] = new JsonArray(Enumerable.Range(0, 40).Select(_ => (JsonNode)new string('z', 500)).ToArray()) };
 
         Assert.Equal("""{"type":"user","anemo_trimmed":"too large"}""", EventTrimmer.Trim(ev).Event.ToJsonString());
     }
@@ -130,11 +163,11 @@ public sealed class TrimmerTests
     [Fact]
     public void The_limit_is_bytes_of_UTF_8_not_characters()
     {
-        // 5 × 1900 characters: 9500 characters either way, but 19 000 bytes in Cyrillic.
+        // 16 × 600 characters (not cut by any step): 9600 characters either way, but 19 200 bytes in Cyrillic.
         JsonObject Event(char c) => new()
         {
             ["type"] = "assistant",
-            ["parts"] = new JsonArray(Enumerable.Range(0, 5).Select(_ => (JsonNode)new string(c, 1900)).ToArray()),
+            ["parts"] = new JsonArray(Enumerable.Range(0, 16).Select(_ => (JsonNode)new string(c, 600)).ToArray()),
         };
 
         Assert.False(EventTrimmer.Trim(Event('a')).Trimmed);
@@ -191,13 +224,28 @@ public sealed class TrimmerTests
     {
         var text = string.Concat(Enumerable.Repeat("😀", 2500)); // 5000 UTF-16 units, 2500 code points
 
-        var cut = EventTrimmer.CutString(text, 1500, 400);
+        var cut = EventTrimmer.CutString(text, 2000, 1500, 400);
 
         var expected = string.Concat(Enumerable.Repeat("😀", 1500)) + string.Format(Marker, 600) + string.Concat(Enumerable.Repeat("😀", 400));
         Assert.Equal(expected, cut);
         // 1999 UTF-16 units of emoji are 1000 code points: not long.
         var short_ = text[..3998];
-        Assert.Same(short_, EventTrimmer.CutString(short_, 1500, 400));
+        Assert.Same(short_, EventTrimmer.CutString(short_, 2000, 1500, 400));
+    }
+
+    [Fact]
+    public void A_tool_call_in_the_stub_keeps_only_the_keys_it_had()
+    {
+        var ev = new JsonObject
+        {
+            ["type"] = "assistant",
+            ["message"] = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_use", ["name"] = "Bash" }) },
+            ["big"] = new JsonArray(Enumerable.Range(0, 40).Select(_ => (JsonNode)new string('z', 500)).ToArray()),
+        };
+
+        Assert.Equal(
+            """{"type":"assistant","anemo_trimmed":"too large","message":{"content":[{"type":"tool_use","name":"Bash"}]}}""",
+            EventTrimmer.Trim(ev).Event.ToJsonString());
     }
 
     [Fact]
@@ -205,8 +253,8 @@ public sealed class TrimmerTests
     {
         var text = new string('a', 2000);
 
-        Assert.Same(text, EventTrimmer.CutString(text, 1500, 400));
-        Assert.NotSame(text + "a", EventTrimmer.CutString(text + "a", 1500, 400));
+        Assert.Same(text, EventTrimmer.CutString(text, 2000, 1500, 400));
+        Assert.NotSame(text + "a", EventTrimmer.CutString(text + "a", 2000, 1500, 400));
     }
 
     [Fact]
