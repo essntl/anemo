@@ -3501,7 +3501,8 @@ export interface paths {
          */
         get: operations["list_jobs_api_code_jobs_get"];
         put?: never;
-        post?: never;
+        /** Start Job */
+        post: operations["start_job_api_code_jobs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3561,6 +3562,74 @@ export interface paths {
          * @description The job live (SSE): `code.events` and `code.job`. Reconnects send Last-Event-ID.
          */
         get: operations["job_stream_api_code_jobs__job_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/follow-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Follow Up */
+        post: operations["follow_up_api_code_jobs__job_id__follow_up_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Job */
+        post: operations["cancel_job_api_code_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Devices */
+        get: operations["devices_api_code_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices/{device_id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Device Projects */
+        get: operations["device_projects_api_code_devices__device_id__projects_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5433,6 +5502,10 @@ export interface components {
             online: boolean;
             /** Last Seen At */
             last_seen_at: string | null;
+            /** Share */
+            share: boolean;
+            /** Start */
+            start: boolean;
         };
         /** CodeEventOut */
         CodeEventOut: {
@@ -5552,6 +5625,46 @@ export interface components {
             event_count: number;
             /** Truncated */
             truncated: boolean;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Conversation Title */
+            conversation_title: string | null;
+        };
+        /** CodeFollowUpIn */
+        CodeFollowUpIn: {
+            /** Prompt */
+            prompt: string;
+            /** Model */
+            model?: string | null;
+            /** Max Turns */
+            max_turns?: number | null;
+        };
+        /** CodeProjectOut */
+        CodeProjectOut: {
+            /** Name */
+            name: string;
+            /** Dir */
+            dir: string;
+            /** Remote */
+            remote: string | null;
+        };
+        /** CodeProjectsOut */
+        CodeProjectsOut: {
+            /** Projects */
+            projects: components["schemas"]["CodeProjectOut"][];
+            /** Remote */
+            remote: components["schemas"]["CodeRemoteRepoOut"][];
+            /** Note */
+            note: string | null;
+        };
+        /** CodeRemoteRepoOut */
+        CodeRemoteRepoOut: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
         };
         /**
          * CodeSettings
@@ -5563,6 +5676,27 @@ export interface components {
              * @default 30
              */
             keep_days: number;
+        };
+        /** CodeStartIn */
+        CodeStartIn: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Project */
+            project: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * New
+             * @default false
+             */
+            new?: boolean;
+            /** Model */
+            model?: string | null;
+            /** Max Turns */
+            max_turns?: number | null;
         };
         /** CodeTodoOut */
         CodeTodoOut: {
@@ -21296,6 +21430,175 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceReplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_job_api_code_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    follow_up_api_code_jobs__job_id__follow_up_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeFollowUpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_job_api_code_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    devices_api_code_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeDeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_projects_api_code_devices__device_id__projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectsOut"];
                 };
             };
             /** @description Validation Error */
