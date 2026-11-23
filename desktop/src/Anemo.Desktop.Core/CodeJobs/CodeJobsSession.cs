@@ -188,7 +188,7 @@ public sealed class CodeJobsSession
         }
 
         var cancelled = JobFolder.IsCancelled(job.Folder);
-        var alive = ProcessLiveness.IsAlive(_probe, job.Meta.Pid, job.Meta.Started);
+        var alive = ProcessLiveness.IsAlive(_probe, job.Meta.Pid, job.Meta.Started, JobFolder.LastOutputAt(job.Folder), _time.GetUtcNow());
         ScanForResult(job); // after the liveness check: a job that just ended is read to its end once more
         var state = cancelled ? JobStates.Cancelled
             : job.ResultFailed is { } failed ? (failed ? JobStates.Failed : JobStates.Done)

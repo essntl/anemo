@@ -38,7 +38,7 @@ internal sealed class WindowsProcessProbe : IProcessProbe
             }
             catch (Exception e) when (e is Win32Exception or InvalidOperationException or NotSupportedException)
             {
-                // Another user's (or an elevated) process: it runs, its start time can't be read.
+                // Another user's (or an elevated) process: Core decides from the job's output.
                 return new ProcessFacts(null);
             }
         }

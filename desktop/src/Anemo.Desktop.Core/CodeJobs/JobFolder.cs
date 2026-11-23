@@ -87,6 +87,22 @@ public static partial class JobFolder
 
     public static bool IsCancelled(string folder) => File.Exists(Path.Combine(folder, Cancelled));
 
+    /// <summary>The last write to <c>out.jsonl</c> or <c>err.txt</c>, or null when neither exists.</summary>
+    public static DateTimeOffset? LastOutputAt(string folder)
+    {
+        DateTimeOffset? last = null;
+        foreach (var name in new[] { Out, Err })
+        {
+            var path = Path.Combine(folder, name);
+            if (File.Exists(path) && new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero) is var at && (last is null || at > last))
+            {
+                last = at;
+            }
+        }
+
+        return last;
+    }
+
     /// <summary>
     /// When the job ended, as far as the folder tells: the <c>cancelled</c> file's time, else
     /// the last write to <c>out.jsonl</c> (else <c>meta.json</c>). Stable across restarts.

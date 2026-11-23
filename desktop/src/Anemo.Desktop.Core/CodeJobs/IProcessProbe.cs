@@ -1,7 +1,10 @@
 namespace Anemo.Desktop.Core.CodeJobs;
 
 /// <summary>A running process, as far as the job's liveness check needs it.</summary>
-/// <param name="StartedAt">When it started; null when Windows won't say (another user's process).</param>
+/// <param name="StartedAt">
+/// When it started; null when Windows won't say whether it exited or when it started
+/// (another user's or an elevated process).
+/// </param>
 public sealed record ProcessFacts(DateTimeOffset? StartedAt);
 
 /// <summary>Whether a job's process still runs (System.Diagnostics.Process in the app).</summary>
@@ -24,15 +27,22 @@ public static class ProcessLiveness
     /// <summary>
     /// The job's process lives: a process with its pid runs and started no later than a
     /// minute after the job did (a later one is another program that got the pid again).
-    /// A process whose start time can't be read counts as alive.
+    /// A process that can't be read (another user's or an elevated one, maybe a program that
+    /// got the pid again) counts as alive only while the job wrote <c>out.jsonl</c> or
+    /// <c>err.txt</c> in the last 30 minutes (<paramref name="lastOutput"/>).
     /// </summary>
-    public static bool IsAlive(IProcessProbe probe, int? pid, DateTimeOffset jobStarted)
+    public static bool IsAlive(IProcessProbe probe, int? pid, DateTimeOffset jobStarted, DateTimeOffset? lastOutput, DateTimeOffset now)
     {
         if (pid is not { } id || probe.Find(id) is not { } process)
         {
             return false;
         }
 
-        return process.StartedAt is not { } at || at <= jobStarted + CodeJobLimits.PidReuseSlack;
+        if (process.StartedAt is { } at)
+        {
+            return at <= jobStarted + CodeJobLimits.PidReuseSlack;
+        }
+
+        return lastOutput is { } written && now - written <= CodeJobLimits.UnreadableProcessQuietFor;
     }
 }

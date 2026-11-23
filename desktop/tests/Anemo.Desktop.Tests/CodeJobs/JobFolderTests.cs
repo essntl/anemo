@@ -230,22 +230,49 @@ public sealed class JobFolderTests : IDisposable
     public void A_process_is_the_job_s_while_it_started_within_a_minute_of_the_job()
     {
         var started = new DateTimeOffset(2026, 11, 22, 9, 30, 0, TimeSpan.Zero);
+        var now = started.AddHours(2);
         var processes = new FakeProcesses();
+        bool Alive(int? pid = 4242, DateTimeOffset? lastOutput = null) => ProcessLiveness.IsAlive(processes, pid, started, lastOutput, now);
 
-        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started)); // gone
-        Assert.False(ProcessLiveness.IsAlive(processes, null, started)); // no pid
+        Assert.False(Alive()); // gone
+        Assert.False(Alive(pid: null)); // no pid
 
         processes.Running[4242] = started.AddSeconds(-2);
-        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started));
+        Assert.True(Alive());
 
         processes.Running[4242] = started.AddSeconds(59);
-        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started));
+        Assert.True(Alive());
 
         processes.Running[4242] = started.AddMinutes(5); // the pid was given to another program
-        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started));
+        Assert.False(Alive(lastOutput: now)); // also while the job wrote recently
+    }
 
-        processes.Running[4242] = null; // can't tell: counts as alive
-        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started));
+    [Fact]
+    public void A_process_that_can_t_be_read_lives_only_while_the_job_wrote_in_the_last_30_minutes()
+    {
+        var started = new DateTimeOffset(2026, 11, 22, 9, 30, 0, TimeSpan.Zero);
+        var now = started.AddHours(5);
+        var processes = new FakeProcesses();
+        processes.Running[4242] = null; // another user's or an elevated process
+
+        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started, now.AddMinutes(-29), now));
+        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started, now.AddMinutes(-30), now));
+        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started, now.AddMinutes(-31), now));
+        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started, null, now)); // no output at all
+    }
+
+    [Fact]
+    public void The_last_output_is_the_later_of_out_jsonl_and_err_txt()
+    {
+        Assert.Null(JobFolder.LastOutputAt(_folder));
+
+        Write("out.jsonl", "{}\n");
+        Write("err.txt", "warn");
+        var older = new DateTime(2026, 11, 22, 8, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(Path.Combine(_folder, "out.jsonl"), older);
+        File.SetLastWriteTimeUtc(Path.Combine(_folder, "err.txt"), older.AddMinutes(20));
+
+        Assert.Equal(new DateTimeOffset(older.AddMinutes(20)), JobFolder.LastOutputAt(_folder));
     }
 
     private void Write(string name, string text) => File.WriteAllText(Path.Combine(_folder, name), text, new UTF8Encoding(false));
