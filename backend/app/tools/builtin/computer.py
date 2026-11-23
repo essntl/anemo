@@ -129,6 +129,12 @@ def _known(ctx: ToolContext, name: str) -> dict[str, Any] | None:
     return found
 
 
+def known_device(ctx: ToolContext, name: str) -> dict[str, Any] | None:
+    """What the last refresh saw of the device of this name ({id, name, kind, trust,
+    control, shell}), or None (not online then, or no computer tool was offered)."""
+    return _known(ctx, name)
+
+
 def _resource(ctx: ToolContext, name: str) -> str:
     """What an "allow for this run" approval is scoped to: the device, by its id (a name
     may contain "/", which would widen the approval to other devices)."""
@@ -865,7 +871,8 @@ class ComputerShell(Tool):
         "Run one PowerShell command on a trusted computer that has PowerShell switched on in "
         "Anemo Desktop (pwsh, or Windows PowerShell 5.1; no profile, not interactive, in the "
         "client's working folder). Returns the exit code and the output (head and tail when "
-        "long). Commands must not prompt."
+        "long). Commands must not prompt. For Claude Code jobs use code_start, code_status "
+        "and code_cancel, not a script."
     )
     capability = SHELL
     Input = ShellInput

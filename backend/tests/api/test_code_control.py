@@ -13,6 +13,12 @@ from app.features.code_sessions import control
 from app.features.code_sessions.models import CodeJob
 from app.features.devices import relay
 from app.features.notifications.models import Notification
+from app.policy.presets import CATEGORY_BY_CAP
+from app.providers.adapters.fake import FakeAdapter
+from app.providers.base import Done, TextDelta
+from app.tools.builtin import code as code_tools
+from app.tools.builtin.web import UNTRUSTED
+from tests.api.test_agent import agent_turn, call, script, setup, timeline
 from tests.api.test_code_sessions import announce, init, result, say, send
 from tests.api.test_devices import add
 from tests.api.test_devices_ws import roundtrip, welcomed
@@ -362,3 +368,118 @@ async def test_cancelling(authed, device_side):
     r = await authed.post(f"/api/code/jobs/{third_id}/cancel")
     assert (r.status_code, error_code(r)) == (409, "device_offline")
     assert (await authed.post(f"/api/code/jobs/{uuid.uuid4()}/cancel")).status_code == 404
+
+
+# -- the agent tools -------------------------------------------------------------------------
+
+
+def test_the_categories_and_their_defaults():
+    assert CATEGORY_BY_CAP["code.see"].label == "See Claude Code jobs"
+    assert CATEGORY_BY_CAP["code.run"].label == "Start and cancel Claude Code jobs"
+    assert CATEGORY_BY_CAP["code.see"].default == "autonomous"
+    assert CATEGORY_BY_CAP["code.run"].default == "autonomous"
+    assert {t.capability for t in code_tools.CODE_TOOLS} == set(code_tools.CODE_CAPS)
+
+
+def test_what_the_calls_would_do():
+    ctx = code_tools.ToolContext(run_id=uuid.uuid4(), emit=None)  # type: ignore[arg-type]
+    ctx.state["computers"] = {"w": {"id": "x", "name": "W", "trust": "watched"}}
+    start = code_tools.CodeStart()
+    (action,) = start.actions(
+        code_tools.StartInput(device="PC", project="anemo", prompt="x" * 300), ctx
+    )
+    assert (action.capability, action.resource, action.risk) == (
+        "code.run",
+        "device:PC/project:anemo",
+        "moderate",
+    )
+    assert action.summary == f"Start a Claude Code job on PC in anemo: “{'x' * 119}…”"
+    (watched,) = start.actions(code_tools.StartInput(device="w", project="anemo", prompt="Hi"), ctx)
+    assert watched.summary.endswith("(refused: a watched computer)")
+    (see,) = code_tools.CodeStatus().actions(code_tools.JobInput(job_id=KEY), ctx)
+    assert (see.capability, see.risk) == ("code.see", "safe")
+
+
+async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
+    device, ws = await computer(authed, "Desk PC")
+    cid = await setup(authed)
+    script(
+        "fix the login",
+        [
+            call("code_start", device="desk pc", project="anemo", prompt="Fix the login bug"),
+            Done("tool_use"),
+        ],
+        [call("code_status", job_id=KEY), Done("tool_use")],
+        [TextDelta("Started."), Done("end")],
+    )
+    secret_tail = "THE-END-OF-A-LONG-LINE"
+    run_id = await agent_turn(authed, cid, "fix the login")
+    # The status call ran right after the start; check what the model got.
+    calls = (await timeline(authed, run_id))["tool_calls"]
+    assert [c["tool_name"] for c in calls] == ["code_start", "code_status"]
+    started, status = calls
+    assert started["status"] == "succeeded", started
+    job = await row()
+    assert (job.conversation_id, job.run_id) == (uuid.UUID(cid), uuid.UUID(run_id))
+    assert started["result_data"] == {"code_job_id": str(job.id)}
+    assert str(job.id) in started["result"]
+    assert status["result_data"] == {"code_job_id": str(job.id)}
+    assert UNTRUSTED in status["result"]
+
+    # Events arrive; the status shows a summary, never the whole log.
+    await announce(ws, KEY, prompt="Fix the login bug")
+    long = "x" * 5000 + secret_tail
+    await send(
+        ws,
+        (1, init()),
+        (2, say(long)),
+        (3, result(result="Fixed in https://github.com/essntl/anemo/pull/9")),
+        key=KEY,
+    )
+    job = await row()
+    assert (job.conversation_id, job.run_id) == (uuid.UUID(cid), uuid.UUID(run_id))
+    script(
+        "how is it",
+        [call("code_status", job_id=str(job.id)), Done("tool_use")],
+        [TextDelta("Done."), Done("end")],
+    )
+    run2 = await agent_turn(authed, cid, "how is it")
+    (status,) = (await timeline(authed, run2))["tool_calls"]
+    content = status["result"]
+    assert UNTRUSTED in content and "done" in content and "Wrote: xxx" in content
+    assert secret_tail not in content and len(content) < 3000
+    assert "Fixed in https://github.com/essntl/anemo/pull/9" in content
+    assert "API-equivalent cost $1.25" in content
+    await ws.disconnect()
+
+
+async def test_a_watched_computer_is_refused_never_asked(authed, device_side):
+    _, ws = await computer(authed, "Lab", trust="watched")
+    cid = await setup(authed)
+    script(
+        "start it",
+        [call("code_start", device="Lab", project="anemo", prompt="Hi"), Done("tool_use")],
+        [TextDelta("Refused."), Done("end")],
+    )
+    run_id = await agent_turn(authed, cid, "start it")
+    (start,) = (await timeline(authed, run_id))["tool_calls"]
+    assert start["status"] == "failed"
+    assert "watched computer" in start["result"]
+    assert device_side.sent == []
+    await ws.disconnect()
+
+
+async def test_the_tools_go_with_the_page(authed):
+    cid = await setup(authed)
+    script("hello", [TextDelta("Hi."), Done("end")])
+    await agent_turn(authed, cid, "hello")
+    offered = {t.name for t in FakeAdapter.requests[-1].tools}
+    assert set(code_tools.CODE_TOOL_NAMES) <= offered
+    navigation = (await authed.get("/api/settings")).json()["navigation"]
+    navigation["more"].remove("code")
+    navigation["off"].append("code")
+    assert (await authed.put("/api/settings/navigation", json=navigation)).status_code == 200
+    script("hello again", [TextDelta("Hi."), Done("end")])
+    await agent_turn(authed, cid, "hello again")
+    offered = {t.name for t in FakeAdapter.requests[-1].tools}
+    assert not offered & set(code_tools.CODE_TOOL_NAMES)

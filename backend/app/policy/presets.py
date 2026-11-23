@@ -110,6 +110,22 @@ CATEGORIES: list[Category] = [
         "Run PowerShell commands on a trusted computer that has PowerShell switched on.",
         "ask",
     ),
+    # Claude Code jobs on those computers (docs/specs/code-sessions.md §12.3). Starting and
+    # cancelling work only on a trusted computer that allows it in Anemo Desktop; a
+    # watched one is refused (tools/builtin/code.py).
+    Category(
+        "code.see",
+        "See Claude Code jobs",
+        "List the projects on your computers and read how Claude Code jobs are doing.",
+        "autonomous",
+    ),
+    Category(
+        "code.run",
+        "Start and cancel Claude Code jobs",
+        "On trusted computers that allow it in Anemo Desktop (the jobs run with "
+        "bypassPermissions).",
+        "autonomous",
+    ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
 ]
