@@ -270,7 +270,9 @@ function Conversation() {
         )}
       </header>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      {/* relative: what is positioned in the history (an sr-only label, a tooltip) is placed and
+          clipped in here; otherwise it lands on the page under the chat and makes it scroll. */}
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-6 px-3 py-5 md:px-6 md:py-8">
           {conversation.data?.branched_from_id && (
             <Link to={`/c/${conversation.data.branched_from_id}`}

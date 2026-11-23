@@ -38,6 +38,59 @@ test('chat streams a reply and survives a reload mid-stream', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Send' })).toBeVisible()
 })
 
+test('nothing in a long chat lets the page scroll away from it', async ({ page }) => {
+  await login(page)
+  const models = await fakeModels(page.request)
+  await newChat(page, 'Chat', models.echo)
+  await send(page, 'a long chat')
+  await expect(page).toHaveURL(/\/c\//)
+  await expect(page.getByText('You said: a long chat')).toBeVisible()
+  // A long history with something positioned at its end, as the sr-only label of a running
+  // tool's timer: it used to be placed on the page under the chat, which could then be
+  // scrolled into empty space below the message box.
+  const main = page.locator('main')
+  await page.getByText('You said: a long chat').evaluate((answer) => {
+    const tall = document.createElement('div')
+    tall.style.height = '3000px'
+    const label = document.createElement('span')
+    label.className = 'sr-only'
+    label.textContent = 'running since 10:00'
+    answer.append(tall, label)
+  })
+  expect(await main.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(0)
+  await page.request.delete(page.url().replace(/.*\/c\//, '/api/conversations/'))
+})
+
+test('the skills menu fits on the new chat screen, also in a short window', async ({ page }) => {
+  await login(page)
+  for (const height of [900, 600]) {
+    await page.setViewportSize({ width: 1280, height })
+    await page.goto('/')
+    const box = page.locator('main textarea').first()
+    await box.fill('/')
+    const menu = page.getByRole('listbox', { name: 'Skills' })
+    await expect(menu).toBeVisible()
+    // Not cut off by the page (its top was hidden above the page's edge): the whole menu,
+    // its heading to "Manage skills", is inside what the page shows.
+    const cut = await menu.evaluate((list) => {
+      const rect = list.parentElement!.getBoundingClientRect()
+      let top = 0
+      let bottom = window.innerHeight
+      for (let el = list.parentElement!.parentElement; el; el = el.parentElement) {
+        if (getComputedStyle(el).overflowY === 'visible') continue
+        const r = el.getBoundingClientRect()
+        top = Math.max(top, r.top)
+        bottom = Math.min(bottom, r.bottom)
+      }
+      return { above: top - rect.top, below: rect.bottom - bottom }
+    })
+    expect(cut.above).toBeLessThanOrEqual(0)
+    expect(cut.below).toBeLessThanOrEqual(0)
+    await expect(page.getByRole('link', { name: 'Manage skills' })).toBeInViewport()
+    await box.press('Escape')
+  }
+})
+
 test('stop cancels the answer and keeps partial text', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)
