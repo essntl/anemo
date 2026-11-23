@@ -32,19 +32,27 @@ STARTED = {"job_id": KEY, "dir": "C:\\dev\\anemo", "project": "anemo"}
 
 
 async def computer(  # type: ignore[no-untyped-def]
-    authed, name: str = "PC", trust: str = "trusted", *, share: bool = True, start: bool = True
+    authed,
+    name: str = "PC",
+    trust: str = "trusted",
+    *,
+    share: bool = True,
+    start: bool = True,
+    control: bool = True,
 ) -> tuple[dict, WsClient]:
     device = await add(authed, name, trust=trust)
     ws, _ = await welcomed(device["token"])
-    await offer(ws, share=share, start=start)
+    await offer(ws, share=share, start=start, control=control)
     return device, ws
 
 
-async def offer(ws: WsClient, *, share: bool = True, start: bool = True) -> None:
+async def offer(
+    ws: WsClient, *, share: bool = True, start: bool = True, control: bool = True
+) -> None:
     await ws.send(
         {
             "type": "device.offer",
-            "control": False,
+            "control": control,  # "Allow control" on and not paused
             "shell": False,
             "code": share,
             "code_start": start,
@@ -98,7 +106,7 @@ async def row(key: str = KEY) -> CodeJob:
 async def test_the_offer_says_whether_anemo_may_start_jobs(authed):
     device, ws = await computer(authed)
     offered = await relay.online(uuid.UUID(device["id"]))
-    assert offered == relay.Offer(control=False, shell=False, code=True, code_start=True)
+    assert offered == relay.Offer(control=True, shell=False, code=True, code_start=True)
     await ws.send({"type": "device.offer", "control": False, "shell": False, "code": True})
     await roundtrip(ws)  # an older client: no code_start, so off
     offered = await relay.online(uuid.UUID(device["id"]))
@@ -520,4 +528,35 @@ async def test_a_resumed_session_follows_the_job_that_had_it(authed, device_side
         )
         _, fields, _ = device_side.sent[-1]
         assert "follow_job_id" not in fields
+    await ws.disconnect()
+
+
+async def test_a_paused_computer_cancels_but_doesnt_start(authed, device_side):
+    # Control off or paused in Anemo Desktop: no new jobs, but a running one can be
+    # cancelled (§12.5).
+    device, ws = await computer(authed, control=False)
+    listed = (await authed.get("/api/code/devices")).json()
+    assert [(d["share"], d["start"], d["cancel"]) for d in listed] == [(True, False, True)]
+    body = {"device_id": device["id"], "project": "anemo", "prompt": "Hi"}
+    r = await authed.post("/api/code/jobs", json=body)
+    assert (r.status_code, error_code(r)) == (409, "code_start_off")
+    assert "Allow control" in r.json()["error"]["message"]
+    first = "20261120-090000-pz01"
+    await announce(ws, first, started="2026-11-20T09:00:00Z", state="done")
+    await send(ws, (1, init("s-p")), key=first)
+    job_id = (await authed.get("/api/code/jobs")).json()["jobs"][0]["id"]
+    r = await authed.post(f"/api/code/jobs/{job_id}/follow-up", json={"prompt": "More"})
+    assert (r.status_code, error_code(r)) == (409, "code_start_off")
+    running = "20261120-100000-pz02"
+    await announce(ws, running, started="2026-11-20T10:00:00Z")
+    jobs = (await authed.get("/api/code/jobs")).json()["jobs"]
+    running_id = next(j["id"] for j in jobs if j["job_key"] == running)
+    device_side.answers["code_cancel"] = {"job_id": running, "state": "cancelled"}
+    r = await authed.post(f"/api/code/jobs/{running_id}/cancel")
+    assert r.status_code == 200 and r.json()["state"] == "cancelled"
+    assert [action for action, _, _ in device_side.sent] == ["code_cancel"]
+    # Without "Let Anemo start Claude Code jobs" there is no cancelling either.
+    await offer(ws, start=False, control=False)
+    listed = (await authed.get("/api/code/devices")).json()
+    assert [(d["share"], d["start"], d["cancel"]) for d in listed] == [(True, False, False)]
     await ws.disconnect()

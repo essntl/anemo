@@ -5528,6 +5528,11 @@ export interface components {
              * @default false
              */
             start: boolean;
+            /**
+             * Cancel
+             * @default false
+             */
+            cancel: boolean;
         };
         /** CodeEventOut */
         CodeEventOut: {

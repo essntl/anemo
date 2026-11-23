@@ -21964,6 +21964,11 @@
             "type": "boolean",
             "title": "Start",
             "default": false
+          },
+          "cancel": {
+            "type": "boolean",
+            "title": "Cancel",
+            "default": false
           }
         },
         "type": "object",

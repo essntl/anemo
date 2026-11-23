@@ -16,10 +16,12 @@ class CodeDeviceOut(BaseModel):
     name: str
     online: bool  # connected to Anemo now
     last_seen_at: datetime | None
-    # From its live offer (false when offline): "Share Claude Code jobs with Anemo" and
-    # "Let Anemo start Claude Code jobs" are on in Anemo Desktop.
+    # From its live offer (false when offline). share: "Share Claude Code jobs with
+    # Anemo" is on; cancel: also "Let Anemo start Claude Code jobs"; start: also "Allow
+    # control", not paused (§12.5).
     share: bool = False
     start: bool = False
+    cancel: bool = False
 
 
 class CodeTodoOut(BaseModel):

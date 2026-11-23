@@ -87,9 +87,9 @@ async def devices(db: AsyncSession) -> list[CodeDeviceOut]:
 
 
 async def _computer(
-    db: AsyncSession, device_id: uuid.UUID, *, need: str
+    db: AsyncSession, device_id: uuid.UUID, *, need: service.Need
 ) -> tuple[Device, relay.Offer]:
-    """The device, checked for an action that needs `need` ("code" or "code_start")."""
+    """The device, checked for an action that needs `need` (service.can)."""
     device = await db.get(Device, device_id)
     if device is None or device.kind != "computer":
         raise NotFound("Computer not found")
@@ -100,13 +100,14 @@ async def _computer(
     offer = await relay.online(device.id)
     if offer is None:
         raise DeviceOffline(f"“{device.name}” isn't connected to Anemo right now.")
-    if not offer.code or (need == "code_start" and not offer.code_start):
-        setting = (
-            "Let Anemo start Claude Code jobs"
-            if need == "code_start" and offer.code
-            else "Share Claude Code jobs with Anemo"
-        )
-        raise CodeStartOff(f"“{setting}” is off in Anemo Desktop on “{device.name}”.")
+    if not service.can(offer, need):
+        if not offer.code:
+            why = "“Share Claude Code jobs with Anemo” is off"
+        elif not offer.code_start:
+            why = "“Let Anemo start Claude Code jobs” is off"
+        else:
+            why = "control is off or paused (Allow control)"
+        raise CodeStartOff(f"On “{device.name}”, {why} in Anemo Desktop.")
     return device, offer
 
 
@@ -127,7 +128,7 @@ def _text(value: Any, limit: int = MAX_TEXT) -> str:
 
 async def projects(db: AsyncSession, device_id: uuid.UUID) -> CodeProjectsOut:
     """The computer's projects and the owner's GitHub repositories not cloned there."""
-    device, _ = await _computer(db, device_id, need="code")
+    device, _ = await _computer(db, device_id, need="share")
     state = await _send(device, "code_projects", {}, PROJECTS_TIMEOUT_S)
     local = [p for p in state.get("projects") or [] if isinstance(p, dict) and p.get("name")]
     remote = [r for r in state.get("remote") or [] if isinstance(r, dict) and r.get("name")]
@@ -170,7 +171,7 @@ async def start_job(
     run that started it). `follow_job_id`: the job (its key) whose folder the new one
     runs in, the project then being ignored by the computer; when not given and
     `resume_session` is, the computer's job that had that session."""
-    device, _ = await _computer(db, device_id, need="code_start")
+    device, _ = await _computer(db, device_id, need="start")
     if follow_job_id is None and resume_session:
         follow_job_id = await db.scalar(
             select(CodeJob.job_key)
@@ -259,7 +260,7 @@ async def cancel_job(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut:
     """Cancel a running job. One that has ended is returned as it is."""
     job = await service.get(db, job_id)
     if job.state not in TERMINAL:
-        device, _ = await _computer(db, job.device_id, need="code_start")
+        device, _ = await _computer(db, job.device_id, need="cancel")
         await db.close()
         state = await _send(device, "code_cancel", {"job_id": job.job_key}, CANCEL_TIMEOUT_S)
         answered = state.get("state")
