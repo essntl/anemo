@@ -1,0 +1,215 @@
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { api } from '@/api/client'
+import { CodeThreadView } from './CodeThreadView'
+import { codeJob } from './testJobs'
+import type { CodeJob } from './threads'
+import type { CodeEvent } from './timeline'
+
+/** A stand-in for the browser's EventSource: the test sends the frames. */
+class FakeEventSource {
+  static all: FakeEventSource[] = []
+  url: string
+  closed = false
+  private listeners = new Map<string, ((e: MessageEvent<string>) => void)[]>()
+  constructor(url: string) {
+    this.url = url
+    FakeEventSource.all.push(this)
+  }
+  addEventListener(type: string, fn: (e: MessageEvent<string>) => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn])
+  }
+  close() {
+    this.closed = true
+  }
+  emit(type: string, data?: unknown) {
+    for (const fn of this.listeners.get(type) ?? []) fn(new MessageEvent(type, { data: JSON.stringify(data ?? {}) }))
+  }
+}
+
+const event = (seq: number, e: Record<string, unknown>, more: Partial<CodeEvent> = {}): CodeEvent => ({
+  seq, kind: 'assistant', event: e, trimmed: false, dropped: false, created_at: '2026-11-23T10:15:00Z', ...more,
+})
+const text = (seq: number, value: string, more: Partial<CodeEvent> = {}) =>
+  event(seq, { type: 'assistant', message: { content: [{ type: 'text', text: value }] }, parent_tool_use_id: null }, more)
+
+let thread: CodeJob[] = []
+let events: Record<string, CodeEvent[]> = {}
+const eventCalls: { job: string; after: number }[] = []
+
+beforeEach(() => {
+  FakeEventSource.all = []
+  eventCalls.length = 0
+  vi.stubGlobal('EventSource', FakeEventSource)
+  vi.spyOn(api, 'GET').mockImplementation((async (path: string, init: { params: { path: { job_id: string }; query?: { after_seq?: number } } }) => {
+    const id = init.params.path.job_id
+    const response = { ok: true, status: 200 } as Response
+    if (path === '/api/code/jobs/{job_id}') return { data: { job: thread.find((j) => j.id === id) ?? thread[0], thread }, response }
+    const after = init.params.query?.after_seq ?? 0
+    eventCalls.push({ job: id, after })
+    const list = (events[id] ?? []).filter((e) => e.seq > after)
+    return { data: { events: list, last_seq: list.at(-1)?.seq ?? after, has_more: false }, response }
+  }) as unknown as typeof api.GET)
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+function show(jobId: string) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter><CodeThreadView jobId={jobId} backTo="/code" /></MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+describe('a finished thread', () => {
+  beforeEach(() => {
+    thread = [
+      codeJob({
+        id: 'j1', title: 'Bump the version', prompt: 'Bump the version to 1.1.0', state: 'done', session_id: 'sess-1',
+        started_at: '2026-11-23T09:00:00Z', ended_at: '2026-11-23T09:05:00Z', num_turns: 12, cost_usd: 1.5, duration_ms: 300_000,
+        result_text: 'Bumped to **1.1.0**.', result_subtype: 'success', job_dir: 'C:\\anemo-bridge\\jobs\\20261123-090000-ab12', truncated: true,
+      }),
+      codeJob({
+        id: 'j2', thread_id: 'j1', title: 'Also the changelog', prompt: 'Now add it to the changelog', state: 'failed', resume_session: 'sess-1', session_id: 'sess-2',
+        started_at: '2026-11-23T10:00:00Z', ended_at: '2026-11-23T10:01:00Z', num_turns: 3, cost_usd: 0.25, result_subtype: 'error_max_turns', is_error: true,
+        branch: 'feat/version', pr_url: 'https://github.com/essntl/anemo/pull/68',
+        device: { id: 'dev-1', name: 'Desk PC', online: false, last_seen_at: '2026-11-23T10:02:00Z' },
+        todos: [{ content: 'Bump', status: 'completed' }, { content: 'Changelog', status: 'pending', activeForm: 'Writing the changelog' }],
+      }),
+    ]
+    events = {
+      j1: [text(1, 'Looking at **package.json**', { trimmed: true }), event(2, { type: 'result', subtype: 'success', result: 'Bumped to **1.1.0**.' }, { kind: 'result' })],
+      j2: [text(1, 'On it'), event(2, { type: 'assistant' }, { dropped: true }), event(3, { type: 'user' }, { dropped: true, kind: 'user' })],
+    }
+  })
+
+  it('shows the header, each job with its prompt, separators and result cards', async () => {
+    show('j2')
+    expect(await screen.findByRole('heading', { name: 'Bump the version' })).toBeInTheDocument()
+    expect(screen.getByText('feat/version')).toHaveAttribute('href', 'https://github.com/essntl/anemo/tree/feat/version')
+    expect(screen.getByRole('link', { name: 'Pull request #68' })).toHaveAttribute('href', 'https://github.com/essntl/anemo/pull/68')
+    expect(screen.getByTestId('device-offline')).toHaveTextContent(/^offline since /)
+    expect(screen.getByText('sess-2')).toBeInTheDocument()
+    // The thread's API-equivalent cost and turns, over both jobs.
+    expect(screen.getAllByText('API-equivalent cost')[0].parentElement).toHaveTextContent('$1.75')
+
+    const parts = screen.getAllByTestId('code-job')
+    expect(parts).toHaveLength(2)
+    expect(within(parts[0]).getByText('Bump the version to 1.1.0')).toBeInTheDocument()
+    expect(await within(parts[0]).findByText('package.json')).toBeInTheDocument()
+    expect(within(parts[1]).getByRole('separator')).toHaveTextContent(/^Follow-up · started /)
+    expect(within(parts[1]).getByText('Now add it to the changelog')).toBeInTheDocument()
+
+    const first = within(parts[0]).getByRole('region', { name: 'Result' })
+    expect(first).toHaveTextContent('Finished')
+    expect(within(first).getByText('1.1.0').tagName).toBe('STRONG')
+    expect(first).toHaveTextContent('12')
+    expect(first).toHaveTextContent('5 min')
+    expect(first).toHaveTextContent('$1.50')
+    const second = within(parts[1]).getByRole('region', { name: 'Result' })
+    expect(second).toHaveTextContent('Failed: error_max_turns')
+    // A finished job opens no stream.
+    expect(FakeEventSource.all).toHaveLength(0)
+  })
+
+  it('says where the full log is for trimmed and dropped events', async () => {
+    show('j1')
+    const parts = await screen.findAllByTestId('code-job')
+    await userEvent.click(await within(parts[0]).findByRole('button', { name: 'trimmed' }))
+    expect(within(parts[0]).getByText('Shortened to be stored. The full log is on the computer: C:\\anemo-bridge\\jobs\\20261123-090000-ab12\\out.jsonl')).toBeInTheDocument()
+    expect(await within(parts[1]).findByText('2 events not stored (over 5 MB).')).toBeInTheDocument()
+  })
+
+  it('folds the todo list once the job has ended', async () => {
+    show('j2')
+    const toggle = await screen.findByRole('button', { name: /Todo list/ })
+    expect(toggle).toHaveTextContent('1 / 2')
+    expect(screen.queryByText('Changelog')).not.toBeInTheDocument()
+    await userEvent.click(toggle)
+    // Not running any more: the item, not what it was doing.
+    expect(screen.getByText('Changelog')).toBeInTheDocument()
+  })
+
+  it('shows the end of stderr when the job exited without a result', async () => {
+    thread = [codeJob({ id: 'x', state: 'exited_without_result', stderr_tail: 'Error: Invalid API key' })]
+    events = { x: [] }
+    show('x')
+    const card = await screen.findByRole('region', { name: 'Result' })
+    expect(card).toHaveTextContent('Exited without a result')
+    expect(card).toHaveTextContent('Error: Invalid API key')
+  })
+})
+
+describe('a running job', () => {
+  beforeEach(() => {
+    thread = [codeJob({
+      id: 'r1', title: 'Fix the footer', state: 'running', started_at: new Date(Date.now() - 65_000).toISOString(),
+      todos: [
+        { content: 'Find the footer', status: 'completed', activeForm: 'Finding the footer' },
+        { content: 'Fix it', status: 'in_progress', activeForm: 'Fixing it' },
+        { content: 'Open a PR', status: 'pending' },
+      ],
+    })]
+    events = { r1: [text(1, 'first'), text(2, 'second')] }
+  })
+
+  it('pins the todo list, with what it is doing now', async () => {
+    show('r1')
+    const toggle = await screen.findByRole('button', { name: /Todo list/ })
+    expect(toggle).toHaveTextContent('1 / 3')
+    expect(toggle.parentElement).toHaveClass('sticky')
+    expect(screen.getByText('Fixing it')).toBeInTheDocument()
+    expect(screen.getByText('Open a PR')).toBeInTheDocument()
+  })
+
+  it('merges live events by seq, fetches what a gap missed, and stops at the end', async () => {
+    show('r1')
+    expect(await screen.findByText('second')).toBeInTheDocument()
+    const source = FakeEventSource.all[0]
+    expect(source.url).toBe('/api/code/jobs/r1/stream')
+
+    // Opened: what came before the stream is fetched after the last seq we have.
+    await act(async () => source.emit('open'))
+    await waitFor(() => expect(eventCalls.at(-1)).toEqual({ job: 'r1', after: 2 }))
+
+    // A frame that follows on, and one repeated: each event once.
+    await act(async () => source.emit('code.events', { job_id: 'r1', events: [text(3, 'third'), text(2, 'second')] }))
+    expect(await screen.findByText('third')).toBeInTheDocument()
+    expect(screen.getAllByText('second')).toHaveLength(1)
+
+    // A frame after a gap (4 and 5 were lost): they are fetched.
+    events.r1.push(text(4, 'fourth'), text(5, 'fifth'))
+    await act(async () => source.emit('code.events', { job_id: 'r1', events: [text(6, 'sixth')] }))
+    expect(await screen.findByText('fifth')).toBeInTheDocument()
+    expect(eventCalls.at(-1)).toEqual({ job: 'r1', after: 3 })
+    const texts = screen.getAllByText(/^(first|second|third|fourth|fifth|sixth)$/).map((el) => el.textContent)
+    expect(texts).toEqual(['first', 'second', 'third', 'fourth', 'fifth', 'sixth'])
+
+    // The job ended: its result shows and the stream closes.
+    await act(async () => source.emit('code.job', { job: { ...thread[0], state: 'done', result_text: 'Footer fixed.', num_turns: 6 } }))
+    expect(await screen.findByRole('region', { name: 'Result' })).toHaveTextContent('Footer fixed.')
+    await waitFor(() => expect(source.closed).toBe(true))
+    expect(screen.queryByRole('button', { name: /Todo list/ })?.parentElement).not.toHaveClass('sticky')
+  })
+
+  it('ignores frames it cannot read', async () => {
+    show('r1')
+    await screen.findByText('second')
+    const source = FakeEventSource.all[0]
+    await act(async () => {
+      for (const fn of (source as unknown as { listeners: Map<string, ((e: MessageEvent<string>) => void)[]> }).listeners.get('code.events') ?? []) {
+        fn(new MessageEvent('code.events', { data: 'not json' }))
+      }
+      source.emit('code.job', { job: null })
+    })
+    expect(screen.getByText('second')).toBeInTheDocument()
+    expect(source.closed).toBe(false)
+  })
+})
