@@ -22,6 +22,8 @@ BAD = [
     "Prn",
     "aux.txt",
     "NUL.tar.gz",
+    "CON.x.y",  # by the part before the first dot, as Windows does
+    "nul.txt",
     "com1",
     "COM9",
     "lpt1.md",

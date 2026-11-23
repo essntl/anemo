@@ -394,17 +394,27 @@ def test_the_categories_and_their_defaults():
 
 def test_what_the_calls_would_do():
     ctx = code_tools.ToolContext(run_id=uuid.uuid4(), emit=None)  # type: ignore[arg-type]
-    ctx.state["computers"] = {"w": {"id": "x", "name": "W", "trust": "watched"}}
+    ctx.state["computers"] = {
+        "w": {"id": "x", "name": "W", "trust": "watched"},
+        "pc": {"id": "id-of-pc", "name": "PC", "trust": "trusted"},
+    }
     start = code_tools.CodeStart()
     (action,) = start.actions(
-        code_tools.StartInput(device="PC", project="anemo", prompt="x" * 300), ctx
+        code_tools.StartInput(device="pc", project="anemo", prompt="x" * 300), ctx
     )
+    # Scoped by the device's id, as the computer tools are: a name may hold "/".
     assert (action.capability, action.resource, action.risk) == (
         "code.run",
-        "device:PC/project:anemo",
+        "device:id-of-pc/project:anemo",
         "moderate",
     )
-    assert action.summary == f"Start a Claude Code job on PC in anemo: “{'x' * 119}…”"
+    (listing,) = code_tools.CodeProjects().actions(code_tools.ProjectsInput(device="PC"), ctx)
+    assert listing.resource == "device:id-of-pc"
+    (unknown,) = start.actions(
+        code_tools.StartInput(device="a/b", project="anemo", prompt="Hi"), ctx
+    )
+    assert unknown.resource == "device:unknown/project:anemo"
+    assert action.summary == f"Start a Claude Code job on pc in anemo: “{'x' * 119}…”"
     (watched,) = start.actions(code_tools.StartInput(device="w", project="anemo", prompt="Hi"), ctx)
     assert watched.summary.endswith("(refused: a watched computer)")
     (see,) = code_tools.CodeStatus().actions(code_tools.JobInput(job_id=KEY), ctx)

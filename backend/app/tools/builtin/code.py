@@ -56,6 +56,13 @@ def _one_line(text: Any, limit: int = MAX_ACTIVITY) -> str:
     return line if len(line) <= limit else line[: limit - 1] + "…"
 
 
+def _resource(ctx: ToolContext, name: str) -> str:
+    """What an "allow for this run" approval is scoped to: the device by its id, as for
+    the computer tools (a name may hold "/", which would widen it to other devices)."""
+    device = known_device(ctx, name)
+    return f"device:{device['id']}" if device else "device:unknown"
+
+
 def _watched_note(ctx: ToolContext, name: str) -> str:
     """What actions() can say about a watched computer (run() refuses it)."""
     device = known_device(ctx, name)
@@ -118,7 +125,7 @@ class CodeProjects(Tool):
         return [
             Action(
                 capability=SEE,
-                resource=f"device:{args.device}",
+                resource=_resource(ctx, args.device),
                 risk="safe",
                 summary=f"List the Claude Code projects on {args.device}"
                 + _watched_note(ctx, args.device),
@@ -184,7 +191,7 @@ class CodeStart(Tool):
         return [
             Action(
                 capability=RUN,
-                resource=f"device:{args.device}/project:{args.project}",
+                resource=f"{_resource(ctx, args.device)}/project:{args.project}",
                 risk="moderate",
                 summary=f"Start a Claude Code job on {args.device} in {args.project}: "
                 f"“{_one_line(args.prompt, 120)}”" + _watched_note(ctx, args.device),
