@@ -50,9 +50,13 @@ public sealed class FakeCodeHost : ICodeHost
         return NextPid ?? throw new System.ComponentModel.Win32Exception(2);
     }
 
+    /// <summary>Runs as the process tree is ended (e.g. the job writes its result just then).</summary>
+    public Action<int>? OnKill { get; set; }
+
     public bool KillTree(int pid)
     {
         Killed.Enqueue(pid);
+        OnKill?.Invoke(pid);
         return KillWorks;
     }
 }

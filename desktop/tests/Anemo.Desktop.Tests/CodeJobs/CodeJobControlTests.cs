@@ -880,6 +880,23 @@ public sealed class CodeJobControlTests : IDisposable
         Assert.Empty(_host.Killed);
     }
 
+    [Theory]
+    [InlineData(false, "done")]
+    [InlineData(true, "failed")]
+    public async Task A_job_that_finished_just_before_the_kill_keeps_its_real_state(bool error, string state)
+    {
+        var job = _jobs.Add(_time.Now.AddMinutes(-3), pid: 4321);
+        _processes.Running[4321] = job.Started;
+        job.WriteTurn(1);
+        _host.OnKill = _ => job.Finish(error); // the result is written between the look and the kill
+
+        var outcome = await RunAsync("code_cancel", new JsonObject { ["job_id"] = job.Id });
+
+        Assert.Equal(new JsonObject { ["job_id"] = job.Id, ["state"] = state }.ToJsonString(), outcome.State!.ToJsonString());
+        Assert.False(File.Exists(Path.Combine(job.Folder, "cancelled")));
+        Assert.Equal([4321], _host.Killed);
+    }
+
     [Fact]
     public async Task A_pid_that_another_program_got_is_never_killed()
     {

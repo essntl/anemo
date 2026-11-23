@@ -676,6 +676,13 @@ public sealed partial class CodeJobControl
             throw CommandException.Failed("Windows wouldn't end the job's process.");
         }
 
+        // It may have finished between the look above and the kill: its result wins (§12.5).
+        if (JobState.ResultState(folder) is { } finished)
+        {
+            TryDeleteFile(marker);
+            return new JsonObject { ["job_id"] = id, ["state"] = finished };
+        }
+
         return new JsonObject { ["job_id"] = id, ["state"] = JobStates.Cancelled };
     }
 

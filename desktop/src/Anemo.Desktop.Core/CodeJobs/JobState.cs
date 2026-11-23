@@ -57,6 +57,12 @@ public static class JobState
         }
 
         var alive = IsAlive(folder, meta, probe, now);
+        return ResultState(folder) ?? (alive ? JobStates.Running : JobStates.ExitedWithoutResult);
+    }
+
+    /// <summary><c>done</c> or <c>failed</c> when <c>out.jsonl</c> holds a <c>result</c> event (the last one counts); else null.</summary>
+    public static string? ResultState(string folder)
+    {
         bool? failed = null;
         JsonlTail.Each(Path.Combine(folder, JobFolder.Out), LinePosition.Start, line =>
         {
@@ -66,8 +72,6 @@ public static class JobState
             }
         });
 
-        return failed is { } fail ? (fail ? JobStates.Failed : JobStates.Done)
-            : alive ? JobStates.Running
-            : JobStates.ExitedWithoutResult;
+        return failed is { } fail ? (fail ? JobStates.Failed : JobStates.Done) : null;
     }
 }
