@@ -111,7 +111,7 @@ made, on GitHub). A dry run at any time: **Actions → Release → Run workflow*
    `desktop-v…` Release, or build it (above). Name it `Anemo Desktop.exe`, put it somewhere permanent (e.g. `%LOCALAPPDATA%\Programs\Anemo Desktop\`)
    and start it. The Settings window opens: paste the Anemo address (the one the web app
    uses, `https://…`) and the token. Save.
-3. The tray icon turns from grey to normal when it is connected. It adds itself to the
+3. The tray icon (the Anemo mark) turns from grey to dark when it is connected. It adds itself to the
    Startup folder ("Start with Windows", on by default).
 
 **The VM needs a console session.** Windows has no desktop to see or act on in a

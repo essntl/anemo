@@ -32,8 +32,11 @@ only run if the fake provider (`ENABLE_FAKE_PROVIDER=true`) is added there, and 
 themselves otherwise; they never fall back to a real model.
 
 The `mobile` project repeats the key flows on a phone-sized touch screen
-(`npx playwright test --project mobile`). App icons are generated from one SVG by
-`e2e/scripts/make-icons.cjs`.
+(`npx playwright test --project mobile`). App icons are generated from the Anemo mark
+(`e2e/scripts/icon-shapes.cjs`): `make-icons.cjs` for the web app, `make-native-icons.cjs`
+for Anemo Desktop's .ico files and Anemo Voice's launcher and notification icons
+(`cd e2e && npm ci && node scripts/make-native-icons.cjs`; it uses Edge when Playwright's
+Chromium isn't installed).
 
 How a chat turn flows: the API stores the message and queues a job → the worker
 streams the model's answer into a Redis stream → the browser follows it over SSE

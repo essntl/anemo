@@ -10,10 +10,14 @@
     <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- WPF for the Settings window (UI/SettingsWindow.xaml) and UI Automation; the tray stays WinForms. -->
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>Anemo Desktop</AssemblyName>
     <RootNamespace>Anemo.Desktop</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The icons are drawn by e2e/scripts/make-native-icons.cjs from the Anemo mark. -->
+    <ApplicationIcon>Assets\Anemo.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <!-- Single-file, self-contained publish (see README.md). -->
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
@@ -23,8 +27,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- UIAutomationClient (System.Windows.Automation) only; no WPF windows, no XAML build. -->
-    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
+    <!-- Loaded by UI/TrayIcons.cs under these names. -->
+    <EmbeddedResource Include="Assets\Anemo.ico" LogicalName="Anemo.ico" />
+    <EmbeddedResource Include="Assets\Tray\*.ico" LogicalName="Tray.%(Filename).ico" />
   </ItemGroup>
 
   <ItemGroup>

@@ -413,10 +413,56 @@ public sealed class TrayStatusTests
     [Fact]
     public void Grey_normal_red()
     {
-        Assert.Equal(TrayIcon.Grey, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Waiting), false));
-        Assert.Equal(TrayIcon.Grey, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Refused, "x"), true));
-        Assert.Equal(TrayIcon.Normal, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Connected), false));
-        Assert.Equal(TrayIcon.Red, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Connected), true));
+        var control = new ControlState(new ManualTime(), true, null);
+
+        Assert.Equal(TrayIcon.Grey, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Waiting), false, control));
+        Assert.Equal(TrayIcon.Grey, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Connecting), false, control));
+        Assert.Equal(TrayIcon.Normal, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Connected), false, control));
+        Assert.Equal(TrayIcon.Red, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Connected), true, control));
+    }
+
+    [Fact]
+    public void Not_set_up_or_refused_is_a_problem()
+    {
+        var control = new ControlState(new ManualTime(), true, null);
+
+        Assert.Equal(TrayIcon.Problem, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.NotConfigured), false, control));
+        Assert.Equal(TrayIcon.Problem, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Refused, "x"), true, control));
+    }
+
+    [Fact]
+    public void A_pause_shows_while_connected_until_it_ends()
+    {
+        var time = new ManualTime();
+        var control = new ControlState(time, true, null);
+        control.Stop();
+        var connected = new ConnectionStatus(ConnectionPhase.Connected);
+
+        Assert.Equal(TrayIcon.Paused, TrayStatus.Icon(connected, false, control));
+        Assert.Equal(TrayIcon.Red, TrayStatus.Icon(connected, true, control)); // a command still finishing
+        Assert.Equal(TrayIcon.Grey, TrayStatus.Icon(new ConnectionStatus(ConnectionPhase.Waiting), false, control));
+
+        time.Now += ControlState.PauseLength + TimeSpan.FromSeconds(1);
+        Assert.Equal(TrayIcon.Normal, TrayStatus.Icon(connected, false, control));
+    }
+
+    [Fact]
+    public void The_summary_names_the_state_and_this_computer()
+    {
+        var time = new ManualTime();
+        var control = new ControlState(time, true, null);
+        var device = new Anemo.Desktop.Core.Protocol.DeviceInfo("d1", "Office PC", "computer", "trusted");
+        var connected = new ConnectionStatus(ConnectionPhase.Connected);
+
+        Assert.Equal(new StatusSummary(StatusTone.Ok, "Connected", "“Office PC” in Anemo · trusted"), TrayStatus.Summary(connected, false, control, device));
+        Assert.Equal(StatusTone.Warn, TrayStatus.Summary(new ConnectionStatus(ConnectionPhase.NotConfigured), false, control, null).Tone);
+        Assert.Equal("gone", TrayStatus.Summary(new ConnectionStatus(ConnectionPhase.Refused, "gone"), false, control, null).Detail);
+        Assert.Equal("Agent at work", TrayStatus.Summary(connected, true, control, device).Title);
+
+        control.Stop();
+        var paused = TrayStatus.Summary(connected, false, control, device);
+        Assert.Equal(StatusTone.Warn, paused.Tone);
+        Assert.StartsWith("Until ", paused.Detail);
     }
 
     [Fact]

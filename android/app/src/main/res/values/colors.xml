@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="launcher_background">#2F5D8A</color>
+    <color name="launcher_background">#15181E</color>
+    <!-- The window behind the Compose screens (ui/theme/Theme.kt's ground). -->
+    <color name="ground">#ECEEF2</color>
 </resources>

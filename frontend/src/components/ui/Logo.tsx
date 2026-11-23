@@ -3,7 +3,7 @@ import { useId } from 'react'
 /**
  * The Anemo mark: three streams of wind that fade in from the left.
  * It is drawn in the current text colour, so `text-accent` or `text-text` set its colour.
- * The app icons use the same shapes: see e2e/scripts/make-icons.cjs.
+ * The app icons use the same shapes: see e2e/scripts/icon-shapes.cjs.
  */
 export function Logo({ className }: { className?: string }) {
   const fade = useId()

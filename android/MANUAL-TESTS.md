@@ -7,8 +7,8 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 
 ## Setup and the notification
 
-- [ ] Install the debug APK; Settings: address, token, wake word, **Download the wake word
-      models** (needs internet to github.com); Save. "Models … ready" shows.
+- [ ] Install the debug APK; Settings: address, token, wake word, **Download** next to the
+      models (needs internet to github.com); Save. "Models … ready" shows.
 - [ ] Start listening: the app asks for the microphone and (Android 13+) notifications.
       With notifications denied, it does **not** listen and says why.
 - [ ] The notification "Anemo is listening for Hey Jarvis" shows before anything is heard,
@@ -27,7 +27,7 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 - [ ] With the channel blocked, Start listening refuses and says why.
 - [ ] Android 15: the main screen, Settings (the Save button) and About are not under the
       status or navigation bar.
-- [ ] About and licences shows the notices; "ONNX Runtime notices" too.
+- [ ] About (the ⓘ button) shows the notices; "ONNX Runtime notices" too.
 
 ## Wake word and recording
 

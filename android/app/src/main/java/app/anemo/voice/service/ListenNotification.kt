@@ -92,14 +92,8 @@ object ListenNotification {
     fun detail(status: Status): String {
         val parts = mutableListOf<String>()
         status.error?.let { parts += it }
-        when (val c = status.connection) {
-            is Connection.Refused -> parts += c.message
-            is Connection.Retrying -> parts += "Can't reach Anemo, trying again in ${c.inSeconds} s"
-            Connection.Connecting -> parts += "Connecting to Anemo…"
-            is Connection.Connected, Connection.Off -> Unit
-        }
-        if (status.activeRuns == 1) parts += "1 request working"
-        if (status.activeRuns > 1) parts += "${status.activeRuns} requests working"
+        StatusText.connection(status.connection)?.let { parts += it }
+        StatusText.activeRuns(status.activeRuns)?.let { parts += it }
         status.notice?.let { parts += it }
         return parts.joinToString(" · ").ifEmpty { "Connected" }
     }

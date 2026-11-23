@@ -35,8 +35,10 @@ internal sealed class TrayApp : ApplicationContext
     private readonly ToolStripMenuItem _share = new("Share this screen with Anemo");
     private readonly ToolStripMenuItem _pause = new("Pause control for 1 hour");
     private readonly ToolStripMenuItem _allow = new("Allow control") { CheckOnClick = true };
+    private readonly TrayMenu _menu = new();
+    private readonly string _version;
     private bool _busy;
-    private SettingsForm? _settingsForm;
+    private SettingsWindow? _settingsWindow;
 
     public TrayApp()
     {
@@ -44,6 +46,7 @@ internal sealed class TrayApp : ApplicationContext
         var time = TimeProvider.System;
         _log = new DiagnosticLog(AppPaths.LogFolder, time);
         var version = typeof(TrayApp).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+        _version = version;
         _agent = new DesktopAgent(new DesktopAgentParts(
             new SettingsStore(AppPaths.SettingsFile, new DpapiProtector()),
             new PlatformServices(new WindowsDesktop(), new SendInputDevice(), new WindowsClipboard(), new StartMenuLauncher(), new PowerShellHost()),
@@ -56,7 +59,7 @@ internal sealed class TrayApp : ApplicationContext
             Processes: new WindowsProcessProbe(),
             CodeHost: new WindowsCodeHost()));
 
-        _indicator = new Indicator(() => _agent.Control.Stop());
+        _indicator = new Indicator(() => _agent.Control.Stop(), () => _agent.Settings.StopHotkey);
         _hideIndicator.Interval = (int)IndicatorLinger.TotalMilliseconds;
         _hideIndicator.Tick += (_, _) =>
         {
@@ -102,6 +105,7 @@ internal sealed class TrayApp : ApplicationContext
             _hotkeys.Dispose();
             _indicator.Dispose();
             _icons.Dispose();
+            _menu.Strip.Dispose();
             _hideIndicator.Dispose();
             _refresh.Dispose();
             _http.Dispose();
@@ -113,7 +117,6 @@ internal sealed class TrayApp : ApplicationContext
 
     private void BuildMenu()
     {
-        var menu = new ContextMenuStrip();
         _share.Click += (_, _) => _ = ShareAsync();
         _pause.Click += (_, _) =>
         {
@@ -127,17 +130,17 @@ internal sealed class TrayApp : ApplicationContext
             }
         };
         _allow.Click += (_, _) => _agent.Control.SetAllow(_allow.Checked);
-        menu.Items.Add(_share);
-        menu.Items.Add(_pause);
-        menu.Items.Add(_allow);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Open Anemo", null, (_, _) => OpenAnemo());
-        menu.Items.Add("Settings…", null, (_, _) => ShowSettings());
-        menu.Items.Add("Command log", null, (_, _) => OpenFolder(AppPaths.LogFolder));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Quit", null, (_, _) => ExitThread());
-        menu.Opening += (_, _) => Refresh();
-        _tray.ContextMenuStrip = menu;
+        _menu.Add(_share, "share");
+        _menu.Add(_pause, "pause");
+        _menu.Add(_allow, "pointer");
+        _menu.AddSeparator();
+        _menu.Add(new ToolStripMenuItem("Open Anemo", null, (_, _) => OpenAnemo()), "external");
+        _menu.Add(new ToolStripMenuItem("Settings…", null, (_, _) => ShowSettings()), "sliders");
+        _menu.Add(new ToolStripMenuItem("Command log", null, (_, _) => OpenFolder(AppPaths.LogFolder)), "list");
+        _menu.AddSeparator();
+        _menu.Add(new ToolStripMenuItem("Quit", null, (_, _) => ExitThread()), "logout");
+        _menu.BeforeOpen = Refresh;
+        _tray.ContextMenuStrip = _menu.Strip;
     }
 
     private void RegisterHotkeys()
@@ -201,12 +204,16 @@ internal sealed class TrayApp : ApplicationContext
     private void Refresh()
     {
         var status = _agent.Connection.Status;
-        _tray.Icon = _icons.For(TrayStatus.Icon(status, _busy));
+        _tray.Icon = _icons.For(TrayStatus.Icon(status, _busy, _agent.Control));
         _tray.Text = TrayStatus.Tooltip(status, _busy, _agent.Control);
+        ShowStatusInSettings();
+        _menu.Status = TrayStatus.Summary(status, _busy, _agent.Control, _agent.Connection.Device);
         _allow.Checked = _agent.Control.AllowControl;
-        _pause.Text = _agent.Control.PausedUntil is { } until
+        var paused = _agent.Control.PausedUntil;
+        _pause.Text = paused is { } until
             ? $"Resume control (paused until {until.ToLocalTime():HH:mm})"
             : "Pause control for 1 hour";
+        _menu.SetIcon(_pause, paused is null ? "pause" : "play");
     }
 
     private async Task ShareAsync()
@@ -217,20 +224,19 @@ internal sealed class TrayApp : ApplicationContext
 
     private void ShowSettings()
     {
-        if (_settingsForm is not null)
+        if (_settingsWindow is not null)
         {
-            _settingsForm.Activate();
+            _settingsWindow.Activate();
             return;
         }
 
-        var device = _agent.Connection.Device;
-        var status = TrayStatus.Tooltip(_agent.Connection.Status, _busy, _agent.Control).Replace("Anemo Desktop: ", "")
-            + (device is null ? "" : $"\nThis computer is “{device.Name}” in Anemo ({device.Trust}).");
-        using var form = new SettingsForm(_agent.Settings, _agent.HasToken, status, AppPaths.DefaultWorkFolder, SaveSettings);
-        _settingsForm = form;
+        var window = new SettingsWindow(new SettingsWindow.Context(
+            _agent.Settings, _agent.HasToken, AppPaths.DefaultWorkFolder, _version, SaveSettings, OpenAnemo, _icons.AppImage));
+        _settingsWindow = window;
+        ShowStatusInSettings();
         try
         {
-            if (form.ShowDialog() == DialogResult.OK)
+            if (window.ShowDialog() == true)
             {
                 RegisterHotkeys();
                 ApplyStartup();
@@ -239,8 +245,14 @@ internal sealed class TrayApp : ApplicationContext
         }
         finally
         {
-            _settingsForm = null;
+            _settingsWindow = null;
         }
+    }
+
+    private void ShowStatusInSettings()
+    {
+        var status = _agent.Connection.Status;
+        _settingsWindow?.ShowStatus(TrayStatus.Summary(status, _busy, _agent.Control, _agent.Connection.Device), status.Phase);
     }
 
     /// <summary>Saves from the Settings window; a sentence when it failed (the window stays open).</summary>

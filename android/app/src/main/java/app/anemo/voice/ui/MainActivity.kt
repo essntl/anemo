@@ -1,81 +1,68 @@
 package app.anemo.voice.ui
 
 import android.Manifest
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.view.View
-import android.view.ViewGroup
-import android.widget.BaseAdapter
-import android.widget.LinearLayout
-import android.widget.ListView
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import app.anemo.voice.core.HistoryEntry
 import app.anemo.voice.core.ListenState
 import app.anemo.voice.history.HistoryDatabase
 import app.anemo.voice.history.RoomHistoryStore
 import app.anemo.voice.service.Launcher
-import app.anemo.voice.service.ListenNotification
 import app.anemo.voice.service.ListenService
 import app.anemo.voice.service.Status
 import app.anemo.voice.service.StatusBus
 import app.anemo.voice.settings.AndroidSettingsStore
-import java.text.DateFormat
-import java.util.Date
+import app.anemo.voice.ui.theme.AnemoTheme
 import java.util.concurrent.Executors
 
 /**
  * The app's main screen: listening on or off, pause, status, and the last 50 requests
  * (heard, request, spoken answer; tap one to open its chat in Anemo).
  */
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     private val io = Executors.newSingleThreadExecutor()
-    private lateinit var title: TextView
-    private lateinit var detail: TextView
-    private lateinit var problem: TextView
-    private lateinit var toggle: android.widget.Button
-    private lateinit var pause: android.widget.Button
-    private val adapter = HistoryAdapter()
+
+    private var status by mutableStateOf(StatusBus.status)
+    private var wakeWord by mutableStateOf("")
+    private var notSetUp by mutableStateOf(false)
+    private var problem by mutableStateOf<ProblemLine?>(null)
+    private var history by mutableStateOf<List<HistoryEntry>?>(null)
 
     private val statusListener: (Status) -> Unit = { runOnUiThread { showStatus() } }
     private val historyListener: () -> Unit = { loadHistory() }
 
+    /** Asked for before listening starts; whatever the answer, [startIfReady] says what is missing. */
+    private val permissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startIfReady() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = label("", 20f)
-        detail = label("")
-        problem = label("")
-        toggle = button("Start listening") { toggleListening() }
-        pause = button("Pause") {
-            Launcher.send(this, if (StatusBus.status.listen == ListenState.Paused) ListenService.RESUME else ListenService.PAUSE)
-        }
-        val status = button("Status") { Launcher.send(this, ListenService.STATUS) }
-        val settings = button("Settings") { startActivity(Intent(this, SettingsActivity::class.java)) }
-        val about = button("About and licences") { startActivity(Intent(this, AboutActivity::class.java)) }
-
-        val header = column().apply {
-            addView(title)
-            addView(detail)
-            addView(problem)
-            addView(row(toggle, pause))
-            addView(row(status, settings))
-            addView(about)
-            addView(heading("Recent requests"))
-        }
-        val list = ListView(this).apply {
-            addHeaderView(header, null, false)
-            adapter = this@MainActivity.adapter
-            setOnItemClickListener { _, _, position, _ ->
-                (getItemAtPosition(position) as? HistoryEntry)?.let { openChat(it.chatLink) }
+        enableEdgeToEdge()
+        setContent {
+            AnemoTheme {
+                MainScreen(
+                    card = ListenCards.of(status, wakeWord, notSetUp),
+                    problem = problem,
+                    history = history,
+                    wakeWord = wakeWord,
+                    onAction = ::act,
+                    onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
+                    onAbout = { startActivity(Intent(this, AboutActivity::class.java)) },
+                    onOpen = { openChat(it.chatLink) },
+                )
             }
         }
-        list.clipToPadding = false
-        list.padForSystemBars()
-        setContentView(list)
         if (startedFromTile(intent)) askPermissionsThenStart()
     }
 
@@ -110,11 +97,13 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun toggleListening() {
-        if (ListenService.running) {
-            startService(ListenService.intent(this, ListenService.STOP))
-        } else {
-            askPermissionsThenStart()
+    private fun act(action: CardAction) {
+        when (action) {
+            CardAction.Start -> if (!ListenService.running) askPermissionsThenStart()
+            CardAction.Stop -> if (ListenService.running) startService(ListenService.intent(this, ListenService.STOP))
+            CardAction.Pause -> Launcher.send(this, ListenService.PAUSE)
+            CardAction.Resume -> Launcher.send(this, ListenService.RESUME)
+            CardAction.Status -> Launcher.send(this, ListenService.STATUS)
         }
     }
 
@@ -123,41 +112,41 @@ class MainActivity : Activity() {
             add(Manifest.permission.RECORD_AUDIO)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
         }.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isEmpty()) startIfReady() else requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_PERMISSIONS) startIfReady()
+        if (missing.isEmpty()) startIfReady() else permissions.launch(missing.toTypedArray())
     }
 
     private fun startIfReady() {
         val p = Launcher.problem(this)
         if (p != null) {
-            problem.text = p.message
+            problem = ListenCards.problemLine(p)
+            notSetUp = true
             return
         }
-        problem.text = ""
+        problem = null
         Launcher.start(this) // the app is in the foreground: Android allows it
     }
 
     private fun showStatus() {
         val s = StatusBus.status
-        val wakeWord = AndroidSettingsStore(this).load().wakeWordName
-        val running = s.listen != ListenState.Stopped
-        title.text = if (running) ListenNotification.title(s, wakeWord) else "Not listening"
-        detail.text = if (running) ListenNotification.detail(s) else s.error.orEmpty()
-        toggle.text = if (running) "Stop listening" else "Start listening"
-        pause.isEnabled = running
-        pause.text = if (s.listen == ListenState.Paused) "Resume" else "Pause"
-        if (!running && problem.text.isEmpty()) Launcher.problem(this)?.let { problem.text = it.message }
-        if (running) problem.text = ""
+        status = s
+        wakeWord = AndroidSettingsStore(this).load().wakeWordName
+        if (s.listen != ListenState.Stopped) {
+            problem = null
+            notSetUp = false
+            return
+        }
+        val p = Launcher.problem(this)
+        notSetUp = p != null
+        // a setup problem is shown again as it is now (fixed in Settings meanwhile: gone);
+        // another message (no browser) stays until listening starts
+        val shown = problem
+        if (shown == null || shown.fromSetup) problem = p?.let { ListenCards.problemLine(it) }
     }
 
     private fun loadHistory() {
         io.execute {
             val entries = RoomHistoryStore(HistoryDatabase.get(this).requests()).recent()
-            runOnUiThread { adapter.show(entries) }
+            runOnUiThread { history = entries }
         }
     }
 
@@ -165,39 +154,12 @@ class MainActivity : Activity() {
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
         } catch (e: ActivityNotFoundException) {
-            problem.text = "No browser to open $link"
-        }
-    }
-
-    private inner class HistoryAdapter : BaseAdapter() {
-        private var entries: List<HistoryEntry> = emptyList()
-        private val time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-
-        fun show(list: List<HistoryEntry>) {
-            entries = list
-            notifyDataSetChanged()
-        }
-
-        override fun getCount() = entries.size
-        override fun getItem(position: Int) = entries[position]
-        override fun getItemId(position: Int) = position.toLong()
-
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
-            val e = entries[position]
-            val view = (convertView as? LinearLayout) ?: column().apply {
-                repeat(4) { addView(label("")) }
-            }
-            (view.getChildAt(0) as TextView).text = e.request
-            (view.getChildAt(1) as TextView).text = "Heard: ${e.heard}"
-            (view.getChildAt(2) as TextView).text = e.answer?.let { "Answer: $it" } ?: "Working…"
-            (view.getChildAt(3) as TextView).text = "${time.format(Date(e.createdAt))} · open the chat"
-            return view
+            problem = ProblemLine("No browser to open $link", opensSettings = false, fromSetup = false)
         }
     }
 
     companion object {
         const val EXTRA_START = "start"
         const val TILE_ALIAS = "app.anemo.voice.ui.StartFromTile"
-        private const val REQUEST_PERMISSIONS = 1
     }
 }

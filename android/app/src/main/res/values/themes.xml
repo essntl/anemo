@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The screens are Jetpack Compose (ui/theme/Theme.kt): no action bar, the window
+         painted in the design's ground colour (values-night: dark) so nothing flashes white. -->
+    <style name="Theme.AnemoVoice" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/ground</item>
+    </style>
+</resources>

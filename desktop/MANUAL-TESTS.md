@@ -9,7 +9,9 @@ Note for each: pass / fail, Windows version, x64 or ARM64, display scale.
 
 ## Setup and connection
 
-1. Start `Anemo Desktop.exe` with no settings: the Settings window opens; the tray icon is grey.
+1. Start `Anemo Desktop.exe` with no settings: the Settings window opens; the tray icon is
+   the Anemo mark on grey with an amber “!” (not set up). The exe, the taskbar button and the
+   Settings window show the Anemo mark.
 2. Paste an `http://` (non-local) address: refused with the https sentence. Paste the real
    address and token, save: the icon turns normal; Settings → Devices shows the device online.
 3. Open `%APPDATA%\Anemo Desktop\settings.json`: no `anemo_` token in clear, only `protectedToken`.
@@ -19,8 +21,8 @@ Note for each: pass / fail, Windows version, x64 or ARM64, display scale.
    Log in as another user (fast user switching): it starts there too (one per session).
 5. Restart Anemo's containers: the icon goes grey, then normal again within a minute.
    Disconnect the network for 2 minutes, reconnect: same.
-6. Delete the device in Anemo: within a minute the icon is grey and a balloon says the token
-   was refused; the client stops retrying. Paste a new token: it connects.
+6. Delete the device in Anemo: within a minute the icon is grey with the amber “!” and a balloon
+   says the token was refused; the client stops retrying. Paste a new token: it connects.
 7. Start the same token on a second computer: the first one shows "Another copy … connected"
    and stops retrying (4409).
 8. Paste a phone's token: after three tries, the 4400 sentence.
@@ -92,21 +94,23 @@ Ask the agent to look (`computer_look`) at each; check the screenshot, the refs 
 ## Stop, pause, control off
 
 30. While the agent types a long text: press **Ctrl+Alt+Shift+S**. Typing stops within a
-    character or two; the tool call fails with "The user stopped control"; the tray shows
-    "control paused until …"; a new action is refused; looking still works.
+    character or two; the tool call fails with "The user stopped control"; the tray icon gets an
+    amber pause badge and its tooltip says "control paused until …"; a new action is refused; looking still works.
 31. Same with the indicator's **Stop** button (the button works without taking the focus from
     the window being typed into).
 32. While a PowerShell command runs (`Start-Sleep 60` on the VM): Stop ends it at once
     (no `powershell.exe`/`pwsh.exe` left in Task Manager).
 33. *Pause control for 1 hour* from the menu, then *Resume control*: actions are refused, then
-    allowed again (within 30 s for the server, at once in the client).
+    allowed again (within 30 s for the server, at once in the client); the pause badge comes
+    and goes with it.
 34. Untick *Allow control*: actions and PowerShell are refused; looks still work; Anemo shows
     control off for the device. Restart the client: still off.
 34a. Press the stop key, then quit and start the client again within the hour: control is still
     paused (the tray menu shows "Resume control (paused until …)"), actions are refused.
 34b. Make `settings.json` read-only (or damage it) and start the client: a balloon says it
     started with control off; with the file read-only, the stop key still stops a command at once.
-35. Change the stop key in Settings to `Ctrl+Alt+F9`: the new key works, the old doesn't. Pick a
+35. Change the stop key in Settings → This computer (click the key field, press `Ctrl+Alt+F9`;
+    Esc keeps the old one): the new key works, the old doesn't. Pick a
     key another program has registered: a balloon says so.
 
 ## Shared screen
@@ -166,7 +170,7 @@ Ask the agent to look (`computer_look`) at each; check the screenshot, the refs 
 Needs `C:\anemo-bridge\cc.ps1` and Claude Code on the computer, and an Anemo with the Code page.
 
 51. **Off by default**: a fresh client's Settings window shows "Share Claude Code jobs with
-    Anemo" unticked, with the sentence about what is sent. Start a job with `cc.ps1`: nothing
+    Anemo" switched off (Settings → Claude Code), with the sentence about what is sent. Start a job with `cc.ps1`: nothing
     appears on the Code page; `connection-*.log` has no "code job" line.
 52. **Trusted device, sharing on**: make the device trusted in Settings → Devices, tick the
     box, save (no restart). Within a few seconds the jobs of the last 3 days appear on the Code
@@ -203,8 +207,9 @@ Needs `C:\anemo-bridge\cc.ps1` and Claude Code on the computer, and an Anemo wit
 Needs Claude Code (`claude`) on PATH, `gh` signed in (`gh auth status`), git, and an Anemo
 with the Code page's phase 2.
 
-61. **Off by default**: the Settings window shows "Let Anemo start Claude Code jobs" unticked
-    with the bypassPermissions sentence; it is greyed out while sharing is unticked. In Anemo,
+61. **Off by default**: the Settings window shows "Let Anemo start Claude Code jobs" switched
+    off with the bypassPermissions sentence; it is greyed out while sharing is off, and so are
+    the Projects folder and GitHub owner while it is off. In Anemo,
     the Code page offers no "New job" for this computer; an agent's `code_start` is refused.
 62. **Turn it on** (trusted device, sharing on): tick it, save (no restart). The Code page's
     "New job" lists this computer, its folders in `C:\dev` (with their GitHub remotes) and the
@@ -255,5 +260,9 @@ with the Code page's phase 2.
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a
     **Windows 11 ARM64** machine (Surface Pro X / Snapdragon laptop / ARM VM).
-46. Display scale 100 %, 125 %, 150 %, 200 %: the tray icon, the Settings window and the
-    indicator look right; coordinates land right.
+46. Display scale 100 %, 125 %, 150 %, 200 %: the tray icon, the tray menu, the Settings window
+    and the indicator look right; coordinates land right.
+46a. Switch Windows between light and dark (Settings → Personalisation → Colours): an open
+    Settings window follows at once; the tray menu follows the taskbar the next time it opens;
+    the indicator follows the apps' mode the next time it shows. Windows 10: square corners and
+    a painted red edge on the indicator; Windows 11: rounded corners.
