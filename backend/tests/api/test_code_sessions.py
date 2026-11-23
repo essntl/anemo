@@ -768,3 +768,17 @@ async def test_jobs_with_recent_activity_are_kept(authed):
     assert kept == ["20260901-090000-long", "20260901-100000-late", "20260901-110000-wait"]
     await ws.disconnect()
     await quiet.disconnect()
+
+
+async def test_a_code_frame_cant_borrow_the_answers_limit(authed):
+    # "device.result" in the first 200 characters selects the 12 MB limit of answers;
+    # the code frame's own limit still applies after it is read.
+    _, ws = await computer(authed)
+    await announce(ws)
+    events = items((1, say("y" * 310_000)))
+    steered = {"device.result": 1, "type": "code.events", "job_id": KEY, "events": events}
+    await no_answer(ws, json.dumps(steered))
+    big_job = {"device.result": 1, "type": "code.job", "job": job(), "pad": "x" * 64_000}
+    await no_answer(ws, json.dumps(big_job))
+    assert (await only_job(authed))["event_count"] == 0
+    await ws.disconnect()

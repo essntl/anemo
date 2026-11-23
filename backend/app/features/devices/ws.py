@@ -210,7 +210,11 @@ class Connection:
             kind = message.get("type")
             if len(text) > MAX_MESSAGE and kind not in ("device.result", "code.job", "code.events"):
                 continue  # the big limits are for those types only
+            # Each type's own limit again: a key named "device.result" early in the text
+            # would have given a code frame the answers' 12 MB above.
             if kind == "code.job" and len(text) > MAX_CODE_JOB:
+                continue
+            if kind == "code.events" and len(text) > MAX_CODE_EVENTS:
                 continue
             await self._handle(message)
 
