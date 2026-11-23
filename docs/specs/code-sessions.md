@@ -418,3 +418,116 @@ to use these instead of `computer_shell` with `cc.ps1`.
    them.
 8. *Notification kind?* The existing `agent` kind, so current destination settings
    apply without a migration.
+
+## 12. Phase 2 in detail
+
+Phase 2 is built on `feat/code-sessions-control` (stacked on phase 1). It adds control
+on top of §3 (phase 2 additions), §5.4 (phase 2 endpoints), §7.4 and §8; this section
+makes those exact.
+
+### 12.1 Desktop (Anemo Desktop 1.2.0)
+
+- Settings: `StartCodeJobs` (bool, false; label "Let Anemo start Claude Code jobs", with
+  a sentence that jobs run with `--permission-mode bypassPermissions`, so Anemo's agents
+  can run anything Claude Code can), `CodeProjectsFolder` (null = `C:\dev`),
+  `GitHubOwner` (null = `essntl`). `StartCodeJobs` only counts while `ShareCodeJobs` is
+  on (a job Anemo starts must be visible to it).
+- Offer: `"code_start": bool` = start on, share on, trusted.
+- `code_projects`: every folder in the projects folder (`name` = folder name, `remote` =
+  the `remote "origin"` `url` from `.git/config`, or null); `remote`: the owner's
+  repositories from `gh repo list <owner> --limit 200 --json name,url` that no local
+  folder has (by folder name or remote repository name); when `gh` is missing or fails,
+  `remote: []` and `note` says why in one sentence. Timeout 30 s for `gh`.
+- `code_start`, like `cc.ps1`:
+  1. Validate: `project` matches `^[A-Za-z0-9._-]{1,100}$` (no path, not `.` or `..`),
+     prompt 1–100 000 characters, `model` `^[A-Za-z0-9._\[\]-]{1,100}$`, `max_turns`
+     1–500, `resume_session` `^[A-Za-z0-9-]{1,100}$`; else `failed` with a sentence.
+  2. Resolve: `<projects>\<project>` if it exists; else a folder whose origin remote's
+     repository name is `project`; else clone `<owner>/<project>` (`gh repo clone` when
+     `gh` is on PATH, else `git clone https://github.com/<owner>/<project>.git`), 10
+     minutes at most; else, with `new`, create `<projects>\<project>` and `git init` it;
+     else `failed`: "There is no project "x" in C:\dev or on GitHub (essntl)."
+  3. Make the job folder `<jobs>\<id>` (id from the local time + 4 random lowercase
+     letters/digits, unique), write `prompt.txt` (UTF-8, no BOM) and `meta.json`
+     `{id, pid, dir, resume, started, prompt_preview, model}` (`prompt_preview`: the
+     first 200 characters).
+  4. Start, detached and windowless, in the project folder: `cmd.exe /d /c claude -p
+     --output-format stream-json --verbose --permission-mode bypassPermissions
+     [--resume <s>] [--model <m>] [--max-turns <n>] < prompt.txt > out.jsonl 2> err.txt`
+     (paths quoted; arguments come only from validated values). Write the pid into
+     `meta.json`. `failed` "Claude Code (claude) isn't on this computer's PATH." when
+     `where claude` finds nothing.
+  5. Answer `{job_id, dir, project}`; the sharing loop discovers the folder on its next
+     scan and sends `code.job` as for any job.
+- `code_cancel`: the job folder must exist (else `failed` "There is no job x."); if the
+  job has ended, answer its state; else kill the process tree of `pid` (with the
+  pid-reuse guard), write the `cancelled` file, answer `{job_id, state: "cancelled"}`.
+- All three are refused (`refused`) unless trusted and the right setting is on
+  (`code_projects`: share; `code_start` / `code_cancel`: start). Commands run like the
+  others (one at a time per device).
+
+### 12.2 Backend
+
+- Migration 0074: `code_jobs.conversation_id` (FK conversations, SET NULL) and `run_id`
+  (FK runs, SET NULL), both nullable and indexed. Ingestion never overwrites them.
+- `relay.Offer` gains `code_start` (stored like `code`).
+- `CodeJobOut` gains `conversation_id`, `run_id`, `conversation_title` (null when none);
+  `CodeDeviceRef` gains `share`, `start` (from the live offer; false when offline).
+- Endpoints (§5.4): `GET /api/code/devices` (trusted computers), `GET
+  /api/code/devices/{id}/projects`, `POST /api/code/jobs`, `POST
+  /api/code/jobs/{id}/follow-up` (the thread's last job must have ended and have a
+  `session_id`; resumes it in the same project on the same device), `POST
+  /api/code/jobs/{id}/cancel` (a job that has ended is returned as it is).
+- Errors (`AppError` subclasses, stable codes): `device_offline` (409: not connected or
+  no fresh offer), `code_start_off` (409: the device doesn't offer `code_start`, or
+  `code` for projects), `device_not_trusted` (403), `job_running` (409: a follow-up
+  while the thread's last job runs), `no_session` (409: nothing to resume),
+  `device_failed` (422: the client answered `failed`; `message` is the client's
+  sentence), `device_refused` (403).
+- Timeouts for `relay.send`: `code_projects` 45 s, `code_start` 660 s (a clone may take
+  10 minutes), `code_cancel` 30 s.
+- Starting creates (upserts) the row from the answer: `job_key`, `dir`, `project`,
+  `prompt`, `title`, `resume_session`, `model`, state `running`, `seen_running`,
+  `started_at` = now, `thread_id` by `resume_session` as usual, plus `conversation_id`
+  and `run_id` when an agent tool started it. It publishes like ingestion.
+- One service function per action (`start_job`, `follow_up`, `cancel_job`, `projects`,
+  `devices`) used by both the router and the tools.
+
+### 12.3 Agent tools (`tools/builtin/code.py`)
+
+| tool | capability | does |
+|---|---|---|
+| `code_projects(device)` | `code.see` | the device's projects and not-cloned repositories |
+| `code_start(device, project, prompt, new?, resume_session?, model?, max_turns?)` | `code.run` | starts a job; answers the job's Anemo id, the device's job id and the folder, and that progress is on the Code page and through `code_status` |
+| `code_status(job_id)` | `code.see` | state, todo list, the last 8 activities as one-line summaries (tool name + subject, or the first 200 characters of text), branch, PR, turns, duration, API-equivalent cost and, when ended, the result (≤ 4000 characters); all job content inside the untrusted-content marking the web tools use (`UNTRUSTED`) |
+| `code_cancel(job_id)` | `code.run` | cancels |
+
+- `job_id` accepts the Anemo id (uuid) or the device's job id (`yyyyMMdd-HHmmss-xxxx`).
+- Policy categories: `code.see` "See Claude Code jobs" (default `autonomous`) and
+  `code.run` "Start and cancel Claude Code jobs" (on trusted computers that allow it in
+  Anemo Desktop; default `autonomous`). A watched device is refused by `run()` (and
+  `actions()` says so in the summary), never asked.
+- `actions()`: `code.run` with resource `device:<name>/project:<project>`, a summary
+  with the first 120 characters of the prompt, risk `moderate`; `code.see` risk `safe`.
+- `ToolResult.data = {"code_job_id": "<uuid>"}` for `code_start`, `code_status` and
+  `code_cancel` (the chat's chip).
+- `FEATURE_TOOLS["code"]`; `PAGE_INFO.code.hasTools = true`.
+- The `computer_shell` description gets one sentence: for Claude Code jobs use
+  `code_start` / `code_status` / `code_cancel`, not a script.
+
+### 12.4 Frontend
+
+- Thread header: **Cancel** while the latest job runs and its device offers `start`
+  (confirm dialog; a toast with `errorMessage` on error).
+- **Follow-up** box under a thread whose last job has ended, has a session and whose
+  device offers `start`: a textarea and Send (Ctrl+Enter); the new job appears in the
+  thread and is followed live. Otherwise hidden, with one line saying why when the
+  device is offline or doesn't allow starting.
+- **New job** button in the list header → dialog: device (trusted computers offering
+  `start`), project (a combobox fed by `GET /api/code/devices/{id}/projects`: local
+  first, then "On GitHub, not cloned"; free text allowed), a "New project" switch (shown
+  when the name matches nothing), prompt, model (Default, Opus, Sonnet, Haiku → null,
+  `opus`, `sonnet`, `haiku`). Success → `/code/<id>`.
+- A job with `conversation_id` shows "From chat: <title>" linking to `/c/<id>`.
+- In the chat, a tool call of `code_start`, `code_status` or `code_cancel` whose `data`
+  has `code_job_id` shows a small chip "Claude Code job" linking to `/code/<id>`.
