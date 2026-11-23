@@ -665,3 +665,37 @@ async def test_status_marks_all_that_the_job_wrote(authed):
         assert piece in inside and piece not in head and piece not in after, piece
     assert "done" in head and KEY in head and "/code/" in head
     await ws.disconnect()
+
+
+async def test_a_job_that_clones_first(authed, device_side):
+    # Anemo Desktop answers before it clones (§12.5): the job is running with no pid;
+    # once the process runs, its code.job brings the pid and a later start time.
+    device, ws = await computer(authed)
+    async with get_sessionmaker()() as db:
+        job = await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="site", prompt="Clone and fix"
+        )
+    await announce(ws, KEY, prompt="Clone and fix", pid=None, started="2026-11-24T10:15:00Z")
+    stored = await row()
+    assert (stored.state, stored.pid) == ("running", None)
+    await announce(ws, KEY, prompt="Clone and fix", pid=4321, started="2026-11-24T10:17:30Z")
+    stored = await row()
+    assert stored.pid == 4321 and stored.started_at.isoformat() == "2026-11-24T10:17:30+00:00"
+    assert str(stored.id) == str(job.id)
+
+    # A clone that fails after the answer: the job ends without a result, the reason in
+    # its stderr tail, and it notifies (Anemo started it, so it was running).
+    failed = "20261124-121500-cl02"
+    device_side.answers["code_start"] = {**STARTED, "job_id": failed}
+    async with get_sessionmaker()() as db:
+        await control.start_job(
+            db, device_id=uuid.UUID(device["id"]), project="site", prompt="Will fail"
+        )
+    reason = "Cloning essntl/site failed: repository not found."
+    await announce(
+        ws, failed, prompt="Will fail", pid=None, state="exited_without_result", stderr_tail=reason
+    )
+    gone = await row(failed)
+    assert gone.state == "exited_without_result" and gone.stderr_tail == reason
+    assert await notification_titles() == ["Claude Code job failed: Will fail"]
+    await ws.disconnect()
