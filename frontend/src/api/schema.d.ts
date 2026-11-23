@@ -4468,6 +4468,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Jobs */
+        get: operations["list_jobs_api_code_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job */
+        get: operations["get_job_api_code_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Events */
+        get: operations["list_events_api_code_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream Job */
+        get: operations["stream_job_api_code_jobs__job_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5319,6 +5387,141 @@ export interface components {
             login_command: string;
             /** Start Command */
             start_command: string;
+        };
+        /** CodeDeviceRef */
+        CodeDeviceRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Online */
+            online: boolean;
+            /** Last Seen At */
+            last_seen_at: string | null;
+        };
+        /** CodeEventOut */
+        CodeEventOut: {
+            /** Seq */
+            seq: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "system" | "assistant" | "user" | "result" | "raw" | "other";
+            /** Event */
+            event: {
+                [key: string]: unknown;
+            };
+            /** Trimmed */
+            trimmed: boolean;
+            /** Dropped */
+            dropped: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CodeEventsOut */
+        CodeEventsOut: {
+            /** Events */
+            events: components["schemas"]["CodeEventOut"][];
+            /** Last Seq */
+            last_seq: number;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** CodeJobDetailOut */
+        CodeJobDetailOut: {
+            job: components["schemas"]["CodeJobOut"];
+            /** Thread */
+            thread: components["schemas"]["CodeJobOut"][];
+        };
+        /** CodeJobListOut */
+        CodeJobListOut: {
+            /** Jobs */
+            jobs: components["schemas"]["CodeJobOut"][];
+            /** Projects */
+            projects: string[];
+            /** Has More */
+            has_more: boolean;
+        };
+        /** CodeJobOut */
+        CodeJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Key */
+            job_key: string;
+            device: components["schemas"]["CodeDeviceRef"];
+            /** Project */
+            project: string;
+            /** Dir */
+            dir: string;
+            /** Job Dir */
+            job_dir: string;
+            /** Title */
+            title: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "done" | "failed" | "cancelled" | "exited_without_result";
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Last Event At */
+            last_event_at: string | null;
+            /** Session Id */
+            session_id: string | null;
+            /** Resume Session */
+            resume_session: string | null;
+            /**
+             * Thread Id
+             * Format: uuid
+             */
+            thread_id: string;
+            /** Model */
+            model: string | null;
+            /** Branch */
+            branch: string | null;
+            /** Pr Url */
+            pr_url: string | null;
+            /** Todos */
+            todos: {
+                [key: string]: unknown;
+            }[];
+            /** Num Turns */
+            num_turns: number | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Cost Usd */
+            cost_usd: number | null;
+            /** Result Text */
+            result_text: string | null;
+            /** Result Subtype */
+            result_subtype: string | null;
+            /** Is Error */
+            is_error: boolean;
+            /** Stderr Tail */
+            stderr_tail: string | null;
+            /** Last Seq */
+            last_seq: number;
+            /** Event Count */
+            event_count: number;
+            /** Truncated */
+            truncated: boolean;
         };
         /** ContentOut */
         ContentOut: {
@@ -7206,7 +7409,7 @@ export interface components {
              *       "files"
              *     ]
              */
-            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
             /**
              * More
              * @default [
@@ -7219,9 +7422,9 @@ export interface components {
              *       "memory"
              *     ]
              */
-            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
             /** Off */
-            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
         };
         /** NewDeviceOut */
         NewDeviceOut: {
@@ -20865,6 +21068,148 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceReplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_jobs_api_code_jobs_get: {
+        parameters: {
+            query?: {
+                project?: string | null;
+                state?: ("running" | "done" | "failed" | "cancelled" | "exited_without_result") | null;
+                device_id?: string | null;
+                limit?: number;
+                /** @description Only jobs started before this time */
+                before?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_code_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_api_code_jobs__job_id__events_get: {
+        parameters: {
+            query?: {
+                after_seq?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeEventsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_job_api_code_jobs__job_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "last-event-id"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
