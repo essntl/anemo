@@ -531,3 +531,66 @@ makes those exact.
 - A job with `conversation_id` shows "From chat: <title>" linking to `/c/<id>`.
 - In the chat, a tool call of `code_start`, `code_status` or `code_cancel` whose `data`
   has `code_job_id` shows a small chip "Claude Code job" linking to `/code/<id>`.
+
+### 12.5 Changes after the phase 2 review (these win over 12.1–12.4)
+
+**Desktop**
+
+- *Which `claude` runs*: the command line names the full path found on PATH (`where`
+  order, PATHEXT), never a bare `claude`, and the detached start sets
+  `NoDefaultCurrentDirectoryInExePath=1`; cmd runs as `cmd.exe /d /v:off /s /c "…"`. A
+  `claude.cmd` in the project folder is never run.
+- *GitHub owner*: `GitHubOwner` null means the account `gh` is signed in as (`gh api
+  user --jq .login`, 30 s). With no `gh`, no signed-in account and no owner set,
+  `code_projects` lists no remote repositories (`note` says to sign in to gh or set an
+  owner) and `code_start` never clones.
+- *Project names*: besides `^[A-Za-z0-9._-]{1,100}$`, a name must not be only dots, must
+  not end with a dot, and must not be a Windows device name (`CON`, `PRN`, `AUX`, `NUL`,
+  `COM1`–`COM9`, `LPT1`–`LPT9`, also with an extension). Same rule on the server and in
+  the page. .NET patterns end with `\z`, not `$`.
+- *Follow-ups*: `code_start` takes an optional `follow_job_id` (a job id). When given,
+  the job runs in the folder recorded in that job's `meta.json` `dir` (which must exist
+  and be a folder; else `failed` "The folder of job x is gone."), `project` is ignored
+  and nothing is cloned or made. The server always sends it for a follow-up.
+- *Answer fast*: `code_start` validates, resolves a local folder, makes the job folder
+  and answers `{job_id, dir, project}` at once. When a clone (or `git init`) is needed,
+  it answers right after making the job folder, with a `starting` file in it, and does
+  the clone and the start in the background; `dir` is the folder it will clone into. A
+  job with a `starting` file and no pid counts as `running` for at most 15 minutes. When
+  the clone fails, the client writes the reason to `err.txt`, removes `starting`, and
+  the job ends as `exited_without_result` (its stderr tail says why). So a command
+  never holds the device for more than a few seconds.
+- *Cancel*: after ending the process tree, the client reads `out.jsonl` again; if a
+  `result` is there, it removes the `cancelled` file and answers the real state. A job
+  still cloning is cancelled by stopping the clone and writing `cancelled`.
+- *Offer*: unchanged on the wire; the server reads "can start now" as `code &&
+  code_start && control` (the existing `control` field already says control is allowed
+  and not paused).
+
+**Backend**
+
+- `CodeDeviceOut`: `start` = `code && code_start && control` (can start now), new
+  `cancel` = `code && code_start` (cancelling doesn't need control).
+- Follow-up sends `follow_job_id` = the thread's last job's `job_key`.
+- `relay.Unavailable` because the device is busy with another command → `device_busy`
+  (409), not `device_offline`.
+- `started()` always sets `seen_running` (Anemo started the job), so a job that ended
+  before the start's answer still notifies.
+- Tool resources use the device id, as `computer.py` does: `device:<id>` and
+  `device:<id>/project:<project>`.
+- `code_status`: everything that came from the computer or the job (project, folder,
+  branch, todo texts, activities, result) is inside the untrusted marking, with a marker
+  that says it was written by a Claude Code job.
+- `code.run` stays `autonomous` by default (the task's decision); Settings → Agent
+  Permissions can make it ask.
+
+**Frontend**
+
+- New job dialog: the device falls back to the first usable one only while none has
+  been picked; a picked device that stops being usable disables Start with a line
+  saying why. The prompt is sent as typed (no trim). "New project" isn't offered for a
+  name that a local folder's remote repository already has.
+- Cancel shows when the device's `cancel` is true; New job and Follow-up need `start`.
+- A 504 or a network error while starting: a toast says the job may have started, and
+  the list and devices are refetched.
+- `device_busy` is shown with the server's message, like the other codes.

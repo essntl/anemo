@@ -268,7 +268,7 @@ event contents. The full log stays on the computer.
 | `code_start` | `project` (≤ 200), `prompt` (1–100 000), `new` (bool), `resume_session?`, `model?` (≤ 100), `max_turns?` (1–500) | `{"job_id", "dir", "project"}` once the job runs. The project resolves to a folder of that name, or a folder whose git remote has that name, else it is cloned from GitHub, else with `new` an empty folder (`git init`) is made; `failed` with a sentence otherwise |
 | `code_cancel` | `job_id` | `{"job_id", "state": "cancelled"}`; ends the job's process tree and writes the `cancelled` file; `failed` when there is no such job, `{"job_id", "state": "<state>"}` when it had already ended |
 
-A follow-up is `code_start` with `resume_session` and the project of the earlier job.
+A follow-up is `code_start` with `resume_session` and `follow_job_id` (the earlier job's id): it runs in that job's recorded folder, and `project` is ignored. `code_start` answers within seconds; a needed clone runs afterwards, while the job folder holds a `starting` file (see `docs/specs/code-sessions.md` §12.5 for this, the full path of `claude`, project-name rules and the GitHub owner).
 The job runs `claude -p --output-format stream-json --verbose --permission-mode
 bypassPermissions [--resume <s>] [--model <m>] [--max-turns <n>]` in its folder, the
 prompt on stdin, like `cc.ps1`.
