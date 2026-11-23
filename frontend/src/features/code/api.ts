@@ -28,12 +28,15 @@ export interface CodeFilters {
 
 const PAGE = 200
 
-/** Jobs, newest first, page by page (`before` = the start of the last one). */
+/** Where the next page starts: after the last row, by (started_at, id) so jobs that started together aren't skipped. */
+type Cursor = { before: string; before_id: string }
+
+/** Jobs, newest first, page by page. */
 export function useCodeJobs(filters: CodeFilters) {
   return useInfiniteQuery({
     queryKey: [...codeJobsKey, filters],
     placeholderData: keepPreviousData,
-    initialPageParam: null as string | null,
+    initialPageParam: null as Cursor | null,
     queryFn: async ({ pageParam }) =>
       unwrap(
         await api.GET('/api/code/jobs', {
@@ -42,12 +45,15 @@ export function useCodeJobs(filters: CodeFilters) {
               limit: PAGE,
               ...(filters.project ? { project: filters.project } : {}),
               ...(filters.state ? { state: filters.state } : {}),
-              ...(pageParam ? { before: pageParam } : {}),
+              ...(pageParam ? { before: pageParam.before, before_id: pageParam.before_id } : {}),
             },
           },
         }),
       ),
-    getNextPageParam: (last) => (last.has_more && last.jobs.length ? last.jobs[last.jobs.length - 1].started_at : null),
+    getNextPageParam: (last): Cursor | null => {
+      const end = last.jobs.at(-1)
+      return last.has_more && end ? { before: end.started_at, before_id: end.id } : null
+    },
   })
 }
 
