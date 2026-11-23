@@ -243,22 +243,9 @@ public sealed class CodeJobsSession
     {
         job.ResultScan = JsonlTail.Each(job.OutPath, job.ResultScan, line =>
         {
-            if (!line.Text.Contains("\"result\"", StringComparison.Ordinal))
+            if (JobState.ResultOf(line.Text) is { } failed)
             {
-                return;
-            }
-
-            try
-            {
-                if (JsonNode.Parse(line.Text) is JsonObject ev && Protocol.Wire.Str(ev, "type") == "result")
-                {
-                    var isError = ev["is_error"] is JsonValue e && e.GetValueKind() == JsonValueKind.True;
-                    job.ResultFailed = isError || Protocol.Wire.Str(ev, "subtype") != "success";
-                }
-            }
-            catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException)
-            {
-                // A raw line: not a result.
+                job.ResultFailed = failed;
             }
         });
     }

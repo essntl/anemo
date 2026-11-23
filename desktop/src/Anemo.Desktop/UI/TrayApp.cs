@@ -53,7 +53,8 @@ internal sealed class TrayApp : ApplicationContext
             _http,
             version,
             AppPaths.DefaultWorkFolder,
-            Processes: new WindowsProcessProbe()));
+            Processes: new WindowsProcessProbe(),
+            CodeHost: new WindowsCodeHost()));
 
         _indicator = new Indicator(() => _agent.Control.Stop());
         _hideIndicator.Interval = (int)IndicatorLinger.TotalMilliseconds;

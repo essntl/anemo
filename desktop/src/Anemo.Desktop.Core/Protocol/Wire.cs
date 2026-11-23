@@ -44,13 +44,17 @@ public static class Wire
 
     public static string Ping() => Json(new JsonObject { ["type"] = "ping" });
 
-    /// <summary>The offer; <paramref name="code"/>: Claude Code jobs are shared (device-contracts.md §7).</summary>
-    public static string Offer(bool control, bool shell, bool code) => Json(new JsonObject
+    /// <summary>
+    /// The offer; <paramref name="code"/>: Claude Code jobs are shared (device-contracts.md §7);
+    /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4).
+    /// </summary>
+    public static string Offer(bool control, bool shell, bool code, bool codeStart) => Json(new JsonObject
     {
         ["type"] = "device.offer",
         ["control"] = control,
         ["shell"] = shell,
         ["code"] = code,
+        ["code_start"] = codeStart,
     });
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });

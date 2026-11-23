@@ -18,6 +18,7 @@ public sealed class CodeJobsConnectionTests : IAsyncLifetime
     private readonly CancellationTokenSource _stop = new();
     private readonly HttpClient _http = new();
     private readonly FakeCodeServer _code = new();
+    private readonly FakeCodeHost _host = FakeCodeHost.WithEverything();
     private FakeAnemoServer _server = null!;
     private SettingsStore _store = null!;
     private Task _running = Task.CompletedTask;
@@ -108,6 +109,74 @@ public sealed class CodeJobsConnectionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_job_started_by_a_command_is_answered_then_shared()
+    {
+        var projects = Path.Combine(_jobs.Root, "projects");
+        Directory.CreateDirectory(Path.Combine(projects, "anemo"));
+        _processes.Running[9000] = DateTimeOffset.UtcNow; // the started cmd.exe
+        Start(share: true, start: true, projects);
+        var client = await _server.NextClientAsync();
+
+        var offer = await client.NextAsync("device.offer");
+        Assert.True((bool)offer["code"]!);
+        Assert.True((bool)offer["code_start"]!);
+
+        await client.CommandAsync("cmd-start", "code_start", new JsonObject
+        {
+            ["project"] = "anemo",
+            ["prompt"] = "Fix the flaky test.",
+            ["new"] = false,
+            ["resume_session"] = null,
+            ["model"] = null,
+            ["max_turns"] = null,
+        });
+        // The result and the job's first code.job, in whichever order they come.
+        JsonObject? result = null, announce = null;
+        while (result is null || announce is null)
+        {
+            var msg = await client.NextAsync();
+            switch ((string?)msg["type"])
+            {
+                case "device.result":
+                    result = msg;
+                    break;
+                case "code.job":
+                    announce ??= msg;
+                    break;
+            }
+        }
+
+        Assert.True((bool)result["ok"]!, result.ToJsonString());
+        var jobId = (string)result["state"]!["job_id"]!;
+        Assert.Equal(Path.Combine(projects, "anemo"), (string?)result["state"]!["dir"]);
+        Assert.Equal("anemo", (string?)result["state"]!["project"]);
+        Assert.Equal(jobId, (string?)announce["job"]!["id"]);
+        Assert.Equal("running", (string?)announce["job"]!["state"]);
+        Assert.Equal("Fix the flaky test.", (string?)announce["job"]!["prompt"]);
+        Assert.Equal(9000, (int?)announce["job"]!["pid"]);
+    }
+
+    [Fact]
+    public async Task With_starting_off_the_offer_has_no_code_start_and_code_start_is_refused()
+    {
+        Start(share: true);
+        var client = await _server.NextClientAsync();
+
+        Assert.False((bool)(await client.NextAsync("device.offer"))["code_start"]!);
+        await client.CommandAsync("cmd-start", "code_start", new JsonObject { ["project"] = "anemo", ["prompt"] = "x" });
+        var result = await client.NextAsync("device.result");
+
+        Assert.False((bool)result["ok"]!);
+        Assert.Equal("refused", (string?)result["code"]);
+        Assert.Empty(_host.Started);
+
+        // Switching it on in Settings offers it at once, without a reconnect.
+        Agent!.Save(Agent.Settings with { StartCodeJobs = true }, newToken: null);
+        Assert.True((bool)(await client.NextAsync("device.offer"))["code_start"]!);
+        Assert.Equal(1, _server.Connections);
+    }
+
+    [Fact]
     public async Task A_watched_device_offers_no_code_and_sends_no_jobs()
     {
         _server.Trust = "watched";
@@ -151,10 +220,17 @@ public sealed class CodeJobsConnectionTests : IAsyncLifetime
         return job;
     }
 
-    private void Start(bool share)
+    private void Start(bool share, bool start = false, string? projects = null)
     {
         var settings = _store.WithToken(
-            new DesktopSettings { Address = _server.BaseUri.ToString(), ShareCodeJobs = share, CodeJobsFolder = _jobs.Jobs },
+            new DesktopSettings
+            {
+                Address = _server.BaseUri.ToString(),
+                ShareCodeJobs = share,
+                CodeJobsFolder = _jobs.Jobs,
+                StartCodeJobs = start,
+                CodeProjectsFolder = projects,
+            },
             FakeAnemoServer.Token);
         _store.Save(settings);
         Agent = new DesktopAgent(new DesktopAgentParts(
@@ -169,7 +245,8 @@ public sealed class CodeJobsConnectionTests : IAsyncLifetime
             new DeviceConnectionOptions { Backoff = () => new Backoff(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(200)) },
             new Core.Commands.CommandOptions { SettleDelay = TimeSpan.Zero, OpenDelay = TimeSpan.Zero },
             _processes,
-            new CodeJobsOptions { PollInterval = TimeSpan.FromMilliseconds(50) }));
+            new CodeJobsOptions { PollInterval = TimeSpan.FromMilliseconds(50) },
+            _host));
         _running = Agent.RunAsync(_stop.Token);
     }
 

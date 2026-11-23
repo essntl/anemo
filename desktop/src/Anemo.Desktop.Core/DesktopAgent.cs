@@ -21,7 +21,9 @@ public sealed record DesktopAgentParts(
     DeviceConnectionOptions? ConnectionOptions = null,
     CommandOptions? CommandOptions = null,
     IProcessProbe? Processes = null,
-    CodeJobsOptions? CodeJobsOptions = null)
+    CodeJobsOptions? CodeJobsOptions = null,
+    ICodeHost? CodeHost = null,
+    CodeJobControlOptions? CodeJobControlOptions = null)
 {
     /// <summary>The Claude Code jobs' state file, beside <c>settings.json</c>.</summary>
     public string CodeJobsStateFile => Path.Combine(Path.GetDirectoryName(Store.Path) ?? ".", "code-jobs.json");
@@ -54,7 +56,13 @@ public sealed class DesktopAgent
             Control,
             () => Settings,
             parts.CommandLog,
-            WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder));
+            WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder),
+            new CodeJobControl(
+                () => Settings,
+                parts.CodeHost ?? NoCodeHost.Instance,
+                parts.Processes ?? NoProcesses.Instance,
+                parts.Time,
+                parts.CodeJobControlOptions));
         CodeJobs = new CodeJobSharing(
             () => Settings,
             new CodeJobStore(parts.CodeJobsStateFile, parts.Time, parts.Log),
@@ -132,7 +140,8 @@ public sealed class DesktopAgent
         {
             Connection.Reconnect();
         }
-        else if (old.PowerShellEnabled != settings.PowerShellEnabled || old.ShareCodeJobs != settings.ShareCodeJobs)
+        else if (old.PowerShellEnabled != settings.PowerShellEnabled || old.ShareCodeJobs != settings.ShareCodeJobs
+            || old.StartCodeJobs != settings.StartCodeJobs)
         {
             Connection.OfferNow();
         }

@@ -5,11 +5,13 @@ namespace Anemo.Desktop.Core.Commands;
 
 /// <summary>
 /// The one-line summary of a command for the local log. It never holds typed text,
-/// clipboard text or a PowerShell command (only their length), nor a URL's path or query.
+/// clipboard text, a PowerShell command or a Claude Code prompt (only their length), nor a
+/// URL's path or query.
 /// </summary>
 public static class CommandSummary
 {
-    public static string For(JsonObject command)
+    /// <param name="state">The answer, when there is one: <c>code_start</c> logs the new job's id.</param>
+    public static string For(JsonObject command, JsonNode? state = null)
     {
         var action = Wire.Str(command, "action") ?? "";
         string? Str(string key) => Wire.Str(command, key);
@@ -28,6 +30,11 @@ public static class CommandSummary
             "open" => OpenTarget(Str("target")),
             "clipboard_set" => $"{Length("text")} characters",
             "shell" => $"a command of {Length("command")} characters, timeout {Num("timeout_s")} s",
+            "code_projects" => "",
+            "code_start" => (state is JsonObject s && Wire.Str(s, "job_id") is { } job ? $"job {Short(job)} in " : "")
+                + $"project {Short(Str("project"))}, a prompt of {Length("prompt")} characters"
+                + (Str("resume_session") is not null ? ", a follow-up" : ""),
+            "code_cancel" => $"job {Short(Str("job_id"))}",
             _ => "unknown action",
         };
     }
