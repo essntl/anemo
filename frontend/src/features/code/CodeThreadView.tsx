@@ -108,7 +108,7 @@ function Prompt({ text }: { text: string }) {
 /** One job of the thread: its prompt, its timeline (live while it runs) and its result. */
 function JobPart({ job, index, onSize }: { job: CodeJob; index: number; onSize?: (count: number) => void }) {
   const running = job.state === 'running'
-  const events = useCodeEvents(job.id, running)
+  const events = useCodeEvents(job.id, { live: running, lastSeq: job.last_seq })
   const items = useMemo(() => buildTimeline(events.data ?? []), [events.data])
   const count = events.data?.length ?? 0
   useEffect(() => onSize?.(count), [count, onSize])

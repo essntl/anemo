@@ -215,7 +215,14 @@ describe('merging events', () => {
   it('merges by seq, each once, in order', () => {
     const merged = mergeEvents([e(1), e(2), e(4)], [e(3), e(4, 'again'), e(5)])
     expect(merged.map((x) => x.seq)).toEqual([1, 2, 3, 4, 5])
-    expect(merged[3].event.text).toBe('again')
+    // A stored event never changes: the copy held stays.
+    expect(merged[3].event.text).toBe('4')
+  })
+
+  it('gives the same list back when nothing is new', () => {
+    const have = [e(1), e(2), e(5)]
+    expect(mergeEvents(have, [])).toBe(have)
+    expect(mergeEvents(have, [e(5, 'again'), e(2)])).toBe(have)
   })
 
   it('knows the last seq without a gap', () => {

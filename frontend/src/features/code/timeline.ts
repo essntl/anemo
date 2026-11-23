@@ -36,12 +36,21 @@ export const num = (v: unknown): number | undefined => {
 
 // ---- Merging what arrives (the first fetch, the live stream, a fetch after a gap) ----
 
-/** Both lists as one, by seq, each seq once (the newer copy wins). */
+/**
+ * Both lists as one, by seq, each seq once. A stored event never changes (the server
+ * keeps the first copy), so one already held is kept, and when nothing is new the
+ * same list comes back: no new render, and no new fetch from it.
+ */
 export function mergeEvents(have: readonly CodeEvent[], incoming: readonly CodeEvent[]): CodeEvent[] {
-  if (incoming.length === 0) return have as CodeEvent[]
   const bySeq = new Map<number, CodeEvent>()
   for (const e of have) bySeq.set(e.seq, e)
-  for (const e of incoming) if (typeof e?.seq === 'number') bySeq.set(e.seq, e)
+  let added = false
+  for (const e of incoming) {
+    if (typeof e?.seq !== 'number' || bySeq.has(e.seq)) continue
+    bySeq.set(e.seq, e)
+    added = true
+  }
+  if (!added) return have as CodeEvent[]
   return [...bySeq.values()].sort((a, b) => a.seq - b.seq)
 }
 
