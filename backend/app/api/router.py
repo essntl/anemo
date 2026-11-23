@@ -19,6 +19,7 @@ from app.features.automations.router import router as automations_router
 from app.features.browser_router import router as browser_router
 from app.features.calendar.router import router as calendar_router
 from app.features.capture.router import router as capture_router
+from app.features.code_sessions.router import router as code_router
 from app.features.conversations.router import router as conversations_router
 from app.features.daily_notes.router import router as daily_notes_router
 from app.features.devices.router import router as devices_router
@@ -101,6 +102,7 @@ protected.include_router(capture_router)
 protected.include_router(inline_router)
 protected.include_router(dictation_router)
 protected.include_router(devices_router)
+protected.include_router(code_router)
 protected.include_router(research_router)
 protected.include_router(automations_router)
 protected.include_router(mcp_router)

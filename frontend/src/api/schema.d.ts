@@ -562,6 +562,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Code Settings */
+        put: operations["put_code_settings_api_settings_code_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -3470,6 +3487,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Jobs
+         * @description Jobs on every computer, newest first, with every project that has jobs.
+         */
+        get: operations["list_jobs_api_code_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Job
+         * @description A job and every job of its thread (follow-ups by `resume_session`), in start
+         *     order.
+         */
+        get: operations["get_job_api_code_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Events
+         * @description The job's stored events after `after_seq`, by seq.
+         */
+        get: operations["job_events_api_code_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Stream
+         * @description The job live (SSE): `code.events` and `code.job`. Reconnects send Last-Event-ID.
+         */
+        get: operations["job_stream_api_code_jobs__job_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research/sessions": {
         parameters: {
             query?: never;
@@ -4468,74 +4566,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/code/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Jobs */
-        get: operations["list_jobs_api_code_jobs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/code/jobs/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Job */
-        get: operations["get_job_api_code_jobs__job_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/code/jobs/{job_id}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Events */
-        get: operations["list_events_api_code_jobs__job_id__events_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/code/jobs/{job_id}/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stream Job */
-        get: operations["stream_job_api_code_jobs__job_id__stream_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4597,6 +4627,7 @@ export interface components {
             properties: components["schemas"]["PropertySettings"];
             dictation: components["schemas"]["DictationSettings"];
             voice: components["schemas"]["VoiceSettings"];
+            code: components["schemas"]["CodeSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -5388,8 +5419,8 @@ export interface components {
             /** Start Command */
             start_command: string;
         };
-        /** CodeDeviceRef */
-        CodeDeviceRef: {
+        /** CodeDeviceOut */
+        CodeDeviceOut: {
             /**
              * Id
              * Format: uuid
@@ -5458,7 +5489,7 @@ export interface components {
             id: string;
             /** Job Key */
             job_key: string;
-            device: components["schemas"]["CodeDeviceRef"];
+            device: components["schemas"]["CodeDeviceOut"];
             /** Project */
             project: string;
             /** Dir */
@@ -5499,9 +5530,7 @@ export interface components {
             /** Pr Url */
             pr_url: string | null;
             /** Todos */
-            todos: {
-                [key: string]: unknown;
-            }[];
+            todos: components["schemas"]["CodeTodoOut"][];
             /** Num Turns */
             num_turns: number | null;
             /** Duration Ms */
@@ -5522,6 +5551,26 @@ export interface components {
             event_count: number;
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * CodeSettings
+         * @description The Code page: Claude Code jobs that computers share (features/code_sessions).
+         */
+        CodeSettings: {
+            /**
+             * Keep Days
+             * @default 30
+             */
+            keep_days: number;
+        };
+        /** CodeTodoOut */
+        CodeTodoOut: {
+            /** Content */
+            content: string;
+            /** Status */
+            status: string;
+            /** Activeform */
+            activeForm?: string | null;
         };
         /** ContentOut */
         ContentOut: {
@@ -7417,6 +7466,7 @@ export interface components {
              *       "focus",
              *       "music",
              *       "runs",
+             *       "code",
              *       "automations",
              *       "agents",
              *       "memory"
@@ -11995,6 +12045,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_code_settings_api_settings_code_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSettings"];
                 };
             };
             /** @description Validation Error */
@@ -18787,6 +18872,146 @@ export interface operations {
             };
         };
     };
+    list_jobs_api_code_jobs_get: {
+        parameters: {
+            query?: {
+                project?: string | null;
+                state?: ("running" | "done" | "failed" | "cancelled" | "exited_without_result") | null;
+                device_id?: string | null;
+                limit?: number;
+                /** @description started_at of the last job shown */
+                before?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_code_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_events_api_code_jobs__job_id__events_get: {
+        parameters: {
+            query?: {
+                after_seq?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeEventsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_stream_api_code_jobs__job_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "last-event-id"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_sessions_api_research_sessions_get: {
         parameters: {
             query?: never;
@@ -21068,148 +21293,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceReplyOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_jobs_api_code_jobs_get: {
-        parameters: {
-            query?: {
-                project?: string | null;
-                state?: ("running" | "done" | "failed" | "cancelled" | "exited_without_result") | null;
-                device_id?: string | null;
-                limit?: number;
-                /** @description Only jobs started before this time */
-                before?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: {
-                aiw_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CodeJobListOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_job_api_code_jobs__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: {
-                aiw_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CodeJobDetailOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_events_api_code_jobs__job_id__events_get: {
-        parameters: {
-            query?: {
-                after_seq?: number;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: {
-                aiw_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CodeEventsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stream_job_api_code_jobs__job_id__stream_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "last-event-id"?: string | null;
-            };
-            path: {
-                job_id: string;
-            };
-            cookie?: {
-                aiw_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
