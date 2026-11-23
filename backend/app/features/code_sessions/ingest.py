@@ -325,25 +325,37 @@ def _prepare(item: EventItem, stored_bytes: int) -> _Prepared:
     )
 
 
+def _newest(job: CodeJob, name: str, seq: int) -> bool:
+    """Whether the pull-out `name` of the event `seq` is the newest seen (then it is
+    recorded): a batch that arrives late doesn't overwrite what a later event said."""
+    seqs = dict(job.pullout_seqs or {})
+    if seq < seqs.get(name, 0):
+        return False
+    seqs[name] = seq
+    job.pullout_seqs = seqs  # a new dict, so the change is saved
+    return True
+
+
 def _apply(job: CodeJob, item: _Prepared) -> bool:
-    """The event's pull-outs onto its job; True when the session id became known."""
-    pulled = item.pulled
+    """The event's pull-outs onto its job, each only when no later event set it
+    already; True when the session id became known."""
+    pulled, seq = item.pulled, item.seq
     session_known = False
-    if pulled.session_id and pulled.session_id != job.session_id:
+    if pulled.session_id and _newest(job, "session_id", seq):
+        session_known = pulled.session_id != job.session_id
         job.session_id = pulled.session_id
-        session_known = True
-    if pulled.model:
+    if pulled.model and _newest(job, "model", seq):
         job.model = pulled.model
-    if pulled.todos is not None and item.seq > job.todos_seq:
+    if pulled.todos is not None and seq > job.todos_seq:
         job.todos = pulled.todos
-        job.todos_seq = item.seq
-    if pulled.pr_url:
+        job.todos_seq = seq
+    if pulled.pr_url and _newest(job, "pr_url", seq):
         job.pr_url = pulled.pr_url
-    if pulled.branch:
+    if pulled.branch and _newest(job, "branch", seq):
         job.branch = pulled.branch
         job.branch_from_events = True
     result = pulled.result
-    if result is not None:
+    if result is not None and _newest(job, "result", seq):
         job.num_turns = result.num_turns
         job.duration_ms = result.duration_ms
         job.cost_usd = result.cost_usd

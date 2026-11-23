@@ -71,6 +71,12 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("todos_seq", sa.Integer(), server_default="0", nullable=False),
+        sa.Column(
+            "pullout_seqs",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
         sa.Column("num_turns", sa.Integer(), nullable=True),
         sa.Column("duration_ms", sa.Integer(), nullable=True),
         sa.Column("cost_usd", sa.Numeric(precision=12, scale=6), nullable=True),

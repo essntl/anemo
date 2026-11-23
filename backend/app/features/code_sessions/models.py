@@ -76,6 +76,11 @@ class CodeJob(Base, IdMixin, TimestampMixin):
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
     todos_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # The seq each other pull-out came from ({"session_id", "model", "pr_url", "branch",
+    # "result"}): a batch that arrives late doesn't overwrite what a later event said.
+    pullout_seqs: Mapped[dict[str, int]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
     num_turns: Mapped[int | None] = mapped_column(Integer)
     duration_ms: Mapped[int | None] = mapped_column(Integer)
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))

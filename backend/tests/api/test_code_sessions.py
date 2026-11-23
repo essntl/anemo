@@ -699,3 +699,33 @@ async def test_paging_keeps_jobs_started_at_the_same_time(authed):
     assert sorted(seen) == ["20261120-090000-aaa1", "20261120-090000-aaa2", "20261120-090000-aaa3"]
     assert len(seen) == 3
     await ws.disconnect()
+
+
+async def test_a_late_older_batch_doesnt_overwrite_newer_pull_outs(authed):
+    _, ws = await computer(authed)
+    await announce(ws)
+    pr = "https://github.com/essntl/anemo/pull/"
+    newer = [
+        (10, init("s-new", "model-new")),
+        (11, bash("git checkout -b feat/new")),
+        (12, say(f"Opened {pr}2")),
+        (13, result(num_turns=9, result="new", session_id="s-new")),
+    ]
+    older = [
+        (1, init("s-old", "model-old")),
+        (2, bash("git checkout -b feat/old")),
+        (3, say(f"Opened {pr}1")),
+        (4, result("error_max_turns", num_turns=3, result="old", session_id="s-old")),
+    ]
+    await send(ws, *newer)
+    await send(ws, *older)
+    shared = await only_job(authed)
+    assert (shared["session_id"], shared["model"]) == ("s-new", "model-new")
+    assert (shared["branch"], shared["pr_url"]) == ("feat/new", f"{pr}2")
+    assert (shared["num_turns"], shared["result_text"], shared["result_subtype"]) == (
+        9,
+        "new",
+        "success",
+    )
+    assert shared["state"] == "done" and shared["last_seq"] == 4  # 5..9 never came
+    await ws.disconnect()
