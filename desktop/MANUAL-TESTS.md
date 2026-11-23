@@ -109,7 +109,8 @@ Ask the agent to look (`computer_look`) at each; check the screenshot, the refs 
     paused (the tray menu shows "Resume control (paused until …)"), actions are refused.
 34b. Make `settings.json` read-only (or damage it) and start the client: a balloon says it
     started with control off; with the file read-only, the stop key still stops a command at once.
-35. Change the stop key in Settings to `Ctrl+Alt+F9`: the new key works, the old doesn't. Pick a
+35. Change the stop key in Settings → This computer (click the key field, press `Ctrl+Alt+F9`;
+    Esc keeps the old one): the new key works, the old doesn't. Pick a
     key another program has registered: a balloon says so.
 
 ## Shared screen
@@ -169,7 +170,7 @@ Ask the agent to look (`computer_look`) at each; check the screenshot, the refs 
 Needs `C:\anemo-bridge\cc.ps1` and Claude Code on the computer, and an Anemo with the Code page.
 
 51. **Off by default**: a fresh client's Settings window shows "Share Claude Code jobs with
-    Anemo" unticked, with the sentence about what is sent. Start a job with `cc.ps1`: nothing
+    Anemo" switched off (Settings → Claude Code), with the sentence about what is sent. Start a job with `cc.ps1`: nothing
     appears on the Code page; `connection-*.log` has no "code job" line.
 52. **Trusted device, sharing on**: make the device trusted in Settings → Devices, tick the
     box, save (no restart). Within a few seconds the jobs of the last 3 days appear on the Code
@@ -206,8 +207,9 @@ Needs `C:\anemo-bridge\cc.ps1` and Claude Code on the computer, and an Anemo wit
 Needs Claude Code (`claude`) on PATH, `gh` signed in (`gh auth status`), git, and an Anemo
 with the Code page's phase 2.
 
-61. **Off by default**: the Settings window shows "Let Anemo start Claude Code jobs" unticked
-    with the bypassPermissions sentence; it is greyed out while sharing is unticked. In Anemo,
+61. **Off by default**: the Settings window shows "Let Anemo start Claude Code jobs" switched
+    off with the bypassPermissions sentence; it is greyed out while sharing is off, and so are
+    the Projects folder and GitHub owner while it is off. In Anemo,
     the Code page offers no "New job" for this computer; an agent's `code_start` is refused.
 62. **Turn it on** (trusted device, sharing on): tick it, save (no restart). The Code page's
     "New job" lists this computer, its folders in `C:\dev` (with their GitHub remotes) and the
@@ -258,5 +260,9 @@ with the Code page's phase 2.
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a
     **Windows 11 ARM64** machine (Surface Pro X / Snapdragon laptop / ARM VM).
-46. Display scale 100 %, 125 %, 150 %, 200 %: the tray icon, the Settings window and the
-    indicator look right; coordinates land right.
+46. Display scale 100 %, 125 %, 150 %, 200 %: the tray icon, the tray menu, the Settings window
+    and the indicator look right; coordinates land right.
+46a. Switch Windows between light and dark (Settings → Personalisation → Colours): an open
+    Settings window follows at once; the tray menu follows the taskbar the next time it opens;
+    the indicator follows the apps' mode the next time it shows. Windows 10: square corners and
+    a painted red edge on the indicator; Windows 11: rounded corners.

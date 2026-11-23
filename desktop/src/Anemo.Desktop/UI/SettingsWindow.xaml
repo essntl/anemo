@@ -1,0 +1,619 @@
+<Window x:Class="Anemo.Desktop.UI.SettingsWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:Anemo.Desktop.UI"
+        Title="Anemo Desktop settings"
+        Width="900" Height="720" MinWidth="820" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Ground}"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
+        FontSize="13"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+    <!-- The "Native apps v2" design (Figma): a grey ground, white cards at 14, controls at 8,
+         bold titles, plain line icons, colour only as a small accent. Colours come from Palette.cs. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="Title" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style x:Key="RowTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+        <Style x:Key="Help" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Subtle}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="LineHeight" Value="17" />
+        </Style>
+        <Style x:Key="ErrorText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource Error}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+        </Style>
+
+        <!-- A white card with a soft static shadow; the shadow is drawn behind, so text stays sharp. -->
+        <Style x:Key="CardBox" TargetType="ContentControl">
+            <Setter Property="Margin" Value="0,0,0,14" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContentControl">
+                        <Grid>
+                            <Border CornerRadius="14" Background="{DynamicResource Card}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="14" ShadowDepth="3" Direction="270" Color="{DynamicResource ShadowColor}" Opacity="{DynamicResource ShadowOpacity}" RenderingBias="Performance" />
+                                </Border.Effect>
+                            </Border>
+                            <Border CornerRadius="14" Background="{DynamicResource Card}" BorderBrush="{DynamicResource CardEdge}" BorderThickness="1" Padding="20,18">
+                                <ContentPresenter />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="IconTile" TargetType="Border">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource Inset}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+        </Style>
+
+        <Style x:Key="Button" TargetType="Button">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="16,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Background" Value="{DynamicResource Inset}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" CornerRadius="8" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" BorderThickness="2" BorderBrush="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.86" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource Button}">
+            <Setter Property="Background" Value="{DynamicResource Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+        </Style>
+        <Style x:Key="Ghost" TargetType="Button" BasedOn="{StaticResource Button}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="10,0" />
+        </Style>
+        <Style x:Key="Caption" TargetType="Button">
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Inset}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A field: white with a thin edge, a leading icon (ui:Field.Icon) and a placeholder (Tag). -->
+        <Style x:Key="FieldBox" TargetType="TextBox">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource Text}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource Accent}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Edge}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="0,0,12,0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Box" CornerRadius="8" MinHeight="38" Background="{DynamicResource Field}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <DockPanel Margin="12,0,0,0">
+                                <ui:LineIcon DockPanel.Dock="Left" Kind="{Binding (ui:Field.Icon), RelativeSource={RelativeSource TemplatedParent}}" Size="16" Stroke="{DynamicResource Subtle}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <Grid Margin="{TemplateBinding Padding}">
+                                    <TextBlock x:Name="Placeholder" Text="{TemplateBinding Tag}" Foreground="{DynamicResource Subtle}" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False" TextTrimming="CharacterEllipsis" Margin="2,0,0,0" />
+                                    <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False" />
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Box" Property="BorderThickness" Value="1.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SecretField" TargetType="PasswordBox">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource Text}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource Accent}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Edge}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="PasswordBox">
+                        <Border x:Name="Box" CornerRadius="8" MinHeight="38" Background="{DynamicResource Field}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <DockPanel Margin="12,0,0,0">
+                                <ui:LineIcon DockPanel.Dock="Left" Kind="key" Size="16" Stroke="{DynamicResource Subtle}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False" Margin="{TemplateBinding Padding}" />
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Box" Property="BorderThickness" Value="1.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A switch: a pill with a white knob. -->
+        <Style x:Key="Switch" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="Ring" CornerRadius="13" BorderThickness="2" BorderBrush="Transparent" Padding="0">
+                            <Border x:Name="Track" Width="40" Height="22" CornerRadius="11" Background="{DynamicResource SwitchOff}">
+                                <Ellipse x:Name="Knob" Width="16" Height="16" Fill="White" HorizontalAlignment="Left" Margin="3,0">
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect BlurRadius="3" ShadowDepth="1" Direction="270" Opacity="0.25" RenderingBias="Performance" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource AccentSoft}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A sidebar page: icon (Tag) and label; the current one is a raised white pill. -->
+        <Style x:Key="Nav" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid>
+                            <Border x:Name="Shadow" CornerRadius="8" Background="{DynamicResource Raised}" Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Direction="270" Color="{DynamicResource ShadowColor}" Opacity="{DynamicResource NavShadowOpacity}" RenderingBias="Performance" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="Box" CornerRadius="8" Height="38" Padding="10,0" Background="Transparent" BorderThickness="1.5" BorderBrush="Transparent">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <ui:LineIcon x:Name="Icon" Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Size="18" Stroke="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Label" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" Margin="10,0,0,0" FontSize="14" FontWeight="Medium" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Shadow" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Raised}" />
+                                <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Text}" />
+                                <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A slim scroll bar: a rounded thumb, no arrows. -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="MinWidth" Value="10" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Width="6" CornerRadius="3" Margin="0,4" HorizontalAlignment="Center" Background="{DynamicResource ScrollThumb}" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="Divider" TargetType="Rectangle">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Fill" Value="{DynamicResource Hairline}" />
+            <Setter Property="Margin" Value="0,12" />
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="Frame">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <DockPanel Grid.Row="0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="MinimizeButton" Style="{StaticResource Caption}" ToolTip="Minimise">
+                        <ui:LineIcon Kind="minus" Size="16" Stroke="{DynamicResource Muted}" />
+                    </Button>
+                    <Button x:Name="CloseButton" Style="{StaticResource Caption}" ToolTip="Close">
+                        <ui:LineIcon Kind="close" Size="16" Stroke="{DynamicResource Muted}" />
+                    </Button>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                    <ui:LogoTile Size="16" />
+                    <TextBlock Text="Anemo Desktop settings" Margin="10,0,0,0" FontSize="12" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                </StackPanel>
+            </DockPanel>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="236" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Sidebar -->
+                <DockPanel Grid.Column="0" Margin="14,6,10,16">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,18">
+                        <ui:LogoTile x:Name="BrandLogo" Size="36" />
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Anemo Desktop" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource Text}" />
+                            <TextBlock x:Name="VersionText" Text="Version" FontSize="12" Foreground="{DynamicResource Subtle}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <RadioButton x:Name="NavConnection" Style="{StaticResource Nav}" Content="Connection" Tag="link" GroupName="Pages" IsChecked="True" />
+                        <RadioButton x:Name="NavComputer" Style="{StaticResource Nav}" Content="This computer" Tag="monitor" GroupName="Pages" />
+                        <RadioButton x:Name="NavCode" Style="{StaticResource Nav}" Content="Claude Code" Tag="code" GroupName="Pages" />
+                    </StackPanel>
+                    <ContentControl DockPanel.Dock="Bottom" Style="{StaticResource CardBox}" Margin="0" VerticalAlignment="Bottom">
+                        <StackPanel>
+                            <Border x:Name="StatusChip" CornerRadius="8" Padding="8,3,10,4" HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse x:Name="StatusDot" Width="8" Height="8" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="StatusTitle" Margin="6,0,0,0" FontSize="12" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock x:Name="StatusDetail" Margin="0,8,0,0" Style="{StaticResource Help}" Foreground="{DynamicResource Muted}" />
+                            <Button x:Name="StatusLink" Style="{StaticResource Ghost}" HorizontalAlignment="Left" Margin="-10,4,0,-6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="StatusLinkText" Text="Open Anemo" FontSize="12" />
+                                    <ui:LineIcon x:Name="StatusLinkIcon" Kind="external" Size="13" Stroke="{DynamicResource Accent}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </ContentControl>
+                    <Border />
+                </DockPanel>
+
+                <!-- Content and footer -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="64" />
+                    </Grid.RowDefinitions>
+                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Focusable="False">
+                        <StackPanel Margin="14,6,26,10">
+                            <TextBlock x:Name="PageTitle" Style="{StaticResource Title}" Text="Connection" />
+                            <TextBlock x:Name="PageSubtitle" Margin="0,4,0,18" FontSize="13" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+
+                            <!-- Connection -->
+                            <StackPanel x:Name="PageConnection">
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="Anemo" />
+                                        <TextBlock Style="{StaticResource Label}" Text="Anemo address" />
+                                        <TextBox x:Name="AddressBox" Style="{StaticResource FieldBox}" ui:Field.Icon="globe" Tag="https://anemo.example.com" />
+                                        <StackPanel x:Name="AddressError" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                                            <ui:LineIcon Kind="alert" Size="14" Stroke="{DynamicResource Error}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                            <TextBlock x:Name="AddressErrorText" Style="{StaticResource ErrorText}" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="AddressHelp" Style="{StaticResource Help}" Margin="0,6,0,0" Text="The address you open Anemo with." />
+
+                                        <TextBlock Style="{StaticResource Label}" Text="Device token" Margin="0,16,0,6" />
+                                        <Grid>
+                                            <PasswordBox x:Name="TokenBox" Style="{StaticResource SecretField}" Padding="0,0,84,0" />
+                                            <TextBlock x:Name="TokenPlaceholder" Margin="38,0,90,0" VerticalAlignment="Center" Foreground="{DynamicResource Subtle}" IsHitTestVisible="False" TextTrimming="CharacterEllipsis" />
+                                            <Border x:Name="TokenSaved" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" CornerRadius="8" Padding="8,3,10,4" Background="{DynamicResource OkSoft}" IsHitTestVisible="False">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource OkDot}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Saved" Margin="6,0,0,0" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Ok}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                        <StackPanel x:Name="TokenError" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                                            <ui:LineIcon Kind="alert" Size="14" Stroke="{DynamicResource Error}" />
+                                            <TextBlock x:Name="TokenErrorText" Style="{StaticResource ErrorText}" />
+                                        </StackPanel>
+                                        <TextBlock Style="{StaticResource Help}" Margin="0,6,0,0" Text="Make it in Anemo: Settings → Devices → Add a device (kind: computer). It is shown once." />
+                                    </StackPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Border x:Name="ConnTile" Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon x:Name="ConnIcon" Kind="link" Size="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Button x:Name="OpenAnemoButton" DockPanel.Dock="Right" Style="{StaticResource Button}" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:LineIcon Kind="external" Size="16" Stroke="{DynamicResource Text}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Open Anemo" Margin="8,0,0,0" />
+                                                </StackPanel>
+                                            </Button>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock x:Name="ConnTitle" Style="{StaticResource RowTitle}" />
+                                                <TextBlock x:Name="ConnDetail" Style="{StaticResource Help}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <StackPanel x:Name="SetupSteps" Margin="44,12,0,0" Visibility="Collapsed">
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource Inset}" DockPanel.Dock="Left">
+                                                    <TextBlock Text="1" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource Text}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource Text}" Text="In Anemo, open Settings → Devices → Add a device, kind “computer”." />
+                                            </DockPanel>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource Inset}" DockPanel.Dock="Left">
+                                                    <TextBlock Text="2" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource Text}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource Text}" Text="Copy the token it shows (it starts with anemo_)." />
+                                            </DockPanel>
+                                            <DockPanel>
+                                                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource Inset}" DockPanel.Dock="Left">
+                                                    <TextBlock Text="3" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource Text}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource Text}" Text="Paste it above with Anemo’s address, then Save." />
+                                            </DockPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </ContentControl>
+                            </StackPanel>
+
+                            <!-- This computer -->
+                            <StackPanel x:Name="PageComputer" Visibility="Collapsed">
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="PowerShell" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="terminal" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="PowerShellSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Allow PowerShell on this computer" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Allow PowerShell on this computer" />
+                                                <TextBlock Style="{StaticResource Help}" Text="Used only when the device is trusted in Anemo." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock Style="{StaticResource Label}" Text="PowerShell folder" Margin="0,16,0,6" />
+                                        <Grid>
+                                            <TextBox x:Name="WorkFolderBox" Style="{StaticResource FieldBox}" ui:Field.Icon="folder" Padding="0,0,90,0" />
+                                            <Button x:Name="WorkFolderBrowse" Style="{StaticResource Ghost}" Content="Browse…" HorizontalAlignment="Right" Margin="0,0,4,0" />
+                                        </Grid>
+                                        <TextBlock Style="{StaticResource Help}" Margin="0,6,0,0" Text="Where commands start. Empty: the default folder." />
+                                    </StackPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="Keys" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="pause" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <ui:KeyField x:Name="StopKey" DockPanel.Dock="Right" AutomationProperties.Name="Stop key" />
+                                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Stop key" />
+                                                <TextBlock Style="{StaticResource Help}" Text="Stops what the agent is doing and pauses control for an hour." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <Rectangle Style="{StaticResource Divider}" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="share" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <ui:KeyField x:Name="ShareKey" DockPanel.Dock="Right" AutomationProperties.Name="Share key" />
+                                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Share key" />
+                                                <TextBlock Style="{StaticResource Help}" Text="Shares this screen with Anemo’s current chat." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <StackPanel x:Name="KeyError" Orientation="Horizontal" Margin="44,10,0,0" Visibility="Collapsed">
+                                            <ui:LineIcon Kind="alert" Size="14" Stroke="{DynamicResource Error}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                            <TextBlock x:Name="KeyErrorText" Style="{StaticResource ErrorText}" />
+                                        </StackPanel>
+                                        <TextBlock Style="{StaticResource Help}" Margin="44,10,0,0" Text="Click a key field and press the new keys: two or more of Ctrl, Alt, Shift, Win, then a letter, digit or F1–F12. Esc keeps the old ones." />
+                                    </StackPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <DockPanel>
+                                        <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                            <ui:LineIcon Kind="power" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <CheckBox x:Name="StartupSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Start with Windows" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource RowTitle}" Text="Start with Windows" />
+                                            <TextBlock Style="{StaticResource Help}" Text="Anemo Desktop starts in the notification area when you sign in." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </ContentControl>
+                            </StackPanel>
+
+                            <!-- Claude Code -->
+                            <StackPanel x:Name="PageCode" Visibility="Collapsed">
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Border x:Name="ShareJobsTile" Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon x:Name="ShareJobsIcon" Kind="code" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="ShareJobsSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Share Claude Code jobs with Anemo" />
+                                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Share Claude Code jobs with Anemo" />
+                                                <TextBlock Style="{StaticResource Help}" Text="The jobs’ prompts, tool calls and output are sent to Anemo, only while this computer is trusted there." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock Style="{StaticResource Label}" Text="Jobs folder" Margin="0,16,0,6" />
+                                        <Grid>
+                                            <TextBox x:Name="JobsFolderBox" Style="{StaticResource FieldBox}" ui:Field.Icon="folder" Padding="0,0,90,0" />
+                                            <Button x:Name="JobsFolderBrowse" Style="{StaticResource Ghost}" Content="Browse…" HorizontalAlignment="Right" Margin="0,0,4,0" />
+                                        </Grid>
+                                    </StackPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Border x:Name="StartJobsTile" Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon x:Name="StartJobsIcon" Kind="terminal" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="StartJobsSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Let Anemo start Claude Code jobs" />
+                                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Let Anemo start Claude Code jobs" />
+                                                <TextBlock x:Name="StartJobsDetail" Style="{StaticResource Help}" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <Border x:Name="BypassWarning" Margin="0,14,0,0" CornerRadius="10" Padding="14,12" Background="{DynamicResource WarnSoft}">
+                                            <DockPanel>
+                                                <ui:LineIcon Kind="shield" Size="18" Stroke="{DynamicResource Warn}" DockPanel.Dock="Left" VerticalAlignment="Top" Margin="0,0,10,0" />
+                                                <TextBlock TextWrapping="Wrap" FontSize="12" LineHeight="18" Foreground="{DynamicResource Text}" Text="Jobs run with --permission-mode bypassPermissions, so Anemo’s agents can run anything Claude Code can on this computer. Only while sharing is on and this computer is trusted." />
+                                            </DockPanel>
+                                        </Border>
+                                        <Grid x:Name="StartJobsFields" Margin="0,16,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="12" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Style="{StaticResource Label}" Text="Projects folder" />
+                                                <Grid>
+                                                    <TextBox x:Name="ProjectsBox" Style="{StaticResource FieldBox}" ui:Field.Icon="folder" Padding="0,0,84,0" />
+                                                    <Button x:Name="ProjectsBrowse" Style="{StaticResource Ghost}" Content="Browse…" HorizontalAlignment="Right" Margin="0,0,4,0" />
+                                                </Grid>
+                                                <TextBlock Style="{StaticResource Help}" Margin="0,6,0,0" Text="Jobs start in a folder inside it." />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Style="{StaticResource Label}" Text="GitHub owner" />
+                                                <TextBox x:Name="OwnerBox" Style="{StaticResource FieldBox}" ui:Field.Icon="branch" />
+                                                <StackPanel x:Name="OwnerError" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                                                    <ui:LineIcon Kind="alert" Size="14" Stroke="{DynamicResource Error}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                                    <TextBlock x:Name="OwnerErrorText" Style="{StaticResource ErrorText}" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="OwnerHelp" Style="{StaticResource Help}" Margin="0,6,0,0" Text="Whose repositories are listed and cloned. Empty: the account gh is signed in as." />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </ContentControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Footer -->
+                    <Border Grid.Row="1" BorderBrush="{DynamicResource Hairline}" BorderThickness="0,1,0,0" Margin="14,0,0,0">
+                        <DockPanel Margin="0,0,26,0" VerticalAlignment="Center">
+                            <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource Primary}" Content="Save" IsDefault="True" MinWidth="80" />
+                            <Button x:Name="CancelButton" DockPanel.Dock="Right" Style="{StaticResource Button}" Content="Cancel" IsCancel="True" Margin="0,0,10,0" MinWidth="80" />
+                            <StackPanel x:Name="FooterMessage" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                                <ui:LineIcon x:Name="FooterIcon" Kind="alert" Size="16" VerticalAlignment="Center" />
+                                <TextBlock x:Name="FooterText" Margin="8,0,12,0" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -24,10 +24,16 @@ internal sealed class TrayIcons : IDisposable
         }
 
         App = Load("Anemo.ico", SystemInformation.IconSize);
+        using var stream = Resource("Anemo.ico");
+        AppImage = new System.Windows.Media.Imaging.IconBitmapDecoder(
+            stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad).Frames[0];
     }
 
-    /// <summary>The Anemo icon, for the title bar of the app's windows.</summary>
+    /// <summary>The Anemo icon, for WinForms windows and message boxes.</summary>
     public Icon App { get; }
+
+    /// <summary>The Anemo icon for WPF windows (Windows picks the size it needs from the .ico).</summary>
+    public System.Windows.Media.ImageSource AppImage { get; }
 
     public Icon For(TrayIcon icon) => _tray[icon];
 
@@ -43,8 +49,11 @@ internal sealed class TrayIcons : IDisposable
 
     private static Icon Load(string name, Size size)
     {
-        using var stream = typeof(TrayIcons).Assembly.GetManifestResourceStream(name)
-            ?? throw new FileNotFoundException("An icon is missing from the app.", name);
+        using var stream = Resource(name);
         return new Icon(stream, size);
     }
+
+    private static Stream Resource(string name) =>
+        typeof(TrayIcons).Assembly.GetManifestResourceStream(name)
+            ?? throw new FileNotFoundException("An icon is missing from the app.", name);
 }

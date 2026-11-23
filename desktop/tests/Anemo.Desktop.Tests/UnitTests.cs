@@ -447,6 +447,25 @@ public sealed class TrayStatusTests
     }
 
     [Fact]
+    public void The_summary_names_the_state_and_this_computer()
+    {
+        var time = new ManualTime();
+        var control = new ControlState(time, true, null);
+        var device = new Anemo.Desktop.Core.Protocol.DeviceInfo("d1", "Office PC", "computer", "trusted");
+        var connected = new ConnectionStatus(ConnectionPhase.Connected);
+
+        Assert.Equal(new StatusSummary(StatusTone.Ok, "Connected", "“Office PC” in Anemo · trusted"), TrayStatus.Summary(connected, false, control, device));
+        Assert.Equal(StatusTone.Warn, TrayStatus.Summary(new ConnectionStatus(ConnectionPhase.NotConfigured), false, control, null).Tone);
+        Assert.Equal("gone", TrayStatus.Summary(new ConnectionStatus(ConnectionPhase.Refused, "gone"), false, control, null).Detail);
+        Assert.Equal("Agent at work", TrayStatus.Summary(connected, true, control, device).Title);
+
+        control.Stop();
+        var paused = TrayStatus.Summary(connected, false, control, device);
+        Assert.Equal(StatusTone.Warn, paused.Tone);
+        Assert.StartsWith("Until ", paused.Detail);
+    }
+
+    [Fact]
     public void The_tooltip_says_the_state_and_fits()
     {
         var control = new ControlState(new ManualTime(), false, null);
