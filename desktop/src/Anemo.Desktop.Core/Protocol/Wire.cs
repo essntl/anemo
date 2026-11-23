@@ -139,5 +139,6 @@ public static class Wire
         return v.TryGetValue<decimal>(out var m) ? (double)m : null;
     }
 
-    private static string Json(JsonNode node) => node.ToJsonString(Relaxed);
+    /// <summary>Compact JSON as every message is sent.</summary>
+    internal static string Json(JsonNode node) => node.ToJsonString(Relaxed);
 }
