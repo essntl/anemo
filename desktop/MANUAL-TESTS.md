@@ -161,6 +161,43 @@ Ask the agent to look (`computer_look`) at each; check the screenshot, the refs 
 50. In a VM without a GPU (WARP) and over RDP: looks still work (Windows.Graphics.Capture on WARP,
     or the GDI fallback).
 
+## Claude Code jobs (Anemo Desktop 1.1.0, the Code page)
+
+Needs `C:\anemo-bridge\cc.ps1` and Claude Code on the computer, and an Anemo with the Code page.
+
+51. **Off by default**: a fresh client's Settings window shows "Share Claude Code jobs with
+    Anemo" unticked, with the sentence about what is sent. Start a job with `cc.ps1`: nothing
+    appears on the Code page; `connection-*.log` has no "code job" line.
+52. **Trusted device, sharing on**: make the device trusted in Settings → Devices, tick the
+    box, save (no restart). Within a few seconds the jobs of the last 3 days appear on the Code
+    page (older ones don't; none of them notifies). Start a job with `cc.ps1`: it appears as
+    running within ~2 s, its tool calls and todo list fill in live, the branch shows (from
+    `.git\HEAD`, also in a `git worktree` folder); when it ends the state becomes done (or
+    failed) with turns, duration and cost, and one notification arrives.
+53. A job that writes a lot (ask it to read a large file or print 50 000 lines): the page keeps
+    up; big tool results show "trimmed"; `out.jsonl` on the computer is complete and untouched.
+54. **Watched device**: switch the device to watched in Settings → Devices (the client reconnects
+    by itself). Start a job: nothing new on the Code page; the device's offer has `code: false`.
+    Switch back to trusted: the job appears and catches up, without restarting the client.
+55. **Reconnect mid-job**: start a long job (`cc.ps1` with "count slowly to 200, one Bash
+    `Start-Sleep 1` per number"), then pull the network (or restart Anemo's containers) for a
+    minute. When it is back, the job goes on where it stopped: no missing and no doubled tool
+    calls. Quit and start the client during a job: same.
+56. **The job ends while the client is closed**: quit the client, let a job finish, start the
+    client: the job shows done with all its events; the notification arrives once.
+57. **Cancelled / crashed**: create `cancelled` in a running job's folder and end its `cmd.exe`
+    in Task Manager: the state becomes cancelled (no notification). End another job's `cmd.exe`
+    without the marker: "exited without result", with the end of `err.txt`, and a notification.
+58. **Sharing off**: untick the box and save: running jobs stop updating on the page within
+    seconds, no reconnect; stored jobs stay. Tick it again: jobs of the last 3 days are sent
+    again, already-finished ones are not sent twice.
+59. **A changed jobs folder**: set "Jobs folder" to another folder with a copied job: it appears
+    without a restart.
+60. `%APPDATA%\Anemo Desktop\code-jobs.json`: per job only `acked_seq`, `acked_offset`,
+    `sent_state`, `settled` (no prompt, no output). Damage the file (type garbage into it) and
+    restart: the client starts, jobs carry on from Anemo's acks, nothing is lost or doubled.
+    `connection-*.log` has only "code job discovered/ended: <id>" lines, no prompts or output.
+
 ## Platforms
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a

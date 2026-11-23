@@ -32,4 +32,13 @@ public sealed record DesktopSettings
 
     /// <summary>A shortcut in the user's Startup folder.</summary>
     public bool StartWithWindows { get; init; } = true;
+
+    /// <summary>
+    /// "Share Claude Code jobs with Anemo": the jobs' prompts, tool calls and output go to
+    /// Anemo while the device is trusted there (code-sessions.md D4). Off by default.
+    /// </summary>
+    public bool ShareCodeJobs { get; init; }
+
+    /// <summary>The Claude Code jobs folder; null means <c>C:\anemo-bridge\jobs</c>.</summary>
+    public string? CodeJobsFolder { get; init; }
 }

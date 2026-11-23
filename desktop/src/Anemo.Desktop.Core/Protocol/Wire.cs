@@ -44,11 +44,13 @@ public static class Wire
 
     public static string Ping() => Json(new JsonObject { ["type"] = "ping" });
 
-    public static string Offer(bool control, bool shell) => Json(new JsonObject
+    /// <summary>The offer; <paramref name="code"/>: Claude Code jobs are shared (device-contracts.md §7).</summary>
+    public static string Offer(bool control, bool shell, bool code) => Json(new JsonObject
     {
         ["type"] = "device.offer",
         ["control"] = control,
         ["shell"] = shell,
+        ["code"] = code,
     });
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });
@@ -139,5 +141,6 @@ public static class Wire
         return v.TryGetValue<decimal>(out var m) ? (double)m : null;
     }
 
-    private static string Json(JsonNode node) => node.ToJsonString(Relaxed);
+    /// <summary>Compact JSON as every message is sent.</summary>
+    internal static string Json(JsonNode node) => node.ToJsonString(Relaxed);
 }
