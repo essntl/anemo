@@ -1,6 +1,7 @@
 """Live event streams (Redis Streams) and run control signals (Redis pub/sub).
 
   run:{run_id}     every event of one run, replayable from any id (SSE Last-Event-ID)
+  code:{job_id}    the new events of one Claude Code job (features/code_sessions)
   events:global    app-wide notices (run status changes, titles, ...) for all tabs
   run:{id}:control pub/sub channel carrying "cancel" to the worker executing the run
 
@@ -72,6 +73,29 @@ async def publish_run_event(run_id: uuid.UUID, event_type: str, data: Mapping[st
         _warn_unavailable("a run event was not published")
         return ""
     return event_id
+
+
+async def publish_stream(
+    key: str, event_type: str, data: Mapping[str, Any], *, maxlen: int, ttl_s: int
+) -> str:
+    """Add an event to a stream of its own (kept `maxlen` entries, `ttl_s` after the last
+    one). Returns its id, or "" when Redis is unavailable (the event is dropped)."""
+    redis = get_redis()
+    try:
+        event_id = cast(
+            str, await redis.xadd(key, _encode(event_type, data), maxlen=maxlen, approximate=True)
+        )
+        await redis.expire(key, ttl_s)
+    except (RedisError, OSError):
+        _warn_unavailable("an event was not published")
+        return ""
+    return event_id
+
+
+async def latest_id(key: str) -> str | None:
+    """The id of the newest event in a stream, None when it is empty or gone."""
+    entries = await get_redis().xrevrange(key, count=1)
+    return cast(str, entries[0][0]) if entries else None
 
 
 async def publish_global(event_type: str, data: Mapping[str, Any]) -> None:

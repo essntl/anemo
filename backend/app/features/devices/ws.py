@@ -10,10 +10,12 @@ The protocol is docs/device-contracts.md §2 (and §6 for versions). In short:
   client → {"type": "ping"}  ← {"type": "pong"}
   server → {"type": "event", "id", "event", "data"}   phones only: events of runs this
            phone started (features/devices/phone_events.py)
-  client → {"type": "device.offer", "control", "shell"}   computers, every 30 s
+  client → {"type": "device.offer", "control", "shell", "code"}   computers, every 30 s
   server → {"type": "device.command", "id", "action", …}   from features/devices/relay.py
   client → {"type": "device.result", "id", "ok", "state" | "error", "code"}
   client → {"type": "device.stopped"}
+  client → {"type": "code.job" | "code.events", …}  ← {"type": "code.ack", "job_id", "seq"}
+           trusted computers only (§7): handled by features/code_sessions/ingest.py
 
 Closes: 4400 bad first message (or none, or the wrong kind), 4401 bad or revoked token
 (checked again every minute; deleting the device closes it at once), 4403 an Origin
@@ -37,6 +39,7 @@ from app.core.db import get_sessionmaker
 from app.core.errors import Unauthorized
 from app.events import bus
 from app.features.auth import tokens
+from app.features.code_sessions import ingest as code_ingest
 from app.features.devices import relay, service
 from app.features.devices.models import Device
 from app.features.devices.phone_events import PhoneFilter
@@ -49,6 +52,9 @@ HELLO_TIMEOUT_S = 10
 RECHECK_S = 60
 BLOCK_MS = 15_000
 MAX_MESSAGE = 4096
+# Claude Code jobs (§7): a job's announcement, and a batch of up to 200 of its events.
+MAX_CODE_JOB = 64_000
+MAX_CODE_EVENTS = 300_000
 # A result carries a screenshot (base64 PNG) and up to 40 000 characters of text.
 MAX_RESULT = 12 * 1024 * 1024
 
@@ -145,6 +151,10 @@ class Connection:
         self.ws = ws
         self.device_id = device.id
         self.kind = device.kind
+        # Claude Code jobs come only from trusted computers (§7); others' are ignored. A
+        # trust change closes the connection (1012), so the level at connect is current.
+        self.takes_code = device.kind == "computer" and device.trust == "trusted"
+        self.sent_code = False  # it sent code frames (its jobs go offline when it closes)
         self.raw = raw
         self.ip = ip
         self.conn = uuid.uuid4().hex
@@ -170,19 +180,34 @@ class Connection:
                             {"type": "event", "id": event_id, "event": event_type, "data": wire}
                         )
 
+    def _limit(self, head: str) -> int:
+        """The most characters a message starting with `head` may have."""
+        if '"device.result"' in head:
+            return self.result_limit
+        if self.takes_code and '"code.events"' in head:
+            return MAX_CODE_EVENTS
+        if self.takes_code and '"code.job"' in head:
+            return MAX_CODE_JOB
+        return MAX_MESSAGE
+
     async def listen(self) -> None:
         while True:
             text = await self.ws.receive_text()
-            is_result = '"device.result"' in text[:200]
-            if len(text) > (self.result_limit if is_result else MAX_MESSAGE):
-                if is_result:
+            limit = self._limit(text[:200])
+            if len(text) > limit:
+                if limit == self.result_limit and '"device.result"' in text[:200]:
                     await self._too_large(text)
                 continue
             try:
                 message: dict[str, Any] = json.loads(text)
-            except ValueError:
+            except (ValueError, RecursionError):
                 continue
             if not isinstance(message, dict):
+                continue
+            kind = message.get("type")
+            if len(text) > MAX_MESSAGE and kind not in ("device.result", "code.job", "code.events"):
+                continue  # the big limits are for those types only
+            if kind == "code.job" and len(text) > MAX_CODE_JOB:
                 continue
             await self._handle(message)
 
@@ -207,10 +232,19 @@ class Connection:
             await self.ws.send_json({"type": "pong"})
         elif kind == "device.offer" and self.kind == "computer":
             offer = relay.Offer(
-                control=bool(message.get("control")), shell=bool(message.get("shell"))
+                control=bool(message.get("control")),
+                shell=bool(message.get("shell")),
+                code=bool(message.get("code")),  # older clients don't send it
             )
             if not await relay.renew(self.device_id, self.conn, offer):
                 raise _Closed(CLOSE_REPLACED, "replaced by a newer connection")
+        elif kind in ("code.job", "code.events"):
+            if not self.takes_code:
+                return  # a phone, or a computer that isn't trusted: nothing stored, no ack
+            self.sent_code = True
+            answer = await code_ingest.handle(self.device_id, message)
+            if answer is not None:
+                await self.ws.send_json(answer)
         elif kind == "device.stopped":
             await relay.stopped(self.device_id, self.conn)
         elif kind == "device.result":
@@ -393,4 +427,6 @@ async def device_socket(ws: WebSocket) -> None:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await relay.disconnect(device.id, connection.conn)
+        if connection.sent_code and device.id not in await relay.connected([device.id]):
+            await code_ingest.device_offline(device.id)
         log.info("device disconnected", extra={"ctx": {"device_id": str(device.id), "ip": ip}})

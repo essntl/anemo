@@ -129,6 +129,7 @@ PageId = Literal[
     "focus",
     "music",
     "runs",
+    "code",
     "automations",
     "agents",
     "memory",
@@ -148,7 +149,16 @@ class NavigationSettings(BaseModel):
         max_length=20,
     )
     more: list[PageId] = Field(
-        default=["projects", "focus", "music", "runs", "automations", "agents", "memory"],
+        default=[
+            "projects",
+            "focus",
+            "music",
+            "runs",
+            "code",
+            "automations",
+            "agents",
+            "memory",
+        ],
         max_length=20,
     )
     off: list[PageId] = Field(default_factory=list, max_length=20)
@@ -268,6 +278,13 @@ class VoiceSettings(BaseModel):
     chat: Literal["daily", "single"] = "daily"
 
 
+class CodeSettings(BaseModel):
+    """The Code page: Claude Code jobs that computers share (features/code_sessions)."""
+
+    # Jobs started longer ago than this are deleted, with their events.
+    keep_days: int = Field(30, ge=1, le=365)
+
+
 @dataclass(frozen=True)
 class SectionSpec:
     model: type[BaseModel]
@@ -293,4 +310,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "properties": SectionSpec(PropertySettings),
     "dictation": SectionSpec(DictationSettings),
     "voice": SectionSpec(VoiceSettings),
+    "code": SectionSpec(CodeSettings),
 }
