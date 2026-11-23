@@ -1,36 +1,37 @@
 package app.anemo.voice.ui
 
-import android.app.Activity
-import android.graphics.Typeface
 import android.os.Bundle
-import android.widget.ScrollView
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import app.anemo.voice.BuildConfig
+import app.anemo.voice.ui.theme.AnemoTheme
 
 /** About Anemo Voice, and the licences of the software inside it (from assets/licenses/). */
-class AboutActivity : Activity() {
+class AboutActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val text = TextView(this).apply {
-            typeface = Typeface.MONOSPACE
-            textSize = 11f
-            setTextIsSelectable(true)
+        enableEdgeToEdge()
+        setContent {
+            AnemoTheme {
+                var which by rememberSaveable { mutableIntStateOf(0) }
+                val asset = if (which == 0) NOTICES else ORT_NOTICES
+                val text = remember(asset) { read(asset) }
+                AboutScreen(
+                    version = BuildConfig.VERSION_NAME,
+                    which = which,
+                    fileName = asset.substringAfterLast('/'),
+                    text = text,
+                    onWhich = { which = it },
+                    onBack = ::finish,
+                )
+            }
         }
-        val content = column().apply {
-            addView(heading("Anemo Voice ${BuildConfig.VERSION_NAME}"))
-            addView(label("Talk to your Anemo from this phone. Part of Anemo, GNU GPL v2."))
-            addView(row(
-                button("Licences") { text.text = read(NOTICES) },
-                button("ONNX Runtime notices") { text.text = read(ORT_NOTICES) },
-            ))
-            addView(text)
-        }
-        text.text = read(NOTICES)
-        setContentView(ScrollView(this).apply {
-            addView(content)
-            clipToPadding = false
-            padForSystemBars()
-        })
     }
 
     private fun read(asset: String): String = assets.open(asset).bufferedReader().use { it.readText() }

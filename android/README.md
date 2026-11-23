@@ -89,7 +89,7 @@ Locally, `./gradlew assembleRelease` with `ANEMO_VOICE_KEYSTORE` (the keystore's
 2. In Anemo, **Settings → Devices**: make a phone device and copy its token (shown once).
 3. In the app, **Settings**: Anemo's address (the https address you open Anemo with,
    through Nginx Proxy Manager with *Websockets Support* on) and the token. Choose a wake
-   word and tap **Download the wake word models**. Save.
+   word and tap **Download** next to its models. Save.
 4. **Start listening**, allow the microphone and notifications. The notification
    "Anemo is listening for ‹wake word›" stays while it listens; a quick-settings tile
    (edit your quick settings to add "Anemo Voice") switches it on and off.
@@ -122,7 +122,9 @@ app/src/main/java/app/anemo/voice/
   settings/  VoiceSettings, the store (token in EncryptedSharedPreferences), Readiness
   service/   ListenService (foreground, microphone), its notification, the tile,
              VoiceRuntime (wires the platform to the core)
-  ui/        MainActivity (status, history), SettingsActivity, AboutActivity (licences)
+  ui/        Jetpack Compose + Material 3: MainActivity (status, history), SettingsActivity,
+             AboutActivity (licences), one *Screen.kt per screen, Components.kt, the pure
+             screen logic (ListenCard, SettingsForm, HistoryText); ui/theme/ the tokens and icons
 ```
 
 ## What it never does
@@ -161,7 +163,7 @@ app/src/main/java/app/anemo/voice/
 
 openWakeWord's pre-trained models are CC BY-NC-SA 4.0 (non-commercial), which can't be
 shipped inside a GPL-2.0 program, so the APK doesn't contain them. The app downloads
-them from openWakeWord's own release when the user taps **Download the wake word models**
+them from openWakeWord's own release when the user taps **Download** next to the models
 (Settings), into its private storage (`files/models/`), and refuses any file whose
 sha256 isn't the one pinned in `ml/ModelFiles.kt`. A custom word ("Hey Anemo"), trained
 with openWakeWord's notebook, is imported as a `.onnx` file with **Import your own word**;
@@ -169,7 +171,7 @@ the import opens it and checks its shapes (N embeddings of 96 in, one score out)
 still uses the downloaded melspectrogram and embedding models.
 
 The APK carries the notices of everything it includes in
-`app/src/main/assets/licenses/` (shown under **About and licences** in the app).
+`app/src/main/assets/licenses/` (shown under **About** (the ⓘ button) in the app).
 
 Silero VAD's licence:
 
