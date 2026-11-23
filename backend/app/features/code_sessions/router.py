@@ -25,12 +25,17 @@ from app.api.deps import Db
 from app.api.sse import comment, frame, sse_response
 from app.core.db import get_sessionmaker
 from app.events import bus
-from app.features.code_sessions import service
+from app.features.code_sessions import control, service
 from app.features.code_sessions.models import State
 from app.features.code_sessions.schemas import (
+    CodeDeviceOut,
     CodeEventsOut,
+    CodeFollowUpIn,
     CodeJobDetailOut,
+    CodeJobIn,
     CodeJobListOut,
+    CodeJobOut,
+    CodeProjectsOut,
 )
 
 router = APIRouter(prefix="/code", tags=["code"])
@@ -137,3 +142,47 @@ async def job_stream(
     if last_event_id is not None and not _STREAM_ID.match(last_event_id):
         last_event_id = None  # not one of ours: from now on
     return await sse_response(db, stream_frames(job_id, request, last_event_id))
+
+
+# -- phase 2: computers, starting, following up, cancelling ------------------------------------
+
+
+@router.get("/devices", response_model=list[CodeDeviceOut])
+async def code_devices(db: Db) -> list[CodeDeviceOut]:
+    """The trusted computers: online, sharing jobs (`share`), letting Anemo start them
+    (`start`)."""
+    return await control.devices(db)
+
+
+@router.get("/devices/{device_id}/projects", response_model=CodeProjectsOut)
+async def code_projects(device_id: uuid.UUID, db: Db) -> CodeProjectsOut:
+    """The computer's projects, and its owner's GitHub repositories not cloned there."""
+    return await control.projects(db, device_id)
+
+
+@router.post("/jobs", response_model=CodeJobOut, status_code=201)
+async def start_job(body: CodeJobIn, db: Db) -> CodeJobOut:
+    """Start a job on a computer (it may clone the project first: up to 11 minutes)."""
+    return await control.start_job(
+        db,
+        device_id=body.device_id,
+        project=body.project,
+        prompt=body.prompt,
+        new=body.new,
+        model=body.model,
+        max_turns=body.max_turns,
+    )
+
+
+@router.post("/jobs/{job_id}/follow-up", response_model=CodeJobOut, status_code=201)
+async def follow_up(job_id: uuid.UUID, body: CodeFollowUpIn, db: Db) -> CodeJobOut:
+    """Resume the session of the thread's last job (it must have ended): the new job."""
+    return await control.follow_up(
+        db, job_id, prompt=body.prompt, model=body.model, max_turns=body.max_turns
+    )
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=CodeJobOut)
+async def cancel_job(job_id: uuid.UUID, db: Db) -> CodeJobOut:
+    """Cancel a running job; one that has ended is returned as it is."""
+    return await control.cancel_job(db, job_id)

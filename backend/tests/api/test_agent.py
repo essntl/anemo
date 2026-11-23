@@ -135,6 +135,12 @@ async def test_agent_uses_tools_and_plan(authed):
             "video_transcript",
             "http_request",
             "browser_current_tab",  # the tab the user shared (needs no browser container)
+            # Claude Code jobs: offered while the Code page is on (they say when no
+            # computer can take one).
+            "code_projects",
+            "code_start",
+            "code_status",
+            "code_cancel",
             "list_tasks",
             "get_task",
             "create_task",

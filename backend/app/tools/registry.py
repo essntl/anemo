@@ -12,6 +12,7 @@ from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.ask import AskUser
 from app.tools.builtin.automation import AUTOMATION_TOOLS, STATE_ALIASES
 from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
+from app.tools.builtin.code import CODE_TOOL_NAMES, CODE_TOOLS
 from app.tools.builtin.computer import COMPUTER_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
@@ -59,6 +60,7 @@ BUILTIN_TOOLS: list[Tool] = [
     *BROWSER_TOOLS,
     BrowserCurrentTab(),
     *COMPUTER_TOOLS,
+    *CODE_TOOLS,
     *TASK_TOOLS,
     *PROJECT_TOOLS,
     *EVENT_TOOLS,
@@ -83,6 +85,7 @@ FEATURE_TOOLS: dict[str, frozenset[str]] = {
     "focus": frozenset(t.name for t in FOCUS_TOOLS) - MUSIC_TOOL_NAMES,
     "music": MUSIC_TOOL_NAMES,
     "automations": frozenset(t.name for t in SCHEDULE_TOOLS),
+    "code": CODE_TOOL_NAMES,
 }
 
 

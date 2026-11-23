@@ -456,7 +456,7 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
 # -- after the change ------------------------------------------------------------------------
 
 
-def _duration(ms: int) -> str:
+def duration_text(ms: int) -> str:
     seconds = ms // 1000
     if seconds < 60:
         return f"{seconds} s"
@@ -477,7 +477,7 @@ def notification_text(job: CodeJob) -> tuple[str, str, str]:
     if job.num_turns is not None:
         parts.append(f"{job.num_turns} turn" + ("" if job.num_turns == 1 else "s"))
     if job.duration_ms is not None:
-        parts.append(_duration(job.duration_ms))
+        parts.append(duration_text(job.duration_ms))
     if job.cost_usd is not None:
         parts.append(f"API-equivalent cost ${job.cost_usd:.2f}")
     return title, " · ".join(parts), level
@@ -506,6 +506,8 @@ async def _finish(db: AsyncSession, job: CodeJob) -> None:
 
 async def _publish(db: AsyncSession, job: CodeJob, changes: _Changes) -> None:
     devices = await service.devices_out(db, [job.device_id], online={job.device_id})
+    titles = await service.conversation_titles(db, [job.conversation_id])
+    title = titles.get(job.conversation_id) if job.conversation_id else None
     device = devices.get(job.device_id)
     if device is None:
         return  # the device was deleted meanwhile
@@ -524,7 +526,7 @@ async def _publish(db: AsyncSession, job: CodeJob, changes: _Changes) -> None:
     await bus.publish_stream(
         key,
         "code.job",
-        {"job": service.job_out(job, device).model_dump(mode="json")},
+        {"job": service.job_out(job, device, title).model_dump(mode="json")},
         maxlen=service.STREAM_MAXLEN,
         ttl_s=service.STREAM_TTL_S,
     )
@@ -597,3 +599,79 @@ async def device_offline(device_id: uuid.UUID) -> None:
     """The computer's connection closed (after it sent code frames): lists show it
     offline."""
     await bus.publish_global("code.job", {"device_id": str(device_id), "online": False})
+
+
+# -- what Anemo started or cancelled (phase 2, control.py) ---------------------------------------
+
+
+@dataclass
+class Started:
+    """A job a computer just started on Anemo's command (its `code_start` answer)."""
+
+    job_key: str
+    dir: str
+    project: str
+    prompt: str
+    resume_session: str | None
+    model: str | None
+    conversation_id: uuid.UUID | None
+    run_id: uuid.UUID | None
+
+
+async def started(device_id: uuid.UUID, start: Started) -> CodeJob:
+    """Make (or complete) the job's row at once, running and seen running, before the
+    client's own code.job fills in the rest. Commits and publishes, as ingestion does."""
+    async with get_sessionmaker()() as db:
+        job = await _locked(db, device_id, start.job_key)
+        changes = _Changes(old_state=job.state if job is not None else None)
+        if job is None:
+            new_id = uuid7()
+            await db.execute(
+                pg_insert(CodeJob)
+                .values(
+                    id=new_id,
+                    device_id=device_id,
+                    job_key=start.job_key,
+                    job_dir="",  # the client's code.job says
+                    project=start.project[:200],
+                    dir=start.dir[:1000],
+                    title=_title(start.prompt, start.job_key),
+                    prompt=start.prompt[:20_000],
+                    state="running",
+                    seen_running=True,
+                    started_at=datetime.now(UTC),
+                    resume_session=start.resume_session,
+                    model=start.model,
+                    thread_id=new_id,
+                    todos=[],
+                )
+                .on_conflict_do_nothing(index_elements=["device_id", "job_key"])
+            )
+            job = await _locked(db, device_id, start.job_key)
+            if job is None:
+                raise RuntimeError("the job row just made is gone")
+        # The client's code.job may have come first (its scan found the folder before
+        # this answer arrived): it keeps what it said; the starter is added.
+        if job.state == "running":
+            job.seen_running = True
+        job.conversation_id = job.conversation_id or start.conversation_id
+        job.run_id = job.run_id or start.run_id
+        changes.thread_changed = await _join_parent(db, job)
+        await _finish(db, job)
+        await _publish(db, job, changes)
+        return job
+
+
+async def answered_state(job_id: uuid.UUID, state: State) -> CodeJob | None:
+    """The state a computer answered a `code_cancel` with, by the same rules as its
+    code.job (cancelled always wins; other ends don't replace an end already stored)."""
+    async with get_sessionmaker()() as db:
+        job = await db.scalar(select(CodeJob).where(CodeJob.id == job_id).with_for_update())
+        if job is None:
+            return None
+        changes = _Changes(old_state=job.state)
+        _client_state(job, state, None)
+        await _finish(db, job)
+        if job.state != changes.old_state:
+            await _publish(db, job, changes)
+        return job

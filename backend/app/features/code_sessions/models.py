@@ -43,6 +43,8 @@ class CodeJob(Base, IdMixin, TimestampMixin):
         Index("ix_code_jobs_thread_id", "thread_id"),
         Index("ix_code_jobs_device_id_session_id", "device_id", "session_id"),
         Index("ix_code_jobs_project", "project"),
+        Index("ix_code_jobs_conversation_id", "conversation_id"),
+        Index("ix_code_jobs_run_id", "run_id"),
     )
 
     device_id: Mapped[uuid.UUID] = mapped_column(
@@ -94,6 +96,14 @@ class CodeJob(Base, IdMixin, TimestampMixin):
     stored_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Some events were trimmed or not stored.
     truncated: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # The chat and run of the agent tool that started the job (phase 2); set only when it
+    # is started, never by what the computer reports.
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL")
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("runs.id", ondelete="SET NULL")
+    )
 
 
 EventKind = Literal["system", "assistant", "user", "result", "raw", "other"]

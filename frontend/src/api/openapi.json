@@ -14669,6 +14669,64 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Start Job",
+        "description": "Start a job on a computer (it may clone the project first: up to 11 minutes).",
+        "operationId": "start_job_api_code_jobs_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeJobIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeJobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/code/jobs/{job_id}": {
@@ -14870,6 +14928,250 @@
         "responses": {
           "200": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/devices": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Code Devices",
+        "description": "The trusted computers: online, sharing jobs (`share`), letting Anemo start them\n(`start`).",
+        "operationId": "code_devices_api_code_devices_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CodeDeviceOut"
+                  },
+                  "title": "Response Code Devices Api Code Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/devices/{device_id}/projects": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Code Projects",
+        "description": "The computer's projects, and its owner's GitHub repositories not cloned there.",
+        "operationId": "code_projects_api_code_devices__device_id__projects_get",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeProjectsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/jobs/{job_id}/follow-up": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Follow Up",
+        "description": "Resume the session of the thread's last job (it must have ended): the new job.",
+        "operationId": "follow_up_api_code_jobs__job_id__follow_up_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeFollowUpIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeJobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/jobs/{job_id}/cancel": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Cancel Job",
+        "description": "Cancel a running job; one that has ended is returned as it is.",
+        "operationId": "cancel_job_api_code_jobs__job_id__cancel_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeJobOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -21652,6 +21954,16 @@
               }
             ],
             "title": "Last Seen At"
+          },
+          "share": {
+            "type": "boolean",
+            "title": "Share",
+            "default": false
+          },
+          "start": {
+            "type": "boolean",
+            "title": "Start",
+            "default": false
           }
         },
         "type": "object",
@@ -21737,6 +22049,46 @@
         ],
         "title": "CodeEventsOut"
       },
+      "CodeFollowUpIn": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._\\[\\]-]{1,100}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "max_turns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Turns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "CodeFollowUpIn"
+      },
       "CodeJobDetailOut": {
         "properties": {
           "job": {
@@ -21756,6 +22108,65 @@
           "thread"
         ],
         "title": "CodeJobDetailOut"
+      },
+      "CodeJobIn": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "project": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,100}$",
+            "title": "Project",
+            "description": "A folder name in the projects folder"
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "new": {
+            "type": "boolean",
+            "title": "New",
+            "description": "Make an empty project when there is none",
+            "default": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._\\[\\]-]{1,100}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "max_turns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Turns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "project",
+          "prompt"
+        ],
+        "title": "CodeJobIn"
       },
       "CodeJobListOut": {
         "properties": {
@@ -22008,6 +22419,41 @@
           "truncated": {
             "type": "boolean",
             "title": "Truncated"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "conversation_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Title"
           }
         },
         "type": "object",
@@ -22043,6 +22489,90 @@
           "truncated"
         ],
         "title": "CodeJobOut"
+      },
+      "CodeProjectOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "dir": {
+            "type": "string",
+            "title": "Dir"
+          },
+          "remote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "dir",
+          "remote"
+        ],
+        "title": "CodeProjectOut"
+      },
+      "CodeProjectsOut": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/CodeProjectOut"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "remote": {
+            "items": {
+              "$ref": "#/components/schemas/CodeRemoteOut"
+            },
+            "type": "array",
+            "title": "Remote"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "projects",
+          "remote",
+          "note"
+        ],
+        "title": "CodeProjectsOut"
+      },
+      "CodeRemoteOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url"
+        ],
+        "title": "CodeRemoteOut"
       },
       "CodeSettings": {
         "properties": {
