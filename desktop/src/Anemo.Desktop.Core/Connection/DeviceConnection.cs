@@ -363,7 +363,8 @@ public sealed class DeviceConnection
             try
             {
                 var code = Device is { } device && _owner._codeJobs?.Offered(device) == true;
-                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code));
+                var codeStart = Device is { } d && _owner._codeJobs?.OfferedStart(d) == true;
+                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart));
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
             {

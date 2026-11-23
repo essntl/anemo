@@ -41,6 +41,19 @@ public sealed class SharingTests : IDisposable
         Assert.False(sharing.Offered(Trusted));
     }
 
+    [Theory]
+    [InlineData(true, true, "trusted", true)]
+    [InlineData(true, true, "watched", false)]
+    [InlineData(false, true, "trusted", false)] // starting only counts while sharing is on
+    [InlineData(true, false, "trusted", false)]
+    public void The_offer_says_code_start_only_when_starting_and_sharing_are_on_and_the_device_is_trusted(
+        bool share, bool start, string trust, bool offered)
+    {
+        _settings = _settings with { ShareCodeJobs = share, StartCodeJobs = start };
+
+        Assert.Equal(offered, Create().OfferedStart(new DeviceInfo("dev-1", "Desk PC", "computer", trust)));
+    }
+
     [Fact]
     public async Task Nothing_is_sent_while_sharing_is_off()
     {

@@ -41,4 +41,17 @@ public sealed record DesktopSettings
 
     /// <summary>The Claude Code jobs folder; null means <c>C:\anemo-bridge\jobs</c>.</summary>
     public string? CodeJobsFolder { get; init; }
+
+    /// <summary>
+    /// "Let Anemo start Claude Code jobs" (code-sessions.md D14, §12.1): <c>code_start</c> and
+    /// <c>code_cancel</c>. The jobs run with <c>--permission-mode bypassPermissions</c>. Only
+    /// counts while <see cref="ShareCodeJobs"/> is on (a job Anemo starts must be visible to it).
+    /// </summary>
+    public bool StartCodeJobs { get; init; }
+
+    /// <summary>Where the projects are; null means <c>C:\dev</c>.</summary>
+    public string? CodeProjectsFolder { get; init; }
+
+    /// <summary>Whose GitHub repositories are listed and cloned; null means <c>essntl</c>.</summary>
+    public string? GitHubOwner { get; init; }
 }
