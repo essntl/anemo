@@ -66,6 +66,23 @@ class JobIn(BaseModel):
     branch: str | None = Field(None, max_length=255)
     stderr_tail: str | None = Field(None, max_length=4000)
 
+    @field_validator(
+        "device_job_dir",
+        "project",
+        "dir",
+        "prompt",
+        "resume_session",
+        "model",
+        "branch",
+        "stderr_tail",
+        mode="before",
+    )
+    @classmethod
+    def storable(cls, value: Any) -> Any:
+        """Postgres takes no NUL character in text, and pydantic no lone surrogate: either
+        would fail the frame, and the client would resend the job forever."""
+        return trim.clean_text(value) if isinstance(value, str) else value
+
     @field_validator("started", "ended")
     @classmethod
     def with_offset(cls, value: datetime | None) -> datetime | None:
@@ -85,6 +102,12 @@ class EventItem(BaseModel):
     seq: int = Field(ge=1, le=MAX_SEQ)
     event: dict[str, Any]
     trimmed: bool = False
+
+    @field_validator("event", mode="before")
+    @classmethod
+    def storable(cls, value: Any) -> Any:
+        """Cleaned before it is validated: a lone surrogate would fail the frame."""
+        return trim.clean(value) if isinstance(value, dict) else value
 
 
 class EventsFrame(BaseModel):

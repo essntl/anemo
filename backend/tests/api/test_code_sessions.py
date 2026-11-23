@@ -639,3 +639,18 @@ async def test_a_trust_change_needs_a_new_connection(authed):
     assert welcome["device"]["trust"] == "trusted"
     assert await announce(ws) == 0
     await ws.disconnect()
+
+
+async def test_unstorable_characters_in_a_job_are_replaced(authed):
+    # Postgres takes no NUL in text: uncleaned, the insert fails and nothing is acked.
+    _, ws = await computer(authed)
+    fields = {"prompt": "Fix\x00 it", "stderr_tail": "bad\x00", "branch": "b\ud800"}
+    assert await announce(ws, **fields) == 0
+    shared = await only_job(authed)
+    assert shared["prompt"] == "Fix� it" and shared["title"] == "Fix� it"
+    assert shared["stderr_tail"] == "bad�" and shared["branch"] == "b�"
+    # The same in an event, keys included.
+    assert await send(ws, (1, {"type": "raw", "text": "x\ud800\x00", "k\ud800": 1})) == 1
+    events = (await authed.get(f"/api/code/jobs/{shared['id']}/events")).json()["events"]
+    assert events[0]["event"] == {"type": "raw", "text": "x��", "k�": 1}
+    await ws.disconnect()

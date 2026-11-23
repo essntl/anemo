@@ -42,7 +42,7 @@ def size(value: Any) -> int:
 _UNSTORABLE = re.compile("[\x00\ud800-\udfff]")  # json.loads joins valid pairs already
 
 
-def _clean_text(text: str) -> str:
+def clean_text(text: str) -> str:
     return _UNSTORABLE.sub("�", text)
 
 
@@ -50,11 +50,11 @@ def clean(value: Any, depth: int = 0) -> Any:
     """A copy of `value` that Postgres can store as jsonb: NUL characters and lone
     surrogates replaced, nesting deeper than MAX_DEPTH replaced by a short text."""
     if isinstance(value, str):
-        return _clean_text(value)
+        return clean_text(value)
     if isinstance(value, dict):
         if depth >= MAX_DEPTH:
             return TOO_DEEP
-        return {_clean_text(str(k)): clean(v, depth + 1) for k, v in value.items()}
+        return {clean_text(str(k)): clean(v, depth + 1) for k, v in value.items()}
     if isinstance(value, list):
         if depth >= MAX_DEPTH:
             return TOO_DEEP
