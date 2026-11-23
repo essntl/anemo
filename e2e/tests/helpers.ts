@@ -98,6 +98,9 @@ export async function confirmWith(page: Page, label: string) {
 
 export async function send(page: Page, text: string) {
   await page.getByPlaceholder('Message the assistant…').fill(text)
+  // Enter sends only when the box can send: not while the last answer is still running
+  // (its text can be on the page before the run has ended), nor while a file uploads.
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled()
   await page.keyboard.press('Enter')
 }
 
