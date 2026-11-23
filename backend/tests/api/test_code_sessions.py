@@ -1,13 +1,14 @@
 """Claude Code jobs shared by computers: the WebSocket side (code.job / code.events →
 code.ack) and the Code page's API (docs/specs/code-sessions.md §5, device-contracts §7)."""
 
+import asyncio
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from redis.exceptions import RedisError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.core.db import get_sessionmaker
 from app.events import bus
@@ -16,6 +17,7 @@ from app.features.code_sessions import router as code_router
 from app.features.code_sessions.models import CodeJob, CodeJobEvent
 from app.features.devices import relay
 from app.features.devices import service as devices_service
+from app.features.devices import ws as dws
 from app.features.notifications.models import Notification
 from tests.api.test_devices import add
 from tests.api.test_devices_ws import roundtrip, welcomed
@@ -581,12 +583,28 @@ async def test_the_stream_sends_the_job_then_what_is_stored(authed, monkeypatch)
 # -- retention and deletion ------------------------------------------------------------------
 
 
+def days_ago(days: int) -> str:
+    return (datetime.now(UTC) - timedelta(days=days)).isoformat()
+
+
+async def set_last_events(key: str, days: int) -> None:
+    async with get_sessionmaker()() as db:
+        await db.execute(
+            update(CodeJob)
+            .where(CodeJob.job_key == key)
+            .values(last_event_at=datetime.now(UTC) - timedelta(days=days))
+        )
+        await db.commit()
+
+
 async def test_old_jobs_are_pruned(authed, monkeypatch):
     _, ws = await computer(authed)
-    await announce(ws, "20261001-090000-old1", started="2026-10-01T09:00:00Z")
+    old = days_ago(60)
+    await announce(ws, "20261001-090000-old1", started=old, state="done", ended=old)
     await send(ws, (1, init()), key="20261001-090000-old1")
-    await announce(ws, "20261120-090000-new1", started="2026-11-20T09:00:00Z")
-    now = datetime(2026, 11, 23, tzinfo=UTC)
+    await set_last_events("20261001-090000-old1", 59)  # its events came long ago
+    await announce(ws, "20261120-090000-new1", started=days_ago(3))
+    now = datetime.now(UTC)
     assert await service.prune(now) == 1
     assert [j["job_key"] for j in (await authed.get("/api/code/jobs")).json()["jobs"]] == [
         "20261120-090000-new1"
@@ -638,4 +656,160 @@ async def test_a_trust_change_needs_a_new_connection(authed):
     ws, welcome = await welcomed(device["token"])
     assert welcome["device"]["trust"] == "trusted"
     assert await announce(ws) == 0
+    await ws.disconnect()
+
+
+async def test_unstorable_characters_in_a_job_are_replaced(authed):
+    # Postgres takes no NUL in text: uncleaned, the insert fails and nothing is acked.
+    _, ws = await computer(authed)
+    fields = {"prompt": "Fix\x00 it", "stderr_tail": "bad\x00", "branch": "b\ud800"}
+    assert await announce(ws, **fields) == 0
+    shared = await only_job(authed)
+    assert shared["prompt"] == "Fix� it" and shared["title"] == "Fix� it"
+    assert shared["stderr_tail"] == "bad�" and shared["branch"] == "b�"
+    # The same in an event, keys included.
+    assert await send(ws, (1, {"type": "raw", "text": "x\ud800\x00", "k\ud800": 1})) == 1
+    events = (await authed.get(f"/api/code/jobs/{shared['id']}/events")).json()["events"]
+    assert events[0]["event"] == {"type": "raw", "text": "x��", "k�": 1}
+    await ws.disconnect()
+
+
+async def test_a_lost_trust_change_is_found_by_the_recheck(authed, monkeypatch):
+    # The relay's "trust_changed" message is lost (Valkey hiccup): the minute's recheck
+    # still closes the connection, so a computer no longer trusted stops sharing.
+    monkeypatch.setattr(dws, "RECHECK_S", 0.1)
+
+    async def lost(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(relay, "tell", lost)
+    device, ws = await computer(authed)
+    assert await announce(ws) == 0
+    async with get_sessionmaker()() as db:
+        await devices_service.set_trust(db, uuid.UUID(device["id"]), "watched", ip=None)
+    for _ in range(40):  # pongs while it is open (2 s at most), then the close
+        await ws.send({"type": "ping"})
+        message = await ws.next(within=5)
+        if message["type"] == "websocket.close":
+            break
+        assert json.loads(message["text"]) == {"type": "pong"}
+        await asyncio.sleep(0.05)
+    assert message["type"] == "websocket.close"
+    assert message["code"] == dws.CLOSE_TRUST_CHANGED
+
+
+async def test_paging_keeps_jobs_started_at_the_same_time(authed):
+    _, ws = await computer(authed)
+    same = "2026-11-20T09:00:00Z"
+    for key in ("20261120-090000-aaa1", "20261120-090000-aaa2", "20261120-090000-aaa3"):
+        await announce(ws, key, started=same)
+    seen: list[str] = []
+    params: dict[str, Any] = {"limit": 2}
+    while True:
+        page = (await authed.get("/api/code/jobs", params=params)).json()
+        seen += [j["job_key"] for j in page["jobs"]]
+        if not page["has_more"]:
+            break
+        last = page["jobs"][-1]
+        params = {"limit": 2, "before": last["started_at"], "before_id": last["id"]}
+    assert sorted(seen) == ["20261120-090000-aaa1", "20261120-090000-aaa2", "20261120-090000-aaa3"]
+    assert len(seen) == 3
+    await ws.disconnect()
+
+
+async def test_a_late_older_batch_doesnt_overwrite_newer_pull_outs(authed):
+    _, ws = await computer(authed)
+    await announce(ws)
+    pr = "https://github.com/essntl/anemo/pull/"
+    newer = [
+        (10, init("s-new", "model-new")),
+        (11, bash("git checkout -b feat/new")),
+        (12, say(f"Opened {pr}2")),
+        (13, result(num_turns=9, result="new", session_id="s-new")),
+    ]
+    older = [
+        (1, init("s-old", "model-old")),
+        (2, bash("git checkout -b feat/old")),
+        (3, say(f"Opened {pr}1")),
+        (4, result("error_max_turns", num_turns=3, result="old", session_id="s-old")),
+    ]
+    await send(ws, *newer)
+    await send(ws, *older)
+    shared = await only_job(authed)
+    assert (shared["session_id"], shared["model"]) == ("s-new", "model-new")
+    assert (shared["branch"], shared["pr_url"]) == ("feat/new", f"{pr}2")
+    assert (shared["num_turns"], shared["result_text"], shared["result_subtype"]) == (
+        9,
+        "new",
+        "success",
+    )
+    assert shared["state"] == "done" and shared["last_seq"] == 4  # 5..9 never came
+    await ws.disconnect()
+
+
+async def test_jobs_with_recent_activity_are_kept(authed):
+    _, ws = await computer(authed)
+    old = days_ago(60)
+    # Started long ago, but its events still arrive.
+    await announce(ws, "20260901-090000-long", started=old)
+    await send(ws, (1, init()), key="20260901-090000-long")
+    # Started and ended long ago, announced only now (its events arrive now): stored
+    # as any job, and kept for keep_days after its last activity.
+    assert await announce(ws, "20260901-100000-late", started=old, state="done", ended=old) == 0
+    assert await send(ws, (1, init()), key="20260901-100000-late") == 1
+    # Running and quiet for long, but its computer sends events: kept.
+    await announce(ws, "20260901-110000-wait", started=old)
+    # Another computer, quiet for long: its running and finished jobs go.
+    _, quiet = await computer(authed, "Quiet")
+    await announce(quiet, "20260901-120000-gone", started=old)
+    await announce(quiet, "20260901-130000-done", started=old, state="done", ended=old)
+    assert await service.prune(datetime.now(UTC)) == 2
+    kept = sorted(j["job_key"] for j in (await authed.get("/api/code/jobs")).json()["jobs"])
+    assert kept == ["20260901-090000-long", "20260901-100000-late", "20260901-110000-wait"]
+    await ws.disconnect()
+    await quiet.disconnect()
+
+
+async def test_a_code_frame_cant_borrow_the_answers_limit(authed):
+    # "device.result" in the first 200 characters selects the 12 MB limit of answers;
+    # the code frame's own limit still applies after it is read.
+    _, ws = await computer(authed)
+    await announce(ws)
+    events = items((1, say("y" * 310_000)))
+    steered = {"device.result": 1, "type": "code.events", "job_id": KEY, "events": events}
+    await no_answer(ws, json.dumps(steered))
+    big_job = {"device.result": 1, "type": "code.job", "job": job(), "pad": "x" * 64_000}
+    await no_answer(ws, json.dumps(big_job))
+    assert (await only_job(authed))["event_count"] == 0
+    await ws.disconnect()
+
+
+async def test_the_global_notice_is_throttled_unless_the_state_changes(authed, monkeypatch):
+    _, ws = await computer(authed)
+    await announce(ws)  # new: a notice
+    await send(ws, (1, init()))
+    await send(ws, (2, say("a")))
+    assert [n["state"] for n in await global_notices()] == ["running"]  # within 5 s
+    await send(ws, (3, result()))  # a state change: at once
+    assert [n["state"] for n in await global_notices()] == ["running", "done"]
+    monkeypatch.setattr(ingest, "GLOBAL_EVERY_S", 0.0)  # 5 s later
+    await send(ws, (4, say("after")))
+    assert [n["state"] for n in await global_notices()] == ["running", "done", "done"]
+    await ws.disconnect()
+
+
+async def test_nothing_is_published_for_a_device_deleted_meanwhile(authed, monkeypatch):
+    _, ws = await computer(authed)
+    await announce(ws)
+    job_id = (await only_job(authed))["id"]
+    key = service.stream_key(job_id)
+    before = len((await bus.read({key: "0-0"}, None, 1000))[0][1])
+
+    async def gone(*args: Any, **kwargs: Any) -> dict:
+        return {}  # the device's row went between the commit and the publishing
+
+    monkeypatch.setattr(ingest.service, "devices_out", gone)
+    assert await send(ws, (1, init())) == 1  # stored and acked all the same
+    assert len((await bus.read({key: "0-0"}, None, 1000))[0][1]) == before
+    assert len(await global_notices()) == 1  # only the first announcement's
     await ws.disconnect()

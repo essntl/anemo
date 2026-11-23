@@ -151,8 +151,11 @@ class Connection:
         self.ws = ws
         self.device_id = device.id
         self.kind = device.kind
+        self.trust = device.trust
         # Claude Code jobs come only from trusted computers (§7); others' are ignored. A
-        # trust change closes the connection (1012), so the level at connect is current.
+        # trust change closes the connection (1012, told at once by the relay, and found
+        # by `recheck` within a minute should that message be lost), so the level at
+        # connect is current.
         self.takes_code = device.kind == "computer" and device.trust == "trusted"
         self.sent_code = False  # it sent code frames (its jobs go offline when it closes)
         self.raw = raw
@@ -207,7 +210,11 @@ class Connection:
             kind = message.get("type")
             if len(text) > MAX_MESSAGE and kind not in ("device.result", "code.job", "code.events"):
                 continue  # the big limits are for those types only
+            # Each type's own limit again: a key named "device.result" early in the text
+            # would have given a code frame the answers' 12 MB above.
             if kind == "code.job" and len(text) > MAX_CODE_JOB:
+                continue
+            if kind == "code.events" and len(text) > MAX_CODE_EVENTS:
                 continue
             await self._handle(message)
 
@@ -306,12 +313,15 @@ class Connection:
             )
 
     async def recheck(self) -> None:
-        """The token (and the device) still exist: checked every minute."""
+        """The token (and the device) still exist, and its trust level is the one it
+        connected with: checked every minute."""
         while True:
             await asyncio.sleep(RECHECK_S)
             device = await _device_for(self.raw, self.ip)
             if device is None or device.id != self.device_id:
                 raise _Closed(CLOSE_UNAUTHORIZED, "token revoked")
+            if device.trust != self.trust or device.kind != self.kind:
+                raise _Closed(CLOSE_TRUST_CHANGED, "trust level changed")
             async with get_sessionmaker()() as db:
                 await service.seen(db, self.device_id)
 

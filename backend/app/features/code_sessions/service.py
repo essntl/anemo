@@ -11,8 +11,9 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.db import get_sessionmaker
 from app.core.errors import NotFound
@@ -153,8 +154,11 @@ async def list_jobs(
     device_id: uuid.UUID | None = None,
     limit: int = 200,
     before: datetime | None = None,
+    before_id: uuid.UUID | None = None,
 ) -> CodeJobListOut:
-    """Jobs, newest first; `before`: the started_at of the last row of the page before."""
+    """Jobs, newest first (by started_at, then id). The next page: `before` and
+    `before_id`, the started_at and id of the last job of the page before (`before`
+    alone: the jobs started before it, which skips others started at the same time)."""
     stmt = select(CodeJob)
     if project is not None:
         stmt = stmt.where(CodeJob.project == project)
@@ -162,7 +166,9 @@ async def list_jobs(
         stmt = stmt.where(CodeJob.state == state)
     if device_id is not None:
         stmt = stmt.where(CodeJob.device_id == device_id)
-    if before is not None:
+    if before is not None and before_id is not None:
+        stmt = stmt.where(tuple_(CodeJob.started_at, CodeJob.id) < tuple_(before, before_id))
+    elif before is not None:
         stmt = stmt.where(CodeJob.started_at < before)
     rows = list(
         await db.scalars(
@@ -232,13 +238,31 @@ async def events(
 
 
 async def prune(now: datetime | None = None) -> int:
-    """Delete the jobs started more than `code.keep_days` ago (their events go with
-    them). Returns how many."""
+    """Delete the jobs whose last activity (start, last events, end) is more than
+    `code.keep_days` ago, their events with them; a running job is kept while its
+    computer sent events within keep_days. (By start alone, a long job, or one whose
+    events still arrive, would be deleted mid-way and announced again from seq 0.)
+    Returns how many."""
     now = now or datetime.now(UTC)
     async with get_sessionmaker()() as db:
         keep = await settings_service.get_section(db, CodeSettings, "code")
+        cutoff = now - timedelta(days=keep.keep_days)
+        last_activity = func.greatest(
+            CodeJob.started_at,
+            func.coalesce(CodeJob.last_event_at, CodeJob.started_at),
+            func.coalesce(CodeJob.ended_at, CodeJob.started_at),
+        )
+        other = aliased(CodeJob)
+        device_active = (
+            select(other.id)
+            .where(other.device_id == CodeJob.device_id, other.last_event_at >= cutoff)
+            .correlate(CodeJob)
+            .exists()
+        )
         result = await db.execute(
-            delete(CodeJob).where(CodeJob.started_at < now - timedelta(days=keep.keep_days))
+            delete(CodeJob)
+            .where(last_activity < cutoff, ~and_(CodeJob.state == "running", device_active))
+            .execution_options(synchronize_session=False)
         )
         await db.commit()
     count = int(result.rowcount or 0)  # type: ignore[attr-defined]
