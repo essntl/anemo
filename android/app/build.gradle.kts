@@ -20,9 +20,28 @@ android {
         }
     }
 
+    // The release key, only when ANEMO_VOICE_KEYSTORE names a keystore (the release
+    // workflow sets it; see README "Cut a release"). Without it a release build is
+    // unsigned and the debug build is unchanged.
+    val releaseKeystore = providers.environmentVariable("ANEMO_VOICE_KEYSTORE").orNull
+    signingConfigs {
+        if (!releaseKeystore.isNullOrEmpty()) {
+            create("release") {
+                val storePass = providers.environmentVariable("ANEMO_VOICE_KEYSTORE_PASSWORD").get()
+                storeFile = file(releaseKeystore)
+                storePassword = storePass
+                keyAlias = providers.environmentVariable("ANEMO_VOICE_KEY_ALIAS").get()
+                // A PKCS12 keystore (keytool's default) has one password for both.
+                keyPassword = providers.environmentVariable("ANEMO_VOICE_KEY_PASSWORD").orNull
+                    ?.takeIf { it.isNotEmpty() } ?: storePass
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

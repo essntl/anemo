@@ -49,3 +49,6 @@ android/.gradle/
 android/build/
 android/app/build/
 android/.kotlin/
+# The release signing key lives in repository secrets, never in the repository.
+*.jks
+*.keystore
