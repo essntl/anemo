@@ -185,7 +185,7 @@ doesn't know answers `failed` with "Unknown action “…”", so an old client 
 ## 7. Claude Code jobs (Anemo Desktop 1.1.0)
 
 A computer can share the Claude Code jobs that run on it (`docs/specs/code-sessions.md`).
-A job is a folder `<jobs>\<id>\` (default `C:nemo-bridge\jobs`) with `prompt.txt`,
+A job is a folder `<jobs>\<id>\` (default `C:\anemo-bridge\jobs`) with `prompt.txt`,
 `out.jsonl` (Claude Code's `--output-format stream-json --verbose`, one event per line),
 `err.txt`, `meta.json` (`{id, pid, dir, resume, started, prompt_preview}`, optionally
 `model`) and, once cancelled, a `cancelled` file. Job ids match
