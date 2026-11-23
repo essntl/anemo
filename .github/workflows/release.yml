@@ -202,8 +202,10 @@ jobs:
           apk=app/build/outputs/apk/release/app-release.apk
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
           "$apksigner" verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/cert.txt"
-          sha=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/cert.txt")
-          [ -n "$sha" ] || { echo "::error::no signer in $apk"; exit 1; }
+          # "Signer #1 certificate …" or "V2 Signer: certificate …", by apksigner version.
+          grep -qx 'Number of signers: 1' "$RUNNER_TEMP/cert.txt" || { echo "::error::$apk does not have exactly one signer"; exit 1; }
+          sha=$(grep -m1 -oP 'certificate SHA-256 digest: \K[0-9a-f]{64}' "$RUNNER_TEMP/cert.txt" || true)
+          [ -n "$sha" ] || { echo "::error::no signing certificate in $apk"; exit 1; }
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
           mkdir -p dist
           cp "$apk" dist/Anemo-Voice.apk
