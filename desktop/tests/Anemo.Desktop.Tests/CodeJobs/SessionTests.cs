@@ -506,6 +506,33 @@ public sealed class SessionTests : IDisposable
     }
 
     [Fact]
+    public async Task Unanswered_counts_the_messages_still_waiting_for_an_ack()
+    {
+        var first = Running(Now.AddMinutes(-1), suffix: "one1");
+        var second = Running(Now.AddMinutes(-2), suffix: "two2");
+
+        await _h.StepAsync();
+        Assert.Equal(new Dictionary<string, int> { [first.Id] = 1, [second.Id] = 1 }, new Dictionary<string, int>(_h.Session.Unanswered()));
+
+        // An ack that came but wasn't applied yet answers its message.
+        _h.Session.OnAck(first.Id, 0);
+        Assert.Equal(new Dictionary<string, int> { [second.Id] = 1 }, new Dictionary<string, int>(_h.Session.Unanswered()));
+    }
+
+    [Fact]
+    public async Task A_message_that_could_not_be_sent_waits_for_no_ack()
+    {
+        var job = Running(Now.AddMinutes(-1));
+        var session = new CodeJobsSession(_jobs.Jobs, _store, _processes, _time, _log, new CodeJobsOptions(),
+            (_, _) => throw new OperationCanceledException());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => session.StepAsync());
+
+        Assert.Empty(session.Unanswered());
+        Assert.Contains(job.Id, session.Following);
+    }
+
+    [Fact]
     public async Task A_server_that_never_acks_is_not_reconnected_to_forever()
     {
         _h.Server.Silent = true;

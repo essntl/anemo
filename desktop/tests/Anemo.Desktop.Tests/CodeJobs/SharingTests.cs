@@ -98,6 +98,57 @@ public sealed class SharingTests : IDisposable
     }
 
     [Fact]
+    public async Task An_ack_for_the_replaced_session_s_message_is_not_taken_for_the_new_one_s()
+    {
+        var job = AddJob();
+        var sharing = Create();
+        _ = sharing.RunAsync(_link, Trusted, _stop.Token);
+        await WaitForAsync(() => _link.Sent.Count == 1); // code.job of the first session, not answered yet
+
+        // Off and on again on the same connection: a new session announces the job again.
+        _settings = _settings with { ShareCodeJobs = false };
+        sharing.SettingsChanged();
+        await WaitForAsync(() => sharing.Session is null);
+        _settings = _settings with { ShareCodeJobs = true };
+        sharing.SettingsChanged();
+        await WaitForAsync(() => _link.Sent.Count == 2);
+        Assert.Equal("code.job", (string?)JsonNode.Parse(_link.Sent.Last())!["type"]);
+
+        // The server answers the first code.job now: the new session must keep waiting.
+        sharing.OnAck(FakeCodeServer.AckMessage(job.Id, 0));
+        await Task.Delay(300);
+        Assert.Equal(2, _link.Sent.Count);
+
+        // The answer to its own code.job lets the events go.
+        sharing.OnAck(FakeCodeServer.AckMessage(job.Id, 0));
+        await WaitForAsync(() => _link.Sent.Count == 3);
+        Assert.Equal("code.events", (string?)JsonNode.Parse(_link.Sent.Last())!["type"]);
+    }
+
+    [Fact]
+    public async Task An_old_frame_s_ack_does_not_settle_a_job_whose_terminal_state_is_still_unanswered()
+    {
+        var job = AddJob();
+        var sharing = Create();
+        _ = sharing.RunAsync(_link, Trusted, _stop.Token);
+        await WaitForAsync(() => _link.Sent.Count == 1);
+        sharing.OnAck(FakeCodeServer.AckMessage(job.Id, 0));
+        await WaitForAsync(() => _link.Sent.Count == 2); // events 1–4, not answered yet
+
+        // The job ends; another folder string for the same folder replaces the session.
+        job.Finish();
+        _processes.Running.Clear();
+        _settings = _settings with { CodeJobsFolder = _jobs.Jobs + Path.DirectorySeparatorChar };
+        sharing.SettingsChanged();
+        await WaitForAsync(() => _link.Sent.Count == 3); // the new session's code.job
+
+        sharing.OnAck(FakeCodeServer.AckMessage(job.Id, 4)); // the old frame's answer
+        await Task.Delay(300);
+        Assert.False(sharing.Store.Get(job.Id)?.Settled ?? false);
+        Assert.Equal(3, _link.Sent.Count);
+    }
+
+    [Fact]
     public async Task Another_jobs_folder_restarts_sharing_there()
     {
         var sharing = Create();
