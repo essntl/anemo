@@ -15,6 +15,10 @@ export interface ConfirmOptions {
   title: string
   message?: ReactNode
   confirmLabel?: string
+  /** The button that says no (default "Cancel"): name it when "Cancel" could be read as the action itself. */
+  cancelLabel?: string
+  /** The focus starts on the button that says no: a stray Enter then changes nothing. */
+  focusCancel?: boolean
   danger?: boolean
 }
 

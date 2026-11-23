@@ -4,17 +4,20 @@
  * yet; any name may be typed), "New project" when the name matches none, the prompt
  * and the model. The started job opens at /code/<id>, followed live.
  */
-import { useId, useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { Field, Input, Textarea } from '@/components/ui/Input'
+import { Field, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
+import { useAutosize } from '@/hooks/useAutosize'
 import { msg, t } from '@/lib/i18n'
 import { type CodeDevice, type CodeModel, startErrorMessage, useCodeDevices, useCodeProjects, useStartJob } from './api'
+import { newJobDraft } from './newJobDraft'
+import { ProjectPicker } from './ProjectPicker'
 import { knownProject, validProjectName } from './projects'
 
 const MODELS: { value: '' | CodeModel; label: string }[] = [
@@ -26,16 +29,22 @@ const MODELS: { value: '' | CodeModel; label: string }[] = [
 
 export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const navigate = useNavigate()
-  const listId = useId()
   const devices = useCodeDevices(open)
   const usable = useMemo(() => (devices.data ?? []).filter((d) => d.online && d.start), [devices.data])
   // The computer picked in the list (kept as it was, should it leave the list).
   const [picked, setPicked] = useState<CodeDevice | null>(null)
-  const [project, setProject] = useState('')
+  // What was typed stays when the dialog is closed (Escape, a click outside), until a job starts.
+  const [project, setProjectState] = useState(newJobDraft.project)
   const [isNew, setNew] = useState(false)
-  const [prompt, setPrompt] = useState('')
+  const [prompt, setPromptState] = useState(newJobDraft.prompt)
+  const setProject = (v: string) => { newJobDraft.project = v; setProjectState(v) }
+  const setPrompt = (v: string) => { newJobDraft.prompt = v; setPromptState(v) }
   const [model, setModel] = useState<'' | CodeModel>('')
   const start = useStartJob()
+  const promptField = useRef<HTMLTextAreaElement>(null)
+  const projectField = useRef<HTMLInputElement>(null)
+  // On a phone the sheet is short: the prompt leaves room for Start.
+  useAutosize(promptField, prompt, Math.min(320, Math.round(window.innerHeight * 0.3)))
 
   // The first computer that can start jobs, until one is chosen.
   // The list is fetched again on every code.job notice: a picked computer that stops
@@ -77,6 +86,8 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={t('New Claude Code job')} className="md:w-[min(92vw,560px)]"
+      // Into the form, not onto Close: the project first, the prompt when a project is there.
+      onOpenAutoFocus={(e) => { e.preventDefault(); (project.trim() ? promptField.current : projectField.current)?.focus() }}
       description={t('Claude Code runs on the computer with every permission (bypassPermissions), in the project’s folder.')}
       footer={
         <>
@@ -94,7 +105,7 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         ) : (
           <Field label={t('Computer')} error={why ?? undefined}>
             <Select aria-label={t('Computer')} value={device?.id ?? ''}
-              onValueChange={(v) => { setPicked(choices.find((d) => d.id === v) ?? null); setProject('') }}
+              onValueChange={(v) => { if (v === device?.id) return; setPicked(choices.find((d) => d.id === v) ?? null); setProject('') }}
               placeholder={devices.isPending ? t('Loading…') : undefined}
               options={choices.map((d) => ({ value: d.id, label: d.name }))} />
           </Field>
@@ -103,14 +114,8 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         <Field label={t('Project')}
           error={badName ? t('A folder name: letters, digits, dots, dashes and underscores; not a Windows device name like CON or NUL, and no dot at the end.') : projects.isError ? errorMessage(projects.error) : undefined}
           hint={projects.isFetching ? t('Asking the computer for its projects…') : projects.data?.note ?? undefined}>
-          <Input value={project} onChange={(e) => setProject(e.target.value)} list={listId} autoComplete="off" spellCheck={false}
-            placeholder={t('A project folder or a GitHub repository')} disabled={!device} />
+          <ProjectPicker ref={projectField} value={project} onChange={setProject} projects={projects.data} loading={projects.isFetching} />
         </Field>
-        {/* The computer's folders first, then the repositories not cloned yet; any other name may be typed. */}
-        <datalist id={listId}>
-          {projects.data?.projects.map((p) => <option key={`l:${p.name}`} value={p.name} label={p.dir} />)}
-          {projects.data?.remote.map((r) => <option key={`r:${r.name}`} value={r.name} label={t('On GitHub, not cloned')} />)}
-        </datalist>
         {offerNew && (
           <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
             <span>
@@ -122,7 +127,7 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         )}
 
         <Field label={t('Prompt')}>
-          <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={6} maxLength={100_000}
+          <Textarea ref={promptField} value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={5} maxLength={100_000} className="resize-none"
             placeholder={t('What should Claude Code do?')}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit() } }} />
         </Field>

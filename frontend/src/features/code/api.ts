@@ -195,18 +195,25 @@ function refreshIfStarted(qc: QueryClient, err: unknown): void {
   void qc.invalidateQueries({ queryKey: codeKey })
 }
 
-/** Resumes the thread of `jobId` with a new prompt: the new job joins the thread, live. */
+/**
+ * Resumes the thread of `jobId` with a new prompt: the new job joins the thread, live.
+ * (Also called outside a component: the queue sends a message when its job has ended.)
+ */
+export async function sendFollowUp(qc: QueryClient, jobId: string, prompt: string): Promise<CodeJob> {
+  try {
+    const job = unwrap(await api.POST('/api/code/jobs/{job_id}/follow-up', { params: { path: { job_id: jobId } }, body: { prompt } }))
+    putJob(qc, job)
+    void qc.invalidateQueries({ queryKey: codeKey })
+    return job
+  } catch (err) {
+    refreshIfStarted(qc, err)
+    throw err
+  }
+}
+
 export function useFollowUp(jobId: string) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (prompt: string) =>
-      unwrap(await api.POST('/api/code/jobs/{job_id}/follow-up', { params: { path: { job_id: jobId } }, body: { prompt } })),
-    onSuccess: (job) => {
-      putJob(qc, job)
-      void qc.invalidateQueries({ queryKey: codeKey })
-    },
-    onError: (err) => refreshIfStarted(qc, err),
-  })
+  return useMutation({ mutationFn: (prompt: string) => sendFollowUp(qc, jobId, prompt) })
 }
 
 /** Cancels a running job (one that has ended comes back as it is). */

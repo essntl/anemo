@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,6 +31,7 @@ const toasts = vi.hoisted(() => [] as string[])
 vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string }) => toasts.push(o.message) }))
 
 const { NewJobDialog } = await import('./NewJobDialog')
+const { clearNewJobDraft } = await import('./newJobDraft')
 
 // Radix Select scrolls to the chosen option, which jsdom can't do.
 Element.prototype.scrollIntoView ??= () => {}
@@ -52,6 +53,7 @@ const pc = (id: string, name: string, more: Partial<CodeDevice> = {}): CodeDevic
 
 beforeEach(() => {
   vi.clearAllMocks()
+  clearNewJobDraft()
   toasts.length = 0
   started.length = 0
   askedProjects.length = 0
@@ -82,11 +84,58 @@ describe('New job', () => {
     expect(within(dialog()).getByText('gh isn’t installed on this computer.')).toBeInTheDocument()
   })
 
-  it('lists local projects first, then the repositories not cloned', () => {
+  it('lists local projects first, then the repositories not cloned', async () => {
     show()
-    const list = document.getElementById(projectBox().getAttribute('list')!)!
-    const options = [...list.querySelectorAll('option')].map((o) => [o.value, o.label])
-    expect(options).toEqual([['anemo', 'C:\\dev\\anemo'], ['site', 'On GitHub, not cloned']])
+    await userEvent.click(projectBox())
+    const options = within(screen.getByRole('listbox', { name: 'Projects' })).getAllByRole('option').map((o) => o.textContent)
+    expect(options).toEqual(['anemoC:\\dev\\anemo', 'site'])
+    expect(screen.getByText('On this computer')).toBeInTheDocument()
+    expect(screen.getByText('On GitHub, not cloned')).toBeInTheDocument()
+  })
+
+  it('narrows the list by what is typed, and takes a project by click or by arrows and Enter', async () => {
+    show()
+    await userEvent.type(projectBox(), 'si')
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['site'])
+    await userEvent.click(screen.getByRole('option', { name: 'site' }))
+    expect(projectBox()).toHaveValue('site')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    // Picked, not typed: the whole list is back.
+    await userEvent.keyboard('{ArrowDown}')
+    expect(screen.getAllByRole('option')).toHaveLength(2)
+    expect(projectBox()).toHaveAttribute('aria-activedescendant', screen.getAllByRole('option')[0].id)
+    await userEvent.keyboard('{Enter}')
+    expect(projectBox()).toHaveValue('anemo')
+    expect(started).toEqual([])
+  })
+
+  it('opens with the focus in the project field (list closed), and keeps what was typed when closed and opened again', async () => {
+    const { unmount } = show()
+    await waitFor(() => expect(projectBox()).toHaveFocus())
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Half a prompt')
+    unmount()
+    show()
+    expect(projectBox()).toHaveValue('anemo')
+    expect(within(dialog()).getByRole('textbox', { name: 'Prompt' })).toHaveValue('Half a prompt')
+  })
+
+  it('Enter takes the first match of what is typed', async () => {
+    show()
+    await userEvent.type(projectBox(), 'ane{Enter}')
+    expect(projectBox()).toHaveValue('anemo')
+    expect(started).toEqual([])
+  })
+
+  it('Escape closes the list, not the dialog; a name that matches nothing shows no list', async () => {
+    show()
+    await userEvent.click(projectBox())
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(dialog()).toBeInTheDocument()
+    await userEvent.type(projectBox(), 'zzz')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
   it('starts a job in a known project with a model, then opens it', async () => {
