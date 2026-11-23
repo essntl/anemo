@@ -16,24 +16,32 @@ test('dialogs, dropdowns and the search palette animate when they close', async 
   // A dialog that only exists while it is open ("New task").
   await page.getByRole('button', { name: 'New task' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
+  // "Visible" is about the page's layout; the opening animation starts with the next frame
+  // the browser draws. Closing before that frame would skip it, so wait for it.
+  await expect.poll(seen).toEqual(expect.arrayContaining(['pop-in', 'fade-in']))
   expect(await seen()).not.toContain('pop-out')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(await seen()).toEqual(expect.arrayContaining(['pop-in', 'fade-in', 'pop-out', 'fade-out']))
 
-  const closings = async () => (await seen()).filter((name) => name === 'pop-out').length
+  const count = async (name: string) => (await seen()).filter((n) => n === name).length
+  const closings = () => count('pop-out')
   const afterDialog = await closings()
   // A dropdown: the project filter on All chats (reached within the app, so the record stays).
   await page.getByRole('link', { name: 'All chats' }).click()
   await expect(page).toHaveURL(/\/chats/)
+  let openings = await count('pop-in')
   await page.getByRole('combobox', { name: 'Project' }).click()
   await expect(page.getByRole('listbox')).toBeVisible()
+  await expect.poll(() => count('pop-in')).toBe(openings + 1)
   await page.keyboard.press('Escape')
   await expect(page.getByRole('listbox')).toHaveCount(0)
   expect(await closings()).toBe(afterDialog + 1)
 
+  openings = await count('pop-in')
   await page.keyboard.press('Control+k')
   await expect(page.getByRole('dialog', { name: 'Search' })).toBeVisible()
+  await expect.poll(() => count('pop-in')).toBe(openings + 1)
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(await closings()).toBe(afterDialog + 2)
