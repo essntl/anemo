@@ -24,6 +24,12 @@ public sealed class CodeJobSharing : ICodeJobsHost
     private CancellationTokenSource? _sessionCts;
     private (bool Share, string Folder)? _sessionFor;
 
+    /// <summary>
+    /// Per job, acks still to come on this connection for messages of a session that was
+    /// replaced (sharing switched off and on, another folder): dropped when they come.
+    /// </summary>
+    private readonly Dictionary<string, int> _stale = new(StringComparer.Ordinal);
+
     public CodeJobSharing(
         Func<DesktopSettings> settings,
         CodeJobStore store,
@@ -85,14 +91,42 @@ public sealed class CodeJobSharing : ICodeJobsHost
 
     public void OnAck(JsonObject msg)
     {
-        if (CodeWire.Ack(msg) is { } ack)
+        if (CodeWire.Ack(msg) is not { } ack)
         {
-            Session?.OnAck(ack.JobId, ack.Seq);
+            return;
         }
+
+        CodeJobsSession? session;
+        lock (_lock)
+        {
+            if (_stale.TryGetValue(ack.JobId, out var left) && left > 0)
+            {
+                // The answer to an earlier session's message: not to the current one's.
+                if (left == 1)
+                {
+                    _stale.Remove(ack.JobId);
+                }
+                else
+                {
+                    _stale[ack.JobId] = left - 1;
+                }
+
+                return;
+            }
+
+            session = _session;
+        }
+
+        session?.OnAck(ack.JobId, ack.Seq);
     }
 
     public async Task RunAsync(ICodeJobsLink link, DeviceInfo device, CancellationToken ct)
     {
+        lock (_lock)
+        {
+            _stale.Clear(); // a new connection: nothing earlier is answered on it
+        }
+
         while (!ct.IsCancellationRequested)
         {
             Task changed;
@@ -142,6 +176,10 @@ public sealed class CodeJobSharing : ICodeJobsHost
                     _session = null;
                     _sessionCts = null;
                     _sessionFor = null;
+                    foreach (var (jobId, count) in session.Unanswered())
+                    {
+                        _stale[jobId] = _stale.GetValueOrDefault(jobId) + count;
+                    }
                 }
             }
         }

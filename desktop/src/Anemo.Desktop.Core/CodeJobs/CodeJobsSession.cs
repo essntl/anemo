@@ -75,6 +75,27 @@ public sealed class CodeJobsSession
         _wake.Release();
     }
 
+    /// <summary>
+    /// Per job, how many messages this session sent that no ack has come for yet. Asked once
+    /// the session stopped: the server still answers those, and their acks must not be taken
+    /// for answers to the next session's messages.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> Unanswered()
+    {
+        var queued = _acks.GroupBy(a => a.JobId).ToDictionary(g => g.Key, g => g.Count());
+        var unanswered = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var job in _jobs.Values.Where(j => j.InFlight is not null))
+        {
+            var left = 1 - queued.GetValueOrDefault(job.Id);
+            if (left > 0)
+            {
+                unanswered[job.Id] = left;
+            }
+        }
+
+        return unanswered;
+    }
+
     /// <summary>Steps until cancelled or until the server stops answering.</summary>
     public async Task<CodeJobsEnd> RunAsync(CancellationToken ct)
     {
@@ -188,7 +209,7 @@ public sealed class CodeJobsSession
         }
 
         var cancelled = JobFolder.IsCancelled(job.Folder);
-        var alive = ProcessLiveness.IsAlive(_probe, job.Meta.Pid, job.Meta.Started);
+        var alive = ProcessLiveness.IsAlive(_probe, job.Meta.Pid, job.Meta.Started, JobFolder.LastOutputAt(job.Folder), _time.GetUtcNow());
         ScanForResult(job); // after the liveness check: a job that just ended is read to its end once more
         var state = cancelled ? JobStates.Cancelled
             : job.ResultFailed is { } failed ? (failed ? JobStates.Failed : JobStates.Done)
@@ -275,8 +296,7 @@ public sealed class CodeJobsSession
         var final = JobStates.IsTerminal(snapshot.State) && snapshot.State == job.State && atEnd;
         if (!job.Announced || changed || (final && !job.FinalSent))
         {
-            job.InFlight = new Sent(now, snapshot, final, null);
-            await _send(CodeWire.Job(snapshot), ct);
+            await SendOneAsync(job, new Sent(now, snapshot, final, null), CodeWire.Job(snapshot), ct);
             return true;
         }
 
@@ -291,9 +311,23 @@ public sealed class CodeJobsSession
             return false;
         }
 
-        job.InFlight = new Sent(now, null, false, items);
-        await _send(CodeWire.Events(job.Id, items), ct);
+        await SendOneAsync(job, new Sent(now, null, false, items), CodeWire.Events(job.Id, items), ct);
         return true;
+    }
+
+    /// <summary>Sends one message and waits for its ack; one that didn't go out waits for nothing.</summary>
+    private async Task SendOneAsync(Job job, Sent sent, string text, CancellationToken ct)
+    {
+        job.InFlight = sent;
+        try
+        {
+            await _send(text, ct);
+        }
+        catch
+        {
+            job.InFlight = null;
+            throw;
+        }
     }
 
     /// <summary>

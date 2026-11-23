@@ -34,6 +34,9 @@ public static class CodeJobLimits
 
     /// <summary>A process with the job's pid that started later than this after the job is another one.</summary>
     public static readonly TimeSpan PidReuseSlack = TimeSpan.FromMinutes(1);
+
+    /// <summary>A job whose process can't be read counts as running only while it wrote output this recently.</summary>
+    public static readonly TimeSpan UnreadableProcessQuietFor = TimeSpan.FromMinutes(30);
 }
 
 /// <summary>Timings of the sharing loop; the defaults are the contract's.</summary>

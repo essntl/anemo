@@ -123,6 +123,62 @@ public sealed class JobFolderTests : IDisposable
         Assert.DoesNotContain('\uFFFD', tail);
     }
 
+    [Theory]
+    [InlineData("utf-16")]
+    [InlineData("utf-16BE")]
+    [InlineData("utf-8-bom")]
+    public void A_large_stderr_with_a_byte_order_mark_is_read_in_its_encoding(string name)
+    {
+        // Windows PowerShell writes UTF-16 with a BOM; the tail is read from far past the BOM.
+        var encoding = name switch
+        {
+            "utf-16" => new UnicodeEncoding(bigEndian: false, byteOrderMark: true),
+            "utf-16BE" => new UnicodeEncoding(bigEndian: true, byteOrderMark: true),
+            _ => (Encoding)new UTF8Encoding(true),
+        };
+        File.WriteAllText(Path.Combine(_folder, "err.txt"), string.Concat(Enumerable.Repeat("Gr\u00FC\u00DFe \u0436 \uD83D\uDE00 ", 3000)) + "Error: the end", encoding);
+        Assert.True(new FileInfo(Path.Combine(_folder, "err.txt")).Length > 16_000);
+
+        var tail = JobFolder.StderrTail(_folder)!;
+
+        Assert.EndsWith("\uD83D\uDE00 Error: the end", tail);
+        Assert.True(tail.Length <= 4000 && tail.Length > 3900);
+        Assert.DoesNotContain('\0', tail);
+        Assert.DoesNotContain('\uFFFD', tail);
+        Assert.False(char.IsLowSurrogate(tail[0]));
+        Assert.Contains("Gr\u00FC\u00DFe \u0436", tail);
+    }
+
+    [Fact]
+    public void A_small_UTF_16_stderr_is_read_whole()
+    {
+        File.WriteAllText(Path.Combine(_folder, "err.txt"), "Fehler: Gr\u00FC\u00DFe", Encoding.Unicode);
+
+        Assert.Equal("Fehler: Gr\u00FC\u00DFe", JobFolder.StderrTail(_folder));
+    }
+
+    [Fact]
+    public void Code_job_strings_have_no_NUL_characters()
+    {
+        const string nul = "a\0b";
+        var job = new JobSnapshot(
+            "20261122-093000-ab12", "C:\\jobs\0x", "pro\0ject", "C:\\dev\\pro\0ject", DateTimeOffset.UtcNow,
+            "prompt " + nul, "sess" + nul, "op\0us", 1, JobStates.Failed, DateTimeOffset.UtcNow, "feat/\0x", "err " + nul);
+
+        var text = CodeWire.Job(job);
+
+        Assert.DoesNotContain("\\u0000", text);
+        var sent = System.Text.Json.Nodes.JsonNode.Parse(text)!["job"]!.AsObject();
+        foreach (var key in new[] { "device_job_dir", "project", "dir", "prompt", "resume_session", "model", "branch", "stderr_tail" })
+        {
+            var value = (string?)sent[key];
+            Assert.DoesNotContain('\0', value!);
+            Assert.Contains('\uFFFD', value!);
+        }
+
+        Assert.Equal("prompt a\uFFFDb", (string?)sent["prompt"]);
+    }
+
     [Fact]
     public void The_branch_comes_from_git_HEAD()
     {
@@ -174,22 +230,49 @@ public sealed class JobFolderTests : IDisposable
     public void A_process_is_the_job_s_while_it_started_within_a_minute_of_the_job()
     {
         var started = new DateTimeOffset(2026, 11, 22, 9, 30, 0, TimeSpan.Zero);
+        var now = started.AddHours(2);
         var processes = new FakeProcesses();
+        bool Alive(int? pid = 4242, DateTimeOffset? lastOutput = null) => ProcessLiveness.IsAlive(processes, pid, started, lastOutput, now);
 
-        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started)); // gone
-        Assert.False(ProcessLiveness.IsAlive(processes, null, started)); // no pid
+        Assert.False(Alive()); // gone
+        Assert.False(Alive(pid: null)); // no pid
 
         processes.Running[4242] = started.AddSeconds(-2);
-        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started));
+        Assert.True(Alive());
 
         processes.Running[4242] = started.AddSeconds(59);
-        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started));
+        Assert.True(Alive());
 
         processes.Running[4242] = started.AddMinutes(5); // the pid was given to another program
-        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started));
+        Assert.False(Alive(lastOutput: now)); // also while the job wrote recently
+    }
 
-        processes.Running[4242] = null; // can't tell: counts as alive
-        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started));
+    [Fact]
+    public void A_process_that_can_t_be_read_lives_only_while_the_job_wrote_in_the_last_30_minutes()
+    {
+        var started = new DateTimeOffset(2026, 11, 22, 9, 30, 0, TimeSpan.Zero);
+        var now = started.AddHours(5);
+        var processes = new FakeProcesses();
+        processes.Running[4242] = null; // another user's or an elevated process
+
+        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started, now.AddMinutes(-29), now));
+        Assert.True(ProcessLiveness.IsAlive(processes, 4242, started, now.AddMinutes(-30), now));
+        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started, now.AddMinutes(-31), now));
+        Assert.False(ProcessLiveness.IsAlive(processes, 4242, started, null, now)); // no output at all
+    }
+
+    [Fact]
+    public void The_last_output_is_the_later_of_out_jsonl_and_err_txt()
+    {
+        Assert.Null(JobFolder.LastOutputAt(_folder));
+
+        Write("out.jsonl", "{}\n");
+        Write("err.txt", "warn");
+        var older = new DateTime(2026, 11, 22, 8, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(Path.Combine(_folder, "out.jsonl"), older);
+        File.SetLastWriteTimeUtc(Path.Combine(_folder, "err.txt"), older.AddMinutes(20));
+
+        Assert.Equal(new DateTimeOffset(older.AddMinutes(20)), JobFolder.LastOutputAt(_folder));
     }
 
     private void Write(string name, string text) => File.WriteAllText(Path.Combine(_folder, name), text, new UTF8Encoding(false));

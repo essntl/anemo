@@ -319,6 +319,7 @@ public sealed class SessionTests : IDisposable
                 break;
             case "start_time_unknown":
                 _processes.Running[4242] = null;
+                SetLastOutput(job, Now.AddMinutes(-1)); // wrote a minute ago
                 expected = "running";
                 break;
         }
@@ -328,6 +329,31 @@ public sealed class SessionTests : IDisposable
         var sent = JsonNode.Parse(Assert.Single(_h.Sent))!["job"]!;
         Assert.Equal(expected, (string?)sent["state"]);
         Assert.Equal(expected == "running", sent["ended"] is null);
+    }
+
+    [Fact]
+    public async Task A_job_whose_process_can_t_be_read_ends_after_30_minutes_without_output()
+    {
+        // The pid now belongs to an elevated or another user's process: nothing about it can be read.
+        var job = _jobs.Add(Now.AddHours(-2));
+        _processes.Running[4242] = null;
+        job.WriteTurn(1);
+        job.Stderr("still working");
+        SetLastOutput(job, Now.AddMinutes(-10));
+        await _h.SettleAsync();
+        Assert.Equal("running", (string?)_h.Server.Jobs[job.Id].Job!["state"]);
+
+        // err.txt counts as output too.
+        _time.Now += TimeSpan.FromMinutes(25);
+        File.SetLastWriteTimeUtc(Path.Combine(job.Folder, "err.txt"), Now.AddMinutes(-2).UtcDateTime);
+        await _h.SettleAsync();
+        Assert.Equal("running", (string?)_h.Server.Jobs[job.Id].Job!["state"]);
+
+        _time.Now += TimeSpan.FromMinutes(31);
+        await _h.SettleAsync();
+
+        Assert.Equal("exited_without_result", (string?)_h.Server.Jobs[job.Id].Job!["state"]);
+        Assert.True(_store.Get(job.Id)!.Settled);
     }
 
     [Fact]
@@ -480,6 +506,33 @@ public sealed class SessionTests : IDisposable
     }
 
     [Fact]
+    public async Task Unanswered_counts_the_messages_still_waiting_for_an_ack()
+    {
+        var first = Running(Now.AddMinutes(-1), suffix: "one1");
+        var second = Running(Now.AddMinutes(-2), suffix: "two2");
+
+        await _h.StepAsync();
+        Assert.Equal(new Dictionary<string, int> { [first.Id] = 1, [second.Id] = 1 }, new Dictionary<string, int>(_h.Session.Unanswered()));
+
+        // An ack that came but wasn't applied yet answers its message.
+        _h.Session.OnAck(first.Id, 0);
+        Assert.Equal(new Dictionary<string, int> { [second.Id] = 1 }, new Dictionary<string, int>(_h.Session.Unanswered()));
+    }
+
+    [Fact]
+    public async Task A_message_that_could_not_be_sent_waits_for_no_ack()
+    {
+        var job = Running(Now.AddMinutes(-1));
+        var session = new CodeJobsSession(_jobs.Jobs, _store, _processes, _time, _log, new CodeJobsOptions(),
+            (_, _) => throw new OperationCanceledException());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => session.StepAsync());
+
+        Assert.Empty(session.Unanswered());
+        Assert.Contains(job.Id, session.Following);
+    }
+
+    [Fact]
     public async Task A_server_that_never_acks_is_not_reconnected_to_forever()
     {
         _h.Server.Silent = true;
@@ -579,6 +632,13 @@ public sealed class SessionTests : IDisposable
         File.WriteAllText(meta, text);
         await _h.SettleAsync();
         Assert.True(_h.Server.Jobs.ContainsKey(job.Id));
+    }
+
+    /// <summary>out.jsonl and err.txt last written then (the fake clock is not the files' clock).</summary>
+    private static void SetLastOutput(FakeJob job, DateTimeOffset at)
+    {
+        File.SetLastWriteTimeUtc(job.OutPath, at.UtcDateTime);
+        File.SetLastWriteTimeUtc(Path.Combine(job.Folder, "err.txt"), at.UtcDateTime);
     }
 
     private FakeJob Running(DateTimeOffset started, string suffix = "ab12")
