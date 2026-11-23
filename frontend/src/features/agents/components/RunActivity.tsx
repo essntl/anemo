@@ -25,7 +25,9 @@ import {
   Wrench,
   XCircle,
   Globe,
+  SquareTerminal,
 } from 'lucide-react'
+import { Link } from 'react-router'
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
@@ -33,6 +35,7 @@ import { Elapsed } from '@/components/ui/Elapsed'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { toolOutputUrl, useEditPlan, useRun } from '@/features/runs/api'
+import { codeJobLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { formatCost, formatCount, formatDuration, formatSize } from '@/lib/format'
 import { dateLocale, msg, plural, rich, t } from '@/lib/i18n'
@@ -76,6 +79,16 @@ function shownImage(call: ToolCallView): { attachment_id: string; width: number;
 }
 
 type GivenFile = { attachment_id: string; filename: string; size: number; kind: string }
+
+/** The tools whose result names a Claude Code job (tools/builtin/code.py). */
+const CODE_JOB_TOOLS = ['code_start', 'code_status', 'code_cancel']
+
+/** The Claude Code job a call started, looked at or cancelled, if it names one. */
+function codeJobOf(call: ToolCallView): string | undefined {
+  if (!CODE_JOB_TOOLS.includes(call.tool_name)) return undefined
+  const id = call.result_data?.code_job_id
+  return typeof id === 'string' && id ? id : undefined
+}
 
 /** Files the agent gave you (attach_file), as downloads. */
 function GivenFiles({ files }: { files: GivenFile[] }) {
@@ -145,6 +158,7 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
   const output = call.result_data?.output as { chars: number } | undefined
   const web = (call.result_data?.search ?? call.result_data?.web) as WebData | undefined
   const given = call.tool_name === 'attach_file' ? (call.result_data?.files as GivenFile[] | undefined) : undefined
+  const codeJob = codeJobOf(call)
   return (
     <div className="py-1">
       <button type="button" onClick={() => setOpen(!open)}
@@ -196,6 +210,15 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
         </div>
       )}
       {given && given.length > 0 && <GivenFiles files={given} />}
+      {codeJob && (
+        <div className="ml-7 mt-1">
+          <Link to={codeJobLink(codeJob)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1 text-[12px] hover:border-accent/60 hover:text-accent">
+            <SquareTerminal aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted" />
+            {t('Claude Code job')}
+          </Link>
+        </div>
+      )}
       {needsApproval &&
         (call.approval?.kind === 'plan' ? <PlanReviewCard runId={runId} call={call} />
           : call.approval?.kind === 'question' ? <QuestionCard runId={runId} call={call} />

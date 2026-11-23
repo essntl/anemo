@@ -1,11 +1,12 @@
 """What the Code page's API answers (docs/specs/code-sessions.md §5.4). The same shapes
 travel on the job's live stream (`code.job` {job}, `code.events` {job_id, events})."""
 
+import re
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
 from app.features.code_sessions.models import EventKind, State
 
@@ -15,6 +16,12 @@ class CodeDeviceOut(BaseModel):
     name: str
     online: bool  # connected to Anemo now
     last_seen_at: datetime | None
+    # From its live offer (false when offline). share: "Share Claude Code jobs with
+    # Anemo" is on; cancel: also "Let Anemo start Claude Code jobs"; start: also "Allow
+    # control", not paused (§12.5).
+    share: bool = False
+    start: bool = False
+    cancel: bool = False
 
 
 class CodeTodoOut(BaseModel):
@@ -53,6 +60,11 @@ class CodeJobOut(BaseModel):
     last_seq: int  # 1..last_seq are all stored
     event_count: int
     truncated: bool  # some events were trimmed or not stored (the full log is on the computer)
+    # The chat and run of the agent tool that started it (None: started on the computer
+    # or from the Code page).
+    conversation_id: uuid.UUID | None = None
+    run_id: uuid.UUID | None = None
+    conversation_title: str | None = None
 
 
 class CodeJobListOut(BaseModel):
@@ -79,3 +91,54 @@ class CodeEventsOut(BaseModel):
     events: list[CodeEventOut]  # by seq
     last_seq: int
     has_more: bool
+
+
+# -- phase 2: starting, following up, cancelling ----------------------------------------------
+
+PROJECT = r"^[A-Za-z0-9._-]{1,100}$"  # a folder name, as Anemo Desktop takes it
+MODEL = r"^[A-Za-z0-9._\[\]-]{1,100}$"
+_WINDOWS_DEVICE = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$", re.IGNORECASE)
+
+
+def project_name(value: str) -> str:
+    """A name Windows takes as a folder of its own: not only dots, not ending with a dot
+    (Windows drops it), not a device name such as CON or COM1, even with an extension
+    (§12.5; Anemo Desktop checks the same)."""
+    if value.strip(".") == "" or value.endswith(".") or _WINDOWS_DEVICE.match(value):
+        raise ValueError("not a name a project folder can have")
+    return value
+
+
+ProjectName = Annotated[str, StringConstraints(pattern=PROJECT), AfterValidator(project_name)]
+
+
+class CodeProjectOut(BaseModel):
+    name: str
+    dir: str
+    remote: str | None  # its origin remote's URL
+
+
+class CodeRemoteOut(BaseModel):
+    name: str
+    url: str
+
+
+class CodeProjectsOut(BaseModel):
+    projects: list[CodeProjectOut]  # folders in the computer's projects folder
+    remote: list[CodeRemoteOut]  # the owner's GitHub repositories not cloned there
+    note: str | None  # why `remote` couldn't be read, when it couldn't
+
+
+class CodeJobIn(BaseModel):
+    device_id: uuid.UUID
+    project: ProjectName = Field(description="A folder name in the projects folder")
+    prompt: str = Field(min_length=1, max_length=100_000)
+    new: bool = Field(False, description="Make an empty project when there is none")
+    model: str | None = Field(None, pattern=MODEL)
+    max_turns: int | None = Field(None, ge=1, le=500)
+
+
+class CodeFollowUpIn(BaseModel):
+    prompt: str = Field(min_length=1, max_length=100_000)
+    model: str | None = Field(None, pattern=MODEL)
+    max_turns: int | None = Field(None, ge=1, le=500)

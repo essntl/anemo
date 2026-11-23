@@ -10,7 +10,8 @@ The protocol is docs/device-contracts.md §2 (and §6 for versions). In short:
   client → {"type": "ping"}  ← {"type": "pong"}
   server → {"type": "event", "id", "event", "data"}   phones only: events of runs this
            phone started (features/devices/phone_events.py)
-  client → {"type": "device.offer", "control", "shell", "code"}   computers, every 30 s
+  client → {"type": "device.offer", "control", "shell", "code", "code_start"}   computers,
+           every 30 s
   server → {"type": "device.command", "id", "action", …}   from features/devices/relay.py
   client → {"type": "device.result", "id", "ok", "state" | "error", "code"}
   client → {"type": "device.stopped"}
@@ -241,7 +242,8 @@ class Connection:
             offer = relay.Offer(
                 control=bool(message.get("control")),
                 shell=bool(message.get("shell")),
-                code=bool(message.get("code")),  # older clients don't send it
+                code=bool(message.get("code")),  # older clients don't send these
+                code_start=bool(message.get("code_start")),
             )
             if not await relay.renew(self.device_id, self.conn, offer):
                 raise _Closed(CLOSE_REPLACED, "replaced by a newer connection")

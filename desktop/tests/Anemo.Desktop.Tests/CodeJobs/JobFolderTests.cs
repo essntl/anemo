@@ -25,7 +25,32 @@ public sealed class JobFolderTests : IDisposable
     [InlineData("2026112-093000-ab12", false)]
     [InlineData("20261399-093000-ab12", false)]
     [InlineData("..", false)]
+    [InlineData("20261122-093000-ab12\n", false)]
     public void Job_ids_match_the_pattern(string id, bool valid) => Assert.Equal(valid, JobFolder.IsJobId(id));
+
+    [Theory]
+    [InlineData("anemo", true)]
+    [InlineData("my.project_2-x", true)]
+    [InlineData(".hidden", true)]
+    [InlineData("console", true)] // only the device names themselves
+    [InlineData("com10", true)]
+    [InlineData("...", false)]
+    [InlineData("anemo.", false)]
+    [InlineData("aux", false)]
+    [InlineData("PRN.log", false)]
+    [InlineData("nul.tar.gz", false)] // the part before the first dot, as Windows reads it
+    [InlineData("CON.x.y", false)]
+    [InlineData("LPT1", false)]
+    [InlineData("anemo\n", false)]
+    public void Project_names_follow_the_rules(string name, bool valid) => Assert.Equal(valid, CodeProjects.IsProjectName(name));
+
+    [Theory]
+    [InlineData("essntl", true)]
+    [InlineData("my-org", true)]
+    [InlineData("essntl\n", false)]
+    [InlineData("-x", false)]
+    [InlineData("a b", false)]
+    public void GitHub_owners_follow_the_rules(string owner, bool valid) => Assert.Equal(valid, CodeProjects.IsOwner(owner));
 
     [Fact]
     public void Meta_is_read_with_unknown_fields_ignored()

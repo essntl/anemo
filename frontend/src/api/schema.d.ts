@@ -3501,7 +3501,12 @@ export interface paths {
          */
         get: operations["list_jobs_api_code_jobs_get"];
         put?: never;
-        post?: never;
+        /**
+         * Start Job
+         * @description Start a job on a computer. It answers at once; a project it must clone first is
+         *     cloned after that (the job then runs, or ends without a result saying why).
+         */
+        post: operations["start_job_api_code_jobs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3563,6 +3568,87 @@ export interface paths {
         get: operations["job_stream_api_code_jobs__job_id__stream_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Devices
+         * @description The trusted computers: online, sharing jobs (`share`), letting Anemo start them
+         *     (`start`).
+         */
+        get: operations["code_devices_api_code_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices/{device_id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Projects
+         * @description The computer's projects, and its owner's GitHub repositories not cloned there.
+         */
+        get: operations["code_projects_api_code_devices__device_id__projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/follow-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Follow Up
+         * @description Resume the session of the thread's last job (it must have ended): the new job.
+         */
+        post: operations["follow_up_api_code_jobs__job_id__follow_up_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Job
+         * @description Cancel a running job; one that has ended is returned as it is.
+         */
+        post: operations["cancel_job_api_code_jobs__job_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5433,6 +5519,21 @@ export interface components {
             online: boolean;
             /** Last Seen At */
             last_seen_at: string | null;
+            /**
+             * Share
+             * @default false
+             */
+            share: boolean;
+            /**
+             * Start
+             * @default false
+             */
+            start: boolean;
+            /**
+             * Cancel
+             * @default false
+             */
+            cancel: boolean;
         };
         /** CodeEventOut */
         CodeEventOut: {
@@ -5466,11 +5567,45 @@ export interface components {
             /** Has More */
             has_more: boolean;
         };
+        /** CodeFollowUpIn */
+        CodeFollowUpIn: {
+            /** Prompt */
+            prompt: string;
+            /** Model */
+            model?: string | null;
+            /** Max Turns */
+            max_turns?: number | null;
+        };
         /** CodeJobDetailOut */
         CodeJobDetailOut: {
             job: components["schemas"]["CodeJobOut"];
             /** Thread */
             thread: components["schemas"]["CodeJobOut"][];
+        };
+        /** CodeJobIn */
+        CodeJobIn: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Project
+             * @description A folder name in the projects folder
+             */
+            project: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * New
+             * @description Make an empty project when there is none
+             * @default false
+             */
+            new: boolean;
+            /** Model */
+            model?: string | null;
+            /** Max Turns */
+            max_turns?: number | null;
         };
         /** CodeJobListOut */
         CodeJobListOut: {
@@ -5552,6 +5687,37 @@ export interface components {
             event_count: number;
             /** Truncated */
             truncated: boolean;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Conversation Title */
+            conversation_title?: string | null;
+        };
+        /** CodeProjectOut */
+        CodeProjectOut: {
+            /** Name */
+            name: string;
+            /** Dir */
+            dir: string;
+            /** Remote */
+            remote: string | null;
+        };
+        /** CodeProjectsOut */
+        CodeProjectsOut: {
+            /** Projects */
+            projects: components["schemas"]["CodeProjectOut"][];
+            /** Remote */
+            remote: components["schemas"]["CodeRemoteOut"][];
+            /** Note */
+            note: string | null;
+        };
+        /** CodeRemoteOut */
+        CodeRemoteOut: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
         };
         /**
          * CodeSettings
@@ -18913,6 +19079,41 @@ export interface operations {
             };
         };
     };
+    start_job_api_code_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeJobIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_job_api_code_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -19003,6 +19204,140 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_devices_api_code_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeDeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_projects_api_code_devices__device_id__projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    follow_up_api_code_jobs__job_id__follow_up_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeFollowUpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_job_api_code_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
             };
             /** @description Validation Error */
             422: {

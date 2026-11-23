@@ -66,6 +66,8 @@ public sealed class CodeJobSharing : ICodeJobsHost
 
     public bool Offered(DeviceInfo device) => device.Trusted && _settings().ShareCodeJobs;
 
+    public bool OfferedStart(DeviceInfo device) => Offered(device) && _settings().StartCodeJobs;
+
     /// <summary>
     /// The settings were saved. Switched off: sharing stops and the next switch-on back-fills
     /// again. Switched on or another folder: sharing (re)starts on the connection.

@@ -45,7 +45,7 @@ export const PAGE_INFO: Record<PageId, PageInfo> = {
   focus: { to: '/focus', icon: Timer, label: msg('Focus'), alsoAt: ['/stats'], hasTools: true },
   music: { to: '/music', icon: Music, label: msg('Music'), hasTools: true },
   runs: { to: '/runs', icon: History, label: msg('Runs') },
-  code: { to: '/code', icon: SquareTerminal, label: msg('Code') },
+  code: { to: '/code', icon: SquareTerminal, label: msg('Code'), hasTools: true },
   automations: { to: '/automations', icon: Clock, label: msg('Automations'), hasTools: true },
   agents: { to: '/agents', icon: Bot, label: msg('Agents'), title: msg('Profiles & Skills') },
   memory: { to: '/memory', icon: Brain, label: msg('Memory') },

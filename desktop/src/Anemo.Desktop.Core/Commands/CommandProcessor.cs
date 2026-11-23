@@ -48,6 +48,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
     private readonly Func<DesktopSettings> _settings;
     private readonly CommandLog? _log;
     private readonly CommandOptions _options;
+    private readonly CodeJobs.CodeJobControl? _codeJobs;
     private readonly ControlRefs _refs = new();
     private readonly WindowRefs _windows = new();
     private ScreenCapture? _lastCapture;
@@ -58,13 +59,15 @@ public sealed partial class CommandProcessor : ICommandExecutor
         ControlState control,
         Func<DesktopSettings> settings,
         CommandLog? log = null,
-        CommandOptions? options = null)
+        CommandOptions? options = null,
+        CodeJobs.CodeJobControl? codeJobs = null)
     {
         _platform = platform;
         _control = control;
         _settings = settings;
         _log = log;
         _options = options ?? new CommandOptions();
+        _codeJobs = codeJobs;
     }
 
     private IDesktop Desktop => _platform.Desktop;
@@ -101,7 +104,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
                 : CommandOutcome.Fail(ResultCodes.Failed, $"Anemo Desktop ran into an error doing that ({e.GetType().Name}).");
         }
 
-        _log?.Write(CommandSummary.Action(command), CommandSummary.For(command), outcome.Ok, outcome.Code);
+        _log?.Write(CommandSummary.Action(command), CommandSummary.For(command, outcome.State), outcome.Ok, outcome.Code);
         return outcome;
     }
 
@@ -118,6 +121,11 @@ public sealed partial class CommandProcessor : ICommandExecutor
         {
             RequireShellAllowed(device);
             return await ShellAsync(args, ct);
+        }
+
+        if (CodeJobs.CodeJobControl.Handles(action))
+        {
+            return await CodeJobAsync(action, args, device, ct);
         }
 
         if (!ActingActions.Contains(action))

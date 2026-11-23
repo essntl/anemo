@@ -22,6 +22,9 @@ public interface ICodeJobsHost
     /// <summary>The offer's <c>code</c>: sharing is on and the device is trusted.</summary>
     bool Offered(DeviceInfo device);
 
+    /// <summary>The offer's <c>code_start</c>: starting is on, sharing is on, the device is trusted (§7.4).</summary>
+    bool OfferedStart(DeviceInfo device);
+
     /// <summary>Shares jobs over <paramref name="link"/> until cancelled (the connection ended).</summary>
     Task RunAsync(ICodeJobsLink link, DeviceInfo device, CancellationToken ct);
 

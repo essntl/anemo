@@ -10,6 +10,7 @@ import time
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy import and_, delete, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +28,7 @@ from app.features.code_sessions.schemas import (
     CodeJobOut,
     CodeTodoOut,
 )
+from app.features.conversations.models import Conversation
 from app.features.devices import relay
 from app.features.devices.models import Device
 from app.features.settings import service as settings_service
@@ -65,7 +67,9 @@ def _todos(job: CodeJob) -> list[CodeTodoOut]:
     return out
 
 
-def job_out(job: CodeJob, device: CodeDeviceOut) -> CodeJobOut:
+def job_out(
+    job: CodeJob, device: CodeDeviceOut, conversation_title: str | None = None
+) -> CodeJobOut:
     return CodeJobOut(
         id=job.id,
         job_key=job.job_key,
@@ -96,6 +100,9 @@ def job_out(job: CodeJob, device: CodeDeviceOut) -> CodeJobOut:
         last_seq=job.last_seq,
         event_count=job.event_count,
         truncated=job.truncated,
+        conversation_id=job.conversation_id,
+        run_id=job.run_id,
+        conversation_title=conversation_title if job.conversation_id else None,
     )
 
 
@@ -110,30 +117,73 @@ def event_out(event: CodeJobEvent) -> CodeEventOut:
     )
 
 
+Need = Literal["share", "start", "cancel"]
+
+
+def can(offer: relay.Offer, need: Need) -> bool:
+    """What a computer's offer allows (§12.5): sharing jobs; cancelling them (with "Let
+    Anemo start Claude Code jobs"); starting them (also with control allowed and not
+    paused)."""
+    if need == "share":
+        return offer.code
+    if need == "cancel":
+        return offer.code and offer.code_start
+    return offer.code and offer.code_start and offer.control
+
+
 async def devices_out(
     db: AsyncSession, device_ids: Iterable[uuid.UUID], *, online: set[uuid.UUID] | None = None
 ) -> dict[uuid.UUID, CodeDeviceOut]:
     """The devices of these jobs, with whether each is connected now (`online`: when
-    the caller knows already)."""
+    the caller knows already) and what its live offer allows."""
     ids = set(device_ids)
     if not ids:
         return {}
     if online is None:
         online = await relay.connected(ids)
+    offers = await relay.offers(ids)
     rows = await db.execute(
         select(Device.id, Device.name, Device.last_seen_at).where(Device.id.in_(ids))
     )
-    return {
-        row.id: CodeDeviceOut(
-            id=row.id, name=row.name, online=row.id in online, last_seen_at=row.last_seen_at
+    out: dict[uuid.UUID, CodeDeviceOut] = {}
+    for row in rows:
+        offer = offers.get(row.id) if row.id in online else None
+        out[row.id] = CodeDeviceOut(
+            id=row.id,
+            name=row.name,
+            online=row.id in online,
+            last_seen_at=row.last_seen_at,
+            share=bool(offer and can(offer, "share")),
+            start=bool(offer and can(offer, "start")),
+            cancel=bool(offer and can(offer, "cancel")),
         )
-        for row in rows
-    }
+    return out
+
+
+async def conversation_titles(
+    db: AsyncSession, conversation_ids: Iterable[uuid.UUID | None]
+) -> dict[uuid.UUID, str]:
+    ids = {c for c in conversation_ids if c is not None}
+    if not ids:
+        return {}
+    rows = await db.execute(
+        select(Conversation.id, Conversation.title).where(Conversation.id.in_(ids))
+    )
+    return {row.id: row.title for row in rows}
 
 
 async def jobs_out(db: AsyncSession, jobs: list[CodeJob]) -> list[CodeJobOut]:
     devices = await devices_out(db, {job.device_id for job in jobs})
-    return [job_out(job, devices[job.device_id]) for job in jobs if job.device_id in devices]
+    titles = await conversation_titles(db, (job.conversation_id for job in jobs))
+    return [
+        job_out(
+            job,
+            devices[job.device_id],
+            titles.get(job.conversation_id) if job.conversation_id else None,
+        )
+        for job in jobs
+        if job.device_id in devices
+    ]
 
 
 # -- queries ---------------------------------------------------------------------------------
@@ -144,6 +194,21 @@ async def get(db: AsyncSession, job_id: uuid.UUID) -> CodeJob:
     if job is None:
         raise NotFound("Claude Code job not found")
     return job
+
+
+async def find(db: AsyncSession, ref: str) -> CodeJob | None:
+    """A job by its Anemo id (a uuid) or its device's job id (the newest of that id)."""
+    ref = ref.strip()
+    try:
+        job_id = uuid.UUID(ref)
+    except ValueError:
+        return await db.scalar(
+            select(CodeJob)
+            .where(CodeJob.job_key == ref)
+            .order_by(CodeJob.started_at.desc(), CodeJob.id.desc())
+            .limit(1)
+        )
+    return await db.get(CodeJob, job_id)
 
 
 async def list_jobs(

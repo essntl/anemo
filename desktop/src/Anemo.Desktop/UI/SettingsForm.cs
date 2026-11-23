@@ -29,6 +29,9 @@ internal sealed class SettingsForm : Form
     private readonly CheckBox _startWithWindows = new() { Text = "Start with Windows", AutoSize = true };
     private readonly CheckBox _shareCodeJobs = new() { Text = "Share Claude Code jobs with Anemo", AutoSize = true };
     private readonly TextBox _codeJobsFolder = new() { Width = 360 };
+    private readonly CheckBox _startCodeJobs = new() { Text = "Let Anemo start Claude Code jobs", AutoSize = true };
+    private readonly TextBox _projectsFolder = new() { Width = 360 };
+    private readonly TextBox _gitHubOwner = new() { Width = 300 };
     private readonly Label _error = new() { AutoSize = true, ForeColor = Color.Firebrick };
     private readonly DesktopSettings _current;
     private readonly Func<DesktopSettings, string?, string?> _save;
@@ -61,6 +64,13 @@ internal sealed class SettingsForm : Form
         _shareCodeJobs.Checked = current.ShareCodeJobs;
         _codeJobsFolder.Text = current.CodeJobsFolder ?? "";
         _codeJobsFolder.PlaceholderText = CodeJobLimits.DefaultFolder;
+        _startCodeJobs.Checked = current.StartCodeJobs;
+        _projectsFolder.Text = current.CodeProjectsFolder ?? "";
+        _projectsFolder.PlaceholderText = CodeJobLimits.DefaultProjectsFolder;
+        _gitHubOwner.Text = current.GitHubOwner ?? "";
+        _gitHubOwner.PlaceholderText = "the account gh is signed in as";
+        _startCodeJobs.Enabled = _shareCodeJobs.Checked; // a job Anemo starts must be visible to it
+        _shareCodeJobs.CheckedChanged += (_, _) => _startCodeJobs.Enabled = _shareCodeJobs.Checked;
 
         var grid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
         void Row(string label, Control control)
@@ -96,6 +106,18 @@ internal sealed class SettingsForm : Form
             ForeColor = SystemColors.GrayText,
         });
         Row("Jobs folder", _codeJobsFolder);
+        grid.Controls.Add(new Label());
+        grid.Controls.Add(_startCodeJobs);
+        grid.Controls.Add(new Label());
+        grid.Controls.Add(new Label
+        {
+            Text = "Jobs run with --permission-mode bypassPermissions, so Anemo's agents can run anything Claude Code can on this computer. Only while sharing is on and this computer is trusted.",
+            AutoSize = true,
+            MaximumSize = new Size(420, 0),
+            ForeColor = SystemColors.GrayText,
+        });
+        Row("Projects folder", _projectsFolder);
+        Row("GitHub owner", _gitHubOwner);
         grid.Controls.Add(new Label { Text = "Status", AutoSize = true, Padding = new Padding(0, 6, 8, 0) });
         grid.Controls.Add(new Label { Text = status, AutoSize = true, MaximumSize = new Size(420, 0), Padding = new Padding(0, 6, 0, 0) });
         grid.Controls.Add(new Label());
@@ -147,6 +169,13 @@ internal sealed class SettingsForm : Form
             return;
         }
 
+        var owner = _gitHubOwner.Text.Trim();
+        if (owner.Length > 0 && !CodeProjects.IsOwner(owner))
+        {
+            _error.Text = "The GitHub owner is a GitHub user or organisation name: letters, digits and dashes.";
+            return;
+        }
+
         var result = _current with
         {
             Address = AnemoAddress.Parse(_address.Text)!.ToString(),
@@ -157,6 +186,9 @@ internal sealed class SettingsForm : Form
             StartWithWindows = _startWithWindows.Checked,
             ShareCodeJobs = _shareCodeJobs.Checked,
             CodeJobsFolder = string.IsNullOrWhiteSpace(_codeJobsFolder.Text) ? null : _codeJobsFolder.Text.Trim(),
+            StartCodeJobs = _startCodeJobs.Checked,
+            CodeProjectsFolder = string.IsNullOrWhiteSpace(_projectsFolder.Text) ? null : _projectsFolder.Text.Trim(),
+            GitHubOwner = owner.Length == 0 ? null : owner,
         };
         var newToken = token.Length > 0 ? token : null;
         if (_save(result, newToken) is { } problem)

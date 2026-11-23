@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { noteServerTime } from '@/lib/serverClock'
 import type { Timeline, ToolCallView } from '../api'
@@ -86,5 +87,26 @@ describe('tool call durations', () => {
     timeline = { ...timeline, status: 'completed' }
     rerender(<RunActivity runId="r1" live={false} timer={<span>12 s</span>} />)
     expect(screen.queryByText('12 s')).not.toBeInTheDocument()
+  })
+})
+
+describe('Claude Code jobs', () => {
+  it('links a code tool call to the job it names', () => {
+    timeline = {
+      run_id: 'r2', kind: 'agent', status: 'completed', pause_requested: false, plan: null, plan_version: 0, file_changes: [],
+      tool_calls: [
+        call('s', 'code_start', { result_data: { code_job_id: 'job-1' } }),
+        call('t', 'code_status', { result_data: { code_job_id: 'job-2' } }),
+        call('x', 'code_cancel', { result_data: { code_job_id: 'job-3' } }),
+        // Another tool naming a job, or a code tool that names none: no chip.
+        call('o', 'read_file', { result_data: { code_job_id: 'job-4' } }),
+        call('n', 'code_projects', { result_data: null }),
+      ],
+    } as Timeline
+    render(<MemoryRouter><RunActivity runId="r2" live={false} /></MemoryRouter>)
+    // Collapsed after the run: open it.
+    act(() => screen.getByText('5 actions').closest('button')!.click())
+    const chips = screen.getAllByRole('link', { name: 'Claude Code job' })
+    expect(chips.map((a) => a.getAttribute('href'))).toEqual(['/code/job-1', '/code/job-2', '/code/job-3'])
   })
 })

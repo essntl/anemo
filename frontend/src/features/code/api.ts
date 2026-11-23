@@ -5,10 +5,13 @@
  *    (features/chat/useAppEvents.ts);
  *  - a running job's own stream (`/api/code/jobs/{id}/stream`) brings its new events
  *    (`code.events`) and its changed row (`code.job`), see `useCodeEvents`.
+ * Phase 2 (§12): the computers, their projects, and starting, following up and
+ * cancelling jobs.
  */
 import { useEffect, useRef } from 'react'
-import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type Schemas, unwrap } from '@/api/client'
+import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ApiError, api, errorMessage, type Schemas, unwrap } from '@/api/client'
+import { t } from '@/lib/i18n'
 import type { CodeJob, CodeJobState } from './threads'
 import { type CodeEvent, contiguousSeq, mergeEvents } from './timeline'
 
@@ -97,18 +100,126 @@ function eventsQuery(qc: QueryClient, jobId: string) {
   }
 }
 
-/** A job's new row, everywhere it is shown (its thread, the list). */
+/**
+ * A job's new row, everywhere it is shown: its thread (a follow-up joins the thread it
+ * belongs to) and the list.
+ */
 export function putJob(qc: QueryClient, job: CodeJob): void {
-  qc.setQueriesData<CodeJobDetail>({ queryKey: ['code', 'job'] }, (old) =>
-    old && (old.job.id === job.id || old.thread.some((j) => j.id === job.id))
-      ? { job: old.job.id === job.id ? job : old.job, thread: old.thread.map((j) => (j.id === job.id ? job : j)) }
-      : old,
-  )
+  qc.setQueriesData<CodeJobDetail>({ queryKey: ['code', 'job'] }, (old) => {
+    if (!old) return old
+    const inThread = old.thread.some((j) => j.id === job.id)
+    const joins = !inThread && old.thread.some((j) => j.thread_id === job.thread_id)
+    if (!inThread && !joins && old.job.id !== job.id) return old
+    return {
+      job: old.job.id === job.id ? job : old.job,
+      thread: inThread ? old.thread.map((j) => (j.id === job.id ? job : j)) : joins ? [...old.thread, job] : old.thread,
+    }
+  })
   qc.setQueriesData<InfiniteData<CodeJobList>>({ queryKey: codeJobsKey }, (old) =>
     old?.pages.some((p) => p.jobs.some((j) => j.id === job.id))
       ? { ...old, pages: old.pages.map((p) => ({ ...p, jobs: p.jobs.map((j) => (j.id === job.id ? job : j)) })) }
       : old,
   )
+}
+
+// ---- Phase 2: starting, following up and cancelling jobs (§12.2) ----
+
+const fetchDevices = async () => unwrap(await api.GET('/api/code/devices'))
+const fetchProjects = async (deviceId: string) =>
+  unwrap(await api.GET('/api/code/devices/{device_id}/projects', { params: { path: { device_id: deviceId } } }))
+
+/** A trusted computer, and whether it shares jobs and lets Anemo start them. */
+export type CodeDevice = Awaited<ReturnType<typeof fetchDevices>>[number]
+/** A computer's projects: local folders, its owner's repositories not cloned yet, and why that list is missing. */
+export type CodeProjects = Awaited<ReturnType<typeof fetchProjects>>
+export type CodeModel = 'opus' | 'sonnet' | 'haiku'
+
+export const codeDevicesKey = ['code', 'devices'] as const
+/** Not under `codeKey`: asking a computer for its projects runs a command there (up to 45 s). */
+export const codeProjectsKey = (deviceId: string) => ['code-projects', deviceId] as const
+
+/** The trusted computers (refreshed by the app-wide notice, like the jobs). */
+export function useCodeDevices(enabled = true) {
+  return useQuery({ queryKey: codeDevicesKey, enabled, queryFn: fetchDevices })
+}
+
+/** A computer's projects, asked of the computer itself. */
+export function useCodeProjects(deviceId: string | null) {
+  return useQuery({
+    queryKey: codeProjectsKey(deviceId ?? 'none'),
+    enabled: Boolean(deviceId),
+    staleTime: 60_000,
+    retry: false,
+    queryFn: () => fetchProjects(deviceId!),
+  })
+}
+
+export interface StartJobInput {
+  device_id: string
+  project: string
+  prompt: string
+  new: boolean
+  model: CodeModel | null
+}
+
+/** Starts a job on a computer. The new job is a thread of its own, followed live like any running job. */
+export function useStartJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: StartJobInput) => unwrap(await api.POST('/api/code/jobs', { body })),
+    onSuccess: (job) => {
+      qc.setQueryData<CodeJobDetail>(codeJobKey(job.id), { job, thread: [job] })
+      void qc.invalidateQueries({ queryKey: codeJobsKey })
+    },
+    onError: (err) => refreshIfStarted(qc, err),
+  })
+}
+
+/**
+ * Whether a start may have happened although it failed here: the answer never came (a
+ * gateway gave up, 502/504, or the connection dropped), while the computer may have
+ * started the job.
+ */
+export function mayHaveStarted(err: unknown): boolean {
+  return err instanceof ApiError ? err.status === 502 || err.status === 504 : true
+}
+
+/** What to say when starting (a job or a follow-up) failed: the server's message, or that it may have started. */
+export function startErrorMessage(err: unknown): string {
+  return mayHaveStarted(err) ? t('No answer came in time: the job may have started anyway. The list is being refreshed.') : errorMessage(err)
+}
+
+/** After a start that may have happened: the jobs (and threads) and computers load again. */
+function refreshIfStarted(qc: QueryClient, err: unknown): void {
+  if (!mayHaveStarted(err)) return
+  void qc.invalidateQueries({ queryKey: codeKey })
+}
+
+/** Resumes the thread of `jobId` with a new prompt: the new job joins the thread, live. */
+export function useFollowUp(jobId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (prompt: string) =>
+      unwrap(await api.POST('/api/code/jobs/{job_id}/follow-up', { params: { path: { job_id: jobId } }, body: { prompt } })),
+    onSuccess: (job) => {
+      putJob(qc, job)
+      void qc.invalidateQueries({ queryKey: codeKey })
+    },
+    onError: (err) => refreshIfStarted(qc, err),
+  })
+}
+
+/** Cancels a running job (one that has ended comes back as it is). */
+export function useCancelJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (jobId: string) =>
+      unwrap(await api.POST('/api/code/jobs/{job_id}/cancel', { params: { path: { job_id: jobId } } })),
+    onSuccess: (job) => {
+      putJob(qc, job)
+      void qc.invalidateQueries({ queryKey: codeKey })
+    },
+  })
 }
 
 function parse(data: string): Record<string, unknown> | null {

@@ -209,7 +209,7 @@ public sealed class CodeJobsSession
         }
 
         var cancelled = JobFolder.IsCancelled(job.Folder);
-        var alive = ProcessLiveness.IsAlive(_probe, job.Meta.Pid, job.Meta.Started, JobFolder.LastOutputAt(job.Folder), _time.GetUtcNow());
+        var alive = JobState.IsAlive(job.Folder, job.Meta, _probe, _time.GetUtcNow());
         ScanForResult(job); // after the liveness check: a job that just ended is read to its end once more
         var state = cancelled ? JobStates.Cancelled
             : job.ResultFailed is { } failed ? (failed ? JobStates.Failed : JobStates.Done)
@@ -243,22 +243,9 @@ public sealed class CodeJobsSession
     {
         job.ResultScan = JsonlTail.Each(job.OutPath, job.ResultScan, line =>
         {
-            if (!line.Text.Contains("\"result\"", StringComparison.Ordinal))
+            if (JobState.ResultOf(line.Text) is { } failed)
             {
-                return;
-            }
-
-            try
-            {
-                if (JsonNode.Parse(line.Text) is JsonObject ev && Protocol.Wire.Str(ev, "type") == "result")
-                {
-                    var isError = ev["is_error"] is JsonValue e && e.GetValueKind() == JsonValueKind.True;
-                    job.ResultFailed = isError || Protocol.Wire.Str(ev, "subtype") != "success";
-                }
-            }
-            catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException)
-            {
-                // A raw line: not a result.
+                job.ResultFailed = failed;
             }
         });
     }

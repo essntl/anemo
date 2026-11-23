@@ -198,6 +198,59 @@ Needs `C:\anemo-bridge\cc.ps1` and Claude Code on the computer, and an Anemo wit
     restart: the client starts, jobs carry on from Anemo's acks, nothing is lost or doubled.
     `connection-*.log` has only "code job discovered/ended: <id>" lines, no prompts or output.
 
+## Starting Claude Code jobs (Anemo Desktop 1.2.0)
+
+Needs Claude Code (`claude`) on PATH, `gh` signed in (`gh auth status`), git, and an Anemo
+with the Code page's phase 2.
+
+61. **Off by default**: the Settings window shows "Let Anemo start Claude Code jobs" unticked
+    with the bypassPermissions sentence; it is greyed out while sharing is unticked. In Anemo,
+    the Code page offers no "New job" for this computer; an agent's `code_start` is refused.
+62. **Turn it on** (trusted device, sharing on): tick it, save (no restart). The Code page's
+    "New job" lists this computer, its folders in `C:\dev` (with their GitHub remotes) and the
+    owner's repositories not cloned yet. Without `gh` on PATH (rename it for a moment): only
+    local projects, and a note saying why.
+63. **Start from the Code page** in an existing project: within a few seconds the job shows
+    running; no console window opens; `C:\anemo-bridge\jobs\<id>\` holds `prompt.txt` (UTF-8,
+    the prompt with its line breaks and non-ASCII text intact), `meta.json` (with `pid`,
+    `model`), `out.jsonl`, `err.txt`. Task Manager shows `cmd.exe` → `claude` (node). Quit
+    Anemo Desktop: the job keeps running; start it again: it catches up.
+64. **Follow-up**: on a finished job, send a follow-up: a new job starts with
+    `--resume <session>` (see `meta.json`'s `resume`), in the earlier job's folder (also one
+    outside `C:\dev`, e.g. a job `cc.ps1` started elsewhere), and joins the thread on the page.
+    Delete or rename that folder and follow up again: "The folder of job … is gone.", nothing
+    cloned or made.
+65. **Cancel**: cancel a running job from the page: `cmd.exe` and `claude` are gone within a
+    second or two, the `cancelled` file exists, the page shows cancelled and no notification
+    arrives. Cancel a job that already finished: the page keeps its state; nothing is killed.
+66. **Clone**: start a job in a large repository of the owner that isn't in `C:\dev`: the page
+    shows the job running within seconds (the job folder holds `starting` and a `meta.json`
+    without pid) while it is cloned (with `gh`; with `gh` off PATH, with `git clone
+    https://github.com/<owner>/<name>.git`), then the job runs in it and `starting` goes.
+    Cancel a second one while it is still cloning: the clone stops, no half clone is left, the
+    job is cancelled. A name that isn't a repository and "new project" unticked: the job ends
+    "exited without result" with "There is no project … in C:\dev or on GitHub (…)" as its
+    stderr tail, and no folder is left behind.
+66a. **No owner**: clear "GitHub owner" in Settings: the owner is the account `gh auth status`
+    shows. Sign out of gh (`gh auth logout`): the page lists no repositories and says to sign
+    in or set an owner; starting a job in a project that isn't in `C:\dev` (not new) fails at
+    once, nothing is cloned.
+66b. **A repository with its own claude.cmd**: put a `claude.cmd` that writes a file into a
+    project's root and start a job there: the real Claude Code runs, the file isn't written.
+    In Task Manager (command line column), cmd.exe names claude by its full path.
+67. **New project**: "new project" ticked with a new name: `C:\dev\<name>` is made with
+    `git init`, and the job runs in it.
+68. **Claude missing**: take `claude` off PATH (rename its folder in PATH for a moment) and
+    start a job: "Claude Code (claude) isn't on this computer's PATH.", nothing cloned or made.
+69. **Paused / watched / off**: press the stop key, then start a job: refused (cancelling still
+    works). Make the device watched: listing, starting and cancelling are refused. Untick
+    starting: the page's "New job" goes within 30 s; starting and cancelling are refused,
+    listing still works.
+70. Hostile values from a test server (`project` `..\Windows`, `nul.txt`, `...`, `model` `opus & calc`, a
+    prompt with `" & calc & "` and `%PATH%`): the bad fields are refused with a sentence;
+    the prompt runs as text (Claude Code sees it literally), no calculator opens.
+    `logs\commands-<day>.jsonl` has `code_start` with the job id and the prompt's length only.
+
 ## Platforms
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a

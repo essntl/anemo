@@ -16,13 +16,29 @@ over the same WebSocket, for the Code page. On a watched device, or with the box
 nothing is sent. The full `out.jsonl` stays on the computer. Spec: `docs/specs/code-sessions.md`;
 messages: `docs/device-contracts.md` §7.
 
+**Starting jobs from Anemo (1.2.0).** With *Let Anemo start Claude Code jobs* also ticked (off
+by default; it only counts while sharing is on), Anemo can list the projects
+(`C:\dev` and the GitHub owner's repositories through `gh`: the owner set in Settings, else
+the account `gh` is signed in as; with neither, no repositories are listed and nothing is
+cloned), start a job in a project (cloning it with `gh` or `git`, or making a new
+repository, when there is no such folder) and cancel one. A follow-up runs in the folder of
+the job it follows. A job is started as `cc.ps1` does: `cmd.exe /d /v:off /s /c ""<full path
+of claude>" -p --output-format stream-json --verbose --permission-mode bypassPermissions … <
+prompt.txt > out.jsonl 2> err.txt"`, detached, with `NoDefaultCurrentDirectoryInExePath=1` (so a
+`claude.cmd` in a cloned repository never runs), in the same jobs folder, so it is shared like
+any other. Anemo gets its answer within seconds: a needed clone or `git init` runs afterwards
+while the job folder holds a `starting` file; a clone that fails ends the job with the reason
+in `err.txt`. **`bypassPermissions` means Anemo's agents can make Claude Code
+do anything it can on this computer**: tick it only on a computer you'd give PowerShell to.
+Needs `claude` on PATH, and `gh` (signed in) or `git` for cloning.
+
 ## Layout
 
 ```
 desktop/
   AnemoDesktop.sln
   src/Anemo.Desktop.Core/     net8.0: everything that can be tested anywhere
-    CodeJobs/                 sharing Claude Code jobs: job folders, out.jsonl tailing, trimming, state, code.* frames
+    CodeJobs/                 Claude Code jobs: sharing (folders, tailing, trimming, state, code.* frames) and starting/cancelling
     Connection/               the WebSocket (hello, welcome, ping, offer, commands, close codes, back-off)
     Commands/                 the command handlers (look, act, shell), key names, refs, output capture, log summaries
     Control/                  "Allow control", the pause, hotkey parsing
@@ -104,5 +120,10 @@ Windows 10 1903 or later is needed (Windows.Graphics.Capture).
   hour*): control is paused for an hour, the running command is cancelled and answered
   `stopped`, and `device.stopped` is sent.
 - Claude Code jobs are sent only while *Share Claude Code jobs with Anemo* is ticked **and**
-  `welcome` says the device is trusted; switching either off stops it at once. The client never
-  starts, changes or cancels a job (1.1.0 only reads the jobs folder).
+  `welcome` says the device is trusted; switching either off stops it at once.
+- Anemo starts or cancels a job only while *Let Anemo start Claude Code jobs* is ticked, sharing
+  is on and the device is trusted (and, to start one, control is allowed and not paused). The
+  project is a plain folder name; the model, session and turns are checked against strict
+  patterns; the prompt goes to Claude Code through `prompt.txt`, never on a command line.
+  Cancelling ends the job's process tree only when that process is still the job's (a pid
+  another program got since is left alone).

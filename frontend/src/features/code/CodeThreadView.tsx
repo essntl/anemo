@@ -20,6 +20,7 @@ import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { useCodeEvents, useCodeJob } from './api'
 import { CodeTimeline } from './CodeTimeline'
+import { CancelJobButton, FollowUpBox, FromChat } from './controls'
 import { JobContext } from './jobContext'
 import { StateBadge, TodoChecklist } from './parts'
 import { type CodeJob, jobDurationMs, pullRequest, toThreads } from './threads'
@@ -123,6 +124,7 @@ function JobPart({ job, index, onSize }: { job: CodeJob; index: number; onSize?:
             <span className="h-px flex-1 bg-border" />
           </div>
         )}
+        <FromChat job={job} />
         <Prompt text={job.prompt} />
         <div className="min-w-0">
           {events.isPending && <p className="px-2 py-1 text-[12.5px] text-muted">{t('Loading…')}</p>}
@@ -182,6 +184,7 @@ function Header({ thread }: { thread: CodeJob[] }) {
         <StateBadge state={latest.state} />
         {running && <Elapsed since={latest.started_at} className="text-[12.5px] text-muted" />}
         <span className="text-[12px] text-muted">{formatWhen(first.started_at)}</span>
+        <span className="ml-auto"><CancelJobButton job={latest} /></span>
       </div>
       <h2 className="mt-2 break-words text-lg font-semibold">{first.title || t('(no title)')}</h2>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px] text-muted">
@@ -269,6 +272,7 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
             <div className="flex flex-col">
               {thread.map((job, i) => <JobPart key={job.id} job={job} index={i} onSize={i === thread.length - 1 ? setSize : undefined} />)}
             </div>
+            <FollowUpBox job={latest} />
           </>
         )}
       </div>
