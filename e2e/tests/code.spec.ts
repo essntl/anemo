@@ -119,14 +119,14 @@ test('a shared Claude Code job shows on the Code page and updates live', async (
     await expect(page.getByText(project).first()).toBeVisible()
     const row = page.getByTestId('code-thread').filter({ hasText: title })
     await expect(row).toBeVisible()
-    await expect(row.getByText('Running')).toBeVisible()
+    await expect(row.getByText('Running', { exact: true })).toBeVisible()
     await row.click()
     await expect(page).toHaveURL(/\/code\/[0-9a-f-]{36}/)
 
     // The todo list, the assistant's text and the command it ran.
-    await expect(page.getByText('Todo list')).toBeVisible()
+    await expect(page.getByText('Todo list').first()).toBeVisible()
     await expect(page.getByText('Run the check').first()).toBeVisible()
-    await expect(page.getByText('The function subtracts instead of adding.')).toBeVisible()
+    await expect(page.getByText('The function subtracts instead of adding.').first()).toBeVisible()
     await expect(page.getByText('python -c "import calc; print(calc.add(2, 3))"').first()).toBeVisible()
 
     // Live: the rest of the job arrives while the page is open.
@@ -134,10 +134,10 @@ test('a shared Claude Code job shows on the Code page and updates live', async (
     const total = firstEvents.length + lastEvents.length
     expect(await computer.ackAtLeast(id, total)).toBe(total)
     computer.job(job(id, project, `${title}\n\nThen run the check.`, 'done'))
-    await expect(page.getByText('All checks pass now.')).toBeVisible()
+    await expect(page.getByText('All checks pass now.').first()).toBeVisible()
     await expect(page.getByText('API-equivalent cost').first()).toBeVisible()
     await expect(page.getByRole('link', { name: /github\.com\/essntl\/calc\/pull\/7|#7/ }).first()).toBeVisible()
-    await expect(row.getByText('Done')).toBeVisible()
+    await expect(row.getByText('Done', { exact: true })).toBeVisible()
 
     // A watched computer's jobs are ignored: no ack, nothing listed.
     watched = await FakeComputer.connect(page.request, baseURL!, `E2E Code watched ${s}`, 'watched')
