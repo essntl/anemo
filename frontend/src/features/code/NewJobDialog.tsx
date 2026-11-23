@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
 import { msg, t } from '@/lib/i18n'
 import { type CodeModel, useCodeDevices, useCodeProjects, useStartJob } from './api'
+import { knownProject, validProjectName } from './projects'
 
 const MODELS: { value: '' | CodeModel; label: string }[] = [
   { value: '', label: msg('Default') },
@@ -22,10 +23,6 @@ const MODELS: { value: '' | CodeModel; label: string }[] = [
   { value: 'sonnet', label: 'Sonnet' },
   { value: 'haiku', label: 'Haiku' },
 ]
-
-/** What Anemo Desktop accepts as a project: a folder name, not a path (§12.1). */
-const PROJECT_NAME = /^[A-Za-z0-9._-]{1,100}$/
-const validProject = (name: string) => PROJECT_NAME.test(name) && name !== '.' && name !== '..'
 
 export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const navigate = useNavigate()
@@ -44,15 +41,10 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const projects = useCodeProjects(open && device ? device.id : null)
 
   const name = project.trim()
-  const known = useMemo(() => {
-    const p = projects.data
-    const lower = name.toLowerCase()
-    return Boolean(p && (p.projects.some((x) => x.name.toLowerCase() === lower) || p.remote.some((x) => x.name.toLowerCase() === lower)))
-  }, [projects.data, name])
-  // "New project" only means something for a name that is nowhere yet.
-  const offerNew = name !== '' && validProject(name) && projects.isSuccess && !known
-  const badName = name !== '' && !validProject(name)
-  const ready = Boolean(device) && validProject(name) && prompt.trim() !== '' && !start.isPending
+  // "New project" only means something for a name the computer can't resolve (§12.1, §12.5).
+  const offerNew = name !== '' && validProjectName(name) && projects.isSuccess && !knownProject(projects.data, name)
+  const badName = name !== '' && !validProjectName(name)
+  const ready = Boolean(device) && validProjectName(name) && prompt.trim() !== '' && !start.isPending
 
   const submit = () => {
     if (!ready || !device) return
@@ -96,7 +88,7 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         )}
 
         <Field label={t('Project')}
-          error={badName ? t('A folder name: letters, digits, dots, dashes and underscores.') : projects.isError ? errorMessage(projects.error) : undefined}
+          error={badName ? t('A folder name: letters, digits, dots, dashes and underscores; not a Windows device name like CON or NUL, and no dot at the end.') : projects.isError ? errorMessage(projects.error) : undefined}
           hint={projects.isFetching ? t('Asking the computer for its projects…') : projects.data?.note ?? undefined}>
           <Input value={project} onChange={(e) => setProject(e.target.value)} list={listId} autoComplete="off" spellCheck={false}
             placeholder={t('A project folder or a GitHub repository')} disabled={!device} />

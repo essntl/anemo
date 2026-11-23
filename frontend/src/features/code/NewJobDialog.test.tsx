@@ -63,7 +63,7 @@ beforeEach(() => {
 })
 
 const dialog = () => screen.getByRole('dialog')
-const projectBox = () => within(dialog()).getByRole('combobox', { name: 'Project' })
+const projectBox = () => within(dialog()).getByRole('combobox', { name: /^Project/ })
 
 describe('New job', () => {
   it('offers only computers that let Anemo start jobs, and asks the chosen one for its projects', async () => {
@@ -125,8 +125,27 @@ describe('New job', () => {
     show()
     await userEvent.type(projectBox(), '..\\secrets')
     await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'x')
-    expect(within(dialog()).getByText('A folder name: letters, digits, dots, dashes and underscores.')).toBeInTheDocument()
+    expect(within(dialog()).getByText(/^A folder name: letters, digits/)).toBeInTheDocument()
     expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+  })
+
+  it('refuses a Windows device name and a name ending with a dot, as the computer does', async () => {
+    show()
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'x')
+    for (const name of ['nul.txt', 'COM3', 'site.', '...']) {
+      await userEvent.clear(projectBox())
+      await userEvent.type(projectBox(), name)
+      expect(within(dialog()).getByText(/^A folder name: letters, digits/)).toBeInTheDocument()
+      expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+      expect(within(dialog()).queryByRole('switch', { name: 'New project' })).not.toBeInTheDocument()
+    }
+  })
+
+  it('doesn’t offer "New project" for a name a local folder is a clone of', async () => {
+    projects.d1.projects.push({ name: 'anemo-main', dir: 'C:\dev\anemo-main', remote: 'https://github.com/essntl/anemo-core.git' })
+    show()
+    await userEvent.type(projectBox(), 'anemo-core')
+    expect(within(dialog()).queryByRole('switch', { name: 'New project' })).not.toBeInTheDocument()
   })
 
   it('shows the server’s message when starting fails, and stays open', async () => {
