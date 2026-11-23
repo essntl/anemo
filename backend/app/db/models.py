@@ -9,6 +9,7 @@ from app.features.audit import models as audit_models
 from app.features.auth import models as auth_models
 from app.features.automations import models as automations_models
 from app.features.calendar import models as calendar_models
+from app.features.code_sessions import models as code_sessions_models
 from app.features.conversations import models as conversations_models
 from app.features.devices import models as devices_models
 from app.features.documents import models as documents_models
@@ -41,6 +42,7 @@ __all__ = [
     "auth_models",
     "automations_models",
     "calendar_models",
+    "code_sessions_models",
     "conversations_models",
     "devices_models",
     "documents_models",

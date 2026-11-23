@@ -562,6 +562,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Code Settings */
+        put: operations["put_code_settings_api_settings_code_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -3470,6 +3487,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Jobs
+         * @description Jobs on every computer, newest first, with every project that has jobs. The next
+         *     page: `before` and `before_id` of the last job shown.
+         */
+        get: operations["list_jobs_api_code_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Job
+         * @description A job and every job of its thread (follow-ups by `resume_session`), in start
+         *     order.
+         */
+        get: operations["get_job_api_code_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Events
+         * @description The job's stored events after `after_seq`, by seq.
+         */
+        get: operations["job_events_api_code_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Stream
+         * @description The job live (SSE): `code.events` and `code.job`. Reconnects send Last-Event-ID.
+         */
+        get: operations["job_stream_api_code_jobs__job_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research/sessions": {
         parameters: {
             query?: never;
@@ -4529,6 +4628,7 @@ export interface components {
             properties: components["schemas"]["PropertySettings"];
             dictation: components["schemas"]["DictationSettings"];
             voice: components["schemas"]["VoiceSettings"];
+            code: components["schemas"]["CodeSettings"];
         };
         /** AppearanceSettings */
         AppearanceSettings: {
@@ -5319,6 +5419,159 @@ export interface components {
             login_command: string;
             /** Start Command */
             start_command: string;
+        };
+        /** CodeDeviceOut */
+        CodeDeviceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Online */
+            online: boolean;
+            /** Last Seen At */
+            last_seen_at: string | null;
+        };
+        /** CodeEventOut */
+        CodeEventOut: {
+            /** Seq */
+            seq: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "system" | "assistant" | "user" | "result" | "raw" | "other";
+            /** Event */
+            event: {
+                [key: string]: unknown;
+            };
+            /** Trimmed */
+            trimmed: boolean;
+            /** Dropped */
+            dropped: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CodeEventsOut */
+        CodeEventsOut: {
+            /** Events */
+            events: components["schemas"]["CodeEventOut"][];
+            /** Last Seq */
+            last_seq: number;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** CodeJobDetailOut */
+        CodeJobDetailOut: {
+            job: components["schemas"]["CodeJobOut"];
+            /** Thread */
+            thread: components["schemas"]["CodeJobOut"][];
+        };
+        /** CodeJobListOut */
+        CodeJobListOut: {
+            /** Jobs */
+            jobs: components["schemas"]["CodeJobOut"][];
+            /** Projects */
+            projects: string[];
+            /** Has More */
+            has_more: boolean;
+        };
+        /** CodeJobOut */
+        CodeJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Key */
+            job_key: string;
+            device: components["schemas"]["CodeDeviceOut"];
+            /** Project */
+            project: string;
+            /** Dir */
+            dir: string;
+            /** Job Dir */
+            job_dir: string;
+            /** Title */
+            title: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "done" | "failed" | "cancelled" | "exited_without_result";
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Last Event At */
+            last_event_at: string | null;
+            /** Session Id */
+            session_id: string | null;
+            /** Resume Session */
+            resume_session: string | null;
+            /**
+             * Thread Id
+             * Format: uuid
+             */
+            thread_id: string;
+            /** Model */
+            model: string | null;
+            /** Branch */
+            branch: string | null;
+            /** Pr Url */
+            pr_url: string | null;
+            /** Todos */
+            todos: components["schemas"]["CodeTodoOut"][];
+            /** Num Turns */
+            num_turns: number | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Cost Usd */
+            cost_usd: number | null;
+            /** Result Text */
+            result_text: string | null;
+            /** Result Subtype */
+            result_subtype: string | null;
+            /** Is Error */
+            is_error: boolean;
+            /** Stderr Tail */
+            stderr_tail: string | null;
+            /** Last Seq */
+            last_seq: number;
+            /** Event Count */
+            event_count: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * CodeSettings
+         * @description The Code page: Claude Code jobs that computers share (features/code_sessions).
+         */
+        CodeSettings: {
+            /**
+             * Keep Days
+             * @default 30
+             */
+            keep_days: number;
+        };
+        /** CodeTodoOut */
+        CodeTodoOut: {
+            /** Content */
+            content: string;
+            /** Status */
+            status: string;
+            /** Activeform */
+            activeForm?: string | null;
         };
         /** ContentOut */
         ContentOut: {
@@ -7206,7 +7459,7 @@ export interface components {
              *       "files"
              *     ]
              */
-            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
             /**
              * More
              * @default [
@@ -7214,14 +7467,15 @@ export interface components {
              *       "focus",
              *       "music",
              *       "runs",
+             *       "code",
              *       "automations",
              *       "agents",
              *       "memory"
              *     ]
              */
-            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
             /** Off */
-            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "automations" | "agents" | "memory")[];
+            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
         };
         /** NewDeviceOut */
         NewDeviceOut: {
@@ -11792,6 +12046,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_code_settings_api_settings_code_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSettings"];
                 };
             };
             /** @description Validation Error */
@@ -18572,6 +18861,148 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_jobs_api_code_jobs_get: {
+        parameters: {
+            query?: {
+                project?: string | null;
+                state?: ("running" | "done" | "failed" | "cancelled" | "exited_without_result") | null;
+                device_id?: string | null;
+                limit?: number;
+                /** @description started_at of the last job shown */
+                before?: string | null;
+                /** @description id of the last job shown */
+                before_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_code_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_events_api_code_jobs__job_id__events_get: {
+        parameters: {
+            query?: {
+                after_seq?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeEventsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_stream_api_code_jobs__job_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "last-event-id"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

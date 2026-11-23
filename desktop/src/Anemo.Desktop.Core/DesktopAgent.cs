@@ -1,3 +1,4 @@
+using Anemo.Desktop.Core.CodeJobs;
 using Anemo.Desktop.Core.Commands;
 using Anemo.Desktop.Core.Connection;
 using Anemo.Desktop.Core.Control;
@@ -18,7 +19,13 @@ public sealed record DesktopAgentParts(
     string Version,
     string DefaultWorkFolder,
     DeviceConnectionOptions? ConnectionOptions = null,
-    CommandOptions? CommandOptions = null);
+    CommandOptions? CommandOptions = null,
+    IProcessProbe? Processes = null,
+    CodeJobsOptions? CodeJobsOptions = null)
+{
+    /// <summary>The Claude Code jobs' state file, beside <c>settings.json</c>.</summary>
+    public string CodeJobsStateFile => Path.Combine(Path.GetDirectoryName(Store.Path) ?? ".", "code-jobs.json");
+}
 
 /// <summary>
 /// The client without its window: settings, control state, the connection and the
@@ -48,6 +55,13 @@ public sealed class DesktopAgent
             () => Settings,
             parts.CommandLog,
             WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder));
+        CodeJobs = new CodeJobSharing(
+            () => Settings,
+            new CodeJobStore(parts.CodeJobsStateFile, parts.Time, parts.Log),
+            parts.Processes ?? NoProcesses.Instance,
+            parts.Time,
+            parts.Log,
+            parts.CodeJobsOptions);
         Connection = new DeviceConnection(
             ConnectionSettings,
             Control,
@@ -55,7 +69,8 @@ public sealed class DesktopAgent
             Processor,
             parts.Log,
             parts.Version,
-            parts.ConnectionOptions);
+            parts.ConnectionOptions,
+            CodeJobs);
         _sharedScreen = new SharedScreenClient(parts.Http);
     }
 
@@ -64,6 +79,9 @@ public sealed class DesktopAgent
     public DeviceConnection Connection { get; }
 
     public CommandProcessor Processor { get; }
+
+    /// <summary>"Share Claude Code jobs with Anemo".</summary>
+    public CodeJobSharing CodeJobs { get; }
 
     public DesktopSettings Settings
     {
@@ -104,11 +122,17 @@ public sealed class DesktopAgent
             _settings = updated;
         }
 
+        var codeChanged = old.ShareCodeJobs != settings.ShareCodeJobs || old.CodeJobsFolder != settings.CodeJobsFolder;
+        if (codeChanged)
+        {
+            CodeJobs.SettingsChanged(); // starts or stops sharing on the open connection
+        }
+
         if (old.Address != settings.Address || newToken is not null)
         {
             Connection.Reconnect();
         }
-        else if (old.PowerShellEnabled != settings.PowerShellEnabled)
+        else if (old.PowerShellEnabled != settings.PowerShellEnabled || old.ShareCodeJobs != settings.ShareCodeJobs)
         {
             Connection.OfferNow();
         }

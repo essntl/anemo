@@ -48,6 +48,7 @@ describe('moving pages', () => {
 describe('addresses', () => {
   it('knows which page an address belongs to', () => {
     expect(pageAt('/runs/abc')).toBe('runs')
+    expect(pageAt('/code/0195a0c4-7b1e-7000-8000-000000000001')).toBe('code')
     expect(pageAt('/stats')).toBe('focus')
     expect(pageAt('/settings/focus')).toBeUndefined()
     expect(pageAt('/musical')).toBeUndefined()

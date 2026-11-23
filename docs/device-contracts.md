@@ -63,9 +63,12 @@ failed and cancelled runs too, with a one-sentence text saying so.
 ### Commands to a computer
 
 ```
-client → {"type": "device.offer", "control": bool, "shell": bool}
+client → {"type": "device.offer", "control": bool, "shell": bool, "code": bool,
+          "code_start": bool}
           on connect and every 30 s; control: "Allow control" is on;
-          shell: PowerShell is switched on in the client
+          shell: PowerShell is switched on in the client; code: "Share Claude Code
+          jobs with Anemo" is on (§7); code_start: "Let Anemo start Claude Code jobs" is
+          on (§7, phase 2). A missing code or code_start means false.
 server → {"type": "device.command", "id": "<uuid>", "action": "<action>", …fields}
 client → {"type": "device.result", "id": "<uuid>", "ok": true, "state": {…}}
 client → {"type": "device.result", "id": "<uuid>", "ok": false, "error": "<one sentence>",
@@ -172,7 +175,100 @@ agent, as untrusted content.
 
 ## 6. Versions
 
-The `version` in `hello` is the client's. The server sends
+The `version` in `hello` is the client's. Anemo Desktop 1.1.0 adds Claude Code jobs
+(§7, `code.*` messages and the `code` offer field); 1.2.0 adds the `code_*` actions
+(§7.4). The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
 `{"type": "notice", "text": "…"}` once per connection when a client is older than the
 oldest version it supports; it keeps working where it can. A client that gets an action it
 doesn't know answers `failed` with "Unknown action “…”", so an old client fails loudly.
+
+## 7. Claude Code jobs (Anemo Desktop 1.1.0)
+
+A computer can share the Claude Code jobs that run on it (`docs/specs/code-sessions.md`).
+A job is a folder `<jobs>\<id>\` (default `C:\anemo-bridge\jobs`) with `prompt.txt`,
+`out.jsonl` (Claude Code's `--output-format stream-json --verbose`, one event per line),
+`err.txt`, `meta.json` (`{id, pid, dir, resume, started, prompt_preview}`, optionally
+`model`) and, once cancelled, a `cancelled` file. Job ids match
+`^\d{8}-\d{6}-[A-Za-z0-9]{4}$`.
+
+The client shares only when "Share Claude Code jobs with Anemo" is on **and** `welcome`
+said the device is `trusted`. The server ignores every `code.*` message of a device that
+isn't trusted, or isn't a computer: it stores nothing and sends no `code.ack`.
+
+### 7.1 Messages
+
+```
+client → {"type": "code.job", "job": {
+            "id": "<job id>",
+            "device_job_dir": "<the job folder>",            // ≤ 1000 characters
+            "project": "<last segment of dir>",              // ≤ 200
+            "dir": "<the folder the job works in>",          // ≤ 1000
+            "started": "<ISO 8601 with offset>",
+            "prompt": "<prompt.txt>",                        // ≤ 20 000 characters
+            "resume_session": "<session id>" | null,         // ≤ 100
+            "model": "<model>" | null,                       // ≤ 100
+            "pid": <int> | null,
+            "state": "running" | "done" | "failed" | "cancelled" | "exited_without_result",
+            "ended": "<ISO 8601>" | null,
+            "branch": "<branch>" | null,                     // from <dir>\.git\HEAD, ≤ 255
+            "stderr_tail": "<last ≤ 4000 characters of err.txt>" | null }}
+server → {"type": "code.ack", "job_id": "<job id>", "seq": <int ≥ 0>}
+client → {"type": "code.events", "job_id": "<job id>",
+          "events": [{"seq": <int ≥ 1>, "event": {…}, "trimmed": bool}, …]}   1–200 items
+server → {"type": "code.ack", "job_id": "<job id>", "seq": <int ≥ 0>}
+```
+
+- `seq` is the 1-based number of the non-blank line in `out.jsonl`. A line that isn't a
+  JSON object is sent as `{"type": "raw", "text": "<line, ≤ 2000 characters>"}`.
+- `code.job` goes first: when a job is discovered, when its `state`, `branch` or `pid`
+  changes, and after every (re)connect for each job that isn't settled (its terminal
+  state was sent and its events were acked to the end of `out.jsonl`).
+- Every `code.job` is answered with a `code.ack` carrying the last `seq` the server has
+  stored without a gap (0 when none). The client then sends events from `seq + 1`.
+  `code.events` for a job the server hasn't been told about is ignored.
+- One `code.events` frame in flight per job; the next waits for the previous one's ack.
+  A frame holds at most 200 events and at most 256 KB of UTF-8. The server ignores a
+  `code.events` text over 300 000 characters and a `code.job` over 64 000.
+- When a job ends, its remaining events are sent before the `code.job` with the
+  terminal state.
+- The ack is the highest `seq` such that all of 1…seq are stored. Repeated items are
+  stored once; items after a gap are stored but the ack waits for the gap to be filled.
+- Each event is trimmed to at most 16 000 bytes of compact UTF-8 JSON before it is sent
+  (`docs/specs/code-sessions.md` §6), `trimmed: true` when anything was cut. The server
+  trims again by the same rules and may store only a stub once a job holds 5 MB.
+- No ack within 60 s: the client reconnects as after a drop. Exception: when no
+  `code.ack` at all came on the connection (a server without this feature), the client
+  stops sharing on that connection and doesn't reconnect for it.
+- Frames must keep every limit (`docs/specs/code-sessions.md` §9 and the lengths above;
+  `seq` ≤ 10 000 000, `pid` 0…2³¹−1): a frame that fails validation is ignored, with no
+  ack. `type` is the first key of every `code.*` message.
+
+### 7.2 State
+
+`cancelled` when the `cancelled` file exists; else `done` / `failed` when a `result`
+event was written (`failed` when `is_error` or a `subtype` other than `success`); else
+`running` while the process with `pid` lives (and started within a minute of
+`started`); else `exited_without_result`. A process that can't be read counts as alive only while `out.jsonl` or `err.txt` was written in the last 30 minutes. The server also makes a job `done` / `failed`
+when it stores a `result` event.
+
+### 7.3 Privacy
+
+Everything a job writes is untrusted content and may hold secrets. Neither side logs
+event contents. The full log stays on the computer.
+
+### 7.4 Actions (Anemo Desktop 1.2.0)
+
+`device.command` actions, answered with `device.result` like §3. All are refused
+(`refused`) when the device isn't trusted or "Let Anemo start Claude Code jobs" is off;
+`code_projects` needs only sharing.
+
+| action | fields | `state` |
+|---|---|---|
+| `code_projects` | | `{"projects": [{"name", "dir", "remote": "<url>" \| null}], "remote": [{"name", "url"}], "note": "…" \| null}`: folders in the projects folder (default `C:\dev`), and the owner's GitHub repositories not cloned yet (`gh repo list`; `note` says why when that list couldn't be read) |
+| `code_start` | `project` (≤ 200), `prompt` (1–100 000), `new` (bool), `resume_session?`, `model?` (≤ 100), `max_turns?` (1–500) | `{"job_id", "dir", "project"}` once the job runs. The project resolves to a folder of that name, or a folder whose git remote has that name, else it is cloned from GitHub, else with `new` an empty folder (`git init`) is made; `failed` with a sentence otherwise |
+| `code_cancel` | `job_id` | `{"job_id", "state": "cancelled"}`; ends the job's process tree and writes the `cancelled` file; `failed` when there is no such job, `{"job_id", "state": "<state>"}` when it had already ended |
+
+A follow-up is `code_start` with `resume_session` and the project of the earlier job.
+The job runs `claude -p --output-format stream-json --verbose --permission-mode
+bypassPermissions [--resume <s>] [--model <m>] [--max-turns <n>]` in its folder, the
+prompt on stdin, like `cc.ps1`.

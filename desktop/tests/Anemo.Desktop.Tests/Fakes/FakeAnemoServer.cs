@@ -29,6 +29,8 @@ public sealed class FakeAnemoServer : IAsyncDisposable
     /// <summary>The real server's limits (backend/app/features/devices/ws.py).</summary>
     public const int MaxMessage = 4096;
     public const int MaxResult = 12 * 1024 * 1024;
+    public const int MaxCodeJob = 64_000;
+    public const int MaxCodeEvents = 300_000;
 
     private readonly WebApplication _app;
     private readonly Channel<FakeClient> _clients = Channel.CreateUnbounded<FakeClient>();
@@ -53,6 +55,9 @@ public sealed class FakeAnemoServer : IAsyncDisposable
     public Version MinVersion { get; set; } = new(1, 0, 0);
 
     public string Cursor { get; set; } = "cursor-1";
+
+    /// <summary>Takes Claude Code jobs (code.job / code.events) and acks them; null: an Anemo that ignores them.</summary>
+    public CodeJobs.FakeCodeServer? Code { get; set; }
 
     public ConcurrentQueue<SeenRequest> Requests { get; } = new();
 
@@ -347,7 +352,7 @@ public sealed class FakeAnemoServer : IAsyncDisposable
                         continue;
                     }
                 }
-                else if (LastLength > MaxMessage)
+                else if (LastLength > type switch { "code.job" => MaxCodeJob, "code.events" => MaxCodeEvents, _ => MaxMessage })
                 {
                     Dropped.Enqueue(type ?? "?");
                     continue;
@@ -359,6 +364,13 @@ public sealed class FakeAnemoServer : IAsyncDisposable
                 }
 
                 _received.Writer.TryWrite(msg);
+
+                // Claude Code jobs (§7): stored and acked only for a trusted device, as the real server does.
+                if (type is "code.job" or "code.events" && _server.Code is { } code && _server.Trust == "trusted"
+                    && code.Handle(msg) is { } ack)
+                {
+                    await SendAsync(CodeJobs.FakeCodeServer.AckMessage(ack.JobId, ack.Seq));
+                }
             }
 
             _closed.TrySetResult((int?)_ws.CloseStatus);

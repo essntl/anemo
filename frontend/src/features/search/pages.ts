@@ -18,6 +18,7 @@ import {
   MessagesSquare,
   Settings,
   SquarePen,
+  SquareTerminal,
 } from 'lucide-react'
 import { isOffAddress, type PageId } from '@/features/settings/navigation'
 import { visibleSections } from '@/features/settings/sections'
@@ -49,6 +50,7 @@ export const PAGES: PageLink[] = [
   { label: msg('Tasks'), to: '/tasks', icon: CheckSquare, keywords: msg('todo board') },
   { label: msg('Calendar'), to: '/calendar', icon: CalendarDays, keywords: msg('events schedule') },
   { label: msg('Runs'), to: '/runs', icon: History, keywords: msg('agent history activity') },
+  { label: msg('Code'), to: '/code', icon: SquareTerminal, keywords: msg('claude code jobs sessions') },
   { label: msg('Automations'), to: '/automations', icon: Clock, keywords: msg('schedule cron recurring') },
   { label: msg('Profiles & Skills'), to: '/agents', icon: Bot, keywords: msg('agent profile skill') },
   { label: msg('Memory'), to: '/memory', icon: Brain, keywords: msg('remember') },

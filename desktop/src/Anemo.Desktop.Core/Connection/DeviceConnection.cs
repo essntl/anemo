@@ -53,6 +53,7 @@ public sealed class DeviceConnection
     private readonly IDiagnosticLog _log;
     private readonly string _version;
     private readonly DeviceConnectionOptions _options;
+    private readonly ICodeJobsHost? _codeJobs;
     private readonly object _lock = new();
     private TaskCompletionSource _kick = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _kicked;
@@ -71,7 +72,8 @@ public sealed class DeviceConnection
         ICommandExecutor executor,
         IDiagnosticLog log,
         string version,
-        DeviceConnectionOptions? options = null)
+        DeviceConnectionOptions? options = null,
+        ICodeJobsHost? codeJobs = null)
     {
         _settings = settings;
         _control = control;
@@ -80,6 +82,7 @@ public sealed class DeviceConnection
         _log = log;
         _version = version;
         _options = options ?? new DeviceConnectionOptions();
+        _codeJobs = codeJobs;
     }
 
     public event Action<ConnectionStatus>? StatusChanged;
@@ -255,6 +258,7 @@ public sealed class DeviceConnection
 
                 Device = welcome;
                 _badHellos = 0;
+                session.Device = welcome;
                 live = session;
                 _session = session;
                 _log.Info($"connected as {welcome.Name} ({welcome.Trust})");
@@ -358,7 +362,8 @@ public sealed class DeviceConnection
         {
             try
             {
-                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn()));
+                var code = Device is { } device && _owner._codeJobs?.Offered(device) == true;
+                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code));
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
             {
@@ -368,6 +373,9 @@ public sealed class DeviceConnection
 
         /// <summary>A stop is being answered; its own offer comes last.</summary>
         public bool StopPending => _stopPending;
+
+        /// <summary>The device from <c>welcome</c> (set before the session is used).</summary>
+        public DeviceInfo? Device { get; set; }
 
         /// <summary>The user stopped control: cancel the running command, or say so at once.</summary>
         public async Task StopAsync()
@@ -419,6 +427,7 @@ public sealed class DeviceConnection
             var worker = Task.Run(() => WorkAsync(device, loopsCts.Token));
             var pings = Task.Run(() => PingAsync(loopsCts.Token));
             var offers = Task.Run(() => OfferAsync(loopsCts.Token));
+            var code = Task.Run(() => ShareCodeJobsAsync(device, loopsCts.Token));
             try
             {
                 while (true)
@@ -436,7 +445,7 @@ public sealed class DeviceConnection
             {
                 _commands.Writer.TryComplete();
                 loopsCts.Cancel();
-                await Task.WhenAll(Quietly(worker), Quietly(pings), Quietly(offers));
+                await Task.WhenAll(Quietly(worker), Quietly(pings), Quietly(offers), Quietly(code));
             }
         }
 
@@ -455,6 +464,9 @@ public sealed class DeviceConnection
                     break;
                 case "notice":
                     Notice(msg);
+                    break;
+                case "code.ack":
+                    _owner._codeJobs?.OnAck(msg);
                     break;
                 case "event":
                     _owner._cursor = Wire.Str(msg, "id") ?? _owner._cursor;
@@ -527,6 +539,31 @@ public sealed class DeviceConnection
                 {
                     await SendStoppedAsync();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Claude Code jobs (device-contracts.md §7) beside the commands: their frames go through
+        /// the same send lock, one at a time. A failure there never ends the connection.
+        /// </summary>
+        private async Task ShareCodeJobsAsync(DeviceInfo device, CancellationToken ct)
+        {
+            if (_owner._codeJobs is not { } host)
+            {
+                return;
+            }
+
+            try
+            {
+                await host.RunAsync(new CodeJobsLink(this), device, ct);
+            }
+            catch (Exception e) when (e is OperationCanceledException or WebSocketException or ObjectDisposedException)
+            {
+                // The connection ended.
+            }
+            catch (Exception e)
+            {
+                _owner._log.Info($"code jobs stopped: {e.GetType().Name}");
             }
         }
 
@@ -605,6 +642,21 @@ public sealed class DeviceConnection
 
                 return System.Text.Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
             }
+        }
+
+        private sealed class CodeJobsLink : ICodeJobsLink
+        {
+            private readonly Session _session;
+
+            public CodeJobsLink(Session session) => _session = session;
+
+            public Task SendAsync(string text, CancellationToken ct)
+            {
+                ct.ThrowIfCancellationRequested();
+                return _session.SendAsync(text);
+            }
+
+            public void Drop() => _session._ws.Abort();
         }
 
         private static async Task Quietly(Task task)

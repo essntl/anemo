@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Anemo.Desktop.Core.CodeJobs;
 using Anemo.Desktop.Core.Connection;
 using Anemo.Desktop.Core.Control;
 using Anemo.Desktop.Core.Storage;
@@ -9,7 +10,8 @@ namespace Anemo.Desktop.UI;
 
 /// <summary>
 /// The Settings window: Anemo's address, the device token (never shown again once saved),
-/// PowerShell, its working folder, the two hotkeys and "Start with Windows".
+/// PowerShell, its working folder, the two hotkeys, "Start with Windows" and sharing Claude
+/// Code jobs.
 /// </summary>
 internal sealed class SettingsForm : Form
 {
@@ -25,6 +27,8 @@ internal sealed class SettingsForm : Form
     private readonly TextBox _stopKey = new() { Width = 200 };
     private readonly TextBox _shareKey = new() { Width = 200 };
     private readonly CheckBox _startWithWindows = new() { Text = "Start with Windows", AutoSize = true };
+    private readonly CheckBox _shareCodeJobs = new() { Text = "Share Claude Code jobs with Anemo", AutoSize = true };
+    private readonly TextBox _codeJobsFolder = new() { Width = 360 };
     private readonly Label _error = new() { AutoSize = true, ForeColor = Color.Firebrick };
     private readonly DesktopSettings _current;
     private readonly Func<DesktopSettings, string?, string?> _save;
@@ -54,6 +58,9 @@ internal sealed class SettingsForm : Form
         _stopKey.Text = current.StopHotkey;
         _shareKey.Text = current.ShareHotkey;
         _startWithWindows.Checked = current.StartWithWindows;
+        _shareCodeJobs.Checked = current.ShareCodeJobs;
+        _codeJobsFolder.Text = current.CodeJobsFolder ?? "";
+        _codeJobsFolder.PlaceholderText = CodeJobLimits.DefaultFolder;
 
         var grid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
         void Row(string label, Control control)
@@ -78,6 +85,17 @@ internal sealed class SettingsForm : Form
         Row("Share key", _shareKey);
         grid.Controls.Add(new Label());
         grid.Controls.Add(_startWithWindows);
+        grid.Controls.Add(new Label());
+        grid.Controls.Add(_shareCodeJobs);
+        grid.Controls.Add(new Label());
+        grid.Controls.Add(new Label
+        {
+            Text = "The jobs' prompts, tool calls and output are sent to Anemo, only while this computer is trusted there.",
+            AutoSize = true,
+            MaximumSize = new Size(420, 0),
+            ForeColor = SystemColors.GrayText,
+        });
+        Row("Jobs folder", _codeJobsFolder);
         grid.Controls.Add(new Label { Text = "Status", AutoSize = true, Padding = new Padding(0, 6, 8, 0) });
         grid.Controls.Add(new Label { Text = status, AutoSize = true, MaximumSize = new Size(420, 0), Padding = new Padding(0, 6, 0, 0) });
         grid.Controls.Add(new Label());
@@ -137,6 +155,8 @@ internal sealed class SettingsForm : Form
             StopHotkey = stop.ToString(),
             ShareHotkey = share.ToString(),
             StartWithWindows = _startWithWindows.Checked,
+            ShareCodeJobs = _shareCodeJobs.Checked,
+            CodeJobsFolder = string.IsNullOrWhiteSpace(_codeJobsFolder.Text) ? null : _codeJobsFolder.Text.Trim(),
         };
         var newToken = token.Length > 0 ? token : null;
         if (_save(result, newToken) is { } problem)

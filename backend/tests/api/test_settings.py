@@ -81,7 +81,16 @@ async def test_navigation_says_where_each_page_goes(authed):
     navigation = (await authed.get("/api/settings")).json()["navigation"]
     assert navigation == {
         "pinned": ["home", "notifications", "tasks", "calendar", "documents", "files"],
-        "more": ["projects", "focus", "music", "runs", "automations", "agents", "memory"],
+        "more": [
+            "projects",
+            "focus",
+            "music",
+            "runs",
+            "code",
+            "automations",
+            "agents",
+            "memory",
+        ],
         "off": [],
     }
     new = {

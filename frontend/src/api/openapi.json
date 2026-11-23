@@ -1750,6 +1750,65 @@
         }
       }
     },
+    "/api/settings/code": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Code Settings",
+        "operationId": "put_code_settings_api_settings_code_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -14455,6 +14514,376 @@
         }
       }
     },
+    "/api/code/jobs": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "List Jobs",
+        "description": "Jobs on every computer, newest first, with every project that has jobs. The next\npage: `before` and `before_id` of the last job shown.",
+        "operationId": "list_jobs_api_code_jobs_get",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "running",
+                    "done",
+                    "failed",
+                    "cancelled",
+                    "exited_without_result"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "started_at of the last job shown",
+              "title": "Before"
+            },
+            "description": "started_at of the last job shown"
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "id of the last job shown",
+              "title": "Before Id"
+            },
+            "description": "id of the last job shown"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeJobListOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Get Job",
+        "description": "A job and every job of its thread (follow-ups by `resume_session`), in start\norder.",
+        "operationId": "get_job_api_code_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeJobDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/jobs/{job_id}/events": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Job Events",
+        "description": "The job's stored events after `after_seq`, by seq.",
+        "operationId": "job_events_api_code_jobs__job_id__events_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "after_seq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "After Seq"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeEventsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/jobs/{job_id}/stream": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Job Stream",
+        "description": "The job live (SSE): `code.events` and `code.job`. Reconnects send Last-Event-ID.",
+        "operationId": "job_stream_api_code_jobs__job_id__stream_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "last-event-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/research/sessions": {
       "get": {
         "tags": [
@@ -18863,6 +19292,9 @@
           },
           "voice": {
             "$ref": "#/components/schemas/VoiceSettings"
+          },
+          "code": {
+            "$ref": "#/components/schemas/CodeSettings"
           }
         },
         "type": "object",
@@ -18884,7 +19316,8 @@
           "updates",
           "properties",
           "dictation",
-          "voice"
+          "voice",
+          "code"
         ],
         "title": "AllSettings"
       },
@@ -21192,6 +21625,467 @@
         ],
         "title": "ClaudeRunnerStatus",
         "description": "The claude-runner as the worker last saw it (the app cannot reach it)."
+      },
+      "CodeDeviceOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "online": {
+            "type": "boolean",
+            "title": "Online"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "online",
+          "last_seen_at"
+        ],
+        "title": "CodeDeviceOut"
+      },
+      "CodeEventOut": {
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "system",
+              "assistant",
+              "user",
+              "result",
+              "raw",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "event": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Event"
+          },
+          "trimmed": {
+            "type": "boolean",
+            "title": "Trimmed"
+          },
+          "dropped": {
+            "type": "boolean",
+            "title": "Dropped"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seq",
+          "kind",
+          "event",
+          "trimmed",
+          "dropped",
+          "created_at"
+        ],
+        "title": "CodeEventOut"
+      },
+      "CodeEventsOut": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CodeEventOut"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "last_seq": {
+            "type": "integer",
+            "title": "Last Seq"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events",
+          "last_seq",
+          "has_more"
+        ],
+        "title": "CodeEventsOut"
+      },
+      "CodeJobDetailOut": {
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/CodeJobOut"
+          },
+          "thread": {
+            "items": {
+              "$ref": "#/components/schemas/CodeJobOut"
+            },
+            "type": "array",
+            "title": "Thread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job",
+          "thread"
+        ],
+        "title": "CodeJobDetailOut"
+      },
+      "CodeJobListOut": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/CodeJobOut"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
+          "projects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs",
+          "projects",
+          "has_more"
+        ],
+        "title": "CodeJobListOut"
+      },
+      "CodeJobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "job_key": {
+            "type": "string",
+            "title": "Job Key"
+          },
+          "device": {
+            "$ref": "#/components/schemas/CodeDeviceOut"
+          },
+          "project": {
+            "type": "string",
+            "title": "Project"
+          },
+          "dir": {
+            "type": "string",
+            "title": "Dir"
+          },
+          "job_dir": {
+            "type": "string",
+            "title": "Job Dir"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "done",
+              "failed",
+              "cancelled",
+              "exited_without_result"
+            ],
+            "title": "State"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "last_event_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event At"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "resume_session": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Session"
+          },
+          "thread_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Thread Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "pr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pr Url"
+          },
+          "todos": {
+            "items": {
+              "$ref": "#/components/schemas/CodeTodoOut"
+            },
+            "type": "array",
+            "title": "Todos"
+          },
+          "num_turns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Turns"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "result_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Text"
+          },
+          "result_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Subtype"
+          },
+          "is_error": {
+            "type": "boolean",
+            "title": "Is Error"
+          },
+          "stderr_tail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stderr Tail"
+          },
+          "last_seq": {
+            "type": "integer",
+            "title": "Last Seq"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_key",
+          "device",
+          "project",
+          "dir",
+          "job_dir",
+          "title",
+          "prompt",
+          "state",
+          "started_at",
+          "ended_at",
+          "last_event_at",
+          "session_id",
+          "resume_session",
+          "thread_id",
+          "model",
+          "branch",
+          "pr_url",
+          "todos",
+          "num_turns",
+          "duration_ms",
+          "cost_usd",
+          "result_text",
+          "result_subtype",
+          "is_error",
+          "stderr_tail",
+          "last_seq",
+          "event_count",
+          "truncated"
+        ],
+        "title": "CodeJobOut"
+      },
+      "CodeSettings": {
+        "properties": {
+          "keep_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Keep Days",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "title": "CodeSettings",
+        "description": "The Code page: Claude Code jobs that computers share (features/code_sessions)."
+      },
+      "CodeTodoOut": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "activeForm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activeform"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content",
+          "status"
+        ],
+        "title": "CodeTodoOut"
       },
       "ContentOut": {
         "properties": {
@@ -26095,6 +26989,7 @@
                 "focus",
                 "music",
                 "runs",
+                "code",
                 "automations",
                 "agents",
                 "memory"
@@ -26126,6 +27021,7 @@
                 "focus",
                 "music",
                 "runs",
+                "code",
                 "automations",
                 "agents",
                 "memory"
@@ -26139,6 +27035,7 @@
               "focus",
               "music",
               "runs",
+              "code",
               "automations",
               "agents",
               "memory"
@@ -26158,6 +27055,7 @@
                 "focus",
                 "music",
                 "runs",
+                "code",
                 "automations",
                 "agents",
                 "memory"
