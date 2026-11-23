@@ -3,7 +3,8 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
-import { type CodeJobDetail, codeJobKey, useCancelJob, useCodeJobs, useFollowUp, useStartJob } from './api'
+import { ApiError } from '@/api/client'
+import { type CodeJobDetail, codeKey, codeJobKey, mayHaveStarted, useCancelJob, useCodeJobs, useFollowUp, useStartJob } from './api'
 import { codeJob } from './testJobs'
 
 afterEach(() => vi.restoreAllMocks())
@@ -68,6 +69,30 @@ describe('starting, following up and cancelling', () => {
     await act(async () => void (await result.current.mutateAsync('More')))
     expect(posted).toEqual([{ path: '/api/code/jobs/{job_id}/follow-up', init: { params: { path: { job_id: 'a' } }, body: { prompt: 'More' } } }])
     expect(client.getQueryData<CodeJobDetail>(codeJobKey('a'))?.thread.map((j) => j.id)).toEqual(['a', 'b'])
+  })
+
+  it('refreshes the jobs and computers when a start may have happened, not on a plain refusal', async () => {
+    const { client, wrapper } = setup()
+    const refresh = vi.spyOn(client, 'invalidateQueries')
+    let fail: unknown = new ApiError(504, 'http_504', 'Gateway Timeout')
+    vi.spyOn(api, 'POST').mockImplementation((async () => { throw fail }) as unknown as typeof api.POST)
+    const { result } = renderHook(() => useStartJob(), { wrapper })
+    const body = { device_id: 'd', project: 'p', prompt: 'x', new: false, model: null }
+    await act(async () => void (await result.current.mutateAsync(body).catch(() => {})))
+    expect(refresh).toHaveBeenCalledWith({ queryKey: codeKey })
+    refresh.mockClear()
+    fail = new ApiError(409, 'device_busy', 'Busy.')
+    await act(async () => void (await result.current.mutateAsync(body).catch(() => {})))
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('knows which failures may hide a start', () => {
+    expect(mayHaveStarted(new ApiError(504, 'http_504', ''))).toBe(true)
+    expect(mayHaveStarted(new ApiError(502, 'http_502', ''))).toBe(true)
+    expect(mayHaveStarted(new TypeError('Failed to fetch'))).toBe(true)
+    for (const code of ['device_offline', 'device_busy', 'code_start_off', 'device_failed']) {
+      expect(mayHaveStarted(new ApiError(409, code, ''))).toBe(false)
+    }
   })
 
   it('cancels: the job shows its new state', async () => {

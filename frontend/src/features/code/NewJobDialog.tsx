@@ -14,7 +14,7 @@ import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
 import { msg, t } from '@/lib/i18n'
-import { type CodeDevice, type CodeModel, useCodeDevices, useCodeProjects, useStartJob } from './api'
+import { type CodeDevice, type CodeModel, startErrorMessage, useCodeDevices, useCodeProjects, useStartJob } from './api'
 import { knownProject, validProjectName } from './projects'
 
 const MODELS: { value: '' | CodeModel; label: string }[] = [
@@ -60,7 +60,7 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const submit = () => {
     if (!ready || !device) return
     start.mutate(
-      { device_id: device.id, project: name, prompt: prompt.trim(), new: offerNew && isNew, model: model || null },
+      { device_id: device.id, project: name, prompt, new: offerNew && isNew, model: model || null },
       {
         onSuccess: (job) => {
           onOpenChange(false)
@@ -69,7 +69,8 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           setNew(false)
           void navigate(`/code/${job.id}`)
         },
-        onError: (err) => toast({ message: errorMessage(err) }),
+        // A start that may have happened isn't followed: the refreshed list shows it if it did.
+        onError: (err) => toast({ message: startErrorMessage(err) }),
       },
     )
   }

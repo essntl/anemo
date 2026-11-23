@@ -10,7 +10,8 @@ let projects: Record<string, CodeProjects> = {}
 const askedProjects: (string | null)[] = []
 const started: StartJobInput[] = []
 let fail: unknown = null
-vi.mock('./api', () => ({
+vi.mock('./api', async (importOriginal) => ({
+  startErrorMessage: (await importOriginal<typeof import('./api')>()).startErrorMessage,
   useCodeDevices: () => ({ data: devices, isSuccess: true, isPending: false, isError: false }),
   useCodeProjects: (id: string | null) => {
     askedProjects.push(id)
@@ -194,6 +195,37 @@ describe('New job', () => {
     devices = devices.filter((d) => d.id !== 'd1')
     rerender(<MemoryRouter initialEntries={['/code']}><Routes><Route path="*" element={<><NewJobDialog open onOpenChange={close} /><Where /></>} /></Routes></MemoryRouter>)
     expect(within(dialog()).getByRole('combobox', { name: 'Computer' })).toHaveTextContent('Laptop')
+  })
+
+  it('sends the prompt as typed, and refuses a blank one', async () => {
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    const prompt = within(dialog()).getByRole('textbox', { name: 'Prompt' })
+    await userEvent.type(prompt, '  {Enter}  ')
+    expect(within(dialog()).getByRole('button', { name: 'Start job' })).toBeDisabled()
+    await userEvent.type(prompt, '- keep the indent{Enter}')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(started[0].prompt).toBe('  \n  - keep the indent\n')
+  })
+
+  it('says the job may have started when no answer came, and doesn’t open anything', async () => {
+    fail = new ApiError(504, 'http_504', 'Gateway Timeout')
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Go')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(toasts).toEqual(['No answer came in time: the job may have started anyway. The list is being refreshed.'])
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/code$/)
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('shows the server’s message when the computer is busy', async () => {
+    fail = new ApiError(409, 'device_busy', 'Desk PC is busy with another command.')
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Go')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(toasts).toEqual(['Desk PC is busy with another command.'])
   })
 
   it('says how to allow starting when no computer does', () => {

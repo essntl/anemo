@@ -89,6 +89,7 @@ const messages: Messages = {
   "{device} is no longer one of your trusted computers.": "{device} більше не належить до ваших довірених комп’ютерів.",
   "{device} is offline now.": "{device} зараз не в мережі.",
   "{device} doesn’t let Anemo start jobs right now.": "{device} зараз не дозволяє Anemo запускати Claude Code.",
+  "No answer came in time: the job may have started anyway. The list is being refreshed.": "Відповідь не надійшла вчасно: можливо, запуск усе ж почався. Список оновлюється.",
 }
 
 export default messages

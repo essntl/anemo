@@ -10,7 +10,8 @@ type Callbacks = { onSuccess?: (v: unknown) => void; onError?: (e: unknown) => v
 const cancelJob = vi.fn()
 const followUp = vi.fn()
 let fail: unknown = null
-vi.mock('./api', () => ({
+vi.mock('./api', async (importOriginal) => ({
+  startErrorMessage: (await importOriginal<typeof import('./api')>()).startErrorMessage,
   useCancelJob: () => ({ isPending: false, mutate: (id: string, cb: Callbacks) => { cancelJob(id); if (fail) cb.onError?.(fail); else cb.onSuccess?.({}) } }),
   useFollowUp: (jobId: string) => ({ isPending: false, mutate: (prompt: string, cb: Callbacks) => { followUp(jobId, prompt); if (fail) cb.onError?.(fail); else cb.onSuccess?.({}) } }),
 }))
@@ -70,14 +71,36 @@ describe('Cancel', () => {
 describe('Follow-up', () => {
   const ended = (more = {}) => codeJob({ id: 'j9', state: 'done', session_id: 'sess-9', ...more })
 
-  it('sends with the button and clears the box', async () => {
+  it('sends with the button, as typed, and clears the box', async () => {
     show(<FollowUpBox job={ended()} />)
     const box = screen.getByRole('textbox', { name: 'Follow-up' })
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    await userEvent.type(box, '   ')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     await userEvent.type(box, '  Now the changelog  ')
     await userEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(followUp).toHaveBeenCalledWith('j9', 'Now the changelog')
+    expect(followUp).toHaveBeenCalledWith('j9', '     Now the changelog  ')
     expect(box).toHaveValue('')
+  })
+
+  it('says the follow-up may have started when no answer came', async () => {
+    for (const err of [new ApiError(504, 'http_504', 'Gateway Timeout'), new ApiError(502, 'http_502', 'Bad Gateway'), new TypeError('Failed to fetch')]) {
+      fail = err
+      toasts.length = 0
+      const { unmount } = show(<FollowUpBox job={ended()} />)
+      await userEvent.type(screen.getByRole('textbox', { name: 'Follow-up' }), 'More')
+      await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+      expect(toasts).toEqual(['No answer came in time: the job may have started anyway. The list is being refreshed.'])
+      unmount()
+    }
+  })
+
+  it('shows the server’s message when the computer is busy', async () => {
+    fail = new ApiError(409, 'device_busy', 'Desk PC is busy with another command. Try again in a moment.')
+    show(<FollowUpBox job={ended()} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Follow-up' }), 'More')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(toasts).toEqual(['Desk PC is busy with another command. Try again in a moment.'])
   })
 
   it('sends with Ctrl+Enter, not with Enter alone', async () => {

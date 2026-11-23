@@ -10,7 +10,8 @@
  */
 import { useEffect, useRef } from 'react'
 import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type Schemas, unwrap } from '@/api/client'
+import { ApiError, api, errorMessage, type Schemas, unwrap } from '@/api/client'
+import { t } from '@/lib/i18n'
 import type { CodeJob, CodeJobState } from './threads'
 import { type CodeEvent, contiguousSeq, mergeEvents } from './timeline'
 
@@ -170,7 +171,28 @@ export function useStartJob() {
       qc.setQueryData<CodeJobDetail>(codeJobKey(job.id), { job, thread: [job] })
       void qc.invalidateQueries({ queryKey: codeJobsKey })
     },
+    onError: (err) => refreshIfStarted(qc, err),
   })
+}
+
+/**
+ * Whether a start may have happened although it failed here: the answer never came (a
+ * gateway gave up, 502/504, or the connection dropped), while the computer may have
+ * started the job.
+ */
+export function mayHaveStarted(err: unknown): boolean {
+  return err instanceof ApiError ? err.status === 502 || err.status === 504 : true
+}
+
+/** What to say when starting (a job or a follow-up) failed: the server's message, or that it may have started. */
+export function startErrorMessage(err: unknown): string {
+  return mayHaveStarted(err) ? t('No answer came in time: the job may have started anyway. The list is being refreshed.') : errorMessage(err)
+}
+
+/** After a start that may have happened: the jobs (and threads) and computers load again. */
+function refreshIfStarted(qc: QueryClient, err: unknown): void {
+  if (!mayHaveStarted(err)) return
+  void qc.invalidateQueries({ queryKey: codeKey })
 }
 
 /** Resumes the thread of `jobId` with a new prompt: the new job joins the thread, live. */
@@ -183,6 +205,7 @@ export function useFollowUp(jobId: string) {
       putJob(qc, job)
       void qc.invalidateQueries({ queryKey: codeKey })
     },
+    onError: (err) => refreshIfStarted(qc, err),
   })
 }
 
