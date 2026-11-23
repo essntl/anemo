@@ -8,9 +8,9 @@ features/extension/browser_relay.py, with one key per device. Commands only ever
 device over its authenticated WebSocket (features/devices/ws.py).
 
 The interface (`Offer`, `DeviceInfo`, the four exceptions, `online`, `list_online`,
-`send`) is fixed in docs/specs/CONTRACTS-devices.md §1 (`Offer.code` and `connected` were
-added later, for the Code page: docs/specs/code-sessions.md). It checks no trust level or
-permission: the tools do that before they call `send`.
+`send`) is fixed in docs/specs/CONTRACTS-devices.md §1 (`Offer.code`, `Offer.code_start`,
+`connected` and `offers` were added later, for the Code page: docs/specs/code-sessions.md).
+It checks no trust level or permission: the tools do that before they call `send`.
 
 Keys (nobody outside features/devices reads them):
   devices:online:<device_id>   a hash: the device's connection (`conn`) and its last offer
@@ -62,6 +62,7 @@ class Offer:
     control: bool  # "Allow control" is on in the client
     shell: bool  # PowerShell is switched on in the client
     code: bool = False  # "Share Claude Code jobs with Anemo" is on (older clients: off)
+    code_start: bool = False  # "Let Anemo start Claude Code jobs" is on (older clients: off)
 
 
 @dataclass(frozen=True)
@@ -114,23 +115,23 @@ _CONNECT = """
 local old = redis.call('HGET', KEYS[1], 'conn')
 redis.call('DEL', KEYS[1])
 redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
-  'offered_at', '')
+  'code_start', '0', 'offered_at', '')
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return old
 """
 
-# ARGV: conn, ttl, has_offer ('1'/'0'), control, shell, offered_at, code. 0 when another
-# connection has the device.
+# ARGV: conn, ttl, has_offer ('1'/'0'), control, shell, offered_at, code, code_start. 0 when
+# another connection has the device.
 _RENEW = """
 local cur = redis.call('HGET', KEYS[1], 'conn')
 if cur and cur ~= ARGV[1] then return 0 end
 if not cur then
   redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
-    'offered_at', '')
+    'code_start', '0', 'offered_at', '')
 end
 if ARGV[3] == '1' then
   redis.call('HSET', KEYS[1], 'control', ARGV[4], 'shell', ARGV[5], 'offered_at', ARGV[6],
-    'code', ARGV[7])
+    'code', ARGV[7], 'code_start', ARGV[8])
 end
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return 1
@@ -173,6 +174,7 @@ def _fresh_offer(entry: dict[str, str]) -> Offer | None:
         control=entry.get("control") == "1",
         shell=entry.get("shell") == "1",
         code=entry.get("code") == "1",
+        code_start=entry.get("code_start") == "1",
     )
 
 
@@ -223,7 +225,7 @@ async def connect(device_id: uuid.UUID, conn: str) -> None:
 async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> bool:
     """The connection is alive (a ping), or sent a new offer. False when a newer
     connection of the same device replaced this one."""
-    args: list[str | int | float] = [conn, ENTRY_TTL_S, "0", "0", "0", "", "0"]
+    args: list[str | int | float] = [conn, ENTRY_TTL_S, "0", "0", "0", "", "0", "0"]
     if offer is not None:
         args[2:] = [
             "1",
@@ -231,6 +233,7 @@ async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> 
             "1" if offer.shell else "0",
             time.time(),
             "1" if offer.code else "0",
+            "1" if offer.code_start else "0",
         ]
     try:
         return bool(await _script(_RENEW, device_id, *args))
@@ -312,6 +315,27 @@ async def connected(device_ids: Iterable[uuid.UUID]) -> set[uuid.UUID]:
     except (RedisError, OSError):
         return set()
     return {device_id for device_id, conn in zip(ids, conns, strict=True) if conn}
+
+
+async def offers(device_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, Offer]:
+    """The fresh offers (renewed within OFFER_TTL_S) of these devices; a device without one
+    is left out. Empty when Valkey is down."""
+    ids = list(dict.fromkeys(device_ids))
+    if not ids:
+        return {}
+    try:
+        async with get_redis().pipeline(transaction=False) as pipe:
+            for device_id in ids:
+                pipe.hgetall(_online_key(device_id))
+            entries = await pipe.execute()
+    except (RedisError, OSError):
+        return {}
+    found: dict[uuid.UUID, Offer] = {}
+    for device_id, entry in zip(ids, entries, strict=True):
+        offer = _fresh_offer(entry) if entry and entry.get("conn") else None
+        if offer is not None:
+            found[device_id] = offer
+    return found
 
 
 async def list_online() -> list[DeviceInfo]:
