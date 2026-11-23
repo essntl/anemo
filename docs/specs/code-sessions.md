@@ -127,11 +127,25 @@ small interface implemented in `Anemo.Desktop/Platform/`).
   alive → `running`; else (the process is gone, the file read to its end once more,
   still no result) → `exited_without_result`. "Alive": a process with that pid exists
   and started no later than one minute after `meta.started` (guards against pid reuse).
-- **Persisted state**: `%APPDATA%\Anemo Desktop\code-jobs.json`: per job `{acked_seq,
-  acked_offset, sent_state, settled}`; written after each ack (temp file, then move).
+- **Persisted state**: `%APPDATA%\Anemo Desktop\code-jobs.json`: `shared_since` (the
+  first scan after sharing was switched on; cleared when it is switched off; a "new
+  folder" is one started no earlier than `shared_since` minus 3 days, and folders older
+  than 14 days are never discovered) and per job `{acked_seq, acked_offset, sent_state,
+  settled}`; written after each ack (temp file, then move).
   Jobs older than 14 days are forgotten. A damaged file starts empty (the server's acks
   repair it).
 - **Trimming**: §6, before a frame is built; `trimmed: true` on the item.
+- **Ordering details**: a job first seen already finished (back-fill, or it ended while
+  the client was closed) is announced with its terminal state, then its events, then the
+  terminal `code.job` again, so it is never announced as running (D10). At most 4 jobs
+  have a frame in flight at once, running jobs first. `ended` is the last-write time of
+  `cancelled` or `out.jsonl`; `stderr_tail` is sent only with a terminal state; the
+  branch is frozen once a job has ended. An unterminated last line of a dead job is
+  never sent.
+- **A server that never acks** (an Anemo without the Code page): when no `code.ack` came
+  on a connection within 60 s of the first `code.job`, the client stops sharing on that
+  connection instead of reconnecting; once one ack has come, 60 s of silence
+  reconnects.
 - Logs (`DiagnosticLog`) say "code job discovered/ended" with the job id only, never
   contents.
 
@@ -191,8 +205,10 @@ session_id)`, `(project)`.
 
 ### 5.2 Ingestion
 
-`ws.py` hands `code.job` / `code.events` of a computer to `code_sessions.ingest` (the
-devices feature imports code_sessions, not the other way round). Each frame: validate
+`ws.py` hands `code.job` / `code.events` of a computer to `code_sessions.ingest`; it is
+the only devices module that imports code_sessions. `code_sessions.service` reads
+`devices.models.Device` and `devices.relay.connected` to show a job's device (no
+module cycle). Each frame: validate
 with Pydantic (`Field` limits), open a session, do the work, commit, publish, ack.
 
 - **code.job**: upsert by `(device_id, job_key)`. Terminal states are sticky, except
@@ -205,7 +221,8 @@ with Pydantic (`Field` limits), open a session, do the work, commit, publish, ac
 - **code.events**: trim (§6) each event, insert, then: `last_seq` = the highest seq such
   that all of 1..seq exist (recomputed from `last_seq` forward only when needed),
   `event_count`, `stored_bytes`, `last_event_at`, and the pull-outs: session id, model,
-  todos (latest `TodoWrite` `input.todos` by seq), PR URL
+  todos (latest `TodoWrite` `input.todos` by seq; pull-outs are read from the event as
+  received, before it is trimmed or stubbed), PR URL
   (`https://github\.com/[\w.-]+/[\w.-]+/pull/\d+` in tool results, assistant text and the
   result), branch (D12), and the `result` fields. A `result` event makes the job
   terminal (`done` / `failed`).
@@ -238,7 +255,7 @@ jobs don't come back.
 | `GET /api/code/jobs` | `project?`, `state?`, `device_id?`, `limit` (1–500, 200), `before?` (ISO, started_at of the last row) | `CodeJobListOut {jobs: CodeJobOut[], projects: string[], has_more}` |
 | `GET /api/code/jobs/{id}` | | `CodeJobDetailOut {job: CodeJobOut, thread: CodeJobOut[]}` (thread in start order, includes the job) |
 | `GET /api/code/jobs/{id}/events` | `after_seq` (≥ 0, 0), `limit` (1–2000, 500) | `CodeEventsOut {events: CodeEventOut[], last_seq, has_more}` |
-| `GET /api/code/jobs/{id}/stream` | `Last-Event-ID` header | SSE: `code.events`, `code.job`; the first read doesn't block |
+| `GET /api/code/jobs/{id}/stream` | `Last-Event-ID` header | SSE: `: connected`, a `code.job` snapshot from the database (no `id:`), then every `code.events` / `code.job` published after the newest stream entry at connect (or after `Last-Event-ID`). It doesn't end by itself; with Valkey down it sends a snapshot every 5 s. The page refetches `events?after_seq=` when a `code.job`'s `last_seq` is past what it holds |
 
 `CodeJobOut`: `id, job_key, device: {id, name, online, last_seen_at}, project, dir,
 job_dir, title, prompt, state, started_at, ended_at, last_event_at, session_id,
@@ -264,12 +281,18 @@ Starting creates the row at once from the command's answer (state `running`,
 
 Applied to one event; `limit` = 16 000 bytes of compact UTF-8 JSON.
 
+0. (Server only) Clean: NUL and lone surrogates become U+FFFD, nesting deeper than 100
+   becomes `"[nested too deep]"` (Postgres `jsonb` would reject them). Sizes are measured
+   on compact JSON as Python's `json.dumps(ensure_ascii=False, separators=(",", ":"))`
+   writes it.
 1. Remove known copies: `tool_use_result.originalFile`, `tool_use_result.file.content`
-   (Read), `tool_use_result.content` (Write, the same text is in the `tool_use` input).
-   Removing counts as trimming.
+   (Read), and `tool_use_result.content` when `tool_use_result.type` is `create` or
+   `update` (Write: the same text is in the `tool_use` input). Removing counts as
+   trimming.
 2. If over `limit`: cut every string longer than 2000 characters to its first 1500 and
    last 400 characters joined by `"\n… [N characters trimmed] …\n"`.
-3. If still over: the same with 400 / 100.
+3. If still over: starting again from step 1's result, cut every string longer than 600
+   characters to its first 400 and last 100.
 4. If still over: replace the event with `{"type", "subtype"?, "anemo_trimmed": "too
    large"}` (plus `message.content[].{type,name,id}` of tool calls when present).
 

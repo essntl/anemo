@@ -236,7 +236,12 @@ server → {"type": "code.ack", "job_id": "<job id>", "seq": <int ≥ 0>}
 - Each event is trimmed to at most 16 000 bytes of compact UTF-8 JSON before it is sent
   (`docs/specs/code-sessions.md` §6), `trimmed: true` when anything was cut. The server
   trims again by the same rules and may store only a stub once a job holds 5 MB.
-- No ack within 60 s: the client reconnects as after a drop.
+- No ack within 60 s: the client reconnects as after a drop. Exception: when no
+  `code.ack` at all came on the connection (a server without this feature), the client
+  stops sharing on that connection and doesn't reconnect for it.
+- Frames must keep every limit (`docs/specs/code-sessions.md` §9 and the lengths above;
+  `seq` ≤ 10 000 000, `pid` 0…2³¹−1): a frame that fails validation is ignored, with no
+  ack. `type` is the first key of every `code.*` message.
 
 ### 7.2 State
 
