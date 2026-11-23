@@ -18,7 +18,8 @@ name: Images
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    # v1.2.3 and the like only: not desktop-v*/voice-v* (release.yml), "voice-v…" starts with v.
+    tags: ["v[0-9]*"]
   workflow_dispatch:
 
 concurrency:

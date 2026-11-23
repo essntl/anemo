@@ -77,11 +77,38 @@ Each gives `publish/<rid>/Anemo Desktop.exe` (about 75 MB, the .NET runtime incl
 install, no admin rights). `publish/` is not committed. The exe is not signed: Windows
 SmartScreen asks once before the first start.
 
+## Cut a release
+
+The `Release` workflow (`.github/workflows/release.yml`) builds both exes on a Windows runner
+(so they carry the version resources) and attaches them to a GitHub Release, on a
+`desktop-v<version>` tag. The server's images use `v<version>` tags; these are separate.
+
+1. In a PR, raise `<Version>` in `Directory.Build.props` (and say what changed in this README
+   if it's a feature). That PR runs the workflow as a dry run: the exes appear under the run's
+   *Artifacts*, and no Release is made. Merge it once CI is green.
+2. Tag the merge commit on main and push the tag:
+
+   ```
+   git checkout main && git pull
+   git tag desktop-v1.2.0
+   git push origin desktop-v1.2.0
+   ```
+
+3. The workflow checks that the tag is `desktop-v` + `<Version>` and is on main (else it
+   fails and publishes nothing), then makes the Release `desktop-v1.2.0` with
+   `Anemo-Desktop-win-x64.exe`, `Anemo-Desktop-win-arm64.exe`, `SHA256SUMS-desktop.txt`
+   and the checksums in its notes. A re-run of a failed run adds the files to the same Release.
+
+A wrong tag is deleted with `git push origin :desktop-v1.2.0` (and the Release, if one was
+made, on GitHub). A dry run at any time: **Actions → Release → Run workflow**, app *desktop*
+(the menu lists the workflow once it is on main).
+
 ## Install on a computer
 
 1. In Anemo: **Settings → Devices → Add a device**, kind *computer*, a name ("VM", "Desk
    PC") and a trust level. Copy the token (it is shown once).
-2. Put `Anemo Desktop.exe` somewhere permanent (e.g. `%LOCALAPPDATA%\Programs\Anemo Desktop\`)
+2. Download `Anemo-Desktop-win-x64.exe` (or `-win-arm64` for an ARM PC) from the latest
+   `desktop-v…` Release, or build it (above). Name it `Anemo Desktop.exe`, put it somewhere permanent (e.g. `%LOCALAPPDATA%\Programs\Anemo Desktop\`)
    and start it. The Settings window opens: paste the Anemo address (the one the web app
    uses, `https://…`) and the token. Save.
 3. The tray icon turns from grey to normal when it is connected. It adds itself to the
