@@ -13,8 +13,22 @@ public sealed record RemoteProject(string Name, string Url);
 /// <summary>The projects folder and its git remotes (code-sessions.md §12.1).</summary>
 public static partial class CodeProjects
 {
-    /// <summary>A project name: no path, not <c>.</c> or <c>..</c>.</summary>
-    public static bool IsProjectName(string name) => ProjectPattern().IsMatch(name) && name is not ("." or "..");
+    /// <summary>Names Windows keeps for devices, also with an extension (<c>nul.txt</c> is NUL).</summary>
+    private static readonly HashSet<string> DeviceNames = new(
+        new[] { "CON", "PRN", "AUX", "NUL" }
+            .Concat(Enumerable.Range(1, 9).Select(i => $"COM{i}"))
+            .Concat(Enumerable.Range(1, 9).Select(i => $"LPT{i}")),
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A project name (code-sessions.md §12.5): letters, digits, <c>.</c>, <c>_</c>, <c>-</c>,
+    /// at most 100; not only dots, not ending with a dot, not a Windows device name.
+    /// </summary>
+    public static bool IsProjectName(string name) =>
+        ProjectPattern().IsMatch(name)
+        && name.Trim('.').Length > 0
+        && !name.EndsWith('.')
+        && !DeviceNames.Contains(name.Split('.')[0]);
 
     /// <summary>A GitHub user or organisation name.</summary>
     public static bool IsOwner(string owner) => OwnerPattern().IsMatch(owner);
@@ -163,15 +177,15 @@ public static partial class CodeProjects
         return Path.Combine(gitDir, "config");
     }
 
-    [GeneratedRegex(@"^[A-Za-z0-9._-]{1,100}$")]
+    [GeneratedRegex(@"^[A-Za-z0-9._-]{1,100}\z")]
     private static partial Regex ProjectPattern();
 
-    [GeneratedRegex(@"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")]
+    [GeneratedRegex(@"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\z")]
     private static partial Regex OwnerPattern();
 
-    [GeneratedRegex(@"^\[\s*remote\s+""origin""\s*\]$")]
+    [GeneratedRegex(@"^\[\s*remote\s+""origin""\s*\]\z")]
     private static partial Regex OriginSection();
 
-    [GeneratedRegex(@"^url\s*=\s*(.*)$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^url\s*=\s*(.*)\z", RegexOptions.IgnoreCase)]
     private static partial Regex UrlLine();
 }

@@ -335,9 +335,9 @@ public static partial class JobFolder
 
     private static string? NullIfBlank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    [GeneratedRegex(@"^\d{8}-\d{6}-[A-Za-z0-9]{4}$")]
+    [GeneratedRegex(@"^\d{8}-\d{6}-[A-Za-z0-9]{4}\z")]
     private static partial Regex IdPattern();
 
-    [GeneratedRegex(@"^\s*\\?/Date\((-?\d+)(?:[+-]\d{4})?\)\\?/\s*$")]
+    [GeneratedRegex(@"^\s*\\?/Date\((-?\d+)(?:[+-]\d{4})?\)\\?/\s*\z")]
     private static partial Regex MsDatePattern();
 }

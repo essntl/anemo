@@ -501,9 +501,9 @@ public sealed partial class CodeJobControl
         }
     }
 
-    [GeneratedRegex(@"^[A-Za-z0-9-]{1,100}$")]
+    [GeneratedRegex(@"^[A-Za-z0-9-]{1,100}\z")]
     private static partial Regex SessionPattern();
 
-    [GeneratedRegex(@"^[A-Za-z0-9._\[\]-]{1,100}$")]
+    [GeneratedRegex(@"^[A-Za-z0-9._\[\]-]{1,100}\z")]
     private static partial Regex ModelPattern();
 }

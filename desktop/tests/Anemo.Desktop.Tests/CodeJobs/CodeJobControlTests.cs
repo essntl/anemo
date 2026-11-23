@@ -187,10 +187,19 @@ public sealed class CodeJobControlTests : IDisposable
     [InlineData("project", "..\\x")]
     [InlineData("project", "my project")]
     [InlineData("project", "x&calc")]
+    [InlineData("project", "...")]
+    [InlineData("project", "anemo.")]
+    [InlineData("project", "CON")]
+    [InlineData("project", "nul.txt")]
+    [InlineData("project", "Com1")]
+    [InlineData("project", "lpt9.md")]
+    [InlineData("project", "anemo\n")]
     [InlineData("model", "opus --dangerously")]
     [InlineData("model", "opus&calc")]
+    [InlineData("model", "opus\n")]
     [InlineData("resume_session", "abc def")]
     [InlineData("resume_session", "a\"b")]
+    [InlineData("resume_session", "abc\n")]
     public async Task Values_that_could_reach_the_command_line_are_checked(string field, string value)
     {
         var fields = StartFields("anemo");
