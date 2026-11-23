@@ -46,6 +46,12 @@ public sealed partial class CodeJobControl
         ["GIT_TERMINAL_PROMPT"] = "0",
     };
 
+    /// <summary>A job's cmd.exe never runs a program from the current (project) folder by a bare name.</summary>
+    public static readonly IReadOnlyDictionary<string, string> StartEnvironment = new Dictionary<string, string>
+    {
+        ["NoDefaultCurrentDirectoryInExePath"] = "1",
+    };
+
     private const int PreviewChars = 200;
     private const string IdAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -78,12 +84,14 @@ public sealed partial class CodeJobControl
     private string JobsFolder => Setting(_settings().CodeJobsFolder) ?? CodeJobLimits.DefaultFolder;
 
     /// <summary>
-    /// The command line of a job's <c>cmd.exe</c> (§12.1 step 4): Claude Code headless with the
-    /// prompt on stdin from <c>prompt.txt</c>, its output and errors into the job folder.
+    /// The command line of a job's <c>cmd.exe</c> (§12.1 step 4, §12.5): Claude Code by the full
+    /// path found on PATH, headless, with the prompt on stdin from <c>prompt.txt</c> and its output
+    /// and errors into the job folder. <c>/s</c> makes cmd take what is between the outer quotes
+    /// as it is; <c>/v:off</c> keeps <c>!</c> literal; <c>/d</c> skips AutoRun.
     /// </summary>
-    public static string CommandLine(string jobFolder, string? resumeSession, string? model, int? maxTurns)
+    public static string CommandLine(string claude, string jobFolder, string? resumeSession, string? model, int? maxTurns)
     {
-        var line = new StringBuilder("/d /c claude -p --output-format stream-json --verbose --permission-mode bypassPermissions");
+        var line = new StringBuilder(Quote(claude)).Append(" -p --output-format stream-json --verbose --permission-mode bypassPermissions");
         if (resumeSession is not null)
         {
             line.Append(" --resume ").Append(resumeSession);
@@ -102,7 +110,7 @@ public sealed partial class CodeJobControl
         line.Append(" < ").Append(Quote(Path.Combine(jobFolder, JobFolder.Prompt)))
             .Append(" > ").Append(Quote(Path.Combine(jobFolder, JobFolder.Out)))
             .Append(" 2> ").Append(Quote(Path.Combine(jobFolder, JobFolder.Err)));
-        return line.ToString();
+        return "/d /v:off /s /c \"" + line + "\"";
     }
 
     internal async Task<JsonNode> RunAsync(string action, Args args, DeviceInfo device, CancellationToken ct)
@@ -238,13 +246,15 @@ public sealed partial class CodeJobControl
         var model = Optional(args, "model", ModelPattern(), "“model” must be a model name of at most 100 letters, digits, dots, dashes, underscores and brackets.");
         int? maxTurns = args.Has("max_turns") ? args.Int("max_turns", 1, 500) : null;
 
-        if (_host.FindOnPath("claude") is null)
+        // The full path, so a claude.cmd in the project folder (a cloned repository's) never runs.
+        var claude = _host.FindOnPath("claude") ?? throw CommandException.Failed(NoClaudeMessage);
+        if (!CommandLineSafe(claude))
         {
-            throw CommandException.Failed(NoClaudeMessage);
+            throw CommandException.Failed("The path of Claude Code (claude) has a \" or % in it, which a command line can't carry.");
         }
 
         var jobs = JobsFolder;
-        if (jobs.IndexOfAny(['"', '%', '\r', '\n']) >= 0)
+        if (!CommandLineSafe(jobs))
         {
             throw CommandException.Failed("The jobs folder's path has a \" or % in it, which a command line can't carry; choose another one in Anemo Desktop's settings.");
         }
@@ -262,7 +272,7 @@ public sealed partial class CodeJobControl
         int pid;
         try
         {
-            pid = _host.StartDetached(new DetachedStart("cmd.exe", CommandLine(folder, resume, model, maxTurns), dir));
+            pid = _host.StartDetached(new DetachedStart("cmd.exe", CommandLine(claude, folder, resume, model, maxTurns), dir, StartEnvironment));
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -465,6 +475,9 @@ public sealed partial class CodeJobControl
     private static string WorkingFolder(string folder) => Directory.Exists(folder) ? folder : Path.GetTempPath();
 
     private static string Quote(string path) => "\"" + path + "\"";
+
+    /// <summary>A path cmd.exe takes literally inside quotes: no quote, no %, no line break.</summary>
+    private static bool CommandLineSafe(string path) => path.IndexOfAny(['"', '%', '\r', '\n']) < 0;
 
     private static string RandomSuffix() =>
         string.Create(4, 0, (span, _) =>

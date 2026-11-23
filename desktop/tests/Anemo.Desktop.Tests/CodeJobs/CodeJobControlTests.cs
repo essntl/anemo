@@ -413,10 +413,11 @@ public sealed class CodeJobControlTests : IDisposable
         Assert.Equal("cmd.exe", start.FileName);
         Assert.Equal(dir, start.WorkingDirectory);
         Assert.Equal(
-            "/d /c claude -p --output-format stream-json --verbose --permission-mode bypassPermissions"
+            "/d /v:off /s /c \"\"C:\\Users\\me\\AppData\\Roaming\\npm\\claude.cmd\" -p --output-format stream-json --verbose --permission-mode bypassPermissions"
             + " --resume 4f1c2a9e-0b7d-4e57-9f0a-3c1d2e3f4a5b --model claude-opus-4-1[1m] --max-turns 40"
-            + $" < \"{folder}{Path.DirectorySeparatorChar}prompt.txt\" > \"{folder}{Path.DirectorySeparatorChar}out.jsonl\" 2> \"{folder}{Path.DirectorySeparatorChar}err.txt\"",
+            + $" < \"{folder}{Path.DirectorySeparatorChar}prompt.txt\" > \"{folder}{Path.DirectorySeparatorChar}out.jsonl\" 2> \"{folder}{Path.DirectorySeparatorChar}err.txt\"\"",
             start.CommandLine);
+        Assert.Equal("1", start.Environment["NoDefaultCurrentDirectoryInExePath"]);
         Assert.DoesNotContain("Grüße", start.CommandLine); // the prompt only goes through the file
     }
 
@@ -424,14 +425,44 @@ public sealed class CodeJobControlTests : IDisposable
     public void The_command_line_has_only_the_options_given()
     {
         var folder = Path.Combine("C:", "anemo-bridge", "jobs", "20261122-100000-k3x9");
+        const string claude = @"C:\Program Files\nodejs\claude.cmd";
+        var redirects = $" < \"{Path.Combine(folder, "prompt.txt")}\" > \"{Path.Combine(folder, "out.jsonl")}\" 2> \"{Path.Combine(folder, "err.txt")}\"";
 
         Assert.Equal(
-            "/d /c claude -p --output-format stream-json --verbose --permission-mode bypassPermissions"
-            + $" < \"{Path.Combine(folder, "prompt.txt")}\" > \"{Path.Combine(folder, "out.jsonl")}\" 2> \"{Path.Combine(folder, "err.txt")}\"",
-            CodeJobControl.CommandLine(folder, null, null, null));
-        Assert.EndsWith(
-            "bypassPermissions --max-turns 7 < " + $"\"{Path.Combine(folder, "prompt.txt")}\" > \"{Path.Combine(folder, "out.jsonl")}\" 2> \"{Path.Combine(folder, "err.txt")}\"",
-            CodeJobControl.CommandLine(folder, null, null, 7));
+            "/d /v:off /s /c \"\"C:\\Program Files\\nodejs\\claude.cmd\" -p --output-format stream-json --verbose --permission-mode bypassPermissions"
+            + redirects + "\"",
+            CodeJobControl.CommandLine(claude, folder, null, null, null));
+        Assert.EndsWith("bypassPermissions --max-turns 7" + redirects + "\"", CodeJobControl.CommandLine(claude, folder, null, null, 7));
+    }
+
+    [Fact]
+    public async Task A_claude_cmd_in_the_project_folder_is_never_the_one_that_runs()
+    {
+        // A cloned repository can hold its own claude.cmd; cmd.exe would look in the current folder first.
+        var dir = Path.Combine(_projects, "evil");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "claude.cmd"), "@echo pwned");
+
+        Assert.True((await RunAsync("code_start", StartFields("evil"))).Ok);
+
+        var start = Assert.Single(_host.Started);
+        Assert.Equal(dir, start.WorkingDirectory);
+        Assert.StartsWith("/d /v:off /s /c \"\"" + _host.OnPath["claude"] + "\" -p ", start.CommandLine);
+        Assert.DoesNotContain(" claude ", start.CommandLine);
+        Assert.DoesNotContain(dir, start.CommandLine);
+        Assert.Equal("1", start.Environment["NoDefaultCurrentDirectoryInExePath"]);
+    }
+
+    [Fact]
+    public async Task A_claude_path_a_command_line_can_t_carry_is_refused()
+    {
+        Directory.CreateDirectory(Path.Combine(_projects, "anemo"));
+        _host.OnPath["claude"] = @"C:\100%tools\claude.cmd";
+
+        var outcome = await RunAsync("code_start", StartFields("anemo"));
+
+        Assert.StartsWith("The path of Claude Code (claude) has a \" or % in it", outcome.Error);
+        Assert.Empty(_host.Started);
     }
 
     [Fact]

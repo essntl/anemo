@@ -119,6 +119,11 @@ internal sealed class WindowsCodeHost : ICodeHost
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        foreach (var (key, value) in start.Environment)
+        {
+            info.Environment[key] = value;
+        }
+
         using var process = Process.Start(info) ?? throw new InvalidOperationException("cmd.exe didn't start.");
         return process.Id;
     }
