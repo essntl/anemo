@@ -14,6 +14,8 @@
     <AssemblyName>Anemo Desktop</AssemblyName>
     <RootNamespace>Anemo.Desktop</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The icons are drawn by e2e/scripts/make-native-icons.cjs from the Anemo mark. -->
+    <ApplicationIcon>Assets\Anemo.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <!-- Single-file, self-contained publish (see README.md). -->
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
@@ -25,6 +27,12 @@
   <ItemGroup>
     <!-- UIAutomationClient (System.Windows.Automation) only; no WPF windows, no XAML build. -->
     <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Loaded by UI/TrayIcons.cs under these names. -->
+    <EmbeddedResource Include="Assets\Anemo.ico" LogicalName="Anemo.ico" />
+    <EmbeddedResource Include="Assets\Tray\*.ico" LogicalName="Tray.%(Filename).ico" />
   </ItemGroup>
 
   <ItemGroup>

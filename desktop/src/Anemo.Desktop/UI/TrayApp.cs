@@ -201,7 +201,7 @@ internal sealed class TrayApp : ApplicationContext
     private void Refresh()
     {
         var status = _agent.Connection.Status;
-        _tray.Icon = _icons.For(TrayStatus.Icon(status, _busy));
+        _tray.Icon = _icons.For(TrayStatus.Icon(status, _busy, _agent.Control));
         _tray.Text = TrayStatus.Tooltip(status, _busy, _agent.Control);
         _allow.Checked = _agent.Control.AllowControl;
         _pause.Text = _agent.Control.PausedUntil is { } until
@@ -227,6 +227,7 @@ internal sealed class TrayApp : ApplicationContext
         var status = TrayStatus.Tooltip(_agent.Connection.Status, _busy, _agent.Control).Replace("Anemo Desktop: ", "")
             + (device is null ? "" : $"\nThis computer is “{device.Name}” in Anemo ({device.Trust}).");
         using var form = new SettingsForm(_agent.Settings, _agent.HasToken, status, AppPaths.DefaultWorkFolder, SaveSettings);
+        form.Icon = _icons.App;
         _settingsForm = form;
         try
         {

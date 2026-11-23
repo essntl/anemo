@@ -9,7 +9,9 @@ Note for each: pass / fail, Windows version, x64 or ARM64, display scale.
 
 ## Setup and connection
 
-1. Start `Anemo Desktop.exe` with no settings: the Settings window opens; the tray icon is grey.
+1. Start `Anemo Desktop.exe` with no settings: the Settings window opens; the tray icon is
+   the Anemo mark on grey with an amber “!” (not set up). The exe, the taskbar button and the
+   Settings window show the Anemo mark.
 2. Paste an `http://` (non-local) address: refused with the https sentence. Paste the real
    address and token, save: the icon turns normal; Settings → Devices shows the device online.
 3. Open `%APPDATA%\Anemo Desktop\settings.json`: no `anemo_` token in clear, only `protectedToken`.
@@ -19,8 +21,8 @@ Note for each: pass / fail, Windows version, x64 or ARM64, display scale.
    Log in as another user (fast user switching): it starts there too (one per session).
 5. Restart Anemo's containers: the icon goes grey, then normal again within a minute.
    Disconnect the network for 2 minutes, reconnect: same.
-6. Delete the device in Anemo: within a minute the icon is grey and a balloon says the token
-   was refused; the client stops retrying. Paste a new token: it connects.
+6. Delete the device in Anemo: within a minute the icon is grey with the amber “!” and a balloon
+   says the token was refused; the client stops retrying. Paste a new token: it connects.
 7. Start the same token on a second computer: the first one shows "Another copy … connected"
    and stops retrying (4409).
 8. Paste a phone's token: after three tries, the 4400 sentence.
@@ -92,14 +94,15 @@ Ask the agent to look (`computer_look`) at each; check the screenshot, the refs 
 ## Stop, pause, control off
 
 30. While the agent types a long text: press **Ctrl+Alt+Shift+S**. Typing stops within a
-    character or two; the tool call fails with "The user stopped control"; the tray shows
-    "control paused until …"; a new action is refused; looking still works.
+    character or two; the tool call fails with "The user stopped control"; the tray icon gets an
+    amber pause badge and its tooltip says "control paused until …"; a new action is refused; looking still works.
 31. Same with the indicator's **Stop** button (the button works without taking the focus from
     the window being typed into).
 32. While a PowerShell command runs (`Start-Sleep 60` on the VM): Stop ends it at once
     (no `powershell.exe`/`pwsh.exe` left in Task Manager).
 33. *Pause control for 1 hour* from the menu, then *Resume control*: actions are refused, then
-    allowed again (within 30 s for the server, at once in the client).
+    allowed again (within 30 s for the server, at once in the client); the pause badge comes
+    and goes with it.
 34. Untick *Allow control*: actions and PowerShell are refused; looks still work; Anemo shows
     control off for the device. Restart the client: still off.
 34a. Press the stop key, then quit and start the client again within the hour: control is still

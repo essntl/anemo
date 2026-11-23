@@ -19,8 +19,10 @@ The phone app (`05-voice-android.md`) is a device too; both use the protocol in
   (computer or phone) and the trust level (below). Anemo shows a token once; paste it into
   the client with the Anemo address. Revoking the device revokes its token and closes its
   connection at once.
-- **The tray icon** shows the state: grey (not connected), normal (connected), red (the
-  agent is acting on this computer right now). Its menu: *Share this screen with Anemo*,
+- **The tray icon** is the Anemo mark on a tile that shows the state: grey (connecting, or
+  trying again), dark (connected), red (the agent is acting on this computer right now),
+  dark with an amber pause badge (control paused), grey with an amber “!” (not set up, or
+  refused by Anemo: open Settings). Its menu: *Share this screen with Anemo*,
   *Pause control for 1 hour*, *Allow control* (on/off), *Open Anemo*, *Quit*.
 - **Stop at once**: Ctrl+Alt+Shift+S (changeable) takes control away from the agent on
   this computer for an hour, cancels the command it was running, and tells Anemo, which
