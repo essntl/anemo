@@ -3,18 +3,20 @@
  * showing its latest job, grouped by project; filters by project and state, kept in
  * the address. Refreshed by the app-wide `code.job` notice (features/chat/useAppEvents.ts).
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { GitBranch, GitPullRequest, SquareTerminal } from 'lucide-react'
+import { GitBranch, GitPullRequest, Plus, SquareTerminal } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Elapsed } from '@/components/ui/Elapsed'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Lingering } from '@/components/ui/Lingering'
 import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { msg, plural, t } from '@/lib/i18n'
 import { type CodeFilters, useCodeJobs } from './api'
+import { NewJobDialog } from './NewJobDialog'
 import { StateBadge } from './parts'
 import { type CodeJobState, type CodeThread, JOB_STATES, groupByProject, jobDurationMs, pullRequest, toThreads } from './threads'
 
@@ -99,6 +101,7 @@ function Skeleton() {
 
 /** The list. `jobId` is the open job (its thread is marked). */
 export function CodeJobList({ jobId }: { jobId?: string }) {
+  const [starting, setStarting] = useState(false)
   const [params, setParams] = useSearchParams()
   const filters = filtersOf(params)
   const jobs = useCodeJobs(filters)
@@ -126,6 +129,11 @@ export function CodeJobList({ jobId }: { jobId?: string }) {
           options={[{ value: '', label: t('All projects') }, ...projects.map((p) => ({ value: p, label: p }))]} />
         <Select variant="pill" aria-label={t('State')} value={filters.state ?? ''} onValueChange={(v) => setFilter('state', v)}
           options={[{ value: '', label: t('All states') }, ...JOB_STATES.map((s) => ({ value: s, label: t(STATE_FILTER[s]) }))]} />
+        <Button size="sm" variant="primary" className="ml-auto" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setStarting(true)}>
+          {t('New job')}
+        </Button>
+        {/* Mounted only while open (and while it animates out): its queries run only then. */}
+        <Lingering value={starting}>{() => <NewJobDialog open={starting} onOpenChange={setStarting} />}</Lingering>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4">
         {jobs.isPending ? <Skeleton /> : jobs.isError ? (

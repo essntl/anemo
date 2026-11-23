@@ -8,6 +8,8 @@ export const taskLink = (id: string) => `/tasks?task=${id}`
 /** A calendar event (the calendar opens on its day with the event shown). */
 export const eventLink = (id: string) => `/calendar?event=${id}`
 export const chatLink = (id: string) => `/c/${id}`
+/** A Claude Code job on the Code page (its whole thread). */
+export const codeJobLink = (id: string) => `/code/${id}`
 /** A file in Files: "/files?path=projects/thesis/draft.pdf" (slashes kept for readability). */
 export const fileLink = (path: string) => `/files?path=${encodeURIComponent(path).replace(/%2F/g, '/')}`
 
