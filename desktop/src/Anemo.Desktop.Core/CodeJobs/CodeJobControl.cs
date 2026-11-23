@@ -38,6 +38,9 @@ public sealed partial class CodeJobControl
     public const string StartOffMessage = "Starting Claude Code jobs is switched off in Anemo Desktop on this computer.";
     public const string NoClaudeMessage = "Claude Code (claude) isn't on this computer's PATH.";
 
+    public const string NoOwnerNote =
+        "Sign in to GitHub's command line tool (gh auth login) or set a GitHub owner in Anemo Desktop's settings to list the repositories not cloned yet.";
+
     /// <summary>Set for every gh and git run: never wait for a password or a question.</summary>
     public static readonly IReadOnlyDictionary<string, string> QuietEnvironment = new Dictionary<string, string>
     {
@@ -79,7 +82,8 @@ public sealed partial class CodeJobControl
 
     private string ProjectsFolder => Setting(_settings().CodeProjectsFolder) ?? CodeJobLimits.DefaultProjectsFolder;
 
-    private string Owner => Setting(_settings().GitHubOwner) ?? CodeJobLimits.DefaultGitHubOwner;
+    /// <summary>The owner set in Settings, or null when none is.</summary>
+    private string? OwnerSetting => Setting(_settings().GitHubOwner);
 
     private string JobsFolder => Setting(_settings().CodeJobsFolder) ?? CodeJobLimits.DefaultFolder;
 
@@ -194,8 +198,7 @@ public sealed partial class CodeJobControl
     /// <summary>The owner's repositories (gh repo list), or none and a sentence why.</summary>
     private async Task<(IReadOnlyList<RemoteProject> Remote, string? Note)> RemoteAsync(string folder, CancellationToken ct)
     {
-        var owner = Owner;
-        if (!CodeProjects.IsOwner(owner))
+        if (OwnerSetting is { } set && !CodeProjects.IsOwner(set))
         {
             return ([], "The GitHub owner in Anemo Desktop's settings isn't a valid GitHub name, so only local projects are listed.");
         }
@@ -203,6 +206,11 @@ public sealed partial class CodeJobControl
         if (_host.FindOnPath("gh") is not { } gh)
         {
             return ([], "GitHub's command line tool (gh) isn't on this computer's PATH, so only local projects are listed.");
+        }
+
+        if (await OwnerAsync(ct) is not { } owner)
+        {
+            return ([], NoOwnerNote);
         }
 
         ToolResult result;
@@ -316,8 +324,8 @@ public sealed partial class CodeJobControl
             return byRemote.Dir;
         }
 
-        var owner = Owner;
-        if (CodeProjects.IsOwner(owner) && await CloneAsync(owner, project, projects, target, ct))
+        var owner = await OwnerAsync(ct);
+        if (owner is not null && await CloneAsync(owner, project, projects, target, ct))
         {
             return target;
         }
@@ -327,7 +335,38 @@ public sealed partial class CodeJobControl
             return await CreateAsync(target, ct);
         }
 
-        throw CommandException.Failed($"There is no project “{project}” in {projects} or on GitHub ({owner}).");
+        throw CommandException.Failed(owner is null
+            ? $"There is no project “{project}” in {projects}, and no GitHub owner is known to clone it from (sign in to gh with gh auth login, or set an owner in Anemo Desktop's settings)."
+            : $"There is no project “{project}” in {projects} or on GitHub ({owner}).");
+    }
+
+    /// <summary>
+    /// The GitHub owner: the one set in Settings, else the account gh is signed in as
+    /// (<c>gh api user --jq .login</c>, 30 s); null when neither is known (§12.5).
+    /// </summary>
+    private async Task<string?> OwnerAsync(CancellationToken ct)
+    {
+        if (OwnerSetting is { } set)
+        {
+            return CodeProjects.IsOwner(set) ? set : null;
+        }
+
+        if (_host.FindOnPath("gh") is not { } gh)
+        {
+            return null;
+        }
+
+        try
+        {
+            var result = await _host.RunAsync(
+                new ToolRun(gh, ["api", "user", "--jq", ".login"], Path.GetTempPath(), QuietEnvironment), _options.ListTimeout, ct);
+            var login = result.Stdout.Trim();
+            return result.ExitCode == 0 && CodeProjects.IsOwner(login) ? login : null;
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
     }
 
     /// <summary>True when the clone made the folder; false when there is no such repository (or no gh/git).</summary>

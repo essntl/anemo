@@ -18,8 +18,9 @@ messages: `docs/device-contracts.md` §7.
 
 **Starting jobs from Anemo (1.2.0).** With *Let Anemo start Claude Code jobs* also ticked (off
 by default; it only counts while sharing is on), Anemo can list the projects
-(`C:\dev` and the GitHub owner's repositories through `gh`, owner `essntl` unless Settings
-names another), start a job in a project (cloning it with `gh` or `git`, or making a new
+(`C:\dev` and the GitHub owner's repositories through `gh`: the owner set in Settings, else
+the account `gh` is signed in as; with neither, no repositories are listed and nothing is
+cloned), start a job in a project (cloning it with `gh` or `git`, or making a new
 repository, when there is no such folder) and cancel one. A job is started as `cc.ps1` does:
 `cmd.exe /d /c claude -p --output-format stream-json --verbose --permission-mode
 bypassPermissions … < prompt.txt > out.jsonl 2> err.txt`, detached, in the same jobs folder,

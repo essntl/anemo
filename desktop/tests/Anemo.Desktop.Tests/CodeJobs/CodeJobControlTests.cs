@@ -167,6 +167,83 @@ public sealed class CodeJobControlTests : IDisposable
     }
 
     [Fact]
+    public async Task Without_an_owner_set_the_repositories_are_those_of_the_account_gh_is_signed_in_as()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.Answer = run => run.Arguments[0] == "api"
+            ? new ToolResult(0, "octo-cat\n", "")
+            : new ToolResult(0, """[{"name":"notes","url":"https://github.com/octo-cat/notes"}]""", "");
+
+        var state = (await RunAsync("code_projects")).State!;
+
+        var runs = _host.Runs.ToList();
+        Assert.Equal(["api", "user", "--jq", ".login"], runs[0].Arguments);
+        Assert.Equal(["repo", "list", "octo-cat", "--limit", "200", "--json", "name,url"], runs[1].Arguments);
+        Assert.Equal("notes", (string?)state["remote"]![0]!["name"]);
+        Assert.Null(state["note"]);
+    }
+
+    [Fact]
+    public async Task Without_an_owner_and_without_a_signed_in_gh_no_repositories_are_listed()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.Answer = _ => new ToolResult(1, "", "You are not logged into any GitHub hosts. To log in, run: gh auth login");
+
+        var state = (await RunAsync("code_projects")).State!;
+
+        Assert.Empty(state["remote"]!.AsArray());
+        Assert.Equal(CodeJobControl.NoOwnerNote, (string?)state["note"]);
+        Assert.Single(_host.Runs); // only the question who is signed in
+    }
+
+    [Fact]
+    public async Task Without_an_owner_and_without_gh_nothing_is_cloned()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.OnPath.TryRemove("gh", out _);
+
+        var outcome = await RunAsync("code_start", StartFields("notes"));
+
+        Assert.StartsWith($"There is no project “notes” in {_projects}, and no GitHub owner is known to clone it from", outcome.Error);
+        Assert.Empty(_host.Runs);
+        Assert.Empty(_host.Started);
+    }
+
+    [Fact]
+    public async Task Without_an_owner_a_new_project_is_made_without_trying_a_clone()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.Answer = run => run.Arguments[0] == "api" ? new ToolResult(1, "", "not logged in") : new ToolResult(0, "", "");
+
+        var outcome = await RunAsync("code_start", StartFields("fresh", isNew: true));
+
+        Assert.True(outcome.Ok, outcome.Error);
+        Assert.DoesNotContain(_host.Runs, r => r.Arguments.Contains("clone"));
+        Assert.Contains(_host.Runs, r => r.Arguments.SequenceEqual(["init"]));
+    }
+
+    [Fact]
+    public async Task Without_an_owner_set_the_clone_is_from_the_signed_in_account()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        var target = Path.Combine(_projects, "notes");
+        _host.Answer = run =>
+        {
+            if (run.Arguments[0] == "api")
+            {
+                return new ToolResult(0, "octo-cat\n", "");
+            }
+
+            Directory.CreateDirectory(target);
+            return new ToolResult(0, "", "");
+        };
+
+        Assert.True((await RunAsync("code_start", StartFields("notes"))).Ok);
+
+        Assert.Contains(_host.Runs, r => r.Arguments.SequenceEqual(["repo", "clone", "octo-cat/notes", target]));
+    }
+
+    [Fact]
     public async Task A_missing_projects_folder_is_said()
     {
         Directory.Delete(_projects);

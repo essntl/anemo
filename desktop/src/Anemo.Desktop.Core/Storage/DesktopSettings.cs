@@ -52,6 +52,6 @@ public sealed record DesktopSettings
     /// <summary>Where the projects are; null means <c>C:\dev</c>.</summary>
     public string? CodeProjectsFolder { get; init; }
 
-    /// <summary>Whose GitHub repositories are listed and cloned; null means <c>essntl</c>.</summary>
+    /// <summary>Whose GitHub repositories are listed and cloned; null means the account gh is signed in as.</summary>
     public string? GitHubOwner { get; init; }
 }
