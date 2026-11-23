@@ -38,7 +38,7 @@ export function TrimmedMark() {
         {t('trimmed')}
       </button>
       {open && view && (
-        <span className="min-w-0 break-all text-[11.5px] text-muted">
+        <span className="min-w-0 text-[11.5px] text-muted [overflow-wrap:anywhere]">
           {t('Shortened to be stored. The full log is on the computer: {path}', { path: logPath(view.job.job_dir) })}
         </span>
       )}

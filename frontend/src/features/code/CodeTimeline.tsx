@@ -135,6 +135,8 @@ function WebBody({ call }: { call: ToolCall }) {
 function TaskBody({ call, depth }: { call: ToolCall; depth: number }) {
   const prompt = typeof call.input.prompt === 'string' ? call.input.prompt : ''
   const agent = typeof call.input.subagent_type === 'string' ? call.input.subagent_type : ''
+  // The sub-agent's first message is the prompt shown above: not twice.
+  const children = call.children.filter((c) => !(c.kind === 'user' && c.text.trim() === prompt.trim()))
   return (
     <>
       {(agent || prompt) && (
@@ -143,9 +145,9 @@ function TaskBody({ call, depth }: { call: ToolCall; depth: number }) {
           {prompt && <Collapsible text={prompt} />}
         </div>
       )}
-      {call.children.length > 0 && (
+      {children.length > 0 && (
         <div className="border-l-2 border-border pl-3">
-          <Items items={call.children} depth={depth + 1} />
+          <Items items={children} depth={depth + 1} />
         </div>
       )}
       {call.result && (
@@ -289,9 +291,9 @@ function Item({ item, depth }: { item: TimelineItem; depth: number }) {
       return (
         <div className="mx-2 my-1 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/12 px-2.5 py-1.5 text-[12px]">
           <TriangleAlert aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-          <span className="min-w-0 break-words">
+          <span className="min-w-0 [overflow-wrap:anywhere]">
             {plural(item.count, '{n} event not stored (over 5 MB).', '{n} events not stored (over 5 MB).')}{' '}
-            {view && <span className="break-all text-muted">{t('The full log is on the computer: {path}', { path: logPath(view.job.job_dir) })}</span>}
+            {view && <span className="text-muted [overflow-wrap:anywhere]">{t('The full log is on the computer: {path}', { path: logPath(view.job.job_dir) })}</span>}
           </span>
         </div>
       )
