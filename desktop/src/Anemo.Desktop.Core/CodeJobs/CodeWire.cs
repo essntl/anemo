@@ -41,11 +41,14 @@ public static class CodeWire
 {
     private const string TimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fffzzz";
 
-    /// <summary>A <c>code.job</c>, shortened (stderr tail first, then the prompt) to fit 64 000 characters.</summary>
+    /// <summary>
+    /// A <c>code.job</c>, shortened (stderr tail first, then the prompt) to fit 64 000
+    /// characters. Every string has its NUL characters replaced by U+FFFD (Postgres stores none).
+    /// </summary>
     public static string Job(JobSnapshot job)
     {
-        var prompt = JobFolder.Cut(job.Prompt, CodeJobLimits.MaxPromptChars);
-        var stderr = job.StderrTail is null ? null : JobFolder.Tail(job.StderrTail, CodeJobLimits.MaxStderrChars);
+        var prompt = Text(job.Prompt, CodeJobLimits.MaxPromptChars)!;
+        var stderr = job.StderrTail is null ? null : JobFolder.Tail(Clean(job.StderrTail), CodeJobLimits.MaxStderrChars);
         while (true)
         {
             var text = Wire.Json(new JsonObject
@@ -54,17 +57,17 @@ public static class CodeWire
                 ["job"] = new JsonObject
                 {
                     ["id"] = job.Id,
-                    ["device_job_dir"] = JobFolder.Cut(job.JobDir, CodeJobLimits.MaxPathChars),
-                    ["project"] = JobFolder.Cut(job.Project, CodeJobLimits.MaxProjectChars),
-                    ["dir"] = JobFolder.Cut(job.Dir, CodeJobLimits.MaxPathChars),
+                    ["device_job_dir"] = Text(job.JobDir, CodeJobLimits.MaxPathChars),
+                    ["project"] = Text(job.Project, CodeJobLimits.MaxProjectChars),
+                    ["dir"] = Text(job.Dir, CodeJobLimits.MaxPathChars),
                     ["started"] = Time(job.Started),
                     ["prompt"] = prompt,
-                    ["resume_session"] = job.ResumeSession is null ? null : JobFolder.Cut(job.ResumeSession, CodeJobLimits.MaxSessionChars),
-                    ["model"] = job.Model is null ? null : JobFolder.Cut(job.Model, CodeJobLimits.MaxModelChars),
+                    ["resume_session"] = Text(job.ResumeSession, CodeJobLimits.MaxSessionChars),
+                    ["model"] = Text(job.Model, CodeJobLimits.MaxModelChars),
                     ["pid"] = job.Pid,
                     ["state"] = job.State,
                     ["ended"] = job.Ended is { } ended ? Time(ended) : null,
-                    ["branch"] = job.Branch is null ? null : JobFolder.Cut(job.Branch, CodeJobLimits.MaxBranchChars),
+                    ["branch"] = Text(job.Branch, CodeJobLimits.MaxBranchChars),
                     ["stderr_tail"] = stderr,
                 },
             });
@@ -122,4 +125,9 @@ public static class CodeWire
     }
 
     private static string Time(DateTimeOffset t) => t.ToString(TimeFormat, CultureInfo.InvariantCulture);
+
+    /// <summary>NUL characters replaced by U+FFFD (the same length, so cuts stay where they were).</summary>
+    internal static string Clean(string text) => text.Contains('\0') ? text.Replace('\0', '�') : text;
+
+    private static string? Text(string? text, int max) => text is null ? null : JobFolder.Cut(Clean(text), max);
 }

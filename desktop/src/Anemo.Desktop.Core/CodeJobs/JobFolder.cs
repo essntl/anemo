@@ -105,24 +105,37 @@ public static partial class JobFolder
         return DateTimeOffset.UtcNow;
     }
 
-    /// <summary>The last characters of <c>err.txt</c>, or null when it is missing or empty.</summary>
+    /// <summary>
+    /// The last characters of <c>err.txt</c>, or null when it is missing or empty. The encoding
+    /// comes from the file's byte order mark (UTF-16 from Windows PowerShell, UTF-8 otherwise),
+    /// also when only the end of a large file is read.
+    /// </summary>
     public static string? StderrTail(string folder, int maxChars = CodeJobLimits.MaxStderrChars)
     {
         try
         {
             using var stream = OpenShared(Path.Combine(folder, Err));
+            var (encoding, bom, unit) = DetectEncoding(stream);
             var maxBytes = (long)maxChars * 4;
-            var cut = stream.Length > maxBytes;
+            var start = (long)bom;
+            var cut = stream.Length - bom > maxBytes;
             if (cut)
             {
-                stream.Seek(-maxBytes, SeekOrigin.End);
+                // From a code unit's start, so UTF-16 isn't read one byte off.
+                start = bom + (stream.Length - maxBytes - bom + unit - 1) / unit * unit;
             }
 
-            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: !cut);
-            var text = reader.ReadToEnd();
+            stream.Seek(start, SeekOrigin.Begin);
+            using var bytes = new MemoryStream();
+            stream.CopyTo(bytes);
+            var text = encoding.GetString(bytes.GetBuffer(), 0, (int)bytes.Length);
             if (cut)
             {
-                text = text.TrimStart('\uFFFD'); // a character cut in half at the start
+                text = text.TrimStart('\uFFFD'); // a UTF-8 character cut in half at the start
+                if (text.Length > 0 && char.IsLowSurrogate(text[0]))
+                {
+                    text = text[1..]; // the second half of a UTF-16 pair
+                }
             }
 
             text = Tail(text, maxChars);
@@ -245,6 +258,26 @@ public static partial class JobFolder
             text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out var t)
             ? t
             : null;
+    }
+
+    /// <summary>The encoding a file's byte order mark names (UTF-8 without one), the mark's length and the code unit size.</summary>
+    private static (Encoding Encoding, int Bom, int Unit) DetectEncoding(FileStream stream)
+    {
+        Span<byte> head = stackalloc byte[3];
+        var read = stream.Read(head);
+        if (read >= 2 && head[0] == 0xFF && head[1] == 0xFE)
+        {
+            return (new UnicodeEncoding(bigEndian: false, byteOrderMark: false), 2, 2);
+        }
+
+        if (read >= 2 && head[0] == 0xFE && head[1] == 0xFF)
+        {
+            return (new UnicodeEncoding(bigEndian: true, byteOrderMark: false), 2, 2);
+        }
+
+        return read == 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF
+            ? (new UTF8Encoding(false), 3, 1)
+            : (new UTF8Encoding(false), 0, 1);
     }
 
     private static DateTimeOffset? LocalIdTime(string id) =>

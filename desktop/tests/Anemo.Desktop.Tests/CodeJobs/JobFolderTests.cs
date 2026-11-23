@@ -123,6 +123,62 @@ public sealed class JobFolderTests : IDisposable
         Assert.DoesNotContain('\uFFFD', tail);
     }
 
+    [Theory]
+    [InlineData("utf-16")]
+    [InlineData("utf-16BE")]
+    [InlineData("utf-8-bom")]
+    public void A_large_stderr_with_a_byte_order_mark_is_read_in_its_encoding(string name)
+    {
+        // Windows PowerShell writes UTF-16 with a BOM; the tail is read from far past the BOM.
+        var encoding = name switch
+        {
+            "utf-16" => new UnicodeEncoding(bigEndian: false, byteOrderMark: true),
+            "utf-16BE" => new UnicodeEncoding(bigEndian: true, byteOrderMark: true),
+            _ => (Encoding)new UTF8Encoding(true),
+        };
+        File.WriteAllText(Path.Combine(_folder, "err.txt"), string.Concat(Enumerable.Repeat("Gr\u00FC\u00DFe \u0436 \uD83D\uDE00 ", 3000)) + "Error: the end", encoding);
+        Assert.True(new FileInfo(Path.Combine(_folder, "err.txt")).Length > 16_000);
+
+        var tail = JobFolder.StderrTail(_folder)!;
+
+        Assert.EndsWith("\uD83D\uDE00 Error: the end", tail);
+        Assert.True(tail.Length <= 4000 && tail.Length > 3900);
+        Assert.DoesNotContain('\0', tail);
+        Assert.DoesNotContain('\uFFFD', tail);
+        Assert.False(char.IsLowSurrogate(tail[0]));
+        Assert.Contains("Gr\u00FC\u00DFe \u0436", tail);
+    }
+
+    [Fact]
+    public void A_small_UTF_16_stderr_is_read_whole()
+    {
+        File.WriteAllText(Path.Combine(_folder, "err.txt"), "Fehler: Gr\u00FC\u00DFe", Encoding.Unicode);
+
+        Assert.Equal("Fehler: Gr\u00FC\u00DFe", JobFolder.StderrTail(_folder));
+    }
+
+    [Fact]
+    public void Code_job_strings_have_no_NUL_characters()
+    {
+        const string nul = "a\0b";
+        var job = new JobSnapshot(
+            "20261122-093000-ab12", "C:\\jobs\0x", "pro\0ject", "C:\\dev\\pro\0ject", DateTimeOffset.UtcNow,
+            "prompt " + nul, "sess" + nul, "op\0us", 1, JobStates.Failed, DateTimeOffset.UtcNow, "feat/\0x", "err " + nul);
+
+        var text = CodeWire.Job(job);
+
+        Assert.DoesNotContain("\\u0000", text);
+        var sent = System.Text.Json.Nodes.JsonNode.Parse(text)!["job"]!.AsObject();
+        foreach (var key in new[] { "device_job_dir", "project", "dir", "prompt", "resume_session", "model", "branch", "stderr_tail" })
+        {
+            var value = (string?)sent[key];
+            Assert.DoesNotContain('\0', value!);
+            Assert.Contains('\uFFFD', value!);
+        }
+
+        Assert.Equal("prompt a\uFFFDb", (string?)sent["prompt"]);
+    }
+
     [Fact]
     public void The_branch_comes_from_git_HEAD()
     {
