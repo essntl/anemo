@@ -23,6 +23,7 @@ public sealed class CodeJobControlTests : IDisposable
     private readonly CommandLog _log;
     private readonly CommandProcessor _processor;
     private readonly string _projects;
+    private readonly CodeJobControl _jobControl;
 
     public CodeJobControlTests()
     {
@@ -38,8 +39,8 @@ public sealed class CodeJobControlTests : IDisposable
         };
         _control = new ControlState(_time, allow: true, pausedUntil: null);
         _log = new CommandLog(Path.Combine(_jobs.Root, "log"), _time);
-        var control = new CodeJobControl(() => Settings, _host, _processes, _time, new CodeJobControlOptions { NewIdSuffix = () => "k3x9" });
-        _processor = new CommandProcessor(new FakePlatform().Services, _control, () => Settings, _log, null, control);
+        _jobControl = new CodeJobControl(() => Settings, _host, _processes, _time, new CodeJobControlOptions { NewIdSuffix = () => "k3x9" });
+        _processor = new CommandProcessor(new FakePlatform().Services, _control, () => Settings, _log, null, _jobControl);
     }
 
     private DesktopSettings Settings { get; set; }
@@ -167,6 +168,100 @@ public sealed class CodeJobControlTests : IDisposable
     }
 
     [Fact]
+    public async Task Without_an_owner_set_the_repositories_are_those_of_the_account_gh_is_signed_in_as()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.Answer = run => run.Arguments[0] == "api"
+            ? new ToolResult(0, "octo-cat\n", "")
+            : new ToolResult(0, """[{"name":"notes","url":"https://github.com/octo-cat/notes"}]""", "");
+
+        var state = (await RunAsync("code_projects")).State!;
+
+        var runs = _host.Runs.ToList();
+        Assert.Equal(["api", "user", "--jq", ".login"], runs[0].Arguments);
+        Assert.Equal(["repo", "list", "octo-cat", "--limit", "200", "--json", "name,url"], runs[1].Arguments);
+        Assert.Equal("notes", (string?)state["remote"]![0]!["name"]);
+        Assert.Null(state["note"]);
+    }
+
+    [Fact]
+    public async Task Without_an_owner_and_without_a_signed_in_gh_no_repositories_are_listed()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.Answer = _ => new ToolResult(1, "", "You are not logged into any GitHub hosts. To log in, run: gh auth login");
+
+        var state = (await RunAsync("code_projects")).State!;
+
+        Assert.Empty(state["remote"]!.AsArray());
+        Assert.Equal(CodeJobControl.NoOwnerNote, (string?)state["note"]);
+        Assert.Single(_host.Runs); // only the question who is signed in
+    }
+
+    [Fact]
+    public async Task Without_an_owner_and_without_gh_nothing_is_cloned()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.OnPath.TryRemove("gh", out _);
+
+        var outcome = await RunAsync("code_start", StartFields("notes"));
+
+        Assert.StartsWith($"There is no project “notes” in {_projects}, and no GitHub owner is known to clone it from", outcome.Error);
+        Assert.Empty(_host.Runs);
+        Assert.Empty(_host.Started);
+    }
+
+    [Fact]
+    public async Task Without_an_owner_a_new_project_is_made_without_trying_a_clone()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        _host.Answer = run => run.Arguments[0] == "api" ? new ToolResult(1, "", "not logged in") : new ToolResult(0, "", "");
+
+        var outcome = await RunAsync("code_start", StartFields("fresh", isNew: true));
+        await _jobControl.IdleAsync();
+
+        Assert.True(outcome.Ok, outcome.Error);
+        Assert.DoesNotContain(_host.Runs, r => r.Arguments.Contains("clone"));
+        Assert.Contains(_host.Runs, r => r.Arguments.SequenceEqual(["init"]));
+    }
+
+    [Fact]
+    public async Task Without_an_owner_set_the_clone_is_from_the_signed_in_account()
+    {
+        Settings = Settings with { GitHubOwner = null };
+        var target = Path.Combine(_projects, "notes");
+        _host.Answer = run =>
+        {
+            if (run.Arguments[0] == "api")
+            {
+                return new ToolResult(0, "octo-cat\n", "");
+            }
+
+            Directory.CreateDirectory(target);
+            return new ToolResult(0, "", "");
+        };
+
+        Assert.True((await RunAsync("code_start", StartFields("notes"))).Ok);
+        await _jobControl.IdleAsync();
+
+        Assert.Contains(_host.Runs, r => r.Arguments.SequenceEqual(["repo", "clone", "octo-cat/notes", target]));
+    }
+
+    [Fact]
+    public async Task A_gh_or_git_that_is_a_batch_file_is_never_run()
+    {
+        // cmd.exe would read %, & and quotes in their arguments (the projects folder from Settings).
+        _host.OnPath["gh"] = @"C:\tools\gh.cmd";
+        _host.OnPath["git"] = @"C:\tools\git.BAT";
+
+        var projects = (await RunAsync("code_projects")).State!;
+        var start = await RunAsync("code_start", StartFields("fresh", isNew: true));
+
+        Assert.Equal("GitHub's command line tool (gh) isn't on this computer's PATH, so only local projects are listed.", (string?)projects["note"]);
+        Assert.Equal("git isn't on this computer's PATH, so the new project can't be made.", start.Error);
+        Assert.Empty(_host.Runs);
+    }
+
+    [Fact]
     public async Task A_missing_projects_folder_is_said()
     {
         Directory.Delete(_projects);
@@ -187,10 +282,19 @@ public sealed class CodeJobControlTests : IDisposable
     [InlineData("project", "..\\x")]
     [InlineData("project", "my project")]
     [InlineData("project", "x&calc")]
+    [InlineData("project", "...")]
+    [InlineData("project", "anemo.")]
+    [InlineData("project", "CON")]
+    [InlineData("project", "nul.txt")]
+    [InlineData("project", "Com1")]
+    [InlineData("project", "lpt9.md")]
+    [InlineData("project", "anemo\n")]
     [InlineData("model", "opus --dangerously")]
     [InlineData("model", "opus&calc")]
+    [InlineData("model", "opus\n")]
     [InlineData("resume_session", "abc def")]
     [InlineData("resume_session", "a\"b")]
+    [InlineData("resume_session", "abc\n")]
     public async Task Values_that_could_reach_the_command_line_are_checked(string field, string value)
     {
         var fields = StartFields("anemo");
@@ -282,13 +386,78 @@ public sealed class CodeJobControlTests : IDisposable
         };
 
         var state = (await RunAsync("code_start", StartFields("notes"))).State!;
+        await _jobControl.IdleAsync();
 
         var run = Assert.Single(_host.Runs);
         Assert.Equal(_host.OnPath["gh"], run.FileName);
         Assert.Equal(["repo", "clone", "essntl/notes", target], run.Arguments);
         Assert.Equal(_projects, run.WorkingDirectory);
         Assert.Equal(target, (string?)state["dir"]);
-        Assert.Single(_host.Started);
+        Assert.Equal("notes", (string?)state["project"]);
+        Assert.Equal(target, Assert.Single(_host.Started).WorkingDirectory);
+    }
+
+    [Fact]
+    public async Task A_clone_is_answered_at_once_and_the_job_counts_as_running_while_it_clones()
+    {
+        var target = Path.Combine(_projects, "notes");
+        var clone = new TaskCompletionSource<ToolResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _host.AnswerAsync = (_, _) => clone.Task;
+
+        var outcome = await RunAsync("code_start", StartFields("notes")).WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Answered while the clone still runs: the job folder has "starting" and no pid.
+        var id = (string)outcome.State!["job_id"]!;
+        var folder = Path.Combine(_jobs.Jobs, id);
+        Assert.Equal(target, (string?)outcome.State["dir"]);
+        Assert.True(File.Exists(Path.Combine(folder, "starting")));
+        Assert.Equal("Fix the flaky test.", File.ReadAllText(Path.Combine(folder, "prompt.txt")));
+        var meta = JobFolder.ReadMeta(folder, id)!;
+        Assert.Null(meta.Pid);
+        Assert.Equal(target, meta.Dir);
+        Assert.Equal("running", JobState.Read(folder, meta, _processes, _time.Now));
+        Assert.Empty(_host.Started);
+
+        // The sharing loop announces it as running meanwhile.
+        var sharing = new SessionHarness(_jobs, _time, _processes, new CodeJobStore(_jobs.StateFile, _time, new ListLog()), new ListLog());
+        await sharing.SettleAsync();
+        Assert.Equal("running", (string?)sharing.Server.Jobs[id].Job!["state"]);
+        Assert.Null(sharing.Server.Jobs[id].Job!["pid"]);
+
+        // The clone ends: the job starts, meta.json gets the pid, "starting" goes.
+        _time.Now += TimeSpan.FromMinutes(3);
+        Directory.CreateDirectory(target);
+        clone.SetResult(new ToolResult(0, "", ""));
+        await _jobControl.IdleAsync();
+
+        Assert.Equal(target, Assert.Single(_host.Started).WorkingDirectory);
+        Assert.False(File.Exists(Path.Combine(folder, "starting")));
+        meta = JobFolder.ReadMeta(folder, id)!;
+        Assert.Equal(9000, meta.Pid);
+        Assert.Equal(TimeZoneInfo.ConvertTime(_time.Now, TimeZoneInfo.Local), meta.Started); // when its process started
+        _processes.Running[9000] = _time.Now;
+        await sharing.SettleAsync();
+        Assert.Equal(9000, (int?)sharing.Server.Jobs[id].Job!["pid"]);
+        Assert.Equal("running", (string?)sharing.Server.Jobs[id].Job!["state"]);
+    }
+
+    [Fact]
+    public async Task A_starting_job_counts_as_running_for_at_most_15_minutes()
+    {
+        var clone = new TaskCompletionSource<ToolResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _host.AnswerAsync = (_, _) => clone.Task;
+        var id = (string)(await RunAsync("code_start", StartFields("notes"))).State!["job_id"]!;
+        var folder = Path.Combine(_jobs.Jobs, id);
+        var meta = JobFolder.ReadMeta(folder, id)!;
+
+        Assert.Equal("running", JobState.Read(folder, meta, _processes, _time.Now.AddMinutes(15)));
+        Assert.Equal("exited_without_result", JobState.Read(folder, meta, _processes, _time.Now.AddMinutes(16)));
+
+        // A "starting" file left behind (the client quit while cloning) ends the job the same way.
+        clone.SetResult(new ToolResult(1, "", ""));
+        await _jobControl.IdleAsync();
+        File.WriteAllText(Path.Combine(folder, "starting"), "");
+        Assert.Equal("exited_without_result", JobState.Read(folder, meta, _processes, _time.Now.AddMinutes(16)));
     }
 
     [Fact]
@@ -303,6 +472,7 @@ public sealed class CodeJobControlTests : IDisposable
         };
 
         await RunAsync("code_start", StartFields("notes"));
+        await _jobControl.IdleAsync();
 
         var run = Assert.Single(_host.Runs);
         Assert.Equal(_host.OnPath["git"], run.FileName);
@@ -318,6 +488,7 @@ public sealed class CodeJobControlTests : IDisposable
             : new ToolResult(0, "Initialized empty Git repository", "");
 
         var state = (await RunAsync("code_start", StartFields("fresh", isNew: true))).State!;
+        await _jobControl.IdleAsync();
 
         Assert.Equal(target, (string?)state["dir"]);
         Assert.True(Directory.Exists(target));
@@ -325,10 +496,11 @@ public sealed class CodeJobControlTests : IDisposable
         Assert.Equal(_host.OnPath["git"], init.FileName);
         Assert.Equal(["init"], init.Arguments);
         Assert.Equal(target, init.WorkingDirectory);
+        Assert.Equal(target, Assert.Single(_host.Started).WorkingDirectory);
     }
 
     [Fact]
-    public async Task No_folder_no_repository_and_not_new_fails_with_the_sentence()
+    public async Task No_folder_no_repository_and_not_new_ends_the_job_with_the_sentence_in_err_txt()
     {
         var target = Path.Combine(_projects, "ghost");
         _host.Answer = _ =>
@@ -338,22 +510,80 @@ public sealed class CodeJobControlTests : IDisposable
         };
 
         var outcome = await RunAsync("code_start", StartFields("ghost"));
+        await _jobControl.IdleAsync();
 
-        Assert.Equal($"There is no project “ghost” in {_projects} or on GitHub (essntl).", outcome.Error);
-        Assert.False(Directory.Exists(target));
+        var id = (string)outcome.State!["job_id"]!;
+        var folder = Path.Combine(_jobs.Jobs, id);
+        var reason = $"There is no project “ghost” in {_projects} or on GitHub (essntl).";
+        Assert.Equal(reason + "\n", File.ReadAllText(Path.Combine(folder, "err.txt")));
+        Assert.False(File.Exists(Path.Combine(folder, "starting")));
+        Assert.False(Directory.Exists(target)); // the half clone is removed
         Assert.Empty(_host.Started);
-        Assert.Empty(Directory.GetDirectories(_jobs.Jobs));
+        Assert.Equal("exited_without_result", JobState.Read(folder, JobFolder.ReadMeta(folder, id)!, _processes, _time.Now));
+
+        // The sharing loop ends it with that reason as its stderr tail.
+        var sharing = new SessionHarness(_jobs, _time, _processes, new CodeJobStore(_jobs.StateFile, _time, new ListLog()), new ListLog());
+        await sharing.SettleAsync();
+        Assert.Equal("exited_without_result", (string?)sharing.Server.Jobs[id].Job!["state"]);
+        Assert.Equal(reason + "\n", (string?)sharing.Server.Jobs[id].Job!["stderr_tail"]);
     }
 
     [Fact]
-    public async Task A_clone_that_takes_more_than_10_minutes_fails()
+    public async Task A_clone_that_takes_more_than_10_minutes_ends_the_job()
     {
         _host.Answer = _ => throw new TimeoutException();
 
         var outcome = await RunAsync("code_start", StartFields("huge", isNew: true));
+        await _jobControl.IdleAsync();
 
-        Assert.Equal("Cloning essntl/huge took longer than 10 minutes, so it was stopped.", outcome.Error);
+        var folder = Path.Combine(_jobs.Jobs, (string)outcome.State!["job_id"]!);
+        Assert.Equal("Cloning essntl/huge took longer than 10 minutes, so it was stopped.\n", File.ReadAllText(Path.Combine(folder, "err.txt")));
         Assert.False(Directory.Exists(Path.Combine(_projects, "huge")));
+        Assert.Empty(_host.Started);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_job_that_is_still_cloning_stops_the_clone()
+    {
+        var target = Path.Combine(_projects, "notes");
+        var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _host.AnswerAsync = async (_, ct) =>
+        {
+            Directory.CreateDirectory(target);
+            await using (ct.Register(() => stopped.TrySetResult()))
+            {
+                await Task.Delay(Timeout.Infinite, ct); // as the real host: a cancel ends the clone
+            }
+
+            return new ToolResult(0, "", "");
+        };
+        var id = (string)(await RunAsync("code_start", StartFields("notes"))).State!["job_id"]!;
+        var folder = Path.Combine(_jobs.Jobs, id);
+
+        var outcome = await RunAsync("code_cancel", new JsonObject { ["job_id"] = id }).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(new JsonObject { ["job_id"] = id, ["state"] = "cancelled" }.ToJsonString(), outcome.State!.ToJsonString());
+        Assert.True(stopped.Task.IsCompleted);
+        Assert.True(File.Exists(Path.Combine(folder, "cancelled")));
+        Assert.False(File.Exists(Path.Combine(folder, "starting")));
+        Assert.False(Directory.Exists(target)); // the half clone is removed
+        Assert.Empty(_host.Started);
+        Assert.Empty(_host.Killed);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_starting_job_the_client_lost_track_of_ends_it()
+    {
+        // The client quit while cloning: "starting" is left, nobody is cloning.
+        var job = _jobs.Add(_time.Now.AddMinutes(-2), pid: null);
+        File.WriteAllText(Path.Combine(job.Folder, "starting"), "");
+
+        var outcome = await RunAsync("code_cancel", new JsonObject { ["job_id"] = job.Id });
+
+        Assert.Equal("cancelled", (string?)outcome.State!["state"]);
+        Assert.False(File.Exists(Path.Combine(job.Folder, "starting")));
+        Assert.True(File.Exists(Path.Combine(job.Folder, "cancelled")));
+        Assert.Empty(_host.Killed);
     }
 
     [Fact]
@@ -404,10 +634,11 @@ public sealed class CodeJobControlTests : IDisposable
         Assert.Equal("cmd.exe", start.FileName);
         Assert.Equal(dir, start.WorkingDirectory);
         Assert.Equal(
-            "/d /c claude -p --output-format stream-json --verbose --permission-mode bypassPermissions"
+            "/d /v:off /s /c \"\"C:\\Users\\me\\AppData\\Roaming\\npm\\claude.cmd\" -p --output-format stream-json --verbose --permission-mode bypassPermissions"
             + " --resume 4f1c2a9e-0b7d-4e57-9f0a-3c1d2e3f4a5b --model claude-opus-4-1[1m] --max-turns 40"
-            + $" < \"{folder}{Path.DirectorySeparatorChar}prompt.txt\" > \"{folder}{Path.DirectorySeparatorChar}out.jsonl\" 2> \"{folder}{Path.DirectorySeparatorChar}err.txt\"",
+            + $" < \"{folder}{Path.DirectorySeparatorChar}prompt.txt\" > \"{folder}{Path.DirectorySeparatorChar}out.jsonl\" 2> \"{folder}{Path.DirectorySeparatorChar}err.txt\"\"",
             start.CommandLine);
+        Assert.Equal("1", start.Environment["NoDefaultCurrentDirectoryInExePath"]);
         Assert.DoesNotContain("Grüße", start.CommandLine); // the prompt only goes through the file
     }
 
@@ -415,14 +646,44 @@ public sealed class CodeJobControlTests : IDisposable
     public void The_command_line_has_only_the_options_given()
     {
         var folder = Path.Combine("C:", "anemo-bridge", "jobs", "20261122-100000-k3x9");
+        const string claude = @"C:\Program Files\nodejs\claude.cmd";
+        var redirects = $" < \"{Path.Combine(folder, "prompt.txt")}\" > \"{Path.Combine(folder, "out.jsonl")}\" 2> \"{Path.Combine(folder, "err.txt")}\"";
 
         Assert.Equal(
-            "/d /c claude -p --output-format stream-json --verbose --permission-mode bypassPermissions"
-            + $" < \"{Path.Combine(folder, "prompt.txt")}\" > \"{Path.Combine(folder, "out.jsonl")}\" 2> \"{Path.Combine(folder, "err.txt")}\"",
-            CodeJobControl.CommandLine(folder, null, null, null));
-        Assert.EndsWith(
-            "bypassPermissions --max-turns 7 < " + $"\"{Path.Combine(folder, "prompt.txt")}\" > \"{Path.Combine(folder, "out.jsonl")}\" 2> \"{Path.Combine(folder, "err.txt")}\"",
-            CodeJobControl.CommandLine(folder, null, null, 7));
+            "/d /v:off /s /c \"\"C:\\Program Files\\nodejs\\claude.cmd\" -p --output-format stream-json --verbose --permission-mode bypassPermissions"
+            + redirects + "\"",
+            CodeJobControl.CommandLine(claude, folder, null, null, null));
+        Assert.EndsWith("bypassPermissions --max-turns 7" + redirects + "\"", CodeJobControl.CommandLine(claude, folder, null, null, 7));
+    }
+
+    [Fact]
+    public async Task A_claude_cmd_in_the_project_folder_is_never_the_one_that_runs()
+    {
+        // A cloned repository can hold its own claude.cmd; cmd.exe would look in the current folder first.
+        var dir = Path.Combine(_projects, "evil");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "claude.cmd"), "@echo pwned");
+
+        Assert.True((await RunAsync("code_start", StartFields("evil"))).Ok);
+
+        var start = Assert.Single(_host.Started);
+        Assert.Equal(dir, start.WorkingDirectory);
+        Assert.StartsWith("/d /v:off /s /c \"\"" + _host.OnPath["claude"] + "\" -p ", start.CommandLine);
+        Assert.DoesNotContain(" claude ", start.CommandLine);
+        Assert.DoesNotContain(dir, start.CommandLine);
+        Assert.Equal("1", start.Environment["NoDefaultCurrentDirectoryInExePath"]);
+    }
+
+    [Fact]
+    public async Task A_claude_path_a_command_line_can_t_carry_is_refused()
+    {
+        Directory.CreateDirectory(Path.Combine(_projects, "anemo"));
+        _host.OnPath["claude"] = @"C:\100%tools\claude.cmd";
+
+        var outcome = await RunAsync("code_start", StartFields("anemo"));
+
+        Assert.StartsWith("The path of Claude Code (claude) has a \" or % in it", outcome.Error);
+        Assert.Empty(_host.Started);
     }
 
     [Fact]
@@ -525,6 +786,57 @@ public sealed class CodeJobControlTests : IDisposable
         Assert.Equal(1, sharing.Server.Jobs[id].LastSeq);
     }
 
+    // -- code_start: follow-ups ----------------------------------------------------------
+
+    [Fact]
+    public async Task A_follow_up_runs_in_the_earlier_job_s_folder_even_outside_the_projects_folder()
+    {
+        var earlier = _jobs.Add(_time.Now.AddHours(-1)); // its dir is <root>\repos\anemo, not in the projects folder
+        earlier.Finish();
+        var fields = StartFields("not even a valid name");
+        fields["follow_job_id"] = earlier.Id;
+        fields["resume_session"] = "sess-1";
+
+        var outcome = await RunAsync("code_start", fields);
+
+        Assert.True(outcome.Ok, outcome.Error);
+        Assert.Equal(earlier.Dir, (string?)outcome.State!["dir"]);
+        Assert.Equal("anemo", (string?)outcome.State["project"]);
+        Assert.Equal(earlier.Dir, Assert.Single(_host.Started).WorkingDirectory);
+        Assert.Empty(_host.Runs); // nothing cloned or made
+        Assert.Contains("--resume sess-1", _host.Started.Single().CommandLine);
+        Assert.Contains(_log.Read(), l => ((string?)l["summary"])!.Contains($"a follow-up of job {earlier.Id}"));
+    }
+
+    [Fact]
+    public async Task A_follow_up_whose_folder_is_gone_fails_and_is_never_cloned()
+    {
+        var earlier = _jobs.Add(_time.Now.AddHours(-1));
+        Directory.Delete(earlier.Dir, true);
+        Directory.CreateDirectory(Path.Combine(_projects, "anemo")); // a folder of that name doesn't count
+        var fields = StartFields("anemo", isNew: true);
+        fields["follow_job_id"] = earlier.Id;
+
+        var outcome = await RunAsync("code_start", fields);
+
+        Assert.Equal($"The folder of job {earlier.Id} is gone.", outcome.Error);
+        Assert.Empty(_host.Runs);
+        Assert.Empty(_host.Started);
+    }
+
+    [Theory]
+    [InlineData("20261122-090000-zzzz", "There is no job 20261122-090000-zzzz.")]
+    [InlineData("..\\x", "“follow_job_id” must be a job id like 20261123-101500-ab12.")]
+    [InlineData("20261122-090000-zzzz\n", "“follow_job_id” must be a job id like 20261123-101500-ab12.")]
+    public async Task A_follow_up_of_an_unknown_or_malformed_job_fails(string follow, string error)
+    {
+        var fields = StartFields("anemo");
+        fields["follow_job_id"] = follow;
+
+        Assert.Equal(error, (await RunAsync("code_start", fields)).Error);
+        Assert.Empty(_host.Started);
+    }
+
     // -- code_cancel ---------------------------------------------------------------------
 
     [Fact]
@@ -566,6 +878,23 @@ public sealed class CodeJobControlTests : IDisposable
 
         Assert.Equal(new JsonObject { ["job_id"] = job.Id, ["state"] = state }.ToJsonString(), outcome.State!.ToJsonString());
         Assert.Empty(_host.Killed);
+    }
+
+    [Theory]
+    [InlineData(false, "done")]
+    [InlineData(true, "failed")]
+    public async Task A_job_that_finished_just_before_the_kill_keeps_its_real_state(bool error, string state)
+    {
+        var job = _jobs.Add(_time.Now.AddMinutes(-3), pid: 4321);
+        _processes.Running[4321] = job.Started;
+        job.WriteTurn(1);
+        _host.OnKill = _ => job.Finish(error); // the result is written between the look and the kill
+
+        var outcome = await RunAsync("code_cancel", new JsonObject { ["job_id"] = job.Id });
+
+        Assert.Equal(new JsonObject { ["job_id"] = job.Id, ["state"] = state }.ToJsonString(), outcome.State!.ToJsonString());
+        Assert.False(File.Exists(Path.Combine(job.Folder, "cancelled")));
+        Assert.Equal([4321], _host.Killed);
     }
 
     [Fact]

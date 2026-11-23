@@ -31,7 +31,7 @@ internal sealed class SettingsForm : Form
     private readonly TextBox _codeJobsFolder = new() { Width = 360 };
     private readonly CheckBox _startCodeJobs = new() { Text = "Let Anemo start Claude Code jobs", AutoSize = true };
     private readonly TextBox _projectsFolder = new() { Width = 360 };
-    private readonly TextBox _gitHubOwner = new() { Width = 200 };
+    private readonly TextBox _gitHubOwner = new() { Width = 300 };
     private readonly Label _error = new() { AutoSize = true, ForeColor = Color.Firebrick };
     private readonly DesktopSettings _current;
     private readonly Func<DesktopSettings, string?, string?> _save;
@@ -68,7 +68,7 @@ internal sealed class SettingsForm : Form
         _projectsFolder.Text = current.CodeProjectsFolder ?? "";
         _projectsFolder.PlaceholderText = CodeJobLimits.DefaultProjectsFolder;
         _gitHubOwner.Text = current.GitHubOwner ?? "";
-        _gitHubOwner.PlaceholderText = CodeJobLimits.DefaultGitHubOwner;
+        _gitHubOwner.PlaceholderText = "the account gh is signed in as";
         _startCodeJobs.Enabled = _shareCodeJobs.Checked; // a job Anemo starts must be visible to it
         _shareCodeJobs.CheckedChanged += (_, _) => _startCodeJobs.Enabled = _shareCodeJobs.Checked;
 

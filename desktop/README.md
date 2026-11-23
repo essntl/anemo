@@ -18,12 +18,17 @@ messages: `docs/device-contracts.md` §7.
 
 **Starting jobs from Anemo (1.2.0).** With *Let Anemo start Claude Code jobs* also ticked (off
 by default; it only counts while sharing is on), Anemo can list the projects
-(`C:\dev` and the GitHub owner's repositories through `gh`, owner `essntl` unless Settings
-names another), start a job in a project (cloning it with `gh` or `git`, or making a new
-repository, when there is no such folder) and cancel one. A job is started as `cc.ps1` does:
-`cmd.exe /d /c claude -p --output-format stream-json --verbose --permission-mode
-bypassPermissions … < prompt.txt > out.jsonl 2> err.txt`, detached, in the same jobs folder,
-so it is shared like any other. **`bypassPermissions` means Anemo's agents can make Claude Code
+(`C:\dev` and the GitHub owner's repositories through `gh`: the owner set in Settings, else
+the account `gh` is signed in as; with neither, no repositories are listed and nothing is
+cloned), start a job in a project (cloning it with `gh` or `git`, or making a new
+repository, when there is no such folder) and cancel one. A follow-up runs in the folder of
+the job it follows. A job is started as `cc.ps1` does: `cmd.exe /d /v:off /s /c ""<full path
+of claude>" -p --output-format stream-json --verbose --permission-mode bypassPermissions … <
+prompt.txt > out.jsonl 2> err.txt"`, detached, with `NoDefaultCurrentDirectoryInExePath=1` (so a
+`claude.cmd` in a cloned repository never runs), in the same jobs folder, so it is shared like
+any other. Anemo gets its answer within seconds: a needed clone or `git init` runs afterwards
+while the job folder holds a `starting` file; a clone that fails ends the job with the reason
+in `err.txt`. **`bypassPermissions` means Anemo's agents can make Claude Code
 do anything it can on this computer**: tick it only on a computer you'd give PowerShell to.
 Needs `claude` on PATH, and `gh` (signed in) or `git` for cloning.
 

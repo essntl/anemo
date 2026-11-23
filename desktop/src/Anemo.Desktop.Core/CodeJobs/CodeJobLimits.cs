@@ -9,9 +9,6 @@ public static class CodeJobLimits
     /// <summary>Where the projects of <c>code_projects</c> and <c>code_start</c> are, unless Settings says otherwise.</summary>
     public const string DefaultProjectsFolder = @"C:\dev";
 
-    /// <summary>Whose GitHub repositories are listed and cloned, unless Settings says otherwise.</summary>
-    public const string DefaultGitHubOwner = "essntl";
-
     public const int MaxEventsPerFrame = 200;
 
     /// <summary>256 KB of UTF-8 for a whole <c>code.events</c> text.</summary>
@@ -43,6 +40,9 @@ public static class CodeJobLimits
 
     /// <summary>A job whose process can't be read counts as running only while it wrote output this recently.</summary>
     public static readonly TimeSpan UnreadableProcessQuietFor = TimeSpan.FromMinutes(30);
+
+    /// <summary>A job with a <c>starting</c> file and no pid counts as running this long at most.</summary>
+    public static readonly TimeSpan StartingFor = TimeSpan.FromMinutes(15);
 }
 
 /// <summary>Timings of the sharing loop; the defaults are the contract's.</summary>

@@ -16,7 +16,12 @@ public sealed record ToolResult(int ExitCode, string Stdout, string Stderr);
 /// A Claude Code job's start: <c>cmd.exe</c> with this raw command line (it holds the
 /// redirections), in the project folder, detached and without a window, outliving Anemo Desktop.
 /// </summary>
-public sealed record DetachedStart(string FileName, string CommandLine, string WorkingDirectory);
+/// <param name="Environment">Variables set for it on top of the client's own.</param>
+public sealed record DetachedStart(
+    string FileName,
+    string CommandLine,
+    string WorkingDirectory,
+    IReadOnlyDictionary<string, string> Environment);
 
 /// <summary>The processes the <c>code_*</c> actions need (System.Diagnostics.Process in the app).</summary>
 public interface ICodeHost
