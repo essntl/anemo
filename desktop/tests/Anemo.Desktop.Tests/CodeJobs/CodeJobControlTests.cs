@@ -657,6 +657,57 @@ public sealed class CodeJobControlTests : IDisposable
         Assert.Equal(1, sharing.Server.Jobs[id].LastSeq);
     }
 
+    // -- code_start: follow-ups ----------------------------------------------------------
+
+    [Fact]
+    public async Task A_follow_up_runs_in_the_earlier_job_s_folder_even_outside_the_projects_folder()
+    {
+        var earlier = _jobs.Add(_time.Now.AddHours(-1)); // its dir is <root>\repos\anemo, not in the projects folder
+        earlier.Finish();
+        var fields = StartFields("not even a valid name");
+        fields["follow_job_id"] = earlier.Id;
+        fields["resume_session"] = "sess-1";
+
+        var outcome = await RunAsync("code_start", fields);
+
+        Assert.True(outcome.Ok, outcome.Error);
+        Assert.Equal(earlier.Dir, (string?)outcome.State!["dir"]);
+        Assert.Equal("anemo", (string?)outcome.State["project"]);
+        Assert.Equal(earlier.Dir, Assert.Single(_host.Started).WorkingDirectory);
+        Assert.Empty(_host.Runs); // nothing cloned or made
+        Assert.Contains("--resume sess-1", _host.Started.Single().CommandLine);
+        Assert.Contains(_log.Read(), l => ((string?)l["summary"])!.Contains($"a follow-up of job {earlier.Id}"));
+    }
+
+    [Fact]
+    public async Task A_follow_up_whose_folder_is_gone_fails_and_is_never_cloned()
+    {
+        var earlier = _jobs.Add(_time.Now.AddHours(-1));
+        Directory.Delete(earlier.Dir, true);
+        Directory.CreateDirectory(Path.Combine(_projects, "anemo")); // a folder of that name doesn't count
+        var fields = StartFields("anemo", isNew: true);
+        fields["follow_job_id"] = earlier.Id;
+
+        var outcome = await RunAsync("code_start", fields);
+
+        Assert.Equal($"The folder of job {earlier.Id} is gone.", outcome.Error);
+        Assert.Empty(_host.Runs);
+        Assert.Empty(_host.Started);
+    }
+
+    [Theory]
+    [InlineData("20261122-090000-zzzz", "There is no job 20261122-090000-zzzz.")]
+    [InlineData("..\\x", "“follow_job_id” must be a job id like 20261123-101500-ab12.")]
+    [InlineData("20261122-090000-zzzz\n", "“follow_job_id” must be a job id like 20261123-101500-ab12.")]
+    public async Task A_follow_up_of_an_unknown_or_malformed_job_fails(string follow, string error)
+    {
+        var fields = StartFields("anemo");
+        fields["follow_job_id"] = follow;
+
+        Assert.Equal(error, (await RunAsync("code_start", fields)).Error);
+        Assert.Empty(_host.Started);
+    }
+
     // -- code_cancel ---------------------------------------------------------------------
 
     [Fact]

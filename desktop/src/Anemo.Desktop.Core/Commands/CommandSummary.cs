@@ -31,9 +31,9 @@ public static class CommandSummary
             "clipboard_set" => $"{Length("text")} characters",
             "shell" => $"a command of {Length("command")} characters, timeout {Num("timeout_s")} s",
             "code_projects" => "",
-            "code_start" => (state is JsonObject s && Wire.Str(s, "job_id") is { } job ? $"job {Short(job)} in " : "")
-                + $"project {Short(Str("project"))}, a prompt of {Length("prompt")} characters"
-                + (Str("resume_session") is not null ? ", a follow-up" : ""),
+            "code_start" => (state is JsonObject s && Wire.Str(s, "job_id") is { } job ? $"job {Short(job)}, " : "")
+                + (Str("follow_job_id") is { } follow ? $"a follow-up of job {Short(follow)}" : $"project {Short(Str("project"))}")
+                + $", a prompt of {Length("prompt")} characters",
             "code_cancel" => $"job {Short(Str("job_id"))}",
             _ => "unknown action",
         };

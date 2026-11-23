@@ -240,12 +240,18 @@ public sealed partial class CodeJobControl
 
     private async Task<JsonNode> StartAsync(Args args, CancellationToken ct)
     {
-        // 1. Validate.
-        var project = args.String("project", CodeJobLimits.MaxProjectChars);
-        if (!CodeProjects.IsProjectName(project))
+        // 1. Validate. A follow-up names its earlier job and runs in its folder: project is ignored.
+        var follow = args.OptionalString("follow_job_id");
+        if (follow is not null && !JobFolder.IsJobId(follow))
+        {
+            throw CommandException.Failed("“follow_job_id” must be a job id like 20261123-101500-ab12.");
+        }
+
+        var project = follow is null ? args.String("project", CodeJobLimits.MaxProjectChars) : null;
+        if (project is not null && !CodeProjects.IsProjectName(project))
         {
             throw CommandException.Failed(
-                "“project” must be a folder name of at most 100 letters, digits, dots, dashes and underscores (not . or ..).");
+                "“project” must be a folder name of at most 100 letters, digits, dots, dashes and underscores (not only dots, not ending with a dot, not a Windows device name).");
         }
 
         var prompt = args.String("prompt", 100_000);
@@ -267,8 +273,8 @@ public sealed partial class CodeJobControl
             throw CommandException.Failed("The jobs folder's path has a \" or % in it, which a command line can't carry; choose another one in Anemo Desktop's settings.");
         }
 
-        // 2. Resolve the project.
-        var dir = await ResolveAsync(project, isNew, ct);
+        // 2. Resolve the project (a follow-up never clones or makes one).
+        var dir = follow is not null ? FollowedFolder(jobs, follow) : await ResolveAsync(project!, isNew, ct);
 
         // 3. The job folder and its prompt.
         var started = _time.GetLocalNow();
@@ -338,6 +344,23 @@ public sealed partial class CodeJobControl
         throw CommandException.Failed(owner is null
             ? $"There is no project “{project}” in {projects}, and no GitHub owner is known to clone it from (sign in to gh with gh auth login, or set an owner in Anemo Desktop's settings)."
             : $"There is no project “{project}” in {projects} or on GitHub ({owner}).");
+    }
+
+    /// <summary>The folder recorded in the earlier job's <c>meta.json</c> (§12.5 follow-ups).</summary>
+    private static string FollowedFolder(string jobs, string follow)
+    {
+        var earlier = Path.Combine(jobs, follow);
+        if (!Directory.Exists(earlier))
+        {
+            throw CommandException.Failed($"There is no job {follow}.");
+        }
+
+        if (JobFolder.ReadMeta(earlier, follow) is not { Dir: { Length: > 0 } dir } || !Directory.Exists(dir))
+        {
+            throw CommandException.Failed($"The folder of job {follow} is gone.");
+        }
+
+        return dir;
     }
 
     /// <summary>
