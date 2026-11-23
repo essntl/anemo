@@ -4,11 +4,11 @@ code.ack) and the Code page's API (docs/specs/code-sessions.md §5, device-contr
 import asyncio
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from redis.exceptions import RedisError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.core.db import get_sessionmaker
 from app.events import bus
@@ -583,12 +583,28 @@ async def test_the_stream_sends_the_job_then_what_is_stored(authed, monkeypatch)
 # -- retention and deletion ------------------------------------------------------------------
 
 
+def days_ago(days: int) -> str:
+    return (datetime.now(UTC) - timedelta(days=days)).isoformat()
+
+
+async def set_last_events(key: str, days: int) -> None:
+    async with get_sessionmaker()() as db:
+        await db.execute(
+            update(CodeJob)
+            .where(CodeJob.job_key == key)
+            .values(last_event_at=datetime.now(UTC) - timedelta(days=days))
+        )
+        await db.commit()
+
+
 async def test_old_jobs_are_pruned(authed, monkeypatch):
     _, ws = await computer(authed)
-    await announce(ws, "20261001-090000-old1", started="2026-10-01T09:00:00Z")
+    old = days_ago(60)
+    await announce(ws, "20261001-090000-old1", started=old, state="done", ended=old)
     await send(ws, (1, init()), key="20261001-090000-old1")
-    await announce(ws, "20261120-090000-new1", started="2026-11-20T09:00:00Z")
-    now = datetime(2026, 11, 23, tzinfo=UTC)
+    await set_last_events("20261001-090000-old1", 59)  # its events came long ago
+    await announce(ws, "20261120-090000-new1", started=days_ago(3))
+    now = datetime.now(UTC)
     assert await service.prune(now) == 1
     assert [j["job_key"] for j in (await authed.get("/api/code/jobs")).json()["jobs"]] == [
         "20261120-090000-new1"
@@ -729,3 +745,26 @@ async def test_a_late_older_batch_doesnt_overwrite_newer_pull_outs(authed):
     )
     assert shared["state"] == "done" and shared["last_seq"] == 4  # 5..9 never came
     await ws.disconnect()
+
+
+async def test_jobs_with_recent_activity_are_kept(authed):
+    _, ws = await computer(authed)
+    old = days_ago(60)
+    # Started long ago, but its events still arrive.
+    await announce(ws, "20260901-090000-long", started=old)
+    await send(ws, (1, init()), key="20260901-090000-long")
+    # Started and ended long ago, announced only now (its events arrive now): stored
+    # as any job, and kept for keep_days after its last activity.
+    assert await announce(ws, "20260901-100000-late", started=old, state="done", ended=old) == 0
+    assert await send(ws, (1, init()), key="20260901-100000-late") == 1
+    # Running and quiet for long, but its computer sends events: kept.
+    await announce(ws, "20260901-110000-wait", started=old)
+    # Another computer, quiet for long: its running and finished jobs go.
+    _, quiet = await computer(authed, "Quiet")
+    await announce(quiet, "20260901-120000-gone", started=old)
+    await announce(quiet, "20260901-130000-done", started=old, state="done", ended=old)
+    assert await service.prune(datetime.now(UTC)) == 2
+    kept = sorted(j["job_key"] for j in (await authed.get("/api/code/jobs")).json()["jobs"])
+    assert kept == ["20260901-090000-long", "20260901-100000-late", "20260901-110000-wait"]
+    await ws.disconnect()
+    await quiet.disconnect()
