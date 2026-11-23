@@ -40,6 +40,19 @@ internal sealed class Args
         return s;
     }
 
+    public bool Bool(string key, bool fallback)
+    {
+        var node = _command[key];
+        if (node is null)
+        {
+            return fallback;
+        }
+
+        return node is JsonValue v && v.TryGetValue<bool>(out var b)
+            ? b
+            : throw CommandException.Failed($"“{key}” must be true or false.");
+    }
+
     public double? OptionalNumber(string key)
     {
         var node = _command[key];
