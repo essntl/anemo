@@ -2,7 +2,7 @@
 CLI errors are classified."""
 
 import launch
-from sessions import classify_error, render_gone
+from sessions import classify_error, render_gone, start_error
 
 
 def test_child_env_is_an_allowlist() -> None:
@@ -58,6 +58,22 @@ def test_usage_limit_is_not_retryable_and_names_the_reset() -> None:
     assert e.kind == "usage_limit" and not e.retryable and "resets at" in str(e)
     assert classify_error("overloaded", "rate_limit", None).retryable
     assert classify_error("x", "authentication_failed", None).kind == "auth"
+
+
+def test_a_session_that_cannot_be_resumed_is_reported_as_resume_failed() -> None:
+    """The worker starts a new session for "resume_failed", and for nothing else."""
+    sdk = "Claude Code returned an error result: {} (exit code: 1)"
+    for said in (
+        "Resume rejected: the fork would drop more than one turn",
+        "No conversation found with session ID: 5cc8213d-a673-4bc6-ab61-dc56204d14bb",
+        # A fork at a message the transcript does not have (--resume-session-at).
+        "No message found with message.uuid of: d91ba1ad-0000-4000-8000-000000000000",
+    ):
+        e = start_error(sdk.format(said))
+        assert e.kind == "resume_failed" and said in str(e), said
+    other = start_error("spawn claude ENOENT")
+    assert other.kind == "start" and other.retryable
+    assert str(other) == "Claude Code did not start: spawn claude ENOENT"
 
 
 def test_results_for_gone_calls_become_a_message() -> None:

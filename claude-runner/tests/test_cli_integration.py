@@ -206,6 +206,23 @@ def test_fork_at_an_earlier_turn_keeps_the_prefix(runner: Runner) -> None:
     assert "question two, edited" in body and "Answer two" not in body
 
 
+def test_a_fork_at_a_message_the_transcript_lacks_is_a_resume_failure(runner: Runner) -> None:
+    """The CLI stores a message a moment after it reports it, so a process that was
+    ended in between leaves the worker with a uuid the transcript does not have. The
+    worker must be told the session cannot be resumed (it then starts a new one)."""
+    runner.start()
+    sid = session_id(runner.turn("conv:h:agent", message("question one")))
+    refused = runner.turn("conv:h:agent", {
+        **message("question one, edited", session=sid),
+        "fork": {"resume_session_at": "d91ba1ad-0000-4000-8000-000000000000"}})
+    assert kinds(refused) == ["error"]
+    assert refused[0]["kind"] == "resume_failed"
+    assert "No message found with message.uuid" in refused[0]["message"]
+    # The session itself is unharmed.
+    again = runner.turn("conv:h:agent", message("question two", session=sid))
+    assert again[-1]["type"] == "end"
+
+
 def test_health_reports_only_three_facts(runner: Runner) -> None:
     import httpx
 
