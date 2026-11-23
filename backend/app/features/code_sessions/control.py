@@ -31,9 +31,10 @@ from app.features.devices.models import Device
 
 log = logging.getLogger(__name__)
 
-# How long the relay waits for each answer (§12.2): a start may clone for 10 minutes.
+# How long the relay waits for each answer. A start answers within seconds: the computer
+# clones a project, when it must, after answering (§12.5).
 PROJECTS_TIMEOUT_S = 45.0
-START_TIMEOUT_S = 660.0
+START_TIMEOUT_S = 60.0
 CANCEL_TIMEOUT_S = 30.0
 
 MAX_LISTED = 500
@@ -197,7 +198,7 @@ async def start_job(
     }
     if follow_job_id is not None:
         fields["follow_job_id"] = follow_job_id
-    await db.close()  # nothing is held while the computer works (minutes, for a clone)
+    await db.close()  # nothing is held while the computer answers
     state = await _send(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
     if not isinstance(job_key, str) or not JOB_KEY.match(job_key):

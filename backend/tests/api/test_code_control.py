@@ -268,7 +268,7 @@ async def test_start_errors(authed, device_side):
         assert r.status_code == 422 and error_code(r) == "validation_error", bad
     assert (await authed.get("/api/code/jobs")).json()["jobs"] == []
     timeouts = {action: timeout for action, _, timeout in device_side.sent}
-    assert timeouts == {"code_start": 660.0}
+    assert timeouts == {"code_start": 60.0}
     await ws.disconnect()
 
 
@@ -613,7 +613,7 @@ async def test_status_marks_all_that_the_job_wrote(authed):
     # Everything that came from the computer or the job is inside one untrusted block,
     # marked as written by a Claude Code job (§12.5); only Anemo's own facts are outside.
     _, ws = await computer(authed)
-    await announce(ws, KEY, project="proj-x", dir="C:\dev\proj-x", prompt="Task-T")
+    await announce(ws, KEY, project="proj-x", dir="C:\\dev\\proj-x", prompt="Task-T")
     todo = {
         "type": "tool_use",
         "id": "t1",
@@ -654,7 +654,7 @@ async def test_status_marks_all_that_the_job_wrote(authed):
     inside, _, after = rest.partition("</untrusted_data>")
     for piece in (
         "proj-x",
-        "C:\dev\proj-x",
+        "C:\\dev\\proj-x",
         "Task-T",
         "feat/zz",
         "Todo-Q",

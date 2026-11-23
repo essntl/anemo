@@ -3503,7 +3503,8 @@ export interface paths {
         put?: never;
         /**
          * Start Job
-         * @description Start a job on a computer (it may clone the project first: up to 11 minutes).
+         * @description Start a job on a computer. It answers at once; a project it must clone first is
+         *     cloned after that (the job then runs, or ends without a result saying why).
          */
         post: operations["start_job_api_code_jobs_post"];
         delete?: never;
