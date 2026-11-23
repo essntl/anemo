@@ -6,7 +6,7 @@
  *  - a running job's own stream (`/api/code/jobs/{id}/stream`) brings its new events
  *    (`code.events`) and its changed row (`code.job`), see `useCodeEvents`.
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
 import type { CodeJob, CodeJobState } from './threads'
@@ -114,57 +114,90 @@ function parse(data: string): Record<string, unknown> | null {
   }
 }
 
+/** The fetch of a job's missing events now in flight, per query client: one at a time per job. */
+const inFlight = new WeakMap<QueryClient, Map<string, { run: Promise<void>; again: boolean }>>()
+
 /**
- * A job's events. While `live` (the job runs), its stream is open: on every (re)open
- * the events after the last one we have without a gap are fetched and merged by seq,
- * as they are again when a frame starts past a gap. The stream closes once the job
- * has ended (after one last fetch for anything still missing).
+ * Fetches the events after the last one held without a gap (`events?after_seq=`) and
+ * merges them. One fetch per job at a time: a call while one runs makes it go once
+ * more when it is done, and waits for that.
  */
-export function useCodeEvents(jobId: string, live: boolean) {
+export function fetchMissingEvents(qc: QueryClient, jobId: string): Promise<void> {
+  let jobs = inFlight.get(qc)
+  if (!jobs) inFlight.set(qc, (jobs = new Map()))
+  const running = jobs.get(jobId)
+  if (running) {
+    running.again = true
+    return running.run
+  }
+  const options = eventsQuery(qc, jobId)
+  const entry = { again: false, run: Promise.resolve() }
+  const all = jobs
+  entry.run = (async () => {
+    try {
+      // The first load (maybe still running) comes first: no need to fetch it twice.
+      await qc.ensureQueryData(options)
+      do {
+        entry.again = false
+        const have = contiguousSeq(qc.getQueryData<CodeEvent[]>(options.queryKey) ?? [])
+        const events = await fetchEventsAfter(jobId, have)
+        qc.setQueryData<CodeEvent[]>(options.queryKey, (old) => mergeEvents(old ?? [], events))
+      } while (entry.again)
+    } catch {
+      // Offline for a moment: the next frame, notice or reconnect tries again.
+    } finally {
+      all.delete(jobId)
+    }
+  })()
+  jobs.set(jobId, entry)
+  return entry.run
+}
+
+/**
+ * A job's events.
+ *
+ * Whenever the job's `last_seq` (the server's last stored seq without a gap, from a
+ * `code.job` frame or from the job's row after a refresh) is past what is held, the
+ * rest is fetched: for a running job and for a finished one (a job back-filled after
+ * it ended, a frame that was never published, a stream that only sends snapshots).
+ *
+ * While `live` (the job runs), its stream is open: on every (re)open the missing
+ * events are fetched, and again when a frame starts past a gap. The stream closes once
+ * the job has ended (after one last fetch for anything still missing).
+ */
+export function useCodeEvents(jobId: string, { live, lastSeq }: { live: boolean; lastSeq?: number }) {
   const qc = useQueryClient()
   const query = useQuery(eventsQuery(qc, jobId))
 
+  // Held without a gap; null until the first load is in.
+  const have = query.data ? contiguousSeq(query.data) : null
+  // The last (held, last_seq) pair a fetch was made for: a fetch that brought nothing
+  // new is not repeated until either moves.
+  const tried = useRef('')
+  useEffect(() => {
+    if (have === null || lastSeq === undefined || lastSeq <= have) return
+    const attempt = `${jobId}:${have}:${lastSeq}`
+    if (tried.current === attempt) return
+    tried.current = attempt
+    void fetchMissingEvents(qc, jobId)
+  }, [qc, jobId, have, lastSeq])
+
   useEffect(() => {
     if (!live) return
-    const options = eventsQuery(qc, jobId)
-    const key = options.queryKey
+    const key = codeEventsKey(jobId)
     const current = () => qc.getQueryData<CodeEvent[]>(key) ?? []
-    const merge = (events: CodeEvent[]) => qc.setQueryData<CodeEvent[]>(key, (old) => mergeEvents(old ?? [], events))
-    let closed = false
-    let fetching: Promise<void> | null = null
-    let again = false
-    const catchUp = (): Promise<void> => {
-      if (fetching) {
-        again = true
-        return fetching
-      }
-      fetching = (async () => {
-        try {
-          // The first load (maybe still running) comes first: no need to fetch it twice.
-          await qc.ensureQueryData(options)
-          do {
-            again = false
-            merge(await fetchEventsAfter(jobId, contiguousSeq(current())))
-          } while (again && !closed)
-        } catch {
-          // Offline for a moment: the next frame or reconnect tries again.
-        } finally {
-          fetching = null
-        }
-      })()
-      return fetching
-    }
-
+    const catchUp = () => fetchMissingEvents(qc, jobId)
     const source = new EventSource(`/api/code/jobs/${encodeURIComponent(jobId)}/stream`)
     source.addEventListener('open', () => void catchUp())
     source.addEventListener('code.events', ((e: MessageEvent<string>) => {
       const events = parse(e.data)?.events
       if (!Array.isArray(events) || events.length === 0) return
-      const have = contiguousSeq(current())
-      merge(events as CodeEvent[])
+      const held = contiguousSeq(current())
+      qc.setQueryData<CodeEvent[]>(key, (old) => mergeEvents(old ?? [], events as CodeEvent[]))
       const first = Math.min(...(events as CodeEvent[]).map((ev) => ev.seq))
-      if (first > have + 1) void catchUp()
+      if (first > held + 1) void catchUp()
     }) as EventListener)
+    // The job's row: its new last_seq reaches the effect above through the caches.
     source.addEventListener('code.job', ((e: MessageEvent<string>) => {
       const job = parse(e.data)?.job as CodeJob | undefined
       if (!job || typeof job.id !== 'string') return
@@ -173,10 +206,7 @@ export function useCodeEvents(jobId: string, live: boolean) {
         void catchUp().finally(() => source.close())
       }
     }) as EventListener)
-    return () => {
-      closed = true
-      source.close()
-    }
+    return () => source.close()
   }, [jobId, live, qc])
 
   return query

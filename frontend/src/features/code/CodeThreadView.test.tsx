@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
+import { codeKey } from './api'
 import { CodeThreadView } from './CodeThreadView'
 import { codeJob } from './testJobs'
 import type { CodeJob } from './threads'
@@ -61,11 +62,12 @@ afterEach(() => {
 
 function show(jobId: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  render(
     <QueryClientProvider client={client}>
       <MemoryRouter><CodeThreadView jobId={jobId} backTo="/code" /></MemoryRouter>
     </QueryClientProvider>,
   )
+  return client
 }
 
 describe('a finished thread', () => {
@@ -137,6 +139,24 @@ describe('a finished thread', () => {
     expect(screen.getByText('Changelog')).toBeInTheDocument()
   })
 
+  it('fetches the rest of a finished job when its last_seq grows after a notice', async () => {
+    // Back-filled: announced finished first, its events arrive afterwards.
+    thread = [codeJob({ id: 'b', state: 'done', last_seq: 1, result_text: 'All done.' })]
+    events = { b: [text(1, 'one')] }
+    const client = show('b')
+    expect(await screen.findByText('one')).toBeInTheDocument()
+    expect(FakeEventSource.all).toHaveLength(0)
+    events.b.push(text(2, 'two'), text(3, 'three'))
+    thread = [{ ...thread[0], last_seq: 3 }]
+    // The app-wide code.job notice.
+    await act(async () => client.invalidateQueries({ queryKey: codeKey }))
+    expect(await screen.findByText('three')).toBeInTheDocument()
+    expect(eventCalls.filter((c) => c.job === 'b')).toEqual([{ job: 'b', after: 0 }, { job: 'b', after: 1 }])
+    // Another notice with nothing new fetches nothing.
+    await act(async () => client.invalidateQueries({ queryKey: codeKey }))
+    await waitFor(() => expect(eventCalls.filter((c) => c.job === 'b')).toHaveLength(2))
+  })
+
   it('shows the end of stderr when the job exited without a result', async () => {
     thread = [codeJob({ id: 'x', state: 'exited_without_result', stderr_tail: 'Error: Invalid API key' })]
     events = { x: [] }
@@ -197,6 +217,21 @@ describe('a running job', () => {
     expect(await screen.findByRole('region', { name: 'Result' })).toHaveTextContent('Footer fixed.')
     await waitFor(() => expect(source.closed).toBe(true))
     expect(screen.queryByRole('button', { name: /Todo list/ })?.parentElement).not.toHaveClass('sticky')
+  })
+
+  it('fetches the rest when a code.job frame says there is more, without any code.events', async () => {
+    show('r1')
+    await screen.findByText('second')
+    const source = FakeEventSource.all[0]
+    // The server's stream sends only snapshots (Valkey is down): no code.events at all.
+    events.r1.push(text(3, 'third'), text(4, 'fourth'))
+    const calls = eventCalls.length
+    await act(async () => source.emit('code.job', { job: { ...thread[0], last_seq: 4 } }))
+    expect(await screen.findByText('fourth')).toBeInTheDocument()
+    expect(eventCalls.slice(calls)).toEqual([{ job: 'r1', after: 2 }])
+    // The same snapshot again: nothing is missing, nothing is fetched.
+    await act(async () => source.emit('code.job', { job: { ...thread[0], last_seq: 4 } }))
+    expect(eventCalls).toHaveLength(calls + 1)
   })
 
   it('ignores frames it cannot read', async () => {
