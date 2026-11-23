@@ -12,8 +12,8 @@ in Anemo Desktop: a watched computer is refused by `run()`, never asked about (i
 run with bypassPermissions, as strong as PowerShell). The service (features/code_sessions/
 control.py) checks the computer live before every command.
 
-What a job wrote is untrusted content for the model, marked as web pages are; code_status
-shows a summary, never the whole log.
+What a job wrote is untrusted content for the model, marked as written by a Claude Code
+job (tools/untrusted.py); code_status shows a summary, never the whole log.
 """
 
 from typing import Any
@@ -31,7 +31,7 @@ from app.features.devices.models import Device
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.computer import known_device
-from app.tools.builtin.web import UNTRUSTED
+from app.tools.untrusted import untrusted, untrusted_note
 
 SEE = "code.see"
 RUN = "code.run"
@@ -49,6 +49,9 @@ MAX_ACTIVITY = 200
 MAX_RESULT = 4000
 MAX_STDERR = 1000
 MAX_LISTED = 100
+
+FROM_JOB = untrusted_note("written by a Claude Code job")
+FROM_COMPUTER = untrusted_note("sent by the computer")
 
 
 def _one_line(text: Any, limit: int = MAX_ACTIVITY) -> str:
@@ -143,7 +146,7 @@ class CodeProjects(Tool):
                 found = await control.projects(db, device.id)
         except AppError as exc:
             return _error(exc)
-        lines = [f"Projects on {device.name} {UNTRUSTED}"]
+        lines = [f"Projects on {device.name} {FROM_COMPUTER}"]
         for project in found.projects[:MAX_LISTED]:
             remote = f", {project.remote}" if project.remote else ""
             lines.append(f"- {project.name} ({project.dir}{remote})")
@@ -288,8 +291,8 @@ def activities(events: list[dict[str, Any]]) -> list[str]:
 
 def _status_text(job: CodeJobOut, recent: list[str]) -> str:
     head = [
-        f"Claude Code job {job.id} (the computer's job id {job.job_key}) on {job.device.name}, "
-        f"project {job.project}: {job.state.replace('_', ' ')}",
+        f"Claude Code job {job.id} (the computer's job id {job.job_key}) on {job.device.name}: "
+        f"{job.state.replace('_', ' ')}",
         f"Started {job.started_at.isoformat(timespec='seconds')}"
         + (f", ended {job.ended_at.isoformat(timespec='seconds')}" if job.ended_at else ""),
     ]
@@ -306,7 +309,10 @@ def _status_text(job: CodeJobOut, recent: list[str]) -> str:
         head.append(f"{job.device.name} is offline: this is what it last sent.")
     head.append(f"The user sees it on the Code page: /code/{job.id}")
 
-    body = [f"What the job wrote {UNTRUSTED}", f"Task: {_one_line(job.title, 120)}"]
+    body = [
+        f"Project: {job.project} ({job.dir or '?'})",
+        f"Task: {_one_line(job.title, 120)}",
+    ]
     if job.branch or job.pr_url:
         body.append(f"Branch: {job.branch or '?'}; pull request: {job.pr_url or 'none'}")
     if job.todos:
@@ -326,7 +332,8 @@ def _status_text(job: CodeJobOut, recent: list[str]) -> str:
         body.append(f"Its error output ended with:\n{job.stderr_tail[-MAX_STDERR:]}")
     if job.truncated:
         body.append("Some events were trimmed or not stored; the full log is on the computer.")
-    return "\n".join(head) + "\n\n" + "\n".join(body)
+    marked = untrusted(f"Claude Code job {job.job_key}", "\n".join(body))
+    return "\n".join(head) + f"\n\n{FROM_JOB}\n{marked}"
 
 
 async def _job(ref: str) -> CodeJob | ToolResult:

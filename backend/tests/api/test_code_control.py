@@ -18,7 +18,6 @@ from app.policy.presets import CATEGORY_BY_CAP
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
 from app.tools.builtin import code as code_tools
-from app.tools.builtin.web import UNTRUSTED
 from tests.api.test_agent import agent_turn, call, script, setup, timeline
 from tests.api.test_code_sessions import announce, init, result, say, send
 from tests.api.test_devices import add
@@ -445,7 +444,7 @@ async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
     assert started["result_data"] == {"code_job_id": str(job.id)}
     assert str(job.id) in started["result"]
     assert status["result_data"] == {"code_job_id": str(job.id)}
-    assert UNTRUSTED in status["result"]
+    assert code_tools.FROM_JOB in status["result"]
 
     # Events arrive; the status shows a summary, never the whole log.
     await announce(ws, KEY, prompt="Fix the login bug")
@@ -467,7 +466,7 @@ async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
     run2 = await agent_turn(authed, cid, "how is it")
     (status,) = (await timeline(authed, run2))["tool_calls"]
     content = status["result"]
-    assert UNTRUSTED in content and "done" in content and "Wrote: xxx" in content
+    assert code_tools.FROM_JOB in content and "done" in content and "Wrote: xxx" in content
     assert secret_tail not in content and len(content) < 3000
     assert "Fixed in https://github.com/essntl/anemo/pull/9" in content
     assert "API-equivalent cost $1.25" in content
@@ -608,3 +607,61 @@ async def test_a_started_job_that_ended_before_the_answer_still_notifies(authed,
 async def notification_titles() -> list[str]:
     async with get_sessionmaker()() as db:
         return list(await db.scalars(select(Notification.title)))
+
+
+async def test_status_marks_all_that_the_job_wrote(authed):
+    # Everything that came from the computer or the job is inside one untrusted block,
+    # marked as written by a Claude Code job (§12.5); only Anemo's own facts are outside.
+    _, ws = await computer(authed)
+    await announce(ws, KEY, project="proj-x", dir="C:\dev\proj-x", prompt="Task-T")
+    todo = {
+        "type": "tool_use",
+        "id": "t1",
+        "name": "TodoWrite",
+        "input": {"todos": [{"content": "Todo-Q", "status": "pending"}]},
+    }
+    await send(
+        ws,
+        (1, init()),
+        (2, {"type": "assistant", "message": {"content": [todo]}}),
+        (
+            3,
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "b",
+                            "name": "Bash",
+                            "input": {"command": "git checkout -b feat/zz"},
+                        }
+                    ]
+                },
+            },
+        ),
+        (4, say("Said-W")),
+        (5, result(result="Result-R https://github.com/o/r/pull/5")),
+        key=KEY,
+    )
+    status = code_tools.CodeStatus()
+    ctx = code_tools.ToolContext(run_id=uuid.uuid4(), emit=None)  # type: ignore[arg-type]
+    out = await status.run(code_tools.JobInput(job_id=KEY), ctx)
+    content = out.content
+    assert "from the web" not in content
+    assert "written by a Claude Code job" in content
+    head, _, rest = content.partition("<untrusted_data")
+    inside, _, after = rest.partition("</untrusted_data>")
+    for piece in (
+        "proj-x",
+        "C:\dev\proj-x",
+        "Task-T",
+        "feat/zz",
+        "Todo-Q",
+        "Said-W",
+        "Result-R",
+        "https://github.com/o/r/pull/5",
+    ):
+        assert piece in inside and piece not in head and piece not in after, piece
+    assert "done" in head and KEY in head and "/code/" in head
+    await ws.disconnect()
