@@ -46,7 +46,7 @@ moves the parts that decide and run one call into `runtime/tool_calls.py`:
 `acting_as`, errors as results) and `change_for(...)` (the change-list entry). `AgentRun`
 calls them; the script runner calls them too. No policy rule is copied.
 
-## 3. Data model (migration `0075_automation_scripts`)
+## 3. Data model (migration `0077_automation_scripts`; planned as 0075, renumbered because main got 0075 and 0076 from other work first)
 
 `automations` gets one column:
 
