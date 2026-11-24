@@ -1,0 +1,96 @@
+import type { Messages } from '@/lib/i18n'
+
+/** Settings > Appearance and Settings > Profile (features/appearance, features/profile). */
+const messages: Messages = {
+  // Preview
+  "Preview": "Предпросмотр",
+  "Can you sum up this week for me?": "Можете подвести итоги этой недели?",
+  "Sure. Three tasks are done and two are due tomorrow.": "Конечно. Три задачи выполнены, срок ещё двух — завтра.",
+  "Open the tasks": "Открыть задачи",
+  "Secondary text looks like this.": "Второстепенный текст выглядит так.",
+  "Primary button": "Основная кнопка",
+  "Button": "Кнопка",
+
+  // Colours
+  "Used for highlights, buttons and selection. Hover shades and the text on it follow automatically.": "Для выделений, кнопок и выбранного. Оттенки под курсором и цвет текста на нём подбираются автоматически.",
+  "Reset to default": "Сбросить по умолчанию",
+  "Custom accent color": "Свой акцентный цвет",
+  "{label} (hex)": "{label} (hex)",
+  "Text on buttons in this color is hard to read ({ratio}:1, needs {needed}:1).": "Текст на кнопках этого цвета трудно читать ({ratio}:1, нужно {needed}:1).",
+  "Links and outlines in this color are hard to see on the page ({ratio}:1, needs {needed}:1).": "Ссылки и обводки этого цвета плохо видны на странице ({ratio}:1, нужно {needed}:1).",
+  "Grey text on this tint is hard to read ({ratio}:1, needs {needed}:1). Lower the strength.": "Серый текст на этом оттенке трудно читать ({ratio}:1, нужно {needed}:1). Уменьшите интенсивность.",
+  "Background tint": "Оттенок фона",
+  "Mixes a color into the page, panels and cards.": "Добавляет цвет к странице, панелям и карточкам.",
+  "Tint {color}": "Оттенок {color}",
+  "Custom tint": "Свой оттенок",
+  "Strength": "Интенсивность",
+  "Tint strength": "Интенсивность оттенка",
+
+  // Fonts
+  "Fonts": "Шрифты",
+  "Fonts that come with Anemo are part of the app: nothing is loaded from Google Fonts or any other site.": "Шрифты, которые идут с Anemo, — часть приложения: ничего не загружается из Google Fonts или с других сайтов.",
+  "Interface": "Интерфейс",
+  "Interface font": "Шрифт интерфейса",
+  "Code font": "Шрифт кода",
+  "comes with Anemo": "входит в Anemo",
+  "from your system": "из вашей системы",
+  "uploaded": "загружен",
+  "System font": "Системный шрифт",
+  "System serif": "Системный с засечками",
+  "System rounded": "Системный скруглённый",
+  "System monospace": "Системный моноширинный",
+  "The quick brown fox jumps over the lazy dog.": "Съешь же ещё этих мягких французских булок, да выпей чаю.",
+  "Upload a font": "Загрузить шрифт",
+  "WOFF2, WOFF, TTF or OTF, up to 4 MB.": "WOFF2, WOFF, TTF или OTF, до 4 МБ.",
+  "Font uploaded. It is now the interface font; you can choose it for code too.": "Шрифт загружен. Теперь это шрифт интерфейса; его можно выбрать и для кода.",
+  "Couldn't use this font: {error}": "Не удалось использовать этот шрифт: {error}",
+
+  // Background
+  "Background": "Фон",
+  "Behind the whole app, including your chats.": "Позади всего приложения, включая ваши чаты.",
+  "Animated gradient": "Анимированный градиент",
+  "Picture or video": "Изображение или видео",
+  "Aurora": "Северное сияние",
+  "Dusk": "Сумерки",
+  "Lagoon": "Лагуна",
+  "PNG, JPEG, WebP, AVIF or GIF up to 15 MB; WebM or MP4 up to 40 MB. Photo details such as the location are removed.": "PNG, JPEG, WebP, AVIF или GIF до 15 МБ; WebM или MP4 до 40 МБ. Данные фото, например место съёмки, удаляются.",
+  "Couldn't use this file: {error}": "Не удалось использовать этот файл: {error}",
+  "Delete {name}": "Удалить {name}",
+  "Blur": "Размытие",
+  "Dim": "Затемнение",
+  "Fit": "Вписать",
+  "Fill": "Заполнить",
+  "Tile": "Плиткой",
+  "Animate on phones too": "Анимировать и на телефонах",
+  "Phones show a still picture to save battery. With reduced motion turned on in your system, it is always still.": "Телефоны показывают неподвижное изображение, чтобы экономить заряд. Если в системе включено уменьшение движения, оно всегда неподвижно.",
+
+  // Glass, this device
+  "Frosted glass": "Матовое стекло",
+  "The sidebar, cards, dialogs and the message box let the background show through, blurred. Off when your system asks for less transparency.": "Боковая панель, карточки, диалоги и поле сообщения пропускают размытый фон. Выключено, если система просит меньше прозрачности.",
+  "Your appearance is saved on the server and follows you to every device.": "Внешний вид хранится на сервере и одинаков на всех ваших устройствах.",
+  "Use a different appearance on this device": "Другой внешний вид на этом устройстве",
+  "Changes made here then stay in this browser and are not saved to the server.": "Тогда изменения, сделанные здесь, остаются в этом браузере и не сохраняются на сервере.",
+  "Export": "Экспортировать",
+  "Import": "Импортировать",
+  "A small JSON file. Uploaded fonts and pictures stay on the server; they are only referred to.": "Небольшой файл JSON. Загруженные шрифты и изображения остаются на сервере; файл только ссылается на них.",
+  "Appearance imported.": "Внешний вид импортирован.",
+  "This file isn't an Anemo appearance file.": "Это не файл внешнего вида Anemo.",
+
+  // Profile
+  "How you appear in Anemo: in your chats, on the Code page and in the sidebar.": "Как вас видно в Anemo: в чатах, на странице Code и на боковой панели.",
+  "Display name": "Отображаемое имя",
+  "Shown next to your messages and in the sidebar. Empty: your login name ({username}).": "Показывается рядом с вашими сообщениями и на боковой панели. Если пусто — ваше имя для входа ({username}).",
+  "Name saved.": "Имя сохранено.",
+  "Upload avatar": "Загрузить аватар",
+  "Change avatar": "Изменить аватар",
+  "PNG, JPEG, WebP, AVIF or GIF, up to 10 MB. Without one, your initials are shown.": "PNG, JPEG, WebP, AVIF или GIF, до 10 МБ. Без аватара показываются ваши инициалы.",
+  "Avatar saved.": "Аватар сохранён.",
+  "Couldn't use this picture: {error}": "Не удалось использовать это изображение: {error}",
+  "Crop your avatar": "Обрежьте аватар",
+  "Drag the picture or use the arrow keys; zoom with the slider or + and −.": "Перетаскивайте изображение или используйте клавиши со стрелками; масштаб — ползунком или + и −.",
+  "Avatar crop area": "Область обрезки аватара",
+  "Zoom": "Масштаб",
+  "Save avatar": "Сохранить аватар",
+}
+
+export default messages

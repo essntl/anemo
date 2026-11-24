@@ -72,6 +72,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <SettingsIndex /> },
               { path: 'general', ...page(() => import('@/features/settings/pages/GeneralPage'), 'GeneralPage') },
+              { path: 'profile', ...page(() => import('@/features/profile/ProfilePage'), 'ProfilePage') },
               { path: 'appearance', ...page(() => import('@/features/settings/pages/AppearancePage'), 'AppearancePage') },
               { path: 'pages', ...page(() => import('@/features/settings/pages/PagesPage'), 'PagesPage') },
               { path: 'focus', ...page(() => import('@/features/focus/FocusSettingsPage'), 'FocusSettingsPage') },
