@@ -203,7 +203,7 @@ shell's folder `~/AnemoWork`.
 **The bridge for agents.** `bridge/cc.mjs` (Node 18+, no packages) is the cross-platform
 replacement of `C:\anemo-bridge\cc.ps1`: `node bridge/cc.mjs start --project <name> --prompt
 "…"`, `status`, `log`, `list`, `cancel`, `projects`, `resolve`, in the same job folder format, so
-its jobs show on the Code page too. Tests: `node --test bridge/`.
+its jobs show on the Code page too. Tests: `node --test bridge/cc.test.mjs`.
 
 ## Rules the client keeps whatever the server sends
 

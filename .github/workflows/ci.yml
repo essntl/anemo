@@ -146,7 +146,7 @@ jobs:
       - run: dotnet build -c Release -p:EnableWindowsTargeting=true
       - run: dotnet test -c Release -p:EnableWindowsTargeting=true
       # The Claude Code bridge for agents (bridge/cc.mjs), with a fake claude.
-      - run: node --test ../bridge/
+      - run: node --test ../bridge/cc.test.mjs
 
   desktop-macos:
     name: macOS client (Apple Silicon build, tests, app bundle, bridge)
@@ -165,9 +165,12 @@ jobs:
         with:
           node-version: 22
       - run: dotnet build -c Release -p:EnableWindowsTargeting=true
-      # Core's tests on macOS, and the Mac host's smoke tests for real (posix_spawn and the
-      # process-group kill, zsh, the Keychain, Objective-C blocks, displays, the clipboard).
-      - run: dotnet test -c Release -p:EnableWindowsTargeting=true --logger "console;verbosity=normal"
+      # Core's tests on macOS.
+      - run: dotnet test tests/Anemo.Desktop.Tests -c Release --no-build
+      # The Mac host's smoke tests for real (posix_spawn and the process-group kill, zsh, the
+      # Keychain, Objective-C blocks, displays, the clipboard). --blame names the test that
+      # was running if a native call crashes the test host.
+      - run: dotnet test tests/Anemo.Desktop.Mac.Tests -c Release --no-build --blame --logger "console;verbosity=normal"
       # The .app, signed ad hoc (no secrets in CI), checked with codesign --verify.
       - run: sh mac/build-app.sh osx-arm64
       - name: The bundle's Info.plist is valid and its executable is arm64
@@ -180,7 +183,7 @@ jobs:
           path: desktop/publish/Anemo-Desktop-macos-arm64.zip
           if-no-files-found: error
           retention-days: 14
-      - run: node --test ../bridge/
+      - run: node --test ../bridge/cc.test.mjs
 
   android:
     name: Android app (tests, debug build)

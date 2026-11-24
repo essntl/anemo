@@ -282,7 +282,7 @@ in the Keychain, the shell's folder `~/AnemoWork`.
   `build-app.sh` (ad-hoc signed) and checks the bundle with `codesign --verify`, and runs the
   bridge's `node --test`. Screenshots and Accessibility can't be tested there (no permission on a
   hosted runner).
-- A **bridge** step in the same macOS job and in the Linux desktop job runs `node --test bridge/`.
+- A **bridge** step in the same macOS job and in the Linux desktop job runs `node --test bridge/cc.test.mjs`.
 - `release.yml`: the desktop release also builds `Anemo-Desktop-macos-arm64.zip` on
   `macos-15`; it signs with Developer ID and notarizes (`xcrun notarytool submit --wait`,
   `xcrun stapler staple`) when the six secrets are set, else ad-hoc signs and says so in the

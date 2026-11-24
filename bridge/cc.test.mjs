@@ -1,4 +1,4 @@
-// node --test bridge/   (Node 18+). Runs on Windows, macOS and Linux with a fake Claude Code.
+// node --test bridge/cc.test.mjs   (Node 18+). Runs on Windows, macOS and Linux with a fake Claude Code.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
