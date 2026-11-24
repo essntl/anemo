@@ -33,6 +33,14 @@ PROVIDER_TYPES: dict[str, dict[str, Any]] = {
         "base_url": "https://openrouter.ai/api/v1",
         "needs_key": True,
     },
+    # Gemini through Google's OpenAI-compatible endpoint: chat models with the OpenAI
+    # adapter, image models with providers/images.py. The key is from Google AI Studio.
+    "google": {
+        "label": "Google Gemini",
+        "adapter": OpenAIChatAdapter,
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "needs_key": True,
+    },
     "openai_compatible": {
         "label": "OpenAI-compatible (Ollama, vLLM, LM Studio, ...)",
         "adapter": OpenAIChatAdapter,

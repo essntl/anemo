@@ -293,19 +293,36 @@ class OpenAIChatAdapter:
         ]
 
     async def _list_openrouter(self) -> list[DiscoveredModel]:
-        """OpenRouter's model list includes context length, modalities and prices."""
+        """OpenRouter's model list includes context length, modalities and prices. It
+        lists models that write text unless asked, so image models are asked for too
+        (for generate_image); that second list is optional."""
         url = (self.cfg.base_url or "https://openrouter.ai/api/v1").rstrip("/") + "/models"
+        headers = {"Authorization": f"Bearer {self.cfg.api_key}"}
         try:
             async with httpx.AsyncClient(timeout=30) as http:
-                resp = await http.get(url, headers={"Authorization": f"Bearer {self.cfg.api_key}"})
+                resp = await http.get(url, headers=headers)
                 resp.raise_for_status()
+                listed = list(resp.json().get("data", []))
+                try:
+                    images = await http.get(
+                        url, headers=headers, params={"output_modalities": "image"}
+                    )
+                    images.raise_for_status()
+                    listed += images.json().get("data", [])
+                except (httpx.HTTPError, ValueError):
+                    log.warning("openrouter image models not listed")
         except httpx.HTTPError as exc:
             raise _map_error(exc) from exc
         models = []
-        for m in resp.json().get("data", []):
+        seen: set[str] = set()
+        for m in listed:
+            if m["id"] in seen:
+                continue
+            seen.add(m["id"])
             caps = guess_capabilities(m["id"])
             supported = set(m.get("supported_parameters") or [])
-            modalities = set((m.get("architecture") or {}).get("input_modalities") or [])
+            architecture = m.get("architecture") or {}
+            modalities = set(architecture.get("input_modalities") or [])
             caps.update(
                 tools="tools" in supported,
                 reasoning="reasoning" in supported or caps["reasoning"],
@@ -313,6 +330,9 @@ class OpenAIChatAdapter:
                 vision="image" in modalities,
                 pdf="file" in modalities,
             )
+            if "image" in (architecture.get("output_modalities") or []):
+                # A model that draws: for generate_image, not for chats.
+                caps.update(image_generation=True, chat=False, streaming=False, tools=False)
             pricing = None
             price = m.get("pricing") or {}
             try:

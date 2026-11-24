@@ -7,6 +7,7 @@ Tool calling is assumed for every chat model: almost all current models have it,
 and most providers' model lists say nothing either way, so "not mentioned" must
 not mean "cannot". If a provider then refuses a request because of the tools,
 the runtime notices (`rejects_tools`) and turns the capability off for that model.
+Image models (`image_generation`) are recognised by name too.
 Vision, PDF and reasoning are still guessed from the name, because sending an
 image to a model that cannot see it fails in less recognisable ways.
 Prices are deliberately not hardcoded here (they go stale); OpenRouter reports
@@ -25,6 +26,7 @@ CAPABILITY_NAMES = (
     "structured_output",
     "embeddings",
     "transcription",
+    "image_generation",
 )
 
 _RULES: list[tuple[str, dict[str, bool]]] = [
@@ -49,6 +51,21 @@ _RULES: list[tuple[str, dict[str, bool]]] = [
             "streaming": False,
             "tools": False,
             "vision": False,
+            "structured_output": False,
+        },
+    ),
+    # Image models (generate_image, features/image_generation): not chat models. Last,
+    # so "gpt-image-…" or "gemini-…-image" get no chat features from the rules above.
+    (
+        r"(gpt-image|dall-e|imagen|-image(-preview)?$|flux|stable-diffusion|sdxl|seedream)",
+        {
+            "image_generation": True,
+            "chat": False,
+            "streaming": False,
+            "tools": False,
+            "vision": False,
+            "pdf": False,
+            "reasoning": False,
             "structured_output": False,
         },
     ),
