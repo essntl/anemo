@@ -178,6 +178,13 @@ public sealed class CodeJobSharing : ICodeJobsHost
             }
             finally
             {
+                // A scan that ran while sharing was being switched off may have set it again:
+                // switched off, the next switch-on must back-fill again (SettingsChanged).
+                if (!Wanted(_settings()).Share)
+                {
+                    _store.SetSharedSince(null);
+                }
+
                 lock (_lock)
                 {
                     _session = null;
