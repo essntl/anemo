@@ -1182,7 +1182,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
     await _record_outcome(run_id, agent, outcome, error)
 
 
-async def _pick_up(db: AsyncSession, run: Run) -> bool:
+async def pick_up(db: AsyncSession, run: Run) -> bool:
     """Whether this worker should drive the run now. A stale or duplicate job leaves it
     alone; a run stopped before it started, or interrupted too often, is ended here.
     After a crash the restart is counted (refactor/BUGS.md run-1)."""
@@ -1217,7 +1217,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
     None when there is nothing to drive."""
     async with get_sessionmaker()() as db:
         run = await db.get(Run, run_id)
-        if run is None or not await _pick_up(db, run):
+        if run is None or not await pick_up(db, run):
             return None
         # Two runs of one automation never work at once: this one may have to wait.
         if not await automations.may_start(db, run):
