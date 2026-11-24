@@ -32,6 +32,7 @@ import { CancelJobButton, FollowUpBox, FromChat } from './controls'
 import { JobContext } from './jobContext'
 import { StateBadge, TodoChecklist } from './parts'
 import { type CodeJob, jobDurationMs, pullRequest, toThreads } from './threads'
+import { PromptImages } from './ImageAttachments'
 import { useFollowEnd } from './useFollowEnd'
 import { type ResultInfo, buildTimeline, num, resultOf, todoProgress, toTodos } from './timeline'
 
@@ -99,8 +100,8 @@ function ResultCard({ job, result }: { job: CodeJob; result?: ResultInfo }) {
   )
 }
 
-/** The prompt that started a job, as the user's message. Long ones fold. */
-function Prompt({ text }: { text: string }) {
+/** The prompt that started a job, as the user's message, with the images sent with it. Long ones fold. */
+function Prompt({ text, images = [] }: { text: string; images?: readonly { id: string; name: string }[] }) {
   const [all, setAll] = useState(false)
   const long = text.length > 800 || text.split('\n').length > 14
   return (
@@ -111,6 +112,7 @@ function Prompt({ text }: { text: string }) {
           {all ? t('Show less') : t('Show all')}
         </button>
       )}
+      <PromptImages images={images} className="mt-2" />
     </div>
   )
 }
@@ -185,7 +187,7 @@ function JobPart({ job, index, agent, agents, onMain }: { job: CodeJob; index: n
           </div>
         )}
         <FromChat job={job} />
-        <Prompt text={job.prompt} />
+        <Prompt text={job.prompt} images={job.images ?? []} />
         <div className="min-w-0">
           {events.isPending && <p className="px-2 py-1 text-[12.5px] text-muted">{t('Loading…')}</p>}
           {events.isError && (

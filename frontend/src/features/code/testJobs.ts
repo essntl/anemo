@@ -13,7 +13,7 @@ export function codeJob(more: Partial<CodeJob> = {}): CodeJob {
     state: 'done', started_at: '2026-11-23T10:00:00Z', ended_at: null, last_event_at: null, session_id: null, resume_session: null,
     thread_id: id, model: null, branch: null, pr_url: null, todos: [], num_turns: null, duration_ms: null, cost_usd: null,
     result_text: null, result_subtype: null, is_error: false, stderr_tail: null, last_seq: 0, event_count: 0, truncated: false,
-    conversation_id: null, run_id: null, conversation_title: null,
+    conversation_id: null, run_id: null, conversation_title: null, images: [],
     ...more,
   }
 }

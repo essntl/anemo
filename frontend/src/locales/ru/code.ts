@@ -119,6 +119,14 @@ const messages: Messages = {
   "{n} sub-agent running | {n} sub-agents running": "Работает {n} субагент | Работают {n} субагента | Работает {n} субагентов",
   "{n} sub-agent | {n} sub-agents": "{n} субагент | {n} субагента | {n} субагентов",
   "Open this sub-agent": "Открыть этого субагента",
+  "At most {n} images can go with one message.": "К одному сообщению можно добавить не больше {n} изображений.",
+  "Add images": "Добавить изображения",
+  "Drop images to add them": "Перетащите изображения сюда, чтобы добавить их",
+  "Add images (PNG, JPEG, WebP, GIF), or drop or paste them": "Добавьте изображения (PNG, JPEG, WebP, GIF) или перетащите либо вставьте их",
+  "“{name}” isn’t a PNG, JPEG, WebP or GIF image.": "«{name}» — не изображение PNG, JPEG, WebP или GIF.",
+  "The file": "Файл",
+  "“{name}” is larger than {size}.": "«{name}» больше {size}.",
+  "Waiting for the images to upload…": "Ждём, пока загрузятся изображения…",
 }
 
 export default messages

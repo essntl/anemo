@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api, errorMessage, type Schemas, unwrap } from '@/api/client'
 import { t } from '@/lib/i18n'
+import { type CodeImage, imageIds } from './codeImages'
 import type { CodeJob, CodeJobState } from './threads'
 import { type CodeEvent, contiguousSeq, mergeEvents } from './timeline'
 
@@ -176,6 +177,8 @@ export interface StartJobInput {
   prompt: string
   new: boolean
   model: CodeModel | null
+  /** Uploaded images to send with the prompt (codeImages.ts). */
+  image_ids?: string[]
 }
 
 /** Starts a job on a computer. The new job is a thread of its own, followed live like any running job. */
@@ -212,12 +215,16 @@ function refreshIfStarted(qc: QueryClient, err: unknown): void {
 }
 
 /**
- * Resumes the thread of `jobId` with a new prompt: the new job joins the thread, live.
- * (Also called outside a component: the queue sends a message when its job has ended.)
+ * Resumes the thread of `jobId` with a new prompt (and its images): the new job joins the
+ * thread, live. (Also called outside a component: the queue sends a message when its job
+ * has ended.)
  */
-export async function sendFollowUp(qc: QueryClient, jobId: string, prompt: string): Promise<CodeJob> {
+export async function sendFollowUp(qc: QueryClient, jobId: string, prompt: string, images: readonly CodeImage[] = []): Promise<CodeJob> {
   try {
-    const job = unwrap(await api.POST('/api/code/jobs/{job_id}/follow-up', { params: { path: { job_id: jobId } }, body: { prompt } }))
+    const job = unwrap(await api.POST('/api/code/jobs/{job_id}/follow-up', {
+      params: { path: { job_id: jobId } },
+      body: { prompt, ...imageIds(images) },
+    }))
     putJob(qc, job)
     void qc.invalidateQueries({ queryKey: codeKey })
     return job
@@ -229,7 +236,9 @@ export async function sendFollowUp(qc: QueryClient, jobId: string, prompt: strin
 
 export function useFollowUp(jobId: string) {
   const qc = useQueryClient()
-  return useMutation({ mutationFn: (prompt: string) => sendFollowUp(qc, jobId, prompt) })
+  return useMutation({
+    mutationFn: ({ prompt, images = [] }: { prompt: string; images?: readonly CodeImage[] }) => sendFollowUp(qc, jobId, prompt, images),
+  })
 }
 
 /** Cancels a running job (one that has ended comes back as it is). */

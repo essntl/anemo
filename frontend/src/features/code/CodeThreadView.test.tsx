@@ -386,3 +386,17 @@ describe('a job with sub-agents', () => {
     expect(screen.queryByRole('button', { name: /^Agent:/ })).not.toBeInTheDocument()
   })
 })
+
+describe('a job started with images', () => {
+  it('shows them with its prompt, small, from the attachments', async () => {
+    thread = [codeJob({ id: 'i1', prompt: 'Make it look like this', images: [{ id: 'att-1', name: '1-mockup.png' }, { id: 'att-2', name: '2-old.png' }] })]
+    events = { i1: [] }
+    show('i1')
+    const prompt = (await screen.findByText('Make it look like this')).parentElement!
+    const thumbs = within(prompt).getAllByRole('img')
+    expect(thumbs.map((img) => [img.getAttribute('src'), img.getAttribute('alt')])).toEqual([
+      ['/api/attachments/att-1/content', '1-mockup.png'],
+      ['/api/attachments/att-2/content', '2-old.png'],
+    ])
+  })
+})
