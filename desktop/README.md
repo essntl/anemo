@@ -91,25 +91,24 @@ The `Release` workflow (`.github/workflows/release.yml`) builds both exes on a W
 (so they carry the version resources) and attaches them to a GitHub Release, on a
 `desktop-v<version>` tag. The server's images use `v<version>` tags; these are separate.
 
-1. In a PR, raise `<Version>` in `Directory.Build.props` (and say what changed in this README
-   if it's a feature). That PR runs the workflow as a dry run: the exes appear under the run's
-   *Artifacts*, and no Release is made. Merge it once CI is green.
-2. Tag the merge commit on main and push the tag:
-
-   ```
-   git checkout main && git pull
-   git tag desktop-v1.2.0
-   git push origin desktop-v1.2.0
-   ```
-
+1. Any pull request that changes the client's code raises `<Version>` in
+   `Directory.Build.props` (and says what changed in this README if it's a feature); CI's
+   *App versions* check fails until it does (docs and tests alone don't count). A PR that
+   touches the version also runs the workflow as a dry run: the files appear under the run's
+   *Artifacts*, and no Release is made.
+2. Merge it. `.github/workflows/auto-release.yml` sees a version on main without a Release,
+   creates the tag `desktop-v<Version>` on the merge commit and starts the Release workflow on
+   it.
 3. The workflow checks that the tag is `desktop-v` + `<Version>` and is on main (else it
-   fails and publishes nothing), then makes the Release `desktop-v1.2.0` with
-   `Anemo-Desktop-win-x64.exe`, `Anemo-Desktop-win-arm64.exe`, `SHA256SUMS-desktop.txt`
-   and the checksums in its notes. A re-run of a failed run adds the files to the same Release.
+   fails and publishes nothing), then makes the Release `desktop-v<version>` with
+   `Anemo-Desktop-win-x64.exe`, `Anemo-Desktop-win-arm64.exe`, the macOS zip,
+   `SHA256SUMS-desktop.txt` and the checksums in its notes. A re-run of a failed run adds the
+   files to the same Release.
 
-A wrong tag is deleted with `git push origin :desktop-v1.2.0` (and the Release, if one was
-made, on GitHub). A dry run at any time: **Actions → Release → Run workflow**, app *desktop*
-(the menu lists the workflow once it is on main).
+Pushing a `desktop-v<version>` tag by hand still works the same way; a wrong tag is deleted
+with `git push origin :desktop-v<version>` (and the Release, if one was made, on GitHub). If a
+release was missed, **Actions → Auto release → Run workflow**. A dry run at any time:
+**Actions → Release → Run workflow**, app *desktop*.
 
 ## Install on a computer
 

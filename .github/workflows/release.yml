@@ -5,9 +5,12 @@
 # The server's Docker images use v<version> tags (images.yml); these prefixes keep them apart.
 # A tag must match the version in the source (desktop/Directory.Build.props, versionName in
 # android/app/build.gradle.kts) and be on main, or nothing is published.
-# Run by hand (Actions > Release > Run workflow) or on a pull request that touches this file
-# or a version, it is a dry run: the files are built and kept as workflow artifacts, and no
-# Release is made. How to cut a release: desktop/README.md and android/README.md.
+# Normally nobody pushes the tag: auto-release.yml creates it when main gets a version that
+# has no Release yet, and starts this workflow on the tag (workflow_dispatch with `app`).
+# A run on a tag publishes, however it was started. Run by hand on a branch (Actions >
+# Release > Run workflow) or on a pull request that touches this file or a version, it is a
+# dry run: the files are built and kept as workflow artifacts, and no Release is made.
+# More: desktop/README.md and android/README.md ("Cut a release").
 name: Release
 
 on:
@@ -373,11 +376,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Only for a tag: the build jobs above never get write access.
+  # Only for a tag (pushed, or a run started on it by auto-release.yml): the build jobs above
+  # never get write access.
   release:
     name: GitHub Release
     needs: [desktop, desktop-macos, voice]
-    if: github.event_name == 'push' && !cancelled() && !failure()
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled() && !failure()
     runs-on: ubuntu-latest
     permissions:
       contents: write
