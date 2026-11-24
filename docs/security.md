@@ -196,6 +196,22 @@ cookies, no token and nothing about you or your data; the answer only fills Sett
 → Advanced. Anemo never downloads or installs anything itself. Switch it off in
 Settings → Advanced or for good with `UPDATE_CHECK=false`.
 
+## Appearance uploads
+
+Backgrounds, fonts and the avatar (Settings → Appearance and Profile) are recognised by
+their content, never by the file name or the type the browser sends
+(`features/appearance/files.py`): pictures must open in Pillow as PNG, JPEG, WebP, AVIF or
+GIF, videos must have a WebM or MP4 header, fonts the magic bytes of WOFF2, WOFF, TTF or
+OTF. SVG, and anything else that starts like XML or HTML, is refused, because an SVG can
+carry script. Each kind has a size cap, and at most 60 uploads are kept. Still pictures
+are re-encoded (no EXIF, GPS or XMP is kept); animated pictures and videos are stored as
+sent.
+
+They are served with the type we recognised, `X-Content-Type-Options: nosniff`,
+`Content-Security-Policy: default-src 'none'` and a file name of our own. Every route needs
+a login. Colours and fonts reach the page only as CSS variables built from checked values
+(hex colours, a fixed list of font names, ids of uploads), never as CSS from the user.
+
 ## Images in answers and documents
 
 Answers, documents, task notes and notifications can contain Markdown written by a model or an

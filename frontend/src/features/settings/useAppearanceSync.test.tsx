@@ -65,4 +65,16 @@ describe('appearance sync', () => {
     await vi.advanceTimersByTimeAsync(600)
     expect(useThemeStore.getState().accent).toBe('#123456')
   })
+
+  it('with an appearance of its own, this device neither loads nor saves the server copy', async () => {
+    useThemeStore.getState().setDeviceOnly(true)
+    useThemeStore.getState().hydrate({ mode: 'light', accent: '#abcdef', density: 'compact' })
+    const { wrapper } = setup()
+    renderHook(() => useAppearanceSync(), { wrapper })
+    expect(useThemeStore.getState().accent).toBe('#abcdef') // not the server's #3478f6
+    useThemeStore.getState().set({ accent: '#00aa55' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(saved.calls).toEqual([])
+    useThemeStore.getState().setDeviceOnly(false)
+  })
 })

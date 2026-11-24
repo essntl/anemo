@@ -2,9 +2,10 @@
  * New job (docs/specs/code-sessions.md §12.4): a computer that lets Anemo start Claude
  * Code jobs, a project (its folders first, then its owner's repositories not cloned
  * yet; any name may be typed), "New project" when the name matches none, the prompt
- * and the model. The started job opens at /code/<id>, followed live.
+ * (with images: picked, dropped or pasted, §13) and the model. The started job opens at
+ * /code/<id>, followed live.
  */
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
@@ -14,11 +15,16 @@ import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
 import { useAutosize } from '@/hooks/useAutosize'
+import { cn } from '@/lib/cn'
 import { msg, t } from '@/lib/i18n'
 import { type CodeDevice, type CodeModel, startErrorMessage, useCodeDevices, useCodeProjects, useStartJob } from './api'
+import { type CodeImage, imageIds, useCodeImages, useImageDrop } from './codeImages'
+import { AddImagesButton, ImageChips } from './ImageAttachments'
 import { newJobDraft } from './newJobDraft'
 import { ProjectPicker } from './ProjectPicker'
 import { knownProject, validProjectName } from './projects'
+
+const refuse = (message: string) => toast({ message })
 
 const MODELS: { value: '' | CodeModel; label: string }[] = [
   { value: '', label: msg('Default') },
@@ -40,7 +46,14 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const setProject = (v: string) => { newJobDraft.project = v; setProjectState(v) }
   const setPrompt = (v: string) => { newJobDraft.prompt = v; setPromptState(v) }
   const [model, setModel] = useState<'' | CodeModel>('')
+  // The images: kept with the draft too (uploaded at once; their ids go with the start).
+  const [images, setImagesState] = useState<CodeImage[]>(newJobDraft.images)
+  const setImages = useCallback((update: (images: CodeImage[]) => CodeImage[]) => {
+    setImagesState((now) => (newJobDraft.images = update(now)))
+  }, [])
+  const pictures = useCodeImages({ images, setImages, onRefused: refuse })
   const start = useStartJob()
+  const drop = useImageDrop(pictures.add, start.isPending)
   const promptField = useRef<HTMLTextAreaElement>(null)
   const projectField = useRef<HTMLInputElement>(null)
   // On a phone the sheet is short: the prompt leaves room for Start.
@@ -64,17 +77,19 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   // "New project" only means something for a name the computer can't resolve (§12.1, §12.5).
   const offerNew = name !== '' && validProjectName(name) && projects.isSuccess && !knownProject(projects.data, name)
   const badName = name !== '' && !validProjectName(name)
-  const ready = Boolean(device) && usableNow && validProjectName(name) && prompt.trim() !== '' && !start.isPending
+  const ready = Boolean(device) && usableNow && validProjectName(name) && prompt.trim() !== '' && !start.isPending && !pictures.uploading
 
   const submit = () => {
     if (!ready || !device) return
     start.mutate(
-      { device_id: device.id, project: name, prompt, new: offerNew && isNew, model: model || null },
+      { device_id: device.id, project: name, prompt, new: offerNew && isNew, model: model || null, ...imageIds(images) },
       {
         onSuccess: (job) => {
           onOpenChange(false)
           setProject('')
           setPrompt('')
+          setImages(() => [])
+          pictures.clearFailed()
           setNew(false)
           void navigate(`/code/${job.id}`)
         },
@@ -95,7 +110,9 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <Button variant="primary" loading={start.isPending} disabled={!ready} onClick={submit}>{t('Start job')}</Button>
         </>
       }>
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit() }}>
+      {/* Images can be dropped anywhere on the form. */}
+      <form className={cn('space-y-4 rounded-lg', drop.dragging && 'outline outline-2 outline-offset-4 outline-accent')} {...drop.box}
+        onSubmit={(e) => { e.preventDefault(); submit() }}>
         {devices.isError ? (
           <p className="text-[13px] text-error">{errorMessage(devices.error)}</p>
         ) : devices.isSuccess && usable.length === 0 && !picked ? (
@@ -128,9 +145,16 @@ export function NewJobDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
         <Field label={t('Prompt')}>
           <Textarea ref={promptField} value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={5} maxLength={100_000} className="resize-none"
-            placeholder={t('What should Claude Code do?')}
+            placeholder={drop.dragging ? t('Drop images to add them') : t('What should Claude Code do?')} onPaste={drop.onPaste}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit() } }} />
         </Field>
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <AddImagesButton onFiles={pictures.add} count={pictures.count} disabled={start.isPending} className="-ml-1.5" />
+            <span className="text-[12.5px] text-muted">{t('Add images (PNG, JPEG, WebP, GIF), or drop or paste them')}</span>
+          </div>
+          <ImageChips images={images} pending={pictures.pending} onRemove={pictures.remove} />
+        </div>
 
         <Field label={t('Model')}>
           <Select aria-label={t('Model')} value={model} onValueChange={(v) => setModel(v as '' | CodeModel)}

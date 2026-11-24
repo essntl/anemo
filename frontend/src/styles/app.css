@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './tokens.css';
+@import './appearance.css';
 
 /* `dark:` variant follows our data-theme attribute instead of the OS setting. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
@@ -31,6 +32,7 @@
 
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
   --color-accent-soft: var(--accent-soft);
   --color-accent-contrast: var(--accent-contrast);
   --color-selection: var(--selection);
@@ -69,8 +71,9 @@
   --radius-card: 14px;
   --radius-panel: 16px;
 
-  --font-sans: 'Inter', 'MiSans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  /* --font-ui / --font-code: the fonts chosen in Settings > Appearance (features/appearance/fonts.ts). */
+  --font-sans: var(--font-ui, 'Inter', 'MiSans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --font-mono: var(--font-code, 'JetBrains Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace);
 }
 
 @layer base {

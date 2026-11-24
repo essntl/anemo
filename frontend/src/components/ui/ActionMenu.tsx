@@ -45,7 +45,7 @@ export function ActionMenu({ actions, label = t('More actions'), className }: { 
         <RadixDialog.Portal>
           <RadixDialog.Overlay className="fade fixed inset-0 z-50 bg-black/30" />
           <RadixDialog.Content aria-describedby={undefined}
-            className="sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-panel border border-border bg-card px-2 pt-2 shadow-float focus:outline-none pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            className="glass sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-panel border border-border bg-card px-2 pt-2 shadow-float focus:outline-none pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <RadixDialog.Title className="sr-only">{label}</RadixDialog.Title>
             <div className="min-h-0 overflow-y-auto">{list}</div>
           </RadixDialog.Content>
@@ -59,7 +59,7 @@ export function ActionMenu({ actions, label = t('More actions'), className }: { 
       <Popover.Trigger asChild>{trigger}</Popover.Trigger>
       <Popover.Portal>
         <Popover.Content align="end" sideOffset={4} collisionPadding={12}
-          className="pop z-50 max-h-[var(--radix-popover-content-available-height)] min-w-48 overflow-y-auto rounded-card border border-border bg-card p-1.5 shadow-float">
+          className="glass pop z-50 max-h-[var(--radix-popover-content-available-height)] min-w-48 overflow-y-auto rounded-card border border-border bg-card p-1.5 shadow-float">
           {list}
         </Popover.Content>
       </Popover.Portal>

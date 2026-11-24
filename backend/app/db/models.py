@@ -4,6 +4,7 @@ When adding a feature with tables, import its models module here.
 """
 
 from app.db.base import Base
+from app.features.appearance import models as appearance_models
 from app.features.attachments import models as attachments_models
 from app.features.audit import models as audit_models
 from app.features.auth import models as auth_models
@@ -37,6 +38,7 @@ from app.knowledge import models as knowledge_models
 
 __all__ = [
     "Base",
+    "appearance_models",
     "attachments_models",
     "audit_models",
     "auth_models",

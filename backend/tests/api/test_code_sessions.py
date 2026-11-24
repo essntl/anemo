@@ -455,6 +455,54 @@ async def test_a_job_over_5_mb_keeps_stubs(authed, monkeypatch):
     await ws.disconnect()
 
 
+async def test_a_job_over_5_mb_still_files_events_under_their_sub_agent(authed, monkeypatch):
+    monkeypatch.setattr(ingest, "MAX_JOB_BYTES", 1000)  # one of the long texts fits
+    _, ws = await computer(authed)
+    await announce(ws)
+    agent = {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "toolu_ag",
+                    "name": "Agent",
+                    "input": {"description": "Review", "run_in_background": True},
+                }
+            ]
+        },
+        "parent_tool_use_id": None,
+    }
+    launched = {
+        "type": "user",
+        "message": {
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_ag", "content": "launched"}]
+        },
+        "tool_use_result": {"status": "async_launched", "agentId": "a1"},
+        "parent_tool_use_id": None,
+    }
+    inside = {**bash("pytest " + "x" * 600), "parent_tool_use_id": "toolu_ag"}
+    done = {
+        "type": "system",
+        "subtype": "task_notification",
+        "tool_use_id": "toolu_ag",
+        "status": "completed",
+    }
+    await send(ws, (1, say("a" * 800)), (2, agent), (3, launched), (4, inside), (5, done))
+    shared = await only_job(authed)
+    events = (await authed.get(f"/api/code/jobs/{shared['id']}/events")).json()["events"]
+    # The Agent call, its launch and its end are kept whole; its work is a stub that still
+    # says whose it is (and which call it was).
+    assert [e["dropped"] for e in events] == [False, False, False, True, False]
+    assert events[3]["event"] == {
+        "type": "assistant",
+        "parent_tool_use_id": "toolu_ag",
+        "message": {"content": [{"type": "tool_use", "name": "Bash", "id": "toolu_1"}]},
+    }
+    assert events[4]["event"]["status"] == "completed"
+    await ws.disconnect()
+
+
 async def test_the_offer_says_whether_jobs_are_shared(authed):
     device, ws = await computer(authed)
     await ws.send({"type": "device.offer", "control": True, "shell": False, "code": True})

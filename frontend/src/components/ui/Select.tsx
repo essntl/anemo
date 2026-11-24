@@ -82,7 +82,7 @@ export function Select({
           className={cn(
             'pop z-50 min-w-[var(--radix-select-trigger-width)] max-w-[min(26rem,calc(100vw-24px))]',
             'max-h-[min(22rem,var(--radix-select-content-available-height))] overflow-hidden',
-            'rounded-card border border-border bg-card shadow-float',
+            'glass rounded-card border border-border bg-card shadow-float',
           )}
         >
           <RadixSelect.ScrollUpButton className="flex h-6 items-center justify-center text-muted">
