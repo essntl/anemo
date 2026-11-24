@@ -13,6 +13,7 @@ const OPTIONS: { key: string; label: string; hint: string }[] = [
   { key: 'pdf', label: 'PDF', hint: msg('Reads PDF files directly. When off, their text is extracted first.') },
   { key: 'reasoning', label: msg('Reasoning'), hint: msg('Thinks before answering, where the provider supports it.') },
   { key: 'structured_output', label: msg('JSON output'), hint: msg('Can be made to answer in a fixed JSON shape.') },
+  { key: 'image_generation', label: msg('Image generation'), hint: msg('Makes pictures (for the generate_image tool, chosen under Default models).') },
 ]
 
 /**

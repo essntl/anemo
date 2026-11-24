@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useSettings } from '@/features/settings/api'
 import { useModels, useProviders, useSetupStatus } from './api'
+import { ImageSettingsCard } from './components/ImageSettingsCard'
 import { ModelDefaultsCard } from './components/ModelDefaultsCard'
 import { ProviderCard } from './components/ProviderCard'
 import { ProviderDialog } from './components/ProviderDialog'
@@ -65,6 +66,10 @@ export function ProvidersPage() {
           initial={settings.data.models}
           models={allModels}
         />
+      )}
+
+      {settings.data && (
+        <ImageSettingsCard key={JSON.stringify(settings.data.images)} initial={settings.data.images} />
       )}
 
       <Lingering value={adding}>{() => <ProviderDialog open onOpenChange={setAdding} />}</Lingering>

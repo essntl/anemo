@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { noteServerTime } from '@/lib/serverClock'
 import type { RunTiming } from '../timing'
@@ -150,5 +151,21 @@ describe('the live timer', () => {
     expect(timer()).toHaveTextContent('5 s')
     expect(listDrawn).toHaveBeenCalledTimes(before.list)
     expect(drawn.markdown).toBe(before.markdown)
+  })
+})
+
+describe('files under an answer', () => {
+  it('links a picture the assistant made to its copy in the workspace', () => {
+    const files = [
+      { id: 'a1', filename: 'fox-1.png', kind: 'image', mime: 'image/png', size: 10, path: 'files/generated/2026-11-24/fox-1.png' },
+      { id: 'a2', filename: 'chart.png', kind: 'image', mime: 'image/png', size: 10, path: null },
+    ]
+    render(<MemoryRouter><AssistantMessage text="Here." status="complete" files={files} /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Open fox-1.png in Files' })).toHaveAttribute(
+      'href', '/files?path=files/generated/2026-11-24/fox-1.png',
+    )
+    // A file attached without a workspace copy (attach_file) has only its download.
+    expect(screen.queryByRole('link', { name: 'Open chart.png in Files' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Download chart.png' })).toBeInTheDocument()
   })
 })

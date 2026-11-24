@@ -9,7 +9,7 @@ import { msg, t } from '@/lib/i18n'
 type TaskKey = Exclude<keyof ModelDefaults, 'fallbacks' | 'reasoning_effort'>
 
 /** Tasks that need a model of their own kind: never the chat model. */
-const OWN_KIND = new Set<TaskKey>(['embeddings', 'transcription'])
+const OWN_KIND = new Set<TaskKey>(['embeddings', 'transcription', 'image'])
 
 const TASKS: { key: TaskKey; label: string; hint: string; needs?: string }[] = [
   { key: 'chat', label: msg('Chat'), hint: msg('Normal conversations. Other tasks fall back to this.') },
@@ -23,6 +23,7 @@ const TASKS: { key: TaskKey; label: string; hint: string; needs?: string }[] = [
   { key: 'embeddings', label: msg('Embeddings'), hint: msg('Semantic search and memory retrieval.'), needs: 'embeddings' },
   { key: 'transcription', label: msg('Transcription'), hint: msg('Dictation: turns what you say into text (Whisper, gpt-4o-transcribe, …).'), needs: 'transcription' },
   { key: 'dictation', label: msg('Dictation clean-up'), hint: msg('Tidies dictated text: fillers out, structure in. A fast model is ideal.') },
+  { key: 'image', label: msg('Image generation'), hint: msg('Makes the pictures the assistant draws for you (gpt-image, Gemini image models, …). Any chat model can ask for one.'), needs: 'image_generation' },
 ]
 
 // Parent re-mounts this card (via `key`) when the saved defaults change.
@@ -42,7 +43,7 @@ export function ModelDefaultsCard({ initial, models }: { initial: ModelDefaults;
         {TASKS.map((task) => {
           const options = enabled.filter((m) =>
             OWN_KIND.has(task.key)
-              ? m.capabilities[task.key]
+              ? m.capabilities[task.needs ?? task.key]
               : m.capabilities.chat !== false && (!task.needs || m.capabilities[task.needs]),
           )
           return (
@@ -57,7 +58,8 @@ export function ModelDefaultsCard({ initial, models }: { initial: ModelDefaults;
                     value: '',
                     label: task.key === 'chat' ? t('Not set')
                       : task.key === 'embeddings' ? t('Not set (disables semantic search)')
-                        : task.key === 'transcription' ? t('Not set (no dictation)') : t('Use chat model'),
+                        : task.key === 'transcription' ? t('Not set (no dictation)')
+                          : task.key === 'image' ? t('Not set (no image generation)') : t('Use chat model'),
                   },
                   ...options.map((m) => ({ value: m.id, label: `${m.display_name} — ${m.provider_name}` })),
                 ]}

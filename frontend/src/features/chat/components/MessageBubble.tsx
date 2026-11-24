@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { AlertCircle, Brain, Check, ChevronLeft, ChevronRight, Copy, Download, GitBranch, MessageCircleReply, Pencil, RotateCcw } from 'lucide-react'
+import { AlertCircle, Brain, Check, ChevronLeft, ChevronRight, Copy, Download, FolderOpen, GitBranch, MessageCircleReply, Pencil, RotateCcw } from 'lucide-react'
+import { Link } from 'react-router'
 import type { Schemas } from '@/api/client'
 import { DiagramFixContext, type DiagramProblem } from '@/components/diagrams/context'
 import { Markdown } from '@/components/ui/Markdown'
+import { fileLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { rich, t } from '@/lib/i18n'
 import { Button } from '@/components/ui/Button'
@@ -215,6 +217,14 @@ function AnswerFiles({ files }: { files: AttachmentSummary[] }) {
               className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-surface/90 text-muted shadow-sm hover:text-text">
               <Download className="h-3.5 w-3.5" />
             </a>
+            {a.path && (
+              // A picture the assistant made (generate_image): the copy saved in the workspace.
+              <Link to={fileLink(a.path)} title={t('Open in Files: {path}', { path: a.path })}
+                aria-label={t('Open {name} in Files', { name: a.filename })}
+                className="absolute bottom-1.5 left-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-surface/90 text-muted shadow-sm hover:text-text">
+                <FolderOpen className="h-3.5 w-3.5" />
+              </Link>
+            )}
           </div>
         ) : (
           <a key={a.id} href={`/api/attachments/${a.id}/content`} download={a.filename}>

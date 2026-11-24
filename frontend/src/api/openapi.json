@@ -1809,6 +1809,65 @@
         }
       }
     },
+    "/api/settings/images": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Images Settings",
+        "operationId": "put_images_settings_api_settings_images_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -19597,6 +19656,9 @@
           },
           "code": {
             "$ref": "#/components/schemas/CodeSettings"
+          },
+          "images": {
+            "$ref": "#/components/schemas/ImageSettings"
           }
         },
         "type": "object",
@@ -19619,7 +19681,8 @@
           "properties",
           "dictation",
           "voice",
-          "code"
+          "code",
+          "images"
         ],
         "title": "AllSettings"
       },
@@ -19896,6 +19959,17 @@
           "size": {
             "type": "integer",
             "title": "Size"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
           }
         },
         "type": "object",
@@ -25374,6 +25448,35 @@
         ],
         "title": "HubSection"
       },
+      "ImageSettings": {
+        "properties": {
+          "max_count": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Count",
+            "default": 4
+          },
+          "max_resolution": {
+            "type": "string",
+            "enum": [
+              "1K",
+              "2K",
+              "4K"
+            ],
+            "title": "Max Resolution",
+            "default": "2K"
+          },
+          "ask_in_automations": {
+            "type": "boolean",
+            "title": "Ask In Automations",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ImageSettings",
+        "description": "The generate_image tool (features/image_generation). Security-sensitive like the\npermissions: it decides how much an agent may spend without asking."
+      },
       "ImportIn": {
         "properties": {
           "content": {
@@ -27163,6 +27266,18 @@
             ],
             "title": "Dictation"
           },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
           "fallbacks": {
             "additionalProperties": {
               "items": {
@@ -27183,7 +27298,8 @@
                 "title",
                 "inline",
                 "transcription",
-                "dictation"
+                "dictation",
+                "image"
               ]
             },
             "type": "object",
@@ -27204,7 +27320,7 @@
         },
         "type": "object",
         "title": "ModelDefaults",
-        "description": "Which model handles each kind of work. Unset tasks fall back to the chat model\n(except embeddings and transcription, which need a model of their own kind)."
+        "description": "Which model handles each kind of work. Unset tasks fall back to the chat model\n(except embeddings, transcription and image, which need a model of their own kind)."
       },
       "ModelIn": {
         "properties": {
@@ -29570,6 +29686,7 @@
               "openai",
               "anthropic",
               "openrouter",
+              "google",
               "openai_compatible",
               "claude_code",
               "fake"
@@ -29639,6 +29756,7 @@
               "openai",
               "anthropic",
               "openrouter",
+              "google",
               "openai_compatible",
               "claude_code",
               "fake"
@@ -29790,6 +29908,7 @@
               "openai",
               "anthropic",
               "openrouter",
+              "google",
               "openai_compatible",
               "claude_code",
               "fake"

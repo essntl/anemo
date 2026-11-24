@@ -110,3 +110,30 @@ describe('Claude Code jobs', () => {
     expect(chips.map((a) => a.getAttribute('href'))).toEqual(['/code/job-1', '/code/job-2', '/code/job-3'])
   })
 })
+
+describe('generated images', () => {
+  it('shows the pictures a generate_image call made, each linked to its file', () => {
+    timeline = {
+      run_id: 'r3', kind: 'agent', status: 'completed', pause_requested: false, plan: null, plan_version: 0, file_changes: [],
+      tool_calls: [
+        call('g', 'generate_image', {
+          result_data: {
+            generated: [
+              { path: 'files/generated/2026-11-24/fox-1.png', width: 1536, height: 1024, attachment_id: 'att-1' },
+              { path: 'files/generated/2026-11-24/fox-2.png', width: 1536, height: 1024, attachment_id: null },
+            ],
+          },
+        }),
+      ],
+    } as Timeline
+    render(<MemoryRouter><RunActivity runId="r3" live={false} /></MemoryRouter>)
+    act(() => screen.getByText('1 action').closest('button')!.click())
+    const links = screen.getAllByRole('link', { name: /files\/generated/ })
+    expect(links.map((a) => a.getAttribute('href'))).toEqual([
+      '/files?path=files/generated/2026-11-24/fox-1.png',
+      '/files?path=files/generated/2026-11-24/fox-2.png',
+    ])
+    // Only a picture with a copy under the answer is shown (from Anemo, not the provider).
+    expect(screen.getAllByRole('img').map((i) => i.getAttribute('src'))).toEqual(['/api/attachments/att-1/content'])
+  })
+})

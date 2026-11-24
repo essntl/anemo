@@ -223,5 +223,8 @@ const messages: Messages = {
   "Tools from connected MCP servers.": "Инструменты с подключённых серверов MCP.",
   "Start sub-agents": "Запуск субагентов",
   "Delegate work to other agents.": "Передача работы другим агентам.",
+  "Generate images": "Создание изображений",
+  "Make pictures with the image model chosen in Settings > Providers & Models (each one costs money at the provider). Automations ask first.": "Создавать изображения моделью, выбранной в Настройки > Провайдеры и модели (каждое стоит денег у провайдера). Автоматизации сначала спрашивают.",
+  "Open in Files: {path}": "Открыть в «Файлах»: {path}",
 }
 export default messages
