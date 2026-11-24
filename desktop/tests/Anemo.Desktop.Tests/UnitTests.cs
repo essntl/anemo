@@ -485,7 +485,9 @@ public sealed class WireTests
     {
         Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.0.0","last_id":null}""", Wire.Hello("anemo_t", "1.0.0", null));
         Assert.Equal("""{"type":"ping"}""", Wire.Ping());
-        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false}""", Wire.Offer(true, false, false, false));
+        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false,"code_images":false}""", Wire.Offer(true, false, false, false));
+        // Images with code_start (1.3.0) come with starting.
+        Assert.Equal("""{"type":"device.offer","control":false,"shell":false,"code":true,"code_start":true,"code_images":true}""", Wire.Offer(false, false, true, true));
         Assert.Equal("""{"type":"device.stopped"}""", Wire.Stopped());
         Assert.Equal("""{"type":"device.result","id":"1","ok":true,"state":{}}""", Wire.Result("1", CommandOutcome.Success(new JsonObject())));
         Assert.Equal("""{"type":"device.result","id":"2","ok":false,"error":"No.","code":"refused"}""", Wire.Result("2", CommandOutcome.Fail("refused", "No.")));

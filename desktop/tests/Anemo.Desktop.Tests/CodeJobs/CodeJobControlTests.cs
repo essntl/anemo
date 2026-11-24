@@ -598,6 +598,92 @@ public sealed class CodeJobControlTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_projects, "fresh")));
     }
 
+    // -- code_start: images (1.3.0) ------------------------------------------------------
+
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
+    private static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 4, 5];
+
+    private static JsonObject Image(string name, byte[] data) => new() { ["name"] = name, ["data"] = Convert.ToBase64String(data) };
+
+    [Fact]
+    public async Task Images_are_written_into_the_job_folder_and_listed_in_the_prompt()
+    {
+        Directory.CreateDirectory(Path.Combine(_projects, "anemo"));
+        var fields = StartFields("anemo", "Make the page look like this.\n");
+        fields["images"] = new JsonArray(Image("1-screenshot.png", Png), Image("2-photo.jpg", Jpeg));
+
+        var outcome = await RunAsync("code_start", fields);
+
+        Assert.True(outcome.Ok, outcome.Error);
+        var folder = Path.Combine(_jobs.Jobs, (string)outcome.State!["job_id"]!);
+        var shot = Path.Combine(folder, "images", "1-screenshot.png");
+        var photo = Path.Combine(folder, "images", "2-photo.jpg");
+        Assert.Equal(Png, File.ReadAllBytes(shot));
+        Assert.Equal(Jpeg, File.ReadAllBytes(photo));
+        Assert.Equal(
+            $"Make the page look like this.\n\n{CodeJobImages.Heading}\n- {shot}\n- {photo}\n",
+            File.ReadAllText(Path.Combine(folder, "prompt.txt")));
+        // The preview stays the user's own text.
+        var meta = JsonNode.Parse(File.ReadAllText(Path.Combine(folder, "meta.json")))!.AsObject();
+        Assert.Equal("Make the page look like this.\n", (string?)meta["prompt_preview"]);
+    }
+
+    [Theory]
+    [InlineData("../1-evil.png")]
+    [InlineData("1-a\\b.png")]
+    [InlineData("screenshot.png")]
+    [InlineData("1-run.exe")]
+    [InlineData("1-.png.cmd")]
+    public async Task An_image_name_the_server_wouldn_t_make_fails_the_start(string name)
+    {
+        Directory.CreateDirectory(Path.Combine(_projects, "anemo"));
+        var fields = StartFields("anemo");
+        fields["images"] = new JsonArray(Image(name, Png));
+
+        var outcome = await RunAsync("code_start", fields);
+
+        Assert.False(outcome.Ok);
+        Assert.StartsWith("An image's name must be like 1-screenshot.png", outcome.Error);
+        Assert.Empty(_host.Started);
+        Assert.False(Directory.Exists(_jobs.Jobs) && Directory.EnumerateDirectories(_jobs.Jobs).Any());
+    }
+
+    [Fact]
+    public async Task Image_data_must_be_the_image_its_name_says()
+    {
+        Directory.CreateDirectory(Path.Combine(_projects, "anemo"));
+        async Task<string?> Start(JsonNode images)
+        {
+            var fields = StartFields("anemo");
+            fields["images"] = images;
+            return (await RunAsync("code_start", fields)).Error;
+        }
+
+        Assert.Equal("The image 1-a.png isn't the PNG, JPEG, WebP or GIF image its name says.", await Start(new JsonArray(Image("1-a.png", Jpeg))));
+        Assert.Equal("The image 1-a.gif isn't the PNG, JPEG, WebP or GIF image its name says.", await Start(new JsonArray(Image("1-a.gif", "MZ\x90\0"u8.ToArray()))));
+        Assert.Equal("The image 1-a.png couldn't be read (its data isn't base64).", await Start(new JsonArray(new JsonObject { ["name"] = "1-a.png", ["data"] = "not base64!" })));
+        Assert.Equal("Every image must have a “name” and “data”.", await Start(new JsonArray(new JsonObject { ["name"] = "1-a.png" })));
+        Assert.Equal("“images” must be a list.", await Start(JsonValue.Create("1-a.png")!));
+        Assert.StartsWith("An image's name must be like", await Start(new JsonArray(Image("1-a.png", Png), Image("1-A.png", Png))));
+        var nine = new JsonArray(Enumerable.Range(1, 9).Select(i => (JsonNode)Image($"{i}-a.png", Png)).ToArray());
+        Assert.Equal("At most 8 images can go with one prompt.", await Start(nine));
+        var huge = new byte[CodeJobImages.MaxImageBytes + 1];
+        Png.CopyTo(huge, 0);
+        Assert.Equal("The image 1-a.png is larger than 4 MB.", await Start(new JsonArray(Image("1-a.png", huge))));
+        Assert.Empty(_host.Started);
+    }
+
+    [Fact]
+    public void Image_types_are_read_from_their_first_bytes()
+    {
+        Assert.Equal("png", CodeJobImages.TypeOf(Png));
+        Assert.Equal("jpg", CodeJobImages.TypeOf(Jpeg));
+        Assert.Equal("gif", CodeJobImages.TypeOf("GIF89a..."u8));
+        Assert.Equal("webp", CodeJobImages.TypeOf("RIFF\0\0\0\0WEBPVP8 "u8));
+        Assert.Null(CodeJobImages.TypeOf("<svg>"u8));
+        Assert.Null(CodeJobImages.TypeOf([]));
+    }
+
     // -- code_start: the job -------------------------------------------------------------
 
     [Fact]

@@ -1,8 +1,9 @@
 /**
  * Controlling a thread (docs/specs/code-sessions.md §12.4): cancelling the running job,
- * sending a follow-up (or queueing one while the job runs), and where a job an agent started came from.
+ * sending a follow-up (or queueing one while the job runs), with images (§13), and where a
+ * job an agent started came from.
  */
-import { type KeyboardEvent, type ReactNode, useRef } from 'react'
+import { type KeyboardEvent, type ReactNode, useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Clock, ListPlus, MessageSquare, Square, TriangleAlert } from 'lucide-react'
@@ -19,6 +20,8 @@ import { chatLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { startErrorMessage, useCancelJob, useFollowUp } from './api'
+import { type CodeImage, MAX_IMAGES, useCodeImages, useImageDrop } from './codeImages'
+import { AddImagesButton, ImageChips, PromptImages } from './ImageAttachments'
 import { type QueuedMessage, codeQueue, useCodeQueue } from './queueStore'
 import { sendQueued } from './sendQueued'
 import type { CodeJob } from './threads'
@@ -82,9 +85,13 @@ function QueuedCard({ message, canSend, sending, onSend, onEdit, onRemove }: {
         )}
       </div>
       <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-[13px] [overflow-wrap:anywhere] max-sm:max-h-10">{message.text}</p>
+      <PromptImages images={message.images ?? []} className="mt-1.5" />
     </div>
   )
 }
+
+const NO_IMAGES: CodeImage[] = []
+const refuse = (message: string) => toast({ message })
 
 /**
  * The box under a thread, which looks and takes keys like the chat's message box: one
@@ -92,7 +99,9 @@ function QueuedCard({ message, canSend, sending, onSend, onEdit, onRemove }: {
  * Shift+Enter for a new line (on a touch screen Enter adds a line). After the last job has ended (with a session to resume, on a
  * computer that lets Anemo start jobs) it sends a follow-up. While the job runs it
  * queues one message, sent when the job ends (queueStore.ts): Claude Code takes nothing
- * in while it works. Otherwise nothing, or one line saying why. `onSent`: a message was
+ * in while it works. Images can be added with the button, dropped or pasted; they wait
+ * with the text (as the draft, and in a queued message). Otherwise nothing, or one line
+ * saying why. `onSent`: a message was
  * sent or queued (the thread goes to its end, where it shows); `title`: the thread's,
  * for the notices.
  */
@@ -104,6 +113,11 @@ export function FollowUpBox({ job, title, onSent }: { job: CodeJob; title?: stri
   // The draft lives with the queue: it survives opening another thread and a reload.
   const text = useCodeQueue((s) => s.drafts[threadId] ?? '')
   const setText = (next: string) => codeQueue.setDraft(threadId, next)
+  // The images wait with the text, as uploaded attachments (their ids).
+  const draftImages = useCodeQueue((s) => s.draftImages?.[threadId] ?? NO_IMAGES)
+  const setDraftImages = useCallback((update: (images: CodeImage[]) => CodeImage[]) => codeQueue.setDraftImages(threadId, update), [threadId])
+  const images = useCodeImages({ images: draftImages, setImages: setDraftImages, onRefused: refuse })
+  const drop = useImageDrop(images.add, followUp.isPending)
   const field = useRef<HTMLTextAreaElement>(null)
   useAutosize(field, text, 240)
   // Touch screens: the on-screen keyboard's Enter adds a line, as in the chat.
@@ -118,6 +132,7 @@ export function FollowUpBox({ job, title, onSent }: { job: CodeJob; title?: stri
   const edit = () => {
     if (!queued) return
     setText(text.trim() ? `${queued.text}\n\n${text}` : queued.text)
+    if (queued.images?.length) setDraftImages((now) => [...(queued.images ?? []), ...now].slice(0, MAX_IMAGES))
     codeQueue.remove(threadId)
     field.current?.focus()
   }
@@ -147,16 +162,27 @@ export function FollowUpBox({ job, title, onSent }: { job: CodeJob; title?: stri
     )
   }
 
+  // Sent (or queued) with its images; the box is empty again after.
+  const cleared = () => {
+    setText('')
+    setDraftImages(() => [])
+    images.clearFailed()
+    onSent?.()
+  }
   const submit = () => {
-    if (blank || followUp.isPending) return
+    if (blank || followUp.isPending || images.uploading) return
     if (running) {
-      codeQueue.add(threadId, job.id, text)
-      setText('')
-      onSent?.()
+      // A message already waiting gets these images after its own: never more than one message takes.
+      if ((queued?.images?.length ?? 0) + draftImages.length > MAX_IMAGES) {
+        refuse(t('At most {n} images can go with one message.', { n: MAX_IMAGES }))
+        return
+      }
+      codeQueue.add(threadId, job.id, text, draftImages)
+      cleared()
       return
     }
-    followUp.mutate(text, {
-      onSuccess: () => { setText(''); onSent?.() },
+    followUp.mutate({ prompt: text, images: draftImages }, {
+      onSuccess: cleared,
       onError: (err) => toast({ message: startErrorMessage(err) }),
     })
   }
@@ -170,16 +196,24 @@ export function FollowUpBox({ job, title, onSent }: { job: CodeJob; title?: stri
   return (
     <Dock>
       {card}
-      {/* The text and the button on one line; as the text grows the button stays at the bottom. */}
-      <form className={cn(MESSAGE_BOX, MESSAGE_BOX_BORDER, 'flex items-end gap-1')} onSubmit={(e) => { e.preventDefault(); submit() }}>
-        <textarea ref={field} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} rows={1} maxLength={100_000}
-          aria-label={running ? t('Message for when this job ends') : t('Follow-up')}
-          placeholder={running ? t('Queue the next message…') : t('Ask for more in the same session…')}
-          readOnly={followUp.isPending}
-          className={cn(MESSAGE_TEXT, 'read-only:opacity-60')} />
-        <SendButton type="submit" label={sendLabel} title={sendLabel} quiet={running} disabled={blank || followUp.isPending}
-          icon={followUp.isPending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            : running ? <ListPlus className="h-4 w-4" /> : undefined} />
+      {/* The images over the text; the image button, the text and the send button on one line
+          (as the text grows the buttons stay at the bottom). Images can also be dropped on the
+          box or pasted into the text. */}
+      <form className={cn(MESSAGE_BOX, drop.dragging ? 'border-accent bg-accent-soft' : MESSAGE_BOX_BORDER)} {...drop.box}
+        onSubmit={(e) => { e.preventDefault(); submit() }}>
+        <ImageChips images={draftImages} pending={images.pending} onRemove={images.remove} className="px-1 pb-1.5 pt-0.5" />
+        <div className="flex items-end gap-1">
+          <AddImagesButton onFiles={images.add} count={images.count} disabled={followUp.isPending} />
+          <textarea ref={field} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} onPaste={drop.onPaste} rows={1} maxLength={100_000}
+            aria-label={running ? t('Message for when this job ends') : t('Follow-up')}
+            placeholder={drop.dragging ? t('Drop images to add them') : running ? t('Queue the next message…') : t('Ask for more in the same session…')}
+            readOnly={followUp.isPending}
+            className={cn(MESSAGE_TEXT, 'px-1.5 read-only:opacity-60')} />
+          <SendButton type="submit" label={sendLabel} title={images.uploading ? t('Waiting for the images to upload…') : sendLabel} quiet={running}
+            disabled={blank || followUp.isPending || images.uploading}
+            icon={followUp.isPending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              : running ? <ListPlus className="h-4 w-4" /> : undefined} />
+        </div>
       </form>
     </Dock>
   )

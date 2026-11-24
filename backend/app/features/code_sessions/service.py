@@ -8,7 +8,7 @@ devices feature calls into this feature only through ingest.py.
 import logging
 import time
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -18,11 +18,14 @@ from sqlalchemy.orm import aliased
 
 from app.core.db import get_sessionmaker
 from app.core.errors import NotFound
+from app.features.attachments import service as attachments
+from app.features.code_sessions import images
 from app.features.code_sessions.models import CodeJob, CodeJobEvent, State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
     CodeEventOut,
     CodeEventsOut,
+    CodeImageOut,
     CodeJobDetailOut,
     CodeJobListOut,
     CodeJobOut,
@@ -103,6 +106,7 @@ def job_out(
         conversation_id=job.conversation_id,
         run_id=job.run_id,
         conversation_title=conversation_title if job.conversation_id else None,
+        images=[CodeImageOut.model_validate(ref) for ref in images.refs(job.images)],
     )
 
 
@@ -324,16 +328,37 @@ async def prune(now: datetime | None = None) -> int:
             .correlate(CodeJob)
             .exists()
         )
-        result = await db.execute(
-            delete(CodeJob)
-            .where(last_activity < cutoff, ~and_(CodeJob.state == "running", device_active))
-            .execution_options(synchronize_session=False)
+        pruned = list(
+            await db.scalars(
+                delete(CodeJob)
+                .where(last_activity < cutoff, ~and_(CodeJob.state == "running", device_active))
+                .returning(CodeJob.images)
+                .execution_options(synchronize_session=False)
+            )
         )
+        await _delete_images(db, pruned)
         await db.commit()
-    count = int(result.rowcount or 0)  # type: ignore[attr-defined]
+    count = len(pruned)
     if count:
         log.info("code jobs pruned", extra={"ctx": {"count": count}})
     return count
+
+
+async def _delete_images(db: AsyncSession, pruned: Sequence[object]) -> None:
+    """The images of pruned jobs, unless a job that stays has them too (a queued message
+    sent twice) or a chat does. Part of prune's change: doesn't commit."""
+    ids: list[uuid.UUID] = []
+    for ref in (r for value in pruned for r in images.refs(value)):
+        try:
+            image_id = uuid.UUID(ref["id"])
+        except ValueError:
+            continue
+        still_used = await db.scalar(
+            select(CodeJob.id).where(CodeJob.images.contains([{"id": ref["id"]}])).limit(1)
+        )
+        if still_used is None:
+            ids.append(image_id)
+    await attachments.delete_unclaimed(db, ids)
 
 
 async def prune_if_due() -> None:

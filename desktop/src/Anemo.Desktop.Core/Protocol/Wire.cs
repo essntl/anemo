@@ -46,7 +46,8 @@ public static class Wire
 
     /// <summary>
     /// The offer; <paramref name="code"/>: Claude Code jobs are shared (device-contracts.md §7);
-    /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4).
+    /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4). <c>code_images</c>:
+    /// a <c>code_start</c> may carry images (1.3.0); always so where starting is offered.
     /// </summary>
     public static string Offer(bool control, bool shell, bool code, bool codeStart) => Json(new JsonObject
     {
@@ -55,6 +56,7 @@ public static class Wire
         ["shell"] = shell,
         ["code"] = code,
         ["code_start"] = codeStart,
+        ["code_images"] = codeStart,
     });
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });

@@ -1,16 +1,19 @@
 /**
  * One job's timeline (built by timeline.ts): text, thinking, tool calls with their
- * results, sub-agents nested in their Task call, raw lines and the notices for what
- * was trimmed or not stored. Everything here comes from the job and is untrusted: it
+ * results, sub-agents nested in their Task call (or, when the thread lists its sub-agents,
+ * a link to the sub-agent's own view), raw lines and the notices for what was trimmed
+ * or not stored. Everything here comes from the job and is untrusted: it
  * is shown as Markdown (which never loads remote images) or as plain text.
  */
 import { type ReactNode, useContext, useState } from 'react'
 import {
-  Bot, Brain, ChevronRight, FilePen, FileSearch, FileText, Globe, ListTodo, Loader2, type LucideIcon, Search, SquareTerminal, TriangleAlert, Wrench, XCircle,
+  ArrowRight, Bot, Brain, ChevronRight, FilePen, FileSearch, FileText, Globe, ListTodo, Loader2, type LucideIcon, Search, SquareTerminal, TriangleAlert, Wrench, XCircle,
 } from 'lucide-react'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
 import { plural, t } from '@/lib/i18n'
+import { AgentNavContext } from './agentNav'
+import { AgentFacts, AgentStatusIcon } from './AgentSidebar'
 import { JobContext } from './jobContext'
 import { TodoChecklist, TrimmedMark } from './parts'
 import { logPath } from './threads'
@@ -132,11 +135,31 @@ function WebBody({ call }: { call: ToolCall }) {
   )
 }
 
+/** The way to a sub-agent's own events, from its call in the main agent's timeline. */
+function OpenAgent({ id }: { id: string }) {
+  const nav = useContext(AgentNavContext)
+  const agent = nav?.byId.get(id)
+  if (!nav || !agent) return null
+  return (
+    <button type="button" onClick={() => nav.select(id)}
+      className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-2 text-left text-[12.5px] hover:border-accent/60 hover:bg-surface-hover">
+      <AgentStatusIcon status={agent.status} />
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{t('Open this sub-agent')}</span>
+        <span className="block truncate text-[11.5px] text-muted"><AgentFacts agent={agent} /></span>
+      </span>
+      <ArrowRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-subtle" />
+    </button>
+  )
+}
+
 function TaskBody({ call, depth }: { call: ToolCall; depth: number }) {
   const prompt = typeof call.input.prompt === 'string' ? call.input.prompt : ''
   const agent = typeof call.input.subagent_type === 'string' ? call.input.subagent_type : ''
   // The sub-agent's first message is the prompt shown above: not twice.
   const children = call.children.filter((c) => !(c.kind === 'user' && c.text.trim() === prompt.trim()))
+  // A background sub-agent's result only says it was launched (Claude Code's own note, not its answer).
+  const launchNote = useContext(AgentNavContext)?.byId.get(call.id)?.background === true
   return (
     <>
       {(agent || prompt) && (
@@ -145,12 +168,13 @@ function TaskBody({ call, depth }: { call: ToolCall; depth: number }) {
           {prompt && <Collapsible text={prompt} />}
         </div>
       )}
+      <OpenAgent id={call.id} />
       {children.length > 0 && (
         <div className="border-l-2 border-border pl-3">
           <Items items={children} depth={depth + 1} />
         </div>
       )}
-      {call.result && (
+      {call.result && !launchNote && (
         call.result.isError ? <ResultText call={call} /> : call.result.text && (
           <div className="rounded-lg border border-border bg-surface p-2.5 text-[13px]"><Markdown text={call.result.text} /></div>
         )
@@ -197,7 +221,10 @@ function ToolBody({ call, depth }: { call: ToolCall; depth: number }) {
 
 function ToolRow({ call, depth }: { call: ToolCall; depth: number }) {
   const view = useContext(JobContext)
-  const waiting = !call.result
+  // A sub-agent listed beside the thread: its state is its own (a background one's call
+  // has its result at once), and its work is in its own view, not in this row.
+  const agent = useContext(AgentNavContext)?.byId.get(call.id)
+  const waiting = !call.result && !agent
   const working = waiting && Boolean(view?.running)
   // A sub-agent is open while it works; everything else waits for a tap.
   const [toggled, setOpen] = useState<boolean | null>(null)
@@ -221,9 +248,10 @@ function ToolRow({ call, depth }: { call: ToolCall; depth: number }) {
             <span className="text-success">+{diff.added}</span> <span className="text-error">-{diff.removed}</span>
           </span>
         )}
+        {agent && <AgentStatusIcon status={agent.status} />}
         {working && <Loader2 aria-label={t('Running')} className="h-3.5 w-3.5 shrink-0 animate-spin text-tool-running" />}
         {waiting && !working && <span className="shrink-0 text-[11.5px] text-subtle">{t('no result')}</span>}
-        {isError && <XCircle aria-label={t('Error')} className="h-3.5 w-3.5 shrink-0 text-error" />}
+        {isError && !agent && <XCircle aria-label={t('Error')} className="h-3.5 w-3.5 shrink-0 text-error" />}
         <ChevronRight aria-hidden="true" className={cn('h-3.5 w-3.5 shrink-0 text-subtle transition-transform', open && 'rotate-90')} />
       </button>
       {call.trimmed && <div className="ml-7"><TrimmedMark /></div>}

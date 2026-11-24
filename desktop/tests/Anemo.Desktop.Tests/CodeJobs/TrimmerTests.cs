@@ -161,6 +161,47 @@ public sealed class TrimmerTests
     }
 
     [Fact]
+    public void The_stub_keeps_what_places_the_event_under_its_sub_agent()
+    {
+        // A sub-agent's tool result, far too large: the stub still says whose it is and how
+        // the call ended, so the Code page files it under its sub-agent (code-sessions.md §6).
+        var blocks = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "toolu_7", ["is_error"] = true, ["content"] = "x" });
+        foreach (var _ in Enumerable.Range(0, 40))
+        {
+            blocks.Add(new JsonObject { ["type"] = "text", ["text"] = new string('q', 590) });
+        }
+
+        var ev = new JsonObject
+        {
+            ["type"] = "user",
+            ["parent_tool_use_id"] = "toolu_agent",
+            ["message"] = new JsonObject { ["content"] = blocks },
+        };
+
+        Assert.Equal(
+            """{"type":"user","parent_tool_use_id":"toolu_agent","anemo_trimmed":"too large","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_7","is_error":true}]}}""",
+            EventTrimmer.Trim(ev).Event.ToJsonString());
+    }
+
+    [Fact]
+    public void The_stub_keeps_a_background_sub_agents_end_but_no_long_or_null_values()
+    {
+        var ev = new JsonObject
+        {
+            ["type"] = "system",
+            ["subtype"] = "task_notification",
+            ["tool_use_id"] = "toolu_agent",
+            ["status"] = new string('s', 300),
+            ["parent_tool_use_id"] = null,
+            ["summary"] = new JsonArray(Enumerable.Range(0, 40).Select(_ => (JsonNode)new string('z', 590)).ToArray()),
+        };
+
+        Assert.Equal(
+            """{"type":"system","subtype":"task_notification","tool_use_id":"toolu_agent","anemo_trimmed":"too large"}""",
+            EventTrimmer.Trim(ev).Event.ToJsonString());
+    }
+
+    [Fact]
     public void The_limit_is_bytes_of_UTF_8_not_characters()
     {
         // 16 × 600 characters (not cut by any step): 9600 characters either way, but 19 200 bytes in Cyrillic.

@@ -64,11 +64,12 @@ failed and cancelled runs too, with a one-sentence text saying so.
 
 ```
 client → {"type": "device.offer", "control": bool, "shell": bool, "code": bool,
-          "code_start": bool}
+          "code_start": bool, "code_images": bool}
           on connect and every 30 s; control: "Allow control" is on;
           shell: PowerShell is switched on in the client; code: "Share Claude Code
           jobs with Anemo" is on (§7); code_start: "Let Anemo start Claude Code jobs" is
-          on (§7, phase 2). A missing code or code_start means false.
+          on (§7, phase 2); code_images: a code_start may carry images (§7.4, 1.3.0).
+          A missing code, code_start or code_images means false.
 server → {"type": "device.command", "id": "<uuid>", "action": "<action>", …fields}
 client → {"type": "device.result", "id": "<uuid>", "ok": true, "state": {…}}
 client → {"type": "device.result", "id": "<uuid>", "ok": false, "error": "<one sentence>",
@@ -177,7 +178,8 @@ agent, as untrusted content.
 
 The `version` in `hello` is the client's. Anemo Desktop 1.1.0 adds Claude Code jobs
 (§7, `code.*` messages and the `code` offer field); 1.2.0 adds the `code_*` actions
-(§7.4). The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
+(§7.4); 1.3.0 adds images to `code_start` (the `code_images` offer field, §7.4) and takes
+messages from the server of up to 16 MB (4 MB before). The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
 `{"type": "notice", "text": "…"}` once per connection when a client is older than the
 oldest version it supports; it keeps working where it can. A client that gets an action it
 doesn't know answers `failed` with "Unknown action “…”", so an old client fails loudly.
@@ -272,3 +274,36 @@ A follow-up is `code_start` with `resume_session` and `follow_job_id` (the earli
 The job runs `claude -p --output-format stream-json --verbose --permission-mode
 bypassPermissions [--resume <s>] [--model <m>] [--max-turns <n>]` in its folder, the
 prompt on stdin, like `cc.ps1`.
+
+**Images (Anemo Desktop 1.3.0).** A client that takes them says `"code_images": true` in
+its offer (Anemo Desktop: whenever it offers `code_start`); the server sends images only
+to such a client and otherwise answers the user with `images_unsupported` (409).
+`code_start` (a new job or a follow-up) may then carry
+
+```
+"images": [{"name": "1-screenshot.png", "data": "<base64>"}, …]      at most 8
+```
+
+- `name` matches `^\d{1,2}-[A-Za-z0-9._-]{1,80}\.(png|jpg|webp|gif)\z` (the server makes
+  it from the upload's name: a number, the safe characters of the name, the real type),
+  each name once (ignoring case). `data` is the image's bytes, base64: at most 4 MB each,
+  10 MB together; its first bytes must be the type its name says (PNG, JPEG, GIF, WebP).
+  The server sends them scaled down to at most 1568 px and 3 MB each, 8 MB together.
+  Anything else fails the command (`failed`, with a sentence), before a job folder is made.
+- The client writes each one to `<job folder>\images\<name>` (never outside that folder)
+  and Claude Code reads the prompt with their full paths after it, in `prompt.txt`:
+
+  ```
+  <the prompt, without trailing whitespace>
+
+  Attached images (open each one with the Read tool):
+  - C:\anemo-bridge\jobs\20261124-101500-ab12\images\1-screenshot.png
+  ```
+
+  So `--resume` works as before (nothing about the session changes), Claude Code opens
+  each image with its Read tool, and the images stay in the job folder with the rest of
+  the log. They are only ever files to look at: nothing runs or opens them. `meta.json`
+  `prompt_preview` stays the user's own text; the `code.job` `prompt` is `prompt.txt`
+  (with the list), and the server keeps the prompt as it sent it for such a job.
+- A port (macOS, Linux) does the same with its own folder separators; nothing else
+  depends on the platform. `cc.ps1` doesn't take images.

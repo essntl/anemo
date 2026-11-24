@@ -22086,6 +22086,16 @@
               }
             ],
             "title": "Max Turns"
+          },
+          "image_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Image Ids",
+            "description": "Uploaded images (POST /api/attachments) to send with the prompt"
           }
         },
         "type": "object",
@@ -22093,6 +22103,25 @@
           "prompt"
         ],
         "title": "CodeFollowUpIn"
+      },
+      "CodeImageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "CodeImageOut"
       },
       "CodeJobDetailOut": {
         "properties": {
@@ -22163,6 +22192,16 @@
               }
             ],
             "title": "Max Turns"
+          },
+          "image_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Image Ids",
+            "description": "Uploaded images (POST /api/attachments) to send with the prompt"
           }
         },
         "type": "object",
@@ -22459,6 +22498,14 @@
               }
             ],
             "title": "Conversation Title"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/CodeImageOut"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
           }
         },
         "type": "object",
