@@ -58,25 +58,24 @@ somewhere safe, outside the repository (`*.jks` is ignored): without them no lat
 can update an installed app, which then has to be uninstalled (losing its settings and token).
 Until the secrets are set, a tag build fails and publishes nothing.
 
-**Each release.**
+**Each release (automatic).**
 
-1. In a PR, raise `versionName` **and** `versionCode` (by one) in `app/build.gradle.kts`.
-   That PR runs the workflow as a dry run: the APK appears under the run's *Artifacts* (signed
-   with a throwaway key until the secrets are set), and no Release is made. Merge it once CI
-   is green.
-2. Tag the merge commit on main and push the tag:
-
-   ```
-   git checkout main && git pull
-   git tag voice-v1.0.0
-   git push origin voice-v1.0.0
-   ```
-
+1. Any pull request that changes the app's code raises `versionName` **and** `versionCode`
+   (by one) in `app/build.gradle.kts`; CI's *App versions* check fails until it does (docs and
+   tests alone don't count). A PR that touches the version also runs the Release workflow as
+   a dry run: the APK appears under the run's *Artifacts*, and no Release is made.
+2. Merge it. `.github/workflows/auto-release.yml` sees a version on main without a Release,
+   creates the tag `voice-v<versionName>` on the merge commit and starts the Release workflow
+   on it.
 3. The workflow checks that the tag is `voice-v` + `versionName` and is on main (else it
-   fails and publishes nothing), then makes the Release `voice-v1.0.0` with `Anemo-Voice.apk`
-   and `SHA256SUMS-voice.txt`; its notes give the checksum and the signing certificate's
-   SHA-256, which stays the same from one release to the next. A re-run of a failed run adds
-   the files to the same Release.
+   fails and publishes nothing), then makes the Release `voice-v<version>` with
+   `Anemo-Voice.apk` and `SHA256SUMS-voice.txt`; its notes give the checksum and the signing
+   certificate's SHA-256, which stays the same from one release to the next. A re-run of a
+   failed run adds the files to the same Release.
+
+Pushing a `voice-v<version>` tag by hand still works the same way. If a release was missed,
+**Actions → Auto release → Run workflow** tags and releases every version that has no
+Release yet.
 
 Locally, `./gradlew assembleRelease` with `ANEMO_VOICE_KEYSTORE` (the keystore's path),
 `ANEMO_VOICE_KEYSTORE_PASSWORD` and `ANEMO_VOICE_KEY_ALIAS` set gives the same signed APK

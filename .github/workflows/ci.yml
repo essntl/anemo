@@ -11,6 +11,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  app-versions:
+    name: App versions (a changed app gets a new version, so it is released)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: sh .github/scripts/check-app-versions.sh "${{ github.event.pull_request.base.sha }}"
+
   backend:
     name: Backend (lint, types, tests, migrations)
     runs-on: ubuntu-latest
