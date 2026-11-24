@@ -23,6 +23,7 @@ from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
 from app.tools.builtin.projects import PROJECT_TOOLS
 from app.tools.builtin.schedules import SCHEDULE_TOOLS, SCHEDULE_WRITE_TOOLS
+from app.tools.builtin.scripts import SCRIPT_TOOLS
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.subagent import RunSubagent
 from app.tools.builtin.tasks import TASK_TOOLS
@@ -73,6 +74,7 @@ BUILTIN_TOOLS: list[Tool] = [
     LoadSkill(),
     RunSubagent(),
     ReadToolOutput(),
+    *SCRIPT_TOOLS,
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 # Tools that only work in a run that answers in a chat.
@@ -84,7 +86,7 @@ FEATURE_TOOLS: dict[str, frozenset[str]] = {
     "calendar": frozenset(t.name for t in EVENT_TOOLS),
     "focus": frozenset(t.name for t in FOCUS_TOOLS) - MUSIC_TOOL_NAMES,
     "music": MUSIC_TOOL_NAMES,
-    "automations": frozenset(t.name for t in SCHEDULE_TOOLS),
+    "automations": frozenset(t.name for t in [*SCHEDULE_TOOLS, *SCRIPT_TOOLS]),
     "code": CODE_TOOL_NAMES,
 }
 
