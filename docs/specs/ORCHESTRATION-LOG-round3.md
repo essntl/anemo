@@ -83,7 +83,7 @@ Audit findings that shaped the contracts:
   mode* (Android shows three buttons).
 - D: the server stores `platform` and `shell_kind` in the offer hash as agreed; Anemo
   Desktop keeps its own C# job start (`bridge/cc.mjs` is the cross-platform bridge for
-  agents and scripts, same folder format). Version 1.4.0 (1.3.0 was taken by #77).
+  agents that start jobs from a shell, same folder format). Version 1.4.0 (1.3.0 was taken by #77).
 - C: scripts run as automation runs (provenance from the existing actor context, as
   §1 decided); the migration is `0077_automation_scripts` instead of 0075.
 
