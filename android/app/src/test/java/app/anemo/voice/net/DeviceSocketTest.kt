@@ -134,6 +134,7 @@ class DeviceSocketTest {
             "e8", "voice.say",
             JSONObject().put("run_id", "r1").put("conversation_id", "c1").put("text", "Done.").put("more", true),
         )
+        conn.event("e9", "voice.stop", JSONObject().put("run_id", "r1").put("conversation_id", "c1"))
         assertEquals(DeviceEvent.RunStatus("r1", "running"), next())
         assertEquals(
             DeviceEvent.ApprovalRequested(Approval("a1", "r1", Approval.Kind.Action, "Send an email", "dangerous")),
@@ -151,7 +152,8 @@ class DeviceSocketTest {
         )
         assertEquals(DeviceEvent.ApprovalDecided("a1", "deny"), next())
         assertEquals(DeviceEvent.VoiceSay("r1", "c1", "Done.", true), next())
-        assertEquals("e8", socket!!.lastId) // ignored events still move the cursor
+        assertEquals(DeviceEvent.VoiceStop("r1", "c1"), next())
+        assertEquals("e9", socket!!.lastId)
     }
 
     @Test
@@ -238,6 +240,25 @@ class DeviceSocketTest {
         Thread.sleep(300) // back-off is 20 ms: a reconnect would have happened
         assertEquals(1, fake.connectionCount.get())
         assertTrue(seen.isEmpty())
+    }
+
+    @Test
+    fun `voice mode messages go to the server, and wait while it is away`() {
+        val s = open()
+        next()
+        s.send(Protocol.voiceMode(true, "tile"))
+        val on = nextOf("voice.mode")
+        assertTrue(on.getBoolean("on"))
+        assertEquals("tile", on.getString("cause"))
+        assertEquals(setOf("type", "on", "cause"), on.keys().asSequence().toSet())
+        // the connection drops: what is sent meanwhile goes after the next welcome
+        fake.nextConnection().socket.close(1001, "going away")
+        assertTrue(next() is Disconnected)
+        s.send(Protocol.voiceMode(false, "timeout"))
+        assertEquals(Connected("Pixel", false), next())
+        val off = nextOf("voice.mode")
+        assertFalse(off.getBoolean("on"))
+        assertEquals("timeout", off.getString("cause"))
     }
 
     @Test

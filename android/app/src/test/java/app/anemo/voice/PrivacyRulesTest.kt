@@ -16,9 +16,21 @@ class PrivacyRulesTest {
         sources.filter { it.name !in allowed && pattern.containsMatchIn(it.readText()) }.map { it.name }
 
     @Test
-    fun `nothing logs`() {
-        val found = offenders(Regex("""\bLog\.[a-z]+\(|println\(|printStackTrace\(|HttpLoggingInterceptor"""))
+    fun `nothing logs, except Logcat`() {
+        val found = offenders(
+            Regex("""\bLog\.[a-z]+\(|println\(|printStackTrace\(|HttpLoggingInterceptor"""),
+            allowed = setOf("Logcat.kt"),
+        )
         assertTrue("logging in $found", found.isEmpty())
+    }
+
+    @Test
+    fun `Logcat takes no text, so no token, transcript or answer can be logged`() {
+        val logcat = sources.single { it.name == "Logcat.kt" }.readText()
+        val parameters = Regex("""fun \w+\(([^)]*)\)""").findAll(logcat).flatMap { it.groupValues[1].split(",") }
+            .map { it.trim() }.filter { it.isNotEmpty() }.toList()
+        assertTrue(parameters.isNotEmpty())
+        assertTrue("text parameters in $parameters", parameters.none { it.endsWith(": String") || it.endsWith(": CharSequence") })
     }
 
     @Test

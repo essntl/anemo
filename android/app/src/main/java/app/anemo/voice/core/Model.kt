@@ -29,6 +29,9 @@ sealed interface DeviceEvent {
         val text: String,
         val more: Boolean,
     ) : DeviceEvent
+
+    /** The agent ended voice mode in a run this phone started (`voice_stop`). */
+    data class VoiceStop(val runId: String, val conversationId: String?) : DeviceEvent
 }
 
 /**
@@ -57,6 +60,18 @@ sealed interface TurnResult {
 
     /** No answer at all: no network, DNS, TLS, timeout. */
     data object Unreachable : TurnResult
+}
+
+/** The answer to `POST /api/voice/transcripts` (device-contracts.md §4). */
+sealed interface TranscriptResult {
+    /** What the transcription model heard, as it heard it. */
+    data class Heard(val text: String) : TranscriptResult
+
+    /** Nothing was heard: what to say. */
+    data class Say(val text: String) : TranscriptResult
+    data class Unauthorized(val error: ServerError) : TranscriptResult
+    data class Refused(val error: ServerError) : TranscriptResult
+    data object Unreachable : TranscriptResult
 }
 
 /** The answer to `POST /api/voice/replies` (device-contracts.md §4). */

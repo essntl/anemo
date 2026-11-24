@@ -12,7 +12,11 @@ object Frames {
 
 class FakeWake : WakeWordDetector {
     var resets = 0
-    override fun process(frame: ShortArray) = frame[0] == Frames.WAKE
+    override var lastScore = 0f
+    override fun process(frame: ShortArray): Boolean {
+        lastScore = if (frame[0] == Frames.WAKE) 0.83f else 0.01f
+        return frame[0] == Frames.WAKE
+    }
     override fun reset() {
         resets++
     }
@@ -24,18 +28,24 @@ class FakeVad : VoiceActivityDetector {
     override fun reset() = Unit
 }
 
+/** Records the cues by name: "start", "end", "timeout", "reply", "reopen", "voicemodeon", "voicemodeoff". */
 class FakeChimes : Chimes {
     val played = mutableListOf<String>()
-    override fun start() {
-        played += "start"
+    override fun play(cue: Cue) {
+        played += cue.name.lowercase()
+    }
+}
+
+class FakeFocus : AudioFocus {
+    var held = false
+    var ducks = 0
+    override fun duck() {
+        held = true
+        ducks++
     }
 
-    override fun stop() {
-        played += "stop"
-    }
-
-    override fun reply() {
-        played += "reply"
+    override fun release() {
+        held = false
     }
 }
 
@@ -66,15 +76,45 @@ class FakeSpeaker : Speaker {
     }
 }
 
+/**
+ * Records every call. A recording is first only transcribed: [heard] answers that at once
+ * (null: the test answers [transcripts] itself), and the request then goes as text.
+ */
 class FakeBackend : VoiceBackend {
-    data class Turn(val wav: ByteArray?, val conversationId: String?, val status: Boolean, val onResult: (TurnResult) -> Unit)
+    data class Turn(
+        val wav: ByteArray?,
+        val conversationId: String?,
+        val status: Boolean,
+        val onResult: (TurnResult) -> Unit,
+        val text: String? = null,
+        val voiceMode: Boolean = false,
+        val keepChat: Boolean = false,
+    )
     data class Reply(val wav: ByteArray, val approvalId: String, val onResult: (ReplyResult) -> Unit)
+    data class Transcript(val wav: ByteArray, val onResult: (TranscriptResult) -> Unit)
 
+    var heard: String? = "uh mail tom no tim"
     val turns = mutableListOf<Turn>()
     val replies = mutableListOf<Reply>()
+    val transcripts = mutableListOf<Transcript>()
 
     override fun sendTurn(wav: ByteArray?, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit) {
         turns += Turn(wav, conversationId, status, onResult)
+    }
+
+    override fun transcribe(wav: ByteArray, onResult: (TranscriptResult) -> Unit) {
+        transcripts += Transcript(wav, onResult)
+        heard?.let { onResult(TranscriptResult.Heard(it)) }
+    }
+
+    override fun sendText(
+        text: String,
+        conversationId: String?,
+        voiceMode: Boolean,
+        keepChat: Boolean,
+        onResult: (TurnResult) -> Unit,
+    ) {
+        turns += Turn(null, conversationId, false, onResult, text, voiceMode, keepChat)
     }
 
     override fun sendReply(wav: ByteArray, approvalId: String, onResult: (ReplyResult) -> Unit) {

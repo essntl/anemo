@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- The buzz with each cue (a normal permission, granted at install). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Bluetooth SCO before Android 12 -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 
@@ -65,6 +67,21 @@
             android:exported="true"
             android:icon="@drawable/ic_notification"
             android:label="Anemo Voice"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <!-- Voice mode: the microphone opens again after each answer, until switched off. -->
+        <service
+            android:name=".service.VoiceModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_notification"
+            android:label="Voice mode"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

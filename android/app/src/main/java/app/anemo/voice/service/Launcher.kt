@@ -34,9 +34,14 @@ object Launcher {
         },
     )
 
-    /** Throws what `startForegroundService` throws when Android doesn't allow it now. */
-    fun start(context: Context) {
-        context.startForegroundService(ListenService.intent(context, ListenService.START))
+    /**
+     * Throws what `startForegroundService` throws when Android doesn't allow it now.
+     * [voiceMode]: turn voice mode on once listening (the voice mode tile).
+     */
+    fun start(context: Context, voiceMode: Boolean = false) {
+        context.startForegroundService(
+            ListenService.intent(context, ListenService.START).putExtra(ListenService.EXTRA_VOICE_MODE, voiceMode),
+        )
     }
 
     fun send(context: Context, action: String) {
