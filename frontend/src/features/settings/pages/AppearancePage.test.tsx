@@ -29,10 +29,13 @@ describe('Settings > Appearance', () => {
 
   it('applies a preset accent to the whole page at once', () => {
     renderPage()
-    fireEvent.click(screen.getByRole('button', { name: 'Accent #1f9d6b' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Green' }))
     expect(useThemeStore.getState().accent).toBe('#1f9d6b')
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#1f9d6b')
-    expect(screen.getByRole('button', { name: 'Accent #1f9d6b' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: 'Green' })).toHaveAttribute('aria-checked', 'true')
+    // One radio group: the arrow keys move to the next preset and choose it.
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Green' }), { key: 'ArrowRight' })
+    expect(useThemeStore.getState().accent).toBe('#0fa3b1')
   })
 
   it('takes a typed hex colour once it is complete, and can reset it', () => {
@@ -88,10 +91,9 @@ describe('Settings > Appearance', () => {
 
   it('shows the glass strength only while glass is on, and applies it', () => {
     renderPage()
-    expect(screen.queryByRole('slider', { name: 'Strength' })).toBeNull()
+    expect(screen.queryByRole('slider', { name: 'Transparency' })).toBeNull()
     fireEvent.click(screen.getByRole('switch', { name: 'Frosted glass' }))
-    // The tint's own Strength stays folded away (tint is off): only the glass one is there.
-    const slider = screen.getByRole('slider', { name: 'Strength' })
+    const slider = screen.getByRole('slider', { name: 'Transparency' })
     fireEvent.keyDown(slider, { key: 'End' })
     expect(useThemeStore.getState().glass_strength).toBe(100)
     expect(document.documentElement.style.getPropertyValue('--glass-opacity')).toBe('70%')

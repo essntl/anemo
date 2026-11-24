@@ -80,7 +80,7 @@ describe('the automations page', () => {
   it('pauses every schedule with one switch, keeping the other protections', async () => {
     show()
     expect(screen.getByText(/stopped after 30 minutes/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('switch', { name: 'Pause all automations' }))
+    await userEvent.click(screen.getByRole('switch', { name: 'Pause all automations and scripts' }))
     expect(state.save).toHaveBeenCalledWith({ paused: true, max_run_minutes: 30 })
   })
 
@@ -88,8 +88,8 @@ describe('the automations page', () => {
     state.protections = { paused: true, max_run_minutes: 30 }
     state.automations = []
     show()
-    expect(screen.getByText('All automations are paused')).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Pause all automations' })).toBeChecked()
+    expect(screen.getByText('All automations and scripts are paused')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Pause all automations and scripts' })).toBeChecked()
   })
 
   it('marks what the assistant set up', () => {

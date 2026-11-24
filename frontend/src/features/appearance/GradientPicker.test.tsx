@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type Background, DEFAULT_BACKGROUND } from './apply'
+
+const toastSpy = vi.hoisted(() => vi.fn())
+vi.mock('@/components/ui/toast', () => ({ toast: toastSpy }))
 import { GradientPicker } from './GradientPicker'
-import { gradientColors, gradientLayer, spotPositions } from './gradients'
+import { gradientColors, gradientLayer } from './gradients'
 
 const ACCENT = '#2a6df4'
 let latest: Background
@@ -42,13 +45,18 @@ describe('the gradient picker', () => {
     expect(latest.gradient).toBe('aurora')
   })
 
-  it('starts a custom gradient from a preset ("Customise this")', async () => {
+  it('starts a custom gradient from a preset, and Undo brings the old one back', async () => {
     render(<Picker initial={{ gradient: 'lagoon' }} />)
+    const before = latest.custom_gradient
     expect(screen.queryByTestId('custom-gradient-editor')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Customise this' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Customise Lagoon' }))
     expect(latest.gradient).toBe('custom')
     expect(latest.custom_gradient.colors).toEqual(gradientColors('lagoon', ACCENT))
     expect(screen.getByTestId('custom-gradient-editor')).toBeInTheDocument()
+    expect(toastSpy).toHaveBeenCalledTimes(1)
+    act(() => toastSpy.mock.calls[0][0].action.onClick())
+    expect(latest.gradient).toBe('lagoon')
+    expect(latest.custom_gradient).toEqual(before)
   })
 
   it('edits the custom stops, between two and four of them', async () => {
@@ -67,12 +75,25 @@ describe('the gradient picker', () => {
     expect(screen.queryByRole('button', { name: /Remove color/ })).not.toBeInTheDocument() // two is the fewest
   })
 
-  it('sets the style, speed and angle', async () => {
+  it('sets the style and speed, and the angle only for bands', async () => {
     render(<Picker initial={{ gradient: 'custom' }} />)
+    // Spots have no direction: no angle to set.
+    expect(screen.queryByRole('slider', { name: 'Angle' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('radio', { name: 'Sliding bands' }))
     await userEvent.click(screen.getByRole('radio', { name: 'Fast' }))
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Angle' }), { key: 'Home' })
     expect(latest.custom_gradient).toMatchObject({ style: 'linear', speed: 'fast', angle: 0 })
+  })
+
+  it('says when a typed colour is not a colour, and puts the last one back on leaving', () => {
+    render(<Picker initial={{ gradient: 'custom' }} />)
+    const field = screen.getByRole('textbox', { name: 'Color 1 (hex)' })
+    fireEvent.change(field, { target: { value: '#zzz' } })
+    expect(screen.getByText('Use a color like #1a2b3c')).toBeInTheDocument()
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.blur(field)
+    expect(field).toHaveValue('#2a6df4')
+    expect(screen.queryByText('Use a color like #1a2b3c')).not.toBeInTheDocument()
   })
 })
 
@@ -90,8 +111,13 @@ describe('gradientLayer', () => {
     expect(layer.style).toMatchObject({ '--g4': '#444444', '--g-angle': '90deg', '--g-duration': '90s', '--g-stops': '#111111, #222222, #333333, #444444' })
   })
 
-  it('places the drifting spots by the angle, around the middle', () => {
-    expect(spotPositions(135)[0]).toBe('25% 30%') // the default angle: as drawn
-    expect(spotPositions(315)[0]).toBe('75% 70%') // half a turn: mirrored through the middle
+  it.each([2, 3, 4])('gives every drifting spot a colour with %i colours (a missing one blanks the background)', (n) => {
+    const colors = ['#111111', '#222222', '#333333', '#444444'].slice(0, n)
+    const layer = gradientLayer({ gradient: 'custom', custom_gradient: { colors, style: 'drift', angle: 135, speed: 'normal' } }, ACCENT)
+    const style = layer.style as Record<string, string>
+    for (const i of [1, 2, 3, 4]) {
+      expect(style[`--g${i}`], `--g${i}`).toBe(colors[(i - 1) % n])
+      expect(style[`--p${i}`], `--p${i}`).toBeTruthy()
+    }
   })
 })

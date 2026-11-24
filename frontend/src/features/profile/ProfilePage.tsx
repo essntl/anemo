@@ -36,7 +36,8 @@ function NameForm({ initial, username }: { initial: string; username: string }) 
       <div className="flex max-w-md items-center gap-2">
         <Input id="profile-display-name" value={name} maxLength={60} placeholder={username} onChange={(e) => setName(e.target.value)}
           className="min-w-0 flex-1" />
-        <Button type="submit" variant="primary" disabled={!dirty} loading={save.isPending}>{t('Save')}</Button>
+        {/* Quiet until there is something to save, then the accent: not a washed-out blue. */}
+        <Button type="submit" variant={dirty ? 'primary' : 'secondary'} disabled={!dirty} loading={save.isPending}>{t('Save')}</Button>
       </div>
       <span className="text-[12px] text-muted">{t('Shown in the sidebar. Empty: your login name ({username}).', { username })}</span>
     </form>

@@ -1,48 +1,28 @@
 /** Settings > Appearance: the accent colour and the background tint, with contrast checks. */
-import { useState } from 'react'
-import { AlertTriangle, Check, RotateCcw } from 'lucide-react'
+import { AlertTriangle, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
-import { SettingRow } from '@/components/ui/SettingRow'
+import { FieldRow, SettingRow } from '@/components/ui/SettingRow'
 import { SliderField } from '@/components/ui/Slider'
 import { ACCENT_PRESETS, useThemeStore } from '@/features/settings/theme'
-import { isHex } from '@/lib/color'
-import { t } from '@/lib/i18n'
+import { msg, t } from '@/lib/i18n'
 import { type ContrastWarning, contrastWarnings, DEFAULT_ACCENT, type Resolved } from './apply'
+import { ColorField, ColorSwatches, type NamedColor } from './ColorSwatches'
 
-const TINT_PRESETS = ['#7a8cff', '#ff8fb1', '#ffb36b', '#6fd6a8', '#5ac8e0', '#b490ff']
-const DEFAULT_TINT = TINT_PRESETS[0]
+/** The tint presets: soft colours, so the mixed-in surfaces stay calm. */
+const TINT_PRESETS: NamedColor[] = [
+  { hex: '#7a8cff', name: msg('Periwinkle') },
+  { hex: '#ff8fb1', name: msg('Rose') },
+  { hex: '#ffb36b', name: msg('Peach') },
+  { hex: '#6fd6a8', name: msg('Mint') },
+  { hex: '#5ac8e0', name: msg('Sky') },
+  { hex: '#b490ff', name: msg('Lavender') },
+]
+const DEFAULT_TINT = TINT_PRESETS[0].hex
 
-/**
- * A colour as a swatch (the browser's colour picker, keyboard-usable) plus a hex field.
- * The field only reports a value once it is a whole hex colour.
- */
-export function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (hex: string) => void }) {
-  const [text, setText] = useState(value)
-  // A new value from outside (a preset, Reset): show it in the field too.
-  const [shown, setShown] = useState(value)
-  if (shown !== value) {
-    setShown(value)
-    setText(value)
-  }
-  const valid = isHex(text)
-  return (
-    <div className="flex items-center gap-2">
-      <input type="color" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-9 w-12 shrink-0 rounded-control border border-border bg-transparent" />
-      <Input aria-label={t('{label} (hex)', { label })} value={text} spellCheck={false} maxLength={7}
-        aria-invalid={!valid || undefined}
-        onChange={(e) => {
-          const next = e.target.value.trim()
-          setText(next)
-          const hex = next.startsWith('#') ? next : `#${next}`
-          if (isHex(hex)) onChange(hex.toLowerCase())
-        }}
-        className={`w-28 font-mono ${valid ? '' : 'border-error'}`} />
-    </div>
-  )
-}
+/** ACCENT_PRESETS (theme.ts) with their names. */
+const ACCENT_NAMES = [msg('Blue'), msg('Violet'), msg('Pink'), msg('Orange'), msg('Amber'), msg('Green'), msg('Teal'), msg('Graphite')]
+const ACCENTS: NamedColor[] = ACCENT_PRESETS.map((hex, i) => ({ hex, name: ACCENT_NAMES[i] }))
 
 function warningText(w: ContrastWarning): string {
   const ratio = w.ratio.toFixed(1)
@@ -88,20 +68,11 @@ export function AccentCard() {
             {t('Reset to default')}
           </Button>
         )} />
-      <CardBody>
-        <div className="flex flex-wrap items-center gap-3">
-          {ACCENT_PRESETS.map((c) => (
-            <button key={c} type="button" aria-label={t('Accent {color}', { color: c })} aria-pressed={accent === c}
-              onClick={() => set({ accent: c })}
-              className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-105"
-              style={{ background: c, boxShadow: accent === c ? `0 0 0 2px var(--card), 0 0 0 4px ${c}` : undefined }}>
-              {accent === c && <Check className="h-4 w-4 text-accent-contrast" />}
-            </button>
-          ))}
-          <div className="ml-1">
-            <ColorField label={t('Custom accent color')} value={accent} onChange={(c) => set({ accent: c })} />
-          </div>
-        </div>
+      <CardBody className="flex flex-col gap-4">
+        <ColorSwatches label={t('Accent color')} colors={ACCENTS} value={accent} onChange={(c) => set({ accent: c })} />
+        <FieldRow label={t('Custom##color')}>
+          <ColorField label={t('Custom accent color')} value={accent} onChange={(c) => set({ accent: c })} />
+        </FieldRow>
         <ContrastWarnings kinds={['accent-text', 'accent-page']} />
       </CardBody>
     </Card>
@@ -119,17 +90,10 @@ export function TintCard() {
       <SettingRow heading title={t('Background tint')} description={t('Mixes a color into the page, panels and cards.')}
         checked={Boolean(tint)} onCheckedChange={(v) => set({ tint: v ? DEFAULT_TINT : null })}>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {TINT_PRESETS.map((c) => (
-              <button key={c} type="button" aria-label={t('Tint {color}', { color: c })} aria-pressed={tint === c}
-                onClick={() => set({ tint: c })}
-                className="flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-105"
-                style={{ background: c, boxShadow: tint === c ? `0 0 0 2px var(--card), 0 0 0 4px ${c}` : undefined }}>
-                {tint === c && <Check className="h-4 w-4 text-black/70" />}
-              </button>
-            ))}
+          <ColorSwatches label={t('Tint')} colors={TINT_PRESETS} value={tint} onChange={(c) => set({ tint: c })} />
+          <FieldRow label={t('Custom##color')}>
             <ColorField label={t('Custom tint')} value={shown} onChange={(c) => set({ tint: c })} />
-          </div>
+          </FieldRow>
           <SliderField label={t('Strength')} min={0} max={100} step={5} value={strength}
             format={(v) => `${v} %`} onChange={(v) => set({ tint_strength: Math.round(v) })} />
           {tint && <ContrastWarnings kinds={['text-surface']} />}

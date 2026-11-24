@@ -2,7 +2,7 @@
  * The animated backgrounds: soft colour spots drifting slowly (`.app-gradient` in
  * styles/appearance.css). "Aurora" is made from your accent colour, "Dusk" and "Lagoon"
  * have colours of their own, and "Custom" is yours: 2–4 colours, drifting spots or
- * sliding bands, an angle and a speed.
+ * sliding bands (at an angle), and a speed.
  */
 import type { CSSProperties } from 'react'
 import { mix } from '@/lib/color'
@@ -22,21 +22,10 @@ export const GRADIENTS: { id: PresetId; label: string }[] = [
 export const SPEED_SECONDS: Record<CustomGradient['speed'], number> = { slow: 90, normal: 48, fast: 20 }
 
 /**
- * Where the spots of a drifting custom gradient sit (% of the layer), at the default
- * angle (135°). Another angle turns these points around the middle.
+ * Where the four spots of a drifting custom gradient sit (% of the layer), spread over
+ * the four corners so each one shows. With fewer than four colours they repeat.
  */
-const SPOTS: [number, number][] = [[25, 30], [75, 25], [55, 75], [20, 80]]
-const DEFAULT_ANGLE = 135
-
-export function spotPositions(angle: number): string[] {
-  const turn = ((angle - DEFAULT_ANGLE) * Math.PI) / 180
-  const [cos, sin] = [Math.cos(turn), Math.sin(turn)]
-  return SPOTS.map(([x, y]) => {
-    const [dx, dy] = [x - 50, y - 50]
-    const round = (v: number) => Math.round(v * 10) / 10
-    return `${round(50 + dx * cos - dy * sin)}% ${round(50 + dx * sin + dy * cos)}%`
-  })
-}
+export const SPOTS = ['24% 28%', '76% 26%', '72% 76%', '26% 74%']
 
 /** The three colours of a built-in gradient. */
 export function gradientColors(id: PresetId, accent: string): [string, string, string] {
@@ -65,13 +54,20 @@ export function gradientLayer(background: Pick<Background, 'gradient' | 'custom_
 } {
   const colors = colorsOf(background, accent)
   const vars: Record<string, string> = {}
-  colors.forEach((c, i) => (vars[`--g${i + 1}`] = c))
-  if (background.gradient !== 'custom') return { style: vars as CSSProperties }
+  if (background.gradient !== 'custom') {
+    colors.forEach((c, i) => (vars[`--g${i + 1}`] = c))
+    return { style: vars as CSSProperties }
+  }
+  // Every spot gets a colour (the colours repeat when there are fewer than four): a
+  // spot whose colour is missing would make the browser drop the whole background.
+  SPOTS.forEach((at, i) => {
+    vars[`--g${i + 1}`] = colors[i % colors.length]
+    vars[`--p${i + 1}`] = at
+  })
   const custom = background.custom_gradient
   vars['--g-angle'] = `${custom.angle}deg`
   vars['--g-duration'] = `${SPEED_SECONDS[custom.speed]}s`
   vars['--g-stops'] = colors.join(', ')
-  spotPositions(custom.angle).forEach((at, i) => (vars[`--p${i + 1}`] = at))
   return { style: vars as CSSProperties, dataStyle: custom.style }
 }
 

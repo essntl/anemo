@@ -84,5 +84,6 @@ const messages: Messages = {
   "Shared links": "Общие ссылки",
   "Usage": "Использование",
   "Compact fits more on screen: tighter lists, chats, cards and the sidebar. Touch screens keep finger-sized rows.": "В компактном режиме на экране помещается больше: плотнее списки, чаты, карточки и боковая панель. На сенсорных экранах строки остаются удобными для пальца.",
+  "Back to Settings": "Назад к настройкам",
 }
 export default messages

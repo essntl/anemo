@@ -8,7 +8,7 @@ import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Segmented } from '@/components/ui/Segmented'
-import { SettingRow } from '@/components/ui/SettingRow'
+import { FieldRow, SettingRow } from '@/components/ui/SettingRow'
 import { SliderField } from '@/components/ui/Slider'
 import { toast } from '@/components/ui/toast'
 import { useThemeStore } from '@/features/settings/theme'
@@ -99,31 +99,32 @@ export function BackgroundCard() {
         )}
 
         {background.kind !== 'none' && (
-          <section aria-labelledby="background-effects" className="-mx-(--card-x) flex flex-col gap-3 border-t border-border px-(--card-x) pt-(--card-y)">
-            <h4 id="background-effects" className="text-[13px] font-semibold">{t('Effects')}</h4>
-            <SliderField label={t('Blur')} min={0} max={40} step={1} value={background.blur}
-              format={(v) => `${v} px`} onChange={(v) => change({ blur: Math.round(v) })} />
-            <SliderField label={t('Dim')} min={0} max={90} step={5} value={background.dim}
-              format={(v) => `${v} %`} onChange={(v) => change({ dim: Math.round(v) })} />
-            {background.kind === 'upload' && (
-              <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 md:grid-cols-[7rem_minmax(0,1fr)]">
-                <span className="text-[13px] text-muted">{t('Fit')}</span>
-                <div>
+          <>
+            {/* A small group label: the controls under it are what matters. */}
+            <section aria-labelledby="background-effects" className="-mx-(--card-x) flex flex-col gap-3 border-t border-border px-(--card-x) pt-(--card-y)">
+              <h4 id="background-effects" className="text-[11.5px] font-semibold uppercase tracking-wider text-muted">{t('Effects')}</h4>
+              <SliderField label={t('Blur')} min={0} max={40} step={1} value={background.blur}
+                format={(v) => `${v} px`} onChange={(v) => change({ blur: Math.round(v) })} />
+              <SliderField label={t('Dim')} min={0} max={90} step={5} value={background.dim}
+                format={(v) => `${v} %`} onChange={(v) => change({ dim: Math.round(v) })} />
+              {background.kind === 'upload' && (
+                <FieldRow label={t('Fit')}>
                   <Segmented<Background['fit']> size="sm" label={t('Fit')} value={background.fit} onChange={(fit) => change({ fit })}
                     options={[
                       { value: 'cover', label: t('Fill') },
                       { value: 'contain', label: t('Fit') },
                       { value: 'tile', label: t('Tile') },
                     ]} />
-                </div>
-              </div>
-            )}
+                </FieldRow>
+              )}
+            </section>
+            {/* Not an effect: whether it moves at all on a phone. A row of its own. */}
             {animated && (
-              <SettingRow className="p-0 pt-1" title={t('Animate on phones too')}
+              <SettingRow className="-mx-(--card-x) -mb-(--card-y) border-t border-border" title={t('Animate on phones too')}
                 description={t('Phones show a still picture to save battery. With reduced motion turned on in your system, it is always still.')}
                 checked={background.animate_on_phones} onCheckedChange={(v) => change({ animate_on_phones: v })} />
             )}
-          </section>
+          </>
         )}
       </CardBody>
     </Card>

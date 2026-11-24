@@ -14,8 +14,6 @@ const messages: Messages = {
   "Watch it work": "Наблюдать за работой",
   "New##automation": "Новая",
   "Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.": "То, что агент делает сам по расписанию и о чём сообщает в <a>уведомлении</a>.",
-  "All automations are paused": "Все автоматизации приостановлены",
-  "Pause all automations": "Приостановить все автоматизации",
   "Nothing starts on a schedule until you resume. A run that is going on finishes.": "По расписанию ничего не будет запускаться, пока вы не возобновите работу. Уже идущий запуск завершится.",
   "Stops every schedule from starting, without switching them off one by one. A scheduled run is stopped after {minutes} minutes.": "Останавливает запуски по всем расписаниям, не выключая их по одному. Запуск по расписанию останавливается через {minutes} мин.",
   "No automations yet": "Автоматизаций пока нет",
@@ -185,5 +183,7 @@ const messages: Messages = {
   "Run scripts": "Запуск скриптов",
   "Start a script you approved and switched on.": "Запуск скрипта, который вы разрешили и включили.",
   "Or start from a template": "Или начните с шаблона",
+  "Pause all automations and scripts": "Приостановить все автоматизации и скрипты",
+  "All automations and scripts are paused": "Все автоматизации и скрипты приостановлены",
 }
 export default messages

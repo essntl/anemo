@@ -84,5 +84,6 @@ const messages: Messages = {
   "Shared links": "Спільні посилання",
   "Usage": "Використання",
   "Compact fits more on screen: tighter lists, chats, cards and the sidebar. Touch screens keep finger-sized rows.": "У компактному режимі на екрані вміщується більше: щільніші списки, чати, картки й бічна панель. На сенсорних екранах рядки лишаються зручними для пальця.",
+  "Back to Settings": "Назад до налаштувань",
 }
 export default messages

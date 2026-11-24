@@ -48,6 +48,17 @@ html[data-background='on'] .chat-panel {
     backdrop-filter: none;
   }
 }
+/* A sticky header inside a glass panel (the chat list's day headings): any fill of its
+   own would show as a band across the glass, so it has none, only a blur of what scrolls
+   under it. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  html[data-glass='on'] .glass-sticky {
+    background-color: transparent;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+
 /* The system asks for less transparency: solid panels (and the settings' preview pane,
    whose glass is set inline from the strength being chosen). */
 @media (prefers-reduced-transparency: reduce) {
@@ -56,7 +67,7 @@ html[data-background='on'] .chat-panel {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
   }
-  html[data-glass='on'] .glass {
+  html[data-glass='on'] :is(.glass, .glass-sticky) {
     background-color: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -106,14 +117,14 @@ video.app-background-media {
   animation: app-gradient-drift var(--g-duration, 48s) ease-in-out infinite alternate;
   will-change: transform;
 }
-/* A custom gradient (gradients.ts): up to four spots, placed around the middle at its
-   angle (the layer itself isn't turned: its corners would then show)... */
+/* A custom gradient (gradients.ts): four spots, one near each corner (the colours repeat
+   when there are fewer than four)... */
 .app-gradient[data-style='drift'] {
   background:
-    radial-gradient(40% 40% at var(--p1), var(--g1), transparent 70%),
-    radial-gradient(35% 35% at var(--p2), var(--g2), transparent 70%),
-    radial-gradient(45% 45% at var(--p3), var(--g3), transparent 70%),
-    radial-gradient(35% 35% at var(--p4), var(--g4, transparent), transparent 70%),
+    radial-gradient(38% 38% at var(--p1), var(--g1), transparent 70%),
+    radial-gradient(38% 38% at var(--p2), var(--g2), transparent 70%),
+    radial-gradient(38% 38% at var(--p3), var(--g3), transparent 70%),
+    radial-gradient(38% 38% at var(--p4), var(--g4), transparent 70%),
     var(--bg);
 }
 /* ...or bands of colour along the angle that slide slowly. */
@@ -136,4 +147,33 @@ html[data-page-hidden] .app-gradient {
   .app-gradient {
     animation: none;
   }
+}
+
+/* ---- Colour pickers (features/appearance/ColorSwatches.tsx) --------------------------- */
+
+/* The browser's colour input drawn as a round swatch like the presets, not a raw box. */
+.color-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 9999px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 9999px;
+}
+.color-input::-moz-color-swatch {
+  border: none;
+  border-radius: 9999px;
+}
+.color-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

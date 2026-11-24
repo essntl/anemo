@@ -63,7 +63,8 @@ export function SettingRow({
           )}
         </div>
         {(hasSwitch || control) && (
-          <div className="flex shrink-0 items-center">
+          // On a phone a wide control (a choice, a select) takes its own full-width line.
+          <div className={cn('flex shrink-0 items-center', !hasSwitch && 'max-sm:basis-full max-sm:[&>*]:flex-1')}>
             {hasSwitch ? <Switch id={id} label={label ?? ''} checked={checked} disabled={disabled} onChange={onCheckedChange} /> : control}
           </div>
         )}
@@ -100,4 +101,17 @@ export function Reveal({ open, children }: { open: boolean; children: ReactNode 
 /** Several setting rows in one card, separated by lines. */
 export function SettingRows({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn('flex flex-col divide-y divide-border py-[calc(var(--row-y)/2)]', className)}>{children}</div>
+}
+
+/**
+ * A labelled control inside a setting's card: the label in a fixed column on the left,
+ * so the controls of one card line up (the same column as SliderField's label).
+ */
+export function FieldRow({ label, children, className }: { label: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <div className={cn('grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 md:grid-cols-[7rem_minmax(0,1fr)]', className)}>
+      <span className="text-[13px] text-muted">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  )
 }

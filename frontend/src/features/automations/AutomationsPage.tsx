@@ -75,11 +75,11 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
           </div>
           <p className="mt-0.5 text-[13px] text-muted">
             {automation.schedule_text}
-            {automation.enabled && automation.next_run_at && <> · {t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</>}
+            {automation.enabled && automation.next_run_at && <> · <span className="whitespace-nowrap">{t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</span></>}
             {!automation.enabled && <> · {t('off')}</>}
             {automation.last_run_at && <> · {t('last ran {when}', { when: formatWhen(automation.last_run_at) })}</>}
           </p>
-          <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap break-words text-[13px] text-subtle">{automation.prompt}</p>
+          <p className="mt-(--item-gap) line-clamp-2 whitespace-pre-wrap break-words text-[13px] text-subtle">{automation.prompt}</p>
           {(automation.failure_streak ?? 0) > 0 && automation.last_error && (
             <p className="mt-1.5 break-words text-[12.5px] text-error">
               {plural(automation.failure_streak ?? 0, 'Failed {n} time in a row: {error}', 'Failed {n} times in a row: {error}', { error: automation.last_error })}
@@ -91,14 +91,15 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
           { label: t('Delete'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
         ]} />
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
+      <div className="mt-(--item-gap) flex flex-wrap items-center gap-2 pl-12">
         <Button size="sm" variant="secondary" icon={<Play className="h-3.5 w-3.5" />} disabled={running}
           loading={runNow.isPending} onClick={() => runNow.mutate(automation.id)}>
           {t('Run now')}
         </Button>
         <Button size="sm" variant="ghost" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}
-          icon={<History className="h-3.5 w-3.5" />}>
-          {t('History')}
+          icon={<History className="h-3.5 w-3.5" />} aria-label={t('History')}>
+          {/* A phone keeps the buttons on one line: History is its icon there. */}
+          <span className="max-sm:sr-only">{t('History')}</span>
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showHistory && 'rotate-180')} />
         </Button>
         {running && automation.active_run_id && status !== 'waiting' && (
@@ -120,13 +121,15 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
 }
 
 /** "New automation", with the templates in a menu beside it once the list has items. */
-function NewAutomationButton({ label, templates, onNew }: {
+function NewAutomationButton({ label, small, templates, onNew }: {
   label: string
+  /** The smaller size, for a phone's top bar. */
+  small?: boolean
   templates: AutomationTemplate[]
   onNew: (template?: AutomationTemplate) => void
 }) {
   const button = (
-    <Button variant="primary" icon={<Plus className="h-4 w-4" />} aria-label={t('New automation')} onClick={() => onNew()}
+    <Button variant="primary" size={small ? 'sm' : 'md'} icon={<Plus className="h-4 w-4" />} aria-label={t('New automation')} onClick={() => onNew()}
       className={cn(templates.length > 0 && 'rounded-r-none')}>
       {label}
     </Button>
@@ -135,8 +138,9 @@ function NewAutomationButton({ label, templates, onNew }: {
   return (
     <div className="flex items-center">
       {button}
-      <ActionMenu label={t('Start from a template')} icon={<ChevronDown className="h-4 w-4" />}
-        className="h-10 w-9 rounded-l-none border-l border-accent-contrast/25 bg-accent text-accent-contrast shadow-soft hover:bg-accent-hover hover:text-accent-contrast pointer-coarse:h-11"
+      <ActionMenu label={t('Start from a template')} heading={t('Start from a template')} icon={<ChevronDown className="h-4 w-4" />}
+        className={cn('w-9 rounded-l-none border-l border-accent-contrast/25 bg-accent text-accent-contrast shadow-soft hover:bg-accent-hover hover:text-accent-contrast',
+          small ? 'h-8 pointer-coarse:h-10' : 'h-10 pointer-coarse:h-11')}
         actions={templates.map((tpl) => ({ label: t(tpl.name), icon: <LayoutTemplate />, onSelect: () => onNew(tpl) }))} />
     </div>
   )
@@ -189,43 +193,50 @@ export function AutomationsPage() {
   const newScript = () => setEditingScript({ automation: null })
   const empty = automations.isSuccess && (tab === 'agent' ? items : scripts).length === 0
 
-  // The New button follows the tab; a phone's top bar has room for the short label only.
+  // The New button follows the tab; a phone's top bar has room for a short, smaller one.
   // While the list is empty the button is in the empty state instead, so it isn't shown twice.
   const newButton = tab === 'script'
     ? (
-        <Button variant="primary" icon={<Plus className="h-4 w-4" />} aria-label={t('New script')} onClick={newScript}>
+        <Button variant="primary" size={desktop ? 'md' : 'sm'} icon={<Plus className="h-4 w-4" />} aria-label={t('New script')} onClick={newScript}>
           {desktop ? t('New script') : t('New##automation')}
         </Button>
       )
-    : <NewAutomationButton label={desktop ? t('New automation') : t('New##automation')} templates={templates} onNew={newAutomation} />
+    : <NewAutomationButton label={desktop ? t('New automation') : t('New##automation')} small={!desktop} templates={templates} onNew={newAutomation} />
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-1">
       <PageHeader title={t('Automations')} inline={desktop}>{!empty && newButton}</PageHeader>
-      <p className="max-w-2xl text-[13px] text-muted">
-        {tab === 'agent'
-          ? rich('Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.', { a: (c) => <Link to="/notifications" className="text-accent underline">{c}</Link> })
-          : t('Scripts are code that runs without a model and acts only through Anemo’s tools, with the same permissions and approvals. Code an assistant writes or changes stays off until you approve it here.')}
-      </p>
-      <Segmented kind="tabs" controls="automations-tab" label={t('Kind of automation')} value={tab} onChange={setTab} className="my-4"
+      {/* The tabs come first and stay put; what each tab is about is said under them. */}
+      <Segmented kind="tabs" controls="automations-tab" label={t('Kind of automation')} value={tab} onChange={setTab} className="mb-3"
         options={[
           { value: 'agent', label: t('Automations##agent') },
           { value: 'script', label: scripts.some((s) => s.script_pending) ? <>{t('Scripts')} <span className="text-warning">●</span></> : t('Scripts'), ariaLabel: t('Scripts') },
         ]} />
+      <p className="mb-4 max-w-2xl text-[13px] text-muted">
+        {tab === 'agent'
+          ? rich('Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.', { a: (c) => <Link to="/notifications" className="text-accent underline">{c}</Link> })
+          : t('Scripts are code that runs without a model and acts only through Anemo’s tools, with the same permissions and approvals. Code an assistant writes or changes stays off until you approve it here.')}
+      </p>
 
+      {/* One switch for every schedule, automations and scripts alike; laid out as the cards
+          below are (switch on the left), only slimmer. */}
       {protections && (all.length > 0 || paused) && (
-        <div className={cn('mb-3 flex items-center gap-3 rounded-card border px-(--item-x) py-(--item-y)', paused ? 'border-warning bg-surface-2' : 'border-border bg-card')}>
-          <Pause className={cn('h-4 w-4 shrink-0', paused ? 'text-warning' : 'text-muted')} />
+        <div className={cn('mb-3 flex items-start gap-3 rounded-card border px-(--item-x) py-(--item-y)', paused ? 'border-warning bg-surface-2' : 'border-border bg-card/60')}>
+          <div className="pt-0.5">
+            <Switch label={t('Pause all automations and scripts')} checked={paused}
+              onChange={(next) => saveProtections.mutate({ ...protections, paused: next })} />
+          </div>
           <div className="min-w-0 flex-1 text-[13px]">
-            <div className="font-medium">{paused ? t('All automations are paused') : t('Pause all automations')}</div>
-            <div className="text-muted">
+            <div className="flex items-center gap-1.5 font-medium">
+              {paused && <Pause className="h-3.5 w-3.5 text-warning" aria-hidden />}
+              {paused ? t('All automations and scripts are paused') : t('Pause all automations and scripts')}
+            </div>
+            <div className="text-[12.5px] text-muted">
               {paused
                 ? t('Nothing starts on a schedule until you resume. A run that is going on finishes.')
                 : t('Stops every schedule from starting, without switching them off one by one. A scheduled run is stopped after {minutes} minutes.', { minutes: protections.max_run_minutes })}
             </div>
           </div>
-          <Switch label={t('Pause all automations')} checked={paused}
-            onChange={(next) => saveProtections.mutate({ ...protections, paused: next })} />
         </div>
       )}
       {saveProtections.isError && <p className="mb-2 text-[13px] text-error">{errorMessage(saveProtections.error)}</p>}

@@ -86,12 +86,12 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
           </div>
           <p className="mt-0.5 text-[13px] text-muted">
             {automation.schedule_text}
-            {automation.enabled && automation.next_run_at && <> · {t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</>}
+            {automation.enabled && automation.next_run_at && <> · <span className="whitespace-nowrap">{t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</span></>}
             {!automation.enabled && <> · {t('off')}</>}
             {automation.last_run_at && <> · {t('last ran {when}', { when: formatWhen(automation.last_run_at) })}</>}
           </p>
           {automation.prompt !== automation.name && (
-            <p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-[13px] text-subtle">{automation.prompt}</p>
+            <p className="mt-(--item-gap) line-clamp-2 whitespace-pre-wrap break-words text-[13px] text-subtle">{automation.prompt}</p>
           )}
           <p className="mt-1 text-[12.5px] text-muted"><Owner automation={automation} /></p>
           {blocked && why && <p className="mt-1 text-[12.5px] text-muted">{why}</p>}
@@ -104,7 +104,7 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
           { label: t('Delete'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
         ]} />
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
+      <div className="mt-(--item-gap) flex flex-wrap items-center gap-2 pl-12">
         <Button size="sm" variant={waiting ? 'primary' : 'secondary'} icon={<FileCode className="h-3.5 w-3.5" />} onClick={onReview}>
           {waiting ? t('Review change') : t('Code')}
         </Button>
@@ -113,8 +113,9 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
           {t('Run now')}
         </Button>
         <Button size="sm" variant="ghost" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}
-          icon={<History className="h-3.5 w-3.5" />}>
-          {t('History')}
+          icon={<History className="h-3.5 w-3.5" />} aria-label={t('History')}>
+          {/* A phone keeps the buttons on one line: History is its icon there. */}
+          <span className="max-sm:sr-only">{t('History')}</span>
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showHistory && 'rotate-180')} />
         </Button>
         {pendingApprovals.length > 0 && (

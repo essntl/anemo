@@ -65,7 +65,6 @@ const messages: Messages = {
 
   // Glass, this device
   "Frosted glass": "Матове скло",
-  "The sidebar, cards, dialogs and the message box let the background show through, blurred. Off when your system asks for less transparency.": "Бічна панель, картки, діалоги й поле повідомлення пропускають розмите тло. Вимкнено, якщо система просить менше прозорості.",
   "Your appearance is saved on the server and follows you to every device.": "Вигляд зберігається на сервері й однаковий на всіх ваших пристроях.",
   "Use a different appearance on this device": "Інший вигляд на цьому пристрої",
   "Changes made here then stay in this browser and are not saved to the server.": "Тоді зміни, зроблені тут, лишаються в цьому браузері й не зберігаються на сервері.",
@@ -91,7 +90,6 @@ const messages: Messages = {
   "Gradient": "Градієнт",
   "Effects": "Ефекти",
   "Custom##gradient": "Свій",
-  "Customise this": "Змінити під себе",
   "Colors": "Кольори",
   "Color {n}": "Колір {n}",
   "Remove color {n}": "Прибрати колір {n}",
@@ -107,6 +105,27 @@ const messages: Messages = {
   "Text on glass stays readable": "Текст на склі лишається читабельним",
   "Shown in the sidebar. Empty: your login name ({username}).": "Показується на бічній панелі. Якщо порожньо — ваше ім’я для входу ({username}).",
   "Your name and picture, shown in the sidebar’s account row.": "Ваше ім’я та зображення в рядку облікового запису на бічній панелі.",
+  "Periwinkle": "Барвінковий",
+  "Rose": "Рожевий",
+  "Peach": "Персиковий",
+  "Mint": "М’ятний",
+  "Sky": "Небесний",
+  "Lavender": "Лавандовий",
+  "Blue": "Синій",
+  "Violet": "Фіолетовий",
+  "Orange": "Помаранчевий",
+  "Amber": "Бурштиновий",
+  "Green": "Зелений",
+  "Teal": "Бірюзовий",
+  "Graphite": "Графітовий",
+  "Custom##color": "Свій",
+  "Tint": "Відтінок",
+  "Use a color like #1a2b3c": "Введіть колір на зразок #1a2b3c",
+  "Your custom gradient now starts from {name}.": "Ваш градієнт тепер починається з «{name}».",
+  "Customise {name}": "Змінити «{name}» під себе",
+  "The sidebar, cards, dialogs and the message box let the background show through, blurred.": "Крізь бічну панель, картки, діалоги й поле повідомлення видно розмите тло.",
+  "Your system asks for less transparency, so panels stay solid on this device. Other devices still use glass.": "Ваша система просить менше прозорості, тож на цьому пристрої панелі лишаються суцільними. Інші пристрої й далі показують скло.",
+  "Transparency": "Прозорість",
 }
 
 export default messages

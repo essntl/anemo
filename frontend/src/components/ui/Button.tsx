@@ -13,8 +13,9 @@ const variants: Record<Variant, string> = {
 
 // Touch screens (`pointer-coarse`) get larger tap targets.
 const sizes: Record<Size, string> = {
-  sm: 'h-8 px-3 text-[13px] gap-1.5 pointer-coarse:h-10',
-  md: 'h-10 px-4 text-sm gap-2 pointer-coarse:h-11',
+  // Heights follow Settings > Appearance > Density (--btn-sm-h, --btn-h in tokens.css).
+  sm: 'h-(--btn-sm-h) px-3 text-[13px] gap-1.5 pointer-coarse:h-10',
+  md: 'h-(--btn-h) px-4 text-sm gap-2 pointer-coarse:h-11',
   icon: 'h-9 w-9 justify-center pointer-coarse:h-11 pointer-coarse:w-11',
 }
 

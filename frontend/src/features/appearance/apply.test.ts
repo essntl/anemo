@@ -134,7 +134,7 @@ describe('density', () => {
   }
 
   it('has a compact value for every spacing token', () => {
-    const spacing = ['--nav-row-h', '--list-row-y', '--row-y', '--card-x', '--card-y', '--card-gap', '--item-x', '--item-y', '--stack-gap', '--msg-gap']
+    const spacing = ['--nav-row-h', '--list-row-y', '--row-y', '--card-x', '--card-y', '--card-gap', '--item-x', '--item-y', '--stack-gap', '--item-gap', '--msg-gap', '--btn-h', '--btn-sm-h']
     const compact = declared("[data-density='compact']")
     for (const name of spacing) {
       expect(tokens, name).toContain(`${name}:`)
