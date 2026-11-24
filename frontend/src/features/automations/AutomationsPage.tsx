@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Segmented } from '@/components/ui/Segmented'
 import { Switch } from '@/components/ui/Switch'
 import { useSaveSection, useSettings } from '@/features/settings/api'
 import { cn } from '@/lib/cn'
@@ -22,13 +23,15 @@ import { plural, rich, t } from '@/lib/i18n'
 import {
   type Automation,
   STATUS_LABELS,
+  STATUS_TONES,
   useAutomations,
   useDeleteAutomation,
   useRunAutomation,
   useSetAutomationEnabled,
 } from './api'
 import { AutomationDialog } from './components/AutomationDialog'
-import { RunHistory, STATUS_TONES } from './components/RunHistory'
+import { RunHistory } from './components/RunHistory'
+import { ScriptsTab } from './components/ScriptsTab'
 import { type AutomationTemplate, TEMPLATES } from './templates'
 import { Lingering } from '@/components/ui/Lingering'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -119,26 +122,34 @@ export function AutomationsPage() {
   const [editing, setEditing] = useState<{ automation: Automation | null; template?: AutomationTemplate } | null>(null)
   const settings = useSettings()
   const saveProtections = useSaveSection('automations')
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const linked = params.get('automation')
   const protections = settings.data?.automations
   const paused = protections?.paused ?? false
-  const items = automations.data ?? []
+  const all = automations.data ?? []
+  // Scripts have a tab of their own; a link to one opens that tab.
+  const linkedKind = all.find((a) => a.id === linked)?.kind
+  const tab: 'agent' | 'script' = params.get('tab') === 'scripts' || linkedKind === 'script' ? 'script' : 'agent'
+  const setTab = (next: 'agent' | 'script') => setParams(next === 'script' ? { tab: 'scripts' } : {}, { replace: true })
+  const items = all.filter((a) => a.kind !== 'script')
+  const scripts = all.filter((a) => a.kind === 'script')
   const templates = TEMPLATES.filter((tpl) => !items.some((a) => a.name === tpl.name || a.name === t(tpl.name)))
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
       <PageHeader title={t('Automations')}>
-        <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>
-          {/* "New" is also said of other things (a document): the empty {automation} keeps this translation apart. */}
-          {t('New##automation')}
-        </Button>
+        {tab === 'agent' && (
+          <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>
+            {/* "New" is also said of other things (a document): the empty {automation} keeps this translation apart. */}
+            {t('New##automation')}
+          </Button>
+        )}
       </PageHeader>
       <p className="mb-4 max-w-2xl text-[13px] text-muted">
         {rich('Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.', { a: (c) => <Link to="/notifications" className="text-accent underline">{c}</Link> })}
         </p>
 
-      {protections && (items.length > 0 || paused) && (
+      {protections && (all.length > 0 || paused) && (
         <div className={cn('mb-3 flex items-center gap-3 rounded-card border px-4 py-2.5', paused ? 'border-warning bg-surface-2' : 'border-border bg-card')}>
           <Pause className={cn('h-4 w-4 shrink-0', paused ? 'text-warning' : 'text-muted')} />
           <div className="min-w-0 flex-1 text-[13px]">
@@ -155,6 +166,17 @@ export function AutomationsPage() {
       )}
       {saveProtections.isError && <p className="mb-2 text-[13px] text-error">{errorMessage(saveProtections.error)}</p>}
       {automations.isError && <p className="text-[13px] text-error">{errorMessage(automations.error)}</p>}
+      <Segmented kind="tabs" controls="automations-tab" label={t('Kind of automation')} value={tab} onChange={setTab} className="mb-3"
+        options={[
+          { value: 'agent', label: t('Automations##agent') },
+          { value: 'script', label: scripts.some((s) => s.script_pending) ? <>{t('Scripts')} <span className="text-warning">●</span></> : t('Scripts'), ariaLabel: t('Scripts') },
+        ]} />
+      {tab === 'script' && (
+        <div id="automations-tab-script" role="tabpanel">
+          {automations.isSuccess && <ScriptsTab scripts={scripts} linked={linked} linkedRun={params.get('run')} />}
+        </div>
+      )}
+      {tab === 'agent' && <div id="automations-tab-agent" role="tabpanel">
       {automations.isSuccess && items.length === 0 && (
         <EmptyState icon={<Clock className="h-5 w-5" />} title={t('No automations yet')}
           description={t('For example: a news briefing every morning, a weekly summary of your open tasks, or a check that tells you when a web page changes.')}
@@ -177,6 +199,8 @@ export function AutomationsPage() {
           </div>
         </section>
       )}
+
+      </div>}
 
       <Lingering value={editing}>{(shown) => <AutomationDialog automation={shown.automation} template={shown.template} onClose={() => setEditing(null)} />}</Lingering>
     </div>

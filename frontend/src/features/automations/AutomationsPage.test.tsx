@@ -30,6 +30,9 @@ vi.mock('@/features/settings/api', () => ({
   useSaveSection: () => ({ mutate: state.save, isError: false, error: null }),
 }))
 vi.mock('./components/AutomationDialog', () => ({ AutomationDialog: () => null }))
+vi.mock('./components/ScriptsTab', () => ({
+  ScriptsTab: ({ scripts }: { scripts: { name: string }[] }) => <p>scripts: {scripts.map((s) => s.name).join(', ')}</p>,
+}))
 vi.mock('@/components/ui/ActionMenu', () => ({ ActionMenu: () => null })) // needs matchMedia, which jsdom lacks
 
 const { AutomationsPage } = await import('./AutomationsPage')
@@ -152,5 +155,21 @@ describe('the automations page', () => {
     show()
     expect(screen.getByText('Failed 3 times in a row: provider down')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', '/c/c7')
+  })
+
+  it('keeps scripts in their own tab', async () => {
+    state.automations = [automation(), automation({ id: 's1', kind: 'script', name: 'Booking sync' })]
+    show()
+    expect(screen.getByText('Morning briefing')).toBeInTheDocument()
+    expect(screen.queryByText('Booking sync')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Scripts' }))
+    expect(screen.getByText('scripts: Booking sync')).toBeInTheDocument()
+    expect(screen.queryByText('Morning briefing')).not.toBeInTheDocument()
+  })
+
+  it('opens the Scripts tab for a link to a script', () => {
+    state.automations = [automation({ id: 's1', kind: 'script', name: 'Booking sync' })]
+    show('/automations?automation=s1&run=r1')
+    expect(screen.getByText('scripts: Booking sync')).toBeInTheDocument()
   })
 })

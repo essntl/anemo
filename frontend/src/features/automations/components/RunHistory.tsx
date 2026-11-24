@@ -12,15 +12,6 @@ import { formatWhen } from '@/lib/format'
 import { plural, t } from '@/lib/i18n'
 import { type Automation, type AutomationRun, useAutomationRun, useAutomationRuns } from '../api'
 
-export const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'error'> = {
-  running: 'accent',
-  waiting: 'warning',
-  paused: 'warning',
-  completed: 'success',
-  failed: 'error',
-  retrying: 'warning',
-  missed: 'warning',
-}
 
 /** How long a run took, quietly, with the details on hover or click (as in the chat);
  * counting up while it works, standing still while it waits for you. */

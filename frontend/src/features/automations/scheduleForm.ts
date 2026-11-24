@@ -9,7 +9,8 @@ import { msg } from '@/lib/i18n'
 
 export type Schedule = Schemas['Schedule']
 
-export type Frequency = 'minutes' | 'hours' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'once' | 'cron' | 'rrule'
+/** `manual`: only when started (Run now, or an agent's run_script). Scripts only. */
+export type Frequency = 'minutes' | 'hours' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'once' | 'cron' | 'rrule' | 'manual'
 
 export interface ScheduleForm {
   frequency: Frequency
@@ -39,6 +40,12 @@ export const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
   { value: 'rrule', label: msg('Custom (repeat rule)') },
 ]
 
+/** A script can also run only when it is started; agent automations never offer that. */
+export const SCRIPT_FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
+  { value: 'manual', label: msg('Only when started') },
+  ...FREQUENCY_OPTIONS,
+]
+
 export const WEEKDAYS = [msg('Sunday'), msg('Monday'), msg('Tuesday'), msg('Wednesday'), msg('Thursday'), msg('Friday'), msg('Saturday')]
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -62,6 +69,8 @@ export const minMinutes = (hasCheck: boolean) => (hasCheck ? 1 : 5)
 export function toSchedule(form: ScheduleForm, tz: string, fewest = 5): Schedule {
   const base = { cron: null, every_minutes: null, at: null, rrule: null, tz }
   switch (form.frequency) {
+    case 'manual':
+      return { ...base, kind: 'manual' }
     case 'minutes':
       return { ...base, kind: 'interval', every_minutes: Math.max(fewest, Math.round(form.every)) }
     case 'hours':
@@ -91,6 +100,7 @@ export function toSchedule(form: ScheduleForm, tz: string, fewest = 5): Schedule
 
 export function fromSchedule(schedule: Schedule, now = new Date()): ScheduleForm {
   const form = defaultForm(now)
+  if (schedule.kind === 'manual') return { ...form, frequency: 'manual' }
   if (schedule.kind === 'interval') {
     const minutes = schedule.every_minutes ?? 60
     return minutes % 60 === 0
