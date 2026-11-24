@@ -596,6 +596,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Images Settings */
+        put: operations["put_images_settings_api_settings_images_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -4941,6 +4958,7 @@ export interface components {
             dictation: components["schemas"]["DictationSettings"];
             voice: components["schemas"]["VoiceSettings"];
             code: components["schemas"]["CodeSettings"];
+            images: components["schemas"]["ImageSettings"];
         };
         /** AppearanceAssetOut */
         AppearanceAssetOut: {
@@ -5162,6 +5180,8 @@ export interface components {
             mime: string;
             /** Size */
             size: number;
+            /** Path */
+            path?: string | null;
         };
         /** AuditOut */
         AuditOut: {
@@ -7210,6 +7230,29 @@ export interface components {
             /** Truncated */
             truncated: boolean;
         };
+        /**
+         * ImageSettings
+         * @description The generate_image tool (features/image_generation). Security-sensitive like the
+         *     permissions: it decides how much an agent may spend without asking.
+         */
+        ImageSettings: {
+            /**
+             * Max Count
+             * @default 4
+             */
+            max_count: number;
+            /**
+             * Max Resolution
+             * @default 2K
+             * @enum {string}
+             */
+            max_resolution: "1K" | "2K" | "4K";
+            /**
+             * Ask In Automations
+             * @default true
+             */
+            ask_in_automations: boolean;
+        };
         /** ImportIn */
         ImportIn: {
             /** Content */
@@ -7869,7 +7912,7 @@ export interface components {
         /**
          * ModelDefaults
          * @description Which model handles each kind of work. Unset tasks fall back to the chat model
-         *     (except embeddings and transcription, which need a model of their own kind).
+         *     (except embeddings, transcription and image, which need a model of their own kind).
          */
         ModelDefaults: {
             /** Chat */
@@ -7894,6 +7937,8 @@ export interface components {
             transcription?: string | null;
             /** Dictation */
             dictation?: string | null;
+            /** Image */
+            image?: string | null;
             /** Fallbacks */
             fallbacks?: {
                 [key: string]: string[];
@@ -8882,7 +8927,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "google" | "openai_compatible" | "claude_code" | "fake";
             /** Base Url */
             base_url?: string | null;
             /**
@@ -8916,7 +8961,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "google" | "openai_compatible" | "claude_code" | "fake";
             /** Base Url */
             base_url: string | null;
             /** Effective Base Url */
@@ -8956,7 +9001,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "google" | "openai_compatible" | "claude_code" | "fake";
             /** Label */
             label: string;
             /** Default Base Url */
@@ -12854,6 +12899,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_images_settings_api_settings_images_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageSettings"];
                 };
             };
             /** @description Validation Error */

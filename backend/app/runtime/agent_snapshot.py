@@ -14,6 +14,7 @@ from app.features.automations import service as automations
 from app.features.automations.models import Automation
 from app.features.conversations.models import ChatMessage
 from app.features.extension import browser_relay
+from app.features.image_generation import service as image_generation
 from app.features.memory import service as memory
 from app.features.memory.schemas import MemorySettings
 from app.features.profiles import service as profiles
@@ -168,6 +169,11 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         db, run, transcript, general.timezone, memory_settings, extra=extra
     )
     navigation = await settings_service.get_section(db, NavigationSettings, "navigation")
+    # Pictures cost money: a run nobody watches asks before each one (unless switched off).
+    if (automation is not None or inherited) and (
+        await image_generation.get_settings(db)
+    ).ask_in_automations:
+        snap_policy = image_generation.ask_in_automations(snap_policy)
     run.options = {**run.options, "memory_context": used}
     run.policy = {
         "policy": snap_policy.model_dump(by_alias=True),

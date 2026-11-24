@@ -241,12 +241,13 @@ TaskType = Literal[
     "inline",
     "transcription",
     "dictation",
+    "image",
 ]
 
 
 class ModelDefaults(BaseModel):
     """Which model handles each kind of work. Unset tasks fall back to the chat model
-    (except embeddings and transcription, which need a model of their own kind)."""
+    (except embeddings, transcription and image, which need a model of their own kind)."""
 
     chat: uuid.UUID | None = None
     agent: uuid.UUID | None = None
@@ -263,6 +264,8 @@ class ModelDefaults(BaseModel):
     # said (a fast chat model is ideal).
     transcription: uuid.UUID | None = None
     dictation: uuid.UUID | None = None
+    # The generate_image tool: a model with the image_generation capability.
+    image: uuid.UUID | None = None
     # Ordered backup models per task, tried when the primary fails or lacks a capability.
     fallbacks: dict[TaskType, list[uuid.UUID]] = Field(default_factory=dict)
     # How hard models that can reason think, unless a message asks for another level
@@ -320,6 +323,19 @@ class VoiceSettings(BaseModel):
     chat: Literal["daily", "single"] = "daily"
 
 
+class ImageSettings(BaseModel):
+    """The generate_image tool (features/image_generation). Security-sensitive like the
+    permissions: it decides how much an agent may spend without asking."""
+
+    # Pictures one call may make; a call asking for more gets this many.
+    max_count: int = Field(4, ge=1, le=10)
+    # The largest resolution a call may ask for (where the provider has a choice).
+    max_resolution: Literal["1K", "2K", "4K"] = "2K"
+    # Automation runs (and their sub-agents) ask before each call, whatever the
+    # "Generate images" permission says (it can still say Never).
+    ask_in_automations: bool = True
+
+
 class CodeSettings(BaseModel):
     """The Code page: Claude Code jobs that computers share (features/code_sessions)."""
 
@@ -354,4 +370,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "dictation": SectionSpec(DictationSettings),
     "voice": SectionSpec(VoiceSettings),
     "code": SectionSpec(CodeSettings),
+    "images": SectionSpec(ImageSettings, sensitive=True),
 }

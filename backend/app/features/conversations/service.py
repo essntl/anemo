@@ -91,7 +91,9 @@ def _version_run_id(v: dict[str, Any]) -> uuid.UUID | None:
 
 
 def _attachment_summary(a: Attachment) -> AttachmentSummary:
-    return AttachmentSummary(id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size)
+    return AttachmentSummary(
+        id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size, path=a.workspace_path
+    )
 
 
 def message_out(

@@ -5,7 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 ProviderType = Literal[
-    "openai", "anthropic", "openrouter", "openai_compatible", "claude_code", "fake"
+    "openai", "anthropic", "openrouter", "google", "openai_compatible", "claude_code", "fake"
 ]
 
 

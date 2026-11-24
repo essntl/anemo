@@ -37,4 +37,7 @@ class Attachment(Base, IdMixin):
     run_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("runs.id", ondelete="SET NULL")
     )
+    # For a copy of a workspace file attached to an answer (generate_image): that file's
+    # path, so the chat can link to it. None for uploads.
+    workspace_path: Mapped[str | None] = mapped_column(String(1000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

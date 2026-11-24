@@ -10,6 +10,7 @@ adapter), and searching inside workspace files that are not documents.
 - [Chat vs. Agent mode](#chat-vs-agent-mode)
 - [Projects and organising chats](#projects-and-organising-chats)
 - [Files in chats](#files-in-chats)
+- [Image generation](#image-generation)
 - [Share links](#share-links)
 - [Profiles, skills, plans and runs](#profiles-skills-plans-and-runs)
 - [Skills as slash commands](#skills-as-slash-commands)
@@ -145,6 +146,53 @@ them over with `attach_file`: they appear as downloads under its answer (up to 1
 each, 20 per answer). An attached file is a copy of the workspace file as it was then.
 Each version of a regenerated answer keeps its own files, and a branched chat gets a
 copy of them.
+
+## Image generation
+
+Ask for a picture ("draw a lighthouse at dusk, as a watercolour") in Chat or Agent mode
+and the assistant calls the `generate_image` tool. Any chat model can do this, because
+it is ordinary tool calling: the picture itself is made by the **image model** you
+choose, through its provider's API. The pictures appear under the answer (click one for
+the full size; each has a download button and an **Open in Files** link), and in Agent
+mode the activity list shows the call with its pictures and paths.
+
+- **Where they go**: `files/generated/<date>/<words-from-the-prompt>.png`, or
+  `projects/<project>/generated/<date>/…` in a project's chat; the assistant can also be
+  told a folder or a file name. A name that is taken gets `-2`, `-3`, …. Next to each
+  picture is a `<picture>.json` file with the prompt, the model, the size, the time and
+  the chat it came from.
+- **Changing a picture**: the assistant passes a saved picture back as an input image
+  ("make the sky darker"). OpenAI and OpenRouter image models can do this; Google's
+  OpenAI-compatible endpoint cannot (the tool says so).
+- **Options the assistant can choose**: shape (1:1, 4:3, 3:2, 16:9 and their portrait
+  versions), how many (up to the limit below), quality (low, medium, high) and resolution
+  (1K, 2K, 4K where the provider has a choice), and another configured image model if you
+  ask for one by name.
+
+**Setting it up** (Settings → Providers & Models):
+
+1. A provider with image models: **OpenAI** (`gpt-image-1.5`, `gpt-image-2`; `gpt-image-1`
+   was shut down in October 2026), **OpenRouter** (its image models, e.g.
+   `google/gemini-2.5-flash-image`; *Discover* lists them), **Google Gemini** (new provider
+   type with a Google AI Studio key: `gemini-2.5-flash-image`,
+   `gemini-3-pro-image-preview`; it also gives you Gemini chat models), or an
+   OpenAI-compatible server with `/images/generations`. Image models are recognised by
+   name and marked **Image generation**; the switch is in each model's capabilities.
+2. **Default models → Image generation**: the model to use. It never falls back to the
+   chat model; without one, the assistant tells you to set it.
+3. The **Image generation** card: pictures per request (default 4, at most 10), the largest
+   resolution (default 2K), and whether automations ask first (default on). Changing it
+   asks for your password again, like the permissions.
+
+**Cost and permission**: every picture costs money at the provider, and each call is in
+Usage (the provider's own cost for OpenRouter, an estimate from the model's prices for
+OpenAI). The permission **Generate images** (Settings → Agent Permissions) is *Fully
+autonomous* by default, so a chat makes pictures without asking; *Always ask* makes the
+agent ask each time (in Chat mode, which cannot ask, the tool is then not offered), and
+*Never* takes the tool away. Automations ask before each picture unless you switch that
+off. A provider's refusal (content policy), a wrong key or no credit comes back as a
+message in the chat, not an error page. The design is in
+[specs/10-image-generation.md](specs/10-image-generation.md).
 
 ## Share links
 

@@ -60,6 +60,8 @@ class AttachmentSummary(BaseModel):
     kind: str
     mime: str
     size: int
+    # The workspace file an answer's attachment is a copy of (generate_image), if any.
+    path: str | None = None
 
 
 class ReferenceSummary(BaseModel):

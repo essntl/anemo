@@ -1,7 +1,7 @@
 """All tools the runtime can offer. A run's toolset is chosen per mode:
 agent mode gets every tool whose capability is not denied by policy (denied tools
-are not even offered); chat mode only gets the memory tools, and only those it
-may use without asking (chat has no approval step)."""
+are not even offered); chat mode only gets the memory tools and generate_image, and
+only those it may use without asking (chat has no approval step)."""
 
 from collections.abc import Iterable
 
@@ -18,6 +18,7 @@ from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.file_exchange import FILE_EXCHANGE_TOOLS
 from app.tools.builtin.focus import FOCUS_TOOLS, MUSIC_TOOL_NAMES
+from app.tools.builtin.images import GenerateImage
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
@@ -68,6 +69,7 @@ BUILTIN_TOOLS: list[Tool] = [
     *EVENT_TOOLS,
     *FOCUS_TOOLS,
     SendNotification(),
+    GenerateImage(),
     *MEMORY_TOOLS,
     *AUTOMATION_TOOLS,
     *SCHEDULE_TOOLS,
@@ -81,6 +83,8 @@ BUILTIN_TOOLS: list[Tool] = [
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 # Tools that only work in a run that answers in a chat.
 CHAT_FILE_TOOLS = {"save_attachment", "attach_file"}
+# Offered in Chat mode too (besides the memory tools), when allowed without asking.
+CHAT_MODE_TOOLS = {"generate_image"}
 # The tools of the parts of the app that can be turned off (Settings > Pages): a part
 # that is off is not offered to any agent, so the model never hears of it.
 FEATURE_TOOLS: dict[str, frozenset[str]] = {
@@ -176,7 +180,7 @@ def toolset_for(
             or (tool.name == "ask_user" and not can_ask)
             or (tool.name in CHAT_FILE_TOOLS and not has_chat)
             or (tool.name == "voice_stop" and not has_phone)
-            or (mode != "agent" and not is_memory)
+            or (mode != "agent" and not (is_memory or tool.name in CHAT_MODE_TOOLS))
         ):
             continue
         probe = Action(capability=tool.capability, resource="", risk="safe")

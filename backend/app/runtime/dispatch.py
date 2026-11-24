@@ -1,9 +1,9 @@
 """Routes a queued run to the runtime for its kind.
 
 Agent runs use the tool loop; script runs (automation scripts) run their code in the
-sandbox (script_run.py). Chat turns use it too when memory is on and the
-chat model supports tools (so "remember that ..." works in chat); otherwise a
-chat turn is one plain model call.
+sandbox (script_run.py). Chat turns use it too when memory is on or an image model is
+chosen, and the chat model supports tools (so "remember that ..." and "draw me ..."
+work in chat); otherwise a chat turn is one plain model call.
 
 When a run's job fails for good, give_up_run() ends the run as failed.
 """
@@ -13,6 +13,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
+from app.features.image_generation import service as image_generation
 from app.features.memory import service as memory
 from app.features.runs.models import Run
 from app.providers.router import NoModelAvailable, RouteRequest, resolve
@@ -27,7 +28,9 @@ GAVE_UP = "An internal error stopped this run."
 async def _chat_uses_tools(db: AsyncSession, run: Run) -> bool:
     if run.policy is not None:
         return True  # it already started in the tool loop
-    if not (await memory.get_settings(db)).enabled:
+    if not (await memory.get_settings(db)).enabled and not (
+        await image_generation.has_default_model(db)
+    ):
         return False
     try:
         candidates = await resolve(
