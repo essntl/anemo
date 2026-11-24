@@ -25,6 +25,10 @@ vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string; action?:
 const confirm = vi.fn()
 vi.mock('@/components/ui/dialogs', () => ({ confirmDialog: (...a: unknown[]) => confirm(...a) }))
 
+// `coarse`: a touch screen (the only media query the follow-up box asks).
+const media = vi.hoisted(() => ({ coarse: false }))
+vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => media.coarse }))
+
 const { CancelJobButton, FollowUpBox, FromChat } = await import('./controls')
 const { codeQueue, useCodeQueue } = await import('./queueStore')
 
@@ -37,6 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   toasts.length = 0
   fail = null
+  media.coarse = false
   localStorage.clear()
   useCodeQueue.setState({ byThread: {}, drafts: {} })
 })
@@ -121,13 +126,37 @@ describe('Follow-up', () => {
     expect(toasts).toEqual(['Desk PC is busy with another command. Try again in a moment.'])
   })
 
-  it('sends with Ctrl+Enter, not with Enter alone', async () => {
+  it('sends with Enter, as the chat does; Shift+Enter starts a new line', async () => {
     show(<FollowUpBox job={ended()} />)
     const box = screen.getByRole('textbox', { name: 'Follow-up' })
-    await userEvent.type(box, 'Line one{Enter}line two')
+    await userEvent.type(box, 'Line one{Shift>}{Enter}{/Shift}line two')
     expect(followUp).not.toHaveBeenCalled()
-    await userEvent.keyboard('{Control>}{Enter}{/Control}')
+    await userEvent.keyboard('{Enter}')
     expect(followUp).toHaveBeenCalledWith('j9', 'Line one\nline two')
+  })
+
+  it('sends with Ctrl+Enter too', async () => {
+    show(<FollowUpBox job={ended()} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Follow-up' }), 'More')
+    await userEvent.keyboard('{Control>}{Enter}{/Control}')
+    expect(followUp).toHaveBeenCalledWith('j9', 'More')
+  })
+
+  it('on a touch screen Enter adds a line and the button sends', async () => {
+    media.coarse = true
+    show(<FollowUpBox job={ended()} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Follow-up' }), 'Line one{Enter}line two')
+    expect(followUp).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(followUp).toHaveBeenCalledWith('j9', 'Line one\nline two')
+  })
+
+  it('is one line with the button beside the text, not under it', () => {
+    show(<FollowUpBox job={ended()} />)
+    const box = screen.getByRole('textbox', { name: 'Follow-up' })
+    expect(box).toHaveAttribute('rows', '1')
+    expect(box).toHaveAttribute('placeholder', 'Ask for more in the same session…')
+    expect(screen.getByRole('button', { name: 'Send' }).parentElement).toBe(box.parentElement)
   })
 
   it('keeps the text and says why when it fails', async () => {

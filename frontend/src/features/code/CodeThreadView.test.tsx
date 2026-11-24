@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
+import { useIslandVisible } from '@/features/island/islandStore'
 import { codeKey } from './api'
 import { CodeThreadView } from './CodeThreadView'
 import { codeJob } from './testJobs'
@@ -37,6 +38,13 @@ const event = (seq: number, e: Record<string, unknown>, more: Partial<CodeEvent>
 const text = (seq: number, value: string, more: Partial<CodeEvent> = {}) =>
   event(seq, { type: 'assistant', message: { content: [{ type: 'text', text: value }] }, parent_tool_use_id: null }, more)
 
+// `desktop`: the `md` width and up (jsdom has no matchMedia). Nothing here is a touch screen.
+const media = vi.hoisted(() => ({ desktop: true }))
+vi.mock('@/hooks/useMediaQuery', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/hooks/useMediaQuery')>()
+  return { ...real, useMediaQuery: (query: string) => query === real.DESKTOP && media.desktop }
+})
+
 let thread: CodeJob[] = []
 let events: Record<string, CodeEvent[]> = {}
 const eventCalls: { job: string; after: number }[] = []
@@ -56,6 +64,8 @@ beforeEach(() => {
   }) as unknown as typeof api.GET)
 })
 afterEach(() => {
+  media.desktop = true
+  useIslandVisible.setState({ visible: false })
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -119,6 +129,29 @@ describe('a finished thread', () => {
     expect(second).toHaveTextContent('Failed: error_max_turns')
     // A finished job opens no stream.
     expect(FakeEventSource.all).toHaveLength(0)
+  })
+
+  it('keeps the way back, the state and the title in one row', async () => {
+    media.desktop = false // a phone
+    show('j2')
+    const row = (await screen.findByRole('link', { name: 'All jobs' })).parentElement!
+    expect(await within(row).findByText('Failed')).toBeInTheDocument()
+    expect(within(row).getByText('Bump the version')).toBeInTheDocument()
+  })
+
+  it('on a phone, moves the state and the title under the Dynamic Island while it shows', async () => {
+    media.desktop = false
+    useIslandVisible.setState({ visible: true })
+    show('j2')
+    const row = (await screen.findByRole('link', { name: 'All jobs' })).parentElement!
+    const bar = row.parentElement!
+    expect(await within(bar).findByText('Failed')).toBeInTheDocument()
+    expect(within(bar).getByText('Bump the version')).toBeInTheDocument()
+    // The row the Island floats over keeps only the way back.
+    expect(within(row).queryByText('Bump the version')).not.toBeInTheDocument()
+    // With room beside the Island (a wider screen) it is one row again.
+    act(() => { media.desktop = true; useIslandVisible.setState({ visible: false }) })
+    expect(within(row).getByText('Bump the version')).toBeInTheDocument()
   })
 
   it('says where the full log is for trimmed and dropped events', async () => {

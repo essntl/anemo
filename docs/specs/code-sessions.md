@@ -521,7 +521,8 @@ makes those exact.
 - Thread header: **Cancel** while the latest job runs and its device offers `start`
   (confirm dialog; a toast with `errorMessage` on error).
 - **Follow-up** box under a thread whose last job has ended, has a session and whose
-  device offers `start`: a textarea and Send (Ctrl+Enter); the new job appears in the
+  device offers `start`: a one-line box that grows, like the chat's (Enter sends,
+  Shift+Enter adds a line; on a touch screen Enter adds a line); the new job appears in the
   thread and is followed live. Otherwise hidden, with one line saying why when the
   device is offline or doesn't allow starting.
 - **New job** button in the list header → dialog: device (trusted computers offering

@@ -14,7 +14,8 @@ import { Button } from '@/components/ui/Button'
 import { Elapsed } from '@/components/ui/Elapsed'
 import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
-import { DESKTOP } from '@/hooks/useMediaQuery'
+import { useIslandVisible } from '@/features/island/islandStore'
+import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
@@ -239,25 +240,35 @@ function Header({ thread }: { thread: CodeJob[] }) {
 
 /**
  * The bar over the thread, always in sight: the way back to the list (where the list is
- * a screen of its own), the state, the title and Cancel.
+ * a screen of its own), the state, the title and Cancel. On a phone it is the page's only
+ * header (the app's top bar with the "Code" title is hidden there, see `ownPhoneHeader`
+ * in app/router.tsx): one row as tall as a chat's header.
  */
 function TopBar({ thread, backTo }: { thread: CodeJob[]; backTo: string }) {
   const location = useLocation()
   const latest = thread.at(-1)
+  // A phone while the Dynamic Island shows: it floats over the middle of this bar, so the
+  // state and the title move to a slim row underneath, as in a chat.
+  const island = useIslandVisible((s) => s.visible)
+  const stacked = !useMediaQuery(DESKTOP) && island
+  const about = latest && (
+    <>
+      <StateBadge state={latest.state} />
+      {latest.state === 'running' && <Elapsed since={latest.started_at} className="shrink-0 text-[12.5px] text-muted max-sm:hidden" />}
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{thread[0].title || t('(no title)')}</span>
+      <CancelJobButton job={latest} />
+    </>
+  )
   return (
-    <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 md:px-4">
-      <Link to={backTo} state={location.state} aria-label={t('All jobs')} title={t('All jobs')}
-        className="-ml-1 inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-1 rounded-control px-1.5 text-[13px] pointer-coarse:h-10 pointer-coarse:min-w-10 text-muted hover:bg-surface-hover hover:text-text lg:hidden">
-        <ArrowLeft aria-hidden="true" className="h-4 w-4" /><span className="max-sm:hidden">{t('All jobs')}</span>
-      </Link>
-      {latest && (
-        <>
-          <StateBadge state={latest.state} />
-          {latest.state === 'running' && <Elapsed since={latest.started_at} className="shrink-0 text-[12.5px] text-muted max-sm:hidden" />}
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{thread[0].title || t('(no title)')}</span>
-          <CancelJobButton job={latest} />
-        </>
-      )}
+    <div className="shrink-0 border-b border-border">
+      <div className="flex min-h-11 items-center gap-2 px-2.5 py-1 md:px-4 md:py-1.5">
+        <Link to={backTo} state={location.state} aria-label={t('All jobs')} title={t('All jobs')}
+          className="-ml-1 inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-1 rounded-control px-1.5 text-[13px] pointer-coarse:h-10 pointer-coarse:min-w-10 text-muted hover:bg-surface-hover hover:text-text lg:hidden">
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" /><span className="max-sm:hidden">{t('All jobs')}</span>
+        </Link>
+        {!stacked && about}
+      </div>
+      {stacked && about && <div className="-mt-1 flex h-10 items-center gap-2 px-3">{about}</div>}
     </div>
   )
 }

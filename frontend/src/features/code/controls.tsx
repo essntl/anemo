@@ -5,14 +5,16 @@
 import { type KeyboardEvent, type ReactNode, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { Clock, ListPlus, MessageSquare, Send, Square, TriangleAlert } from 'lucide-react'
+import { Clock, ListPlus, MessageSquare, Square, TriangleAlert } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
-import { Textarea } from '@/components/ui/Input'
+import { MESSAGE_BOX, MESSAGE_BOX_BORDER, MESSAGE_TEXT, SendButton } from '@/components/ui/MessageBox'
 import { toast } from '@/components/ui/toast'
 import { useToastLift } from '@/components/ui/useToastLift'
+import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { useAutosize } from '@/hooks/useAutosize'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { chatLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
@@ -85,7 +87,9 @@ function QueuedCard({ message, canSend, sending, onSend, onEdit, onRemove }: {
 }
 
 /**
- * The box under a thread. After the last job has ended (with a session to resume, on a
+ * The box under a thread, which looks and takes keys like the chat's message box: one
+ * line that grows with the text, the round button at its right end, Enter to send and
+ * Shift+Enter for a new line (on a touch screen Enter adds a line). After the last job has ended (with a session to resume, on a
  * computer that lets Anemo start jobs) it sends a follow-up. While the job runs it
  * queues one message, sent when the job ends (queueStore.ts): Claude Code takes nothing
  * in while it works. Otherwise nothing, or one line saying why. `onSent`: a message was
@@ -102,6 +106,8 @@ export function FollowUpBox({ job, title, onSent }: { job: CodeJob; title?: stri
   const setText = (next: string) => codeQueue.setDraft(threadId, next)
   const field = useRef<HTMLTextAreaElement>(null)
   useAutosize(field, text, 240)
+  // Touch screens: the on-screen keyboard's Enter adds a line, as in the chat.
+  const touch = useMediaQuery('(pointer: coarse)')
   const running = job.state === 'running'
   const canStart = job.device.online && job.device.start
 
@@ -155,29 +161,25 @@ export function FollowUpBox({ job, title, onSent }: { job: CodeJob; title?: stri
     })
   }
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
+    if (matchesShortcut(SHORTCUTS['chat.send'], e) && !touch && !e.nativeEvent.isComposing) {
       e.preventDefault()
       submit()
     }
   }
+  const sendLabel = !running ? t('Send') : queued && !queued.held ? t('Add to queue') : t('Queue message')
   return (
     <Dock>
       {card}
-      <form className="rounded-xl border border-border bg-surface p-2 shadow-soft focus-within:border-border-strong" onSubmit={(e) => { e.preventDefault(); submit() }}>
-        <Textarea ref={field} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} rows={1} maxLength={100_000}
+      {/* The text and the button on one line; as the text grows the button stays at the bottom. */}
+      <form className={cn(MESSAGE_BOX, MESSAGE_BOX_BORDER, 'flex items-end gap-1')} onSubmit={(e) => { e.preventDefault(); submit() }}>
+        <textarea ref={field} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} rows={1} maxLength={100_000}
           aria-label={running ? t('Message for when this job ends') : t('Follow-up')}
           placeholder={running ? t('Queue the next message…') : t('Ask for more in the same session…')}
           readOnly={followUp.isPending}
-          className="resize-none border-0 bg-transparent px-2 py-1.5 focus:ring-0 read-only:opacity-60" />
-        <div className="mt-1 flex items-center justify-end gap-2">
-          <span className="min-w-0 truncate text-[11.5px] text-subtle max-md:hidden">
-            {!running ? t('Ctrl+Enter to send') : queued && !queued.held ? t('Ctrl+Enter adds it to the queued message') : t('Ctrl+Enter to queue · Claude Code takes it when this job ends')}
-          </span>
-          <Button type="submit" size="sm" variant={running ? 'secondary' : 'primary'} loading={followUp.isPending} disabled={blank}
-            icon={running ? <ListPlus className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}>
-            {!running ? t('Send') : queued && !queued.held ? t('Add to queue') : t('Queue message')}
-          </Button>
-        </div>
+          className={cn(MESSAGE_TEXT, 'read-only:opacity-60')} />
+        <SendButton type="submit" label={sendLabel} title={sendLabel} quiet={running} disabled={blank || followUp.isPending}
+          icon={followUp.isPending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            : running ? <ListPlus className="h-4 w-4" /> : undefined} />
       </form>
     </Dock>
   )
@@ -187,5 +189,5 @@ export function FollowUpBox({ job, title, onSent }: { job: CodeJob; title?: stri
 function Dock({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   useToastLift(ref)
-  return <div ref={ref} className="mx-auto w-full max-w-3xl px-4 pb-3 pt-1 md:px-8">{children}</div>
+  return <div ref={ref} className="mx-auto w-full max-w-3xl px-3 pb-2 pt-1 md:px-8 md:pb-3">{children}</div>
 }
