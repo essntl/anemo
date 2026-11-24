@@ -205,6 +205,14 @@ only images from Anemo itself (and `data:`/`blob:` images) load by themselves; a
 another site shows as a "show image from example.org" button and loads when you click it. The
 document itself is not changed.
 
+Pictures made with `generate_image` are shown from Anemo too. When an image provider
+answers with an address instead of the picture, the server fetches it with the same guarded
+client as web pages (no addresses on your network unless allowed), at most 25 MB, and keeps
+it only if the server says it is an image and the bytes are a PNG, JPEG, WebP or GIF. The
+provider's API key stays an encrypted secret: the model never sees it. Each picture costs
+money, so automation runs ask before each call unless you switch that off in Settings →
+Providers & Models → Image generation; that rule can only make a call stricter.
+
 ## Diagrams, charts and math
 
 Diagrams can be written from untrusted content (a web page an agent read, a shared
@@ -250,6 +258,7 @@ The kinds of action and their defaults:
 | Update memory | Fully autonomous |
 | MCP tools | Always ask (each tool can be set on its own) |
 | Start sub-agents | Never |
+| Generate images | Fully autonomous (automations ask first, see below) |
 | See your computers | Ask for dangerous actions (looking is safe, so it goes ahead) |
 | Use your computers | Always ask (a watched computer asks every time whatever the level) |
 | Commands on your computers | Always ask (never offered on a watched computer) |

@@ -66,7 +66,7 @@ generate_image(
   provider's revised prompt or text if it gave one. The images themselves are not sent
   back to the chat model (it would pay to look at its own picture; it can `read_file`
   one if it needs to).
-- **Result for the UI** (`ToolResult.data`): `images: [{path, attachment_id, width,
+- **Result for the UI** (`ToolResult.data`): `generated: [{path, attachment_id, width,
   height}]`, `model`, `prompt`.
 - **Where files go**: `path` when given (a folder, or a file name: `-2`, `-3`, … are added
   for more than one image). Otherwise `files/generated/<date>/<slug>-<n>.<ext>`, or
