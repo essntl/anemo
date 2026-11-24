@@ -60,7 +60,8 @@ export const router = createBrowserRouter([
           { path: 'runs', ...page(() => import('@/features/runs/pages/RunsPage'), 'RunsPage') },
           { path: 'runs/:runId', ...page(() => import('@/features/runs/pages/RunDetailPage'), 'RunDetailPage') },
           { path: 'code', ...page(() => import('@/features/code/CodePage'), 'CodePage') },
-          { path: 'code/:jobId', ...page(() => import('@/features/code/CodePage'), 'CodePage') },
+          // One job: on a phone its own bar (back, state, title) is the header.
+          { path: 'code/:jobId', ...page(() => import('@/features/code/CodePage'), 'CodePage'), handle: { ownPhoneHeader: true } satisfies RouteHandle },
           { path: 'automations', ...page(() => import('@/features/automations/AutomationsPage'), 'AutomationsPage') },
           { path: 'agents', ...page(() => import('@/features/profiles/pages/ProfilesPage'), 'ProfilesPage') },
           { path: 'memory', ...page(() => import('@/features/memory/MemoryPage'), 'MemoryPage') },

@@ -41,7 +41,7 @@ export function NewChatButton({ className }: { className?: string }) {
  *
  * `scoped`: the page shows only what the project switcher allows. On a phone the switcher
  * is then a small line under the title (on wider screens it is in the sidebar).
- * `phoneHidden`: the page has a header of its own on a phone (an open document).
+ * `phoneHidden`: the page has a header of its own on a phone (an open document, a Claude Code job).
  */
 export function TopBar({ scoped, phoneHidden }: { scoped?: boolean; phoneHidden?: boolean }) {
   // Each half stops short of the Island while it shows (.island-clear-left in app.css).
