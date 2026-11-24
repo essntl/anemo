@@ -52,7 +52,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
   const limits = { ...DEFAULT_LIMITS, ...form.limits }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader
           title={t('What agents may do')}
@@ -157,7 +157,7 @@ function PermissionsForm({ initial }: { initial: PermissionSettings }) {
 export function PermissionsPage() {
   const settings = useSettings()
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <ShieldCheck className="h-5 w-5" />

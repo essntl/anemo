@@ -66,7 +66,7 @@ export function PagesPage() {
   const withTools = (Object.keys(PAGE_INFO) as PageId[]).filter((id) => PAGE_INFO[id].hasTools).map((id) => t(PAGE_INFO[id].label)).join(', ')
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Pages')}
           description={t('Choose which pages are in the sidebar, which wait behind “More”, and which you don’t use at all.')}

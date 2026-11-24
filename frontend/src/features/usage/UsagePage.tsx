@@ -157,7 +157,7 @@ export function UsagePage() {
   })
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <BarChart3 className="h-5 w-5" />

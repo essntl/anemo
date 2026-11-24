@@ -224,7 +224,7 @@ export function NotificationSettingsPage() {
   const devices = all.filter((d) => d.type === 'webpush')
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <Bell className="h-5 w-5" />

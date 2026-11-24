@@ -24,7 +24,7 @@ export function ProvidersPage() {
   const allModels = models.data ?? []
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t('Providers & Models')}</h2>

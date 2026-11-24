@@ -178,7 +178,7 @@ export function DevicesSettingsPage() {
   const [made, setMade] = useState<{ name: string; kind: DeviceKind; token: string } | null>(null)
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Devices')}
           description={t('Your Windows computers (Anemo Desktop) and phones (Anemo Voice). Each has its own token and, for computers, its own trust level. Changing the trust level asks for your password.')} />

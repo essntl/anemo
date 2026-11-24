@@ -49,7 +49,7 @@ export function DictationSettingsPage() {
   const update = (patch: Partial<DictationSettings>) => save.mutate({ ...d, ...patch })
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Dictation')}
           description={t('Speak instead of typing: press Caps Lock twice, or the microphone in the message box. What you say is written down and tidied up, then put where you were typing.')} />

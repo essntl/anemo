@@ -41,7 +41,7 @@ function VoiceForm({ initial }: { initial: VoiceSettings }) {
   const set = (patch: Partial<VoiceSettings>) => setForm({ ...form, ...patch })
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Voice')}
           description={t('Talk to Anemo from your phone with the Anemo Voice app: say the wake word and what you want. It runs as an agent request in a Voice chat, and the phone reads the answer out.')} />

@@ -33,7 +33,7 @@ import { ScopeControl } from './ScopeControl'
 import { useSidebar } from './sidebarStore'
 
 // 32px rows: with six pages, More and the chats the sidebar still fits a 720px-high window without scrolling.
-const ROW = 'flex h-8 min-w-0 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors pointer-coarse:h-10'
+const ROW = 'flex h-(--nav-row-h) min-w-0 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors pointer-coarse:h-10'
 const ROW_ON = 'bg-surface-2 font-semibold text-text [&>span>svg]:text-accent'
 const ROW_OFF = 'text-text hover:bg-surface-hover [&>span>svg]:text-muted'
 const ICON_BUTTON = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
