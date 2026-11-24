@@ -162,3 +162,13 @@ get it.
 - Name and avatar show in the sidebar, chat and Code page; without an avatar, initials.
 - Keyboard: every picker, slider and the avatar cropper work without a mouse, and focus rings
   are visible on any accent.
+
+## Screenshots
+
+Taken with Playwright (Edge) against a local dev server with sample pictures.
+
+| | |
+|---|---|
+| Settings › Appearance, light, picture background, frosted glass ![](11-appearance/1-appearance-light-glass.webp) | A chat with frosted glass ![](11-appearance/2-chat-light-glass.webp) |
+| A chat on the picture without glass (blur 10, dim 45 %) ![](11-appearance/7-chat-background-no-glass.webp) | Home, dark, “Aurora” gradient, teal accent ![](11-appearance/3-home-dark-gradient.webp) |
+| Pink tint, and the warning for an accent that is too light ![](11-appearance/4-tint-and-contrast-warning.webp) | Phone ![](11-appearance/6-phone-chat.webp) |
