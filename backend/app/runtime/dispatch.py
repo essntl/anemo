@@ -1,6 +1,7 @@
 """Routes a queued run to the runtime for its kind.
 
-Agent runs use the tool loop. Chat turns use it too when memory is on and the
+Agent runs use the tool loop; script runs (automation scripts) run their code in the
+sandbox (script_run.py). Chat turns use it too when memory is on and the
 chat model supports tools (so "remember that ..." works in chat); otherwise a
 chat turn is one plain model call.
 
@@ -18,6 +19,7 @@ from app.providers.router import NoModelAvailable, RouteRequest, resolve
 from app.runtime import agent_finalize, chat
 from app.runtime.agent import execute_agent_run
 from app.runtime.chat import execute_chat_run
+from app.runtime.script_run import execute_script_run
 
 GAVE_UP = "An internal error stopped this run."
 
@@ -43,7 +45,9 @@ async def execute_run(run_id: uuid.UUID) -> None:
             return
         use_loop = run.kind == "agent" or (run.kind == "chat" and await _chat_uses_tools(db, run))
         kind = run.kind
-    if use_loop:
+    if kind == "script":
+        await execute_script_run(run_id)
+    elif use_loop:
         await execute_agent_run(run_id)
     elif kind == "chat":
         await execute_chat_run(run_id)

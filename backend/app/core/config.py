@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     claude_runner_url: str = "http://claude-runner:7100"
     claude_runner_token_file: str = "/run/claude-runner-token/token"  # noqa: S105 (a path)
 
+    # Automation scripts run in Deno, a child process of the worker (in the image).
+    deno_path: str = "deno"
+
     @model_validator(mode="after")
     def _check_secret_key(self) -> "Settings":
         if self.env != "test" and len(self.app_secret_key.get_secret_value()) < 32:
