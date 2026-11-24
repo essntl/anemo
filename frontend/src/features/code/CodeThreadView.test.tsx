@@ -1,10 +1,11 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { useIslandVisible } from '@/features/island/islandStore'
+import sample from './agents.fixture.json'
 import { codeKey } from './api'
 import { CodeThreadView } from './CodeThreadView'
 import { codeJob } from './testJobs'
@@ -39,10 +40,14 @@ const text = (seq: number, value: string, more: Partial<CodeEvent> = {}) =>
   event(seq, { type: 'assistant', message: { content: [{ type: 'text', text: value }] }, parent_tool_use_id: null }, more)
 
 // `desktop`: the `md` width and up (jsdom has no matchMedia). Nothing here is a touch screen.
-const media = vi.hoisted(() => ({ desktop: true }))
+// `wide`: the `xl` width, where the sub-agents get a column of their own.
+const media = vi.hoisted(() => ({ desktop: true, wide: false }))
 vi.mock('@/hooks/useMediaQuery', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/hooks/useMediaQuery')>()
-  return { ...real, useMediaQuery: (query: string) => query === real.DESKTOP && media.desktop }
+  return {
+    ...real,
+    useMediaQuery: (query: string) => (query === real.DESKTOP && media.desktop) || (query === '(min-width: 1280px)' && media.wide),
+  }
 })
 
 let thread: CodeJob[] = []
@@ -65,16 +70,22 @@ beforeEach(() => {
 })
 afterEach(() => {
   media.desktop = true
+  media.wide = false
   useIslandVisible.setState({ visible: false })
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
-function show(jobId: string) {
+/** The address's query, to check what a click put there. */
+function Search() {
+  return <output data-testid="search">{useLocation().search}</output>
+}
+
+function show(jobId: string, search = '') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter><CodeThreadView jobId={jobId} backTo="/code" /></MemoryRouter>
+      <MemoryRouter initialEntries={[`/code/${jobId}${search}`]}><CodeThreadView jobId={jobId} backTo="/code" /><Search /></MemoryRouter>
     </QueryClientProvider>,
   )
   return client
@@ -279,5 +290,99 @@ describe('a running job', () => {
     })
     expect(screen.getByText('second')).toBeInTheDocument()
     expect(source.closed).toBe(false)
+  })
+})
+
+describe('a job with sub-agents', () => {
+  const SETUP = 'toolu_01VsoTZBKwaqBXxfEzXgZkAr'
+  const VOICE = 'toolu_012dPMLFLMR8cG5UVa2zzbb4'
+  const SAMPLE = sample as unknown as CodeEvent[]
+  beforeEach(() => {
+    thread = [codeJob({ id: 'o1', title: 'Orchestrate round 3', prompt: 'You are the ORCHESTRATOR', state: 'done', last_seq: SAMPLE.length })]
+    events = { o1: SAMPLE }
+  })
+
+  it('lists Main and each sub-agent beside the thread, and shows only the picked agent\'s events', async () => {
+    media.wide = true
+    show('o1')
+    const list = await screen.findByRole('list', { name: 'Agents' })
+    expect(await within(list).findByText('B: Android voice mode')).toBeInTheDocument()
+    expect(within(list).getByText('Main agent')).toBeInTheDocument()
+    expect(within(list).getByText('Set up local test toolchain').closest('button')).toHaveTextContent('27 tool calls')
+    // The job has ended without their end: neither runs on.
+    expect(within(list).getAllByRole('img', { name: 'Stopped' })).toHaveLength(2)
+    // Main: the orchestrator's text and its Agent calls, none of the sub-agents' work.
+    expect(screen.getByText(/start by reading the required docs/)).toBeInTheDocument()
+    expect(screen.queryByText(/voice-mode-android && git status/)).not.toBeInTheDocument()
+
+    await userEvent.click(within(list).getByText('B: Android voice mode'))
+    expect(screen.getByTestId('search')).toHaveTextContent(`?agent=${VOICE}`)
+    const view = await screen.findByTestId('code-agent')
+    expect(within(view).getByText(/voice-mode-android && git status/)).toBeInTheDocument()
+    expect(screen.queryByText(/start by reading the required docs/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/ci\.yml/)).not.toBeInTheDocument()
+    // Back to the main agent.
+    await userEvent.click(within(view).getByRole('button', { name: 'Main agent' }))
+    expect(screen.getByTestId('search')).toBeEmptyDOMElement()
+    expect(await screen.findByText(/start by reading the required docs/)).toBeInTheDocument()
+  })
+
+  it('opens on the sub-agent in the address (a reload keeps it)', async () => {
+    media.wide = true
+    show('o1', `?agent=${SETUP}`)
+    const view = await screen.findByTestId('code-agent')
+    expect(within(view).getByText('Set up local test toolchain')).toBeInTheDocument()
+    expect(within(view).getByText(/ci\.yml/)).toBeInTheDocument()
+    // Its prompt, from the Agent call, as the message it was given.
+    expect(within(view).getByText(/You prepare a local test toolchain/)).toBeInTheDocument()
+  })
+
+  it('links an Agent call of the main timeline to its sub-agent', async () => {
+    show('o1')
+    const row = await screen.findByRole('button', { name: /Agent\s*B: Android voice mode/ })
+    await userEvent.click(row)
+    await userEvent.click(screen.getByRole('button', { name: /Open this sub-agent/ }))
+    expect(screen.getByTestId('search')).toHaveTextContent(`?agent=${VOICE}`)
+  })
+
+  it('on narrower screens, switches agents from the top bar', async () => {
+    media.desktop = false // a phone: the list is a sheet
+    show('o1')
+    const switcher = await screen.findByRole('button', { name: 'Agent: Main agent' })
+    expect(screen.queryByRole('list', { name: 'Agents' })).not.toBeInTheDocument()
+    await userEvent.click(switcher)
+    const sheet = await screen.findByRole('dialog')
+    await userEvent.click(within(sheet).getByText('Set up local test toolchain'))
+    expect(screen.getByTestId('search')).toHaveTextContent(`?agent=${SETUP}`)
+    expect(await screen.findByRole('button', { name: 'Agent: Set up local test toolchain' })).toBeInTheDocument()
+  })
+
+  it('shows a running sub-agent as running, and its end as it comes', async () => {
+    media.wide = true
+    thread = [codeJob({ id: 'o1', title: 'Orchestrate round 3', state: 'running', last_seq: SAMPLE.length })]
+    show('o1')
+    const list = await screen.findByRole('list', { name: 'Agents' })
+    expect(await within(list).findAllByRole('img', { name: 'Running' })).toHaveLength(2)
+    expect(within(list).getByText('2 sub-agents running')).toBeInTheDocument()
+    // A new event on the job's stream: the first agent ends.
+    await waitFor(() => expect(FakeEventSource.all.length).toBeGreaterThan(0))
+    act(() => FakeEventSource.all[0].emit('code.events', {
+      events: [{
+        seq: SAMPLE.length + 1, kind: 'system', trimmed: false, dropped: false, created_at: '2026-11-24T12:00:00Z',
+        event: { type: 'system', subtype: 'task_notification', tool_use_id: SETUP, status: 'completed' },
+      }],
+    }))
+    expect(await within(list).findByRole('img', { name: 'Done' })).toBeInTheDocument()
+    expect(within(list).getByText('1 sub-agent running')).toBeInTheDocument()
+  })
+
+  it('shows no agents for a job without sub-agents', async () => {
+    media.wide = true
+    events = { o1: [text(1, 'Just me')] }
+    thread = [codeJob({ id: 'o1', state: 'done', last_seq: 1 })]
+    show('o1')
+    expect(await screen.findByText('Just me')).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Agents' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Agent:/ })).not.toBeInTheDocument()
   })
 })

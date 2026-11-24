@@ -113,6 +113,12 @@ const messages: Messages = {
   "Queue message": "У чергу",
   "Discard message": "Відхилити",
   "“{title}”: {reason}": "«{title}»: {reason}",
+  "Main agent": "Головний агент",
+  "Agent: {name}": "Агент: {name}",
+  "{n} tool call | {n} tool calls": "{n} виклик інструмента | {n} виклики інструментів | {n} викликів інструментів",
+  "{n} sub-agent running | {n} sub-agents running": "Працює {n} субагент | Працюють {n} субагенти | Працює {n} субагентів",
+  "{n} sub-agent | {n} sub-agents": "{n} субагент | {n} субагенти | {n} субагентів",
+  "Open this sub-agent": "Відкрити цього субагента",
 }
 
 export default messages

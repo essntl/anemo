@@ -8,8 +8,8 @@
  * Phase 2 (§12): the computers, their projects, and starting, following up and
  * cancelling jobs.
  */
-import { useEffect, useRef } from 'react'
-import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef } from 'react'
+import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api, errorMessage, type Schemas, unwrap } from '@/api/client'
 import { t } from '@/lib/i18n'
 import type { CodeJob, CodeJobState } from './threads'
@@ -98,6 +98,22 @@ function eventsQuery(qc: QueryClient, jobId: string) {
       return mergeEvents(qc.getQueryData<CodeEvent[]>(queryKey) ?? [], fetched)
     },
   }
+}
+
+/**
+ * The events of several jobs (a thread's), by job id, as far as they are loaded. The
+ * same queries as `useCodeEvents`, so nothing is fetched twice: each job's part of the
+ * thread keeps its own events live, and this only reads them (for the sub-agent list).
+ */
+export function useThreadEvents(jobIds: readonly string[]): Record<string, CodeEvent[]> {
+  const qc = useQueryClient()
+  const key = jobIds.join(',')
+  // A stable `combine`: the result is a new object only when some job's events changed.
+  const combine = useCallback(
+    (results: { data?: CodeEvent[] }[]) => Object.fromEntries(key.split(',').map((id, i) => [id, results[i]?.data ?? []])),
+    [key],
+  )
+  return useQueries({ queries: jobIds.map((id) => eventsQuery(qc, id)), combine })
 }
 
 /**
