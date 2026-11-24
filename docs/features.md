@@ -795,6 +795,22 @@ agent request. When the run finishes, the phone reads the answer out.
   nothing starts.
 - **Follow-ups.** A request within 5 minutes of an answer continues that chat, so "and
   move it to Friday" knows what "it" is.
+- **A cue you can trust.** The moment the wake word is heard, music gets quiet, a short
+  rising sound plays and the phone buzzes; no cue means it wasn't heard. The request may
+  follow the wake word in one breath. A falling sound means the request was taken; a low
+  double sound means the wake word was heard but nothing after it. The sounds follow the
+  phone's system (ring) volume, not the media volume; "Vibrate with the sounds" is on by
+  default, so a phone on silent still buzzes.
+- **Voice mode** (a conversation without the wake word): turn it on with the **Voice
+  mode** quick-settings tile, the notification's **Voice mode** button, or by saying
+  **"start voice mode"** (also right after the wake word; it can be switched off in the
+  app). After each answer the phone plays the start sound and listens again, in the same
+  chat. It ends with the tile or the notification, by saying **"stop"** or **"end voice
+  mode"** on its own, when nobody speaks for 45 seconds (30 to 90 in the app), or when the
+  agent decides the conversation is over (the `voice_stop` tool, permission **Voice
+  mode**, allowed by default). The commands are recognised by the phone on what you said,
+  never by a model, and nothing the agent writes can turn voice mode on. Each on and off
+  is in **Settings → Audit log**, with its cause.
 - **What is spoken.** The final answer without Markdown, cut at a sentence end near 600
   characters, then "The rest is in the chat." A failed or stopped run says so in one
   sentence. The phone speaks with Android's own text-to-speech: the engine chosen in
@@ -827,7 +843,8 @@ part of the app: it downloads them from openWakeWord's own release when you choo
 word. A wake word model you train yourself has no such limit. A spoken yes or no is
 recognised in English, Ukrainian and Russian; in another language it counts as unclear
 and the notification decides. Design:
-[docs/specs/05-voice-android.md](specs/05-voice-android.md).
+[docs/specs/05-voice-android.md](specs/05-voice-android.md) and, for the cue and voice
+mode, [docs/specs/07-voice-mode-android.md](specs/07-voice-mode-android.md).
 
 <a id="devices-your-windows-computers"></a>
 

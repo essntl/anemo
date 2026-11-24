@@ -2,6 +2,7 @@ package app.anemo.voice.net
 
 import app.anemo.voice.core.ReplyResult
 import app.anemo.voice.core.ServerError
+import app.anemo.voice.core.TranscriptResult
 import app.anemo.voice.core.TurnResult
 import app.anemo.voice.core.Wav
 import okhttp3.OkHttpClient
@@ -50,6 +51,56 @@ class VoiceApiTest {
         assertTrue(audio.bytes.contentEquals(wav))
         assertFalse(up.parts.containsKey("conversation_id"))
         assertFalse(up.parts.containsKey("status"))
+    }
+
+    private fun transcript(): TranscriptResult {
+        val q = LinkedBlockingQueue<TranscriptResult>()
+        api.transcribe(wav) { q.add(it) }
+        return q.poll(5, TimeUnit.SECONDS)!!
+    }
+
+    @Test
+    fun `a transcript uploads only the wav and gives back what was heard`() {
+        assertEquals(TranscriptResult.Heard("Uh mail Tom no Tim."), transcript())
+        val up = fake.nextUpload()
+        assertEquals("/api/voice/transcripts", up.path)
+        assertEquals("Bearer ${fake.token}", up.headers["Authorization"])
+        assertEquals(setOf("audio"), up.parts.keys)
+        assertTrue(up.parts.getValue("audio").bytes.contentEquals(wav))
+    }
+
+    @Test
+    fun `a transcript of nothing, and its errors`() {
+        fake.transcriptResponse = FakeAnemo.json(200, """{"heard":"","say":"Sorry, I didn't catch that."}""")
+        assertEquals(TranscriptResult.Say("Sorry, I didn't catch that."), transcript())
+        fake.transcriptResponse = FakeAnemo.error(409, "no_transcription_model", "Choose one.")
+        assertEquals(TranscriptResult.Refused(ServerError(409, "no_transcription_model", "Choose one.")), transcript())
+        fake.transcriptResponse = FakeAnemo.json(404, """{"detail":"Not Found"}""") // an older Anemo
+        assertEquals(404, (transcript() as TranscriptResult.Refused).error.httpStatus)
+        val wrong = VoiceApi(client, fake.address, "anemo_wrong")
+        val q = LinkedBlockingQueue<TranscriptResult>()
+        wrong.transcribe(wav) { q.add(it) }
+        assertTrue(q.poll(5, TimeUnit.SECONDS) is TranscriptResult.Unauthorized)
+    }
+
+    @Test
+    fun `a request as text sends the text, voice mode and keep chat, and no audio`() {
+        val q = LinkedBlockingQueue<TurnResult>()
+        api.sendText("What's on today?", "c1", voiceMode = true, keepChat = true) { q.add(it) }
+        assertEquals(TurnResult.Started("r1", "c1", "uh mail tom no tim", "Email Tim."), q.poll(5, TimeUnit.SECONDS))
+        val up = fake.nextUpload()
+        assertEquals("/api/voice/turns", up.path)
+        assertEquals("What's on today?", up.parts.getValue("text").text)
+        assertEquals("c1", up.parts.getValue("conversation_id").text)
+        assertEquals("true", up.parts.getValue("voice_mode").text)
+        assertEquals("true", up.parts.getValue("keep_chat").text)
+        assertFalse(up.parts.containsKey("audio"))
+        // outside voice mode neither field is sent
+        api.sendText("x".repeat(5_000), null, voiceMode = false, keepChat = false) { q.add(it) }
+        q.poll(5, TimeUnit.SECONDS)
+        val plain = fake.nextUpload()
+        assertEquals(setOf("text"), plain.parts.keys)
+        assertEquals(VoiceApi.MAX_TEXT_CHARS, plain.parts.getValue("text").text.length)
     }
 
     @Test

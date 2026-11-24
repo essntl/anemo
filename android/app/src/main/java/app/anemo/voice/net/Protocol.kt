@@ -32,6 +32,10 @@ object Protocol {
 
     fun ping(): String = JSONObject().put("type", "ping").toString()
 
+    /** Voice mode went on or off (the server writes it to its audit log, answers nothing). */
+    fun voiceMode(on: Boolean, cause: String): String =
+        JSONObject().put("type", "voice.mode").put("on", on).put("cause", cause).toString()
+
     fun parse(text: String): ServerMessage = try {
         val o = JSONObject(text)
         when (o.optString("type")) {
@@ -60,6 +64,7 @@ object Protocol {
             text = d.stringOrNull("text").orEmpty(),
             more = d.optBoolean("more", false),
         )
+        "voice.stop" -> DeviceEvent.VoiceStop(d.getString("run_id"), d.stringOrNull("conversation_id"))
         "approval.requested" -> approval(d)?.let { DeviceEvent.ApprovalRequested(it) }
         "approval.decided" -> DeviceEvent.ApprovalDecided(d.getString("approval_id"), d.stringOrNull("decision").orEmpty())
         else -> null

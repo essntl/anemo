@@ -92,7 +92,21 @@ Locally, `./gradlew assembleRelease` with `ANEMO_VOICE_KEYSTORE` (the keystore's
    word and tap **Download** next to its models. Save.
 4. **Start listening**, allow the microphone and notifications. The notification
    "Anemo is listening for ‹wake word›" stays while it listens; a quick-settings tile
-   (edit your quick settings to add "Anemo Voice") switches it on and off.
+   (edit your quick settings to add "Anemo Voice") switches it on and off. A second tile,
+   "Voice mode", switches voice mode (below).
+
+**Voice mode** is a conversation without the wake word: after each answer the phone plays
+the start sound and listens again. Turn it on with the "Voice mode" tile, the
+notification's **Voice mode** button, or by saying "start voice mode" (also right after
+the wake word; Settings → Voice mode can switch the phrase off). It ends with the tile,
+**End voice mode** on the notification, "stop" or "end voice mode" said on its own,
+nobody speaking for 45 s (30–90 s in Settings), or the agent ending a conversation that is
+over. Each change is logged (`adb logcat -s AnemoVoice`) and goes to Anemo's audit log.
+Design: [docs/specs/07-voice-mode-android.md](../docs/specs/07-voice-mode-android.md).
+
+Version 1.1.0 needs an Anemo with `/api/voice/transcripts` for the voice-mode commands;
+with an older Anemo it sends recordings as before and voice mode can't be turned on by
+voice.
 
 Answers are spoken with the text-to-speech engine chosen in the phone's settings
 (*Text-to-speech output*). It needs a voice for the language of the answers: on a phone
@@ -112,16 +126,18 @@ app/src/main/java/app/anemo/voice/
              reply), VoiceSession (microphone, connection and loop started and stopped
              together, microphone recovery), Endpointer (end of speech), ReplyBudget, Wav,
              Phrases (what the phone says itself), Ports (the interfaces the platform
-             implements)
-  net/       Address, VoiceApi (POST /api/voice/turns and /replies), DeviceSocket (the
-             WebSocket: hello, ping, reconnect with back-off, last_id), Protocol (JSON)
+             implements), Commands (the voice-mode phrases), VoiceMode (its sessions),
+             CueTones (the sounds as PCM, the vibration patterns)
+  net/       Address, VoiceApi (POST /api/voice/turns, /transcripts and /replies),
+             DeviceSocket (the WebSocket: hello, ping, reconnect with back-off, last_id,
+             voice.mode messages), Protocol (JSON)
   ml/        OpenWakeWord and SileroVad on ONNX Runtime, ModelFiles (download / import)
-  audio/     MicrophoneSource (AudioRecord), AndroidSpeaker (TextToSpeech, audio focus),
-             ToneChimes, BluetoothRouting
+  audio/     MicrophoneSource (AudioRecord, echo canceller), AndroidSpeaker (TextToSpeech,
+             audio focus), ToneCues (the cues and the buzz), AudioDucking, BluetoothRouting
   history/   Room: the last 50 requests (heard, request, spoken answer, chat link)
   settings/  VoiceSettings, the store (token in EncryptedSharedPreferences), Readiness
-  service/   ListenService (foreground, microphone), its notification, the tile,
-             VoiceRuntime (wires the platform to the core)
+  service/   ListenService (foreground, microphone), its notification, the two tiles,
+             VoiceRuntime (wires the platform to the core), Logcat (the only log)
   ui/        Jetpack Compose + Material 3: MainActivity (status, history), SettingsActivity,
              AboutActivity (licences), one *Screen.kt per screen, Components.kt, the pure
              screen logic (ListenCard, SettingsForm, HistoryText); ui/theme/ the tokens and icons
@@ -132,14 +148,18 @@ app/src/main/java/app/anemo/voice/
 - Record without its notification showing: the service puts the notification up before
   it opens the microphone; it doesn't start, and stops, when notifications are off, the
   Listening channel is blocked or the notification is swiped away.
-- Upload anything but a recording that followed the wake word, a reply it asked for
-  (after speaking a question, an approval or a plan), or the status command (which sends
-  no audio).
+- Upload anything but a recording that followed the wake word, a recording made in voice
+  mode (which only you turn on, on the phone), a reply it asked for (after speaking a
+  question, an approval or a plan), or the status command (which sends no audio).
+- Let anything from the server turn voice mode on: the voice-mode commands are matched on
+  the phone on what you said, and the only voice-mode event is `voice.stop`, which ends it.
 - Let a run turn it into a listening device: it listens for a reply only after reading
   something out, always with the reply sound, for at most 8 s until you start and 15 s
   once you did, at most 3 times per run and 6 times in all per 5 minutes. A dangerous
   action, or an action that comes without a risk, is never asked by voice.
-- Put the token in a URL or a log (nothing in the app logs; `PrivacyRulesTest` checks).
+- Put the token, a transcript or an answer in a URL or a log (only `Logcat.kt` logs, and
+  only numbers and fixed words: the wake word's score, voice mode on/off and why;
+  `PrivacyRulesTest` checks).
 - Write audio or transcripts to storage: recordings stay in memory; the history keeps
   only what was heard, the request, the spoken answer and the chat link.
 
@@ -151,8 +171,12 @@ app/src/main/java/app/anemo/voice/
 - When Anemo answers with an error, the phone speaks Anemo's own `message`; its own
   phrases are only for no answer at all ("I could not reach Anemo") and for answers
   without a message, such as a proxy's error page ("Anemo did not accept the recording").
-- **Status** (in the app and on the notification) asks what is running; a recording that
-  is only "status" is a normal request, which Anemo answers the same way.
+- A request is first only transcribed (`/voice/transcripts`); the phone checks for a
+  voice-mode command and otherwise sends the transcript, without the wake word, to
+  `/voice/turns` as `text`.
+- **Status** (in the app) asks what is running; a recording that is only "status" is a
+  normal request, which Anemo answers the same way. (The notification has room for three
+  buttons: Pause, Voice mode and Stop.)
 
 ## Models and their licences
 

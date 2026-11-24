@@ -52,11 +52,7 @@ class EndToEndTest {
     }
 
     private val controller = VoiceController(
-        FakeWake(), FakeVad(), object : Chimes {
-            override fun start() = Unit
-            override fun stop() = Unit
-            override fun reply() = Unit
-        },
+        FakeWake(), FakeVad(), Chimes {},
         speaker,
         PostingBackend(VoiceApi(client, fake.address, fake.token), voice),
         history,
@@ -106,6 +102,14 @@ class EndToEndTest {
         speak()
     }
 
+    /** The next request: first only transcribed, then sent on as text. */
+    private fun nextTurn(): FakeAnemo.Upload {
+        val transcript = fake.nextUpload()
+        assertEquals("/api/voice/transcripts", transcript.path)
+        assertTrue(transcript.parts.containsKey("audio"))
+        return fake.nextUpload()
+    }
+
     private fun nextSpoken(): String = checkNotNull(spoken.poll(5, TimeUnit.SECONDS)) { "nothing was said" }
 
     private fun awaitState(state: ListenState) {
@@ -122,8 +126,10 @@ class EndToEndTest {
     @Test
     fun `wake word, request, run, spoken answer, and a follow-up in the same chat`() {
         request()
-        val up = fake.nextUpload()
+        val up = nextTurn()
         assertEquals("/api/voice/turns", up.path)
+        assertEquals("Uh mail Tom no Tim.", up.parts.getValue("text").text)
+        assertFalse(up.parts.containsKey("audio")) // transcribed once only
         assertNull(up.parts["conversation_id"])
         awaitHistory()
         assertEquals(fake.address.chat("c1"), history.entries.single().chatLink)
@@ -138,7 +144,41 @@ class EndToEndTest {
         assertEquals("I emailed Tim.", onVoice { history.entries.single().answer })
 
         request()
-        assertEquals("c1", fake.nextUpload().parts.getValue("conversation_id").text)
+        assertEquals("c1", nextTurn().parts.getValue("conversation_id").text)
+    }
+
+    @Test
+    fun `an Anemo without the transcript endpoint gets the recording, as before`() {
+        fake.transcriptResponse = FakeAnemo.json(404, """{"detail":"Not Found"}""")
+        request()
+        val up = nextTurn()
+        assertEquals("/api/voice/turns", up.path)
+        assertTrue(up.parts.containsKey("audio"))
+        awaitHistory()
+    }
+
+    @Test
+    fun `a transcript the server refuses is said in its words`() {
+        fake.transcriptResponse = FakeAnemo.error(409, "no_transcription_model", "Choose a Transcription model first.")
+        request()
+        assertEquals("Choose a Transcription model first.", nextSpoken())
+        assertEquals("/api/voice/transcripts", fake.nextUpload().path)
+        assertTrue(fake.uploads.isEmpty()) // nothing else was sent
+    }
+
+    @Test
+    fun `start voice mode is matched on the phone, nothing is sent on, and the microphone opens`() {
+        fake.transcriptResponse = FakeAnemo.json(200, """{"heard":"Jarvis, start voice mode."}""")
+        request()
+        assertEquals("/api/voice/transcripts", fake.nextUpload().path)
+        awaitState(ListenState.Recording) // voice mode: listening again, no wake word
+        assertTrue(onVoice { controller.voiceModeOn })
+        fake.transcriptResponse = FakeAnemo.json(200, """{"heard":"What's on today?"}""")
+        speak()
+        val up = nextTurn()
+        assertEquals("What's on today?", up.parts.getValue("text").text)
+        assertEquals("true", up.parts.getValue("voice_mode").text)
+        assertFalse(up.parts.containsKey("keep_chat")) // the first request of the session
     }
 
     private fun awaitHistory() {
@@ -179,7 +219,7 @@ class EndToEndTest {
         Thread.setDefaultUncaughtExceptionHandler { _, e -> synchronized(errors) { errors += e } }
         try {
             request()
-            fake.nextUpload()
+            nextTurn()
             voice.shutdown() // the service stopped while the upload was in flight
             latch.await(800, TimeUnit.MILLISECONDS)
             assertTrue(errors.toString(), errors.isEmpty())

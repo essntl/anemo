@@ -128,6 +128,14 @@ CATEGORIES: list[Category] = [
     ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
+    # Anemo Voice's voice mode (docs/specs/07-voice-mode-android.md): the agent can only
+    # end it, never start it.
+    Category(
+        "voice.control",
+        "Voice mode",
+        "End voice mode on your phone when a spoken conversation is over.",
+        "autonomous",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 

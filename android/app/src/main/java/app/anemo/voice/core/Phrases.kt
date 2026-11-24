@@ -12,6 +12,9 @@ object Phrases {
     const val UNAUTHORIZED = "Anemo refused the token. Check it in the app's settings."
     const val UNREACHABLE = "I could not reach Anemo."
 
+    /** Only the wake word was heard (the server says the same when it hears nothing). */
+    const val NOT_HEARD = "Sorry, I didn't catch that."
+
     /** Said instead of asking when a question or approval has no text to read out. */
     const val NOTHING_TO_READ = "Anemo is waiting for your answer. $USE_NOTIFICATION"
 
