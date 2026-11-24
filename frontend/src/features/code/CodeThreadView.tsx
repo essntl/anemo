@@ -397,46 +397,49 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
   const showMain = useCallback(() => select(MAIN), [select])
 
   return (
-    // The thread scrolls; the bar over it and the follow-up box under it stay.
+    // The thread scrolls; the bar over it and the follow-up box under it stay. The list of
+    // agents is a column of its own beside both, so the box is centred under the thread.
     <div className="flex h-full flex-col">
       <TopBar thread={thread} backTo={backTo}
         switcher={nav && !wide ? <AgentSwitcher agents={agents} selected={selected} onSelect={select} /> : undefined} />
       <AgentNavContext.Provider value={nav}>
         <div className="flex min-h-0 flex-1">
-          <div className="relative min-h-0 min-w-0 flex-1">
-            <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
-              <div ref={content} className="mx-auto max-w-3xl px-2 pb-6 pt-4 md:px-6">
-                {detail.isPending && <p className="p-2 text-[13px] text-muted">{t('Loading…')}</p>}
-                {detail.isError && (
-                  <div className="p-2 text-[13px]">
-                    <p className="text-error">{errorMessage(detail.error)}</p>
-                    <Button size="sm" className="mt-2" onClick={() => void detail.refetch()}>{t('Try again')}</Button>
-                  </div>
-                )}
-                {latest && (
-                  <>
-                    <Header thread={thread} />
-                    <Todos job={latest} />
-                    <div className="flex flex-col">
-                      {thread.map((job, i) => (
-                        <JobPart key={job.id} job={job} index={i} agent={selected} agents={perJob.get(job.id) ?? NO_AGENTS} onMain={showMain} />
-                      ))}
+          <div data-testid="code-thread-column" className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className="relative min-h-0 flex-1">
+              <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
+                <div ref={content} className="mx-auto max-w-3xl px-2 pb-6 pt-4 md:px-6">
+                  {detail.isPending && <p className="p-2 text-[13px] text-muted">{t('Loading…')}</p>}
+                  {detail.isError && (
+                    <div className="p-2 text-[13px]">
+                      <p className="text-error">{errorMessage(detail.error)}</p>
+                      <Button size="sm" className="mt-2" onClick={() => void detail.refetch()}>{t('Try again')}</Button>
                     </div>
-                  </>
-                )}
+                  )}
+                  {latest && (
+                    <>
+                      <Header thread={thread} />
+                      <Todos job={latest} />
+                      <div className="flex flex-col">
+                        {thread.map((job, i) => (
+                          <JobPart key={job.id} job={job} index={i} agent={selected} agents={perJob.get(job.id) ?? NO_AGENTS} onMain={showMain} />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
+              {away && (
+                <Button size="sm" icon={<ArrowDown className="h-3.5 w-3.5" />} className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-border shadow-float"
+                  onClick={() => toEnd(true)}>
+                  {latest?.state === 'running' ? t('Jump to latest') : t('Jump to the end')}
+                </Button>
+              )}
             </div>
-            {away && (
-              <Button size="sm" icon={<ArrowDown className="h-3.5 w-3.5" />} className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-border shadow-float"
-                onClick={() => toEnd(true)}>
-                {latest?.state === 'running' ? t('Jump to latest') : t('Jump to the end')}
-              </Button>
-            )}
+            {latest && <div className="shrink-0"><FollowUpBox job={latest} title={thread[0]?.title} onSent={toEnd} /></div>}
           </div>
           {nav && wide && <AgentSidebar agents={agents} selected={selected} onSelect={select} />}
         </div>
       </AgentNavContext.Provider>
-      {latest && <div className="shrink-0"><FollowUpBox job={latest} title={thread[0]?.title} onSent={toEnd} /></div>}
     </div>
   )
 }

@@ -327,6 +327,18 @@ describe('a job with sub-agents', () => {
     expect(await screen.findByText(/start by reading the required docs/)).toBeInTheDocument()
   })
 
+  it('keeps the follow-up box under the thread, beside the list of agents rather than under it', async () => {
+    media.wide = true
+    show('o1')
+    const list = await screen.findByRole('list', { name: 'Agents' })
+    const column = screen.getByTestId('code-thread-column')
+    // The box (here the line saying why nothing can be sent) is centred in the thread's
+    // column; the list of agents is a column of its own next to it.
+    expect(column).toContainElement(screen.getByTestId('follow-up-off'))
+    expect(column).not.toContainElement(list)
+    expect(column.parentElement).toContainElement(list)
+  })
+
   it('opens on the sub-agent in the address (a reload keeps it)', async () => {
     media.wide = true
     show('o1', `?agent=${SETUP}`)
