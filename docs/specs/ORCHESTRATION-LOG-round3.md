@@ -20,9 +20,9 @@ nothing merged into `main` by the agents; every sub-agent runs on Claude Opus 5.
 
 | Id | Workstream | Branch | Status |
 | --- | --- | --- | --- |
-| A | Roadmap refresh (orchestrator) | `feat/roadmap-refresh` | #76 |
+| A | Roadmap refresh (orchestrator) | `feat/roadmap-refresh` | #76, open (docs only) |
 | B | Android voice: wake-word cue, voice mode | `feat/voice-mode-android` | #78, merged |
-| C | Scripts under Automations | `feat/automation-scripts` | #82 |
+| C | Scripts under Automations | `feat/automation-scripts` | #82, merged |
 | D | Anemo Desktop for macOS | `feat/desktop-macos` | #81, merged |
 
 ## Wave 0 (orchestrator)
@@ -100,3 +100,14 @@ Audit findings that shaped the contracts:
 - Scripts: approving a script's code is the only way it runs; read spec 08's security
   section before enabling the first agent-written one.
 - An activity log with undo is still not built (roadmap → *Next*).
+
+## Close (2026-11-24)
+
+- #78, #81 and #82 merged into `main` (by Artem), each with all CI jobs green, including
+  the end-to-end job and the new macOS job. #76 (this log, the roadmap, the contracts)
+  is open and merges cleanly onto `main` at `230ae27`.
+- Not run anywhere: Anemo Voice 1.1.0 on a phone, Anemo Desktop on a real logged-in Mac
+  (CI's macOS runner ran Core's tests, smoke tests and one real screenshot only),
+  Developer ID signing and notarization, an agent-written script approved and run on the
+  real install.
+
