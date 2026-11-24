@@ -42,7 +42,7 @@ class OpenWakeWord(
     private var framesSinceReset = 0
 
     /** The last score, for the settings screen's level meter and for tests. */
-    var lastScore = 0f
+    override var lastScore = 0f
         private set
 
     init {

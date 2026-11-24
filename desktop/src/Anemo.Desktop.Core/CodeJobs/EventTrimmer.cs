@@ -213,6 +213,30 @@ public static class EventTrimmer
         return ReferenceEquals(cut, text) ? null : JsonValue.Create(cut);
     }
 
+    /// <summary>
+    /// Short fields that say where an event belongs (the sub-agent of <c>parent_tool_use_id</c>)
+    /// and what it ends (a background sub-agent's <c>tool_use_id</c> and <c>status</c>): a stub
+    /// keeps them, as the server does (code-sessions.md §6 step 4).
+    /// </summary>
+    private static readonly string[] Placing = ["parent_tool_use_id", "tool_use_id", "status"];
+
+    /// <summary>The fields a stub keeps of a content block, by the block's type.</summary>
+    private static readonly Dictionary<string, string[]> KeptBlockFields = new(StringComparer.Ordinal)
+    {
+        ["tool_use"] = ["type", "name", "id"],
+        ["tool_result"] = ["type", "tool_use_id", "is_error"],
+    };
+
+    private const int MaxKeptChars = 200;
+
+    /// <summary>A text of at most 200 characters, or true / false: a value a stub may keep.</summary>
+    private static bool IsShort(JsonNode? node) => node is JsonValue v && v.GetValueKind() switch
+    {
+        JsonValueKind.True or JsonValueKind.False => true,
+        JsonValueKind.String => v.GetValue<string>().Length <= MaxKeptChars,
+        _ => false,
+    };
+
     private static JsonObject Stub(JsonObject ev)
     {
         var stub = new JsonObject { ["type"] = ev["type"]?.DeepClone() };
@@ -221,30 +245,39 @@ public static class EventTrimmer
             stub["subtype"] = ev["subtype"]?.DeepClone();
         }
 
+        foreach (var key in Placing)
+        {
+            if (IsShort(ev[key]))
+            {
+                stub[key] = ev[key]!.DeepClone();
+            }
+        }
+
         stub["anemo_trimmed"] = TooLarge;
         if (ev["message"] is JsonObject { } message && message["content"] is JsonArray content)
         {
-            var calls = new JsonArray();
+            var kept = new JsonArray();
             foreach (var block in content.OfType<JsonObject>())
             {
-                if (block["type"] is JsonValue t && t.GetValueKind() == JsonValueKind.String && t.GetValue<string>() == "tool_use")
+                if (block["type"] is JsonValue t && t.GetValueKind() == JsonValueKind.String
+                    && KeptBlockFields.TryGetValue(t.GetValue<string>(), out var fields))
                 {
-                    var call = new JsonObject();
-                    foreach (var key in new[] { "type", "name", "id" })
+                    var part = new JsonObject();
+                    foreach (var key in fields)
                     {
-                        if (block.ContainsKey(key))
+                        if (block.ContainsKey(key) && IsShort(block[key]))
                         {
-                            call[key] = block[key]?.DeepClone();
+                            part[key] = block[key]!.DeepClone();
                         }
                     }
 
-                    calls.Add(call);
+                    kept.Add(part);
                 }
             }
 
-            if (calls.Count > 0)
+            if (kept.Count > 0)
             {
-                stub["message"] = new JsonObject { ["content"] = calls };
+                stub["message"] = new JsonObject { ["content"] = kept };
             }
         }
 

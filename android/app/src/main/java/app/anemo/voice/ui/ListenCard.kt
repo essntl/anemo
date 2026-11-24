@@ -83,7 +83,7 @@ object ListenCards {
                 CardButton(CardAction.Status, primary = false),
             )
         }
-        return ListenCard(title, chip(status), detail, tile, buttons)
+        return ListenCard(StatusText.withVoiceMode(title, status.voiceMode), chip(status), detail, tile, buttons)
     }
 
     /** The chip while listening: an error, else what the connection is doing. */

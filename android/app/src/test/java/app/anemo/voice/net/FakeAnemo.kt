@@ -42,6 +42,7 @@ class FakeAnemo : Closeable {
 
     val uploads = LinkedBlockingQueue<Upload>()
     @Volatile var turnResponse: MockResponse = json(202, TURN_STARTED)
+    @Volatile var transcriptResponse: MockResponse = json(200, """{"heard":"Uh mail Tom no Tim."}""")
     @Volatile var replyResponse: MockResponse = json(200, """{"decided":"approve","heard":"yes"}""")
     @Volatile var statusSay = "Nothing is running."
 
@@ -102,6 +103,7 @@ class FakeAnemo : Closeable {
                     MockResponse().withWebSocketUpgrade(Connection(request))
                 }
                 "/api/voice/turns" -> upload(request, turnResponse)
+                "/api/voice/transcripts" -> upload(request, transcriptResponse)
                 "/api/voice/replies" -> upload(request, replyResponse)
                 else -> MockResponse().setResponseCode(404)
             }
@@ -136,6 +138,8 @@ class FakeAnemo : Closeable {
         if (path == "/api/voice/turns" && parts["status"]?.text == "true") {
             return json(200, JSONObject().put("say", statusSay).toString())
         }
+        // a request may come as text (the transcript), anything else needs audio
+        if (path == "/api/voice/turns" && parts["text"] != null) return response
         if (parts["audio"] == null) return error(422, "empty_audio", "The recording is empty.")
         return response
     }

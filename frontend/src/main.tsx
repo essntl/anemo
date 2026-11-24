@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient } from '@tanstack/react-query'
 import { App } from '@/app/App'
 import { registerLanguages, setLanguage, storedChoice } from '@/lib/i18n'
-import { applyAppearance, useThemeStore, watchSystemTheme } from '@/features/settings/theme'
+import { applyAppearance, currentAppearance, watchSystemTheme } from '@/features/settings/theme'
 import '@/styles/app.css'
 
 const queryClient = new QueryClient({
@@ -12,8 +12,7 @@ const queryClient = new QueryClient({
   },
 })
 
-const { mode, accent, density } = useThemeStore.getState()
-applyAppearance({ mode, accent, density })
+applyAppearance(currentAppearance())
 watchSystemTheme()
 
 // Installable app: register the service worker (production builds only; it never caches /api).

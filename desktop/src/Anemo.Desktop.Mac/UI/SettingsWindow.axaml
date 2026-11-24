@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Anemo.Desktop.Mac.UI.SettingsWindow"
+        Title="Anemo Desktop: settings"
+        Width="600" Height="720" MinWidth="520" MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+  <!-- The same settings as the Windows client's Settings window (desktop/README.md);
+       checked by Core's SettingsDraft. "Shell" is PowerShell there, zsh here. -->
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Padding="24,12" BorderBrush="#22808080" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button x:Name="Cancel" Content="Cancel" IsCancel="True" />
+          <Button x:Name="Save" Content="Save" IsDefault="True" Classes="accent" />
+        </StackPanel>
+        <TextBlock x:Name="Problem" Foreground="#dc3b3b" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+      </DockPanel>
+    </Border>
+    <ScrollViewer>
+      <StackPanel Margin="24" Spacing="10">
+        <TextBlock x:Name="StatusTitle" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock x:Name="StatusDetail" Opacity="0.8" TextWrapping="Wrap" />
+
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Connection" />
+        <TextBlock Text="Anemo address (the one the web app uses)" />
+        <TextBox x:Name="Address" Watermark="https://anemo.example.com" />
+        <TextBlock Text="Device token (Settings → Devices in Anemo)" />
+        <TextBox x:Name="Token" PasswordChar="•" />
+        <TextBlock x:Name="TokenHint" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Shell" />
+        <CheckBox x:Name="ShellSwitch" Content="Let Anemo run commands in zsh on this Mac (trusted devices only)" />
+        <TextBlock Text="Folder the shell starts in" />
+        <TextBox x:Name="WorkFolder" />
+
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Keys" />
+        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
+                   Text="Written as Ctrl+Alt+Shift+S: Ctrl is Control (⌃), Alt is Option (⌥), Win is Command (⌘)." />
+        <TextBlock Text="Stop key (pauses control for an hour)" />
+        <TextBox x:Name="StopKey" />
+        <TextBlock Text="Share key (shares the screen with Anemo)" />
+        <TextBox x:Name="ShareKey" />
+
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Start" />
+        <CheckBox x:Name="OpenAtLogin" Content="Open at login" />
+
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Claude Code jobs" />
+        <CheckBox x:Name="ShareJobs" Content="Share Claude Code jobs with Anemo (trusted devices only)" />
+        <TextBlock Text="Jobs folder" />
+        <TextBox x:Name="JobsFolder" />
+        <CheckBox x:Name="StartJobs" Content="Let Anemo start Claude Code jobs" />
+        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
+                   Text="Jobs run with bypassPermissions: Anemo's agents can then make Claude Code do anything it can on this Mac. Tick it only on a Mac you would give the shell to." />
+        <TextBlock Text="Projects folder" />
+        <TextBox x:Name="ProjectsFolder" />
+        <TextBlock Text="GitHub owner (empty: the account gh is signed in as)" />
+        <TextBox x:Name="GitHubOwner" />
+        <TextBlock x:Name="Version" Opacity="0.6" FontSize="12" Margin="0,12,0,0" />
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

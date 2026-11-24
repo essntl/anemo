@@ -44,9 +44,14 @@ public sealed class FakeCodeHost : ICodeHost
         return AnswerAsync is { } answer ? answer(run, ct) : Task.FromResult(Answer(run));
     }
 
-    public int StartDetached(DetachedStart start)
+    /// <summary>Every job as Core described it.</summary>
+    public ConcurrentQueue<JobLaunch> Launches { get; } = new();
+
+    /// <summary>Records the job, and in <see cref="Started"/> the cmd.exe start Windows makes of it.</summary>
+    public int StartJob(JobLaunch launch)
     {
-        Started.Enqueue(start);
+        Launches.Enqueue(launch);
+        Started.Enqueue(WindowsJobCommand.For(launch));
         return NextPid ?? throw new System.ComponentModel.Win32Exception(2);
     }
 

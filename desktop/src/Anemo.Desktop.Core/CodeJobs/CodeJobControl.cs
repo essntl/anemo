@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Anemo.Desktop.Core.Commands;
+using Anemo.Desktop.Core.Platform;
 using Anemo.Desktop.Core.Protocol;
 using Anemo.Desktop.Core.Storage;
 
@@ -66,6 +67,7 @@ public sealed partial class CodeJobControl
     private readonly IProcessProbe _probe;
     private readonly TimeProvider _time;
     private readonly CodeJobControlOptions _options;
+    private readonly DesktopPlatform _platform;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Starting> _starting = new(StringComparer.Ordinal);
 
     public CodeJobControl(
@@ -73,23 +75,25 @@ public sealed partial class CodeJobControl
         ICodeHost host,
         IProcessProbe probe,
         TimeProvider time,
-        CodeJobControlOptions? options = null)
+        CodeJobControlOptions? options = null,
+        DesktopPlatform? platform = null)
     {
         _settings = settings;
         _host = host;
         _probe = probe;
         _time = time;
         _options = options ?? new CodeJobControlOptions();
+        _platform = platform ?? DesktopPlatform.Windows;
     }
 
     public static bool Handles(string action) => action is "code_projects" or "code_start" or "code_cancel";
 
-    private string ProjectsFolder => Setting(_settings().CodeProjectsFolder) ?? CodeJobLimits.DefaultProjectsFolder;
+    private string ProjectsFolder => Setting(_settings().CodeProjectsFolder) ?? _platform.DefaultProjectsFolder;
 
     /// <summary>The owner set in Settings, or null when none is.</summary>
     private string? OwnerSetting => Setting(_settings().GitHubOwner);
 
-    private string JobsFolder => Setting(_settings().CodeJobsFolder) ?? CodeJobLimits.DefaultFolder;
+    private string JobsFolder => Setting(_settings().CodeJobsFolder) ?? _platform.DefaultJobsFolder;
 
     /// <summary>
     /// The command line of a job's <c>cmd.exe</c> (§12.1 step 4, §12.5): Claude Code by the full
@@ -263,16 +267,17 @@ public sealed partial class CodeJobControl
         var resume = Optional(args, "resume_session", SessionPattern(), "“resume_session” must be a Claude Code session id (letters, digits and dashes).");
         var model = Optional(args, "model", ModelPattern(), "“model” must be a model name of at most 100 letters, digits, dots, dashes, underscores and brackets.");
         int? maxTurns = args.Has("max_turns") ? args.Int("max_turns", 1, 500) : null;
+        var images = CodeJobImages.Parse(args);
 
         // The full path, so a claude.cmd in the project folder (a cloned repository's) never runs.
         var claude = _host.FindOnPath("claude") ?? throw CommandException.Failed(NoClaudeMessage);
-        if (!CommandLineSafe(claude))
+        if (_platform.JobsThroughCmdExe && !CommandLineSafe(claude))
         {
             throw CommandException.Failed("The path of Claude Code (claude) has a \" or % in it, which a command line can't carry.");
         }
 
         var jobs = JobsFolder;
-        if (!CommandLineSafe(jobs))
+        if (_platform.JobsThroughCmdExe && !CommandLineSafe(jobs))
         {
             throw CommandException.Failed("The jobs folder's path has a \" or % in it, which a command line can't carry; choose another one in Anemo Desktop's settings.");
         }
@@ -296,10 +301,22 @@ public sealed partial class CodeJobControl
             prepare = prepareFolder;
         }
 
-        // 3. The job folder and its prompt.
+        // 3. The job folder and its prompt. Images go into the folder's images\, and the prompt
+        // Claude Code reads lists their full paths after the user's text (1.3.0).
         var started = _time.GetLocalNow();
         var (id, folder) = NewJobFolder(jobs, started);
-        File.WriteAllText(Path.Combine(folder, JobFolder.Prompt), prompt, new UTF8Encoding(false));
+        string fullPrompt;
+        try
+        {
+            fullPrompt = CodeJobImages.Write(folder, images, prompt);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            TryDelete(folder);
+            throw CommandException.Failed("The images couldn't be written into the job's folder.");
+        }
+
+        File.WriteAllText(Path.Combine(folder, JobFolder.Prompt), fullPrompt, new UTF8Encoding(false));
 
         if (prepare is null)
         {
@@ -432,19 +449,18 @@ public sealed partial class CodeJobControl
         }
     }
 
-    /// <summary>Starts the job's cmd.exe and writes meta.json with its pid.</summary>
-    /// <exception cref="CommandException">Windows didn't start it.</exception>
+    /// <summary>Starts the job's process (on Windows its cmd.exe) and writes meta.json with its pid.</summary>
+    /// <exception cref="CommandException">The system didn't start it.</exception>
     private void Launch(string id, string folder, string dir, DateTimeOffset started, PlannedJob job)
     {
         int pid;
         try
         {
-            pid = _host.StartDetached(new DetachedStart(
-                "cmd.exe", CommandLine(job.Claude, folder, job.Resume, job.Model, job.MaxTurns), dir, StartEnvironment));
+            pid = _host.StartJob(new JobLaunch(job.Claude, folder, dir, job.Resume, job.Model, job.MaxTurns));
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            throw CommandException.Failed($"Windows couldn't start the job ({e.GetType().Name}).");
+            throw CommandException.Failed($"{_platform.DisplayName} couldn't start the job ({e.GetType().Name}).");
         }
 
         WriteMeta(folder, Meta(id, pid, dir, started, job));
@@ -673,7 +689,7 @@ public sealed partial class CodeJobControl
         if (!_host.KillTree(meta.Pid!.Value))
         {
             TryDeleteFile(marker);
-            throw CommandException.Failed("Windows wouldn't end the job's process.");
+            throw CommandException.Failed($"{_platform.DisplayName} wouldn't end the job's process.");
         }
 
         // It may have finished between the look above and the kill: its result wins (§12.5).

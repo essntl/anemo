@@ -8,14 +8,16 @@ import android.media.AudioManager
 import android.os.SystemClock
 import app.anemo.voice.BuildConfig
 import app.anemo.voice.audio.AndroidSpeaker
+import app.anemo.voice.audio.AudioDucking
 import app.anemo.voice.audio.BluetoothRouting
 import app.anemo.voice.audio.MicrophoneSource
-import app.anemo.voice.audio.ToneChimes
+import app.anemo.voice.audio.ToneCues
 import app.anemo.voice.core.DeviceEvent
 import app.anemo.voice.core.ExecutorTimer
 import app.anemo.voice.core.ListenState
 import app.anemo.voice.core.PostingBackend
 import app.anemo.voice.core.VoiceController
+import app.anemo.voice.core.VoiceModeCause
 import app.anemo.voice.core.VoiceSession
 import app.anemo.voice.history.HistoryDatabase
 import app.anemo.voice.history.RoomHistoryStore
@@ -24,8 +26,10 @@ import app.anemo.voice.ml.OpenWakeWord
 import app.anemo.voice.ml.SileroVad
 import app.anemo.voice.net.Address
 import app.anemo.voice.net.DeviceSocket
+import app.anemo.voice.net.Protocol
 import app.anemo.voice.net.VoiceApi
 import app.anemo.voice.settings.VoiceSettings
+import app.anemo.voice.settings.WakeWord
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.Executors
@@ -90,7 +94,7 @@ object VoiceRuntime {
         made += { wake.close() }
         val vad = SileroVad(env, context.assets.open(SileroVad.ASSET).use { it.readBytes() })
         made += { vad.close() }
-        val chimes = ToneChimes(settings.sounds)
+        val chimes = ToneCues(context, settings.sounds, settings.vibrate)
         made += { chimes.release() }
         val speaker = AndroidSpeaker(
             context, settings.ttsVoice, settings.ttsSpeed,
@@ -101,6 +105,7 @@ object VoiceRuntime {
         made += { speaker.shutdown() }
         val audio = context.getSystemService(AudioManager::class.java)
         val microphone = MicrophoneSource(if (settings.bluetoothMic) BluetoothRouting(audio) else null)
+        lateinit var socket: DeviceSocket // made below; the controller only uses it once running
 
         val controller = VoiceController(
             wake = wake,
@@ -117,10 +122,25 @@ object VoiceRuntime {
                 override fun onStateChanged(state: ListenState) = onStatus { it.copy(listen = state) }
                 override fun onHistoryChanged() = StatusBus.historyChanged()
                 override fun onActiveRunsChanged(count: Int) = onStatus { it.copy(activeRuns = count) }
+                override fun onWakeWord(score: Float) = Logcat.wakeWord(score)
+
+                // Logged here, and in Anemo's audit log (there is no activity log).
+                override fun onVoiceModeChanged(on: Boolean, cause: VoiceModeCause) {
+                    Logcat.voiceMode(on, cause)
+                    onStatus { it.copy(voiceMode = on) }
+                    socket.send(Protocol.voiceMode(on, cause.wire))
+                }
             },
+            focus = AudioDucking(audio),
+            options = VoiceController.Options(
+                // a custom word without a name: nothing to take off the start of a request
+                wakeWord = if (settings.wakeWord == WakeWord.Custom && settings.customWordName.isBlank()) "" else settings.wakeWordName,
+                startPhrase = settings.voiceModePhrase,
+                voiceModeIdleMs = settings.voiceModeIdleSeconds * 1000,
+            ),
         )
 
-        val socket = DeviceSocket(
+        socket = DeviceSocket(
             client, address.deviceSocket, settings.token, BuildConfig.VERSION_NAME,
             object : DeviceSocket.Listener {
                 override fun onConnected(deviceName: String, missed: Boolean) =

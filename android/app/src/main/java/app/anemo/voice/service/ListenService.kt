@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.service.quicksettings.TileService
 import app.anemo.voice.core.ListenState
+import app.anemo.voice.core.VoiceModeCause
 import app.anemo.voice.core.VoiceSession
 import app.anemo.voice.settings.AndroidSettingsStore
 import app.anemo.voice.settings.VoiceSettings
@@ -41,7 +42,9 @@ class ListenService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            START -> begin()
+            START -> begin(voiceMode = intent.getBooleanExtra(EXTRA_VOICE_MODE, false))
+            VOICE_MODE_ON -> session?.setVoiceMode(true, cause(intent))
+            VOICE_MODE_OFF -> session?.setVoiceMode(false, cause(intent))
             PAUSE -> session?.pause()
             RESUME -> session?.resume()
             STATUS -> session?.status()
@@ -52,8 +55,16 @@ class ListenService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun begin() {
-        if (session != null) return
+    /** Only the tile and the notification switch voice mode from outside the voice loop. */
+    private fun cause(intent: Intent): VoiceModeCause =
+        if (intent.getStringExtra(EXTRA_CAUSE) == FROM_NOTIFICATION) VoiceModeCause.Notification else VoiceModeCause.Tile
+
+    /** [voiceMode]: the voice mode tile started listening, so voice mode goes on at once. */
+    private fun begin(voiceMode: Boolean) {
+        if (session != null) {
+            if (voiceMode) session?.setVoiceMode(true, VoiceModeCause.Tile)
+            return
+        }
         settings = AndroidSettingsStore(this).load()
         val first = Status(listen = ListenState.Listening, connection = Connection.Connecting)
         // The notification first: never a microphone without it.
@@ -92,6 +103,7 @@ class ListenService : Service() {
             made = VoiceRuntime.build(this, settings, StatusBus::update) { message -> main.post { end(message) } }
             made.start()
             session = made
+            if (voiceMode) made.setVoiceMode(true, VoiceModeCause.Tile)
         } catch (e: Exception) {
             made?.stop() // a half-started session: stop the connection and the loop again
             end("Anemo Voice could not start (${e.message ?: e.javaClass.simpleName}).")
@@ -149,6 +161,7 @@ class ListenService : Service() {
 
     private fun refreshTile() {
         TileService.requestListeningState(this, ComponentName(this, ListenTileService::class.java))
+        TileService.requestListeningState(this, ComponentName(this, VoiceModeTileService::class.java))
     }
 
     companion object {
@@ -158,6 +171,15 @@ class ListenService : Service() {
         const val STATUS = "app.anemo.voice.STATUS"
         const val STOP = "app.anemo.voice.STOP"
         const val HIDDEN = "app.anemo.voice.HIDDEN"
+        const val VOICE_MODE_ON = "app.anemo.voice.VOICE_MODE_ON"
+        const val VOICE_MODE_OFF = "app.anemo.voice.VOICE_MODE_OFF"
+
+        /** With [START]: turn voice mode on as soon as listening started. */
+        const val EXTRA_VOICE_MODE = "voice_mode"
+
+        /** With [VOICE_MODE_ON] / [VOICE_MODE_OFF]: [FROM_NOTIFICATION], else the tile. */
+        const val EXTRA_CAUSE = "cause"
+        const val FROM_NOTIFICATION = "notification"
 
         fun intent(context: Context, action: String): Intent =
             Intent(context, ListenService::class.java).setAction(action)

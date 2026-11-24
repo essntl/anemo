@@ -160,8 +160,8 @@ class VoiceSessionTest {
         assertEquals(ListenState.Listening, onVoice { c.state })
         s.stop()
         s.stop()
-        await("disconnect")
         await("mic close")
+        await("disconnect") // after the loop stopped: its last message (voice mode off) still goes
         await("cleanup")
         assertTrue(voice.awaitTermination(2, TimeUnit.SECONDS))
         assertFalse(events.contains("cleanup"))

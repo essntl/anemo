@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
+import { withoutAgent } from './agents'
 import { CodeJobList } from './CodeJobList'
 import { CodeThreadView } from './CodeThreadView'
 
@@ -26,7 +27,7 @@ export function CodePage() {
       <section className={cn('h-full min-w-0 flex-1', !jobId && 'max-lg:hidden')}>
         {jobId ? (
           // A thread of its own: its own scroll position and live streams.
-          <CodeThreadView key={jobId} jobId={jobId} backTo={`/code${search}`} />
+          <CodeThreadView key={jobId} jobId={jobId} backTo={`/code${withoutAgent(search)}`} />
         ) : (
           <EmptyState icon={<SquareTerminal className="h-5 w-5" />} title={t('Pick a job')}
             description={t('Choose a job on the left to follow what Claude Code does, step by step.')} />

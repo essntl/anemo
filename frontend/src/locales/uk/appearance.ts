@@ -1,0 +1,96 @@
+import type { Messages } from '@/lib/i18n'
+
+/** Settings > Appearance and Settings > Profile (features/appearance, features/profile). */
+const messages: Messages = {
+  // Preview
+  "Preview": "Попередній перегляд",
+  "Can you sum up this week for me?": "Можете підсумувати цей тиждень?",
+  "Sure. Three tasks are done and two are due tomorrow.": "Звісно. Три завдання виконано, термін ще двох — завтра.",
+  "Open the tasks": "Відкрити завдання",
+  "Secondary text looks like this.": "Другорядний текст виглядає так.",
+  "Primary button": "Основна кнопка",
+  "Button": "Кнопка",
+
+  // Colours
+  "Used for highlights, buttons and selection. Hover shades and the text on it follow automatically.": "Для виділень, кнопок і вибраного. Відтінки під курсором і колір тексту на ньому підбираються автоматично.",
+  "Reset to default": "Скинути до типового",
+  "Custom accent color": "Власний акцентний колір",
+  "{label} (hex)": "{label} (hex)",
+  "Text on buttons in this color is hard to read ({ratio}:1, needs {needed}:1).": "Текст на кнопках цього кольору важко читати ({ratio}:1, потрібно {needed}:1).",
+  "Links and outlines in this color are hard to see on the page ({ratio}:1, needs {needed}:1).": "Посилання й обведення цього кольору погано видно на сторінці ({ratio}:1, потрібно {needed}:1).",
+  "Grey text on this tint is hard to read ({ratio}:1, needs {needed}:1). Lower the strength.": "Сірий текст на цьому відтінку важко читати ({ratio}:1, потрібно {needed}:1). Зменште інтенсивність.",
+  "Background tint": "Відтінок тла",
+  "Mixes a color into the page, panels and cards.": "Додає колір до сторінки, панелей і карток.",
+  "Tint {color}": "Відтінок {color}",
+  "Custom tint": "Власний відтінок",
+  "Strength": "Інтенсивність",
+  "Tint strength": "Інтенсивність відтінку",
+
+  // Fonts
+  "Fonts": "Шрифти",
+  "Fonts that come with Anemo are part of the app: nothing is loaded from Google Fonts or any other site.": "Шрифти, що постачаються з Anemo, є частиною застосунку: нічого не завантажується з Google Fonts чи інших сайтів.",
+  "Interface": "Інтерфейс",
+  "Interface font": "Шрифт інтерфейсу",
+  "Code font": "Шрифт коду",
+  "comes with Anemo": "входить до Anemo",
+  "from your system": "із вашої системи",
+  "uploaded": "завантажений",
+  "System font": "Системний шрифт",
+  "System serif": "Системний із засічками",
+  "System rounded": "Системний заокруглений",
+  "System monospace": "Системний моноширинний",
+  "The quick brown fox jumps over the lazy dog.": "Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів!",
+  "Upload a font": "Завантажити шрифт",
+  "WOFF2, WOFF, TTF or OTF, up to 4 MB.": "WOFF2, WOFF, TTF або OTF, до 4 МБ.",
+  "Font uploaded. It is now the interface font; you can choose it for code too.": "Шрифт завантажено. Тепер це шрифт інтерфейсу; його можна вибрати й для коду.",
+  "Couldn't use this font: {error}": "Не вдалося використати цей шрифт: {error}",
+
+  // Background
+  "Background": "Тло",
+  "Behind the whole app, including your chats.": "Позаду всього застосунку, зокрема ваших чатів.",
+  "Animated gradient": "Анімований градієнт",
+  "Picture or video": "Зображення або відео",
+  "Aurora": "Полярне сяйво",
+  "Dusk": "Сутінки",
+  "Lagoon": "Лагуна",
+  "PNG, JPEG, WebP, AVIF or GIF up to 15 MB; WebM or MP4 up to 40 MB. Photo details such as the location are removed.": "PNG, JPEG, WebP, AVIF або GIF до 15 МБ; WebM або MP4 до 40 МБ. Дані фото, як-от місце зйомки, видаляються.",
+  "Couldn't use this file: {error}": "Не вдалося використати цей файл: {error}",
+  "Delete {name}": "Видалити {name}",
+  "Blur": "Розмиття",
+  "Dim": "Затемнення",
+  "Fit": "Вписати",
+  "Fill": "Заповнити",
+  "Tile": "Плиткою",
+  "Animate on phones too": "Анімувати й на телефонах",
+  "Phones show a still picture to save battery. With reduced motion turned on in your system, it is always still.": "Телефони показують нерухоме зображення, щоб заощадити заряд. Якщо в системі ввімкнено зменшення руху, воно завжди нерухоме.",
+
+  // Glass, this device
+  "Frosted glass": "Матове скло",
+  "The sidebar, cards, dialogs and the message box let the background show through, blurred. Off when your system asks for less transparency.": "Бічна панель, картки, діалоги й поле повідомлення пропускають розмите тло. Вимкнено, якщо система просить менше прозорості.",
+  "Your appearance is saved on the server and follows you to every device.": "Вигляд зберігається на сервері й однаковий на всіх ваших пристроях.",
+  "Use a different appearance on this device": "Інший вигляд на цьому пристрої",
+  "Changes made here then stay in this browser and are not saved to the server.": "Тоді зміни, зроблені тут, лишаються в цьому браузері й не зберігаються на сервері.",
+  "Export": "Експортувати",
+  "Import": "Імпортувати",
+  "A small JSON file. Uploaded fonts and pictures stay on the server; they are only referred to.": "Невеликий файл JSON. Завантажені шрифти й зображення лишаються на сервері; файл лише посилається на них.",
+  "Appearance imported.": "Вигляд імпортовано.",
+  "This file isn't an Anemo appearance file.": "Це не файл вигляду Anemo.",
+
+  // Profile
+  "How you appear in Anemo: in your chats, on the Code page and in the sidebar.": "Як вас видно в Anemo: у чатах, на сторінці Code і на бічній панелі.",
+  "Display name": "Ім’я для показу",
+  "Shown next to your messages and in the sidebar. Empty: your login name ({username}).": "Показується біля ваших повідомлень і на бічній панелі. Якщо порожньо — ваше ім’я для входу ({username}).",
+  "Name saved.": "Ім’я збережено.",
+  "Upload avatar": "Завантажити аватар",
+  "Change avatar": "Змінити аватар",
+  "PNG, JPEG, WebP, AVIF or GIF, up to 10 MB. Without one, your initials are shown.": "PNG, JPEG, WebP, AVIF або GIF, до 10 МБ. Без аватара показуються ваші ініціали.",
+  "Avatar saved.": "Аватар збережено.",
+  "Couldn't use this picture: {error}": "Не вдалося використати це зображення: {error}",
+  "Crop your avatar": "Обріжте аватар",
+  "Drag the picture or use the arrow keys; zoom with the slider or + and −.": "Перетягуйте зображення або користуйтеся клавішами зі стрілками; масштаб — повзунком або + і −.",
+  "Avatar crop area": "Область обрізання аватара",
+  "Zoom": "Масштаб",
+  "Save avatar": "Зберегти аватар",
+}
+
+export default messages

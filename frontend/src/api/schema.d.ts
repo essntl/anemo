@@ -290,6 +290,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Profile Settings */
+        put: operations["put_profile_settings_api_settings_profile_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/models": {
         parameters: {
             query?: never;
@@ -1286,6 +1303,80 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Assets */
+        get: operations["list_assets_api_appearance_assets_get"];
+        put?: never;
+        /** Upload Asset */
+        post: operations["upload_asset_api_appearance_assets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets/{asset_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Asset Content */
+        get: operations["asset_content_api_appearance_assets__asset_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Asset */
+        delete: operations["delete_asset_api_appearance_assets__asset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Avatar
+         * @description Replace the avatar with the square (crop_x, crop_y, crop_size: fractions of the
+         *     picture's width, height and shorter side) of the uploaded picture.
+         */
+        put: operations["set_avatar_api_appearance_avatar_put"];
+        post?: never;
+        /** Remove Avatar */
+        delete: operations["remove_avatar_api_appearance_avatar_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4623,10 +4714,33 @@ export interface paths {
         put?: never;
         /**
          * Voice Turn
-         * @description A spoken request: transcribed, made a clear request, and started as an agent run
-         *     in the Voice chat (or continuing `conversation_id` within the follow-up window).
+         * @description A spoken request: transcribed (or `text`, the transcript from `/voice/transcripts`),
+         *     made a clear request, and started as an agent run in the Voice chat (or continuing
+         *     `conversation_id` within the follow-up window; with `keep_chat`, whatever the window
+         *     says). `voice_mode`: the phone listens again after the answer.
          */
         post: operations["voice_turn_api_voice_turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/voice/transcripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Transcript
+         * @description Only transcribes: the phone matches its voice-mode commands on what was heard
+         *     before anything starts (docs/specs/07-voice-mode-android.md). Stores nothing.
+         */
+        post: operations["voice_transcript_api_voice_transcripts_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4698,6 +4812,7 @@ export interface components {
         AllSettings: {
             general: components["schemas"]["GeneralSettings"];
             appearance: components["schemas"]["AppearanceSettings"];
+            profile: components["schemas"]["ProfileSettings"];
             models: components["schemas"]["ModelDefaults"];
             permissions: components["schemas"]["PermissionSettings"];
             workspace: components["schemas"]["WorkspaceSettings"];
@@ -4716,7 +4831,84 @@ export interface components {
             voice: components["schemas"]["VoiceSettings"];
             code: components["schemas"]["CodeSettings"];
         };
-        /** AppearanceSettings */
+        /** AppearanceAssetOut */
+        AppearanceAssetOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "background" | "font" | "avatar";
+            /**
+             * Media
+             * @enum {string}
+             */
+            media: "image" | "animated" | "video" | "font";
+            /** Mime */
+            mime: string;
+            /** Size */
+            size: number;
+            /** Filename */
+            filename: string;
+            /** Url */
+            url: string;
+            /** Poster Url */
+            poster_url: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * AppearanceBackground
+         * @description What is behind the app: nothing, a built-in animated gradient, or an upload.
+         */
+        AppearanceBackground: {
+            /**
+             * Kind
+             * @default none
+             * @enum {string}
+             */
+            kind: "none" | "gradient" | "upload";
+            /**
+             * Gradient
+             * @default aurora
+             * @enum {string}
+             */
+            gradient: "aurora" | "dusk" | "lagoon";
+            /** Asset Id */
+            asset_id?: string | null;
+            /**
+             * Blur
+             * @default 0
+             */
+            blur: number;
+            /**
+             * Dim
+             * @default 35
+             */
+            dim: number;
+            /**
+             * Fit
+             * @default cover
+             * @enum {string}
+             */
+            fit: "cover" | "contain" | "tile";
+            /**
+             * Animate On Phones
+             * @default false
+             */
+            animate_on_phones: boolean;
+        };
+        /**
+         * AppearanceSettings
+         * @description Settings > Appearance; applied in the browser (frontend/src/features/appearance).
+         */
         AppearanceSettings: {
             /**
              * Mode
@@ -4735,6 +4927,29 @@ export interface components {
              * @enum {string}
              */
             density: "comfortable" | "compact";
+            /** Tint */
+            tint?: string | null;
+            /**
+             * Tint Strength
+             * @default 40
+             */
+            tint_strength: number;
+            /**
+             * Ui Font
+             * @default default
+             */
+            ui_font: string;
+            /**
+             * Code Font
+             * @default default
+             */
+            code_font: string;
+            background?: components["schemas"]["AppearanceBackground"];
+            /**
+             * Glass
+             * @default false
+             */
+            glass: boolean;
         };
         /** AppendTo */
         AppendTo: {
@@ -5149,6 +5364,26 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_set_avatar_api_appearance_avatar_put */
+        Body_set_avatar_api_appearance_avatar_put: {
+            /** File */
+            file: string;
+            /**
+             * Crop X
+             * @default 0
+             */
+            crop_x: number;
+            /**
+             * Crop Y
+             * @default 0
+             */
+            crop_y: number;
+            /**
+             * Crop Size
+             * @default 1
+             */
+            crop_size: number;
+        };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
             /** File */
@@ -5168,6 +5403,16 @@ export interface components {
              * @description For a folder upload: each file's path inside the uploaded folder (`photos/2024/beach.jpg`), in the order of `files`. Missing folders are made.
              */
             paths?: string[] | null;
+        };
+        /** Body_upload_asset_api_appearance_assets_post */
+        Body_upload_asset_api_appearance_assets_post: {
+            /** File */
+            file: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "background" | "font";
         };
         /** Body_upload_asset_api_documents_assets_post */
         Body_upload_asset_api_documents_assets_post: {
@@ -5189,6 +5434,11 @@ export interface components {
              */
             approval_id: string;
         };
+        /** Body_voice_transcript_api_voice_transcripts_post */
+        Body_voice_transcript_api_voice_transcripts_post: {
+            /** Audio */
+            audio: string;
+        };
         /** Body_voice_turn_api_voice_turns_post */
         Body_voice_turn_api_voice_turns_post: {
             /** Audio */
@@ -5200,6 +5450,18 @@ export interface components {
              * @default false
              */
             status: boolean;
+            /** Text */
+            text?: string | null;
+            /**
+             * Voice Mode
+             * @default false
+             */
+            voice_mode: boolean;
+            /**
+             * Keep Chat
+             * @default false
+             */
+            keep_chat: boolean;
         };
         /** BranchIn */
         BranchIn: {
@@ -5575,6 +5837,21 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
+        };
+        /** CodeImageOut */
+        CodeImageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** CodeJobDetailOut */
         CodeJobDetailOut: {
@@ -5606,6 +5883,11 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
         };
         /** CodeJobListOut */
         CodeJobListOut: {
@@ -5693,6 +5975,11 @@ export interface components {
             run_id?: string | null;
             /** Conversation Title */
             conversation_title?: string | null;
+            /**
+             * Images
+             * @default []
+             */
+            images: components["schemas"]["CodeImageOut"][];
         };
         /** CodeProjectOut */
         CodeProjectOut: {
@@ -8345,6 +8632,20 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * ProfileSettings
+         * @description Settings > Profile: how you appear in the app. The avatar is set through
+         *     PUT /appearance/avatar, which also stores its id here.
+         */
+        ProfileSettings: {
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /** Avatar Id */
+            avatar_id?: string | null;
+        };
         /** ProjectIn */
         ProjectIn: {
             /** Name */
@@ -10945,6 +11246,13 @@ export interface components {
              */
             chat: "daily" | "single";
         };
+        /** VoiceTranscriptOut */
+        VoiceTranscriptOut: {
+            /** Heard */
+            heard: string;
+            /** Say */
+            say?: string | null;
+        };
         /**
          * VoiceTurnOut
          * @description 202 with the run that started; 200 with `cancelled` or `say` when none did.
@@ -11652,6 +11960,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AppearanceSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_profile_settings_api_settings_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
                 };
             };
             /** @description Validation Error */
@@ -13789,6 +14132,206 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assets_api_appearance_assets_get: {
+        parameters: {
+            query?: {
+                kind?: ("background" | "font" | "avatar") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppearanceAssetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_asset_api_appearance_assets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_asset_api_appearance_assets_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppearanceAssetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    asset_content_api_appearance_assets__asset_id__content_get: {
+        parameters: {
+            query?: {
+                variant?: "poster" | null;
+                /** @description An avatar's size in px: 64, 128 or 256 */
+                size?: number | null;
+            };
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_asset_api_appearance_assets__asset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_avatar_api_appearance_avatar_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_set_avatar_api_appearance_avatar_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_avatar_api_appearance_avatar_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -21596,6 +22139,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_transcript_api_voice_transcripts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_transcript_api_voice_transcripts_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTranscriptOut"];
                 };
             };
             /** @description Validation Error */
