@@ -101,8 +101,11 @@ API; Anemo has one user, so "only the owner" is "only someone logged in".
 `features/appearance/apply.ts` turns the settings into:
 - CSS variables for light and dark (`--accent`, `--accent-hover`, `--accent-active`,
   `--accent-contrast`, the tinted `--bg`/`--surface`/`--surface-2`/`--surface-hover`/`--card`,
-  `--font-ui`, `--font-code`, `--glass-*`), and
-- data attributes (`data-theme`, `data-density`, `data-glass`, `data-background`).
+  `--font-ui`, `--font-code`), and
+- data attributes (`data-theme`, `data-density`, `data-glass`).
+
+The background itself is a React component (`AppBackground`, mounted once in `AppLayout`)
+with the blur and dim as CSS variables on its own element.
 
 The result is cached in localStorage (`anemo.appearance.css`) and the inline script in
 `index.html` copies it onto `<html>` before the app's JS loads, so a reload never flashes the
@@ -116,8 +119,10 @@ appears when the app has started.
 `lib/color.ts`, pure and unit-tested: hex parsing, sRGB ↔ OKLab, mixing in OKLab (the same
 space CSS `color-mix(in oklch)` used before, so shades look even), WCAG relative luminance and
 contrast ratio, the best text colour on a colour, and the derived shades. Light: hover = mix
-toward black 12 %, active 20 %; dark: toward white. The contrast text is chosen against the
-worst of the accent and its hover shade.
+toward black 12 %, active 20 %; dark: toward white. The text on the accent is white or
+near-black (`#111`), whichever has the higher WCAG contrast on the accent itself. That is a
+change: before, a brightness cut-off kept white text on mid colours such as the pink, orange,
+green and teal presets, where white has only 3–4:1.
 
 ### Glass
 
