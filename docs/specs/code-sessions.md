@@ -37,6 +37,7 @@ claude_code.py`, `claude-runner/`) is unrelated and is not used.
 | D12 | The branch is taken from the events (`git checkout -b`, `git switch -c`, `git push -u <remote> <branch>`, "Switched to a new branch '…'") and otherwise from the client, which reads `<dir>\.git\HEAD` when it sends `code.job`. Events win. | Free, needs no process on the computer. |
 | D13 | `total_cost_usd` is shown as **API-equivalent cost**, never as money spent. | Artem uses a Claude subscription. |
 | D14 | Phase 2 commands are `device.command` actions (`code_projects`, `code_start`, `code_cancel`) and need a second desktop setting, "Let Anemo start Claude Code jobs" (off by default), advertised in `device.offer`. | Starting a job with `bypassPermissions` is as strong as PowerShell; it gets its own switch. |
+| D15 | Images with a prompt are files in the job's folder whose paths the prompt lists (§13), not `--input-format stream-json` image blocks. | Works for a new job and `--resume` alike with the `claude -p` command line, `prompt.txt` and the folder format unchanged; easy to port. |
 
 ## 3. Protocol (phase 1)
 
@@ -638,3 +639,38 @@ makes those exact.
 - A 504 or a network error while starting: a toast says the job may have started, and
   the list and devices are refetched.
 - `device_busy` is shown with the server's message, like the other codes.
+
+## 13. Images with a prompt
+
+The New job dialog, the follow-up box and a queued message take images: PNG, JPEG, WebP
+or GIF, picked with a button, dropped on the box or pasted into its text, shown as
+thumbnails that can be removed before sending (the chat's `AttachmentChip`).
+
+- **Upload first**: each image is uploaded as soon as it is added (`POST
+  /api/attachments`, as in the chat), so a request only carries ids: `POST
+  /api/code/jobs` and `POST /api/code/jobs/{id}/follow-up` take `image_ids` (at most 8).
+  A queued message keeps the ids (in the browser, with its text) until it is sent; so
+  does a thread's draft and the New job dialog's.
+- **Checks** (`code_sessions/images.py`): each id must be an image attachment (by its
+  content) of at most 10 MB; it is scaled down to what a model looks at (≤ 1568 px,
+  ≤ 3 MB; `attachments/images.py`), and all of one message to ≤ 8 MB together. Errors:
+  `bad_image`, `too_many_images`, `images_too_large` (422) with a sentence; the computer
+  must offer `code_images` (`images_unsupported`, 409: "update Anemo Desktop to 1.3.0").
+  The page checks type, size and count before uploading and says why it refused a file.
+- **Names**: the server names each file `<n>-<safe part of the uploaded name>.<real
+  type>` (only letters, digits, `.`, `_`, `-`; no path, no leading dot); the computer
+  checks the same pattern again.
+- **Transport** (D15, `docs/device-contracts.md` §7.4): the `code_start` command carries
+  the images as base64; the computer writes them to `<job>\images\` and lists their full
+  paths after the prompt in `prompt.txt`; Claude Code opens them with its Read tool.
+  Rejected alternative: `--input-format stream-json` with image content blocks would have
+  needed a JSON prompt on stdin for every job, changed what `prompt.txt` holds (which
+  `cc.ps1`, agents and the page read), put the image bytes in the session transcript sent
+  again with every resumed turn, and needed the same JSON building in every port.
+- **The row**: `code_jobs.images` (`[{id, name}]`, migration 0075) for a job Anemo started
+  with images; `CodeJobOut.images`. While it has any, the job's `prompt` and `title` stay
+  what Anemo sent (the computer's `prompt.txt` also has the list of paths). The thread
+  shows them as thumbnails in the prompt's bubble (a tap shows one large); a queued
+  message shows them too.
+- **Retention**: pruning a job (§5.3) deletes its images' attachments unless a chat or a
+  job that stays has them.

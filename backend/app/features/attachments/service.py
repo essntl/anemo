@@ -416,6 +416,27 @@ async def delete_for_message(
         await db.delete(att)
 
 
+async def delete_unclaimed(db: AsyncSession, ids: list[uuid.UUID]) -> None:
+    """Delete these attachments (rows and bytes) unless a chat has them: uploads used
+    outside the chat only, such as the images of Claude Code jobs that were pruned.
+    Part of the caller's change: doesn't commit."""
+    if not ids:
+        return
+    rows = await db.scalars(
+        select(Attachment).where(
+            Attachment.id.in_(ids),
+            Attachment.message_id.is_(None),
+            Attachment.conversation_id.is_(None),
+        )
+    )
+    for att in rows:
+        try:
+            await asyncio.to_thread(file_path(att).unlink, True)
+        except OSError:
+            pass
+        await db.delete(att)
+
+
 async def delete_files_for_conversation(db: AsyncSession, conversation_id: uuid.UUID) -> None:
     rows = await db.scalars(select(Attachment).where(Attachment.conversation_id == conversation_id))
     for att in rows:

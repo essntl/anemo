@@ -104,6 +104,13 @@ class CodeJob(Base, IdMixin, TimestampMixin):
     run_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("runs.id", ondelete="SET NULL")
     )
+    # The images sent with the prompt when Anemo started the job ([{id, name}]: the
+    # attachment and the file name on the computer, images.py); set only when it is
+    # started. While there are any, `prompt` stays the one Anemo sent: the computer's
+    # prompt.txt also lists the images' paths.
+    images: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
 
 
 EventKind = Literal["system", "assistant", "user", "result", "raw", "other"]

@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict, Forbidden, NotFound
-from app.features.code_sessions import ingest, service
+from app.features.code_sessions import images, ingest, service
 from app.features.code_sessions.models import STATES, TERMINAL, CodeJob, State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -73,6 +73,10 @@ class DeviceRefused(Forbidden):
 
 class DeviceBusy(Conflict):
     code = "device_busy"
+
+
+class ImagesUnsupported(Conflict):
+    code = "images_unsupported"
 
 
 # -- the computer ----------------------------------------------------------------------------
@@ -175,12 +179,20 @@ async def start_job(
     conversation_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
     follow_job_id: str | None = None,
+    image_ids: list[uuid.UUID] | None = None,
 ) -> CodeJobOut:
     """Start a job on the computer and make its row at once (running, with the chat and
     run that started it). `follow_job_id`: the job (its key) whose folder the new one
     runs in, the project then being ignored by the computer; when not given and
-    `resume_session` is, the computer's job that had that session."""
-    device, _ = await _computer(db, device_id, need="start")
+    `resume_session` is, the computer's job that had that session. `image_ids`: uploaded
+    images to send with the prompt (images.py)."""
+    device, offer = await _computer(db, device_id, need="start")
+    ready = await images.ready(db, image_ids or [])
+    if ready and not offer.code_images:
+        raise ImagesUnsupported(
+            f"Anemo Desktop on “{device.name}” can't take images yet: update it to 1.3.0 "
+            "or later, or send the message without them."
+        )
     if follow_job_id is None and resume_session:
         follow_job_id = await db.scalar(
             select(CodeJob.job_key)
@@ -198,6 +210,8 @@ async def start_job(
     }
     if follow_job_id is not None:
         fields["follow_job_id"] = follow_job_id
+    if ready:
+        fields["images"] = [image.command() for image in ready]
     await db.close()  # nothing is held while the computer answers
     state = await _send(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
@@ -214,6 +228,7 @@ async def start_job(
             model=model,
             conversation_id=conversation_id,
             run_id=run_id,
+            images=[image.ref() for image in ready],
         ),
     )
     log.info(
@@ -240,6 +255,7 @@ async def follow_up(
     max_turns: int | None = None,
     conversation_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
+    image_ids: list[uuid.UUID] | None = None,
 ) -> CodeJobOut:
     """Resume the session of the thread's last job, in its project on its computer: the
     new job joins the thread."""
@@ -259,6 +275,7 @@ async def follow_up(
         conversation_id=conversation_id,
         run_id=run_id,
         follow_job_id=last.job_key,
+        image_ids=image_ids,
     )
 
 

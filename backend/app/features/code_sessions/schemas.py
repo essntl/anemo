@@ -8,6 +8,7 @@ from typing import Annotated, Any
 
 from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
+from app.features.code_sessions.images import MAX_IMAGES
 from app.features.code_sessions.models import EventKind, State
 
 
@@ -28,6 +29,11 @@ class CodeTodoOut(BaseModel):
     content: str
     status: str  # pending | in_progress | completed (as Claude Code wrote it)
     activeForm: str | None = None  # Claude Code's own name for it
+
+
+class CodeImageOut(BaseModel):
+    id: uuid.UUID  # the attachment: GET /api/attachments/{id}/content
+    name: str  # the file name in the job's folder on the computer (images\\<name>)
 
 
 class CodeJobOut(BaseModel):
@@ -65,6 +71,8 @@ class CodeJobOut(BaseModel):
     conversation_id: uuid.UUID | None = None
     run_id: uuid.UUID | None = None
     conversation_title: str | None = None
+    # The images sent with its prompt (only for a job Anemo started with images).
+    images: list[CodeImageOut] = []
 
 
 class CodeJobListOut(BaseModel):
@@ -138,9 +146,19 @@ class CodeJobIn(BaseModel):
     new: bool = Field(False, description="Make an empty project when there is none")
     model: str | None = Field(None, pattern=MODEL)
     max_turns: int | None = Field(None, ge=1, le=500)
+    image_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        max_length=MAX_IMAGES,
+        description="Uploaded images (POST /api/attachments) to send with the prompt",
+    )
 
 
 class CodeFollowUpIn(BaseModel):
     prompt: str = Field(min_length=1, max_length=100_000)
     model: str | None = Field(None, pattern=MODEL)
     max_turns: int | None = Field(None, ge=1, le=500)
+    image_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        max_length=MAX_IMAGES,
+        description="Uploaded images (POST /api/attachments) to send with the prompt",
+    )

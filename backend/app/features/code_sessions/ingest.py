@@ -261,8 +261,11 @@ async def _job(db: AsyncSession, device_id: uuid.UUID, data: JobIn) -> tuple[Cod
     job.job_dir = data.device_job_dir
     job.project = data.project
     job.dir = data.dir
-    job.prompt = data.prompt
-    job.title = _title(data.prompt, data.id)
+    if not job.images:
+        # With images, the computer's prompt.txt also lists their paths: the prompt
+        # Anemo sent (started()) is the one to show.
+        job.prompt = data.prompt
+        job.title = _title(data.prompt, data.id)
     job.started_at = data.started
     job.resume_session = data.resume_session or job.resume_session
     if data.model and not job.model:
@@ -629,6 +632,7 @@ class Started:
     model: str | None
     conversation_id: uuid.UUID | None
     run_id: uuid.UUID | None
+    images: list[dict[str, str]] = field(default_factory=list)  # [{id, name}]
 
 
 async def started(device_id: uuid.UUID, start: Started) -> CodeJob:
@@ -669,6 +673,12 @@ async def started(device_id: uuid.UUID, start: Started) -> CodeJob:
         job.seen_running = True
         job.conversation_id = job.conversation_id or start.conversation_id
         job.run_id = job.run_id or start.run_id
+        if start.images:
+            # The computer's code.job may have come first, with its prompt.txt (which
+            # lists the images' paths): the prompt as Anemo sent it wins.
+            job.images = start.images
+            job.prompt = start.prompt[:20_000]
+            job.title = _title(start.prompt, start.job_key)
         changes.thread_changed = await _join_parent(db, job)
         await _finish(db, job)
         await _publish(db, job, changes)

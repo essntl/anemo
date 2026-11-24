@@ -244,6 +244,7 @@ class Connection:
                 shell=bool(message.get("shell")),
                 code=bool(message.get("code")),  # older clients don't send these
                 code_start=bool(message.get("code_start")),
+                code_images=bool(message.get("code_images")),
             )
             if not await relay.renew(self.device_id, self.conn, offer):
                 raise _Closed(CLOSE_REPLACED, "replaced by a newer connection")
