@@ -141,8 +141,46 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      # The whole solution: the Windows app, the Mac host (it builds anywhere) and the Core tests
+      # (the Mac smoke tests are skipped off macOS).
       - run: dotnet build -c Release -p:EnableWindowsTargeting=true
       - run: dotnet test -c Release -p:EnableWindowsTargeting=true
+      # The Claude Code bridge for agents (bridge/cc.mjs), with a fake claude.
+      - run: node --test ../bridge/
+
+  desktop-macos:
+    name: macOS client (Apple Silicon build, tests, app bundle, bridge)
+    # macos-15 runners are Apple Silicon (arm64). No Screen Recording or Accessibility there:
+    # what needs them is in docs/specs/09-desktop-macos-mac-testing.md.
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: dotnet build -c Release -p:EnableWindowsTargeting=true
+      # Core's tests on macOS, and the Mac host's smoke tests for real (posix_spawn and the
+      # process-group kill, zsh, the Keychain, Objective-C blocks, displays, the clipboard).
+      - run: dotnet test -c Release -p:EnableWindowsTargeting=true --logger "console;verbosity=normal"
+      # The .app, signed ad hoc (no secrets in CI), checked with codesign --verify.
+      - run: sh mac/build-app.sh osx-arm64
+      - name: The bundle's Info.plist is valid and its executable is arm64
+        run: |
+          plutil -lint "publish/osx-arm64/Anemo Desktop.app/Contents/Info.plist"
+          file "publish/osx-arm64/Anemo Desktop.app/Contents/MacOS/Anemo Desktop" | tee /dev/stderr | grep -q arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: desktop/publish/Anemo-Desktop-macos-arm64.zip
+          if-no-files-found: error
+          retention-days: 14
+      - run: node --test ../bridge/
 
   android:
     name: Android app (tests, debug build)
