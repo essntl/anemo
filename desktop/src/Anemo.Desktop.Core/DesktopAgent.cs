@@ -42,12 +42,17 @@ public sealed class DesktopAgent
     private readonly DesktopAgentParts _parts;
     private readonly SharedScreenClient _sharedScreen;
     private readonly object _lock = new();
+
+    /// <summary>The shell's kind for the offer, looked up once (installing pwsh needs a restart to show).</summary>
+    private readonly Lazy<string> _shellKind;
     private DesktopSettings _settings;
 
     public DesktopAgent(DesktopAgentParts parts)
     {
         _parts = parts;
         _settings = parts.Store.Load();
+        _shellKind = new Lazy<string>(() =>
+            parts.Platform.Shell.FindShell()?.Kind ?? (parts.Os.IsMac ? ShellKinds.Zsh : ShellKinds.PowerShell));
         StartupProblem = parts.Store.LoadProblem;
         if (StartupProblem is not null)
         {
@@ -84,7 +89,9 @@ public sealed class DesktopAgent
             parts.Log,
             parts.Version,
             parts.ConnectionOptions,
-            CodeJobs);
+            CodeJobs,
+            parts.Os.WireName,
+            () => _shellKind.Value);
         _sharedScreen = new SharedScreenClient(parts.Http);
     }
 

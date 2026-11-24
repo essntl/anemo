@@ -51,8 +51,18 @@ public static class KeyParser
         ["Win"] = VkWin,
     };
 
-    /// <summary>The combo, or throws a <see cref="CommandException"/> (failed or refused).</summary>
-    public static KeyCombo Parse(string text)
+    public const ushort VkEscape = 0x1B;
+    public const ushort VkQ = 0x51;
+
+    /// <summary>
+    /// The combo, or throws a <see cref="CommandException"/> (failed or refused). On a Mac
+    /// (<paramref name="mac"/>) <c>Cmd</c> is a modifier too; it is the same key as <c>Win</c>
+    /// and <c>Meta</c>, which the Mac host presses as Command.
+    /// </summary>
+    public static KeyCombo Parse(string text) => Parse(text, mac: false);
+
+    /// <inheritdoc cref="Parse(string)"/>
+    public static KeyCombo Parse(string text, bool mac)
     {
         var parts = text.Split('+');
         if (parts.Any(p => p.Length == 0))
@@ -63,7 +73,12 @@ public static class KeyParser
         var modifiers = new List<ushort>();
         foreach (var part in parts[..^1])
         {
-            if (!ModifierKeys.TryGetValue(part, out var vk))
+            ushort vk;
+            if (mac && part == "Cmd")
+            {
+                vk = VkWin; // Command: the Mac host presses Win/Meta as Cmd
+            }
+            else if (!ModifierKeys.TryGetValue(part, out vk))
             {
                 throw CommandException.Failed($"Unknown modifier “{part}” in “{text}”.");
             }
@@ -83,16 +98,42 @@ public static class KeyParser
             throw CommandException.Refused("Ctrl+Alt+Del (or Ctrl+Alt+End) can't be pressed by the agent.");
         }
 
+        if (mac)
+        {
+            RefuseOnMac(modifiers, key);
+        }
+
         return new KeyCombo(modifiers, key, text);
+    }
+
+    /// <summary>Cmd+Ctrl+Q locks the Mac; Cmd+Option+Esc opens Force Quit.</summary>
+    private static void RefuseOnMac(List<ushort> modifiers, ushort key)
+    {
+        var cmd = modifiers.Contains(VkWin);
+        if (cmd && modifiers.Contains(VkControl) && key == VkQ)
+        {
+            throw CommandException.Refused("Cmd+Ctrl+Q (lock the screen) can't be pressed by the agent.");
+        }
+
+        if (cmd && modifiers.Contains(VkAlt) && key == VkEscape)
+        {
+            throw CommandException.Refused("Cmd+Option+Esc (Force Quit) can't be pressed by the agent.");
+        }
     }
 
     /// <summary>
     /// True when the combo puts text into a field: a letter or digit (Shift allowed, no
     /// Control, Alt or Win), Space, or a paste (Control+v, Shift+Insert).
     /// </summary>
-    public static bool EntersText(KeyCombo combo)
+    public static bool EntersText(KeyCombo combo) => EntersText(combo, mac: false);
+
+    /// <summary>
+    /// As <see cref="EntersText(KeyCombo)"/>; on a Mac also Option with a letter, digit or Space
+    /// (it types a character such as ß or ¡) and Cmd+V.
+    /// </summary>
+    public static bool EntersText(KeyCombo combo, bool mac)
     {
-        var commandModifier = combo.Modifiers.Any(m => m is VkControl or VkAlt or VkWin);
+        var commandModifier = combo.Modifiers.Any(m => m is VkControl or VkWin || (m == VkAlt && !mac));
         var letterOrDigit = combo.Key is (>= 0x41 and <= 0x5A) or (>= 0x30 and <= 0x39);
         if ((letterOrDigit || combo.Key == VkSpace) && !commandModifier)
         {
@@ -100,7 +141,8 @@ public static class KeyParser
         }
 
         var paste = (combo.Key == VkV && combo.Modifiers.Contains(VkControl))
-            || (combo.Key == VkInsert && combo.Modifiers.Contains(VkShift));
+            || (combo.Key == VkInsert && combo.Modifiers.Contains(VkShift))
+            || (mac && combo.Key == VkV && combo.Modifiers.Contains(VkWin));
         return paste;
     }
 

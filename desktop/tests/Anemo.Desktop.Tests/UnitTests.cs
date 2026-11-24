@@ -483,9 +483,12 @@ public sealed class WireTests
     [Fact]
     public void Messages_have_the_contract_shapes()
     {
-        Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.0.0","last_id":null}""", Wire.Hello("anemo_t", "1.0.0", null));
+        // platform and shell_kind were added in 1.3.0 (round 3): optional on the server, Windows by default.
+        Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.0.0","last_id":null,"platform":"windows"}""", Wire.Hello("anemo_t", "1.0.0", null));
+        Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.3.0","last_id":"1-0","platform":"macos"}""", Wire.Hello("anemo_t", "1.3.0", "1-0", "macos"));
         Assert.Equal("""{"type":"ping"}""", Wire.Ping());
-        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false}""", Wire.Offer(true, false, false, false));
+        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false,"shell_kind":"powershell"}""", Wire.Offer(true, false, false, false));
+        Assert.Equal("""{"type":"device.offer","control":true,"shell":true,"code":false,"code_start":false,"shell_kind":"zsh"}""", Wire.Offer(true, true, false, false, "zsh"));
         Assert.Equal("""{"type":"device.stopped"}""", Wire.Stopped());
         Assert.Equal("""{"type":"device.result","id":"1","ok":true,"state":{}}""", Wire.Result("1", CommandOutcome.Success(new JsonObject())));
         Assert.Equal("""{"type":"device.result","id":"2","ok":false,"error":"No.","code":"refused"}""", Wire.Result("2", CommandOutcome.Fail("refused", "No.")));

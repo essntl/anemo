@@ -33,28 +33,32 @@ public static class Wire
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static string Hello(string token, string version, string? lastId) => Json(new JsonObject
+    /// <summary>The first message; <paramref name="platform"/>: <c>windows</c> or <c>macos</c> (§2).</summary>
+    public static string Hello(string token, string version, string? lastId, string platform = "windows") => Json(new JsonObject
     {
         ["type"] = "hello",
         ["token"] = token,
         ["kind"] = "computer",
         ["version"] = version,
         ["last_id"] = lastId,
+        ["platform"] = platform,
     });
 
     public static string Ping() => Json(new JsonObject { ["type"] = "ping" });
 
     /// <summary>
     /// The offer; <paramref name="code"/>: Claude Code jobs are shared (device-contracts.md §7);
-    /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4).
+    /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4);
+    /// <paramref name="shellKind"/>: powershell, pwsh, zsh or bash (§2).
     /// </summary>
-    public static string Offer(bool control, bool shell, bool code, bool codeStart) => Json(new JsonObject
+    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell") => Json(new JsonObject
     {
         ["type"] = "device.offer",
         ["control"] = control,
         ["shell"] = shell,
         ["code"] = code,
         ["code_start"] = codeStart,
+        ["shell_kind"] = shellKind,
     });
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });
