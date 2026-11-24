@@ -126,8 +126,11 @@ missing) that says what each is for, has a button that asks macOS (`CGRequestScr
 `AXIsProcessTrustedWithOptions(prompt: true)`) and one that opens the right pane of System
 Settings (`x-apple.systempreferences:` URLs). The app never edits the TCC database, never uses
 `tccutil`, AppleScript or UI scripting of System Settings, and never clicks or types into a
-system permission prompt (the client refuses to act on System Settings' *Privacy & Security*
-pane, as the Windows client refuses the secure desktop). Without Screen Recording, `look`
+system permission prompt: while System Settings, a password or permission prompt
+(SecurityAgent, UserNotificationCenter, universalAccessAuthWarn), the login window or the lock
+screen is in front, every command answers `unavailable`, as the Windows client does on the
+secure desktop. (This also means the agent can't help with System Settings at all; that is
+deliberate.) Without Screen Recording, `look`
 answers `unavailable` with a sentence telling the agent to ask the user to allow it; without
 Accessibility, the controls list is empty with a `note`, and acting answers `unavailable`.
 
@@ -183,8 +186,8 @@ README, the release notes and the PR.
   `device_job_dir` and `dir` are the device's own absolute paths, opaque strings to the server
   (it never parses them, and the Code page already handles `/` paths). `out.jsonl` is
   unchanged, so the Code page needs no change.
-- Version: the macOS client starts at the same version as the Windows one (1.3.0, both); the
-  server needs no version check for it (the fields are optional).
+- Version: both clients are 1.3.0 (`desktop/Directory.Build.props`); the server needs no
+  version check for it (the fields are optional).
 
 ## 4. Server changes
 
@@ -194,8 +197,11 @@ README, the release notes and the PR.
   `DeviceInfo.shell_kind`; the Lua scripts store them; a hash written by an older server (no
   such fields) reads as Windows/PowerShell.
 - `tools/builtin/computer.py`:
-  - the device line in the turn context says the OS and the shell:
-    `- Mac: computer (macOS, shell: zsh), trusted, control allowed, shell on`;
+  - the device line in the turn context says the OS and the shell for a Mac:
+    `- Mac: computer (macOS, shell: zsh), trusted, control allowed, zsh on`; a Windows
+    computer's line stays exactly as it was (`- VM: computer, trusted, control allowed,
+    PowerShell on`), and the section's first line says a computer is Windows with PowerShell
+    unless its line names another system;
   - `computer_shell`'s description and input are shell-neutral ("one command for the
     computer's shell, which the turn context names: PowerShell on Windows, zsh or bash on
     macOS"); the tool list stays identical for every device (prompt cache, `docs/claude-code.md`);
@@ -207,7 +213,11 @@ README, the release notes and the PR.
     delete-…`/`dump-keychain`/`find-…-password`, `dscl`/`sysadminctl`, `pmset`, `nvram`,
     `systemsetup`, `networksetup`, `shutdown`/`reboot`/`halt`), plus a POSIX network check for
     `contacts_people`;
-  - the shell's transcript prompt is `PS name>` for PowerShell and `name%` for zsh/bash.
+  - the shell's transcript prompt is `PS name>` for PowerShell and `name%` for zsh/bash;
+  - a device the step's list didn't know is rated as PowerShell (as before); if it turns out
+    to have zsh/bash, or its shell changed since the step began, `run()` sends nothing and
+    asks the model to call the tool again (then rated by the right rules);
+  - `press` takes `Cmd` (`cmd+s` → `Cmd+s`).
 - `tools/builtin/code.py` assumed nothing about paths; only its texts that said "Windows" were
   neutral already. A test pins that a macOS job's `/Users/…` paths go through unchanged.
 - No migration (the values live in Valkey). No HTTP API change.
@@ -233,20 +243,24 @@ relative entries); `MacKeyCodes` (virtual keys to macOS key codes).
 ## 6. The macOS host (`desktop/src/Anemo.Desktop.Mac`)
 
 ```
-Program.cs               single instance, logging, starts Avalonia
-App.axaml(.cs)           the menu bar item and its menu (TrayIcon + NativeMenu)
-AppPaths.cs              ~/Library/Application Support/Anemo Desktop (settings, logs, code-jobs.json)
-Native/                  the P/Invoke declarations, one file per framework, nothing else
-Platform/MacDesktop.cs   windows (CGWindowList + NSRunningApplication), focus, secure screen
-Platform/AxTree.cs       the Accessibility tree of a window → Core's UiTree; AxElement (IUiElement)
-Platform/ScreenCapture.cs  ScreenCaptureKit (SCShareableContent, SCScreenshotManager), PNG by ImageIO
-Platform/MacInput.cs     CGEvent mouse, keys and scroll; typing by CGEventKeyboardSetUnicodeString
-Platform/MacServices.cs  clipboard (NSPasteboard), apps and URLs (NSWorkspace), zsh, Keychain
-Platform/MacCodeHost.cs  gh/git runs, posix_spawn of jobs, process group kill; MacProcessProbe
-Platform/Permissions.cs  Screen Recording and Accessibility: check, ask, open System Settings
-Platform/LoginItem.cs    SMAppService
-Platform/HotKeys.cs      Carbon RegisterEventHotKey for Stop and Share
-UI/SettingsWindow, PermissionsWindow, IndicatorWindow (.axaml)
+Program.cs                 single instance, logging, starts Avalonia; AppPaths
+                           (~/Library/Application Support/Anemo Desktop: settings, logs, code-jobs.json)
+App.axaml(.cs)             the Avalonia application (no main window)
+Native/                    the P/Invoke declarations, one file per framework: ObjC (+ Blocks),
+                           CoreFoundation, CoreGraphics (+ ImageIO), Accessibility, Keychain,
+                           Carbon (hot keys, secure input), Posix (posix_spawn, kill)
+Platform/MacDesktop.cs     windows (CGWindowList), focus, the "secure screen", the focused control
+Platform/AxTree.cs         the Accessibility tree of a window → Core's UiTree; AxElement (IUiElement)
+Platform/ScreenCapturer.cs ScreenCaptureKit (SCShareableContent, SCScreenshotManager), stitching, PNG
+Platform/MacInput.cs       CGEvent mouse, keys and scroll; typing by CGEventKeyboardSetUnicodeString
+Platform/MacServices.cs    apps and URLs (NSWorkspace, open), clipboard (NSPasteboard), zsh, the
+                           PATH for children, the Keychain token protector
+Platform/MacCodeHost.cs    gh/git runs, posix_spawn of jobs, process group kill; MacProcessProbe
+Platform/Permissions.cs    Screen Recording and Accessibility: check, ask, open System Settings;
+                           LoginItem (SMAppService)
+Platform/HotKeys.cs        Carbon RegisterEventHotKey for Stop and Share
+UI/MenuBarApp.cs           the menu bar item and its menu, wiring (the Windows TrayApp's counterpart)
+UI/SettingsWindow, PermissionsWindow (.axaml); UI/Small.cs: icons, notices, the indicator
 mac/Info.plist, mac/Entitlements.plist, mac/build-app.sh
 ```
 
@@ -259,9 +273,11 @@ in the Keychain, the shell's folder `~/AnemoWork`.
 - `ci.yml`: the existing *Windows client* job (Linux) builds the whole solution, the Mac host
   included, and runs every Core test. A new **macOS client** job on `macos-15` (Apple Silicon)
   builds the Mac host for `osx-arm64`, runs the Core tests and the Mac smoke tests
-  (`tests/Anemo.Desktop.Mac.Tests`: the native libraries and Objective-C classes load, a job is
-  started with `posix_spawn` in its own process group and the group is ended, the Keychain
-  round trip in a temporary keychain, the display layout of the runner's real screen), runs
+  (`tests/Anemo.Desktop.Mac.Tests`: the frameworks and Objective-C classes load, a job is
+  started with `posix_spawn` with its files as stdio in its own process group and the group,
+  grandchild included, is ended and reaped, a hand-built block is called by Objective-C, zsh
+  runs with the augmented PATH, the Keychain round trip under a throwaway service name, the
+  runner's real displays in points, the clipboard, the Applications list), runs
   `build-app.sh` (ad-hoc signed) and checks the bundle with `codesign --verify`, and runs the
   bridge's `node --test`. Screenshots and Accessibility can't be tested there (no permission on a
   hosted runner).

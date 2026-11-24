@@ -24,8 +24,9 @@ from the PR's CI run (*Artifacts* → *desktop-macos*), or build it (`desktop/RE
 3. The **Permissions** window opens (first start). Expected: it lists *Screen Recording* and
    *Accessibility*, both "not allowed", each with a sentence on what it is for, an *Allow…*
    button and an *Open System Settings* button. Nothing was asked of macOS yet.
-4. Start it again (double-click the app while it runs). Expected: a message that it is already
-   running; still one menu bar item.
+4. Start it again (double-click the app while it runs). Expected: still one menu bar item (macOS
+   brings the running copy forward; from Terminal, `open -n` or the executable prints "already
+   running" and quits).
 5. Open Keychain Access → login → search `Anemo Desktop`. Expected: one *application password*
    `Anemo Desktop` / `device-token`. `~/Library/Application Support/Anemo Desktop/settings.json`
    contains `"keychain:v1"` and **not** the token.
@@ -93,8 +94,10 @@ from the PR's CI run (*Artifacts* → *desktop-macos*), or build it (`desktop/RE
 26. Terminal → `sudo -v` (password prompt, Secure Keyboard Entry): ask the agent to type into
     Terminal. Expected: refused while the prompt waits (Secure Event Input is on).
 27. Ask the agent to press Cmd+Ctrl+Q, Cmd+Option+Esc. Expected: refused.
-28. Open System Settings → Privacy & Security. Ask the agent to click there. Expected: refused
-    (the client doesn't act on the permission settings).
+28. Open System Settings (any page) and keep it in front. Ask the agent to look and to click
+    there. Expected: both answered "unavailable" with a sentence about System Settings or a
+    prompt being in front (the client doesn't look at or act on it). Same with a password
+    prompt (e.g. installing something that asks for your password) in front.
 29. Open the Anemo Desktop Settings window; ask the agent to click on it. Expected: refused (its
     own window).
 

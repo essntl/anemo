@@ -37,7 +37,7 @@ adapter), and searching inside workspace files that are not documents.
 - [On your phone](#on-your-phone)
 - [Browser extension](#browser-extension)
 - [Voice from your phone](#voice-from-your-phone)
-- [Devices: your Windows computers](#devices-your-windows-computers)
+- [Devices: your computers (Windows and macOS)](#devices-your-computers-windows-and-macos)
 
 ## Chat vs. Agent mode
 
@@ -795,14 +795,18 @@ recognised in English, Ukrainian and Russian; in another language it counts as u
 and the notification decides. Design:
 [docs/specs/05-voice-android.md](specs/05-voice-android.md).
 
-## Devices: your Windows computers
+<a id="devices-your-windows-computers"></a>
 
-**Anemo Desktop** is a small tray program for Windows 10 and 11 that lets the agent see
-and use a computer: take a screenshot, read the window in front, click, type, press keys,
-open programs and, where you allow it, run PowerShell. Put it on the agent's own VM, your
-main PC or your laptop; each one is a **device** with its own name, token and trust
-level. It only connects out to Anemo (one WebSocket, through the address the web app
-uses); no port is opened on the computer.
+## Devices: your computers (Windows and macOS)
+
+**Anemo Desktop** is a small tray program for Windows 10 and 11, and a menu bar app for
+macOS 14 or later (Apple Silicon), that lets the agent see and use a computer: take a
+screenshot, read the window in front, click, type, press keys, open programs and, where
+you allow it, run commands in its shell (PowerShell on Windows, zsh on a Mac). Put it on
+the agent's own VM, your main PC or your laptop; each one is a **device** with its own
+name, token and trust level. It only connects out to Anemo (one WebSocket, through the
+address the web app uses); no port is opened on the computer. The client tells Anemo
+which system and shell it has, and the agent sees it in its turn context.
 
 **Settings → Devices** lists your computers and phones, whether they are connected now,
 the client's version and, for a computer, whether *Allow control* is on. **Add a
@@ -815,7 +819,7 @@ within a minute.)
 
 **Trust levels**, per computer:
 
-| Level | Looking (screenshot, window text) | Acting (click, type, keys, open) | PowerShell |
+| Level | Looking (screenshot, window text) | Acting (click, type, keys, open) | Shell (PowerShell, zsh) |
 |---|---|---|---|
 | **Watched** (the default; your own PC and laptop) | as the permission says | asked every time | not offered |
 | **Trusted** (the agent's own VM) | as the permission says | as the permission says | as the permission says |
@@ -833,14 +837,16 @@ the agent sees which ones are, with their trust level, in its turn context.
 | Tool | Does |
 |---|---|
 | `computer_look` | A screenshot of the screen or of one window, and the window's controls as a numbered list (role, name, value); or the list of open windows |
-| `computer_act` | One action: click, double or right click (a control or a point), type, press keys, scroll, bring a window to the front, open a program by its Start menu name or a web address, put text on the clipboard. It answers with the new state |
-| `computer_shell` | One PowerShell command on a trusted computer with PowerShell switched on in the client, with a timeout (60 s by default, at most 10 minutes) |
+| `computer_act` | One action: click, double or right click (a control or a point), type, press keys (Cmd on a Mac), scroll, bring a window to the front, open a program by its Start menu name (on a Mac: its name in Applications) or a web address, put text on the clipboard. It answers with the new state |
+| `computer_shell` | One command in the computer's shell (PowerShell on Windows, zsh or bash on a Mac) on a trusted computer with the shell switched on in the client, with a timeout (60 s by default, at most 10 minutes) |
 | `computer_shared_screen` | What you shared last with *Share this screen with Anemo* |
 
 PowerShell commands are rated like shell commands: one that deletes, formats, changes
 users, services, the firewall or the registry, or downloads and runs something, is
-dangerous; one that uses the network counts as reaching people. Each action's
-screenshot is kept in the run's timeline.
+dangerous; one that uses the network counts as reaching people. A Mac's zsh commands are
+rated by the rules of the shell tool, plus macOS's own (AppleScript, `defaults write`,
+`launchctl`, erasing disks, the Keychain, users, system settings: dangerous). Each
+action's screenshot is kept in the run's timeline.
 
 **On the computer.** The tray icon is grey while not connected and red while the agent
 is acting, and a small border in the corner says "Anemo is using this computer" with a
@@ -859,6 +865,15 @@ terminal from the Start menu or with Win+R and type into it, as an ordinary acti
 (asked every time on a watched computer, decided by *Use your computers* on a trusted
 one). The hard boundaries are a watched computer, *Allow control* off and Stop.
 
+**On a Mac** the client lives in the menu bar (the same menu as the Windows tray icon) and
+needs two permissions that only you can give, in System Settings → Privacy & Security:
+*Screen Recording* for screenshots and *Accessibility* for reading controls and acting. A
+**Permissions** window explains both and opens the right page; without them the agent is
+told to ask you. The client never acts on System Settings or on a password or permission
+prompt, and treats a field as a password field whenever macOS's secure keyboard entry is
+on. Stop is Ctrl+Option+Shift+S. The token is kept in the Keychain. Builds that aren't
+signed by a developer lose both permissions at every update (allow them again).
+
 **Share this screen** (tray menu or Ctrl+Alt+Shift+A) sends a screenshot and the text of
 the window in front once, like *Share this tab* in the browser extension. The agent reads
 it with `computer_shared_screen`; it is forgotten after 12 hours or when you stop
@@ -867,5 +882,6 @@ sharing, and the API never returns its content.
 Automations get the computer tools only when the automation lists them. What a screen
 shows is untrusted content for the model, like a web page. Installing the client:
 [deployment.md](deployment.md#anemo-desktop-and-anemo-voice). Design:
-[docs/specs/06-desktop-client.md](specs/06-desktop-client.md); the protocol both apps
-use: [docs/device-contracts.md](device-contracts.md).
+[docs/specs/06-desktop-client.md](specs/06-desktop-client.md) and, for macOS,
+[docs/specs/09-desktop-macos.md](specs/09-desktop-macos.md); the protocol the apps use:
+[docs/device-contracts.md](device-contracts.md).
