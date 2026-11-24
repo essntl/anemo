@@ -806,6 +806,65 @@
         }
       }
     },
+    "/api/settings/profile": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Profile Settings",
+        "operationId": "put_profile_settings_api_settings_profile_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/models": {
       "put": {
         "tags": [
@@ -4885,6 +4944,383 @@
         }
       }
     },
+    "/api/appearance/assets": {
+      "get": {
+        "tags": [
+          "appearance"
+        ],
+        "summary": "List Assets",
+        "operationId": "list_assets_api_appearance_assets_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "background",
+                    "font",
+                    "avatar"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/app__features__appearance__router__AssetOut"
+                  },
+                  "title": "Response List Assets Api Appearance Assets Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "appearance"
+        ],
+        "summary": "Upload Asset",
+        "operationId": "upload_asset_api_appearance_assets_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_asset_api_appearance_assets_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__features__appearance__router__AssetOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appearance/assets/{asset_id}/content": {
+      "get": {
+        "tags": [
+          "appearance"
+        ],
+        "summary": "Asset Content",
+        "operationId": "asset_content_api_appearance_assets__asset_id__content_get",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          },
+          {
+            "name": "variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "poster",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Variant"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An avatar's size in px: 64, 128 or 256",
+              "title": "Size"
+            },
+            "description": "An avatar's size in px: 64, 128 or 256"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appearance/assets/{asset_id}": {
+      "delete": {
+        "tags": [
+          "appearance"
+        ],
+        "summary": "Delete Asset",
+        "operationId": "delete_asset_api_appearance_assets__asset_id__delete",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appearance/avatar": {
+      "put": {
+        "tags": [
+          "appearance"
+        ],
+        "summary": "Set Avatar",
+        "description": "Replace the avatar with the square (crop_x, crop_y, crop_size: fractions of the\npicture's width, height and shorter side) of the uploaded picture.",
+        "operationId": "set_avatar_api_appearance_avatar_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_set_avatar_api_appearance_avatar_put"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "appearance"
+        ],
+        "summary": "Remove Avatar",
+        "operationId": "remove_avatar_api_appearance_avatar_delete",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{run_id}/timeline": {
       "get": {
         "tags": [
@@ -8780,7 +9216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AssetOut"
+                  "$ref": "#/components/schemas/app__features__documents__router__AssetOut"
                 }
               }
             }
@@ -19547,6 +19983,9 @@
           "appearance": {
             "$ref": "#/components/schemas/AppearanceSettings"
           },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileSettings"
+          },
           "models": {
             "$ref": "#/components/schemas/ModelDefaults"
           },
@@ -19603,6 +20042,7 @@
         "required": [
           "general",
           "appearance",
+          "profile",
           "models",
           "permissions",
           "workspace",
@@ -19622,6 +20062,74 @@
           "code"
         ],
         "title": "AllSettings"
+      },
+      "AppearanceBackground": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "none",
+              "gradient",
+              "upload"
+            ],
+            "title": "Kind",
+            "default": "none"
+          },
+          "gradient": {
+            "type": "string",
+            "enum": [
+              "aurora",
+              "dusk",
+              "lagoon"
+            ],
+            "title": "Gradient",
+            "default": "aurora"
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "blur": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 0.0,
+            "title": "Blur",
+            "default": 0
+          },
+          "dim": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 0.0,
+            "title": "Dim",
+            "default": 35
+          },
+          "fit": {
+            "type": "string",
+            "enum": [
+              "cover",
+              "contain",
+              "tile"
+            ],
+            "title": "Fit",
+            "default": "cover"
+          },
+          "animate_on_phones": {
+            "type": "boolean",
+            "title": "Animate On Phones",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "AppearanceBackground",
+        "description": "What is behind the app: nothing, a built-in animated gradient, or an upload."
       },
       "AppearanceSettings": {
         "properties": {
@@ -19649,10 +20157,50 @@
             ],
             "title": "Density",
             "default": "comfortable"
+          },
+          "tint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tint"
+          },
+          "tint_strength": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Tint Strength",
+            "default": 40
+          },
+          "ui_font": {
+            "type": "string",
+            "pattern": "^(default|system|serif|rounded|inter|plex-sans|nunito|source-serif|custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+            "title": "Ui Font",
+            "default": "default"
+          },
+          "code_font": {
+            "type": "string",
+            "pattern": "^(default|system|jetbrains-mono|fira-code|plex-mono|custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+            "title": "Code Font",
+            "default": "default"
+          },
+          "background": {
+            "$ref": "#/components/schemas/AppearanceBackground"
+          },
+          "glass": {
+            "type": "boolean",
+            "title": "Glass",
+            "default": false
           }
         },
         "type": "object",
-        "title": "AppearanceSettings"
+        "title": "AppearanceSettings",
+        "description": "Settings > Appearance; applied in the browser (frontend/src/features/appearance)."
       },
       "AppendTo": {
         "properties": {
@@ -19799,19 +20347,6 @@
         },
         "type": "object",
         "title": "ApproveIn"
-      },
-      "AssetOut": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "title": "Path"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path"
-        ],
-        "title": "AssetOut"
       },
       "AttachIn": {
         "properties": {
@@ -21043,6 +21578,41 @@
         ],
         "title": "Body_pdf_text_api_extension_pdf_text_post"
       },
+      "Body_set_avatar_api_appearance_avatar_put": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "crop_x": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Crop X",
+            "default": 0.0
+          },
+          "crop_y": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Crop Y",
+            "default": 0.0
+          },
+          "crop_size": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Crop Size",
+            "default": 1.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_set_avatar_api_appearance_avatar_put"
+      },
       "Body_upload_api_attachments_post": {
         "properties": {
           "file": {
@@ -21094,6 +21664,29 @@
           "files"
         ],
         "title": "Body_upload_api_files_upload_post"
+      },
+      "Body_upload_asset_api_appearance_assets_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "background",
+              "font"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "kind"
+        ],
+        "title": "Body_upload_asset_api_appearance_assets_post"
       },
       "Body_upload_asset_api_documents_assets_post": {
         "properties": {
@@ -29340,6 +29933,31 @@
         ],
         "title": "ProfileOut"
       },
+      "ProfileSettings": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Display Name",
+            "default": ""
+          },
+          "avatar_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Id"
+          }
+        },
+        "type": "object",
+        "title": "ProfileSettings",
+        "description": "Settings > Profile: how you appear in the app. The avatar is set through\nPUT /appearance/avatar, which also stores its id here."
+      },
       "ProjectIn": {
         "properties": {
           "name": {
@@ -36530,6 +37148,79 @@
         "title": "WorkspaceSettings",
         "description": "Stored in app_settings[\"workspace\"]."
       },
+      "app__features__appearance__router__AssetOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "background",
+              "font",
+              "avatar"
+            ],
+            "title": "Kind"
+          },
+          "media": {
+            "type": "string",
+            "enum": [
+              "image",
+              "animated",
+              "video",
+              "font"
+            ],
+            "title": "Media"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "media",
+          "mime",
+          "size",
+          "filename",
+          "url",
+          "poster_url",
+          "created_at"
+        ],
+        "title": "AssetOut"
+      },
       "app__features__calendar__schemas__PropertiesIn": {
         "properties": {
           "set": {
@@ -36545,6 +37236,19 @@
         ],
         "title": "PropertiesIn",
         "description": "Property values to set; null removes one. The others stay as they are."
+      },
+      "app__features__documents__router__AssetOut": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "AssetOut"
       },
       "app__features__documents__router__MoveIn": {
         "properties": {
