@@ -16,6 +16,7 @@ from app.features.attachments.router import router as attachments_router
 from app.features.audit.router import router as audit_router
 from app.features.auth.router import router as auth_router
 from app.features.automations.router import router as automations_router
+from app.features.automations.scripts_router import router as scripts_router
 from app.features.browser_router import router as browser_router
 from app.features.calendar.router import router as calendar_router
 from app.features.capture.router import router as capture_router
@@ -105,6 +106,7 @@ protected.include_router(devices_router)
 protected.include_router(code_router)
 protected.include_router(research_router)
 protected.include_router(automations_router)
+protected.include_router(scripts_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)
 protected.include_router(search_router)

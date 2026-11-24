@@ -136,6 +136,7 @@ async def test_editing_a_synced_event_in_the_ui_sets_edited_by_user_at(authed):
         "kind": "user",
         "label": "You",
         "url": None,
+        "automation_kind": None,  # only for automations (scripts, spec 08)
     }
     assert edited["created_by_actor"]["kind"] == "chat"
 
@@ -332,6 +333,7 @@ async def test_a_task_shows_the_chat_it_was_made_in_or_the_user(authed):
         "kind": "user",
         "label": "You",
         "url": None,
+        "automation_kind": None,  # only for automations (scripts, spec 08)
     }
 
     tasks = {t["title"]: t for t in (await authed.get("/api/tasks")).json()}
@@ -342,6 +344,7 @@ async def test_a_task_shows_the_chat_it_was_made_in_or_the_user(authed):
         "kind": "chat",
         "label": "Ludmyla planning",
         "url": f"/c/{cid}",
+        "automation_kind": None,
     }
     assert made["updated_by_actor"] == made["created_by_actor"]
     assert tasks["Mine"]["created_by_actor"]["kind"] == "user"
