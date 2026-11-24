@@ -519,6 +519,26 @@ between its runs, so "tell me when this page changes" works. Failed runs can be
 retried. If the app was off when a run was due, that run is skipped rather than
 caught up later, and a run still going when the next one is due is not stacked.
 
+### Scripts
+
+The **Scripts** tab holds automations that run code instead of asking a model: cheap,
+the same every time, and mostly written by the assistant ("every morning, turn new
+bookings into tasks"). A script is an automation like the others: the same schedules
+(or "Only when started"), Run now, run log, notifications, retries, limits and "Pause
+all". Its TypeScript runs in a sandbox (Deno) without network or files, and acts only
+through Anemo's tools (`anemo.call("create_task", …)`, `anemo.tasks.create(…)`, an MCP
+server's tools), with your permissions and approvals, and only the tools, hosts and
+secrets its code declares. When it needs judgement it asks a model with
+`anemo.think(prompt, data)`; the data is handed over as data, never as instructions.
+
+Code an assistant writes or changes is saved **switched off**. The card says who wrote
+it (a link to the chat) and that a change waits for review; **Review change** shows the
+diff of the code and of what it may use, and only you can approve it (with your
+password) and switch it on. Only the approved version, exactly as you saw it, ever
+runs. What a script does shows in its run's timeline and change list, and what it
+creates is marked as made by "the script X". Secrets are set on the card, never shown
+again, and filled in only in request headers to the script's declared hosts.
+
 ## MCP servers
 
 MCP servers give agents extra tools (GitHub, a database, your smart home, …).

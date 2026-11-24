@@ -117,7 +117,7 @@ export default async function main(input, anemo) {
   (built-in, or `mcp__<server>__<tool>`). A refused or failed call throws `ToolError`
   (`.denied` true when the policy or the user said no); the script may catch it.
 - Short forms for the common tools: `anemo.tasks.create/update/list`, `anemo.events.create/
-  update/list`, `anemo.notify(title, body)`, `anemo.state.set(note)`. They are only
+  update/list`, `anemo.notify(title, message)`, `anemo.state.set(note)`. They are only
   `anemo.call` with a fixed name.
 - `anemo.fetch(url, {method, headers, body, json})`: `http_request` (any method) with the
   declared-host check; `anemo.secret("NAME")` gives a placeholder (`{{secret:NAME}}`) that
@@ -364,3 +364,46 @@ All under `/api/automations/{automation_id}/script` (login required):
 - Webhook or event triggers: none exist yet (spec 02 §2.8); scripts would get them for free.
 - CPU limits beyond wall-clock time, and kernel isolation of the Deno process (§9).
 - A code editor with syntax highlighting: a plain monospace text area.
+
+## 18. Decided while building it
+
+Details the sections above left open, or that turned out differently:
+
+- **Files.** `features/automations/scripts.py` (versions, review, secrets),
+  `scripts_router.py` (§14), `runtime/script_run.py` (the worker side of §5–7),
+  `runtime/script_sandbox.py` + `script_harness.js` (§9), `tools/builtin/scripts.py`
+  (§13). `runtime/agent.py`'s `pick_up` became public (a refactor commit) so script runs
+  are picked up the same way after a crash.
+- **Tools a script can't list** (refused when saved, and again by the worker):
+  `ask_user`, `update_plan`, `run_subagent`, `load_skill`, `read_tool_output`,
+  `save_attachment`, `attach_file`, `browser_current_tab`, the schedule writers, the
+  script tools, the browser tools and the computer tools (they need a session or a
+  device the run doesn't set up). `run_shell` with network is refused at call time
+  (`shell.network`): the shell sandbox's network is all or nothing, not per host.
+- **Hosts** are checked on every action of capability `net.fetch` / `http.request`
+  (their `resource` is the host), so `read_web_page` and `video_transcript` are covered
+  too. `*.example.com` means its subdomains, not `example.com` itself.
+- **Secrets**: only names the approved version declares are filled in; any other
+  placeholder stays text. Known gap: `http_request` follows redirects, and httpx drops
+  only the `Authorization` header when a redirect leaves the host, so a secret in a
+  custom header could reach the host a declared host redirects to (security.md).
+- **think**: at most 10 per run (the sub-agent cap per task, `subagents.MAX_PER_TASK`).
+  The child is a normal sub-agent run (`kind="agent"`, the script run's conversation,
+  profile and model); its policy snapshot inherits `automation.tools` = the version's
+  `think_tools`, which is how its tool list is narrowed without changing
+  `subagents.py`.
+- **Discard** is refused for a script that was never approved (nothing to go back to:
+  delete it instead). Approving a hash that is already approved is a no-op, so a double
+  click doesn't fail.
+- **Pause** by the user is honoured between calls (the run becomes `paused`; resuming
+  replays the journal like an approval).
+- **The run's chat**: its first message is the script's description, its answer the
+  result as a JSON code block, the log, and the `Outcome:` line last (a fence longer than
+  any backtick run in the result, so the result can't end the block).
+- **Deno** comes from `denoland/deno:bin-2.9.8` in the image; `DENO_PATH` (config) points
+  elsewhere. The sandbox tests (`tests/unit/test_script_sandbox.py`) run where Deno is
+  found and are skipped elsewhere; the API tests use an in-process fake runner.
+- **No new provenance table.** As decided in CONTRACTS-round3 §1: the run's tool calls,
+  its change list, `created_by`/`updated_by` = `automation:<id>/<run id>`, and
+  `ActorOut.automation_kind` so the app and the tools say "the script X".
+

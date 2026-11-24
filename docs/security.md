@@ -299,6 +299,7 @@ sub-agent depth. When one is reached the run stops and says which.
 | A tab you shared | "Share this tab with Anemo" in Anemo Companion sends a copy of that one page's text. The agent can read that copy (no approval; "Never" for "Your own Chrome" takes the tool away), and nothing else: it cannot list or read other tabs, or see the shared one again after it changed. One tab at a time, forgotten after 12 hours or when you stop sharing; kept in Valkey, not the database. Not for automations. |
 | Music through the server | With "Keep playing in the background" on (Settings → Music), a YouTube track's audio is fetched by the Anemo host and passed on to your browser; nothing is stored. yt-dlp is given only an address built from an 11-character video id, with only its YouTube extractor enabled; the stream itself is fetched through the guarded client and only from YouTube's media hosts (`*.googlevideo.com`, https), so the route cannot be pointed at your network. It needs a signed-in session like every other route. YouTube's terms do not provide for this way of playing; switch it off to use YouTube's own embedded player only. |
 | Video transcripts | Read with yt-dlp on the Anemo host, from YouTube, Vimeo, Dailymotion and TED addresses only (checked by host name; yt-dlp's fetch-anything extractor is off), so the tool cannot be pointed at your network. If YouTube blocks the server and browser control is on, the transcript is read through your Chrome instead (a read, like opening a page there). |
+| Scripts | A script's code runs in Deno as a child process of the worker with no permissions except its own folder (`/data/scripts/<id>`): no network, no environment variables, no subprocesses, no other files, no remote or npm imports; 256 MB of memory, the automation's time and tool-call limits, 1 MB per message, 64 KB of log and of result. It reaches Anemo only through JSON messages the worker answers: each call is checked against the version's tool list (and web addresses against its hosts) and then goes through the permission engine and approvals exactly like an agent's, as the automation's run. Code an agent writes or changes is saved switched off and never runs until you approve that exact version (by its hash, with your password); `update_schedule` cannot switch a script on. `think` gives its data to a model inside an untrusted block, with no tools unless the script lists some. Secrets are filled in by the worker only in request headers to a declared host and replaced by their placeholder in what comes back. Deno has no kernel-level isolation: approved code runs inside the worker container. |
 | Schedules | An agent can set up a prompt that runs by itself (an automation) only with your confirmation, every time, whatever the "Schedules" level says. Scheduled runs wait for you when an action needs approval, cannot create or change schedules themselves, are stopped after the time limit for scheduled runs (30 minutes unless changed), run at most every 5 minutes, and all stop starting while "Pause all" is on (Automations page). |
 | Deleting | Files, tasks and calendar events an agent deletes go to a trash only you can restore from or empty. Forgetting a memory and deleting a schedule are permanent; both say so. |
 | MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
@@ -319,8 +320,8 @@ key, token or base URL, none of Anemo's secrets).
 
 ## Secrets
 
-API keys, webhook addresses, push subscriptions and keys, and MCP credentials are
-encrypted in the database with
+API keys, webhook addresses, push subscriptions and keys, MCP credentials and the
+values of script secrets are encrypted in the database with
 `APP_SECRET_KEY`. The API never returns them (you see the last four characters),
 they are not written to logs or run records, and they are never given to a model
 or a tool. The test suite checks this by saving a key, running an agent and then
@@ -338,6 +339,11 @@ searching every response, record and stored file for it.
   prefer "ask" there.
 - **What you approve, runs.** Read approval requests; the exact command or change
   is shown.
+- **An approved script runs as written, unattended.** Read the code (and the diff of a
+  change) before approving it. Its sandbox is Deno's permission system, not a separate
+  container: a flaw in Deno or V8 would reach the worker. And a secret in a custom
+  header (not `Authorization`) follows a redirect from a declared host to another one;
+  declare only hosts you trust.
 - **A trusted computer is the agent's computer.** On a computer marked trusted, with
   acting or PowerShell set to fully autonomous, the agent does what that Windows user
   can, without asking, steered partly by what is on the screen. Keep your own logins,
