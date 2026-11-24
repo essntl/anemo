@@ -131,6 +131,13 @@ def _lay_out(code: str, folder: Path) -> tuple[Path, str]:
     return scratch, str(folder.resolve())
 
 
+def _executable(name: str) -> str:
+    """The full path of Deno, looked up on the worker's own PATH. Deno's environment has no
+    PATH (see `_environment`), and without one a bare name is only searched for in
+    /bin and /usr/bin, while the image puts Deno in /usr/local/bin."""
+    return shutil.which(name) or name
+
+
 class DenoRunner:
     def __init__(self, deno: str | None = None) -> None:
         self.deno = deno
@@ -138,8 +145,9 @@ class DenoRunner:
     async def start(self, code: str, folder: Path, limits: SandboxLimits) -> DenoProcess:
         scratch, own = await asyncio.to_thread(_lay_out, code, folder)
         try:
+            deno = _executable(self.deno or get_settings().deno_path)
             process = await asyncio.create_subprocess_exec(
-                self.deno or get_settings().deno_path,
+                deno,
                 "run",
                 "--quiet",
                 "--no-prompt",
@@ -161,8 +169,8 @@ class DenoRunner:
             )
         except OSError as exc:
             shutil.rmtree(scratch, ignore_errors=True)
-            log.warning("deno could not be started")
-            raise ScriptCrashed(f"Deno could not be started: {exc}") from exc
+            log.warning("deno could not be started", extra={"ctx": {"deno": deno}})
+            raise ScriptCrashed(f"Deno could not be started ({deno}): {exc}") from exc
         return DenoProcess(process, scratch)
 
 

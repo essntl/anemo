@@ -4,6 +4,7 @@ DENO_PATH, or have `deno` on the PATH; the worker image has it)."""
 
 import asyncio
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -158,6 +159,26 @@ async def test_code_that_imports_from_the_internet_does_not_start(tmp_path: Path
     finally:
         await process.stop()
     assert ended is None
+
+
+@needs_deno
+async def test_deno_is_found_by_name_on_the_workers_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The worker names Deno without a folder (`DENO_PATH=deno`), and the image puts it in
+    /usr/local/bin. Deno's own environment has no PATH, so the name must be looked up on
+    the worker's PATH first (before, the run failed: "No such file or directory: 'deno'")."""
+    assert DENO is not None
+    monkeypatch.setenv("PATH", str(Path(DENO).parent) + os.pathsep + os.environ.get("PATH", ""))
+    process = await DenoRunner(Path(DENO).name).start(
+        "export default () => 'found'", tmp_path / "box", SandboxLimits(memory_mb=128)
+    )
+    try:
+        await process.send({"type": "start", "input": {"trigger": "manual", "input": {}}})
+        done = await until_done(process)
+    finally:
+        await process.stop()
+    assert done is not None and done["type"] == "done"
 
 
 # -- helpers ---------------------------------------------------------------------------
