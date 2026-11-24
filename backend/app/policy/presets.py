@@ -138,6 +138,29 @@ CATEGORIES: list[Category] = [
     ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
+    # Automation scripts (docs/specs/08-automation-scripts.md). Whatever this level says, a
+    # script an agent writes or changes is switched off until you approve its code.
+    Category(
+        "scripts.manage",
+        "Scripts",
+        "Write and change automation scripts (code that runs without a model). They stay "
+        "off until you approve the code on the Automations page.",
+        "ask",
+    ),
+    Category(
+        "scripts.run",
+        "Run scripts",
+        "Start a script you approved and switched on.",
+        "ask",
+    ),
+    # Anemo Voice's voice mode (docs/specs/07-voice-mode-android.md): the agent can only
+    # end it, never start it.
+    Category(
+        "voice.control",
+        "Voice mode",
+        "End voice mode on your phone when a spoken conversation is over.",
+        "autonomous",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 

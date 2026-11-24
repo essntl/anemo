@@ -9,12 +9,9 @@ Models added earlier whose name says they make images (gpt-image, dall-e, Gemini
 *-image models, ...) get the new `image_generation` capability and leave the chat model
 lists, where they never worked (as 0071 did for speech-to-text models).
 
-Revision ID: 0076
-Revises: 0074
+Revision ID: 0078
+Revises: 0077
 Create Date: 2026-11-24 12:00:00.000000
-
-(0075 is taken by another branch in flight: if it is merged first, this revision's
-down_revision becomes "0075".)
 """
 
 from collections.abc import Sequence
@@ -22,8 +19,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0076"
-down_revision: str | None = "0074"
+revision: str = "0078"
+down_revision: str | None = "0077"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

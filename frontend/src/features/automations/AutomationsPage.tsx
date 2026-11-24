@@ -5,7 +5,7 @@
  * shows an answer's duration). `?automation=<id>&run=<run id>` opens
  * that automation's run log at that run (links to what an automation did).
  */
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { ChevronDown, Clock, History, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
@@ -14,109 +14,27 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Segmented } from '@/components/ui/Segmented'
 import { Switch } from '@/components/ui/Switch'
-import { AnswerDuration, LiveTiming } from '@/features/chat/components/AnswerTiming'
-import { RunStatusBadge } from '@/features/runs/components/RunStatusBadge'
 import { useSaveSection, useSettings } from '@/features/settings/api'
 import { cn } from '@/lib/cn'
 import { formatUpcoming, formatWhen } from '@/lib/format'
 import { plural, rich, t } from '@/lib/i18n'
 import {
   type Automation,
-  type AutomationRun,
   STATUS_LABELS,
-  useAutomationRun,
-  useAutomationRuns,
+  STATUS_TONES,
   useAutomations,
   useDeleteAutomation,
   useRunAutomation,
   useSetAutomationEnabled,
 } from './api'
 import { AutomationDialog } from './components/AutomationDialog'
+import { RunHistory } from './components/RunHistory'
+import { ScriptsTab } from './components/ScriptsTab'
 import { type AutomationTemplate, TEMPLATES } from './templates'
 import { Lingering } from '@/components/ui/Lingering'
 import { PageHeader } from '@/components/ui/PageHeader'
-
-const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'error'> = {
-  running: 'accent',
-  waiting: 'warning',
-  paused: 'warning',
-  completed: 'success',
-  failed: 'error',
-  retrying: 'warning',
-  missed: 'warning',
-}
-
-/** How long a run took, quietly, with the details on hover or click (as in the chat);
- * counting up while it works, standing still while it waits for you. */
-function RunDuration({ run }: { run: AutomationRun }) {
-  const { timing } = run
-  return (
-    <span className="shrink-0 text-[12px] text-muted">
-      {timing.finished_at ? <AnswerDuration timing={timing} label={t('How long the run took:')} /> : <LiveTiming timing={timing} paused={run.status === 'paused'} />}
-    </span>
-  )
-}
-
-/** One run in the log: when, how it went, how long it took, the model's outcome line
- * and the changes the server recorded from its tool calls. */
-function RunLogEntry({ run, highlighted }: { run: AutomationRun; highlighted: boolean }) {
-  const ref = useRef<HTMLLIElement>(null)
-  const [open, setOpen] = useState(highlighted)
-  useEffect(() => {
-    if (highlighted) ref.current?.scrollIntoView?.({ block: 'center' })
-  }, [highlighted])
-  const changes = run.changes ?? []
-  const summary = run.error ?? run.outcome_line
-  return (
-    <li ref={ref} className={cn('rounded-control', highlighted && 'bg-surface-2')}>
-      <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 text-[13px] pointer-coarse:py-2.5">
-        <Link to={run.conversation_id ? `/c/${run.conversation_id}` : `/runs/${run.run_id}`}
-          className="w-32 shrink-0 text-muted hover:underline">{formatWhen(run.created_at)}</Link>
-        <RunStatusBadge status={run.status} />
-        <RunDuration run={run} />
-        {run.nothing_to_do && <Badge tone="neutral">{t('Nothing to do')}</Badge>}
-        <span className={cn('min-w-0 flex-1 truncate text-[12.5px]', run.error ? 'text-error' : 'text-subtle')} title={summary ?? undefined}>
-          {summary}
-        </span>
-        {changes.length > 0 && (
-          <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}
-            className="text-[12px] text-accent hover:underline">
-            {plural(changes.length, '{n} change', '{n} changes')}
-          </button>
-        )}
-      </div>
-      {open && changes.length > 0 && (
-        <ul className="mb-1.5 ml-36 flex flex-col gap-0.5 text-[12.5px] text-muted max-md:ml-4">
-          {changes.map((c, i) => (
-            <li key={i} className="min-w-0 truncate">
-              <span className="font-mono text-[11.5px] text-subtle">{c.tool}</span>{' '}
-              {c.ref ? <Link to={c.ref} className="text-accent hover:underline">{c.summary}</Link> : c.summary}
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  )
-}
-
-/** The run log of one automation; each run opens its conversation. A run a link points
- * to that is older than the log shows is fetched on its own and shown first. */
-function RunHistory({ automation, highlight }: { automation: Automation; highlight: string | null }) {
-  const runs = useAutomationRuns(automation.id, [automation.active_run_id, automation.last_status, automation.last_run_at].join('|'))
-  const listed = runs.data?.some((run) => run.run_id === highlight) ?? true
-  const linked = useAutomationRun(automation.id, highlight && !listed ? highlight : null)
-  if (runs.isError) return <p className="text-[12.5px] text-error">{errorMessage(runs.error)}</p>
-  if (!runs.data) return <p className="text-[12.5px] text-muted">{t('Loading…')}</p>
-  const older = listed ? [] : (linked.data ?? [])
-  if (runs.data.length === 0 && older.length === 0) return <p className="text-[12.5px] text-muted">{t('It has not run yet.')}</p>
-  return (
-    <ul className="flex flex-col">
-      {older.map((run) => <RunLogEntry key={run.run_id} run={run} highlighted />)}
-      {runs.data.map((run) => <RunLogEntry key={run.run_id} run={run} highlighted={run.run_id === highlight} />)}
-    </ul>
-  )
-}
 
 function AutomationCard({ automation, onEdit, highlight }: { automation: Automation; onEdit: () => void; highlight?: string | null }) {
   const setEnabled = useSetAutomationEnabled()
@@ -204,26 +122,34 @@ export function AutomationsPage() {
   const [editing, setEditing] = useState<{ automation: Automation | null; template?: AutomationTemplate } | null>(null)
   const settings = useSettings()
   const saveProtections = useSaveSection('automations')
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const linked = params.get('automation')
   const protections = settings.data?.automations
   const paused = protections?.paused ?? false
-  const items = automations.data ?? []
+  const all = automations.data ?? []
+  // Scripts have a tab of their own; a link to one opens that tab.
+  const linkedKind = all.find((a) => a.id === linked)?.kind
+  const tab: 'agent' | 'script' = params.get('tab') === 'scripts' || linkedKind === 'script' ? 'script' : 'agent'
+  const setTab = (next: 'agent' | 'script') => setParams(next === 'script' ? { tab: 'scripts' } : {}, { replace: true })
+  const items = all.filter((a) => a.kind !== 'script')
+  const scripts = all.filter((a) => a.kind === 'script')
   const templates = TEMPLATES.filter((tpl) => !items.some((a) => a.name === tpl.name || a.name === t(tpl.name)))
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
       <PageHeader title={t('Automations')}>
-        <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>
-          {/* "New" is also said of other things (a document): the empty {automation} keeps this translation apart. */}
-          {t('New##automation')}
-        </Button>
+        {tab === 'agent' && (
+          <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>
+            {/* "New" is also said of other things (a document): the empty {automation} keeps this translation apart. */}
+            {t('New##automation')}
+          </Button>
+        )}
       </PageHeader>
       <p className="mb-4 max-w-2xl text-[13px] text-muted">
         {rich('Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.', { a: (c) => <Link to="/notifications" className="text-accent underline">{c}</Link> })}
         </p>
 
-      {protections && (items.length > 0 || paused) && (
+      {protections && (all.length > 0 || paused) && (
         <div className={cn('mb-3 flex items-center gap-3 rounded-card border px-4 py-2.5', paused ? 'border-warning bg-surface-2' : 'border-border bg-card')}>
           <Pause className={cn('h-4 w-4 shrink-0', paused ? 'text-warning' : 'text-muted')} />
           <div className="min-w-0 flex-1 text-[13px]">
@@ -240,6 +166,17 @@ export function AutomationsPage() {
       )}
       {saveProtections.isError && <p className="mb-2 text-[13px] text-error">{errorMessage(saveProtections.error)}</p>}
       {automations.isError && <p className="text-[13px] text-error">{errorMessage(automations.error)}</p>}
+      <Segmented kind="tabs" controls="automations-tab" label={t('Kind of automation')} value={tab} onChange={setTab} className="mb-3"
+        options={[
+          { value: 'agent', label: t('Automations##agent') },
+          { value: 'script', label: scripts.some((s) => s.script_pending) ? <>{t('Scripts')} <span className="text-warning">●</span></> : t('Scripts'), ariaLabel: t('Scripts') },
+        ]} />
+      {tab === 'script' && (
+        <div id="automations-tab-script" role="tabpanel">
+          {automations.isSuccess && <ScriptsTab scripts={scripts} linked={linked} linkedRun={params.get('run')} />}
+        </div>
+      )}
+      {tab === 'agent' && <div id="automations-tab-agent" role="tabpanel">
       {automations.isSuccess && items.length === 0 && (
         <EmptyState icon={<Clock className="h-5 w-5" />} title={t('No automations yet')}
           description={t('For example: a news briefing every morning, a weekly summary of your open tasks, or a check that tells you when a web page changes.')}
@@ -262,6 +199,8 @@ export function AutomationsPage() {
           </div>
         </section>
       )}
+
+      </div>}
 
       <Lingering value={editing}>{(shown) => <AutomationDialog automation={shown.automation} template={shown.template} onClose={() => setEditing(null)} />}</Lingering>
     </div>

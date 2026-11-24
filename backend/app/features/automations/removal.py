@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import and_, func, or_, select
 
 from app.core.db import get_sessionmaker
-from app.features.automations import service
+from app.features.automations import scripts, service
 from app.features.automations.models import Automation
 from app.features.conversations import service as conversations
 from app.features.conversations.models import Conversation
@@ -39,8 +39,10 @@ async def delete_with_runs(automation_id: uuid.UUID) -> None:
             )
         )
         await conversations.delete_conversations(db, chats)
+        await scripts.forget_secrets(db, automation.id)
         await db.delete(automation)
         await db.commit()
+    scripts.remove_folder(automation_id)
     await service.notify_changed()
 
 

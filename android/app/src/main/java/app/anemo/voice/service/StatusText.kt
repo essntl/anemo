@@ -10,6 +10,9 @@ object StatusText {
         is Connection.Connected, Connection.Off -> null
     }
 
+    /** [title] with "Voice mode · " in front while voice mode is on. */
+    fun withVoiceMode(title: String, voiceMode: Boolean): String = if (voiceMode) "Voice mode · $title" else title
+
     /** "1 request working", "3 requests working", or null for none. */
     fun activeRuns(count: Int): String? = when {
         count == 1 -> "1 request working"

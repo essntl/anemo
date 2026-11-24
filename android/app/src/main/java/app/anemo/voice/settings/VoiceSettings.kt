@@ -36,12 +36,26 @@ data class VoiceSettings(
     val ttsVoice: String = "",
     /** Speech rate, 0.5 to 2.0 (1.0 is normal). */
     val ttsSpeed: Float = 1.0f,
+    /** Buzz with every sound (in silent mode the buzz is the cue). */
+    val vibrate: Boolean = true,
+    /** Saying "start voice mode" turns voice mode on. */
+    val voiceModePhrase: Boolean = true,
+    /** Voice mode ends when nobody speaks this long after the microphone opened; one of [IDLE_CHOICES]. */
+    val voiceModeIdleSeconds: Int = 45,
 ) {
     val wakeWordName: String
         get() = if (wakeWord == WakeWord.Custom && customWordName.isNotBlank()) customWordName.trim() else wakeWord.spoken
 
     /** The `toString` of a data class would print the token: never. */
     override fun toString(): String = "VoiceSettings(address=$address, wakeWord=${wakeWord.id}, token=…)"
+
+    companion object {
+        /** "End voice mode after silence", in seconds. */
+        val IDLE_CHOICES = listOf(30, 45, 60, 90)
+
+        /** A stored value that isn't one of the choices becomes the default. */
+        fun idleSeconds(stored: Int): Int = if (stored in IDLE_CHOICES) stored else 45
+    }
 }
 
 interface SettingsStore {

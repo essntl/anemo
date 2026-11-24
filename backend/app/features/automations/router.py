@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.api.deps import Db, client_ip
 from app.core.errors import Conflict
 from app.features.audit import service as audit
-from app.features.automations import catalog, service
+from app.features.automations import catalog, scripts, service
 from app.features.automations.models import Automation
 from app.features.automations.schedule import describe, upcoming
 from app.features.automations.schemas import (
@@ -108,8 +108,10 @@ async def delete_automation(automation_id: uuid.UUID, request: Request, db: Db) 
         details={"name": automation.name},
     )
     await conversations.delete_conversations(db, ids)
+    await scripts.forget_secrets(db, automation.id)
     await db.delete(automation)
     await db.commit()
+    scripts.remove_folder(automation_id)
     await service.notify_changed()
 
 

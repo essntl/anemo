@@ -31,9 +31,8 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.actor import USER, Actor, acting_as
+from app.core.actor import USER, Actor
 from app.core.db import get_sessionmaker
-from app.core.refs import ObjectType, ref_url
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.images import PreparedImage
@@ -44,7 +43,7 @@ from app.features.runs import service as runs
 from app.features.runs.models import TERMINAL_STATUSES, Approval, FileChange, Run, ToolCall
 from app.features.usage import service as usage
 from app.jobs import queue
-from app.policy.engine import combine, evaluate
+from app.policy.engine import evaluate
 from app.policy.models import Action, Grant, Limits, Policy
 from app.providers.base import (
     AttachmentRef,
@@ -60,7 +59,7 @@ from app.providers.base import (
 )
 from app.providers.catalog import rejects_tools
 from app.providers.router import NoModelAvailable, ResolvedModel
-from app.runtime import citations, compaction, outputs, subagents
+from app.runtime import citations, compaction, outputs, subagents, tool_calls
 from app.runtime.agent_finalize import after_answer, finalize, notify_question, save_progress
 from app.runtime.agent_prompt import build_system_prompt
 from app.runtime.agent_snapshot import resolve_models, session_key_for, snapshot_run
@@ -91,7 +90,6 @@ log = logging.getLogger(__name__)
 MAX_CRASH_RESUMES = 2
 INVALID_JSON_KEY = "__invalid_json__"
 DONE_TOOL_STATUSES = ("succeeded", "failed", "denied", "cancelled", "interrupted")
-_RISK_ORDER = {"safe": 0, "moderate": 1, "dangerous": 2}
 # Compact when the context is this full; keep this share of it as recent messages.
 COMPACT_AT = 0.75
 KEEP_RECENT = 0.35
@@ -768,51 +766,45 @@ class AgentRun:
         args: Any,
         grants: list[Grant],
     ) -> str | None:
-        # A tool that describes no actions is still checked: against its own capability,
-        # never waved through (refactor/BUGS.md sec-15).
-        actions = tool.actions(args, self.ctx) or [
-            Action(capability=tool.capability, summary=tool.name)
-        ]
-        verdict = combine(
-            [
-                evaluate(
-                    a,
-                    self.policy,
-                    ceiling=self.ceiling,
-                    ancestors=self.ancestors,
-                    grants=grants,
-                    ask_contacts=self._asks_contacts(tool),
-                )
-                for a in actions
-            ]
+        verdict = tool_calls.decide(
+            tool,
+            args,
+            self.ctx,
+            self.policy,
+            ceiling=self.ceiling,
+            ancestors=self.ancestors,
+            grants=grants,
+            ask_contacts=self._asks_contacts(tool),
         )
+        actions = verdict.actions
         row.capability = tool.capability
         row.actions = [a.model_dump() for a in actions]
-        row.risk = max((a.risk for a in actions), key=lambda r: _RISK_ORDER[r], default="safe")
-        row.decision, row.decision_reason = verdict.decision, verdict.reason
+        row.risk = verdict.risk
+        evaluation = verdict.evaluation
+        row.decision, row.decision_reason = evaluation.decision, evaluation.reason
 
-        if verdict.decision == "deny":
+        if evaluation.decision == "deny":
             await self._finish_row(
                 db,
                 row,
                 "denied",
                 ToolResult(
                     content="Not allowed by the user's permission settings "
-                    f"({verdict.reason}). "
+                    f"({evaluation.reason}). "
                     "Do not retry; continue without it or tell the user.",
                     is_error=True,
                 ),
             )
             await self._emit("tool.denied", {"tool_call_id": str(row.id)})
             return None
-        if verdict.decision == "ask":
+        if evaluation.decision == "ask":
             summary = "; ".join(a.summary for a in actions if a.summary) or tool.name
             if self.on_ask == "pause" and await self._asked_before(db, run, row):
                 return None
             if self.on_ask == "pause":
                 return await self._ask(db, run, row, tool, "action", summary)
             # Unattended and set not to wait: the answer is no, never a silent yes.
-            row.decision_reason = f"{verdict.reason}; nobody is here to approve"[:300]
+            row.decision_reason = f"{evaluation.reason}; nobody is here to approve"[:300]
             await self._finish_row(
                 db,
                 row,
@@ -969,21 +961,11 @@ class AgentRun:
         self.current_call = self.ctx.call_id = row.id
         await self._emit("tool.started", {"tool_call_id": str(row.id), "tool": tool.name})
         try:
-            with acting_as(self.ctx.actor):  # what the tool writes is recorded as the run's
-                result = await asyncio.wait_for(tool.run(args, self.ctx), timeout=tool.timeout_s)
-        except TimeoutError:
-            result = ToolResult(
-                content=f"{tool.name} timed out after {tool.timeout_s:.0f}s.", is_error=True
-            )
+            result = await tool_calls.run_tool(tool, args, self.ctx)
         except asyncio.CancelledError:
             row.status, row.ended_at = "cancelled", datetime.now(UTC)
             await db.commit()
             raise
-        except Exception as exc:  # noqa: BLE001 - tool bugs become errors the model can see
-            log.exception("tool failed", extra={"ctx": {"tool": tool.name}})
-            result = ToolResult(
-                content=f"{tool.name} failed: {type(exc).__name__}: {exc}", is_error=True
-            )
         if result.data and result.data.get("sources"):
             # Web sources, so citations in the answer can be turned into links.
             sources = [*run.options.get("sources", []), *result.data["sources"]]
@@ -1002,9 +984,7 @@ class AgentRun:
     def _asks_contacts(self, tool: Tool) -> bool:
         """Automation runs ask before a tool reaches other people, whatever the policy
         says, unless the automation allows that tool (policy/engine.py)."""
-        if self.automation is None:
-            return False
-        return tool.name not in (self.automation.get("contacts_allowed") or [])
+        return tool_calls.asks_contacts(tool, self.automation)
 
     def _root_run_id(self, run: Run) -> uuid.UUID:
         return run.root_run_id or run.id
@@ -1042,18 +1022,11 @@ class AgentRun:
     ) -> None:
         """Automation runs: a call that changed something goes into the run's list of
         changes (a sub-agent's into the automation run it works for)."""
-        changed = tool.changes(args) if result.changed is None else result.changed
-        if self.automation is None or result.is_error or not changed:
+        if self.automation is None:
             return
-        summary = "; ".join(a.get("summary") or "" for a in row.actions if a.get("summary"))
-        change: dict[str, Any] = {"tool": tool.name, "summary": (summary or tool.name)[:300]}
-        data = result.data or {}
-        kinds: tuple[ObjectType, ...] = ("task", "event")
-        for kind in kinds:
-            item = data.get(kind)
-            if isinstance(item, dict) and item.get("id"):
-                change["ref"] = ref_url(kind, uuid.UUID(str(item["id"])))
-        await automations.record_change(db, self._root_run_id(run), change)
+        change = tool_calls.change_for(tool, args, row.actions, result)
+        if change is not None:
+            await automations.record_change(db, self._root_run_id(run), change)
 
     # -- sub-agents ----------------------------------------------------------------
 
@@ -1209,7 +1182,7 @@ async def execute_agent_run(run_id: uuid.UUID) -> None:
     await _record_outcome(run_id, agent, outcome, error)
 
 
-async def _pick_up(db: AsyncSession, run: Run) -> bool:
+async def pick_up(db: AsyncSession, run: Run) -> bool:
     """Whether this worker should drive the run now. A stale or duplicate job leaves it
     alone; a run stopped before it started, or interrupted too often, is ended here.
     After a crash the restart is counted (refactor/BUGS.md run-1)."""
@@ -1244,7 +1217,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
     None when there is nothing to drive."""
     async with get_sessionmaker()() as db:
         run = await db.get(Run, run_id)
-        if run is None or not await _pick_up(db, run):
+        if run is None or not await pick_up(db, run):
             return None
         # Two runs of one automation never work at once: this one may have to wait.
         if not await automations.may_start(db, run):
@@ -1297,6 +1270,9 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
             and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),
             can_ask=run.kind == "agent" and run.automation_id is None and run.depth == 0,
             has_chat=answer_message is not None,
+            has_phone=run.depth == 0
+            and run.options.get("source") == "voice"
+            and bool(run.options.get("device_id")),
             ancestors=ancestors,
             off=run.policy.get("off") or (),
         )

@@ -14,7 +14,8 @@ It checks no trust level or permission: the tools do that before they call `send
 
 Keys (nobody outside features/devices reads them):
   devices:online:<device_id>   a hash: the device's connection (`conn`) and its last offer
-                               (`control`, `shell`, `code`, `offered_at`); 90 s, renewed by the
+                               (`control`, `shell`, `code`, `code_start`, `platform`,
+                               `shell_kind`, `offered_at`); 90 s, renewed by the
                                client's pings and offers. The offer counts for OFFER_TTL_S
                                after offered_at. Changed only by the Lua scripts below,
                                which compare `conn` first, so a late message of a replaced
@@ -55,14 +56,37 @@ MAX_ERROR = 500
 MIN_TURN_S = 5.0
 
 
+Platform = Literal["windows", "macos"]
+ShellKind = Literal["powershell", "pwsh", "zsh", "bash"]
+PLATFORMS: tuple[Platform, ...] = ("windows", "macos")
+SHELL_KINDS: tuple[ShellKind, ...] = ("powershell", "pwsh", "zsh", "bash")
+DEFAULT_PLATFORM: Platform = "windows"
+DEFAULT_SHELL_KIND: ShellKind = "powershell"
+
+
+def platform_of(value: object) -> Platform:
+    """A `hello.platform` as sent; missing or unknown (older clients) means Windows."""
+    return cast(Platform, value) if value in PLATFORMS else DEFAULT_PLATFORM
+
+
+def shell_kind_of(value: object) -> ShellKind:
+    """A `device.offer.shell_kind` as sent; missing or unknown means Windows PowerShell."""
+    return cast(ShellKind, value) if value in SHELL_KINDS else DEFAULT_SHELL_KIND
+
+
 @dataclass(frozen=True)
 class Offer:
     """What a connected device said it allows, in its last `device.offer`."""
 
     control: bool  # "Allow control" is on in the client
-    shell: bool  # PowerShell is switched on in the client
+    shell: bool  # the shell (PowerShell, zsh, …) is switched on in the client
     code: bool = False  # "Share Claude Code jobs with Anemo" is on (older clients: off)
     code_start: bool = False  # "Let Anemo start Claude Code jobs" is on (older clients: off)
+    # It takes images with code_start (Anemo Desktop 1.3.0; older clients: off).
+    code_images: bool = False
+    # From `hello` (older clients: Windows) and the offer (older clients: Windows PowerShell).
+    platform: Platform = DEFAULT_PLATFORM
+    shell_kind: ShellKind = DEFAULT_SHELL_KIND
 
 
 @dataclass(frozen=True)
@@ -75,6 +99,8 @@ class DeviceInfo:
     trust: Literal["watched", "trusted"]
     control: bool
     shell: bool
+    platform: Platform = DEFAULT_PLATFORM
+    shell_kind: ShellKind = DEFAULT_SHELL_KIND
 
 
 class Unavailable(Exception):
@@ -120,23 +146,24 @@ _CONNECT = """
 local old = redis.call('HGET', KEYS[1], 'conn')
 redis.call('DEL', KEYS[1])
 redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
-  'code_start', '0', 'offered_at', '')
+  'code_start', '0', 'code_images', '0', 'offered_at', '')
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return old
 """
 
-# ARGV: conn, ttl, has_offer ('1'/'0'), control, shell, offered_at, code, code_start. 0 when
-# another connection has the device.
+# ARGV: conn, ttl, has_offer ('1'/'0'), control, shell, offered_at, code, code_start,
+# code_images, platform, shell_kind. 0 when another connection has the device.
 _RENEW = """
 local cur = redis.call('HGET', KEYS[1], 'conn')
 if cur and cur ~= ARGV[1] then return 0 end
 if not cur then
   redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
-    'code_start', '0', 'offered_at', '')
+    'code_start', '0', 'code_images', '0', 'offered_at', '')
 end
 if ARGV[3] == '1' then
   redis.call('HSET', KEYS[1], 'control', ARGV[4], 'shell', ARGV[5], 'offered_at', ARGV[6],
-    'code', ARGV[7], 'code_start', ARGV[8])
+    'code', ARGV[7], 'code_start', ARGV[8], 'code_images', ARGV[9], 'platform', ARGV[10],
+    'shell_kind', ARGV[11])
 end
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return 1
@@ -180,6 +207,10 @@ def _fresh_offer(entry: dict[str, str]) -> Offer | None:
         shell=entry.get("shell") == "1",
         code=entry.get("code") == "1",
         code_start=entry.get("code_start") == "1",
+        code_images=entry.get("code_images") == "1",
+        # A hash an older server wrote has neither field: Windows PowerShell, as it was.
+        platform=platform_of(entry.get("platform")),
+        shell_kind=shell_kind_of(entry.get("shell_kind")),
     )
 
 
@@ -230,7 +261,7 @@ async def connect(device_id: uuid.UUID, conn: str) -> None:
 async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> bool:
     """The connection is alive (a ping), or sent a new offer. False when a newer
     connection of the same device replaced this one."""
-    args: list[str | int | float] = [conn, ENTRY_TTL_S, "0", "0", "0", "", "0", "0"]
+    args: list[str | int | float] = [conn, ENTRY_TTL_S, "0", "0", "0", "", "0", "0", "0", "", ""]
     if offer is not None:
         args[2:] = [
             "1",
@@ -239,6 +270,9 @@ async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> 
             time.time(),
             "1" if offer.code else "0",
             "1" if offer.code_start else "0",
+            "1" if offer.code_images else "0",
+            offer.platform,
+            offer.shell_kind,
         ]
     try:
         return bool(await _script(_RENEW, device_id, *args))
@@ -369,6 +403,8 @@ async def list_online() -> list[DeviceInfo]:
                 trust=device.trust,
                 control=offer.control if offer else False,
                 shell=offer.shell if offer else False,
+                platform=offer.platform if offer else DEFAULT_PLATFORM,
+                shell_kind=offer.shell_kind if offer else DEFAULT_SHELL_KIND,
             )
         )
     return found

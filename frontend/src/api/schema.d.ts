@@ -290,6 +290,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Profile Settings */
+        put: operations["put_profile_settings_api_settings_profile_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/models": {
         parameters: {
             query?: never;
@@ -1303,6 +1320,80 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Assets */
+        get: operations["list_assets_api_appearance_assets_get"];
+        put?: never;
+        /** Upload Asset */
+        post: operations["upload_asset_api_appearance_assets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets/{asset_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Asset Content */
+        get: operations["asset_content_api_appearance_assets__asset_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Asset */
+        delete: operations["delete_asset_api_appearance_assets__asset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Avatar
+         * @description Replace the avatar with the square (crop_x, crop_y, crop_size: fractions of the
+         *     picture's width, height and shorter side) of the uploaded picture.
+         */
+        put: operations["set_avatar_api_appearance_avatar_put"];
+        post?: never;
+        /** Remove Avatar */
+        delete: operations["remove_avatar_api_appearance_avatar_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3924,6 +4015,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automations/scripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Script
+         * @description A new script, written in the app: approved at once, off until switched on.
+         */
+        post: operations["create_script_api_automations_scripts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Script
+         * @description The approved version and the one waiting for review (for the diff), who wrote it
+         *     and which of its secrets are set.
+         */
+        get: operations["get_script_api_automations__automation_id__script_get"];
+        /**
+         * Save Script
+         * @description Save a new version from the app (approved at once: the user wrote it).
+         */
+        put: operations["save_script_api_automations__automation_id__script_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Script
+         * @description Approve the version waiting for review: the one with the hash the user looked at.
+         */
+        post: operations["approve_script_api_automations__automation_id__script_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Discard Change
+         * @description Throw the change waiting for review away; the approved version stays.
+         */
+        delete: operations["discard_change_api_automations__automation_id__script_pending_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/secrets/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Secret
+         * @description Set the value of one of the script's secrets (write-only: it is never shown).
+         */
+        put: operations["set_secret_api_automations__automation_id__script_secrets__name__put"];
+        post?: never;
+        /** Clear Secret */
+        delete: operations["clear_secret_api_automations__automation_id__script_secrets__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mcp/servers": {
         parameters: {
             query?: never;
@@ -4640,10 +4837,33 @@ export interface paths {
         put?: never;
         /**
          * Voice Turn
-         * @description A spoken request: transcribed, made a clear request, and started as an agent run
-         *     in the Voice chat (or continuing `conversation_id` within the follow-up window).
+         * @description A spoken request: transcribed (or `text`, the transcript from `/voice/transcripts`),
+         *     made a clear request, and started as an agent run in the Voice chat (or continuing
+         *     `conversation_id` within the follow-up window; with `keep_chat`, whatever the window
+         *     says). `voice_mode`: the phone listens again after the answer.
          */
         post: operations["voice_turn_api_voice_turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/voice/transcripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Transcript
+         * @description Only transcribes: the phone matches its voice-mode commands on what was heard
+         *     before anything starts (docs/specs/07-voice-mode-android.md). Stores nothing.
+         */
+        post: operations["voice_transcript_api_voice_transcripts_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4699,6 +4919,11 @@ export interface components {
              * @description Where it leads: the chat, or the automation's run
              */
             url: string | null;
+            /**
+             * Automation Kind
+             * @description For an automation: a prompt (agent) or a script; None otherwise
+             */
+            automation_kind?: ("agent" | "script") | null;
         };
         /** AgentStats */
         AgentStats: {
@@ -4715,6 +4940,7 @@ export interface components {
         AllSettings: {
             general: components["schemas"]["GeneralSettings"];
             appearance: components["schemas"]["AppearanceSettings"];
+            profile: components["schemas"]["ProfileSettings"];
             models: components["schemas"]["ModelDefaults"];
             permissions: components["schemas"]["PermissionSettings"];
             workspace: components["schemas"]["WorkspaceSettings"];
@@ -4734,7 +4960,84 @@ export interface components {
             code: components["schemas"]["CodeSettings"];
             images: components["schemas"]["ImageSettings"];
         };
-        /** AppearanceSettings */
+        /** AppearanceAssetOut */
+        AppearanceAssetOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "background" | "font" | "avatar";
+            /**
+             * Media
+             * @enum {string}
+             */
+            media: "image" | "animated" | "video" | "font";
+            /** Mime */
+            mime: string;
+            /** Size */
+            size: number;
+            /** Filename */
+            filename: string;
+            /** Url */
+            url: string;
+            /** Poster Url */
+            poster_url: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * AppearanceBackground
+         * @description What is behind the app: nothing, a built-in animated gradient, or an upload.
+         */
+        AppearanceBackground: {
+            /**
+             * Kind
+             * @default none
+             * @enum {string}
+             */
+            kind: "none" | "gradient" | "upload";
+            /**
+             * Gradient
+             * @default aurora
+             * @enum {string}
+             */
+            gradient: "aurora" | "dusk" | "lagoon";
+            /** Asset Id */
+            asset_id?: string | null;
+            /**
+             * Blur
+             * @default 0
+             */
+            blur: number;
+            /**
+             * Dim
+             * @default 35
+             */
+            dim: number;
+            /**
+             * Fit
+             * @default cover
+             * @enum {string}
+             */
+            fit: "cover" | "contain" | "tile";
+            /**
+             * Animate On Phones
+             * @default false
+             */
+            animate_on_phones: boolean;
+        };
+        /**
+         * AppearanceSettings
+         * @description Settings > Appearance; applied in the browser (frontend/src/features/appearance).
+         */
         AppearanceSettings: {
             /**
              * Mode
@@ -4753,6 +5056,29 @@ export interface components {
              * @enum {string}
              */
             density: "comfortable" | "compact";
+            /** Tint */
+            tint?: string | null;
+            /**
+             * Tint Strength
+             * @default 40
+             */
+            tint_strength: number;
+            /**
+             * Ui Font
+             * @default default
+             */
+            ui_font: string;
+            /**
+             * Code Font
+             * @default default
+             */
+            code_font: string;
+            background?: components["schemas"]["AppearanceBackground"];
+            /**
+             * Glass
+             * @default false
+             */
+            glass: boolean;
         };
         /** AppendTo */
         AppendTo: {
@@ -4953,6 +5279,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Kind
+             * @default agent
+             * @enum {string}
+             */
+            kind: "agent" | "script";
             /** Name */
             name: string;
             /** Prompt */
@@ -5030,6 +5362,16 @@ export interface components {
             last_run_id: string | null;
             /** Active Run Id */
             active_run_id?: string | null;
+            /**
+             * Script Approved
+             * @default false
+             */
+            script_approved: boolean;
+            /**
+             * Script Pending
+             * @default false
+             */
+            script_pending: boolean;
             /**
              * Created At
              * Format: date-time
@@ -5169,6 +5511,26 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_set_avatar_api_appearance_avatar_put */
+        Body_set_avatar_api_appearance_avatar_put: {
+            /** File */
+            file: string;
+            /**
+             * Crop X
+             * @default 0
+             */
+            crop_x: number;
+            /**
+             * Crop Y
+             * @default 0
+             */
+            crop_y: number;
+            /**
+             * Crop Size
+             * @default 1
+             */
+            crop_size: number;
+        };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
             /** File */
@@ -5188,6 +5550,16 @@ export interface components {
              * @description For a folder upload: each file's path inside the uploaded folder (`photos/2024/beach.jpg`), in the order of `files`. Missing folders are made.
              */
             paths?: string[] | null;
+        };
+        /** Body_upload_asset_api_appearance_assets_post */
+        Body_upload_asset_api_appearance_assets_post: {
+            /** File */
+            file: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "background" | "font";
         };
         /** Body_upload_asset_api_documents_assets_post */
         Body_upload_asset_api_documents_assets_post: {
@@ -5209,6 +5581,11 @@ export interface components {
              */
             approval_id: string;
         };
+        /** Body_voice_transcript_api_voice_transcripts_post */
+        Body_voice_transcript_api_voice_transcripts_post: {
+            /** Audio */
+            audio: string;
+        };
         /** Body_voice_turn_api_voice_turns_post */
         Body_voice_turn_api_voice_turns_post: {
             /** Audio */
@@ -5220,6 +5597,18 @@ export interface components {
              * @default false
              */
             status: boolean;
+            /** Text */
+            text?: string | null;
+            /**
+             * Voice Mode
+             * @default false
+             */
+            voice_mode: boolean;
+            /**
+             * Keep Chat
+             * @default false
+             */
+            keep_chat: boolean;
         };
         /** BranchIn */
         BranchIn: {
@@ -5595,6 +5984,21 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
+        };
+        /** CodeImageOut */
+        CodeImageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** CodeJobDetailOut */
         CodeJobDetailOut: {
@@ -5626,6 +6030,11 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
         };
         /** CodeJobListOut */
         CodeJobListOut: {
@@ -5713,6 +6122,11 @@ export interface components {
             run_id?: string | null;
             /** Conversation Title */
             conversation_title?: string | null;
+            /**
+             * Images
+             * @default []
+             */
+            images: components["schemas"]["CodeImageOut"][];
         };
         /** CodeProjectOut */
         CodeProjectOut: {
@@ -8390,6 +8804,20 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * ProfileSettings
+         * @description Settings > Profile: how you appear in the app. The avatar is set through
+         *     PUT /appearance/avatar, which also stores its id here.
+         */
+        ProfileSettings: {
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /** Avatar Id */
+            avatar_id?: string | null;
+        };
         /** ProjectIn */
         ProjectIn: {
             /** Name */
@@ -9339,7 +9767,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "cron" | "interval" | "once" | "rrule";
+            kind: "cron" | "interval" | "once" | "rrule" | "manual";
             /** Cron */
             cron?: string | null;
             /** Every Minutes */
@@ -9377,6 +9805,143 @@ export interface components {
         Scope: {
             /** Roots */
             roots?: string[];
+        };
+        /** ScriptApproveIn */
+        ScriptApproveIn: {
+            /** Hash */
+            hash: string;
+            /**
+             * Enable
+             * @default false
+             */
+            enable: boolean;
+        };
+        /**
+         * ScriptCode
+         * @description What a version of a script is: its code and what the code may use. All of it is
+         *     reviewed together: changing any part is a new version.
+         */
+        ScriptCode: {
+            /** Code */
+            code: string;
+            /** Tools */
+            tools?: string[];
+            /** Hosts */
+            hosts?: string[];
+            /** Secrets */
+            secrets?: string[];
+            /** Think Tools */
+            think_tools?: string[];
+        };
+        /**
+         * ScriptCreateIn
+         * @description A new script from the app: approved at once (the user wrote or saw it), off
+         *     until it is switched on.
+         */
+        ScriptCreateIn: {
+            /** Code */
+            code: string;
+            /** Tools */
+            tools?: string[];
+            /** Hosts */
+            hosts?: string[];
+            /** Secrets */
+            secrets?: string[];
+            /** Think Tools */
+            think_tools?: string[];
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            schedule?: components["schemas"]["Schedule"];
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * On Ask
+             * @default pause
+             * @enum {string}
+             */
+            on_ask: "pause" | "deny" | "fail";
+            /**
+             * Notify
+             * @default agent_decides
+             * @enum {string}
+             */
+            notify: "agent_decides" | "always" | "on_failure" | "never";
+            /**
+             * Max Retries
+             * @default 0
+             */
+            max_retries: number;
+            /**
+             * Max Tool Calls
+             * @default 30
+             */
+            max_tool_calls: number;
+            /**
+             * Max Runtime S
+             * @default 300
+             */
+            max_runtime_s: number;
+            /** Chat Retention Days */
+            chat_retention_days?: number | null;
+        };
+        /** ScriptOut */
+        ScriptOut: {
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            approved: components["schemas"]["ScriptVersionOut"] | null;
+            pending: components["schemas"]["ScriptVersionOut"] | null;
+            owner: components["schemas"]["ActorOut"] | null;
+            /** Secrets */
+            secrets: components["schemas"]["ScriptSecretOut"][];
+        };
+        /** ScriptSecretIn */
+        ScriptSecretIn: {
+            /** Value */
+            value: string;
+        };
+        /** ScriptSecretOut */
+        ScriptSecretOut: {
+            /** Name */
+            name: string;
+            /** Value Hint */
+            value_hint: string | null;
+        };
+        /** ScriptVersionOut */
+        ScriptVersionOut: {
+            /** Number */
+            number: number;
+            /** Hash */
+            hash: string;
+            /** Code */
+            code: string;
+            /** Tools */
+            tools: string[];
+            /** Hosts */
+            hosts: string[];
+            /** Secrets */
+            secrets: string[];
+            /** Think Tools */
+            think_tools: string[];
+            created_by: components["schemas"]["ActorOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Approved At */
+            approved_at: string | null;
         };
         /** SearchGroup */
         SearchGroup: {
@@ -10990,6 +11555,13 @@ export interface components {
              */
             chat: "daily" | "single";
         };
+        /** VoiceTranscriptOut */
+        VoiceTranscriptOut: {
+            /** Heard */
+            heard: string;
+            /** Say */
+            say?: string | null;
+        };
         /**
          * VoiceTurnOut
          * @description 202 with the run that started; 200 with `cancelled` or `say` when none did.
@@ -11697,6 +12269,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AppearanceSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_profile_settings_api_settings_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
                 };
             };
             /** @description Validation Error */
@@ -13869,6 +14476,206 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assets_api_appearance_assets_get: {
+        parameters: {
+            query?: {
+                kind?: ("background" | "font" | "avatar") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppearanceAssetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_asset_api_appearance_assets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_asset_api_appearance_assets_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppearanceAssetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    asset_content_api_appearance_assets__asset_id__content_get: {
+        parameters: {
+            query?: {
+                variant?: "poster" | null;
+                /** @description An avatar's size in px: 64, 128 or 256 */
+                size?: number | null;
+            };
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_asset_api_appearance_assets__asset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_avatar_api_appearance_avatar_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_set_avatar_api_appearance_avatar_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_avatar_api_appearance_avatar_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -20114,6 +20921,253 @@ export interface operations {
             };
         };
     };
+    create_script_api_automations_scripts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_script_api_automations__automation_id__script_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_script_api_automations__automation_id__script_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptCode"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_script_api_automations__automation_id__script_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_change_api_automations__automation_id__script_pending_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_secret_api_automations__automation_id__script_secrets__name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+                name: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptSecretIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_secret_api_automations__automation_id__script_secrets__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+                name: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_servers_api_mcp_servers_get: {
         parameters: {
             query?: never;
@@ -21676,6 +22730,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_transcript_api_voice_transcripts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_transcript_api_voice_transcripts_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTranscriptOut"];
                 };
             };
             /** @description Validation Error */

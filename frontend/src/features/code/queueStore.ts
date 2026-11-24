@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { CodeImage } from './codeImages'
 
 /**
  * Messages written while a Claude Code job runs, one per thread, waiting for that job
@@ -11,6 +12,8 @@ export interface QueuedMessage {
   /** A job of the thread (the one that ran when the message was written). */
   jobId: string
   text: string
+  /** Uploaded images that go with it (their ids: the images stay on the server until it is sent). */
+  images?: CodeImage[]
   /** Why it wasn't sent by itself (the job failed, the computer went offline, …): it waits for the user. */
   held?: string
 }
@@ -19,6 +22,8 @@ interface QueueState {
   byThread: Record<string, QueuedMessage>
   /** What is typed in a thread's box and not sent or queued yet: it survives leaving the thread. */
   drafts: Record<string, string>
+  /** The images added to a thread's box and not sent or queued yet (like `drafts`). */
+  draftImages?: Record<string, CodeImage[]>
 }
 
 const NAME = 'anemo.codeQueue'
@@ -38,11 +43,13 @@ const without = <T,>(all: Record<string, T>, threadId: string) => {
 }
 
 export const codeQueue = {
-  /** Queue a message for the thread; one already waiting gets it as a new paragraph. */
-  add(threadId: string, jobId: string, text: string) {
+  /** Queue a message for the thread; one already waiting gets it as a new paragraph (and its images after its own). */
+  add(threadId: string, jobId: string, text: string, images: CodeImage[] = []) {
     useCodeQueue.setState((s) => {
       const before = s.byThread[threadId]
-      return { byThread: { ...s.byThread, [threadId]: { jobId, text: before ? `${before.text}\n\n${text}` : text } } }
+      const all = [...(before?.images ?? []), ...images]
+      const message: QueuedMessage = { jobId, text: before ? `${before.text}\n\n${text}` : text, ...(all.length ? { images: all } : {}) }
+      return { byThread: { ...s.byThread, [threadId]: message } }
     })
   },
   remove(threadId: string) {
@@ -54,6 +61,13 @@ export const codeQueue = {
   },
   setDraft(threadId: string, text: string) {
     useCodeQueue.setState((s) => ({ drafts: text ? { ...s.drafts, [threadId]: text } : without(s.drafts, threadId) }))
+  },
+  setDraftImages(threadId: string, update: (images: CodeImage[]) => CodeImage[]) {
+    useCodeQueue.setState((s) => {
+      const all = s.draftImages ?? {}
+      const next = update(all[threadId] ?? [])
+      return { draftImages: next.length ? { ...all, [threadId]: next } : without(all, threadId) }
+    })
   },
   /** Take the thread's message off the queue, as storage has it now (another tab may have sent it). */
   async take(threadId: string): Promise<QueuedMessage | null> {

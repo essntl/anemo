@@ -17,7 +17,8 @@ export interface PendingAttachment {
   error?: string
 }
 
-async function upload(file: File): Promise<UploadedAttachment> {
+/** Uploads one file as an attachment (also used by the Code page for its images). */
+export async function uploadAttachment(file: File): Promise<UploadedAttachment> {
   const form = new FormData()
   form.append('file', file)
   const res = await fetch('/api/attachments', { method: 'POST', body: form, credentials: 'same-origin' })
@@ -50,7 +51,7 @@ export function useAttachments() {
     }))
     setItems((prev) => [...prev, ...added])
     for (const item of added) {
-      upload(item.file).then(
+      uploadAttachment(item.file).then(
         (uploaded) =>
           setItems((prev) => prev.map((i) => (i.key === item.key ? { ...i, status: 'ready', uploaded } : i))),
         (err: unknown) =>

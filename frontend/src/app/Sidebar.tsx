@@ -17,6 +17,8 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Logo } from '@/components/ui/Logo'
 import { useLogout, useMe } from '@/features/auth/api'
+import { Avatar } from '@/features/profile/Avatar'
+import { useProfile } from '@/features/profile/profile'
 import { ConversationList } from '@/features/chat/components/ConversationList'
 import { usePalette } from '@/features/search/paletteStore'
 import { shortcutText } from '@/features/shortcuts/registry'
@@ -152,6 +154,7 @@ export function SidebarRail({ className }: { className?: string }) {
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const navigate = useNavigate()
   const me = useMe()
+  const profile = useProfile()
   const logout = useLogout()
   const openSearch = usePalette((s) => s.setOpen)
   const setCollapsed = useSidebar((s) => s.setCollapsed)
@@ -162,7 +165,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   return (
     // Normally nothing here scrolls but the chats; in a very low window the sidebar as a
     // whole does, rather than squeezing the chats away.
-    <aside className={cn('h-full shrink-0 flex-col overflow-y-auto bg-surface p-3', onClose ? 'flex' : '', className)}>
+    <aside className={cn('glass h-full shrink-0 flex-col overflow-y-auto bg-surface p-3', onClose ? 'flex' : '', className)}>
       <div className={cn('flex items-center gap-2 px-1.5', onClose ? 'mb-3 gap-1' : 'mb-3')}>
         {/* The logo leads home. */}
         <NavLink to="/home" title={t('Home')} aria-label={t('Anemo, go to Home')}
@@ -239,10 +242,8 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <>
           <Divider className="-mx-3 mt-2" />
           <div className="-mb-1 flex shrink-0 items-center gap-1 pt-2">
-            <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[12px] font-semibold uppercase text-accent">
-              {me.data?.username.slice(0, 1) ?? ''}
-            </span>
-            <span className="ml-1 min-w-0 flex-1 truncate text-[13px] font-medium">{me.data?.username}</span>
+            <Avatar size={28} />
+            <span className="ml-1 min-w-0 flex-1 truncate text-[13px] font-medium">{profile.name}</span>
             <NavLink to="/settings" aria-label={t('Settings')} title={t('Settings')}
               className={({ isActive }) => cn(ICON_BUTTON, isActive && 'bg-surface-2 text-accent')}>
               <Settings className="h-4 w-4" />

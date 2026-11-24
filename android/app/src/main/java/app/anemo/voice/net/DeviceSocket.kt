@@ -53,6 +53,10 @@ class DeviceSocket(
 
     private var generation = 0
     private var socket: WebSocket? = null
+    private var welcomed = false
+
+    /** Messages to the server made while it wasn't connected: sent after the next welcome. */
+    private val outbox = ArrayDeque<String>()
     private var running = false
     private var lastReceivedAt = 0L
     private var ticker: ScheduledFuture<*>? = null
@@ -69,16 +73,31 @@ class DeviceSocket(
         connect()
     }
 
+    /**
+     * Sends a message to the server (`voice.mode`). While not connected it waits, at most
+     * [MAX_WAITING] of them (the oldest are dropped), and goes after the next welcome.
+     */
+    fun send(text: String) = onExecutor {
+        if (!running) return@onExecutor
+        val ws = socket
+        if (welcomed && ws != null && ws.send(text)) return@onExecutor
+        outbox.addLast(text)
+        while (outbox.size > MAX_WAITING) outbox.removeFirst()
+    }
+
     fun stop() = executor.execute {
         running = false
+        welcomed = false
         generation++
         cancelTimers()
         socket?.close(1000, null)
         socket = null
+        outbox.clear()
     }
 
     private fun connect() {
         val gen = ++generation
+        welcomed = false
         // No Origin header: OkHttp sends none, and the server closes with 4403 if one comes.
         val request = Request.Builder().url(url).build()
         lastReceivedAt = now()
@@ -108,7 +127,9 @@ class DeviceSocket(
         when (val m = Protocol.parse(text)) {
             is ServerMessage.Welcome -> {
                 backoff.reset()
+                welcomed = true
                 if (m.cursor != null) lastId = m.cursor
+                while (outbox.isNotEmpty()) socket?.send(outbox.removeFirst())
                 listener.onConnected(m.deviceName, m.missed)
             }
             is ServerMessage.Event -> {
@@ -127,13 +148,16 @@ class DeviceSocket(
             return
         }
         running = false
+        welcomed = false
         generation++
         cancelTimers()
         socket = null
+        outbox.clear()
         listener.onStopped(reason)
     }
 
     private fun dropped() {
+        welcomed = false
         generation++
         cancelTimers()
         socket?.cancel()
@@ -152,6 +176,18 @@ class DeviceSocket(
     }
 
     private fun now(): Long = System.nanoTime() / 1_000_000
+
+    private fun onExecutor(block: () -> Unit) {
+        try {
+            executor.execute(block)
+        } catch (e: RejectedExecutionException) {
+            // shut down: the service is gone
+        }
+    }
+
+    private companion object {
+        const val MAX_WAITING = 20
+    }
 
     /** OkHttp's callbacks, moved onto [executor] and dropped once their connection is old. */
     private inner class Callbacks(private val gen: Int) : WebSocketListener() {

@@ -107,7 +107,9 @@ internal sealed class WindowsCodeHost : ICodeHost
         }
     }
 
-    public int StartDetached(DetachedStart start)
+    public int StartJob(JobLaunch launch) => StartDetached(WindowsJobCommand.For(launch));
+
+    private static int StartDetached(DetachedStart start)
     {
         var program = start.FileName.Equals("cmd.exe", StringComparison.OrdinalIgnoreCase)
             ? Path.Combine(Environment.SystemDirectory, "cmd.exe")

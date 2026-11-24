@@ -66,9 +66,19 @@ describe('starting, following up and cancelling', () => {
     const { client, wrapper } = setup()
     client.setQueryData<CodeJobDetail>(codeJobKey('a'), { job: first, thread: [first] })
     const { result } = renderHook(() => useFollowUp('a'), { wrapper })
-    await act(async () => void (await result.current.mutateAsync('More')))
+    await act(async () => void (await result.current.mutateAsync({ prompt: 'More' })))
+    // Without images the request has no image_ids at all.
     expect(posted).toEqual([{ path: '/api/code/jobs/{job_id}/follow-up', init: { params: { path: { job_id: 'a' } }, body: { prompt: 'More' } } }])
     expect(client.getQueryData<CodeJobDetail>(codeJobKey('a'))?.thread.map((j) => j.id)).toEqual(['a', 'b'])
+  })
+
+  it('follows up with images: their ids go with the prompt', async () => {
+    answer(codeJob({ id: 'b', thread_id: 'a' }))
+    const { wrapper } = setup()
+    const { result } = renderHook(() => useFollowUp('a'), { wrapper })
+    const images = [{ id: 'att-1', name: 'shot.png', size: 10 }, { id: 'att-2', name: 'b.jpg', size: 20 }]
+    await act(async () => void (await result.current.mutateAsync({ prompt: 'Like this', images })))
+    expect(posted[0].init).toEqual({ params: { path: { job_id: 'a' } }, body: { prompt: 'Like this', image_ids: ['att-1', 'att-2'] } })
   })
 
   it('refreshes the jobs and computers when a start may have happened, not on a plain refusal', async () => {

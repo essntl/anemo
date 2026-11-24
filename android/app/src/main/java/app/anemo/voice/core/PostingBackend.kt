@@ -15,6 +15,17 @@ class PostingBackend(private val inner: VoiceBackend, private val executor: Exec
     override fun sendReply(wav: ByteArray, approvalId: String, onResult: (ReplyResult) -> Unit) =
         inner.sendReply(wav, approvalId) { r -> post { onResult(r) } }
 
+    override fun transcribe(wav: ByteArray, onResult: (TranscriptResult) -> Unit) =
+        inner.transcribe(wav) { r -> post { onResult(r) } }
+
+    override fun sendText(
+        text: String,
+        conversationId: String?,
+        voiceMode: Boolean,
+        keepChat: Boolean,
+        onResult: (TurnResult) -> Unit,
+    ) = inner.sendText(text, conversationId, voiceMode, keepChat) { r -> post { onResult(r) } }
+
     private fun post(block: () -> Unit) {
         try {
             executor.execute(block)

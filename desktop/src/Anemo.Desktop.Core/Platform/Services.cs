@@ -37,10 +37,43 @@ public interface IAppLauncher
 /// <summary>A program to start for <c>shell</c>, hidden, with its output read.</summary>
 public sealed record ShellStart(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory);
 
+/// <summary>The names of <c>device.offer.shell_kind</c> (device-contracts.md §2).</summary>
+public static class ShellKinds
+{
+    public const string PowerShell = "powershell";
+    public const string Pwsh = "pwsh";
+    public const string Zsh = "zsh";
+    public const string Bash = "bash";
+
+    /// <summary>The kind of the shell program at this path, from its file name (pwsh.exe → pwsh).</summary>
+    public static string FromPath(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path.Replace('\\', '/').Split('/')[^1]).ToLowerInvariant();
+        return name switch
+        {
+            "pwsh" => Pwsh,
+            "zsh" => Zsh,
+            "bash" => Bash,
+            _ => PowerShell,
+        };
+    }
+
+    public static bool IsPowerShell(string kind) => kind is PowerShell or Pwsh;
+}
+
+/// <summary>The shell <c>shell</c> runs in: its program and its kind (<see cref="ShellKinds"/>).</summary>
+public sealed record ShellProgram(string Path, string Kind)
+{
+    public static ShellProgram At(string path) => new(path, ShellKinds.FromPath(path));
+}
+
 public interface IShellHost
 {
-    /// <summary>pwsh when installed, else Windows PowerShell 5.1; null when neither is found.</summary>
-    string? FindPowerShell();
+    /// <summary>
+    /// The shell to run commands in: on Windows pwsh when installed, else Windows PowerShell
+    /// 5.1; on macOS zsh, else bash. Null when none is found.
+    /// </summary>
+    ShellProgram? FindShell();
 
     /// <summary>
     /// Runs the program to its end and returns its exit code. Cancelling the token kills it

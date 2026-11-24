@@ -1,5 +1,5 @@
 """When an automation runs: a cron expression, a fixed interval, a repeat rule (RRULE,
-as tasks and events use), or one moment.
+as tasks and events use), one moment, or (scripts only) only when it is started.
 
 Cron and repeat-rule times are local wall-clock times in the schedule's time zone
 ("every day at 08:00" stays 08:00 when the clocks change). All results are UTC.
@@ -74,7 +74,9 @@ def _rule(rule: str, start: datetime, zone: ZoneInfo) -> RRule:
 
 
 class Schedule(BaseModel):
-    kind: Literal["cron", "interval", "once", "rrule"]
+    # manual: never by itself, only when started (Run now, run_script). Scripts only
+    # (docs/specs/08-automation-scripts.md §3); never comes due.
+    kind: Literal["cron", "interval", "once", "rrule", "manual"]
     cron: str | None = Field(None, max_length=100)  # minute hour day month weekday
     every_minutes: int | None = Field(None, ge=1, le=60 * 24 * 31)
     # once: when it runs. rrule: where the rule starts (its first run, and the time of
@@ -119,6 +121,8 @@ class Schedule(BaseModel):
             if any(b - a < _floor.get() for a, b in pairwise(times)):
                 raise ValueError(TOO_OFTEN)
             self.rrule, self.at, self.cron, self.every_minutes = rule, start, None, None
+        elif self.kind == "manual":
+            self.cron, self.every_minutes, self.at, self.rrule = None, None, None, None
         else:
             if self.at is None:
                 raise ValueError("Say when it runs (at)")
@@ -144,6 +148,8 @@ def next_run(
     `previous`: the run time before it (interval schedules keep their rhythm from it;
     without one the first run is one interval from `after`).
     """
+    if schedule.kind == "manual":
+        return None  # never comes due
     if schedule.kind == "once":
         return schedule.at if schedule.at and schedule.at > after else None
     if schedule.kind == "interval":
@@ -228,6 +234,8 @@ def _rrule_text(rule: str, start: datetime, zone: ZoneInfo) -> str:
 
 def describe(schedule: Schedule) -> str:
     """The schedule in words, for lists and previews."""
+    if schedule.kind == "manual":
+        return "Only when started"
     if schedule.kind == "interval":
         return _minutes_text(schedule.every_minutes or 60)
     zone = _zone(schedule.tz)

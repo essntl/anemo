@@ -175,7 +175,8 @@ public sealed partial class CommandProcessor
     private void Press(Args args, CancellationToken ct)
     {
         // Every key is checked before any is pressed.
-        var combos = args.StringList("keys", 1, 10).Select(KeyParser.Parse).ToList();
+        var mac = _options.Platform.IsMac;
+        var combos = args.StringList("keys", 1, 10).Select(k => KeyParser.Parse(k, mac)).ToList();
         foreach (var combo in combos)
         {
             if (IsOwnHotkey(combo))
@@ -190,7 +191,7 @@ public sealed partial class CommandProcessor
 
             // Checked before every key: the one before may have moved the focus.
             GuardKeyboard();
-            if (KeyParser.EntersText(combo))
+            if (KeyParser.EntersText(combo, mac))
             {
                 GuardPasswordFocus();
             }

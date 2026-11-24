@@ -92,11 +92,15 @@ class FakeDevices:
         control: bool = True,
         shell: bool = False,
         online: bool = True,
+        platform: relay.Platform = "windows",
+        shell_kind: relay.ShellKind = "powershell",
     ) -> FakeDevice:
         device = FakeDevice(uuid.uuid4(), name, kind, trust)
         self.rows[name.casefold()] = device
         if online:
-            self.offers[device.id] = relay.Offer(control=control, shell=shell)
+            self.offers[device.id] = relay.Offer(
+                control=control, shell=shell, platform=platform, shell_kind=shell_kind
+            )
         return device
 
     async def by_name(self, db: Any, name: str) -> FakeDevice | None:
@@ -114,6 +118,8 @@ class FakeDevices:
                 trust=d.trust,  # type: ignore[arg-type]
                 control=self.offers[d.id].control,
                 shell=self.offers[d.id].shell,
+                platform=self.offers[d.id].platform,
+                shell_kind=self.offers[d.id].shell_kind,
             )
             for d in self.rows.values()
             if d.id in self.offers

@@ -29,6 +29,11 @@ vi.mock('./api', async (importOriginal) => ({
 }))
 const toasts = vi.hoisted(() => [] as string[])
 vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string }) => toasts.push(o.message) }))
+// An image upload (POST /api/attachments): answered with the next id.
+const uploads = vi.hoisted(() => ({ n: 0 }))
+vi.mock('@/features/chat/useAttachments', () => ({
+  uploadAttachment: async (file: File) => ({ id: `att-${++uploads.n}`, filename: file.name, mime: file.type, size: file.size, kind: 'image', extraction_note: null }),
+}))
 
 const { NewJobDialog } = await import('./NewJobDialog')
 const { clearNewJobDraft } = await import('./newJobDraft')
@@ -54,6 +59,9 @@ const pc = (id: string, name: string, more: Partial<CodeDevice> = {}): CodeDevic
 beforeEach(() => {
   vi.clearAllMocks()
   clearNewJobDraft()
+  uploads.n = 0
+  URL.createObjectURL = vi.fn(() => 'blob:preview')
+  URL.revokeObjectURL = vi.fn()
   toasts.length = 0
   started.length = 0
   askedProjects.length = 0
@@ -164,6 +172,19 @@ describe('New job', () => {
     expect(started).toEqual([{ device_id: 'd1', project: 'anemo', prompt: 'Bump the version', new: false, model: 'sonnet' }])
     expect(close).toHaveBeenCalledWith(false)
     expect(screen.getByTestId('where')).toHaveTextContent('/code/new-job')
+  })
+
+  it('starts a job with images: picked, shown, sent by id, and gone from the draft after', async () => {
+    show()
+    await userEvent.type(projectBox(), 'anemo')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Prompt' }), 'Make it look like this')
+    const shot = new File([new Uint8Array(50)], 'mockup.png', { type: 'image/png' })
+    await userEvent.upload(within(dialog()).getByTestId('code-image-input'), shot)
+    await waitFor(() => expect(within(dialog()).getByTestId('code-images').querySelector('img')).toHaveAttribute('src', '/api/attachments/att-1/content'))
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Start job' }))
+    expect(started).toEqual([{ device_id: 'd1', project: 'anemo', prompt: 'Make it look like this', new: false, model: null, image_ids: ['att-1'] }])
+    const { newJobDraft } = await import('./newJobDraft')
+    expect(newJobDraft.images).toEqual([])
   })
 
   it('offers "New project" for a name that is nowhere, and sends the default model as null', async () => {

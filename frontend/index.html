@@ -19,19 +19,32 @@
     <!-- Browser/status bar colour; kept in sync with the theme by applyAppearance(). -->
     <meta name="theme-color" content="#f4f5f8" />
     <script>
-      // Apply the cached theme before first paint to avoid a light/dark flash.
-      // Mirrors applyAppearance() in src/features/settings/theme.ts.
+      // Apply the cached appearance before first paint, so nothing flashes in the default
+      // colours. The values were worked out by src/features/appearance/apply.ts (lookFor)
+      // and cached under anemo.appearance.css; this only copies them onto <html>.
+      // Older caches (aiw.appearance: mode, density, accent) still work.
       try {
-        var a = JSON.parse(localStorage.getItem('aiw.appearance') || '{}')
-        var mode = a.mode || 'system'
+        var root = document.documentElement
+        var look = JSON.parse(localStorage.getItem('anemo.appearance.css') || 'null')
+        var old = JSON.parse(localStorage.getItem('aiw.appearance') || '{}')
+        var mode = (look && look.mode) || old.mode || 'system'
         if (mode === 'system') {
           mode = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
         }
-        var root = document.documentElement
         root.dataset.theme = mode
-        root.dataset.density = a.density || 'comfortable'
-        if (a.accent) root.style.setProperty('--accent', a.accent)
-        document.querySelector('meta[name=theme-color]').content = mode === 'dark' ? '#0e1014' : '#f4f5f8'
+        root.dataset.density = (look && look.density) || old.density || 'comfortable'
+        root.dataset.glass = look && look.glass ? 'on' : 'off'
+        root.dataset.background = look && look.background ? 'on' : 'off'
+        var vars = look && look[mode]
+        if (vars) {
+          for (var name in vars) {
+            if (/^--[a-z0-9-]+$/.test(name)) root.style.setProperty(name, String(vars[name]))
+          }
+        } else if (old.accent) {
+          root.style.setProperty('--accent', old.accent)
+        }
+        var bg = (vars && vars['--bg']) || (mode === 'dark' ? '#0e1014' : '#eceef2')
+        document.querySelector('meta[name=theme-color]').content = bg
       } catch (e) {}
     </script>
   </head>

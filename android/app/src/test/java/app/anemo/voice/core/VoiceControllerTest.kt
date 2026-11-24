@@ -77,13 +77,19 @@ class VoiceControllerTest {
         assertTrue(backend.turns.isEmpty())
         c.onFrame(Frames.silence())
         assertEquals(1, backend.turns.size)
-        assertEquals(listOf("start", "stop"), chimes.played)
+        assertEquals(listOf("start", "end"), chimes.played)
+        // first only transcribed, then sent on as text
+        val wav = backend.transcripts.single().wav
+        assertEquals("RIFF", String(wav, 0, 4))
+        // the wake word's frame + 6 speech + 13 silence frames, 2 bytes each, after the 44-byte header
+        assertEquals(44 + 20 * AudioFormat16k.FRAME_SAMPLES * 2, wav.size)
         val turn = backend.turns[0]
         assertFalse(turn.status)
         assertNull(turn.conversationId)
-        assertEquals("RIFF", String(turn.wav!!, 0, 4))
-        // 6 speech + 13 silence frames, 2 bytes each, after the 44-byte header
-        assertEquals(44 + 19 * AudioFormat16k.FRAME_SAMPLES * 2, turn.wav!!.size)
+        assertNull(turn.wav)
+        assertEquals("uh mail tom no tim", turn.text)
+        assertFalse(turn.voiceMode)
+        assertFalse(turn.keepChat)
         assertEquals(ListenState.Listening, c.state)
     }
 
@@ -94,7 +100,8 @@ class VoiceControllerTest {
         assertTrue(backend.turns.isEmpty())
         c.onFrame(Frames.speech())
         assertEquals(1, backend.turns.size)
-        assertEquals(44 + 60 * 16_000 * 2, backend.turns[0].wav!!.size)
+        // 60 s of speech, after the wake word's frame
+        assertEquals(44 + (60 * 16_000 + AudioFormat16k.FRAME_SAMPLES) * 2, backend.transcripts[0].wav.size)
     }
 
     @Test
@@ -102,8 +109,9 @@ class VoiceControllerTest {
         c.onFrame(Frames.wake())
         frames(Frames::silence, 63) // 5040 ms
         assertTrue(backend.turns.isEmpty())
+        assertTrue(backend.transcripts.isEmpty())
         assertEquals(ListenState.Listening, c.state)
-        assertEquals(listOf("start", "stop"), chimes.played)
+        assertEquals(listOf("start", "timeout"), chimes.played) // heard, but nobody spoke
     }
 
     @Test
@@ -548,7 +556,7 @@ class VoiceControllerTest {
         timer.advance(63_000)
         assertEquals(ListenState.Listening, c.state)
         assertTrue(backend.turns.isEmpty())
-        assertEquals(listOf("start", "stop"), chimes.played)
+        assertEquals(listOf("start", "end"), chimes.played)
     }
 
     @Test
