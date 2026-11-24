@@ -51,6 +51,7 @@ you need by REST.
 | `approval.requested` | `{approval_id, run_id, kind: "action" \| "question" \| "plan", summary, risk, question?, options?, steps?}` | a run this device started waits for the user |
 | `approval.decided` | `{approval_id, decision}` | decided anywhere (stop asking on the phone) |
 | `voice.say` | `{run_id, conversation_id, text, more: bool}` | a run this device started finished; `text` is plain text to speak, `more` when the answer was shortened |
+| `voice.stop` | `{run_id, conversation_id}` | the agent called `voice_stop` in a run this device started: the phone leaves voice mode after speaking that run's answer (Anemo Voice 1.1.0) |
 
 For `kind: "plan"` (the agent's plan waits for a review, when "review the plan first" is
 on), `steps` is the plan's steps in order, as plain text: at most 30 strings of at most
@@ -58,7 +59,22 @@ on), `steps` is the plan's steps in order, as plain text: at most 30 strings of 
 event.
 
 Only events of runs started by *this* device go to a phone. `voice.say` is sent for
-failed and cancelled runs too, with a one-sentence text saying so.
+failed and cancelled runs too, with a one-sentence text saying so. There is **no** event
+that turns voice mode on or opens the microphone: only the user does, on the phone
+(docs/specs/07-voice-mode-android.md).
+
+### Messages from a phone
+
+| message | when |
+|---|---|
+| `{"type": "voice.mode", "on": bool, "cause": "tile" \| "notification" \| "phrase" \| "stop_phrase" \| "timeout" \| "voice_stop" \| "service_stopped"}` | voice mode went on or off (Anemo Voice 1.1.0) |
+
+The server writes each `voice.mode` to the audit log (`action: "voice.mode"`, target the
+device, `details: {on, cause}`, actor `agent` for `voice_stop`, else `user`) and answers
+nothing. It ignores a message that doesn't validate: an unknown cause, `on: true` with a
+cause other than `tile`, `notification` or `phrase`, `on: false` with `phrase`, or one
+from a computer. A phone queues messages made while it isn't connected (at most 20) and
+sends them after the next `welcome`.
 
 ### Commands to a computer
 
@@ -119,13 +135,35 @@ last 90 s the device is offline for the agent.
 
 ## 4. Voice REST
 
+Anemo Voice 1.1.0 first sends a request's recording to `/voice/transcripts`, matches its
+voice-mode commands on what was heard, and sends anything else on to `/voice/turns` as
+`text`. When `/voice/transcripts` answers 404 (an older Anemo) it sends the recording to
+`/voice/turns` as before.
+
+### `POST /api/voice/transcripts` (multipart, Anemo Voice 1.1.0)
+
+| field | |
+|---|---|
+| `audio` | the recording, as for `/voice/turns` |
+
+```
+200 { "heard": "Hey Jarvis, start voice mode." }       as the transcription model heard it
+200 { "heard": "", "say": "Sorry, I didn't catch that." }   nothing was heard
+```
+
+Errors as `/voice/turns` (409 `no_transcription_model`, 422 audio codes, 400
+`transcription_failed`). Only transcribes: no clean-up, no run, nothing stored.
+
 ### `POST /api/voice/turns` (multipart)
 
 | field | |
 |---|---|
 | `audio` | the recording; WAV 16 kHz mono preferred; ≤ 25 MB |
+| `text` | instead of `audio` (1–4000 characters): the transcript `/voice/transcripts` gave, cleaned up and started as a recording would be, not transcribed again |
 | `conversation_id` | optional: continue this chat (the phone sends it within the follow-up window) |
 | `status` | optional `true`: the user asked what is running; no run starts |
+| `voice_mode` | optional `true`: voice mode is on, the phone listens again after the answer; the agent is told so and may end it with `voice_stop` |
+| `keep_chat` | optional `true`: continue `conversation_id` whatever the follow-up window says (not an archived, temporary, automation or busy chat); sent from the second request of a voice mode session on |
 
 ```
 202 { "run_id": "…", "conversation_id": "…",

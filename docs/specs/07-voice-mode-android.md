@@ -171,8 +171,13 @@ Rules the loop keeps:
   its own reply window, as before).
 - The idle timeout counts from the reopen: no speech (Silero VAD) within it ends voice
   mode. Once speech starts the normal limits apply (1 s of silence ends it, 60 s at most).
-- Leaving while recording throws that recording away; leaving while speaking lets the
-  speech finish and doesn't reopen.
+- Leaving throws away what voice mode was recording (a request after the wake word goes
+  on and is sent as an ordinary request); leaving while speaking lets the speech finish
+  and doesn't reopen.
+- Turning voice mode on while a request after the wake word is being recorded lets that
+  recording go on: it is sent in voice mode and its answer opens the microphone.
+- The first opening after voice mode goes on plays no start sound of its own: the "on"
+  sound was the cue.
 
 ### The commands, and why the model can never open the microphone
 
@@ -180,18 +185,24 @@ The phone does no speech-to-text itself; the server's transcription model does. 
 command phrases are matched **on the phone, on the raw transcript**, by plain code
 (`core/Commands.kt`), never by a language model:
 
-1. When a command could apply (voice mode is on, or "Say start voice mode" is on), the
-   phone uploads the recording to **`POST /api/voice/transcripts`**, which only
-   transcribes it and answers `{"heard": "…"}`: no clean-up model, no run.
+1. The phone uploads every request recording (after the wake word or in voice mode) to
+   **`POST /api/voice/transcripts`**, which only transcribes it and answers
+   `{"heard": "…"}`: no clean-up model, no run.
 2. The phone matches `heard`. A command acts on the phone and nothing more is sent.
 3. Anything else goes to `POST /api/voice/turns` as **`text`** (the transcript, with a
    leading wake word removed) instead of audio: the server cleans it up and starts the run
    exactly as for a recording (cancel and status words included). It isn't transcribed a
-   second time.
+   second time. When only the wake word was heard, nothing is sent and the phone says
+   "Sorry, I didn't catch that."
 
-When no command can apply (voice mode off and the phrase switched off) the phone sends
-the recording to `/voice/turns` in one call, as today. The extra round trip costs one
-small HTTP request; the transcription is done once either way.
+*Changed while building:* the first draft sent a recording in one call when no command
+could apply (voice mode off, the phrase switched off). It now always takes the two steps:
+one code path, and the wake word, which the recording now starts with (pre-roll), is
+always taken off the request on the phone instead of hoping the clean-up model drops it.
+The extra round trip costs one small HTTP request; the transcription is done once either
+way. When `/voice/transcripts` answers 404 (an Anemo older than this app), the recording
+goes to `/voice/turns` as before, so an updated phone keeps working with an old server
+(without the spoken commands).
 
 Why this design: the phone is the only thing that can switch its microphone, and the only
 input to the matcher is what the transcription model heard the user say in a recording
@@ -210,8 +221,14 @@ Matching (`Commands.match`), on the whole utterance only:
   for words of 5 letters or more) and filler words anywhere ("please", "ok", "okay",
   "um", "uh", "the", "now", "anemo") are dropped;
 - the rest is compared with each phrase word by word. A phrase of three or more words
-  matches with **one** misheard word (any word); a shorter phrase must match exactly. When
-  several phrases match, the one closest by letters wins; a tie matches nothing.
+  matches with **one** misheard word, if that word is close (at most half its letters
+  different: "mood" for "mode", "choice" for "voice", not "memo" or "recording", so "start
+  voice memo" stays a request); a shorter phrase must match exactly. The closest phrase of
+  either kind wins, *before* it is checked whether that kind counts now, so "stop voice
+  mode" said while voice mode is off is never taken for "start voice mode"; a tie between
+  a start and a stop phrase matches nothing.
+- the end of the wake word also counts as the wake word when it is the first word ("…vis,
+  start voice mode": the recording begins a little before the detection).
 - Start phrases: "start voice mode", "turn on voice mode", "voice mode on", "enable voice
   mode", "begin voice mode". Stop phrases (only while voice mode is on): "stop", "stop
   voice mode", "end voice mode", "exit voice mode", "turn off voice mode", "voice mode
@@ -261,8 +278,19 @@ Anemo has no activity log (`CONTRACTS-round3.md` §1). Each change is:
   target_type="device", target_id=<device id>, details={"on", "cause"})`. Settings →
   Audit log shows it. A message that doesn't validate is ignored; computers' are ignored.
   Messages made while the socket is down wait (at most 20) and go after the next welcome.
-- logged on the phone (logcat, tag `AnemoVoice`: `voice mode on cause=tile`), and added
-  to the app's history list as a line ("Voice mode on · from the tile").
+- logged on the phone (logcat, tag `AnemoVoice`: `voice mode on cause=tile`). The phone's
+  stop sends it before the WebSocket closes (`VoiceSession.stop` stops the connection
+  after the voice loop).
+
+*Changed while building:* the first draft also put a line into the app's history list.
+That list is a Room table of requests (run, chat link, answer); a second kind of row
+needs a schema migration and new screen code for a line the audit log already shows. Left
+out; the history stays requests only.
+
+`Logcat.kt` is the only file that logs (the privacy test allowed no logging at all; it
+now allows that one file and checks that its functions take no text, so no token,
+transcript or answer can reach the log). It logs the wake word's score on each detection
+(`wake word heard score=0.83`) and voice mode on/off with the cause.
 
 ## 3. Wire changes (`docs/device-contracts.md`, phone sections)
 
@@ -297,8 +325,9 @@ be updated first (the PR says so).
 - `core/CueTones.kt`: the cue sounds as PCM, and the vibration patterns (pure).
 - `core/VoiceController.kt`: pre-roll, ducking, the new cues, the transcript step, voice
   mode reopen and idle timeout, `voice.stop`.
-- `core/Ports.kt`, `Model.kt`: `Chimes` gets `timeout`, `reopen`, `voiceModeOn/Off`; new
-  `AudioFocus`; `VoiceBackend` gets `transcribe` and `sendText`; `VoiceEvents` for logs.
+- `core/Ports.kt`, `Model.kt`: `Chimes` becomes `play(Cue)`; new `AudioFocus`;
+  `VoiceBackend` gets `transcribe` and `sendText`; `WakeWordDetector.lastScore`; the
+  controller's `Listener` gets `onWakeWord(score)` and `onVoiceModeChanged(on, cause)`.
 - `audio/ToneCues.kt` (replaces `ToneChimes.kt`): `AudioTrack` + `Vibrator`.
   `audio/AudioDucking.kt`: the focus request. `audio/MicrophoneSource.kt`: echo canceller.
 - `net/VoiceApi.kt`, `net/Protocol.kt`, `net/DeviceSocket.kt` (`send`, queued until
@@ -306,6 +335,9 @@ be updated first (the PR says so).
 - `service/`: `ListenService` (voice-mode actions), `ListenNotification` (titles, the
   Voice mode button), `VoiceModeTileService` (new tile), `VoiceRuntime` (wiring),
   `Logcat.kt` (the only file that logs; typed functions, no free text).
+  Android shows at most three notification buttons, so the notification becomes Pause /
+  **Voice mode** (or **End voice mode**) / Stop; **Status** stays on the app's main
+  screen (it was on both).
 - `settings/`: `vibrate`, `voiceModePhrase`, `voiceModeIdleSeconds`; the settings screen.
 - `AndroidManifest.xml`: `VIBRATE`, the second tile.
 
