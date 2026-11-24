@@ -140,6 +140,23 @@ def has_todo_write(event: dict[str, Any]) -> bool:
     return any(call.get("name") == "TodoWrite" for call in tool_calls(event))
 
 
+SUB_AGENT_CALLS = ("Task", "Agent")
+SUB_AGENT_STATE = ("task_started", "task_notification", "task_updated")
+
+
+def holds_sub_agent_state(event: dict[str, Any]) -> bool:
+    """Whether the event starts or ends a sub-agent: a Task/Agent call, a sub-agent's
+    tool result (`tool_use_result.agentId`), or a background sub-agent's start, end or
+    change of state (`system/task_*`). Kept past a job's 5 MB like a result, so the page
+    can still list its sub-agents and tell how each ended."""
+    if any(call.get("name") in SUB_AGENT_CALLS for call in tool_calls(event)):
+        return True
+    if event.get("type") == "system":
+        return event.get("subtype") in SUB_AGENT_STATE
+    details = event.get("tool_use_result")
+    return event.get("type") == "user" and isinstance(details, dict) and "agentId" in details
+
+
 def _tool_result_texts(event: dict[str, Any]) -> list[str]:
     texts: list[str] = []
     for block in _blocks(event):

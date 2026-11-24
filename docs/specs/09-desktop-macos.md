@@ -186,7 +186,8 @@ README, the release notes and the PR.
   `device_job_dir` and `dir` are the device's own absolute paths, opaque strings to the server
   (it never parses them, and the Code page already handles `/` paths). `out.jsonl` is
   unchanged, so the Code page needs no change.
-- Version: both clients are 1.3.0 (`desktop/Directory.Build.props`); the server needs no
+- Version: both clients are 1.4.0 (`desktop/Directory.Build.props`; 1.3.0 added images with
+  `code_start`); the server needs no
   version check for it (the fields are optional).
 
 ## 4. Server changes

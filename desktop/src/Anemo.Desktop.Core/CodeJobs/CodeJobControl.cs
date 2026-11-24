@@ -267,6 +267,7 @@ public sealed partial class CodeJobControl
         var resume = Optional(args, "resume_session", SessionPattern(), "“resume_session” must be a Claude Code session id (letters, digits and dashes).");
         var model = Optional(args, "model", ModelPattern(), "“model” must be a model name of at most 100 letters, digits, dots, dashes, underscores and brackets.");
         int? maxTurns = args.Has("max_turns") ? args.Int("max_turns", 1, 500) : null;
+        var images = CodeJobImages.Parse(args);
 
         // The full path, so a claude.cmd in the project folder (a cloned repository's) never runs.
         var claude = _host.FindOnPath("claude") ?? throw CommandException.Failed(NoClaudeMessage);
@@ -300,10 +301,22 @@ public sealed partial class CodeJobControl
             prepare = prepareFolder;
         }
 
-        // 3. The job folder and its prompt.
+        // 3. The job folder and its prompt. Images go into the folder's images\, and the prompt
+        // Claude Code reads lists their full paths after the user's text (1.3.0).
         var started = _time.GetLocalNow();
         var (id, folder) = NewJobFolder(jobs, started);
-        File.WriteAllText(Path.Combine(folder, JobFolder.Prompt), prompt, new UTF8Encoding(false));
+        string fullPrompt;
+        try
+        {
+            fullPrompt = CodeJobImages.Write(folder, images, prompt);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            TryDelete(folder);
+            throw CommandException.Failed("The images couldn't be written into the job's folder.");
+        }
+
+        File.WriteAllText(Path.Combine(folder, JobFolder.Prompt), fullPrompt, new UTF8Encoding(false));
 
         if (prepare is null)
         {

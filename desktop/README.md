@@ -140,7 +140,7 @@ Windows 10 1903 or later is needed (Windows.Graphics.Capture).
 
 ## macOS
 
-**Anemo Desktop for macOS** (1.3.0) does what the Windows client does: computer use, the shell
+**Anemo Desktop for macOS** (1.4.0) does what the Windows client does: computer use, the shell
 (zsh), Claude Code jobs for the Code page, *Share this screen*. Design and decisions:
 `docs/specs/09-desktop-macos.md`; what still has to be tried on a real Mac:
 `docs/specs/09-desktop-macos-mac-testing.md`. Needs macOS 14 Sonoma or later; built for Apple

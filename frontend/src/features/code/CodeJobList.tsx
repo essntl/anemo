@@ -15,6 +15,7 @@ import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { msg, plural, t } from '@/lib/i18n'
+import { withoutAgent } from './agents'
 import { type CodeFilters, useCodeJobs } from './api'
 import { NewJobDialog } from './NewJobDialog'
 import { StateBadge } from './parts'
@@ -120,7 +121,8 @@ export function CodeJobList({ jobId }: { jobId?: string }) {
     if (filters.project) names.add(filters.project)
     return [...names].sort((a, b) => a.localeCompare(b))
   }, [pages, filters.project])
-  const search = params.toString() ? `?${params.toString()}` : ''
+  // The open job's sub-agent (?agent=) is no part of the address of another job.
+  const search = withoutAgent(params)
   const filtered = Boolean(filters.project || filters.state)
 
   const setFilter = (name: 'project' | 'state', value: string) => {
