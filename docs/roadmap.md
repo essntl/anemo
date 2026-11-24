@@ -1,260 +1,197 @@
 # Roadmap
 
-Features agreed on but not built yet. Each one says what it does for you and roughly
-how it fits into what Anemo already has; [Build order](#build-order) says in which
-order they are built.
+Where Anemo stands, what is being built now, and what comes next. Each item links to
+its spec or to the section of [features.md](features.md) that says how it works.
 
-| # | Feature | Size | Wave |
-| --- | --- | --- | --- |
-| 1 | [Shortcut sheet](#1-shortcut-sheet) | small | 2 |
-| 2 | [Daily note widget](#2-daily-note-widget) | small–medium | 2 |
-| 3 | [Subtasks, checklists and *blocked by* links](#3-subtasks-checklists-and-blocked-by-links) | medium | 1 |
-| 4 | [Real push notifications](#4-real-push-notifications) | medium | 1 |
-| 5 | [First-run setup and update notice](#5-first-run-setup-and-update-notice) | medium | 3 |
-| 6 | [Diagrams, charts and math](#6-diagrams-charts-and-math) | medium | 2 |
-| 7 | [Voice from your phone (Anemo Voice)](#7-voice-from-your-phone-anemo-voice) | large | devices |
-| 8 | [Devices: Anemo Desktop on your Windows computers](#8-devices-anemo-desktop-on-your-windows-computers) | large | devices |
+Last audited against the code and the git history on **2026-11-24**, and updated at
+the end of round 3 (pull requests up to #82).
 
-Features 7 and 8 were built together after the waves below, as separate packages (see
-`docs/specs/ORCHESTRATION-LOG-devices.md`).
-
-## Build order
-
-One feature per branch and pull request, each started from the latest `main`. The
-features in a wave don't depend on each other and can be built at the same time; a
-wave starts once everything before it is merged.
-
-| Wave | Features | Why this order |
-| --- | --- | --- |
-| 1 | **3** Subtasks, checklists and *blocked by* · **4** Push notifications | The two largest backend changes, in separate parts of the code. Each adds a migration: whichever merges second rebases onto the first and points its migration at it. |
-| 2 | **1** Shortcut sheet · **2** Daily note widget · **6** Diagrams, charts and math | Mostly frontend and small. The shortcut sheet changes the shared hotkey code, so nothing else in this wave adds shortcuts; the daily note doesn't touch the document editor that diagrams change. |
-| 3 | **5** First-run setup and update notice | Last, because it uses the others: its notifications step turns on push (4), and it can point to the shortcut sheet (1) and the Home widgets (2). |
+- [Done](#done): built and merged into `main`.
+- [In progress](#in-progress): open pull requests.
+- [Next](#next): agreed or proposed, with what already exists of each.
+- [Ideas](#ideas): worth keeping, not planned.
 
 Every pull request: backend and frontend tests, an end-to-end test with the fake
-provider, `make test`, `make lint` and `make gen-api` passing, the section for the
-feature in `docs/features.md` written or updated, and the feature marked done here.
+provider where the area has them, the checks of `make test` and `make lint`, `make
+gen-api` after an API change, `docs/features.md` updated, and this file updated.
 
 ---
 
-## 1. Shortcut sheet
+## Done
 
-**Status: built.**
+### The workspace (before the specs)
 
-Press **?** anywhere (outside a text field) to see every keyboard shortcut in one
-place. Today they are spread over the README and individual pages (Ctrl+K, Ctrl+\\,
-E on Home, Space/R/S/+ for the timer, Shift over the chat list, …) and nothing in
-the app lists them.
+| What | Where it is described | Pull requests |
+| --- | --- | --- |
+| Chat and Agent mode, tools, permissions and approvals, plans, sub-agents, skills as slash commands | [features.md](features.md#chat-vs-agent-mode) | #7, #9, #10 |
+| Claude subscription as a model provider (Claude Code in `claude-runner`) | [claude-code.md](claude-code.md) | #1, #44, #45, #66 |
+| Home, focus timer, music, Dynamic Island, stats | [features.md](features.md#home) | #4, #48 |
+| Files in chats, Office files, uploads of many files and folders | [features.md](features.md#files-in-chats) | #11, #54 |
+| Shortcut sheet (**?**) with one registry for every shortcut | [features.md](features.md#keyboard-shortcuts) | #14 |
+| Daily note widget on Home | [features.md](features.md#home) | #15 |
+| Subtasks, checklists and *blocked by* links | [features.md](features.md#tasks-and-calendar) | #12 |
+| Push notifications, with Allow once / Deny on approvals | [features.md](features.md#notifications) | #13 |
+| First-run setup and the update notice | [features.md](features.md) | #18 |
+| Diagrams, charts and math | [features.md](features.md#diagrams-charts-and-math) | #16 |
+| The refactor: conventions, import boundaries, run lifecycle, agent loop split | `refactor/` | #21–#31 |
+| Redesigned shell: sidebar, top bar, **Inbox** (notifications and *Needs you*), project switcher | [features.md](features.md#notifications) | #42, #43, #46, #47 |
+| Ukrainian and Russian; Settings → Pages to arrange and turn off pages | [features.md](features.md) | #49 |
+| Reasoning effort slider | [features.md](features.md#reasoning-effort) | #57 |
+| Prebuilt images for x86-64 and ARM64 | [deployment.md](deployment.md) | #3, #52, #55 |
 
-- An overlay grouped by area: *Everywhere*, *Chat*, *Home*, *Focus*, *Files*, … with
-  the page you are on shown first.
-- Shows ⌘ instead of Ctrl on a Mac.
-- Also reachable from the search box (Ctrl+K → *Keyboard shortcuts*) and from a small
-  link in Settings.
-- The shortcuts are registered in one list that the hotkey hook and the sheet both
-  read, so the sheet can't fall out of date when a shortcut is added or changed.
-- Not shown on touch-only devices.
+### Anemo Companion (the browser extension)
 
-## 2. Daily note widget
+Built: a Chromium extension with a side panel chat, "Share this tab", the agent's
+browser tools in your own Chrome (every click asks), YouTube transcripts, attachments,
+find in chat. `extension/`, [companion-contracts.md](companion-contracts.md),
+[features.md](features.md#browser-extension). Pull requests #37–#40.
 
-**Status: built.**
+### Specs 01–04 (the "fundamentals" round, `integrate/fundamentals`, #58)
 
-A **Daily note** widget on Home for today's important short notes: a phone number to
-call back, a thought to pick up later, three things that must not slip today.
+| Spec | Status |
+| --- | --- |
+| [01 Organisation, links and sources](specs/01-organisation-links-sources.md), phases 1–3 | **Done.** Who created and last changed a document, task or event (`app/core/actor.py`, `features/provenance/`); source fields and `external_key` for synced items; document properties, views and stable paths; links and backlinks between documents, tasks and events. Known small gaps: [FINAL-REPORT.md](specs/FINAL-REPORT.md) §5. |
+| [02 Automations that reason](specs/02-automations.md) | **Done.** Quiet runs (`agent_decides`), the state note, model, tool allowlist and limits per automation, contact tools always ask, no overlapping runs, approvals that don't block later runs, the change check, the failure streak. The real artemk automation is set up by hand (FINAL-REPORT.md §4). Webhooks (§2.8) were left for later on purpose. |
+| [03 Response timer](specs/03-response-timer.md) | **Done.** Durations on messages, runs and tool calls. |
+| [04 Dictation](specs/04-dictation.md) | **Done** (#59, #60). Speak and get tidy text where you were typing; WAV upload so whisper.cpp servers take it. |
 
-- Type a line and press Enter: it is added as a short note. Notes can be ticked off,
-  edited, reordered and deleted in place; nothing to open or save.
-- One note per day. The day follows the time zone from **Settings → General**, so it
-  turns over at your midnight, not the server's.
-- Arrows in the widget step back through earlier days (read and edit); *Today* jumps
-  back.
-- Optional (Settings → General): carry unticked notes over to the next day.
-- Stored as an ordinary Markdown document, `documents/daily/<date>.md`, as a
-  checklist. So the notes show up in search, keep a version history, can be linked
-  to from tasks and documents, and agents can read them (and add to them under the
-  *Edit documents* permission), for example from the **Daily summary** automation.
-- Follows the project switcher like the other widgets: with a project chosen, the
-  widget shows that project's daily note (`documents/<project>/daily/<date>.md`).
-- Placed near the top of the default layout; existing layouts get it added and can
-  hide it in **Edit layout**.
+### Devices (specs 05 and 06, `integrate/devices`, #62)
 
-## 3. Subtasks, checklists and *blocked by* links
+| What | Status |
+| --- | --- |
+| [05 Anemo Voice](specs/05-voice-android.md) (Android, `android/`) | **Done, and used on a real phone** (#62, #63). Wake word only (no button); one wake word = one answered turn; questions, approvals and plan reviews by voice; a follow-up within 5 minutes continues the same chat (the phone sends the chat's id: the *microphone* does not reopen by itself). A model of its own for voice requests. |
+| [06 Anemo Desktop](specs/06-desktop-client.md) (Windows, `desktop/`) | **Done.** Tray client in C# / .NET 8: look and act (UI Automation, `SendInput`), PowerShell on a trusted computer, shared screen, stop hotkey, watched / trusted levels. Its manual test list (`desktop/MANUAL-TESTS.md`) is still open on real hardware. |
+| Release workflow for both apps, redesigned screens and icons | **Done** (#69, #70). |
 
-**Status: built.**
+### Code sessions (the Code page)
 
-Three ways to break up and order work inside **Tasks**.
+**Done** ([code-sessions.md](specs/code-sessions.md), #67, #68, #72, #73, #75). Anemo
+Desktop shares the Claude Code jobs that run on a trusted Windows computer (the
+`C:\anemo-bridge\jobs` folder format of `cc.ps1`: `out.jsonl` in stream-json): a live
+view on the Code page, starting a job in a project (cloned from GitHub if needed),
+follow-ups, cancelling, queued messages, and the agent tools `code_projects`,
+`code_start`, `code_status`, `code_cancel`. Works on a phone (#75).
 
-**Checklist.** Quick items inside one task (text and a tick), for steps that don't
-need their own date or status.
+---
 
-- Added and ticked in the task editor; the list and the board show progress
-  ("3/5") on the task.
-- A repeating task's next occurrence gets the same checklist, unticked.
+### Round 3 (2026-11-24)
 
-**Subtasks.** Real tasks that belong to a parent task: their own status, due date,
-priority, notes and attachments.
+Built in parallel from [specs/CONTRACTS-round3.md](specs/CONTRACTS-round3.md); how it
+went is in [specs/ORCHESTRATION-LOG-round3.md](specs/ORCHESTRATION-LOG-round3.md).
 
-- Shown under the parent in the task editor and, folded, in the list. One level deep,
-  to keep it simple.
-- Finishing a parent with open subtasks asks whether to finish them too.
-- The parent's project and tags are suggested for new subtasks.
+| What | Spec | Pull request |
+| --- | --- | --- |
+| **Anemo Voice: a cue you can trust, and voice mode.** The start sound and a buzz play on the frame the wake word is detected, on the system-sounds stream (not media volume), with other audio ducked; the recording keeps the audio from the wake word on. Distinct start / end / timeout / reopen / on / off sounds. **Voice mode**: after each answer the mic reopens without a wake word, until you turn it off (tile, notification, "stop" on its own, 45 s of silence, or the agent's `voice_stop`). Only you turn it on (tile, notification, or "start voice mode", matched by code on the phone, never by the model). On/off goes to the audit log. Not yet tried on a phone. | [07](specs/07-voice-mode-android.md) | #78 |
+| **Scripts under Automations.** A script is a kind of automation: TypeScript in a Deno sandbox (no network but declared hosts, its own folder only, time / memory / output limits, secrets by name) that acts only through Anemo's tools and approvals, hands judgement to the model with `anemo.think`, and runs only code you approved: anything an agent writes or changes waits, with a diff, in the Scripts tab. | [08](specs/08-automation-scripts.md) | #82 |
+| **Anemo Desktop for macOS** (Apple Silicon): Code jobs, look and act (ScreenCaptureKit, Accessibility, CGEvent), shell, shared screen, permission screens, Keychain, open at login, menu bar. Devices now tell the server their system and shell (`platform`, `shell_kind`), and `bridge/cc.mjs` starts Claude Code jobs on Windows and macOS. Built and smoke-tested on CI's macOS runner; the full checklist needs a real Mac. Signing and notarization wait for an Apple Developer account. | [09](specs/09-desktop-macos.md), [Mac tests](specs/09-desktop-macos-mac-testing.md) | #81 |
+| This roadmap, audited against the code. | – | #76 |
 
-**Blocked by.** A task can wait on one or more other tasks.
+Merged alongside, from other sessions: the Code page's sub-agent sidebar and images in
+prompts (#77), appearance and profile customisation (#79).
 
-- Pick them in the task's side panel. The other task shows *Blocks: …* in turn.
-- While any of them is open the task is marked as blocked (a badge in the list and on
-  the board). When the last one is done, its status moves from *blocked* back to *to
-  do* and you get a notification.
-- Loops (A waits on B, B waits on A) are refused.
-- Deleting a task removes it from what it blocked.
+---
 
-**Everywhere else:** agents can read and change all three with the *Manage tasks*
-permission; shared projects show them in the copy; search finds checklist items.
+## In progress
 
-## 4. Real push notifications
+| Branch | What |
+| --- | --- |
+| `feat/image-generation` | A `generate_image` tool any chat model can call (#80, another session). |
 
-**Status: built.**
+To check by hand: Anemo Voice 1.1.0 on the phone (`android/MANUAL-TESTS.md`), Anemo
+Desktop for macOS on a borrowed Mac (`docs/specs/09-desktop-macos-mac-testing.md`), the
+Windows client's manual tests (`desktop/MANUAL-TESTS.md`).
 
-Notifications on your phone or computer **even when Anemo is closed**, without
-Discord. Uses the browser's standard Web Push, which works in Chrome, Edge and
-Firefox, and on iPhone/iPad (iOS 16.4+) once Anemo is added to the Home Screen.
+---
 
-- **Settings → Notifications → Push**: *Turn on for this device*. Each device you turn
-  it on for is listed with its name and when it last received something, and can be
-  removed. As with Discord, you pick which kinds go to push (reminders, automations,
-  approvals, agent messages, focus).
-- Tapping a notification opens the page it is about (the chat, the task, the run).
-- **Approve from the notification.** When an agent or automation is waiting for
-  approval, the notification has **Allow once** and **Deny** buttons. Each button
-  works one time, only for that approval, and expires with it; anything else (e.g.
-  *Allow for this run*) opens the approval in the app.
-- Built on the existing notification outbox: push is a new kind of destination next
-  to Discord, so sending is retried the same way, and a device that has been removed
-  or no longer accepts pushes is dropped on its own.
-- The server's push keys (VAPID) are created on first start and stored encrypted.
-- Needs HTTPS, like desktop notifications. A notification shows only its title and a
-  short line, never file contents or secrets.
+## Next
 
-## 5. First-run setup and update notice
+Proposals that are still open, with what of each exists today. Order is a suggestion.
 
-**Status: built.**
+### Activity log with undo
 
-**First-run setup.** On the first login, a short guided setup instead of an empty app
-and a hint to go to Settings.
+**Status: not built as such; the pieces exist.** There is no single list of "what was
+done, by whom, and undo it". What exists:
 
-1. **Model provider**: add one (OpenAI, Anthropic, OpenRouter, an OpenAI-compatible
-   server such as Ollama, or the Claude subscription), test it, pick models and the
-   default chat model.
-2. **Helper models** (optional): Summaries, Memory and Embeddings, with sensible
-   suggestions from the provider just added.
-3. **You**: time zone, and whether Anemo opens on Home or a new chat.
-4. **Optional parts**: a check of the sandbox, browser, MCP host, Claude runner and
-   SearXNG. Each one shows whether it is running and, if not, the one command or
-   `.env` line that starts it.
-5. **Notifications** (optional): turn on push for this device or add Discord.
+- `audit_log` (`features/audit/`): security-relevant actions only (logins, settings,
+  tokens, devices, MCP servers, approvals by voice), actor `user | agent | system`.
+- Provenance on documents, tasks and events: who created them and who changed them last
+  (`created_by` / `updated_by` as actor references `user`, `chat:<id>`,
+  `automation:<id>/<run>`), shown as "the assistant in ‹chat›".
+- Per run: the timeline of tool calls; for automation runs, the list of changes the
+  server recorded (`runs.changes`, at most 200, `{tool, summary, ref}`).
+- **Undo** exists for files an agent changed (each change is kept and can be reverted
+  while the file is still as the agent left it: `workspace/revert.py`), for deletions
+  (the trash), and for a memory just saved (a notice with *Undo*). Task, event and
+  document edits can't be undone from one place (documents have revisions).
 
-Every step can be skipped, the setup can be left and picked up later, and it can be
-opened again from **Settings → Advanced**. Nothing it sets differs from setting it by
-hand.
+What it would take: one `activity` table written where `record_change` and the
+provenance helpers already run, a page that lists it with filters (by actor, by
+object), and undo per entry where an inverse exists (file revert, trash restore, a
+task/event field change from a stored before-value). Scripts (#82)
+record their actions with provenance through the same
+paths, so they show up there once it exists.
 
-**Update notice.** Tells you when a newer Anemo is out, and what changed once you
-have updated. Anemo has no numbered releases (the images are rebuilt from `main` on
-every change), so it compares commits: each build records the commit it was made from.
+### Inbox for loose items
 
-- About once a day the server asks GitHub how many changes `main` has that this build
-  doesn't. When there are some, **Settings → Advanced** lists their titles (newest
-  first) with the update command for your kind of install (`docker compose pull &&
-  docker compose up -d` for the prebuilt images, `git pull` and a rebuild for a
-  checkout), and a small dismissible notice appears in Home's *Needs you*.
-- After an update, a **What's new** card lists the changes since the version that ran
-  before, once.
-- Anemo never updates itself. The check is the only call it makes for this, sends
-  nothing about you, and can be switched off in Settings → Advanced (or with an `.env`
-  setting).
+**Status: partly built.** The **Inbox** page exists (notifications, and *Needs you*:
+approvals, memory suggestions, the update notice). What is not built: a capture inbox
+for loose items (a thought, a link, a file) to sort into tasks, documents or projects
+later.
 
-## 6. Diagrams, charts and math
+### Project-scoped memories
 
-**Status: built.**
+**Status: not built.** Memories are global (`memories` has a `project` *kind* but no
+project id); projects have their own instructions instead. Needs a nullable
+`project_id` on memories, retrieval that prefers the current project's, and a filter on
+the Memory page.
 
-Answers, documents and automation results can show **diagrams, charts and formulas**
-instead of their source code. Today a diagram the model writes appears as a plain code
-block.
+### Chat recall
 
-They are ordinary fenced code blocks in Markdown, so files stay plain Markdown, other
-Markdown tools still read them, and agents need no new tool to make them:
+**Status: partly built.** Chats are found by the search page and Ctrl+K (full text in
+messages and titles). Agents have no tool to search or read earlier chats; memories
+extracted from chats are the only bridge. Next step: a read-only `search_chats` /
+`read_chat` tool pair under a new permission.
 
-- **```` ```mermaid ````**: flowcharts, mind maps, sequence diagrams, timelines, Gantt
-  charts, state diagrams and pie charts ([Mermaid](https://mermaid.js.org/)).
-- **```` ```chart ````**: line, bar, area and pie charts from a small JSON description
-  (`type`, the x values, one or more named series). Drawn by Anemo itself, so charts
-  use the app's colors, work in light and dark mode, and show values on hover.
-- **Math**: `$…$` inline and `$$…$$` as a block (KaTeX).
+### Ctrl+K
 
-**How it behaves**
+**Status: done.** The command palette searches chats, documents, memories, tasks,
+events, files and automations, and page names (features.md, *Search*). Left: actions
+in the palette (new task, start focus, …) beyond opening pages.
 
-- The same rendering everywhere: chat, documents, share links, automation results and
-  run pages.
-- While an answer is still being written the block shows its code; it is drawn once
-  the block is complete, so nothing flickers or errors halfway.
-- Each diagram or chart has: *Source / Diagram* toggle, copy, download as SVG or PNG,
-  and full screen with zoom and pan (for big mind maps).
-- If the code can't be drawn, the source is shown with the error and a **Fix diagram**
-  button that asks the model to correct it.
-- In the document editor a diagram is shown drawn, with an edit button that opens its
-  source; the Markdown source view shows the code as usual.
-- Mermaid is only downloaded when a page actually contains a diagram, so pages
-  without one stay as fast as now.
+### Templates
 
-**Getting the model to use it**
+**Status: partly built.** Automations have *Start from a template* (e.g. *Daily
+summary*); skills act as reusable prompts (slash commands). Not built: templates for
+documents, tasks or projects.
 
-- The system prompt (Chat and Agent mode) says these blocks are available and when they
-  help, briefly.
-- A built-in **`/diagram`** skill: "show this as a mind map / flowchart / timeline /
-  chart". Like the other built-in skills it can be edited or switched off in
-  **Settings → Skills**.
-- Agents can turn data into charts directly, for example read a CSV with a shell
-  command and answer with a `chart` block.
+### Devices, from the specs' "Later"
 
-**Safety**
-
-Diagrams can be written from untrusted content (a web page the agent read), so Mermaid
-runs in its strict mode: no HTML or scripts in labels, no links that run code, and
-nothing loaded from other sites. Charts are drawn from data only.
-
-## 7. Voice from your phone (Anemo Voice)
-
-**Status: built.** The server side, Settings → Voice and the Android app (`android/`).
-Design:
-[docs/specs/05-voice-android.md](specs/05-voice-android.md); what it does:
-[features.md](features.md#voice-from-your-phone).
-
-Say the wake word near your Android phone, say what you want, and Anemo runs it as an
-agent request in a Voice chat and the phone reads the answer out. Questions, approvals
-and plan reviews come back to the phone and are answered by voice; a dangerous action
-always needs a tap.
-
-**Later**
-
-- A realtime voice model for real back-and-forth (interrupting, quick clarifications).
-  Its tools would be "start a run" and "check a run", and Anemo would give the phone a
-  short-lived key.
-- Voice notes without a run: "note: …" goes straight to the daily note.
-- A Wear OS tile as a push-to-talk button.
-
-## 8. Devices: Anemo Desktop on your Windows computers
-
-**Status: built.** Settings → Devices, the device connection, the computer tools and
-the Windows client (`desktop/`). Design:
-[docs/specs/06-desktop-client.md](specs/06-desktop-client.md); what it does:
-[features.md](features.md#devices-your-windows-computers).
-
-A tray program on each Windows computer you want Anemo to reach (the agent's own VM,
-your PC, your laptop) lets the agent look at the screen, click, type, open programs
-and, on a trusted computer, run PowerShell. Each computer is a device with its own
-token and trust level: on a watched one every action asks, on a trusted one the
-permissions decide.
-
-**Later**
-
-- macOS and Linux clients on the same protocol.
 - Files between Anemo's workspace and a device (`device_file_get` / `device_file_put`).
+- A Linux client on the same protocol (Windows and macOS exist).
 - Watching a window over time (with your say-so) for longer tasks on the VM.
+- Run the Windows client's manual tests on real hardware; `Windows.Graphics.Capture` has
+  never run (GDI is the fallback in use).
+
+### Voice, from the spec's "Later"
+
+- Voice notes without a run: "note: …" straight into the daily note.
+- A realtime voice model for real back-and-forth (the phone would get a short-lived
+  key; tools "start a run" and "check a run").
+
+### Automations
+
+- Webhooks (`POST /api/hooks/{id}` with an HMAC signature, behind a Cloudflare Tunnel
+  rule), spec 02 §2.8. Scripts (#82) are designed not to rule it out.
+
+---
+
+## Ideas
+
+- A Wear OS tile as a push-to-talk button.
+- Inline links in single changed occurrences of repeating events; search-box chips for
+  more than documents; an "in the trash" state for links to documents and chats
+  (FINAL-REPORT.md §5).
+- Agent moves of documents offering instruction and memory updates inline instead of
+  through the Inbox.
+- The licence question for the Android app: the repo is GPL v2, the APK links
+  Apache-2.0 libraries (only matters when the APK is distributed).
