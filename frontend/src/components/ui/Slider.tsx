@@ -150,3 +150,27 @@ export function Slider({
     </div>
   )
 }
+
+/**
+ * A slider with its name on the left and its value on the right, in fixed columns, so
+ * several of them line up (Settings > Appearance: blur, dim, tint strength…).
+ *
+ *   <SliderField label="Blur" value={blur} onChange={setBlur} min={0} max={40} step={1} format={(v) => `${v} px`} />
+ */
+export function SliderField({
+  label,
+  format,
+  ...slider
+}: Omit<SliderProps, 'valueText' | 'label'> & {
+  label: string
+  /** The value as shown and read out, e.g. "12 px". */
+  format: (value: number) => string
+}) {
+  return (
+    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_3.25rem] items-center gap-3 md:grid-cols-[7rem_minmax(0,1fr)_3.5rem]">
+      <span className="truncate text-[13px] text-muted">{label}</span>
+      <Slider label={label} valueText={(v) => format(Math.round(v))} {...slider} />
+      <span className="text-right text-[12.5px] tabular-nums text-muted">{format(slider.value)}</span>
+    </div>
+  )
+}
