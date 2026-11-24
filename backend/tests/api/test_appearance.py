@@ -184,3 +184,36 @@ async def test_login_is_needed(client):
     assert r.status_code in (401, 403)
     r = await client.delete("/api/appearance/avatar")
     assert r.status_code in (401, 403)
+
+
+async def test_custom_gradient_and_glass_strength(authed):
+    custom = {
+        "colors": ["#112233", "#445566", "#778899", "#aabbcc"],
+        "style": "linear",
+        "angle": 90,
+        "speed": "fast",
+    }
+    r = await authed.put(
+        "/api/settings/appearance",
+        json={
+            "background": {"kind": "gradient", "gradient": "custom", "custom_gradient": custom},
+            "glass": True,
+            "glass_strength": 80,
+        },
+    )
+    assert r.status_code == 200, r.text
+    saved = (await authed.get("/api/settings")).json()["appearance"]
+    assert saved["background"]["gradient"] == "custom"
+    assert saved["background"]["custom_gradient"] == custom
+    assert saved["glass_strength"] == 80
+
+    for bad in (
+        {"glass_strength": 101},
+        {"background": {"custom_gradient": {"colors": ["#112233"]}}},  # one stop
+        {"background": {"custom_gradient": {"colors": ["#112233"] * 5}}},  # five
+        {"background": {"custom_gradient": {"colors": ["#112233", "url(x)"]}}},
+        {"background": {"custom_gradient": {"angle": 360}}},
+        {"background": {"custom_gradient": {"speed": "warp"}}},
+    ):
+        r = await authed.put("/api/settings/appearance", json=bad)
+        assert r.status_code == 422, bad

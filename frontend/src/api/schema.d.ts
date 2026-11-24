@@ -5009,7 +5009,8 @@ export interface components {
              * @default aurora
              * @enum {string}
              */
-            gradient: "aurora" | "dusk" | "lagoon";
+            gradient: "aurora" | "dusk" | "lagoon" | "custom";
+            custom_gradient?: components["schemas"]["CustomGradient"];
             /** Asset Id */
             asset_id?: string | null;
             /**
@@ -5079,6 +5080,11 @@ export interface components {
              * @default false
              */
             glass: boolean;
+            /**
+             * Glass Strength
+             * @default 50
+             */
+            glass_strength: number;
         };
         /** AppendTo */
         AppendTo: {
@@ -6295,6 +6301,31 @@ export interface components {
             properties?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * CustomGradient
+         * @description The user's own animated gradient (Background > Animated gradient > Custom).
+         */
+        CustomGradient: {
+            /** Colors */
+            colors?: string[];
+            /**
+             * Style
+             * @default drift
+             * @enum {string}
+             */
+            style: "drift" | "linear";
+            /**
+             * Angle
+             * @default 135
+             */
+            angle: number;
+            /**
+             * Speed
+             * @default normal
+             * @enum {string}
+             */
+            speed: "slow" | "normal" | "fast";
         };
         /** DailyNoteIn */
         DailyNoteIn: {
