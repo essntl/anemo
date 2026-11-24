@@ -207,6 +207,33 @@ describe('buildTimeline', () => {
     const orphan = tools(items)[1]
     expect(orphan).toMatchObject({ id: 'nobody', name: '', result: { text: '', images: 1 } })
   })
+
+  it('hides routine rate-limit and progress events, and shows a limit when it changes', () => {
+    at = 0
+    const limit = (status: unknown, resetsAt?: unknown) =>
+      ev({ type: 'rate_limit_event', rate_limit_info: { status, rateLimitType: 'five_hour', ...(resetsAt === undefined ? {} : { resetsAt }) }, session_id: SESSION })
+    const items = buildTimeline([
+      toolUse('toolu_task', 'Task', { description: 'Look around', prompt: 'Look.' }),
+      limit('allowed', 1764000000), limit('allowed', 1764000000),
+      ev({ type: 'tool_progress', tool_use_id: 'toolu_task', tool_name: 'Task', elapsed_time_seconds: 3 }),
+      toolUse('toolu_sub', 'Bash', { command: 'ls' }, 'toolu_task'),
+      limit('allowed_warning', 1764000000), limit('allowed_warning', 1764000000), limit('allowed_warning'),
+      limit('rejected', '1764000000'), limit('rejected'),
+      limit('allowed'),
+      limit('allowed_warning', 1764000000000),
+      limit(42), ev({ type: 'rate_limit_event' }),
+      ev({ type: 'rate_limit_event', anemo_trimmed: 'too large' }, { trimmed: true }),
+    ])
+    // Nothing for the dozens of "allowed" and progress events; one notice per change.
+    expect(items.map((i) => i.kind)).toEqual(['tool', 'rate_limit', 'rate_limit', 'rate_limit'])
+    expect(items.slice(1)).toMatchObject([
+      { status: 'warning', resetsAt: 1764000000000 },
+      { status: 'rejected', resetsAt: 1764000000000 },
+      { status: 'warning', resetsAt: 1764000000000 },
+    ])
+    // The sub-agent's own events still go inside its call.
+    expect(call(items, 'Task').children.map((c) => c.kind)).toEqual(['tool'])
+  })
 })
 
 describe('merging events', () => {

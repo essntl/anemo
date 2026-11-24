@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
+import { formatUpcoming } from '@/lib/format'
 import { plural, t } from '@/lib/i18n'
 import { JobContext } from './jobContext'
 import { TodoChecklist, TrimmedMark } from './parts'
@@ -294,6 +295,19 @@ function Item({ item, depth }: { item: TimelineItem; depth: number }) {
           <span className="min-w-0 [overflow-wrap:anywhere]">
             {plural(item.count, '{n} event not stored (over 5 MB).', '{n} events not stored (over 5 MB).')}{' '}
             {view && <span className="text-muted [overflow-wrap:anywhere]">{t('The full log is on the computer: {path}', { path: logPath(view.job.job_dir) })}</span>}
+          </span>
+        </div>
+      )
+    case 'rate_limit':
+      return (
+        <div className={cn('mx-2 my-1 flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-[12px]',
+          item.status === 'rejected' ? 'border-error/30 bg-error/12' : 'border-warning/30 bg-warning/12')}>
+          <TriangleAlert aria-hidden="true" className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', item.status === 'rejected' ? 'text-error' : 'text-warning')} />
+          <span className="min-w-0">
+            {item.status === 'rejected' ? t('The usage limit is reached.') : t('Close to the usage limit.')}
+            {item.resetsAt !== undefined && (
+              <span className="text-muted">{' '}{t('Resets: {when}', { when: formatUpcoming(new Date(item.resetsAt).toISOString()) })}</span>
+            )}
           </span>
         </div>
       )
