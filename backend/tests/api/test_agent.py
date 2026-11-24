@@ -173,18 +173,21 @@ async def test_agent_uses_tools_and_plan(authed):
             "update_schedule",
             "delete_schedule",
             "get_current_time",
+            "generate_image",
             "read_tool_output",
         ]
     )
 
 
-async def test_chat_mode_only_offers_memory_tools(authed):
+async def test_chat_mode_only_offers_memory_tools_and_image_generation(authed):
     cid = await setup(authed)
     script("hi", [TextDelta("hello"), Done("end")])
     r = await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})
     await execute_run(uuid.UUID(r.json()["run_id"]))
+    # generate_image is offered too (it says what to set up when no image model is).
     assert [t.name for t in FakeAdapter.requests[-1].tools] == [
         "forget_memory",
+        "generate_image",
         "remember",
         "search_memory",
         "update_memory",

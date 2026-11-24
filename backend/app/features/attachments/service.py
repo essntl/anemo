@@ -195,9 +195,11 @@ async def store_output(
     conversation_id: uuid.UUID | None,
     message_id: uuid.UUID | None,
     run_id: uuid.UUID | None,
+    workspace_path: str | None = None,
 ) -> Attachment:
     """A file the agent hands to the user (attach_file): a snapshot of a workspace file,
-    shown as a download under its answer. Its text is not extracted (the agent made it)."""
+    shown as a download under its answer. Its text is not extracted (the agent made it).
+    `workspace_path`: the workspace file it is a copy of, when the chat should link to it."""
     filename = Path(filename).name[:255] or "file"
     try:
         kind = classify(filename, "", data)
@@ -205,6 +207,7 @@ async def store_output(
         kind = "file"  # e.g. a damaged image: still downloadable
     att = await _store(db, filename, _mime_for(kind, filename, "", data), kind, data, None, None)
     att.conversation_id, att.message_id, att.run_id = conversation_id, message_id, run_id
+    att.workspace_path = workspace_path
     await db.flush()
     return att
 
@@ -321,6 +324,7 @@ async def duplicate(
         storage_path=str(rel),
         extracted_text=att.extracted_text,
         extraction_note=att.extraction_note,
+        workspace_path=att.workspace_path,
     )
     db.add(copy)  # run_id stays empty: the copy belongs to no run of the new chat
     await db.flush()

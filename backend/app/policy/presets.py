@@ -126,6 +126,16 @@ CATEGORIES: list[Category] = [
         "bypassPermissions).",
         "autonomous",
     ),
+    # generate_image (tools/builtin/images.py): each call costs money at the provider.
+    # Automation runs ask anyway unless Settings > Providers & Models says otherwise
+    # (features/image_generation/service.py).
+    Category(
+        "image.generate",
+        "Generate images",
+        "Make pictures with the image model chosen in Settings > Providers & Models "
+        "(each one costs money at the provider). Automations ask first.",
+        "autonomous",
+    ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
 ]
