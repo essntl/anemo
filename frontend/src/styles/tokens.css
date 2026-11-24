@@ -3,7 +3,8 @@
  *
  * Components never use raw colors. They use Tailwind utilities that map to
  * these variables (see app.css), e.g. `bg-surface`, `text-muted`, `bg-accent`.
- * `--accent` is overwritten at runtime from Settings > Appearance.
+ * The accent (and its shades), a tint of the surfaces and the fonts are overwritten at
+ * runtime from Settings > Appearance (features/appearance/apply.ts).
  */
 
 :root {
@@ -11,6 +12,7 @@
 
   --accent: #2a6df4;
   --accent-hover: color-mix(in oklch, var(--accent), black 12%);
+  --accent-active: color-mix(in oklch, var(--accent), black 20%);
   --accent-soft: color-mix(in oklch, var(--accent) 12%, transparent);
   --accent-contrast: #ffffff;
   --selection: color-mix(in oklch, var(--accent) 22%, transparent);
@@ -82,6 +84,7 @@
   color-scheme: dark;
 
   --accent-hover: color-mix(in oklch, var(--accent), white 12%);
+  --accent-active: color-mix(in oklch, var(--accent), white 20%);
   --accent-soft: color-mix(in oklch, var(--accent) 20%, transparent);
   --selection: color-mix(in oklch, var(--accent) 32%, transparent);
 

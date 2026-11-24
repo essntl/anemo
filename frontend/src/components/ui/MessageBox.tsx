@@ -8,7 +8,7 @@ import { ArrowUp } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 /** The frame around the text and its buttons. Add the border's colour (`MESSAGE_BOX_BORDER` at rest). */
-export const MESSAGE_BOX = 'relative rounded-panel border bg-card p-2 shadow-soft transition-colors focus-within:border-accent/60'
+export const MESSAGE_BOX = 'glass relative rounded-panel border bg-card p-2 shadow-soft transition-colors focus-within:border-accent/60'
 export const MESSAGE_BOX_BORDER = 'border-border-strong'
 
 /** The text itself: a `<textarea rows={1}>` that grows with what is typed (the box sets its height). */

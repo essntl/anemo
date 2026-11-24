@@ -28,7 +28,7 @@ _HEADERS = {
 }
 
 
-class AssetOut(BaseModel):
+class AppearanceAssetOut(BaseModel):
     id: uuid.UUID
     kind: Literal["background", "font", "avatar"]
     media: Literal["image", "animated", "video", "font"]
@@ -41,9 +41,9 @@ class AssetOut(BaseModel):
     created_at: datetime
 
 
-def _out(asset: AppearanceAsset) -> AssetOut:
+def _out(asset: AppearanceAsset) -> AppearanceAssetOut:
     url = f"/api/appearance/assets/{asset.id}/content"
-    return AssetOut(
+    return AppearanceAssetOut(
         id=asset.id,
         kind=asset.kind,  # type: ignore[arg-type]
         media=asset.media,  # type: ignore[arg-type]
@@ -63,17 +63,17 @@ async def _read(file: UploadFile, cap: int) -> bytes:
     return data
 
 
-@router.get("/assets", response_model=list[AssetOut])
+@router.get("/assets", response_model=list[AppearanceAssetOut])
 async def list_assets(
     db: Db, kind: Literal["background", "font", "avatar"] | None = None
-) -> list[AssetOut]:
+) -> list[AppearanceAssetOut]:
     return [_out(a) for a in await service.list_assets(db, kind)]
 
 
-@router.post("/assets", response_model=AssetOut, status_code=201)
+@router.post("/assets", response_model=AppearanceAssetOut, status_code=201)
 async def upload_asset(
     file: UploadFile, kind: Annotated[Literal["background", "font"], Form()], db: Db
-) -> AssetOut:
+) -> AppearanceAssetOut:
     data = await _read(file, files.MAX_UPLOAD_BYTES)
     return _out(await service.upload(db, kind, file.filename or "file", data))
 

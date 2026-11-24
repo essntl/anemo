@@ -4998,7 +4998,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__features__appearance__router__AssetOut"
+                    "$ref": "#/components/schemas/AppearanceAssetOut"
                   },
                   "title": "Response List Assets Api Appearance Assets Get"
                 }
@@ -5057,7 +5057,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__features__appearance__router__AssetOut"
+                  "$ref": "#/components/schemas/AppearanceAssetOut"
                 }
               }
             }
@@ -9216,7 +9216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__features__documents__router__AssetOut"
+                  "$ref": "#/components/schemas/AssetOut"
                 }
               }
             }
@@ -20063,6 +20063,79 @@
         ],
         "title": "AllSettings"
       },
+      "AppearanceAssetOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "background",
+              "font",
+              "avatar"
+            ],
+            "title": "Kind"
+          },
+          "media": {
+            "type": "string",
+            "enum": [
+              "image",
+              "animated",
+              "video",
+              "font"
+            ],
+            "title": "Media"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "media",
+          "mime",
+          "size",
+          "filename",
+          "url",
+          "poster_url",
+          "created_at"
+        ],
+        "title": "AppearanceAssetOut"
+      },
       "AppearanceBackground": {
         "properties": {
           "kind": {
@@ -20347,6 +20420,19 @@
         },
         "type": "object",
         "title": "ApproveIn"
+      },
+      "AssetOut": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "AssetOut"
       },
       "AttachIn": {
         "properties": {
@@ -37148,79 +37234,6 @@
         "title": "WorkspaceSettings",
         "description": "Stored in app_settings[\"workspace\"]."
       },
-      "app__features__appearance__router__AssetOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "background",
-              "font",
-              "avatar"
-            ],
-            "title": "Kind"
-          },
-          "media": {
-            "type": "string",
-            "enum": [
-              "image",
-              "animated",
-              "video",
-              "font"
-            ],
-            "title": "Media"
-          },
-          "mime": {
-            "type": "string",
-            "title": "Mime"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "filename": {
-            "type": "string",
-            "title": "Filename"
-          },
-          "url": {
-            "type": "string",
-            "title": "Url"
-          },
-          "poster_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Poster Url"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "kind",
-          "media",
-          "mime",
-          "size",
-          "filename",
-          "url",
-          "poster_url",
-          "created_at"
-        ],
-        "title": "AssetOut"
-      },
       "app__features__calendar__schemas__PropertiesIn": {
         "properties": {
           "set": {
@@ -37236,19 +37249,6 @@
         ],
         "title": "PropertiesIn",
         "description": "Property values to set; null removes one. The others stay as they are."
-      },
-      "app__features__documents__router__AssetOut": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "title": "Path"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path"
-        ],
-        "title": "AssetOut"
       },
       "app__features__documents__router__MoveIn": {
         "properties": {

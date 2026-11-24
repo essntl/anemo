@@ -4808,6 +4808,39 @@ export interface components {
             voice: components["schemas"]["VoiceSettings"];
             code: components["schemas"]["CodeSettings"];
         };
+        /** AppearanceAssetOut */
+        AppearanceAssetOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "background" | "font" | "avatar";
+            /**
+             * Media
+             * @enum {string}
+             */
+            media: "image" | "animated" | "video" | "font";
+            /** Mime */
+            mime: string;
+            /** Size */
+            size: number;
+            /** Filename */
+            filename: string;
+            /** Url */
+            url: string;
+            /** Poster Url */
+            poster_url: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /**
          * AppearanceBackground
          * @description What is behind the app: nothing, a built-in animated gradient, or an upload.
@@ -4951,6 +4984,11 @@ export interface components {
         ApproveIn: {
             /** Content */
             content?: string | null;
+        };
+        /** AssetOut */
+        AssetOut: {
+            /** Path */
+            path: string;
         };
         /** AttachIn */
         AttachIn: {
@@ -11256,39 +11294,6 @@ export interface components {
                 [key: string]: "none" | "read" | "read_write";
             };
         };
-        /** AssetOut */
-        app__features__appearance__router__AssetOut: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "background" | "font" | "avatar";
-            /**
-             * Media
-             * @enum {string}
-             */
-            media: "image" | "animated" | "video" | "font";
-            /** Mime */
-            mime: string;
-            /** Size */
-            size: number;
-            /** Filename */
-            filename: string;
-            /** Url */
-            url: string;
-            /** Poster Url */
-            poster_url: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-        };
         /**
          * PropertiesIn
          * @description Property values to set; null removes one. The others stay as they are.
@@ -11298,11 +11303,6 @@ export interface components {
             set: {
                 [key: string]: unknown;
             };
-        };
-        /** AssetOut */
-        app__features__documents__router__AssetOut: {
-            /** Path */
-            path: string;
         };
         /** MoveIn */
         app__features__documents__router__MoveIn: {
@@ -14091,7 +14091,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__features__appearance__router__AssetOut"][];
+                    "application/json": components["schemas"]["AppearanceAssetOut"][];
                 };
             };
             /** @description Validation Error */
@@ -14126,7 +14126,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__features__appearance__router__AssetOut"];
+                    "application/json": components["schemas"]["AppearanceAssetOut"];
                 };
             };
             /** @description Validation Error */
@@ -16409,7 +16409,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__features__documents__router__AssetOut"];
+                    "application/json": components["schemas"]["AssetOut"];
                 };
             };
             /** @description Validation Error */
