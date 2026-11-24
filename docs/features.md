@@ -17,6 +17,7 @@ adapter), and searching inside workspace files that are not documents.
 - [Sub-agents](#sub-agents)
 - [Documents](#documents)
 - [Tasks and calendar](#tasks-and-calendar)
+- [Appearance and profile](#appearance-and-profile)
 - [Home](#home)
 - [Focus](#focus)
 - [Music](#music)
@@ -393,6 +394,39 @@ without a zone, use the time zone from **Settings → General**.
 subtasks and what a task waits on. Changes follow the
 *Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
 action, so the default level asks you first.
+
+## Appearance and profile
+
+**Settings → Appearance** changes the look of the whole app at once, and the change is
+saved on the server, so it follows you to every device (or tick *Use a different
+appearance on this device* to keep one browser to itself):
+
+- **Theme** (light, dark, system), **accent color** (presets, a color picker or a hex
+  code; hover shades and the text on it are worked out from it) and an optional
+  **background tint** with a strength slider. When a choice makes text or buttons
+  hard to read, the page says so, with the WCAG contrast ratio.
+- **Fonts** for the interface and for code: the default, fonts that come with Anemo
+  (Inter, IBM Plex Sans, Nunito, Source Serif 4, JetBrains Mono, Fira Code, IBM Plex
+  Mono), system fonts, or a font file you upload (WOFF2, WOFF, TTF, OTF, up to 4 MB).
+  Nothing is loaded from Google Fonts or any other site.
+- **Background** behind the whole app: an animated gradient, or a picture (PNG, JPEG,
+  WebP, AVIF, GIF, up to 15 MB) or video (WebM, MP4, up to 40 MB), with blur, dim and
+  fit (fill, fit, tile). Photos lose their EXIF data (location, camera) when they are
+  saved. Anything that moves shows a still frame when your system asks for reduced
+  motion, and on phones unless you turn on *Animate on phones too*; it pauses while the
+  tab is hidden. Videos are muted and have no controls.
+- **Frosted glass**: the sidebar, cards, dialogs and the message box turn translucent
+  over the background. It stays solid when your system asks for less transparency or
+  the browser can't blur.
+- **Export / Import** the appearance as a small JSON file (uploads are referred to,
+  not included).
+
+**Settings → Profile** sets your **display name** and **avatar** (crop it to a square;
+the server makes small copies of it). They show in the sidebar, next to your messages
+in chats and next to your prompts on the Code page; without an avatar, your initials.
+
+These work in the browser and the installed app (PWA). The Android voice app and the
+Windows desktop client are native apps and look as they always do.
 
 ## Home
 

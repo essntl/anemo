@@ -8,6 +8,7 @@ import { MoveChatsDialog } from '@/features/chat/components/MoveChatsDialog'
 import { DictationHost } from '@/features/dictation/DictationHost'
 import { useAppEvents } from '@/features/chat/useAppEvents'
 import { CodeQueueRunner } from '@/features/code/CodeQueueRunner'
+import { AppBackground } from '@/features/appearance/AppBackground'
 import { useServiceWorkerLinks } from '@/features/notifications/useServiceWorkerLinks'
 import { Island } from '@/features/island/Island'
 import { CommandPalette } from '@/features/search/CommandPalette'
@@ -94,6 +95,8 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full">
+      {/* Settings > Appearance > Background: behind everything else. */}
+      <AppBackground />
       {/* Desktop: the sidebar is a white panel on the ground, like the cards of a page. */}
       <div className="hidden shrink-0 p-3 pr-0 md:flex">
         {collapsed

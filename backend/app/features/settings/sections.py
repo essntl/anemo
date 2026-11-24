@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from app.features.memory.schemas import MemorySettings
 from app.policy.presets import PermissionSettings
@@ -180,11 +180,53 @@ class FilesSettings(BaseModel):
     show_documents_folder: bool = False
 
 
+HEX_COLOUR = r"^#[0-9a-fA-F]{6}$"
+# An uploaded font is "custom:<asset id>" (features/appearance); the rest are built in
+# (frontend/src/features/appearance/fonts.ts).
+_CUSTOM_FONT = r"custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+UI_FONT = rf"^(default|system|serif|rounded|inter|plex-sans|nunito|source-serif|{_CUSTOM_FONT})$"
+CODE_FONT = rf"^(default|system|jetbrains-mono|fira-code|plex-mono|{_CUSTOM_FONT})$"
+
+
+class AppearanceBackground(BaseModel):
+    """What is behind the app: nothing, a built-in animated gradient, or an upload."""
+
+    kind: Literal["none", "gradient", "upload"] = "none"
+    gradient: Literal["aurora", "dusk", "lagoon"] = "aurora"
+    # An `appearance_assets` row of kind "background" (image, animated image or video).
+    asset_id: uuid.UUID | None = None
+    blur: int = Field(0, ge=0, le=40)  # px
+    # How much of the page colour lies over it (%), so text stays readable.
+    dim: int = Field(35, ge=0, le=90)
+    fit: Literal["cover", "contain", "tile"] = "cover"
+    # Phones show a still frame of an animated background unless this is on.
+    animate_on_phones: bool = False
+
+
 class AppearanceSettings(BaseModel):
+    """Settings > Appearance; applied in the browser (frontend/src/features/appearance)."""
+
     mode: Literal["light", "dark", "system"] = "system"
     # The default has 4.5:1 against white text (the buttons).
-    accent: str = Field("#2a6df4", pattern=r"^#[0-9a-fA-F]{6}$")
+    accent: str = Field("#2a6df4", pattern=HEX_COLOUR)
     density: Literal["comfortable", "compact"] = "comfortable"
+    # A colour mixed into the page, panel and card colours; None: the theme's own.
+    tint: str | None = Field(None, pattern=HEX_COLOUR)
+    tint_strength: int = Field(40, ge=0, le=100)
+    ui_font: str = Field("default", pattern=UI_FONT)
+    code_font: str = Field("default", pattern=CODE_FONT)
+    background: AppearanceBackground = Field(default_factory=AppearanceBackground)
+    # Panels, cards, dialogs and the message box turn translucent over the background.
+    glass: bool = False
+
+
+class ProfileSettings(BaseModel):
+    """Settings > Profile: how you appear in the app. The avatar is set through
+    PUT /appearance/avatar, which also stores its id here."""
+
+    # Shown instead of the login name; empty: the login name.
+    display_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60)] = ""
+    avatar_id: uuid.UUID | None = None
 
 
 TaskType = Literal[
@@ -294,6 +336,7 @@ class SectionSpec:
 SECTIONS: dict[str, SectionSpec] = {
     "general": SectionSpec(GeneralSettings),
     "appearance": SectionSpec(AppearanceSettings),
+    "profile": SectionSpec(ProfileSettings),
     "models": SectionSpec(ModelDefaults),
     "permissions": SectionSpec(PermissionSettings, sensitive=True),
     "workspace": SectionSpec(WorkspaceSettings, sensitive=True),

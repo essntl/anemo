@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends
 
 from app.api import health
 from app.api.deps import require_session
+from app.features.appearance.router import router as appearance_router
 from app.features.attachments.router import router as attachments_router
 from app.features.audit.router import router as audit_router
 from app.features.auth.router import router as auth_router
@@ -77,6 +78,7 @@ protected.include_router(providers_router)
 protected.include_router(conversations_router)
 protected.include_router(runs_router)
 protected.include_router(attachments_router)
+protected.include_router(appearance_router)
 protected.include_router(agent_router)
 protected.include_router(permissions_router)
 protected.include_router(links_router)

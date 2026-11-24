@@ -4,7 +4,8 @@ import { cn } from '@/lib/cn'
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('rounded-card border border-border bg-card shadow-soft', className)}
+      // glass: translucent when Settings > Appearance > Frosted glass is on (styles/appearance.css).
+      className={cn('glass rounded-card border border-border bg-card shadow-soft', className)}
       {...rest}
     />
   )

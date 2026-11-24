@@ -7,7 +7,26 @@ async def test_settings_have_defaults(authed):
     r = await authed.get("/api/settings")
     assert r.status_code == 200
     body = r.json()
-    assert body["appearance"] == {"mode": "system", "accent": "#2a6df4", "density": "comfortable"}
+    assert body["appearance"] == {
+        "mode": "system",
+        "accent": "#2a6df4",
+        "density": "comfortable",
+        "tint": None,
+        "tint_strength": 40,
+        "ui_font": "default",
+        "code_font": "default",
+        "background": {
+            "kind": "none",
+            "gradient": "aurora",
+            "asset_id": None,
+            "blur": 0,
+            "dim": 35,
+            "fit": "cover",
+            "animate_on_phones": False,
+        },
+        "glass": False,
+    }
+    assert body["profile"] == {"display_name": "", "avatar_id": None}
     assert body["general"]["default_chat_mode"] == "chat"
 
 
@@ -15,7 +34,9 @@ async def test_put_appearance_persists(authed):
     new = {"mode": "dark", "accent": "#e0457b", "density": "compact"}
     r = await authed.put("/api/settings/appearance", json=new)
     assert r.status_code == 200
-    assert (await authed.get("/api/settings")).json()["appearance"] == new
+    saved = (await authed.get("/api/settings")).json()["appearance"]
+    # The fields left out keep their defaults.
+    assert saved == {**r.json(), **new} and saved["glass"] is False
 
 
 async def test_invalid_settings_are_rejected(authed):

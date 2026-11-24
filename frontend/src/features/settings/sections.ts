@@ -12,6 +12,7 @@ export interface SectionLink {
 
 export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'general', label: msg('General') },
+  { to: 'profile', label: msg('Profile') },
   { to: 'appearance', label: msg('Appearance') },
   { to: 'pages', label: msg('Pages') },
   { to: 'focus', label: msg('Focus & music'), of: ['focus', 'music'] },

@@ -20,6 +20,7 @@ import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
 import { useIslandVisible } from '@/features/island/islandStore'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
+import { Avatar } from '@/features/profile/Avatar'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
@@ -105,14 +106,18 @@ function Prompt({ text, images = [] }: { text: string; images?: readonly { id: s
   const [all, setAll] = useState(false)
   const long = text.length > 800 || text.split('\n').length > 14
   return (
-    <div className="ml-auto max-w-[min(42rem,92%)] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[13.5px]">
-      <p className={cn('whitespace-pre-wrap break-words', long && !all && 'line-clamp-[12]')}>{text}</p>
-      {long && (
-        <button type="button" onClick={() => setAll(!all)} className="mt-1 text-[12px] font-medium text-accent hover:underline">
-          {all ? t('Show less') : t('Show all')}
-        </button>
-      )}
-      <PromptImages images={images} className="mt-2" />
+    // Your avatar (Settings > Profile) beside it, as in a chat; phones keep the width for the text.
+    <div className="flex items-start justify-end gap-2">
+      <div className="max-w-[min(42rem,92%)] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[13.5px]">
+        <p className={cn('whitespace-pre-wrap break-words', long && !all && 'line-clamp-[12]')}>{text}</p>
+        {long && (
+          <button type="button" onClick={() => setAll(!all)} className="mt-1 text-[12px] font-medium text-accent hover:underline">
+            {all ? t('Show less') : t('Show all')}
+          </button>
+        )}
+        <PromptImages images={images} className="mt-2" />
+      </div>
+      <Avatar size={28} className="max-md:hidden" />
     </div>
   )
 }
