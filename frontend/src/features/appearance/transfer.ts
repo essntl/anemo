@@ -4,7 +4,7 @@
  * another one, what it doesn't have goes back to the default.
  */
 import { isHex } from '@/lib/color'
-import { type Appearance, type Background, DEFAULT_APPEARANCE, DEFAULT_BACKGROUND } from './apply'
+import { type Appearance, type Background, type CustomGradient, DEFAULT_APPEARANCE, DEFAULT_BACKGROUND, DEFAULT_CUSTOM_GRADIENT } from './apply'
 import { CODE_FONTS, customFontId, UI_FONTS } from './fonts'
 import { GRADIENTS } from './gradients'
 
@@ -23,6 +23,18 @@ function oneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
 
 function between(value: unknown, min: number, max: number, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.round(Math.min(max, Math.max(min, value))) : fallback
+}
+
+function customGradient(value: unknown): CustomGradient {
+  const v = (typeof value === 'object' && value ? value : {}) as Record<string, unknown>
+  const d = DEFAULT_CUSTOM_GRADIENT
+  const colors = Array.isArray(v.colors) ? v.colors.filter((c): c is string => typeof c === 'string' && isHex(c)).map((c) => c.toLowerCase()) : []
+  return {
+    colors: colors.length >= 2 && colors.length <= 4 ? colors : d.colors,
+    style: oneOf(v.style, ['drift', 'linear'] as const, d.style),
+    angle: between(v.angle, 0, 359, d.angle),
+    speed: oneOf(v.speed, ['slow', 'normal', 'fast'] as const, d.speed),
+  }
 }
 
 /**
@@ -65,7 +77,8 @@ export function parseImport(text: string, uploadIds: readonly string[]): Appeara
     code_font: font(v.code_font, CODE_FONTS),
     background: {
       kind,
-      gradient: oneOf(bg.gradient, GRADIENTS.map((g) => g.id), DEFAULT_BACKGROUND.gradient),
+      gradient: oneOf<Background['gradient']>(bg.gradient, [...GRADIENTS.map((g) => g.id), 'custom'], DEFAULT_BACKGROUND.gradient),
+      custom_gradient: customGradient(bg.custom_gradient),
       asset_id: assetId,
       blur: between(bg.blur, 0, 40, DEFAULT_BACKGROUND.blur),
       dim: between(bg.dim, 0, 90, DEFAULT_BACKGROUND.dim),
@@ -73,5 +86,6 @@ export function parseImport(text: string, uploadIds: readonly string[]): Appeara
       animate_on_phones: bg.animate_on_phones === true,
     },
     glass: v.glass === true,
+    glass_strength: between(v.glass_strength, 0, 100, d.glass_strength),
   }
 }

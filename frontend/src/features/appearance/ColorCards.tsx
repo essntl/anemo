@@ -4,8 +4,8 @@ import { AlertTriangle, Check, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
+import { SettingRow } from '@/components/ui/SettingRow'
+import { SliderField } from '@/components/ui/Slider'
 import { ACCENT_PRESETS, useThemeStore } from '@/features/settings/theme'
 import { isHex } from '@/lib/color'
 import { t } from '@/lib/i18n'
@@ -112,31 +112,29 @@ export function TintCard() {
   const tint = useThemeStore((s) => s.tint)
   const strength = useThemeStore((s) => s.tint_strength)
   const set = useThemeStore((s) => s.set)
-  const on = Boolean(tint)
+  // While off, the controls keep showing the default (they fold away, see SettingRow).
+  const shown = tint ?? DEFAULT_TINT
   return (
     <Card>
-      <CardHeader title={t('Background tint')} description={t('Mixes a color into the page, panels and cards.')}
-        actions={<Switch label={t('Background tint')} checked={on} onChange={(v) => set({ tint: v ? DEFAULT_TINT : null })} />} />
-      {on && tint && (
-        <CardBody className="flex flex-col gap-4">
+      <SettingRow heading title={t('Background tint')} description={t('Mixes a color into the page, panels and cards.')}
+        checked={Boolean(tint)} onCheckedChange={(v) => set({ tint: v ? DEFAULT_TINT : null })}>
+        <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">
             {TINT_PRESETS.map((c) => (
               <button key={c} type="button" aria-label={t('Tint {color}', { color: c })} aria-pressed={tint === c}
                 onClick={() => set({ tint: c })}
-                className="h-8 w-8 rounded-full transition-transform hover:scale-105"
-                style={{ background: c, boxShadow: tint === c ? `0 0 0 2px var(--card), 0 0 0 4px ${c}` : undefined }} />
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-105"
+                style={{ background: c, boxShadow: tint === c ? `0 0 0 2px var(--card), 0 0 0 4px ${c}` : undefined }}>
+                {tint === c && <Check className="h-4 w-4 text-black/70" />}
+              </button>
             ))}
-            <ColorField label={t('Custom tint')} value={tint} onChange={(c) => set({ tint: c })} />
+            <ColorField label={t('Custom tint')} value={shown} onChange={(c) => set({ tint: c })} />
           </div>
-          <div className="flex items-center gap-3">
-            <span className="w-20 shrink-0 text-[13px] text-muted">{t('Strength')}</span>
-            <Slider label={t('Tint strength')} min={0} max={100} step={5} value={strength}
-              valueText={(v) => `${Math.round(v)} %`} onChange={(v) => set({ tint_strength: Math.round(v) })} className="flex-1" />
-            <span className="w-10 text-right text-[12.5px] tabular-nums text-muted">{strength} %</span>
-          </div>
-          <ContrastWarnings kinds={['text-surface']} />
-        </CardBody>
-      )}
+          <SliderField label={t('Strength')} min={0} max={100} step={5} value={strength}
+            format={(v) => `${v} %`} onChange={(v) => set({ tint_strength: Math.round(v) })} />
+          {tint && <ContrastWarnings kinds={['text-surface']} />}
+        </div>
+      </SettingRow>
     </Card>
   )
 }

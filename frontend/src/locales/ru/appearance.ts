@@ -24,7 +24,6 @@ const messages: Messages = {
   "Tint {color}": "Оттенок {color}",
   "Custom tint": "Свой оттенок",
   "Strength": "Интенсивность",
-  "Tint strength": "Интенсивность оттенка",
 
   // Fonts
   "Fonts": "Шрифты",
@@ -77,9 +76,7 @@ const messages: Messages = {
   "This file isn't an Anemo appearance file.": "Это не файл внешнего вида Anemo.",
 
   // Profile
-  "How you appear in Anemo: in your chats, on the Code page and in the sidebar.": "Как вас видно в Anemo: в чатах, на странице Code и на боковой панели.",
   "Display name": "Отображаемое имя",
-  "Shown next to your messages and in the sidebar. Empty: your login name ({username}).": "Показывается рядом с вашими сообщениями и на боковой панели. Если пусто — ваше имя для входа ({username}).",
   "Name saved.": "Имя сохранено.",
   "Upload avatar": "Загрузить аватар",
   "Change avatar": "Изменить аватар",
@@ -91,6 +88,25 @@ const messages: Messages = {
   "Avatar crop area": "Область обрезки аватара",
   "Zoom": "Масштаб",
   "Save avatar": "Сохранить аватар",
+  "Gradient": "Градиент",
+  "Effects": "Эффекты",
+  "Custom##gradient": "Свой",
+  "Customise this": "Изменить под себя",
+  "Colors": "Цвета",
+  "Color {n}": "Цвет {n}",
+  "Remove color {n}": "Убрать цвет {n}",
+  "Add a color": "Добавить цвет",
+  "Style": "Стиль",
+  "Drifting spots": "Плывущие пятна",
+  "Sliding bands": "Скользящие полосы",
+  "Speed": "Скорость",
+  "Slow": "Медленно",
+  "Normal##speed": "Обычно",
+  "Fast": "Быстро",
+  "Angle": "Угол",
+  "Text on glass stays readable": "Текст на стекле остаётся читаемым",
+  "Shown in the sidebar. Empty: your login name ({username}).": "Показывается на боковой панели. Если пусто — ваше имя для входа ({username}).",
+  "Your name and picture, shown in the sidebar’s account row.": "Ваше имя и изображение в строке учётной записи на боковой панели.",
 }
 
 export default messages

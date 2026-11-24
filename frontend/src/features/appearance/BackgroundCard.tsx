@@ -1,19 +1,22 @@
-/** Settings > Appearance > Background: none, an animated gradient or an upload; blur, dim, fit. */
-import { useRef, type CSSProperties, type ReactNode } from 'react'
+/**
+ * Settings > Appearance > Background: none, an animated gradient (a preset or your own)
+ * or an upload; then its effects: blur, dim, fit, and whether it moves on phones.
+ */
+import { useRef } from 'react'
 import { Film, Trash2, Upload } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Segmented } from '@/components/ui/Segmented'
-import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
+import { SettingRow } from '@/components/ui/SettingRow'
+import { SliderField } from '@/components/ui/Slider'
 import { toast } from '@/components/ui/toast'
 import { useThemeStore } from '@/features/settings/theme'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { type AppearanceAsset, assetUrl, useAppearanceAssets, useDeleteAsset, useUploadAsset } from './api'
 import type { Background } from './apply'
-import { GRADIENTS, gradientColors } from './gradients'
+import { GradientPicker } from './GradientPicker'
 
 /** What the file picker offers (no SVG); the server checks the content anyway. */
 export const BACKGROUND_ACCEPT = 'image/png,image/jpeg,image/webp,image/avif,image/gif,video/webm,video/mp4'
@@ -24,8 +27,8 @@ function Thumb({ asset, chosen, onChoose, onDelete }: { asset: AppearanceAsset; 
   return (
     <li className="relative">
       <button type="button" onClick={onChoose} aria-pressed={chosen} aria-label={t('Use {name}', { name: asset.filename })}
-        className={cn('flex h-20 w-28 items-center justify-center overflow-hidden rounded-control border-2 bg-surface-2 bg-cover bg-center',
-          chosen ? 'border-accent' : 'border-transparent hover:border-border-strong')}
+        className={cn('flex h-16 w-24 items-center justify-center overflow-hidden rounded-control bg-surface-2 bg-cover bg-center shadow-soft transition-transform hover:scale-[1.03]',
+          chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-card')}
         style={still ? { backgroundImage: `url("${still}")` } : undefined}>
         {!still && <Film className="h-6 w-6 text-muted" />}
       </button>
@@ -34,15 +37,6 @@ function Thumb({ asset, chosen, onChoose, onDelete }: { asset: AppearanceAsset; 
         <Trash2 className="h-3 w-3" />
       </button>
     </li>
-  )
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className="w-28 shrink-0 text-[13px] text-muted">{label}</span>
-      <div className="flex min-w-0 flex-1 items-center gap-3">{children}</div>
-    </div>
   )
 }
 
@@ -70,31 +64,17 @@ export function BackgroundCard() {
   return (
     <Card>
       <CardHeader title={t('Background')} description={t('Behind the whole app, including your chats.')} />
-      <CardBody className="flex flex-col gap-5">
+      <CardBody className="flex flex-col gap-(--card-y)">
         <Segmented<Background['kind']> label={t('Background')} value={background.kind} onChange={(kind) => change({ kind })}
+          className="max-md:flex max-md:w-full"
           options={[
             { value: 'none', label: t('None') },
-            { value: 'gradient', label: t('Animated gradient') },
+            // Phones show the short name, so the three fit side by side.
+            { value: 'gradient', ariaLabel: t('Animated gradient'), label: <><span className="md:hidden">{t('Gradient')}</span><span className="max-md:hidden">{t('Animated gradient')}</span></> },
             { value: 'upload', label: t('Picture or video') },
           ]} />
 
-        {background.kind === 'gradient' && (
-          <ul className="flex flex-wrap gap-3">
-            {GRADIENTS.map((g) => {
-              const [a, b, c] = gradientColors(g.id, accent)
-              return (
-                <li key={g.id}>
-                  <button type="button" aria-pressed={background.gradient === g.id} onClick={() => change({ gradient: g.id })}
-                    className={cn('flex h-20 w-28 items-end rounded-control border-2 p-2 text-[12px] font-medium text-white',
-                      background.gradient === g.id ? 'border-accent' : 'border-transparent hover:border-border-strong')}
-                    style={{ background: `linear-gradient(135deg, ${a}, ${b}, ${c})` } as CSSProperties}>
-                    <span className="drop-shadow">{t(g.label)}</span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+        {background.kind === 'gradient' && <GradientPicker background={background} accent={accent} onChange={change} />}
 
         {background.kind === 'upload' && (
           <div className="flex flex-col gap-3">
@@ -119,37 +99,31 @@ export function BackgroundCard() {
         )}
 
         {background.kind !== 'none' && (
-          <div className="flex flex-col gap-4">
-            <Row label={t('Blur')}>
-              <Slider label={t('Blur')} min={0} max={40} step={1} value={background.blur} className="flex-1"
-                valueText={(v) => `${Math.round(v)} px`} onChange={(v) => change({ blur: Math.round(v) })} />
-              <span className="w-12 text-right text-[12.5px] tabular-nums text-muted">{background.blur} px</span>
-            </Row>
-            <Row label={t('Dim')}>
-              <Slider label={t('Dim')} min={0} max={90} step={5} value={background.dim} className="flex-1"
-                valueText={(v) => `${Math.round(v)} %`} onChange={(v) => change({ dim: Math.round(v) })} />
-              <span className="w-12 text-right text-[12.5px] tabular-nums text-muted">{background.dim} %</span>
-            </Row>
+          <section aria-labelledby="background-effects" className="-mx-(--card-x) flex flex-col gap-3 border-t border-border px-(--card-x) pt-(--card-y)">
+            <h4 id="background-effects" className="text-[13px] font-semibold">{t('Effects')}</h4>
+            <SliderField label={t('Blur')} min={0} max={40} step={1} value={background.blur}
+              format={(v) => `${v} px`} onChange={(v) => change({ blur: Math.round(v) })} />
+            <SliderField label={t('Dim')} min={0} max={90} step={5} value={background.dim}
+              format={(v) => `${v} %`} onChange={(v) => change({ dim: Math.round(v) })} />
             {background.kind === 'upload' && (
-              <Row label={t('Fit')}>
-                <Segmented<Background['fit']> size="sm" label={t('Fit')} value={background.fit} onChange={(fit) => change({ fit })}
-                  options={[
-                    { value: 'cover', label: t('Fill') },
-                    { value: 'contain', label: t('Fit') },
-                    { value: 'tile', label: t('Tile') },
-                  ]} />
-              </Row>
+              <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 md:grid-cols-[7rem_minmax(0,1fr)]">
+                <span className="text-[13px] text-muted">{t('Fit')}</span>
+                <div>
+                  <Segmented<Background['fit']> size="sm" label={t('Fit')} value={background.fit} onChange={(fit) => change({ fit })}
+                    options={[
+                      { value: 'cover', label: t('Fill') },
+                      { value: 'contain', label: t('Fit') },
+                      { value: 'tile', label: t('Tile') },
+                    ]} />
+                </div>
+              </div>
             )}
             {animated && (
-              <label className="flex items-center justify-between gap-4">
-                <span>
-                  <span className="block text-[13.5px] font-medium">{t('Animate on phones too')}</span>
-                  <span className="block text-[12.5px] text-muted">{t('Phones show a still picture to save battery. With reduced motion turned on in your system, it is always still.')}</span>
-                </span>
-                <Switch label={t('Animate on phones too')} checked={background.animate_on_phones} onChange={(v) => change({ animate_on_phones: v })} />
-              </label>
+              <SettingRow className="p-0 pt-1" title={t('Animate on phones too')}
+                description={t('Phones show a still picture to save battery. With reduced motion turned on in your system, it is always still.')}
+                checked={background.animate_on_phones} onCheckedChange={(v) => change({ animate_on_phones: v })} />
             )}
-          </div>
+          </section>
         )}
       </CardBody>
     </Card>

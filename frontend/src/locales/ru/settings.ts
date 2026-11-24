@@ -30,7 +30,6 @@ const messages: Messages = {
   "Accent {color}": "Акцент {color}",
   "Custom": "Свой",
   "Density": "Плотность",
-  "Compact fits more on screen.": "В компактном режиме на экране помещается больше.",
   "Comfortable": "Удобная",
   "Compact": "Компактная",
   "General": "Общие",
@@ -84,5 +83,6 @@ const messages: Messages = {
   "Notifications": "Уведомления",
   "Shared links": "Общие ссылки",
   "Usage": "Использование",
+  "Compact fits more on screen: tighter lists, chats, cards and the sidebar. Touch screens keep finger-sized rows.": "В компактном режиме на экране помещается больше: плотнее списки, чаты, карточки и боковая панель. На сенсорных экранах строки остаются удобными для пальца.",
 }
 export default messages

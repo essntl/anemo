@@ -67,11 +67,43 @@ describe('Settings > Appearance', () => {
     renderPage()
     expect(screen.queryByRole('slider', { name: 'Blur' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('radio', { name: 'Animated gradient' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Dusk' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Dusk' }))
     expect(useThemeStore.getState().background).toMatchObject({ kind: 'gradient', gradient: 'dusk' })
+    expect(screen.getByRole('radio', { name: 'Dusk' })).toHaveAttribute('aria-checked', 'true')
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Blur' }), { key: 'End' })
     expect(useThemeStore.getState().background.blur).toBe(40)
     expect(screen.getByRole('switch', { name: 'Animate on phones too' })).toBeInTheDocument()
+  })
+
+  it('saves a custom gradient with the appearance', () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('radio', { name: 'Animated gradient' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Custom' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Color 1 (hex)' }), { target: { value: '#ff0000' } })
+    const { background, editVersion } = useThemeStore.getState()
+    expect(background.gradient).toBe('custom')
+    expect(background.custom_gradient.colors[0]).toBe('#ff0000')
+    expect(editVersion).toBeGreaterThan(0) // an edit: saved to the server (useAppearanceSync)
+  })
+
+  it('shows the glass strength only while glass is on, and applies it', () => {
+    renderPage()
+    expect(screen.queryByRole('slider', { name: 'Strength' })).toBeNull()
+    fireEvent.click(screen.getByRole('switch', { name: 'Frosted glass' }))
+    // The tint's own Strength stays folded away (tint is off): only the glass one is there.
+    const slider = screen.getByRole('slider', { name: 'Strength' })
+    fireEvent.keyDown(slider, { key: 'End' })
+    expect(useThemeStore.getState().glass_strength).toBe(100)
+    expect(document.documentElement.style.getPropertyValue('--glass-opacity')).toBe('70%')
+    expect(screen.getByTestId('glass-preview')).toBeInTheDocument()
+  })
+
+  it('switches the density for the whole app', () => {
+    renderPage()
+    expect(document.documentElement.dataset.density).toBe('comfortable')
+    fireEvent.click(screen.getByRole('radio', { name: 'Compact' }))
+    expect(useThemeStore.getState().density).toBe('compact')
+    expect(document.documentElement.dataset.density).toBe('compact')
   })
 
   it('keeps this device to itself when asked', () => {
