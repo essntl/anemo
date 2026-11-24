@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The macOS menu bar app (docs/specs/09-desktop-macos.md): the platform implementations
+       (ScreenCaptureKit, Accessibility, CGEvent, NSWorkspace, Keychain, SMAppService, Carbon
+       hot keys, posix_spawn) by P/Invoke, and the UI in Avalonia. Plain net8.0, so it builds
+       on Windows and Linux too; it runs on macOS 14 or later, Apple Silicon first.
+       Publish: dotnet publish -c Release -r osx-arm64, then mac/build-app.sh (README.md). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Anemo Desktop</AssemblyName>
+    <RootNamespace>Anemo.Desktop.Mac</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RuntimeIdentifiers>osx-arm64;osx-x64</RuntimeIdentifiers>
+    <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Windows client's icons (drawn by e2e/scripts/make-native-icons.cjs): the menu bar
+         item and the windows use the same Anemo mark. -->
+    <AvaloniaResource Include="..\Anemo.Desktop\Assets\Anemo.ico" Link="Assets\Anemo.ico" />
+    <AvaloniaResource Include="..\Anemo.Desktop\Assets\Tray\*.ico" Link="Assets\Tray\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Anemo.Desktop.Mac.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Anemo.Desktop.Core\Anemo.Desktop.Core.csproj" />
+  </ItemGroup>
+
+</Project>
