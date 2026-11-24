@@ -20,7 +20,7 @@ nothing merged into `main` by the agents; every sub-agent runs on Claude Opus 5.
 
 | Id | Workstream | Branch | Status |
 | --- | --- | --- | --- |
-| A | Roadmap refresh (orchestrator) | `feat/roadmap-refresh` | #76, open (docs only) |
+| A | Roadmap refresh (orchestrator) | `feat/roadmap-refresh` | #76, merged |
 | B | Android voice: wake-word cue, voice mode | `feat/voice-mode-android` | #78, merged |
 | C | Scripts under Automations | `feat/automation-scripts` | #82, merged |
 | D | Anemo Desktop for macOS | `feat/desktop-macos` | #81, merged |
@@ -103,9 +103,11 @@ Audit findings that shaped the contracts:
 
 ## Close (2026-11-24)
 
-- #78, #81 and #82 merged into `main` (by Artem), each with all CI jobs green, including
-  the end-to-end job and the new macOS job. #76 (this log, the roadmap, the contracts)
-  is open and merges cleanly onto `main` at `230ae27`.
+- All four pull requests are merged into `main`, each with every CI job green: #78 and
+  #81 by Artem; #82 (after merging `main` into it and the Deno fix) and #76 by the
+  orchestrator, at Artem's request ("make sure all changes are merged to main"). #76's
+  end-to-end job failed once on a timeout in `files.spec.ts` (unrelated, docs-only
+  change) and passed when re-run.
 - Not run anywhere: Anemo Voice 1.1.0 on a phone, Anemo Desktop on a real logged-in Mac
   (CI's macOS runner ran Core's tests, smoke tests and one real screenshot only),
   Developer ID signing and notarization, an agent-written script approved and run on the
