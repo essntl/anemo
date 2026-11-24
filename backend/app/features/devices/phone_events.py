@@ -17,7 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.runs.models import Approval, Run, ToolCall
 
 # The global events a phone may get.
-EVENTS = frozenset({"run.status", "approval.requested", "approval.decided", "voice.say"})
+EVENTS = frozenset(
+    {"run.status", "approval.requested", "approval.decided", "voice.say", "voice.stop"}
+)
 
 MAX_STEPS = 30
 MAX_STEP_CHARS = 200
@@ -125,6 +127,8 @@ class PhoneFilter:
                     "more": bool(data.get("more")),
                 }
             ]
+        if event == "voice.stop":  # the agent ended voice mode (tools/builtin/voice.py)
+            return [{"run_id": str(run_id), "conversation_id": data.get("conversation_id")}]
         # approval.requested: one per pending approval not yet sent on this connection.
         pending: list[dict[str, Any]] = await self._with_db(
             lambda db: pending_approvals(db, run_id)

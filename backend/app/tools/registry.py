@@ -26,6 +26,7 @@ from app.tools.builtin.schedules import SCHEDULE_TOOLS, SCHEDULE_WRITE_TOOLS
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.subagent import RunSubagent
 from app.tools.builtin.tasks import TASK_TOOLS
+from app.tools.builtin.voice import VoiceStop
 from app.tools.builtin.web import HttpRequest, ReadWebPage, VideoTranscript, WebSearch
 from app.tools.builtin.workspace import (
     CreateFolder,
@@ -73,6 +74,7 @@ BUILTIN_TOOLS: list[Tool] = [
     LoadSkill(),
     RunSubagent(),
     ReadToolOutput(),
+    VoiceStop(),
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 # Tools that only work in a run that answers in a chat.
@@ -136,6 +138,7 @@ def toolset_for(
     can_spawn: bool = False,
     can_ask: bool = False,
     has_chat: bool = False,
+    has_phone: bool = False,
     ancestors: Iterable[Policy] = (),
     off: Iterable[str] = (),
 ) -> list[Tool]:
@@ -148,7 +151,8 @@ def toolset_for(
     attach files to the answer. `off`: the parts of the app the user turned off
     (Settings > Pages); their tools are not offered. `has_computer`: a computer that
     runs Anemo Desktop is online (for an unattended run: and the automation lists one of
-    the computer tools)."""
+    the computer tools). `has_phone`: a phone started the run by voice (it gets
+    `voice_stop`; docs/specs/07-voice-mode-android.md)."""
     offered = []
     turned_off = tools_of(off)
     for tool in BUILTIN_TOOLS:
@@ -169,6 +173,7 @@ def toolset_for(
             or (tool.name == "run_subagent" and not can_spawn)
             or (tool.name == "ask_user" and not can_ask)
             or (tool.name in CHAT_FILE_TOOLS and not has_chat)
+            or (tool.name == "voice_stop" and not has_phone)
             or (mode != "agent" and not is_memory)
         ):
             continue

@@ -17,6 +17,8 @@ The protocol is docs/device-contracts.md §2 (and §6 for versions). In short:
   client → {"type": "device.stopped"}
   client → {"type": "code.job" | "code.events", …}  ← {"type": "code.ack", "job_id", "seq"}
            trusted computers only (§7): handled by features/code_sessions/ingest.py
+  client → {"type": "voice.mode", "on", "cause"}   phones: voice mode switched on or off;
+           written to the audit log (features/voice/mode.py), nothing is answered
 
 Closes: 4400 bad first message (or none, or the wrong kind), 4401 bad or revoked token
 (checked again every minute; deleting the device closes it at once), 4403 an Origin
@@ -44,6 +46,7 @@ from app.features.code_sessions import ingest as code_ingest
 from app.features.devices import relay, service
 from app.features.devices.models import Device
 from app.features.devices.phone_events import PhoneFilter
+from app.features.voice import mode as voice_mode
 
 log = logging.getLogger(__name__)
 
@@ -254,6 +257,8 @@ class Connection:
             answer = await code_ingest.handle(self.device_id, message)
             if answer is not None:
                 await self.ws.send_json(answer)
+        elif kind == "voice.mode":
+            await self._voice_mode(message)
         elif kind == "device.stopped":
             await relay.stopped(self.device_id, self.conn)
         elif kind == "device.result":
@@ -269,6 +274,17 @@ class Connection:
             await relay.answer(
                 command_id, {"ok": ok, "state": state, "error": message.get("error"), "code": code}
             )
+
+    async def _voice_mode(self, message: dict[str, Any]) -> None:
+        """A phone switched voice mode on or off: into the audit log. Ignored from a
+        computer, or when it doesn't validate; never answered."""
+        if self.kind != "phone":
+            return
+        parsed = voice_mode.parse(message)
+        if parsed is None:
+            return
+        async with get_sessionmaker()() as db:
+            await voice_mode.record(db, self.device_id, parsed)
 
     async def commands(self, pubsub: PubSub | None) -> None:
         """Commands from the worker, passed on to the device; and being replaced, revoked
