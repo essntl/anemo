@@ -16,7 +16,7 @@ public sealed class ProcessorFixture : IDisposable
 
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "anemo-desktop-tests", Guid.NewGuid().ToString("N"));
 
-    public ProcessorFixture()
+    public ProcessorFixture(DesktopPlatform? platform = null)
     {
         Control = new ControlState(Time, allow: true, pausedUntil: null);
         Log = new CommandLog(_folder, Time);
@@ -25,7 +25,7 @@ public sealed class ProcessorFixture : IDisposable
             Control,
             () => Settings,
             Log,
-            new CommandOptions { SettleDelay = TimeSpan.Zero, OpenDelay = TimeSpan.Zero, DefaultWorkFolder = @"C:\Users\me\AnemoWork" });
+            new CommandOptions { SettleDelay = TimeSpan.Zero, OpenDelay = TimeSpan.Zero, DefaultWorkFolder = @"C:\Users\me\AnemoWork", Platform = platform ?? DesktopPlatform.Windows });
         Save = new FakeElement { Desktop = Platform.Desktop };
         Name = new FakeElement { CanInvoke = false, Desktop = Platform.Desktop, Point = new ScreenPoint(640, 220) };
         Pass = new FakeElement { Password = true, Desktop = Platform.Desktop };

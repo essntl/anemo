@@ -3,15 +3,17 @@
     GET /api/devices/ws   (WebSocket)
 
 The protocol is docs/device-contracts.md §2 (and §6 for versions). In short:
-  client → {"type": "hello", "token", "kind", "version", "last_id"}   first, within 10 s;
+  client → {"type": "hello", "token", "kind", "version", "last_id", "platform"?}   first,
+           within 10 s (platform: "windows" | "macos"; missing means windows);
            the token travels in the message, never the URL.
   server → {"type": "welcome", "device": {id, name, kind, trust}, "missed", "cursor"}
   server → {"type": "notice", "text"}   once, when the client is older than supported
   client → {"type": "ping"}  ← {"type": "pong"}
   server → {"type": "event", "id", "event", "data"}   phones only: events of runs this
            phone started (features/devices/phone_events.py)
-  client → {"type": "device.offer", "control", "shell", "code", "code_start"}   computers,
-           every 30 s
+  client → {"type": "device.offer", "control", "shell", "code", "code_start", "shell_kind"?}
+           computers, every 30 s (shell_kind: "powershell" | "pwsh" | "zsh" | "bash";
+           missing means powershell)
   server → {"type": "device.command", "id", "action", …}   from features/devices/relay.py
   client → {"type": "device.result", "id", "ok", "state" | "error", "code"}
   client → {"type": "device.stopped"}
@@ -148,8 +150,16 @@ _RESULT_ID = re.compile(r'"id"\s*:\s*"([^"\\]{1,100})"')
 
 
 class Connection:
-    def __init__(self, ws: WebSocket, device: Device, raw: str, ip: str | None) -> None:
+    def __init__(
+        self,
+        ws: WebSocket,
+        device: Device,
+        raw: str,
+        ip: str | None,
+        platform: relay.Platform = relay.DEFAULT_PLATFORM,
+    ) -> None:
         self.ws = ws
+        self.platform = platform  # from hello; written with every offer
         self.device_id = device.id
         self.kind = device.kind
         self.trust = device.trust
@@ -245,6 +255,8 @@ class Connection:
                 code=bool(message.get("code")),  # older clients don't send these
                 code_start=bool(message.get("code_start")),
                 code_images=bool(message.get("code_images")),
+                platform=self.platform,
+                shell_kind=relay.shell_kind_of(message.get("shell_kind")),
             )
             if not await relay.renew(self.device_id, self.conn, offer):
                 raise _Closed(CLOSE_REPLACED, "replaced by a newer connection")
@@ -377,7 +389,7 @@ async def device_socket(ws: WebSocket) -> None:
     async with get_sessionmaker()() as db:
         await service.seen(db, device.id, str(version) if version is not None else "")
 
-    connection = Connection(ws, device, raw, ip)
+    connection = Connection(ws, device, raw, ip, relay.platform_of(hello.get("platform")))
     last_id = hello.get("last_id")
     if not isinstance(last_id, str) or not _STREAM_ID.match(last_id):
         last_id = None  # a malformed cursor counts as none
