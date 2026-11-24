@@ -87,14 +87,14 @@ internal sealed class MacDesktop : IDesktop
         }
     }
 
-    public ScreenRect VirtualScreen() => DisplayLayout.Union(ScreenCapture.Displays());
+    public ScreenRect VirtualScreen() => DisplayLayout.Union(ScreenCapturer.Displays());
 
-    public Core.Platform.ScreenCapture CaptureScreen() => ScreenCapture.CaptureScreen();
+    public Core.Platform.ScreenCapture CaptureScreen() => ScreenCapturer.CaptureScreen();
 
     public Core.Platform.ScreenCapture CaptureWindow(long handle)
     {
         var window = WindowList.Read(onScreenOnly: false).FirstOrDefault(w => w.Id == handle) ?? throw new ElementGoneException();
-        return ScreenCapture.CaptureWindow((uint)window.Id, window.Bounds);
+        return ScreenCapturer.CaptureWindow((uint)window.Id, window.Bounds);
     }
 
     public UiTree ReadTree(long windowHandle, CancellationToken ct)

@@ -11,7 +11,7 @@ namespace Anemo.Desktop.Mac.Platform;
 /// screenshot, from its full-resolution image, and drawn into one bitmap where the displays
 /// are arranged as in System Settings → Displays.
 /// </summary>
-internal static class ScreenCapture
+internal static class ScreenCapturer
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
@@ -116,6 +116,7 @@ internal static class ScreenCapture
     {
         if (!CG.PreflightScreenCapture())
         {
+            Permissions.ReportMissing();
             throw CommandException.Unavailable(NoPermissionMessage);
         }
     }

@@ -135,6 +135,7 @@ internal sealed class MacInput : IInput
     {
         if (!AX.IsTrusted())
         {
+            Permissions.ReportMissing();
             throw CommandException.Unavailable(NoAccessibilityMessage);
         }
     }

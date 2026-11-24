@@ -59,7 +59,7 @@ public sealed record DesktopPlatform
         ShellName = "The shell",
         NoShellMessage = "Neither zsh nor bash was found on this Mac.",
         SecureScreenMessage =
-            "The Mac is locked or showing its login window, where no program can look or act. Ask the user to unlock it first.",
+            "The Mac is locked, or System Settings or a permission or password prompt is in front: Anemo Desktop doesn't look at or act on those. Ask the user to deal with it first.",
         // Joined with "/" whatever system the tests run on: these are macOS paths.
         DefaultJobsFolder = home.TrimEnd('/') + "/anemo-bridge/jobs",
         DefaultProjectsFolder = home.TrimEnd('/') + "/dev",

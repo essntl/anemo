@@ -19,6 +19,11 @@ internal static class Permissions
 
     public static bool AllGranted => ScreenRecording && Accessibility;
 
+    /// <summary>A command needed a permission that is missing (the menu bar app shows the Permissions window).</summary>
+    public static event Action? Missing;
+
+    public static void ReportMissing() => Missing?.Invoke();
+
     /// <summary>macOS's prompt for Screen Recording (shown once per app; afterwards only System Settings).</summary>
     public static void AskScreenRecording() => CG.RequestScreenCapture();
 
