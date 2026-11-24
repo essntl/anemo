@@ -301,18 +301,31 @@ def _stub_type(event: dict[str, Any]) -> str:
     return value[:40] if isinstance(value, str) and value else "other"
 
 
+def dropped_stub(event: dict[str, Any]) -> dict[str, Any]:
+    """What is stored of an event once its job holds MAX_JOB_BYTES: its type, and what
+    places it (the sub-agent it belongs to, the ids of its tool calls and results), so
+    the page still files it under the right agent."""
+    stub = trim.stub_of(event)
+    stub["type"] = _stub_type(event)
+    return stub
+
+
 def _prepare(item: EventItem, stored_bytes: int) -> _Prepared:
     """The event as it is stored: cleaned, trimmed (§6), a stub when the job holds
-    MAX_JOB_BYTES already (except results and TodoWrite calls); the pull-outs come from
-    the event as it was received."""
+    MAX_JOB_BYTES already (except results, TodoWrite calls and what starts or ends a
+    sub-agent); the pull-outs come from the event as it was received."""
     received = trim.clean(item.event)
     pulled = parse.pull_outs(received)
     stored, trimmed = trim.trim(received)
     size = trim.size(stored)
     dropped = False
-    keep = parse.kind(received) == "result" or parse.has_todo_write(received)
+    keep = (
+        parse.kind(received) == "result"
+        or parse.has_todo_write(received)
+        or parse.holds_sub_agent_state(received)
+    )
     if stored_bytes + size > MAX_JOB_BYTES and not keep:
-        stored, dropped = {"type": _stub_type(received)}, True
+        stored, dropped = dropped_stub(received), True
         size = trim.size(stored)
     return _Prepared(
         seq=item.seq,

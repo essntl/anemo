@@ -83,7 +83,9 @@ class CodeEventOut(BaseModel):
     kind: EventKind
     event: dict[str, Any]
     trimmed: bool
-    dropped: bool  # not stored (the job held 5 MB): `event` is only {"type"}
+    # not stored (the job held 5 MB): `event` is only its type and the ids that place it
+    # (parent_tool_use_id, tool_use_id, status, its tool calls and results: trim.stub_of)
+    dropped: bool
     created_at: datetime
 
 
