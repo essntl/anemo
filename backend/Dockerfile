@@ -29,6 +29,9 @@ ARG PGID=1000
 RUN groupadd -g ${PGID} app && useradd -u ${PUID} -g app -m -s /usr/sbin/nologin app \
     && mkdir -p /data /workspace /run/sandbox-ssh && chown app:app /data /workspace /run/sandbox-ssh     && chmod 700 /run/sandbox-ssh
 COPY --from=deps /opt/venv /opt/venv
+# Deno runs automation scripts (a sandboxed child process of the worker; see
+# docs/specs/08-automation-scripts.md §9).
+COPY --from=denoland/deno:bin-2.9.8 /deno /usr/local/bin/deno
 WORKDIR /app
 COPY backend/ ./
 COPY --from=frontend /frontend/dist /app/static
