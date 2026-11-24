@@ -254,7 +254,8 @@ internal static class WindowList
             for (nint i = 0; i < count; i++)
             {
                 var info = CF.ArrayAt(array, i);
-                var bounds = CG.RectFromDictionary(CF.Get(info, "kCGWindowBounds"), out var rect) ? rect.ToScreenRect() : default;
+                var boundsDict = CF.Get(info, "kCGWindowBounds");
+                var bounds = boundsDict != 0 && CG.RectFromDictionary(boundsDict, out var rect) ? rect.ToScreenRect() : default;
                 list.Add(new Entry(
                     CF.ToLong(CF.Get(info, "kCGWindowNumber")) ?? 0,
                     CF.ToInt(CF.Get(info, "kCGWindowOwnerPID")) ?? 0,

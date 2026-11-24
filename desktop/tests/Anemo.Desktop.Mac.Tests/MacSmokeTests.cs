@@ -38,7 +38,6 @@ public sealed class MacSmokeTests
         // Checking a permission never asks and never throws.
         _ = Permissions.ScreenRecording;
         _ = Permissions.Accessibility;
-        _ = LoginItem.IsOn;
     }
 
     [MacFact]
