@@ -3,11 +3,11 @@
 Where Anemo stands, what is being built now, and what comes next. Each item links to
 its spec or to the section of [features.md](features.md) that says how it works.
 
-Last audited against the code and the git history on **2026-11-24** (`main` at
-`0c5b488`, pull request #75).
+Last audited against the code and the git history on **2026-11-24**, and updated at
+the end of round 3 (pull requests up to #82).
 
 - [Done](#done): built and merged into `main`.
-- [In progress](#in-progress): this round's four pull requests.
+- [In progress](#in-progress): open pull requests.
 - [Next](#next): agreed or proposed, with what already exists of each.
 - [Ideas](#ideas): worth keeping, not planned.
 
@@ -74,18 +74,32 @@ follow-ups, cancelling, queued messages, and the agent tools `code_projects`,
 
 ---
 
+### Round 3 (2026-11-24)
+
+Built in parallel from [specs/CONTRACTS-round3.md](specs/CONTRACTS-round3.md); how it
+went is in [specs/ORCHESTRATION-LOG-round3.md](specs/ORCHESTRATION-LOG-round3.md).
+
+| What | Spec | Pull request |
+| --- | --- | --- |
+| **Anemo Voice: a cue you can trust, and voice mode.** The start sound and a buzz play on the frame the wake word is detected, on the system-sounds stream (not media volume), with other audio ducked; the recording keeps the audio from the wake word on. Distinct start / end / timeout / reopen / on / off sounds. **Voice mode**: after each answer the mic reopens without a wake word, until you turn it off (tile, notification, "stop" on its own, 45 s of silence, or the agent's `voice_stop`). Only you turn it on (tile, notification, or "start voice mode", matched by code on the phone, never by the model). On/off goes to the audit log. Not yet tried on a phone. | [07](specs/07-voice-mode-android.md) | #78 |
+| **Scripts under Automations.** A script is a kind of automation: TypeScript in a Deno sandbox (no network but declared hosts, its own folder only, time / memory / output limits, secrets by name) that acts only through Anemo's tools and approvals, hands judgement to the model with `anemo.think`, and runs only code you approved: anything an agent writes or changes waits, with a diff, in the Scripts tab. | [08](specs/08-automation-scripts.md) | #82 |
+| **Anemo Desktop for macOS** (Apple Silicon): Code jobs, look and act (ScreenCaptureKit, Accessibility, CGEvent), shell, shared screen, permission screens, Keychain, open at login, menu bar. Devices now tell the server their system and shell (`platform`, `shell_kind`), and `bridge/cc.mjs` starts Claude Code jobs on Windows and macOS. Built and smoke-tested on CI's macOS runner; the full checklist needs a real Mac. Signing and notarization wait for an Apple Developer account. | [09](specs/09-desktop-macos.md), [Mac tests](specs/09-desktop-macos-mac-testing.md) | #81 |
+| This roadmap, audited against the code. | – | #76 |
+
+Merged alongside, from other sessions: the Code page's sub-agent sidebar and images in
+prompts (#77), appearance and profile customisation (#79).
+
+---
+
 ## In progress
 
-This round (2026-11-24). One branch and pull request each, all from `main`; shared
-names are in [specs/CONTRACTS-round3.md](specs/CONTRACTS-round3.md), the round's log in
-[specs/ORCHESTRATION-LOG-round3.md](specs/ORCHESTRATION-LOG-round3.md).
+| Branch | What |
+| --- | --- |
+| `feat/image-generation` | A `generate_image` tool any chat model can call (#80, another session). |
 
-| Branch | What | Spec |
-| --- | --- | --- |
-| `feat/roadmap-refresh` | This file, audited against the code; the round's contracts and log. | – |
-| `feat/voice-mode-android` | Anemo Voice: a cue the moment the wake word is heard (sound and vibration on a stream that doesn't follow media volume, media ducked, the audio from the wake word on kept), distinct start / end / timeout sounds; a **voice mode** for continuous conversation, turned on only by you (tile, notification, the phrase "start voice mode" matched on the phone) and off by tile, "stop", an idle timeout or the new agent tool `voice_stop`. | `specs/07-voice-mode-android.md` |
-| `feat/automation-scripts` | **Scripts** as a kind of automation: code that runs without a model, acts only through Anemo's tools (approvals apply), can hand off to the model with `anemo.think`, and starts disabled until you have read the code or the diff. A Scripts tab in Automations. | `specs/08-automation-scripts.md` |
-| `feat/desktop-macos` | Anemo Desktop for macOS (Apple Silicon first): Code jobs, look and act, shell, shared screen; the device's shell type known to the server instead of assuming PowerShell. Can't be run on this Windows VM: a manual test list for a real Mac. | `specs/09-desktop-macos.md`, `specs/09-desktop-macos-mac-testing.md` |
+To check by hand: Anemo Voice 1.1.0 on the phone (`android/MANUAL-TESTS.md`), Anemo
+Desktop for macOS on a borrowed Mac (`docs/specs/09-desktop-macos-mac-testing.md`), the
+Windows client's manual tests (`desktop/MANUAL-TESTS.md`).
 
 ---
 
@@ -113,8 +127,8 @@ done, by whom, and undo it". What exists:
 What it would take: one `activity` table written where `record_change` and the
 provenance helpers already run, a page that lists it with filters (by actor, by
 object), and undo per entry where an inverse exists (file revert, trash restore, a
-task/event field change from a stored before-value). This round's scripts
-(`feat/automation-scripts`) record their actions with provenance through the same
+task/event field change from a stored before-value). Scripts (#82)
+record their actions with provenance through the same
 paths, so they show up there once it exists.
 
 ### Inbox for loose items
@@ -153,7 +167,7 @@ documents, tasks or projects.
 ### Devices, from the specs' "Later"
 
 - Files between Anemo's workspace and a device (`device_file_get` / `device_file_put`).
-- A Linux client on the same protocol (macOS is in progress).
+- A Linux client on the same protocol (Windows and macOS exist).
 - Watching a window over time (with your say-so) for longer tasks on the VM.
 - Run the Windows client's manual tests on real hardware; `Windows.Graphics.Capture` has
   never run (GDI is the fallback in use).
@@ -167,7 +181,7 @@ documents, tasks or projects.
 ### Automations
 
 - Webhooks (`POST /api/hooks/{id}` with an HMAC signature, behind a Cloudflare Tunnel
-  rule), spec 02 §2.8. Scripts (in progress) are designed not to rule it out.
+  rule), spec 02 §2.8. Scripts (#82) are designed not to rule it out.
 
 ---
 
