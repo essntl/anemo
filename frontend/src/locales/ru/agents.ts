@@ -223,5 +223,7 @@ const messages: Messages = {
   "Tools from connected MCP servers.": "Инструменты с подключённых серверов MCP.",
   "Start sub-agents": "Запуск субагентов",
   "Delegate work to other agents.": "Передача работы другим агентам.",
+  "Voice mode": "Голосовой режим",
+  "End voice mode on your phone when a spoken conversation is over.": "Завершение голосового режима на вашем телефоне, когда разговор окончен.",
 }
 export default messages

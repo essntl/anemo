@@ -28,7 +28,8 @@ JSON text messages. Closes: 4400 bad first message, 4401 bad or revoked token, 4
 
 ```
 client → {"type": "hello", "token": "anemo_…", "kind": "phone" | "computer",
-          "version": "1.0.0", "last_id": "<id>" | null}          first, within 10 s
+          "version": "1.0.0", "last_id": "<id>" | null,
+          "platform": "windows" | "macos"}                         first, within 10 s
 server → {"type": "welcome", "device": {"id", "name", "kind", "trust"},
           "missed": bool, "cursor": "<id>"}
 client → {"type": "ping"}            ← {"type": "pong"}           every ~20 s
@@ -38,6 +39,10 @@ server → {"type": "event", "id": "<id>", "event": "<type>", "data": {…}}
 When a device's trust level is changed in Settings, the server closes its connection with
 the standard code 1012; the client reconnects as after any drop and reads the new trust
 from `welcome`.
+
+`platform` (computers, Anemo Desktop 1.4.0) is the client's operating system; missing, or
+any other value, means `"windows"` (older clients). The server keeps it with the connection
+and stores it with every offer (§ *Commands to a computer*).
 
 `kind` must match the device's kind (else 4400). `missed` and `cursor` mean what they mean
 on the extension's stream: after a drop, resume from `cursor`; when `missed`, fetch what
@@ -51,6 +56,7 @@ you need by REST.
 | `approval.requested` | `{approval_id, run_id, kind: "action" \| "question" \| "plan", summary, risk, question?, options?, steps?}` | a run this device started waits for the user |
 | `approval.decided` | `{approval_id, decision}` | decided anywhere (stop asking on the phone) |
 | `voice.say` | `{run_id, conversation_id, text, more: bool}` | a run this device started finished; `text` is plain text to speak, `more` when the answer was shortened |
+| `voice.stop` | `{run_id, conversation_id}` | the agent called `voice_stop` in a run this device started: the phone leaves voice mode after speaking that run's answer (Anemo Voice 1.1.0) |
 
 For `kind: "plan"` (the agent's plan waits for a review, when "review the plan first" is
 on), `steps` is the plan's steps in order, as plain text: at most 30 strings of at most
@@ -58,24 +64,50 @@ on), `steps` is the plan's steps in order, as plain text: at most 30 strings of 
 event.
 
 Only events of runs started by *this* device go to a phone. `voice.say` is sent for
-failed and cancelled runs too, with a one-sentence text saying so.
+failed and cancelled runs too, with a one-sentence text saying so. There is **no** event
+that turns voice mode on or opens the microphone: only the user does, on the phone
+(docs/specs/07-voice-mode-android.md).
+
+### Messages from a phone
+
+| message | when |
+|---|---|
+| `{"type": "voice.mode", "on": bool, "cause": "tile" \| "notification" \| "phrase" \| "stop_phrase" \| "timeout" \| "voice_stop" \| "service_stopped"}` | voice mode went on or off (Anemo Voice 1.1.0) |
+
+The server writes each `voice.mode` to the audit log (`action: "voice.mode"`, target the
+device, `details: {on, cause}`, actor `agent` for `voice_stop`, else `user`) and answers
+nothing. It ignores a message that doesn't validate: an unknown cause, `on: true` with a
+cause other than `tile`, `notification` or `phrase`, `on: false` with `phrase`, or one
+from a computer. A phone queues messages made while it isn't connected (at most 20) and
+sends them after the next `welcome`.
 
 ### Commands to a computer
 
 ```
 client → {"type": "device.offer", "control": bool, "shell": bool, "code": bool,
-          "code_start": bool, "code_images": bool}
+          "code_start": bool, "code_images": bool,
+          "shell_kind": "powershell" | "pwsh" | "zsh" | "bash"}
           on connect and every 30 s; control: "Allow control" is on;
-          shell: PowerShell is switched on in the client; code: "Share Claude Code
-          jobs with Anemo" is on (§7); code_start: "Let Anemo start Claude Code jobs" is
-          on (§7, phase 2); code_images: a code_start may carry images (§7.4, 1.3.0).
-          A missing code, code_start or code_images means false.
+          shell: the shell is switched on in the client (PowerShell on Windows, zsh on
+          macOS); code: "Share Claude Code jobs with Anemo" is on (§7); code_start: "Let
+          Anemo start Claude Code jobs" is on (§7, phase 2); code_images: a code_start may
+          carry images (§7.4, 1.3.0). A missing code, code_start or code_images means
+          false. shell_kind (1.4.0): the shell `shell` runs in; missing, or any other
+          value, means "powershell".
 server → {"type": "device.command", "id": "<uuid>", "action": "<action>", …fields}
 client → {"type": "device.result", "id": "<uuid>", "ok": true, "state": {…}}
 client → {"type": "device.result", "id": "<uuid>", "ok": false, "error": "<one sentence>",
           "code": "stopped" | "refused" | "unavailable" | "failed"}
 client → {"type": "device.stopped"}   the user pressed the stop hotkey or chose Pause
 ```
+
+The relay stores the offer in the device's `devices:online:<id>` hash, with `platform`
+(from `hello`) and `shell_kind`; `relay.Offer` and `relay.DeviceInfo` carry both (defaults
+`"windows"` / `"powershell"`, also for a hash an older server wrote). The turn context's
+line of a Mac names its system and shell (`- Mac: computer (macOS, shell: zsh), trusted,
+control allowed, zsh on`); a Windows computer's line is as before. The tool descriptions
+are the same for every device; `computer_shell` is rated by PowerShell rules for
+`powershell`/`pwsh` and by `policy/shell_risk.py` plus macOS rules for `zsh`/`bash`.
 
 One command at a time per device; the server doesn't send the next before the answer.
 A result for an id the connection wasn't sent is ignored. Without an offer renewed in the
@@ -89,7 +121,7 @@ last 90 s the device is offline for the agent.
 ```
 { "window": {"ref": "w3", "title": "…", "app": "EXCEL.EXE"},
   "screenshot": "<base64 PNG>",        // ≤ 1568 px on the long side; omitted for what="windows"
-  "scale": 1.5,                         // screen pixels per screenshot pixel
+  "scale": 1.5,                         // screen units per screenshot pixel (below)
   "controls": [ {"ref": "c12", "role": "button", "name": "Save", "value": null,
                  "enabled": true, "password": false} ],   // ≤ 300
   "text": "…",                          // window text, ≤ 40 000 characters
@@ -102,31 +134,65 @@ last 90 s the device is offline for the agent.
 | `look` | `what: "screen" \| "window" \| "windows"`, `window_ref?` | the state; `windows` gives `{"windows": [{ref, title, app, minimized}]}` |
 | `click` / `double_click` / `right_click` | `ref` or `x, y` (screenshot pixels) | UI Automation `Invoke` when the control has it, else the mouse |
 | `type` | `text` (≤ 5000), `ref?` | into the control, or where the focus is; `refused` for a password control |
-| `press` | `keys: string[]` (1–10) | key names as in `companion-contracts.md` §7a, plus `Win` as a modifier; never Ctrl+Alt+Del |
+| `press` | `keys: string[]` (1–10) | key names as in `companion-contracts.md` §7a, plus `Win` as a modifier, and on macOS `Cmd` (`Win` and `Meta` are Cmd there, `Alt` is Option); never Ctrl+Alt+Del; on macOS never Cmd+Ctrl+Q or Cmd+Option+Esc |
 | `scroll` | `direction: "up" \| "down" \| "left" \| "right"`, `amount` (1–10), `ref?` | |
 | `focus_window` | `window_ref` | brings it to the front |
-| `open` | `target`: a program's name from the Start menu, or an http(s) URL | starts it; URL in the default browser |
+| `open` | `target`: a program's name from the Start menu (macOS: an app in the Applications folders, e.g. `TextEdit`), or an http(s) URL | starts it; URL in the default browser |
 | `clipboard_set` | `text` (≤ 20 000) | `{}` |
-| `shell` | `command` (≤ 8000), `timeout_s` (1–600) | `{"exit_code", "stdout", "stderr", "truncated", "duration_ms"}`; output head 20 000 + tail 10 000 characters |
+| `shell` | `command` (≤ 8000), `timeout_s` (1–600) | `{"exit_code", "stdout", "stderr", "truncated", "duration_ms"}`; output head 20 000 + tail 10 000 characters. Windows: PowerShell `-NoProfile -NonInteractive`; macOS: `zsh -f -c` (or `bash --noprofile --norc -c`), as `shell_kind` says |
 
+- **Coordinates.** `x`, `y` are screenshot pixels; the client maps them back with its own
+  last capture: screen point = origin + (x, y) × `scale`. Screen units are physical pixels on
+  Windows and **points** on macOS (the global display space: the main display's top-left is
+  0,0, a display left of or above it has negative coordinates; a Retina display has 2×2
+  pixels per point). A Mac's screenshot is fitted from the size in points, so its `scale` is
+  about 1 on a laptop screen, not 2. `look what=screen` shows every display, arranged as in
+  the system's display settings.
 - Refs are valid until the next command; a stale ref answers `failed` with
   "That control is gone; look again".
-- The client refuses (`refused`) acting when control is off, `shell` when PowerShell is
+- The client refuses (`refused`) acting when control is off, `shell` when the shell is
   off or the device isn't trusted (the server doesn't send it then, but the client checks
-  too), and typing into a password control.
+  too), and typing into a password control (macOS: a control whose role or subrole is
+  `AXSecureTextField`, or any focus while macOS has secure keyboard entry on).
+- `unavailable` on the secure desktop (Windows: UAC prompts, the lock screen; macOS: the
+  lock screen, the login window, System Settings, password and permission prompts), and on
+  macOS without the Screen Recording permission (looking) or the Accessibility permission
+  (acting; looking then has no controls and a `note`), with a sentence asking the user.
 - `stopped` when the user pressed the stop hotkey during the command; the server fails the
   tool call with "The user stopped control" and offers nothing more until the next offer
   with `control: true`.
 
 ## 4. Voice REST
 
+Anemo Voice 1.1.0 first sends a request's recording to `/voice/transcripts`, matches its
+voice-mode commands on what was heard, and sends anything else on to `/voice/turns` as
+`text`. When `/voice/transcripts` answers 404 (an older Anemo) it sends the recording to
+`/voice/turns` as before.
+
+### `POST /api/voice/transcripts` (multipart, Anemo Voice 1.1.0)
+
+| field | |
+|---|---|
+| `audio` | the recording, as for `/voice/turns` |
+
+```
+200 { "heard": "Hey Jarvis, start voice mode." }       as the transcription model heard it
+200 { "heard": "", "say": "Sorry, I didn't catch that." }   nothing was heard
+```
+
+Errors as `/voice/turns` (409 `no_transcription_model`, 422 audio codes, 400
+`transcription_failed`). Only transcribes: no clean-up, no run, nothing stored.
+
 ### `POST /api/voice/turns` (multipart)
 
 | field | |
 |---|---|
 | `audio` | the recording; WAV 16 kHz mono preferred; ≤ 25 MB |
+| `text` | instead of `audio` (1–4000 characters): the transcript `/voice/transcripts` gave, cleaned up and started as a recording would be, not transcribed again |
 | `conversation_id` | optional: continue this chat (the phone sends it within the follow-up window) |
 | `status` | optional `true`: the user asked what is running; no run starts |
+| `voice_mode` | optional `true`: voice mode is on, the phone listens again after the answer; the agent is told so and may end it with `voice_stop` |
+| `keep_chat` | optional `true`: continue `conversation_id` whatever the follow-up window says (not an archived, temporary, automation or busy chat); sent from the second request of a voice mode session on |
 
 ```
 202 { "run_id": "…", "conversation_id": "…",
@@ -179,7 +245,8 @@ agent, as untrusted content.
 The `version` in `hello` is the client's. Anemo Desktop 1.1.0 adds Claude Code jobs
 (§7, `code.*` messages and the `code` offer field); 1.2.0 adds the `code_*` actions
 (§7.4); 1.3.0 adds images to `code_start` (the `code_images` offer field, §7.4) and takes
-messages from the server of up to 16 MB (4 MB before). The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
+messages from the server of up to 16 MB (4 MB before). 1.4.0 adds `hello.platform` and the `shell_kind` offer field
+(§2) and the macOS client (`09-desktop-macos.md`). The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
 `{"type": "notice", "text": "…"}` once per connection when a client is older than the
 oldest version it supports; it keeps working where it can. A client that gets an action it
 doesn't know answers `failed` with "Unknown action “…”", so an old client fails loudly.
@@ -187,11 +254,15 @@ doesn't know answers `failed` with "Unknown action “…”", so an old client 
 ## 7. Claude Code jobs (Anemo Desktop 1.1.0)
 
 A computer can share the Claude Code jobs that run on it (`docs/specs/code-sessions.md`).
-A job is a folder `<jobs>\<id>\` (default `C:\anemo-bridge\jobs`) with `prompt.txt`,
+A job is a folder `<jobs>\<id>\` (default `C:\anemo-bridge\jobs` on Windows,
+`~/anemo-bridge/jobs/<id>/` on macOS) with `prompt.txt`,
 `out.jsonl` (Claude Code's `--output-format stream-json --verbose`, one event per line),
 `err.txt`, `meta.json` (`{id, pid, dir, resume, started, prompt_preview}`, optionally
 `model`) and, once cancelled, a `cancelled` file. Job ids match
-`^\d{8}-\d{6}-[A-Za-z0-9]{4}$`.
+`^\d{8}-\d{6}-[A-Za-z0-9]{4}$`. `device_job_dir` and `dir` are the device's own absolute
+paths (`C:\…` or `/Users/…`): the server stores and shows them as opaque strings and never
+parses them as Windows paths. Jobs are written by Anemo Desktop (§7.4) or by the bridge
+for agents, `bridge/cc.mjs` (Windows, macOS, Linux), in the same format.
 
 The client shares only when "Share Claude Code jobs with Anemo" is on **and** `welcome`
 said the device is `trusted`. The server ignores every `code.*` message of a device that
@@ -266,14 +337,18 @@ event contents. The full log stays on the computer.
 
 | action | fields | `state` |
 |---|---|---|
-| `code_projects` | | `{"projects": [{"name", "dir", "remote": "<url>" \| null}], "remote": [{"name", "url"}], "note": "…" \| null}`: folders in the projects folder (default `C:\dev`), and the owner's GitHub repositories not cloned yet (`gh repo list`; `note` says why when that list couldn't be read) |
+| `code_projects` | | `{"projects": [{"name", "dir", "remote": "<url>" \| null}], "remote": [{"name", "url"}], "note": "…" \| null}`: folders in the projects folder (default `C:\dev`; macOS `~/dev`), and the owner's GitHub repositories not cloned yet (`gh repo list`; `note` says why when that list couldn't be read) |
 | `code_start` | `project` (≤ 200), `prompt` (1–100 000), `new` (bool), `resume_session?`, `model?` (≤ 100), `max_turns?` (1–500) | `{"job_id", "dir", "project"}` once the job runs. The project resolves to a folder of that name, or a folder whose git remote has that name, else it is cloned from GitHub, else with `new` an empty folder (`git init`) is made; `failed` with a sentence otherwise |
 | `code_cancel` | `job_id` | `{"job_id", "state": "cancelled"}`; ends the job's process tree and writes the `cancelled` file; `failed` when there is no such job, `{"job_id", "state": "<state>"}` when it had already ended |
 
 A follow-up is `code_start` with `resume_session` and `follow_job_id` (the earlier job's id): it runs in that job's recorded folder, and `project` is ignored. `code_start` answers within seconds; a needed clone runs afterwards, while the job folder holds a `starting` file (see `docs/specs/code-sessions.md` §12.5 for this, the full path of `claude`, project-name rules and the GitHub owner).
 The job runs `claude -p --output-format stream-json --verbose --permission-mode
 bypassPermissions [--resume <s>] [--model <m>] [--max-turns <n>]` in its folder, the
-prompt on stdin, like `cc.ps1`.
+prompt on stdin, like `cc.ps1`. Windows starts it through `cmd.exe` as before; macOS with
+`posix_spawn` of `claude` itself (no shell), `prompt.txt` / `out.jsonl` / `err.txt` as its
+stdin / stdout / stderr, as its own session and process group; `code_cancel` there ends
+that process group (SIGTERM, SIGKILL after 3 s). `pid` in `meta.json` is the `cmd.exe`'s
+on Windows and Claude Code's own on macOS.
 
 **Images (Anemo Desktop 1.3.0).** A client that takes them says `"code_images": true` in
 its offer (Anemo Desktop: whenever it offers `code_start`); the server sends images only

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.anemo.voice.settings.Sensitivity
+import app.anemo.voice.settings.VoiceSettings
 import app.anemo.voice.settings.WakeWord
 import app.anemo.voice.ui.theme.AnemoTheme
 import app.anemo.voice.ui.theme.LineIcons
@@ -153,9 +154,16 @@ fun SettingsScreen(
             AnemoCard(padding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)) {
                 SwitchRow(
                     "Start and stop sounds",
-                    "A short tone when Anemo starts and stops listening",
+                    "A short tone when Anemo hears the wake word and when it stops listening",
                     form.sounds,
                     { onChange(form.copy(sounds = it)) },
+                )
+                Hairline()
+                SwitchRow(
+                    "Vibrate with the sounds",
+                    "A short buzz with each sound, also in silent mode",
+                    form.vibrate,
+                    { onChange(form.copy(vibrate = it)) },
                 )
                 Hairline()
                 SwitchRow(
@@ -192,6 +200,25 @@ fun SettingsScreen(
                     Text(SettingsForm.speedLabel(0), Modifier.weight(1f), color = c.subtle, fontSize = 11.sp)
                     Text(SettingsForm.speedLabel(SettingsForm.MAX_SPEED_STEP), color = c.subtle, fontSize = 11.sp)
                 }
+            }
+
+            GroupLabel("Voice mode")
+            AnemoCard(padding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)) {
+                SwitchRow(
+                    "Say “start voice mode” to turn it on",
+                    "Also right after the wake word. The tile and the notification always can.",
+                    form.voiceModePhrase,
+                    { onChange(form.copy(voiceModePhrase = it)) },
+                )
+                Hairline()
+                Spacer(Modifier.height(14.dp))
+                FieldLabel("End voice mode after silence")
+                SegmentedControl(
+                    options = VoiceSettings.IDLE_CHOICES.map { "$it s" },
+                    selected = form.idleStep,
+                    onSelect = { onChange(form.copy(idleStep = it)) },
+                )
+                FieldHint("Voice mode listens again after each answer, until you say “stop”, use the tile or nobody speaks.")
             }
         }
         SaveBar(view.message, onSave)

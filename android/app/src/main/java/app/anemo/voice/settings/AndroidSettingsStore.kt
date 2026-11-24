@@ -37,6 +37,9 @@ class AndroidSettingsStore(context: Context) : SettingsStore {
             bluetoothMic = plain.getBoolean(BLUETOOTH, d.bluetoothMic),
             ttsVoice = plain.getString(TTS_VOICE, d.ttsVoice).orEmpty(),
             ttsSpeed = plain.getFloat(TTS_SPEED, d.ttsSpeed),
+            vibrate = plain.getBoolean(VIBRATE, d.vibrate),
+            voiceModePhrase = plain.getBoolean(VOICE_MODE_PHRASE, d.voiceModePhrase),
+            voiceModeIdleSeconds = VoiceSettings.idleSeconds(plain.getInt(VOICE_MODE_IDLE, d.voiceModeIdleSeconds)),
         )
     }
 
@@ -50,6 +53,9 @@ class AndroidSettingsStore(context: Context) : SettingsStore {
             .putBoolean(BLUETOOTH, settings.bluetoothMic)
             .putString(TTS_VOICE, settings.ttsVoice)
             .putFloat(TTS_SPEED, settings.ttsSpeed.coerceIn(0.5f, 2.0f))
+            .putBoolean(VIBRATE, settings.vibrate)
+            .putBoolean(VOICE_MODE_PHRASE, settings.voiceModePhrase)
+            .putInt(VOICE_MODE_IDLE, VoiceSettings.idleSeconds(settings.voiceModeIdleSeconds))
             .apply()
         secure.edit().putString(TOKEN, settings.token.trim()).apply()
     }
@@ -64,5 +70,8 @@ class AndroidSettingsStore(context: Context) : SettingsStore {
         const val BLUETOOTH = "bluetooth_mic"
         const val TTS_VOICE = "tts_voice"
         const val TTS_SPEED = "tts_speed"
+        const val VIBRATE = "vibrate"
+        const val VOICE_MODE_PHRASE = "voice_mode_phrase"
+        const val VOICE_MODE_IDLE = "voice_mode_idle_seconds"
     }
 }

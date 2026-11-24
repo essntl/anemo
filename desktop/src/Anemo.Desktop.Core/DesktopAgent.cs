@@ -23,8 +23,12 @@ public sealed record DesktopAgentParts(
     IProcessProbe? Processes = null,
     CodeJobsOptions? CodeJobsOptions = null,
     ICodeHost? CodeHost = null,
-    CodeJobControlOptions? CodeJobControlOptions = null)
+    CodeJobControlOptions? CodeJobControlOptions = null,
+    DesktopPlatform? TargetSystem = null)
 {
+    /// <summary>The system the client runs on (Windows unless the host says otherwise).</summary>
+    public DesktopPlatform Os => TargetSystem ?? DesktopPlatform.Windows;
+
     /// <summary>The Claude Code jobs' state file, beside <c>settings.json</c>.</summary>
     public string CodeJobsStateFile => Path.Combine(Path.GetDirectoryName(Store.Path) ?? ".", "code-jobs.json");
 }
@@ -38,12 +42,17 @@ public sealed class DesktopAgent
     private readonly DesktopAgentParts _parts;
     private readonly SharedScreenClient _sharedScreen;
     private readonly object _lock = new();
+
+    /// <summary>The shell's kind for the offer, looked up once (installing pwsh needs a restart to show).</summary>
+    private readonly Lazy<string> _shellKind;
     private DesktopSettings _settings;
 
     public DesktopAgent(DesktopAgentParts parts)
     {
         _parts = parts;
         _settings = parts.Store.Load();
+        _shellKind = new Lazy<string>(() =>
+            parts.Platform.Shell.FindShell()?.Kind ?? (parts.Os.IsMac ? ShellKinds.Zsh : ShellKinds.PowerShell));
         StartupProblem = parts.Store.LoadProblem;
         if (StartupProblem is not null)
         {
@@ -56,20 +65,22 @@ public sealed class DesktopAgent
             Control,
             () => Settings,
             parts.CommandLog,
-            WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder),
+            WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder, parts.Os),
             new CodeJobControl(
                 () => Settings,
                 parts.CodeHost ?? NoCodeHost.Instance,
                 parts.Processes ?? NoProcesses.Instance,
                 parts.Time,
-                parts.CodeJobControlOptions));
+                parts.CodeJobControlOptions,
+                parts.Os));
         CodeJobs = new CodeJobSharing(
             () => Settings,
             new CodeJobStore(parts.CodeJobsStateFile, parts.Time, parts.Log),
             parts.Processes ?? NoProcesses.Instance,
             parts.Time,
             parts.Log,
-            parts.CodeJobsOptions);
+            parts.CodeJobsOptions,
+            parts.Os.DefaultJobsFolder);
         Connection = new DeviceConnection(
             ConnectionSettings,
             Control,
@@ -78,7 +89,9 @@ public sealed class DesktopAgent
             parts.Log,
             parts.Version,
             parts.ConnectionOptions,
-            CodeJobs);
+            CodeJobs,
+            parts.Os.WireName,
+            () => _shellKind.Value);
         _sharedScreen = new SharedScreenClient(parts.Http);
     }
 
@@ -159,7 +172,7 @@ public sealed class DesktopAgent
         SharedScreenContent content;
         try
         {
-            content = await Task.Run(() => SharedScreenClient.Capture(_parts.Platform.Desktop, ct), ct);
+            content = await Task.Run(() => SharedScreenClient.Capture(_parts.Platform.Desktop, ct, _parts.Os), ct);
         }
         catch (CommandException e)
         {
@@ -176,11 +189,12 @@ public sealed class DesktopAgent
         return result;
     }
 
-    private static CommandOptions WithWorkFolder(CommandOptions options, string folder) => new()
+    private static CommandOptions WithWorkFolder(CommandOptions options, string folder, DesktopPlatform platform) => new()
     {
         SettleDelay = options.SettleDelay,
         OpenDelay = options.OpenDelay,
         DefaultWorkFolder = folder,
+        Platform = platform,
     };
 
     private ConnectionSettings? ConnectionSettings()

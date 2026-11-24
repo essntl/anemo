@@ -25,11 +25,11 @@ public sealed class SharedScreenClient
     public SharedScreenClient(HttpClient http) => _http = http;
 
     /// <summary>The screen and the front window's text, read now.</summary>
-    public static SharedScreenContent Capture(IDesktop desktop, CancellationToken ct)
+    public static SharedScreenContent Capture(IDesktop desktop, CancellationToken ct, DesktopPlatform? platform = null)
     {
         if (desktop.IsSecureDesktop())
         {
-            throw CommandException.Unavailable(CommandProcessor.SecureDesktopMessage);
+            throw CommandException.Unavailable((platform ?? DesktopPlatform.Windows).SecureScreenMessage);
         }
 
         var capture = desktop.CaptureScreen();

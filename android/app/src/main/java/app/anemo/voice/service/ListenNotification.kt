@@ -11,7 +11,10 @@ import app.anemo.voice.R
 import app.anemo.voice.core.ListenState
 import app.anemo.voice.ui.MainActivity
 
-/** The permanent notification of the listening service, with Pause / Resume, Status and Stop. */
+/**
+ * The permanent notification of the listening service, with Pause / Resume, Voice mode /
+ * End voice mode, and Stop. (Android shows three buttons at most: Status is in the app.)
+ */
 object ListenNotification {
     const val ID = 1
     private const val PROBLEM_ID = 2
@@ -73,7 +76,7 @@ object ListenNotification {
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
             .addAction(action(context, if (paused) "Resume" else "Pause", if (paused) ListenService.RESUME else ListenService.PAUSE, 1))
-            .addAction(action(context, "Status", ListenService.STATUS, 2))
+            .addAction(voiceModeAction(context, status.voiceMode))
             .addAction(action(context, "Stop", ListenService.STOP, 3))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
@@ -81,13 +84,16 @@ object ListenNotification {
         return builder.build()
     }
 
-    /** The title, as spec 05 words it while listening. */
-    fun title(status: Status, wakeWord: String): String = when (status.listen) {
-        ListenState.Paused -> "Anemo is paused"
-        ListenState.Recording -> "Anemo is listening to you"
-        ListenState.Speaking -> "Anemo is speaking"
-        else -> "Anemo is listening for $wakeWord"
-    }
+    /** The title: "Listening" while recording (spec 07), "Voice mode · …" in voice mode. */
+    fun title(status: Status, wakeWord: String): String = StatusText.withVoiceMode(
+        when (status.listen) {
+            ListenState.Paused -> "Anemo is paused"
+            ListenState.Recording -> "Listening"
+            ListenState.Speaking -> "Anemo is speaking"
+            else -> "Anemo is listening for $wakeWord"
+        },
+        status.voiceMode,
+    )
 
     fun detail(status: Status): String {
         val parts = mutableListOf<String>()
@@ -100,6 +106,14 @@ object ListenNotification {
 
     private fun action(context: Context, label: String, what: String, code: Int): Notification.Action =
         Notification.Action.Builder(null, label, service(context, what, code)).build()
+
+    private fun voiceModeAction(context: Context, on: Boolean): Notification.Action {
+        val intent = Intent(context, ListenService::class.java)
+            .setAction(if (on) ListenService.VOICE_MODE_OFF else ListenService.VOICE_MODE_ON)
+            .putExtra(ListenService.EXTRA_CAUSE, ListenService.FROM_NOTIFICATION)
+        val pending = PendingIntent.getService(context, if (on) 6 else 5, intent, PendingIntent.FLAG_IMMUTABLE)
+        return Notification.Action.Builder(null, if (on) "End voice mode" else "Voice mode", pending).build()
+    }
 
     private fun service(context: Context, what: String, code: Int): PendingIntent =
         PendingIntent.getService(

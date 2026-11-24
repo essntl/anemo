@@ -20242,7 +20242,7 @@
           "voice"
         ],
         "summary": "Voice Turn",
-        "description": "A spoken request: transcribed, made a clear request, and started as an agent run\nin the Voice chat (or continuing `conversation_id` within the follow-up window).",
+        "description": "A spoken request: transcribed (or `text`, the transcript from `/voice/transcripts`),\nmade a clear request, and started as an agent run in the Voice chat (or continuing\n`conversation_id` within the follow-up window; with `keep_chat`, whatever the window\nsays). `voice_mode`: the phone listens again after the answer.",
         "operationId": "voice_turn_api_voice_turns_post",
         "parameters": [
           {
@@ -20288,6 +20288,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VoiceTurnOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice/transcripts": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "summary": "Voice Transcript",
+        "description": "Only transcribes: the phone matches its voice-mode commands on what was heard\nbefore anything starts (docs/specs/07-voice-mode-android.md). Stores nothing.",
+        "operationId": "voice_transcript_api_voice_transcripts_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_voice_transcript_api_voice_transcripts_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceTranscriptOut"
                 }
               }
             }
@@ -22329,6 +22389,20 @@
         ],
         "title": "Body_voice_reply_api_voice_replies_post"
       },
+      "Body_voice_transcript_api_voice_transcripts_post": {
+        "properties": {
+          "audio": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Audio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio"
+        ],
+        "title": "Body_voice_transcript_api_voice_transcripts_post"
+      },
       "Body_voice_turn_api_voice_turns_post": {
         "properties": {
           "audio": {
@@ -22358,6 +22432,29 @@
           "status": {
             "type": "boolean",
             "title": "Status",
+            "default": false
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "voice_mode": {
+            "type": "boolean",
+            "title": "Voice Mode",
+            "default": false
+          },
+          "keep_chat": {
+            "type": "boolean",
+            "title": "Keep Chat",
             "default": false
           }
         },
@@ -37953,6 +38050,30 @@
         "type": "object",
         "title": "VoiceSettings",
         "description": "Talking to Anemo from a phone (features/voice, docs/specs/05-voice-android.md)."
+      },
+      "VoiceTranscriptOut": {
+        "properties": {
+          "heard": {
+            "type": "string",
+            "title": "Heard"
+          },
+          "say": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Say"
+          }
+        },
+        "type": "object",
+        "required": [
+          "heard"
+        ],
+        "title": "VoiceTranscriptOut"
       },
       "VoiceTurnOut": {
         "properties": {

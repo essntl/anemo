@@ -1270,6 +1270,9 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
             and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),
             can_ask=run.kind == "agent" and run.automation_id is None and run.depth == 0,
             has_chat=answer_message is not None,
+            has_phone=run.depth == 0
+            and run.options.get("source") == "voice"
+            and bool(run.options.get("device_id")),
             ancestors=ancestors,
             off=run.policy.get("off") or (),
         )

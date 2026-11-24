@@ -20,6 +20,10 @@ data class SettingsForm(
     val bluetoothMic: Boolean,
     val voice: String,
     val speedStep: Int,
+    val vibrate: Boolean = true,
+    val voiceModePhrase: Boolean = true,
+    /** An index into [VoiceSettings.IDLE_CHOICES]. */
+    val idleStep: Int = 1,
 ) {
     /** The token must not reach a log through `toString`. */
     override fun toString(): String = "SettingsForm(address=$address, wakeWord=${wakeWord.id}, token=…)"
@@ -41,6 +45,9 @@ data class SettingsForm(
                 bluetoothMic = bluetoothMic,
                 ttsVoice = voice,
                 ttsSpeed = speedOf(speedStep),
+                vibrate = vibrate,
+                voiceModePhrase = voiceModePhrase,
+                voiceModeIdleSeconds = VoiceSettings.IDLE_CHOICES[idleStep.coerceIn(VoiceSettings.IDLE_CHOICES.indices)],
             ),
         )
     }
@@ -63,6 +70,9 @@ data class SettingsForm(
             bluetoothMic = saved.bluetoothMic,
             voice = "",
             speedStep = speedStep(saved.ttsSpeed),
+            vibrate = saved.vibrate,
+            voiceModePhrase = saved.voiceModePhrase,
+            idleStep = VoiceSettings.IDLE_CHOICES.indexOf(VoiceSettings.idleSeconds(saved.voiceModeIdleSeconds)),
         )
 
         /** The saved voice once the phone's voices are known; Android's voice when it is gone. */

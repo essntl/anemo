@@ -34,8 +34,8 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 - [ ] Say the wake word from 1 m and 3 m: the start sound plays; speak; after about a
       second of silence the stop sound plays.
 - [ ] Talk for more than 60 s: it stops at 60 s.
-- [ ] Wake word, then say nothing: after 5 s it stops and nothing is sent (no request in
-      Anemo).
+- [ ] Wake word, then say nothing: after 5 s the timeout sound (a low double note) plays
+      and nothing is sent (no request in Anemo).
 - [ ] False wakes: leave it listening for an hour with a TV or radio on and during a
       conversation; count false starts at each sensitivity (Low / Medium / High).
 - [ ] A custom `.onnx` word: import, choose "your own word", name it; the notification
@@ -50,7 +50,8 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 - [ ] Music playing: it ducks while the answer is spoken, and comes back after.
 - [ ] Within Anemo's follow-up window (Settings → Voice, 5 minutes by default): "and move it
       to Friday" continues the same chat. After it, a new turn starts.
-- [ ] The **Status** button (app or notification) speaks what is running.
+- [ ] The **Status** button in the app speaks what is running (the notification has
+      Pause, Voice mode and Stop since 1.1.0).
 - [ ] Anemo without a transcription model: the phone speaks Anemo's message, which names
       the setting.
 - [ ] Wake word, then a cough only: Anemo's "Sorry, I didn't catch that." is spoken.
@@ -111,6 +112,67 @@ Settings → Devices. Write down the phone, the Android version and what you saw
 - [ ] Music quality in the headset while listening with the headset microphone (HFP is
       mono and narrow-band): note it; turn the setting off if it is too bad.
 - [ ] Setting off: the phone's own microphone is used even with a headset connected.
+
+## The cue and voice mode (Anemo Voice 1.1.0)
+
+Needs an Anemo with this branch's server (`/api/voice/transcripts`). Write down the phone
+(Xiaomi: MIUI or HyperOS, global or Chinese ROM), what you heard and felt, and the logcat
+lines (`adb logcat -s AnemoVoice`).
+
+1. [ ] **Cue on detection.** Say the wake word: the rising start sound and a buzz come at
+       once, before you can start speaking (target: under 150 ms; film the phone with
+       sound and count frames, or watch `wake word heard score=…` in logcat against the
+       sound). No sound and no buzz = it didn't hear you.
+2. [ ] **Media volume at 0.** Turn the media volume all the way down: the cue still plays
+       (it follows the ring / system volume). Ring volume at 0 or silent mode: no sound,
+       but the buzz.
+3. [ ] **Xiaomi.** On the Xiaomi, with normal ring volume: the cues are audible (the
+       sonification usage). If they are silent, note it: the fallback is the alarm usage
+       (one line in `audio/ToneCues.kt`), Artem decides.
+4. [ ] **Headset.** With a Bluetooth headset connected, the cue plays in the headset.
+5. [ ] **Ducking.** Play music, say the wake word: the music gets quiet at once and comes
+       back after the request (and again while the answer is spoken).
+6. [ ] **One breath.** Say "Hey Jarvis what's on tomorrow" without a pause: the request in
+       Anemo is "what's on tomorrow" (nothing lost at the start, no wake word in it).
+7. [ ] **End and timeout sounds.** After a request: the falling end sound. Wake word and
+       silence: the low double timeout sound after 5 s. All three sound different.
+8. [ ] **Notification.** While you speak a request the notification's title is
+       "Listening"; in voice mode the titles start with "Voice mode · ".
+9. [ ] **Sound settings.** "Start and stop sounds" off: no start/end/timeout sounds, but
+       the reply sound, the voice mode sounds and the buzz still come. "Vibrate with the
+       sounds" off: no buzz at all.
+10. [ ] **Voice mode from the tile.** Add the "Voice mode" tile; tap it while listening:
+       the three-note "on" sound, the microphone opens. Tap it with listening off: it
+       starts listening with voice mode on (or opens the app on Android 14+ if not
+       allowed).
+11. [ ] **Voice mode from the notification.** The notification's **Voice mode** button turns
+       it on, **End voice mode** turns it off.
+12. [ ] **"Start voice mode".** Wake word, pause, "start voice mode": voice mode goes on and
+       nothing is sent to Anemo (no chat message). Then in one breath: "Hey Jarvis, start
+       voice mode". Try a misheard variant ("start voice mood"). With the setting
+       "Say “start voice mode”…" off it becomes an ordinary request.
+13. [ ] **The conversation.** In voice mode ask something, hear the answer, then the start
+       sound and the microphone opens again: ask a follow-up without the wake word. The
+       chat stays the same (check in Anemo), also after the 5-minute follow-up window.
+14. [ ] **No echo.** With the loudspeaker (no headset) and the volume up: the end of the
+       spoken answer is not sent as the next request (look at the chat). Note whether the
+       phone has an echo canceller (`AcousticEchoCanceler`).
+15. [ ] **"Stop".** In voice mode say "stop": the falling three-note "off" sound, back to
+       the wake word. "End voice mode" too. "Stop the music" is a normal request.
+16. [ ] **Idle timeout.** In voice mode say nothing: after 45 s the "off" sound. Set 30 s in
+       Settings → Voice mode and check again.
+17. [ ] **The agent ends it.** In voice mode: "thanks, that's all, goodbye": the agent says
+       goodbye and voice mode ends after it (the run's timeline shows `voice_stop`).
+18. [ ] **Pause and Stop** end voice mode (the "off" sound).
+19. [ ] **Audit log.** Settings → Audit log in Anemo lists each voice mode on/off with its
+       cause (tile, notification, phrase, stop_phrase, timeout, voice_stop,
+       service_stopped), the phone as the target, `agent` for voice_stop.
+20. [ ] **Approvals in voice mode.** In voice mode, a request that needs an approval: it is
+       asked with the reply sound, answered, and after the run's answer voice mode listens
+       again.
+21. [ ] **The wake word in voice mode** still starts a request while waiting for an answer.
+22. [ ] **Older server.** With an Anemo without `/api/voice/transcripts`: requests still work
+       (the recording is sent as before); voice mode can still be turned on from the tile.
 
 ## Reboot and battery
 
