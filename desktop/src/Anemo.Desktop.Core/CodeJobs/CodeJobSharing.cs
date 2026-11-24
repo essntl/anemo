@@ -30,14 +30,19 @@ public sealed class CodeJobSharing : ICodeJobsHost
     /// </summary>
     private readonly Dictionary<string, int> _stale = new(StringComparer.Ordinal);
 
+    /// <summary>The jobs folder when Settings names none (the platform's).</summary>
+    private readonly string _defaultFolder;
+
     public CodeJobSharing(
         Func<DesktopSettings> settings,
         CodeJobStore store,
         IProcessProbe probe,
         TimeProvider time,
         IDiagnosticLog log,
-        CodeJobsOptions? options = null)
+        CodeJobsOptions? options = null,
+        string? defaultFolder = null)
     {
+        _defaultFolder = defaultFolder ?? CodeJobLimits.DefaultFolder;
         _settings = settings;
         _store = store;
         _probe = probe;
@@ -193,6 +198,6 @@ public sealed class CodeJobSharing : ICodeJobsHost
         return _changed.Task;
     }
 
-    private static (bool Share, string Folder) Wanted(DesktopSettings settings) =>
-        (settings.ShareCodeJobs, string.IsNullOrWhiteSpace(settings.CodeJobsFolder) ? CodeJobLimits.DefaultFolder : settings.CodeJobsFolder.Trim());
+    private (bool Share, string Folder) Wanted(DesktopSettings settings) =>
+        (settings.ShareCodeJobs, string.IsNullOrWhiteSpace(settings.CodeJobsFolder) ? _defaultFolder : settings.CodeJobsFolder.Trim());
 }

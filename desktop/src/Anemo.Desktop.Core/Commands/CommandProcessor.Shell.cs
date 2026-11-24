@@ -21,12 +21,24 @@ public sealed partial class CommandProcessor
         return new ShellStart(program, ["-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand", encoded], workFolder);
     }
 
+    /// <summary>
+    /// How the shell is started for <paramref name="command"/>: PowerShell as above; zsh with
+    /// <c>-f</c> (no startup files) and bash with <c>--noprofile --norc</c>, the command as one
+    /// argument after <c>-c</c>, so nothing needs quoting (docs/specs/09-desktop-macos.md D5).
+    /// </summary>
+    public static ShellStart ShellStartFor(ShellProgram shell, string command, string workFolder) => shell.Kind switch
+    {
+        ShellKinds.Zsh => new ShellStart(shell.Path, ["-f", "-c", command], workFolder),
+        ShellKinds.Bash => new ShellStart(shell.Path, ["--noprofile", "--norc", "-c", command], workFolder),
+        _ => ShellStartFor(shell.Path, command, workFolder),
+    };
+
     private async Task<JsonNode> ShellAsync(Args args, CancellationToken ct)
     {
         var command = args.String("command", 8000);
         var timeout = args.Int("timeout_s", 1, 600, fallback: 60);
-        var program = _platform.Shell.FindPowerShell()
-            ?? throw CommandException.Unavailable("PowerShell wasn't found on this computer.");
+        var program = _platform.Shell.FindShell()
+            ?? throw CommandException.Unavailable(_options.Platform.NoShellMessage);
         var folder = string.IsNullOrWhiteSpace(_settings().WorkFolder) ? _options.DefaultWorkFolder : _settings().WorkFolder!;
         _platform.Shell.EnsureFolder(folder);
 
