@@ -6,13 +6,12 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { ChevronDown, Code2, FileCode, History, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, FileCode, History, Pencil, Play, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { Lingering } from '@/components/ui/Lingering'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
@@ -28,7 +27,6 @@ import {
   useSetAutomationEnabled,
 } from '../api'
 import { RunHistory } from './RunHistory'
-import { ScriptDialog } from './ScriptDialog'
 import { ScriptReviewDialog } from './ScriptReviewDialog'
 
 /** Who wrote the script: you, the assistant in a chat (a link to it), or an automation. */
@@ -73,7 +71,7 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
   }
 
   return (
-    <div className={cn('rounded-card border border-border bg-card px-4 py-3 shadow-soft', !automation.enabled && 'opacity-90')}
+    <div className={cn('rounded-card border border-border bg-card px-(--item-x) py-(--item-y) shadow-soft', !automation.enabled && 'opacity-90')}
       data-testid="script-card">
       <div className="flex items-start gap-3">
         <div className="pt-1" title={blocked ? why : undefined}>
@@ -132,31 +130,22 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
   )
 }
 
-export function ScriptsTab({ scripts, linked, linkedRun }: { scripts: Automation[]; linked: string | null; linkedRun: string | null }) {
-  // null: closed. { automation: null }: a new one.
-  const [editing, setEditing] = useState<{ automation: Automation | null } | null>(null)
+/** The list of scripts. The page has the New button, the empty state and the edit dialog. */
+export function ScriptsTab({ scripts, linked, linkedRun, onEdit }: {
+  scripts: Automation[]
+  linked: string | null
+  linkedRun: string | null
+  onEdit: (automation: Automation) => void
+}) {
   const [reviewing, setReviewing] = useState<Automation | null>(null)
   const current = reviewing ? (scripts.find((s) => s.id === reviewing.id) ?? reviewing) : null
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <p className="min-w-0 flex-1 text-[13px] text-muted">
-          {t('Scripts are code that runs without a model and acts only through Anemo’s tools, with the same permissions and approvals. Code an assistant writes or changes stays off until you approve it here.')}
-        </p>
-        <Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>{t('New script')}</Button>
-      </div>
-      {scripts.length === 0 && (
-        <EmptyState icon={<Code2 className="h-5 w-5" />} title={t('No scripts yet')}
-          description={t('Ask the assistant to write one, e.g. “every morning, turn new bookings into tasks”, or write one yourself.')} />
-      )}
-      <div className="flex flex-col gap-2">
-        {scripts.map((s) => (
-          <ScriptCard key={s.id} automation={s} onEdit={() => setEditing({ automation: s })} onReview={() => setReviewing(s)}
-            highlight={s.id === linked ? linkedRun : undefined} />
-        ))}
-      </div>
-      <Lingering value={editing}>{(shown) => <ScriptDialog automation={shown.automation} onClose={() => setEditing(null)} />}</Lingering>
+    <div className="flex flex-col gap-(--stack-gap)">
+      {scripts.map((s) => (
+        <ScriptCard key={s.id} automation={s} onEdit={() => onEdit(s)} onReview={() => setReviewing(s)}
+          highlight={s.id === linked ? linkedRun : undefined} />
+      ))}
       <Lingering value={current}>{(shown) => <ScriptReviewDialog automation={shown} onClose={() => setReviewing(null)} />}</Lingering>
     </div>
   )

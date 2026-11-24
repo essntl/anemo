@@ -1,5 +1,6 @@
 /**
- * Automations: prompts an agent runs by itself on a schedule. Each card shows
+ * Automations: prompts an agent runs by itself on a schedule (and, in their own tab,
+ * scripts: code that runs without a model). Each card shows
  * when it runs next and how the last run went; its history (the run log) lists past
  * runs with their outcome, what they changed and how long they took (shown as the chat
  * shows an answer's duration). `?automation=<id>&run=<run id>` opens
@@ -7,7 +8,7 @@
  */
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { ChevronDown, Clock, History, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Clock, Code2, History, LayoutTemplate, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
@@ -17,6 +18,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Segmented } from '@/components/ui/Segmented'
 import { Switch } from '@/components/ui/Switch'
 import { useSaveSection, useSettings } from '@/features/settings/api'
+import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { formatUpcoming, formatWhen } from '@/lib/format'
 import { plural, rich, t } from '@/lib/i18n'
@@ -31,6 +33,7 @@ import {
 } from './api'
 import { AutomationDialog } from './components/AutomationDialog'
 import { RunHistory } from './components/RunHistory'
+import { ScriptDialog } from './components/ScriptDialog'
 import { ScriptsTab } from './components/ScriptsTab'
 import { type AutomationTemplate, TEMPLATES } from './templates'
 import { Lingering } from '@/components/ui/Lingering'
@@ -58,7 +61,7 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
   }
 
   return (
-    <div className={cn('rounded-card border border-border bg-card px-4 py-3 shadow-soft', !automation.enabled && 'opacity-80')}>
+    <div className={cn('rounded-card border border-border bg-card px-(--item-x) py-(--item-y) shadow-soft', !automation.enabled && 'opacity-80')}>
       <div className="flex items-start gap-3">
         <div className="pt-1">
           <Switch label={t('Run “{name}” on schedule', { name: automation.name })} checked={automation.enabled}
@@ -116,12 +119,58 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
   )
 }
 
+/** "New automation", with the templates in a menu beside it once the list has items. */
+function NewAutomationButton({ label, templates, onNew }: {
+  label: string
+  templates: AutomationTemplate[]
+  onNew: (template?: AutomationTemplate) => void
+}) {
+  const button = (
+    <Button variant="primary" icon={<Plus className="h-4 w-4" />} aria-label={t('New automation')} onClick={() => onNew()}
+      className={cn(templates.length > 0 && 'rounded-r-none')}>
+      {label}
+    </Button>
+  )
+  if (templates.length === 0) return button
+  return (
+    <div className="flex items-center">
+      {button}
+      <ActionMenu label={t('Start from a template')} icon={<ChevronDown className="h-4 w-4" />}
+        className="h-10 w-9 rounded-l-none border-l border-accent-contrast/25 bg-accent text-accent-contrast shadow-soft hover:bg-accent-hover hover:text-accent-contrast pointer-coarse:h-11"
+        actions={templates.map((tpl) => ({ label: t(tpl.name), icon: <LayoutTemplate />, onSelect: () => onNew(tpl) }))} />
+    </div>
+  )
+}
+
+/** Templates as small buttons, under the empty list's own "New automation". */
+function TemplateChoices({ templates, onPick }: { templates: AutomationTemplate[]; onPick: (tpl: AutomationTemplate) => void }) {
+  return (
+    <section className="mt-5 flex flex-col items-center gap-2" aria-label={t('Templates')}>
+      <h4 className="text-[12.5px] text-muted">{t('Or start from a template')}</h4>
+      <div className="flex flex-wrap justify-center gap-2">
+        {templates.map((tpl) => (
+          <Button key={tpl.name} variant="secondary" size="sm" icon={<LayoutTemplate className="h-3.5 w-3.5" />} onClick={() => onPick(tpl)}>
+            {t(tpl.name)}
+          </Button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The page is one column: the title with the New button (which follows the tab), the
+ * description, the tabs, then the list. On a phone the title and the button are in the
+ * app's top bar, which is that column's width there anyway.
+ */
 export function AutomationsPage() {
   const automations = useAutomations()
   // null: closed. { automation: null }: creating one.
   const [editing, setEditing] = useState<{ automation: Automation | null; template?: AutomationTemplate } | null>(null)
+  const [editingScript, setEditingScript] = useState<{ automation: Automation | null } | null>(null)
   const settings = useSettings()
   const saveProtections = useSaveSection('automations')
+  const desktop = useMediaQuery(DESKTOP)
   const [params, setParams] = useSearchParams()
   const linked = params.get('automation')
   const protections = settings.data?.automations
@@ -134,23 +183,38 @@ export function AutomationsPage() {
   const items = all.filter((a) => a.kind !== 'script')
   const scripts = all.filter((a) => a.kind === 'script')
   const templates = TEMPLATES.filter((tpl) => !items.some((a) => a.name === tpl.name || a.name === t(tpl.name)))
+  // A template fills the dialog in the user's language.
+  const newAutomation = (tpl?: AutomationTemplate) =>
+    setEditing({ automation: null, template: tpl && { ...tpl, name: t(tpl.name), prompt: t(tpl.prompt) } })
+  const newScript = () => setEditingScript({ automation: null })
+  const empty = automations.isSuccess && (tab === 'agent' ? items : scripts).length === 0
+
+  // The New button follows the tab; a phone's top bar has room for the short label only.
+  // While the list is empty the button is in the empty state instead, so it isn't shown twice.
+  const newButton = tab === 'script'
+    ? (
+        <Button variant="primary" icon={<Plus className="h-4 w-4" />} aria-label={t('New script')} onClick={newScript}>
+          {desktop ? t('New script') : t('New##automation')}
+        </Button>
+      )
+    : <NewAutomationButton label={desktop ? t('New automation') : t('New##automation')} templates={templates} onNew={newAutomation} />
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-2">
-      <PageHeader title={t('Automations')}>
-        {tab === 'agent' && (
-          <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>
-            {/* "New" is also said of other things (a document): the empty {automation} keeps this translation apart. */}
-            {t('New##automation')}
-          </Button>
-        )}
-      </PageHeader>
-      <p className="mb-4 max-w-2xl text-[13px] text-muted">
-        {rich('Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.', { a: (c) => <Link to="/notifications" className="text-accent underline">{c}</Link> })}
-        </p>
+    <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-1">
+      <PageHeader title={t('Automations')} inline={desktop}>{!empty && newButton}</PageHeader>
+      <p className="max-w-2xl text-[13px] text-muted">
+        {tab === 'agent'
+          ? rich('Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.', { a: (c) => <Link to="/notifications" className="text-accent underline">{c}</Link> })
+          : t('Scripts are code that runs without a model and acts only through Anemo’s tools, with the same permissions and approvals. Code an assistant writes or changes stays off until you approve it here.')}
+      </p>
+      <Segmented kind="tabs" controls="automations-tab" label={t('Kind of automation')} value={tab} onChange={setTab} className="my-4"
+        options={[
+          { value: 'agent', label: t('Automations##agent') },
+          { value: 'script', label: scripts.some((s) => s.script_pending) ? <>{t('Scripts')} <span className="text-warning">●</span></> : t('Scripts'), ariaLabel: t('Scripts') },
+        ]} />
 
       {protections && (all.length > 0 || paused) && (
-        <div className={cn('mb-3 flex items-center gap-3 rounded-card border px-4 py-2.5', paused ? 'border-warning bg-surface-2' : 'border-border bg-card')}>
+        <div className={cn('mb-3 flex items-center gap-3 rounded-card border px-(--item-x) py-(--item-y)', paused ? 'border-warning bg-surface-2' : 'border-border bg-card')}>
           <Pause className={cn('h-4 w-4 shrink-0', paused ? 'text-warning' : 'text-muted')} />
           <div className="min-w-0 flex-1 text-[13px]">
             <div className="font-medium">{paused ? t('All automations are paused') : t('Pause all automations')}</div>
@@ -166,43 +230,39 @@ export function AutomationsPage() {
       )}
       {saveProtections.isError && <p className="mb-2 text-[13px] text-error">{errorMessage(saveProtections.error)}</p>}
       {automations.isError && <p className="text-[13px] text-error">{errorMessage(automations.error)}</p>}
-      <Segmented kind="tabs" controls="automations-tab" label={t('Kind of automation')} value={tab} onChange={setTab} className="mb-3"
-        options={[
-          { value: 'agent', label: t('Automations##agent') },
-          { value: 'script', label: scripts.some((s) => s.script_pending) ? <>{t('Scripts')} <span className="text-warning">●</span></> : t('Scripts'), ariaLabel: t('Scripts') },
-        ]} />
+
       {tab === 'script' && (
         <div id="automations-tab-script" role="tabpanel">
-          {automations.isSuccess && <ScriptsTab scripts={scripts} linked={linked} linkedRun={params.get('run')} />}
+          {empty && (
+            <EmptyState compact icon={<Code2 className="h-5 w-5" />} title={t('No scripts yet')}
+              description={t('Ask the assistant to write one, e.g. “every morning, turn new bookings into tasks”, or write one yourself.')}
+              action={<Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={newScript}>{t('New script')}</Button>} />
+          )}
+          {automations.isSuccess && (
+            <ScriptsTab scripts={scripts} linked={linked} linkedRun={params.get('run')} onEdit={(automation) => setEditingScript({ automation })} />
+          )}
         </div>
       )}
-      {tab === 'agent' && <div id="automations-tab-agent" role="tabpanel">
-      {automations.isSuccess && items.length === 0 && (
-        <EmptyState icon={<Clock className="h-5 w-5" />} title={t('No automations yet')}
-          description={t('For example: a news briefing every morning, a weekly summary of your open tasks, or a check that tells you when a web page changes.')}
-          action={<Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>{t('New automation')}</Button>} />
-      )}
-      <div className="flex flex-col gap-2">
-        {items.map((a) => (
-          <AutomationCard key={a.id} automation={a} onEdit={() => setEditing({ automation: a })}
-            highlight={a.id === linked ? params.get('run') : undefined} />
-        ))}
-      </div>
-
-      {automations.isSuccess && templates.length > 0 && (
-        <section className="mt-6" aria-label={t('Templates')}>
-          <h2 className="mb-2 text-[13px] font-semibold text-muted">{t('Start from a template')}</h2>
-          <div className="flex flex-wrap gap-2">
-            {templates.map((tpl) => (
-              <Button key={tpl.name} variant="secondary" size="sm" onClick={() => setEditing({ automation: null, template: { ...tpl, name: t(tpl.name), prompt: t(tpl.prompt) } })}>{t(tpl.name)}</Button>
+      {tab === 'agent' && (
+        <div id="automations-tab-agent" role="tabpanel">
+          {empty && (
+            <EmptyState compact icon={<Clock className="h-5 w-5" />} title={t('No automations yet')}
+              description={t('For example: a news briefing every morning, a weekly summary of your open tasks, or a check that tells you when a web page changes.')}
+              action={<Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => newAutomation()}>{t('New automation')}</Button>}>
+              {templates.length > 0 && <TemplateChoices templates={templates} onPick={newAutomation} />}
+            </EmptyState>
+          )}
+          <div className="flex flex-col gap-(--stack-gap)">
+            {items.map((a) => (
+              <AutomationCard key={a.id} automation={a} onEdit={() => setEditing({ automation: a })}
+                highlight={a.id === linked ? params.get('run') : undefined} />
             ))}
           </div>
-        </section>
+        </div>
       )}
 
-      </div>}
-
       <Lingering value={editing}>{(shown) => <AutomationDialog automation={shown.automation} template={shown.template} onClose={() => setEditing(null)} />}</Lingering>
+      <Lingering value={editingScript}>{(shown) => <ScriptDialog automation={shown.automation} onClose={() => setEditingScript(null)} />}</Lingering>
     </div>
   )
 }

@@ -184,5 +184,6 @@ const messages: Messages = {
   "Write and change automation scripts (code that runs without a model). They stay off until you approve the code on the Automations page.": "Написання та змінення скриптів автоматизацій (коду, що працює без моделі). Вони залишаються вимкненими, доки ви не дозволите код на сторінці «Автоматизації».",
   "Run scripts": "Запуск скриптів",
   "Start a script you approved and switched on.": "Запуск скрипту, який ви дозволили й увімкнули.",
+  "Or start from a template": "Або почніть із шаблону",
 }
 export default messages

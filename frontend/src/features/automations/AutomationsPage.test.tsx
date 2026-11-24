@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -29,11 +29,24 @@ vi.mock('@/features/settings/api', () => ({
   useSettings: () => ({ data: { automations: state.protections } }),
   useSaveSection: () => ({ mutate: state.save, isError: false, error: null }),
 }))
-vi.mock('./components/AutomationDialog', () => ({ AutomationDialog: () => null }))
+vi.mock('./components/AutomationDialog', () => ({
+  AutomationDialog: ({ template }: { template?: { name: string } }) => <p>automation dialog{template ? `: ${template.name}` : ''}</p>,
+}))
 vi.mock('./components/ScriptsTab', () => ({
   ScriptsTab: ({ scripts }: { scripts: { name: string }[] }) => <p>scripts: {scripts.map((s) => s.name).join(', ')}</p>,
 }))
-vi.mock('@/components/ui/ActionMenu', () => ({ ActionMenu: () => null })) // needs matchMedia, which jsdom lacks
+vi.mock('./components/ScriptDialog', () => ({ ScriptDialog: () => <p>script dialog</p> }))
+// The real menu needs matchMedia, which jsdom lacks: its actions as plain buttons.
+vi.mock('@/components/ui/ActionMenu', () => ({
+  ActionMenu: ({ label, actions }: { label?: string; actions: { label: string; onSelect?: () => void }[] }) => (
+    <div role="group" aria-label={label}>{actions.map((a) => <button key={a.label} type="button" onClick={a.onSelect}>{a.label}</button>)}</div>
+  ),
+}))
+// A desktop: the title and the New button are in the page's column.
+vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/hooks/useMediaQuery')>()),
+  useMediaQuery: () => true,
+}))
 
 const { AutomationsPage } = await import('./AutomationsPage')
 
@@ -171,5 +184,32 @@ describe('the automations page', () => {
     state.automations = [automation({ id: 's1', kind: 'script', name: 'Booking sync' })]
     show('/automations?automation=s1&run=r1')
     expect(screen.getByText('scripts: Booking sync')).toBeInTheDocument()
+  })
+
+  it('keeps an empty page compact: one New button, with the templates under it', async () => {
+    state.automations = []
+    show()
+    expect(screen.getByText('No automations yet')).toBeInTheDocument()
+    // Only the empty state's button: the header has none while the list is empty.
+    expect(screen.getAllByRole('button', { name: /New automation/ })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Daily summary' }))
+    expect(screen.getByText('automation dialog: Daily summary')).toBeInTheDocument()
+  })
+
+  it('moves the templates into the New menu once there are automations', async () => {
+    show()
+    expect(screen.queryByText('Or start from a template')).not.toBeInTheDocument()
+    const menu = screen.getByRole('group', { name: 'Start from a template' })
+    await userEvent.click(within(menu).getByRole('button', { name: 'Daily summary' }))
+    expect(screen.getByText('automation dialog: Daily summary')).toBeInTheDocument()
+  })
+
+  it('has the New button follow the tab', async () => {
+    show()
+    expect(screen.getByRole('button', { name: 'New automation' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Scripts' }))
+    expect(screen.queryByRole('button', { name: 'New automation' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'New script' }))
+    expect(screen.getByText('script dialog')).toBeInTheDocument()
   })
 })
