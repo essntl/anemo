@@ -181,5 +181,8 @@ const messages: Messages = {
   "No scripts yet": "Скриптов пока нет",
   "Ask the assistant to write one, e.g. “every morning, turn new bookings into tasks”, or write one yourself.": "Попросите ассистента написать скрипт, напр. «каждое утро превращай новые бронирования в задачи», или напишите его сами.",
   "Only when started": "Только при ручном запуске",
+  "Write and change automation scripts (code that runs without a model). They stay off until you approve the code on the Automations page.": "Написание и изменение скриптов автоматизаций (кода, который работает без модели). Они остаются выключенными, пока вы не разрешите код на странице «Автоматизации».",
+  "Run scripts": "Запуск скриптов",
+  "Start a script you approved and switched on.": "Запуск скрипта, который вы разрешили и включили.",
 }
 export default messages
