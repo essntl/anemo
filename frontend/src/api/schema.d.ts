@@ -3998,6 +3998,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automations/scripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Script
+         * @description A new script, written in the app: approved at once, off until switched on.
+         */
+        post: operations["create_script_api_automations_scripts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Script
+         * @description The approved version and the one waiting for review (for the diff), who wrote it
+         *     and which of its secrets are set.
+         */
+        get: operations["get_script_api_automations__automation_id__script_get"];
+        /**
+         * Save Script
+         * @description Save a new version from the app (approved at once: the user wrote it).
+         */
+        put: operations["save_script_api_automations__automation_id__script_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Script
+         * @description Approve the version waiting for review: the one with the hash the user looked at.
+         */
+        post: operations["approve_script_api_automations__automation_id__script_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Discard Change
+         * @description Throw the change waiting for review away; the approved version stays.
+         */
+        delete: operations["discard_change_api_automations__automation_id__script_pending_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/secrets/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Secret
+         * @description Set the value of one of the script's secrets (write-only: it is never shown).
+         */
+        put: operations["set_secret_api_automations__automation_id__script_secrets__name__put"];
+        post?: never;
+        /** Clear Secret */
+        delete: operations["clear_secret_api_automations__automation_id__script_secrets__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mcp/servers": {
         parameters: {
             query?: never;
@@ -4796,6 +4902,11 @@ export interface components {
              * @description Where it leads: the chat, or the automation's run
              */
             url: string | null;
+            /**
+             * Automation Kind
+             * @description For an automation: a prompt (agent) or a script; None otherwise
+             */
+            automation_kind?: ("agent" | "script") | null;
         };
         /** AgentStats */
         AgentStats: {
@@ -5148,6 +5259,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Kind
+             * @default agent
+             * @enum {string}
+             */
+            kind: "agent" | "script";
             /** Name */
             name: string;
             /** Prompt */
@@ -5225,6 +5342,16 @@ export interface components {
             last_run_id: string | null;
             /** Active Run Id */
             active_run_id?: string | null;
+            /**
+             * Script Approved
+             * @default false
+             */
+            script_approved: boolean;
+            /**
+             * Script Pending
+             * @default false
+             */
+            script_pending: boolean;
             /**
              * Created At
              * Format: date-time
@@ -9595,7 +9722,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "cron" | "interval" | "once" | "rrule";
+            kind: "cron" | "interval" | "once" | "rrule" | "manual";
             /** Cron */
             cron?: string | null;
             /** Every Minutes */
@@ -9633,6 +9760,143 @@ export interface components {
         Scope: {
             /** Roots */
             roots?: string[];
+        };
+        /** ScriptApproveIn */
+        ScriptApproveIn: {
+            /** Hash */
+            hash: string;
+            /**
+             * Enable
+             * @default false
+             */
+            enable: boolean;
+        };
+        /**
+         * ScriptCode
+         * @description What a version of a script is: its code and what the code may use. All of it is
+         *     reviewed together: changing any part is a new version.
+         */
+        ScriptCode: {
+            /** Code */
+            code: string;
+            /** Tools */
+            tools?: string[];
+            /** Hosts */
+            hosts?: string[];
+            /** Secrets */
+            secrets?: string[];
+            /** Think Tools */
+            think_tools?: string[];
+        };
+        /**
+         * ScriptCreateIn
+         * @description A new script from the app: approved at once (the user wrote or saw it), off
+         *     until it is switched on.
+         */
+        ScriptCreateIn: {
+            /** Code */
+            code: string;
+            /** Tools */
+            tools?: string[];
+            /** Hosts */
+            hosts?: string[];
+            /** Secrets */
+            secrets?: string[];
+            /** Think Tools */
+            think_tools?: string[];
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            schedule?: components["schemas"]["Schedule"];
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * On Ask
+             * @default pause
+             * @enum {string}
+             */
+            on_ask: "pause" | "deny" | "fail";
+            /**
+             * Notify
+             * @default agent_decides
+             * @enum {string}
+             */
+            notify: "agent_decides" | "always" | "on_failure" | "never";
+            /**
+             * Max Retries
+             * @default 0
+             */
+            max_retries: number;
+            /**
+             * Max Tool Calls
+             * @default 30
+             */
+            max_tool_calls: number;
+            /**
+             * Max Runtime S
+             * @default 300
+             */
+            max_runtime_s: number;
+            /** Chat Retention Days */
+            chat_retention_days?: number | null;
+        };
+        /** ScriptOut */
+        ScriptOut: {
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            approved: components["schemas"]["ScriptVersionOut"] | null;
+            pending: components["schemas"]["ScriptVersionOut"] | null;
+            owner: components["schemas"]["ActorOut"] | null;
+            /** Secrets */
+            secrets: components["schemas"]["ScriptSecretOut"][];
+        };
+        /** ScriptSecretIn */
+        ScriptSecretIn: {
+            /** Value */
+            value: string;
+        };
+        /** ScriptSecretOut */
+        ScriptSecretOut: {
+            /** Name */
+            name: string;
+            /** Value Hint */
+            value_hint: string | null;
+        };
+        /** ScriptVersionOut */
+        ScriptVersionOut: {
+            /** Number */
+            number: number;
+            /** Hash */
+            hash: string;
+            /** Code */
+            code: string;
+            /** Tools */
+            tools: string[];
+            /** Hosts */
+            hosts: string[];
+            /** Secrets */
+            secrets: string[];
+            /** Think Tools */
+            think_tools: string[];
+            created_by: components["schemas"]["ActorOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Approved At */
+            approved_at: string | null;
         };
         /** SearchGroup */
         SearchGroup: {
@@ -20564,6 +20828,253 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunStarted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_script_api_automations_scripts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_script_api_automations__automation_id__script_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_script_api_automations__automation_id__script_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptCode"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_script_api_automations__automation_id__script_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_change_api_automations__automation_id__script_pending_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_secret_api_automations__automation_id__script_secrets__name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+                name: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptSecretIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_secret_api_automations__automation_id__script_secrets__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+                name: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
                 };
             };
             /** @description Validation Error */

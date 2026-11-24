@@ -16870,6 +16870,475 @@
         }
       }
     },
+    "/api/automations/scripts": {
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Create Script",
+        "description": "A new script, written in the app: approved at once, off until switched on.",
+        "operationId": "create_script_api_automations_scripts_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScriptCreateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/{automation_id}/script": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Get Script",
+        "description": "The approved version and the one waiting for review (for the diff), who wrote it\nand which of its secrets are set.",
+        "operationId": "get_script_api_automations__automation_id__script_get",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Save Script",
+        "description": "Save a new version from the app (approved at once: the user wrote it).",
+        "operationId": "save_script_api_automations__automation_id__script_put",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScriptCode"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/{automation_id}/script/approve": {
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Approve Script",
+        "description": "Approve the version waiting for review: the one with the hash the user looked at.",
+        "operationId": "approve_script_api_automations__automation_id__script_approve_post",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScriptApproveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/{automation_id}/script/pending": {
+      "delete": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Discard Change",
+        "description": "Throw the change waiting for review away; the approved version stays.",
+        "operationId": "discard_change_api_automations__automation_id__script_pending_delete",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automations/{automation_id}/script/secrets/{name}": {
+      "put": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Set Secret",
+        "description": "Set the value of one of the script's secrets (write-only: it is never shown).",
+        "operationId": "set_secret_api_automations__automation_id__script_secrets__name__put",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScriptSecretIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Clear Secret",
+        "operationId": "clear_secret_api_automations__automation_id__script_secrets__name__delete",
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/mcp/servers": {
       "get": {
         "tags": [
@@ -19992,6 +20461,22 @@
             ],
             "title": "Url",
             "description": "Where it leads: the chat, or the automation's run"
+          },
+          "automation_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "agent",
+                  "script"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Kind",
+            "description": "For an automation: a prompt (agent) or a script; None otherwise"
           }
         },
         "type": "object",
@@ -20908,6 +21393,15 @@
             "format": "uuid",
             "title": "Id"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "script"
+            ],
+            "title": "Kind",
+            "default": "agent"
+          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -21190,6 +21684,16 @@
               }
             ],
             "title": "Active Run Id"
+          },
+          "script_approved": {
+            "type": "boolean",
+            "title": "Script Approved",
+            "default": false
+          },
+          "script_pending": {
+            "type": "boolean",
+            "title": "Script Pending",
+            "default": false
           },
           "created_at": {
             "type": "string",
@@ -32720,7 +33224,8 @@
               "cron",
               "interval",
               "once",
-              "rrule"
+              "rrule",
+              "manual"
             ],
             "title": "Kind"
           },
@@ -32838,6 +33343,432 @@
         "type": "object",
         "title": "Scope",
         "description": "Restricts a rule to workspace roots (top-level folders). \"*\" means any."
+      },
+      "ScriptApproveIn": {
+        "properties": {
+          "hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Hash"
+          },
+          "enable": {
+            "type": "boolean",
+            "title": "Enable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "hash"
+        ],
+        "title": "ScriptApproveIn"
+      },
+      "ScriptCode": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "tools": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_.-]+$"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Tools"
+          },
+          "hosts": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(\\*\\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Hosts"
+          },
+          "secrets": {
+            "items": {
+              "type": "string",
+              "maxLength": 60,
+              "minLength": 1,
+              "pattern": "^[A-Z][A-Z0-9_]*$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Secrets"
+          },
+          "think_tools": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_.-]+$"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Think Tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "ScriptCode",
+        "description": "What a version of a script is: its code and what the code may use. All of it is\nreviewed together: changing any part is a new version."
+      },
+      "ScriptCreateIn": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "tools": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_.-]+$"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Tools"
+          },
+          "hosts": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(\\*\\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Hosts"
+          },
+          "secrets": {
+            "items": {
+              "type": "string",
+              "maxLength": 60,
+              "minLength": 1,
+              "pattern": "^[A-Z][A-Z0-9_]*$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Secrets"
+          },
+          "think_tools": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_.-]+$"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Think Tools"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/Schedule"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "on_ask": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "deny",
+              "fail"
+            ],
+            "title": "On Ask",
+            "default": "pause"
+          },
+          "notify": {
+            "type": "string",
+            "enum": [
+              "agent_decides",
+              "always",
+              "on_failure",
+              "never"
+            ],
+            "title": "Notify",
+            "default": "agent_decides"
+          },
+          "max_retries": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Max Retries",
+            "default": 0
+          },
+          "max_tool_calls": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Tool Calls",
+            "default": 30
+          },
+          "max_runtime_s": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 30.0,
+            "title": "Max Runtime S",
+            "default": 300
+          },
+          "chat_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Retention Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "ScriptCreateIn",
+        "description": "A new script from the app: approved at once (the user wrote or saw it), off\nuntil it is switched on."
+      },
+      "ScriptOut": {
+        "properties": {
+          "automation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Automation Id"
+          },
+          "approved": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScriptVersionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScriptVersionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "secrets": {
+            "items": {
+              "$ref": "#/components/schemas/ScriptSecretOut"
+            },
+            "type": "array",
+            "title": "Secrets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "automation_id",
+          "approved",
+          "pending",
+          "owner",
+          "secrets"
+        ],
+        "title": "ScriptOut"
+      },
+      "ScriptSecretIn": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "ScriptSecretIn"
+      },
+      "ScriptSecretOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Hint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value_hint"
+        ],
+        "title": "ScriptSecretOut"
+      },
+      "ScriptVersionOut": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hosts"
+          },
+          "secrets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Secrets"
+          },
+          "think_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Think Tools"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "hash",
+          "code",
+          "tools",
+          "hosts",
+          "secrets",
+          "think_tools",
+          "created_by",
+          "created_at",
+          "approved_at"
+        ],
+        "title": "ScriptVersionOut"
       },
       "SearchGroup": {
         "properties": {

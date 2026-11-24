@@ -172,6 +172,13 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_schedule",
             "update_schedule",
             "delete_schedule",
+            # Automation scripts (spec 08): reading them, and writing or starting them
+            # (those ask by default).
+            "list_scripts",
+            "read_script",
+            "create_script",
+            "update_script",
+            "run_script",
             "get_current_time",
             "read_tool_output",
         ]

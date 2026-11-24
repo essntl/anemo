@@ -531,6 +531,17 @@ class UpdateSchedule(Tool):
             automation = await db.get(Automation, automation_id) if automation_id else None
             if automation is None:
                 return ToolResult(content=f"No schedule with id {args.id}.", is_error=True)
+            changed = args.model_fields_set - {"id"}
+            if automation.kind == "script" and not (
+                changed <= {"name", "enabled"} and args.enabled is not True
+            ):
+                # Its code, tools and switching it on go through the user's review
+                # (update_script, the Automations page), never an approval card.
+                return ToolResult(
+                    content="This is a script: change it with update_script. Only the user "
+                    "can switch a script on.",
+                    is_error=True,
+                )
             tz = await settings_service.user_timezone(db)
             changes: dict[str, object] = {
                 k: getattr(args, k)

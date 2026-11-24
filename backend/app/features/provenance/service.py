@@ -37,24 +37,29 @@ async def describe(db: AsyncSession, refs: Iterable[str | None]) -> dict[str, Ac
     chats = {a.chat_id for a in actors.values() if a.chat_id is not None}
     automations = {a.automation_id for a in actors.values() if a.automation_id is not None}
     titles: dict[uuid.UUID, str] = {}
-    names: dict[uuid.UUID, str] = {}
+    names: dict[uuid.UUID, tuple[str, str]] = {}
     if chats:
         rows = await db.execute(
             select(Conversation.id, Conversation.title).where(Conversation.id.in_(chats))
         )
         titles = {row_id: title for row_id, title in rows}
     if automations:
-        rows = await db.execute(
-            select(Automation.id, Automation.name).where(Automation.id.in_(automations))
+        found = await db.execute(
+            select(Automation.id, Automation.name, Automation.kind).where(
+                Automation.id.in_(automations)
+            )
         )
-        names = {row_id: name for row_id, name in rows}
+        names = {row_id: (name, kind) for row_id, name, kind in found}
     return {ref: _out(ref, actor, titles, names) for ref, actor in actors.items()}
 
 
 def _out(
-    ref: str, actor: Actor, titles: dict[uuid.UUID, str], names: dict[uuid.UUID, str]
+    ref: str,
+    actor: Actor,
+    titles: dict[uuid.UUID, str],
+    names: dict[uuid.UUID, tuple[str, str]],
 ) -> ActorOut:
-    label, url = USER_LABEL, None
+    label, url, kind = USER_LABEL, None, None
     if actor.kind == "external":
         label = EXTERNAL_LABEL
     elif actor.kind == "chat" and actor.chat_id is not None:
@@ -62,11 +67,12 @@ def _out(
         label = title if title is not None else DELETED_CHAT
         url = ref_url("chat", actor.chat_id) if title is not None else None
     elif actor.kind == "automation" and actor.automation_id is not None:
-        name = names.get(actor.automation_id)
-        label = name if name is not None else DELETED_AUTOMATION
-        if name is not None:
+        found = names.get(actor.automation_id)
+        label = found[0] if found is not None else DELETED_AUTOMATION
+        if found is not None:
+            kind = found[1]
             url = f"/automations?automation={actor.automation_id}&run={actor.run_id}"
-    return ActorOut(ref=ref, kind=actor.kind, label=label, url=url)
+    return ActorOut(ref=ref, kind=actor.kind, label=label, url=url, automation_kind=kind)  # type: ignore[arg-type]
 
 
 def phrase(actor: ActorOut) -> str:
@@ -78,6 +84,8 @@ def phrase(actor: ActorOut) -> str:
     if actor.kind == "automation":
         if actor.url is None:
             return "an automation that was deleted"
+        if actor.automation_kind == "script":
+            return f"the script “{actor.label}”"
         return f"the automation “{actor.label}”"
     if actor.kind == "external":
         return "a change made outside Anemo"

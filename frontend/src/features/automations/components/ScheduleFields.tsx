@@ -20,16 +20,18 @@ interface Props {
   preview: SchedulePreview
   /** The fewest minutes between runs (1 with a change check). */
   fewest?: number
+  /** The choices of how often (scripts add "Only when started"). */
+  options?: { value: Frequency; label: string }[]
 }
 
-export function ScheduleFields({ form, onChange, tz, preview, fewest = 5 }: Props) {
+export function ScheduleFields({ form, onChange, tz, preview, fewest = 5, options = FREQUENCY_OPTIONS }: Props) {
   const set = (patch: Partial<ScheduleForm>) => onChange({ ...form, ...patch })
 
   return (
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('Runs##how often')}>
-          <Select value={form.frequency} options={FREQUENCY_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} onValueChange={(v) => set({ frequency: v as Frequency })} />
+          <Select value={form.frequency} options={options.map((o) => ({ ...o, label: t(o.label) }))} onValueChange={(v) => set({ frequency: v as Frequency })} />
         </Field>
         {form.frequency === 'weekly' && (
           <Field label={t('On##day')}>
@@ -72,7 +74,9 @@ export function ScheduleFields({ form, onChange, tz, preview, fewest = 5 }: Prop
         )}
       </div>
       <div className="rounded-control bg-surface-2 px-3 py-2 text-[12.5px]" aria-live="polite">
-        {preview.problem ? (
+        {form.frequency === 'manual' ? (
+          <span className="text-muted">{t('It runs when you press Run now, or when an assistant starts it.')}</span>
+        ) : preview.problem ? (
           <span className="text-error">{preview.problem}</span>
         ) : preview.text ? (
           <>

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.actor import ActorKind
@@ -13,6 +15,9 @@ class ActorOut(BaseModel):
         "'deleted chat' / 'deleted automation' when it is gone"
     )
     url: str | None = Field(description="Where it leads: the chat, or the automation's run")
+    automation_kind: Literal["agent", "script"] | None = Field(
+        None, description="For an automation: a prompt (agent) or a script; None otherwise"
+    )
 
 
 class SourceIn(BaseModel):
