@@ -24,6 +24,11 @@ class VoiceTurnOut(BaseModel):
     say: str | None = None  # something to say instead (status, nothing heard)
 
 
+class VoiceTranscriptOut(BaseModel):
+    heard: str  # what the transcription model heard, as it heard it
+    say: str | None = None  # nothing was heard: what to say
+
+
 class VoiceReplyOut(BaseModel):
     decided: Literal["approve", "deny"] | None
     heard: str
@@ -50,10 +55,15 @@ async def voice_turn(
     audio: UploadFile | None = None,
     conversation_id: Annotated[uuid.UUID | None, Form()] = None,
     status: Annotated[bool, Form()] = False,
+    text: Annotated[str | None, Form(min_length=1, max_length=service.MAX_TEXT_CHARS)] = None,
+    voice_mode: Annotated[bool, Form()] = False,
+    keep_chat: Annotated[bool, Form()] = False,
 ) -> VoiceTurnOut:
-    """A spoken request: transcribed, made a clear request, and started as an agent run
-    in the Voice chat (or continuing `conversation_id` within the follow-up window)."""
-    data, content_type = await _read(audio)
+    """A spoken request: transcribed (or `text`, the transcript from `/voice/transcripts`),
+    made a clear request, and started as an agent run in the Voice chat (or continuing
+    `conversation_id` within the follow-up window; with `keep_chat`, whatever the window
+    says). `voice_mode`: the phone listens again after the answer."""
+    data, content_type = await _read(audio) if text is None else (b"", "")
     result = await service.turn(
         db,
         data,
@@ -61,10 +71,22 @@ async def voice_turn(
         conversation_id=conversation_id,
         status=status,
         token_id=session.token_id,
+        text=text,
+        voice_mode=voice_mode,
+        keep_chat=keep_chat,
     )
     if result.run_id is None:
         response.status_code = 200
     return VoiceTurnOut(**vars(result))
+
+
+@router.post("/transcripts", response_model=VoiceTranscriptOut, response_model_exclude_none=True)
+async def voice_transcript(db: Db, audio: UploadFile) -> VoiceTranscriptOut:
+    """Only transcribes: the phone matches its voice-mode commands on what was heard
+    before anything starts (docs/specs/07-voice-mode-android.md). Stores nothing."""
+    data, content_type = await _read(audio)
+    result = await service.transcript(db, data, content_type)
+    return VoiceTranscriptOut(heard=result.heard or "", say=result.say)
 
 
 @router.post("/replies", response_model=VoiceReplyOut, response_model_exclude_unset=True)

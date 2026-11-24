@@ -4623,10 +4623,33 @@ export interface paths {
         put?: never;
         /**
          * Voice Turn
-         * @description A spoken request: transcribed, made a clear request, and started as an agent run
-         *     in the Voice chat (or continuing `conversation_id` within the follow-up window).
+         * @description A spoken request: transcribed (or `text`, the transcript from `/voice/transcripts`),
+         *     made a clear request, and started as an agent run in the Voice chat (or continuing
+         *     `conversation_id` within the follow-up window; with `keep_chat`, whatever the window
+         *     says). `voice_mode`: the phone listens again after the answer.
          */
         post: operations["voice_turn_api_voice_turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/voice/transcripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Transcript
+         * @description Only transcribes: the phone matches its voice-mode commands on what was heard
+         *     before anything starts (docs/specs/07-voice-mode-android.md). Stores nothing.
+         */
+        post: operations["voice_transcript_api_voice_transcripts_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5189,6 +5212,11 @@ export interface components {
              */
             approval_id: string;
         };
+        /** Body_voice_transcript_api_voice_transcripts_post */
+        Body_voice_transcript_api_voice_transcripts_post: {
+            /** Audio */
+            audio: string;
+        };
         /** Body_voice_turn_api_voice_turns_post */
         Body_voice_turn_api_voice_turns_post: {
             /** Audio */
@@ -5200,6 +5228,18 @@ export interface components {
              * @default false
              */
             status: boolean;
+            /** Text */
+            text?: string | null;
+            /**
+             * Voice Mode
+             * @default false
+             */
+            voice_mode: boolean;
+            /**
+             * Keep Chat
+             * @default false
+             */
+            keep_chat: boolean;
         };
         /** BranchIn */
         BranchIn: {
@@ -10944,6 +10984,13 @@ export interface components {
              * @enum {string}
              */
             chat: "daily" | "single";
+        };
+        /** VoiceTranscriptOut */
+        VoiceTranscriptOut: {
+            /** Heard */
+            heard: string;
+            /** Say */
+            say?: string | null;
         };
         /**
          * VoiceTurnOut
@@ -21596,6 +21643,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_transcript_api_voice_transcripts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_transcript_api_voice_transcripts_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTranscriptOut"];
                 };
             };
             /** @description Validation Error */
