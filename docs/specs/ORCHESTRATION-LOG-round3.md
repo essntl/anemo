@@ -58,7 +58,7 @@ Audit findings that shaped the contracts:
   resumed the same round; for a time two C agents edited the same worktree. They
   noticed, the second one stopped (it left notes in the worktree and `_progress/`), and
   this session finished C, D and the log.
-- **Local toolchain** (`C:\devnemo\.local-env\`, not in the repo): portable Postgres 16
+- **Local toolchain** (`C:\dev\anemo\.local-env\`, not in the repo): portable Postgres 16
   + pgvector and Redis 8 on localhost, a Python 3.13 venv, .NET 8, JDK 17 + Android SDK
   35, Deno 2.9.8. The backend is Linux-only in places; two local-only shims make it
   testable here (POSIX `os.O_*` flags; `safe_fs` replaced by pathlib in a pytest plugin,
