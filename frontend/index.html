@@ -34,6 +34,7 @@
         root.dataset.theme = mode
         root.dataset.density = (look && look.density) || old.density || 'comfortable'
         root.dataset.glass = look && look.glass ? 'on' : 'off'
+        root.dataset.background = look && look.background ? 'on' : 'off'
         var vars = look && look[mode]
         if (vars) {
           for (var name in vars) {

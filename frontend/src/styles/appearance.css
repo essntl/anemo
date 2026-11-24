@@ -5,6 +5,14 @@
  * these rules win over the Tailwind utilities of the elements they change.
  */
 
+/* ---- The chat over the background ------------------------------------------------ */
+
+/* With a background, the conversation's panel is see-through, so the chat sits on the
+   picture (its blur and dim keep the text readable). Frosted glass, below, wins over this. */
+html[data-background='on'] .chat-panel {
+  background-color: transparent;
+}
+
 /* ---- Frosted glass --------------------------------------------------------------- */
 
 /* The panel keeps most of its colour, so text on it stays readable whatever is behind. */

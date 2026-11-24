@@ -144,6 +144,8 @@ export interface CachedLook {
   mode: ThemeMode
   density: Density
   glass: boolean
+  /** A background is chosen: the chat panel lets it show through. */
+  background: boolean
   light: Vars
   dark: Vars
 }
@@ -155,6 +157,7 @@ export function lookFor(a: Appearance): CachedLook {
     mode: a.mode,
     density: a.density,
     glass: a.glass,
+    background: a.background.kind !== 'none',
     light: cssVariables(a, 'light'),
     dark: cssVariables(a, 'dark'),
   }
@@ -170,6 +173,7 @@ export function applyLook(look: CachedLook, resolved: Resolved, root: HTMLElemen
   root.dataset.theme = resolved
   root.dataset.density = look.density
   root.dataset.glass = look.glass ? 'on' : 'off'
+  root.dataset.background = look.background ? 'on' : 'off'
   for (const name of MANAGED) root.style.removeProperty(name)
   for (const [name, value] of Object.entries(look[resolved])) root.style.setProperty(name, value)
 }

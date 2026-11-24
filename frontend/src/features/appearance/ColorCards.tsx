@@ -84,7 +84,7 @@ export function AccentCard() {
     <Card>
       <CardHeader title={t('Accent color')} description={t('Used for highlights, buttons and selection. Hover shades and the text on it follow automatically.')}
         actions={accent !== DEFAULT_ACCENT && (
-          <Button size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => set({ accent: DEFAULT_ACCENT })}>
+          <Button size="sm" variant="ghost" className="shrink-0 whitespace-nowrap" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => set({ accent: DEFAULT_ACCENT })}>
             {t('Reset to default')}
           </Button>
         )} />

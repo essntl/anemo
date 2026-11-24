@@ -85,6 +85,7 @@ describe('applying a look', () => {
     applyLook(lookFor({ ...DEFAULT_APPEARANCE, tint: '#336699', glass: true }), 'dark', root)
     expect(root.dataset.theme).toBe('dark')
     expect(root.dataset.glass).toBe('on')
+    expect(root.dataset.background).toBe('off')
     expect(root.style.getPropertyValue('--bg')).not.toBe('')
     applyLook(lookFor(DEFAULT_APPEARANCE), 'light', root)
     expect(root.style.getPropertyValue('--bg')).toBe('')
