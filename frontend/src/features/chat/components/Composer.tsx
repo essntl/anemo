@@ -1,8 +1,9 @@
 import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, Fragment, type DragEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
-import { ArrowUp, ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, SlidersHorizontal, Square, SquareSlash, X } from 'lucide-react'
+import { ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, SlidersHorizontal, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
+import { MESSAGE_BOX, MESSAGE_BOX_BORDER, MESSAGE_TEXT, SendButton } from '@/components/ui/MessageBox'
 import { toast } from '@/components/ui/toast'
 import { DictationButton } from '@/features/dictation/DictationButton'
 import { useDictationMessageBox } from '@/features/dictation/useDictationMessageBox'
@@ -350,10 +351,7 @@ export function Composer({
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
-      className={cn(
-        'relative rounded-panel border bg-card p-2 shadow-soft transition-colors focus-within:border-accent/60',
-        dragging ? 'border-accent bg-accent-soft' : 'border-border-strong',
-      )}
+      className={cn(MESSAGE_BOX, dragging ? 'border-accent bg-accent-soft' : MESSAGE_BOX_BORDER)}
     >
       {references.length > 0 && (
         <div className="flex flex-wrap gap-2 px-2 pb-1 pt-2">
@@ -448,7 +446,7 @@ export function Composer({
           aria-expanded={menuOpen ? true : undefined}
           aria-controls={menuOpen ? menuId : undefined}
           aria-activedescendant={menuOpen && matches.length ? `${menuId}-${Math.min(active, matches.length - 1)}` : undefined}
-          className={cn('pointer-events-auto block max-h-60 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-[14.5px] placeholder:text-subtle focus:outline-none',
+          className={cn(MESSAGE_TEXT, 'pointer-events-auto',
             resting && 'placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap')}
         />
       </div>
@@ -547,18 +545,7 @@ export function Composer({
               <Square className="h-3.5 w-3.5 fill-current" />
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={send}
-              aria-label={t('Send')}
-              disabled={!canSend}
-              className={cn(
-                'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-contrast transition-all pointer-coarse:h-10 pointer-coarse:w-10',
-                'hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40',
-              )}
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
+            <SendButton label={t('Send')} onClick={send} disabled={!canSend} />
           )}
         </div>
       </div>
