@@ -107,6 +107,50 @@ def test_step_4_leaves_a_stub_with_the_tool_calls():
     assert trim.trim(plain) == ({"type": "user", "anemo_trimmed": "too large"}, True)
 
 
+def test_step_4_keeps_what_places_an_event_under_its_sub_agent():
+    # A sub-agent's tool result, far too large: the stub still says whose it is and how
+    # the call ended (the Code page files it under its sub-agent and counts its end).
+    event = {
+        "type": "user",
+        "parent_tool_use_id": "toolu_agent",
+        "message": {
+            "content": [
+                {"type": "tool_result", "tool_use_id": "toolu_7", "is_error": True, "content": "x"}
+            ]
+            + [{"type": "text", "text": "q" * 590}] * 40
+        },
+        "tool_use_result": {"stdout": "z" * 590},
+    }
+    stored, trimmed = trim.trim(event)
+    assert trimmed is True
+    assert stored == {
+        "type": "user",
+        "parent_tool_use_id": "toolu_agent",
+        "message": {
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_7", "is_error": True}]
+        },
+        "anemo_trimmed": "too large",
+    }
+    # A background sub-agent's notice keeps its call id and status; a long or odd value
+    # is not kept.
+    notice = {
+        "type": "system",
+        "subtype": "task_notification",
+        "tool_use_id": "toolu_agent",
+        "status": "completed",
+        "parent_tool_use_id": None,
+        "summary": ["s" * 590] * 40,
+    }
+    assert trim.trim(notice)[0] == {
+        "type": "system",
+        "subtype": "task_notification",
+        "tool_use_id": "toolu_agent",
+        "status": "completed",
+        "anemo_trimmed": "too large",
+    }
+    assert "status" not in trim.stub_of({"type": "system", "status": "s" * 300})
+
+
 def test_size_counts_utf8_bytes_of_compact_json():
     assert trim.size({"a": "é"}) == len('{"a":"é"}'.encode())
     assert trim.size({"a": [1, 2]}) == len('{"a":[1,2]}')

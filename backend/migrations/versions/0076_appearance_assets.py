@@ -1,7 +1,7 @@
 """appearance: uploaded backgrounds, fonts and the avatar
 
-Revision ID: 0075
-Revises: 0074
+Revision ID: 0076
+Revises: 0075
 Create Date: 2026-11-24 12:00:00.000000
 
 docs/specs/11-appearance-customisation.md. The appearance and profile settings are
@@ -14,8 +14,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0075"
-down_revision: str | None = "0074"
+revision: str = "0076"
+down_revision: str | None = "0075"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

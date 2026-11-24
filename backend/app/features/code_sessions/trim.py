@@ -11,7 +11,10 @@ again, and its result is the one stored (the client can't be trusted to have don
   3. Still over: the same, from the event of step 1, for strings longer than 600
      characters, keeping 400 and 100.
   4. Still over: the event becomes {"type", "subtype"?, "anemo_trimmed": "too large"},
-     plus `message.content[].{type, name, id}` of its tool calls.
+     plus what places it: `parent_tool_use_id` (the sub-agent it belongs to) and
+     `tool_use_id` / `status` (a sub-agent's progress or end), `message.content[]
+     .{type, name, id}` of its tool calls and `.{type, tool_use_id, is_error}` of its
+     tool results (so a sub-agent's end is still seen).
 
 `clean` is not part of the algorithm: it makes an event storable in Postgres (jsonb
 takes no NUL character and no lone surrogate) and is applied before it.
@@ -105,22 +108,53 @@ def _cut(value: Any, longer_than: int, head: int, tail: int) -> tuple[Any, bool]
     return value, False
 
 
-def _stub(event: dict[str, Any]) -> dict[str, Any]:
-    """Step 4: what is left of an event that is still too large."""
+# Short fields that say where an event belongs (which sub-agent) and what it ends: a stub
+# keeps them when they are short texts (an id, a status) or booleans.
+PLACING = ("parent_tool_use_id", "tool_use_id", "status")
+_KEPT_BLOCK_FIELDS = {
+    "tool_use": ("type", "name", "id"),
+    "tool_result": ("type", "tool_use_id", "is_error"),
+}
+_MAX_KEPT = 200  # characters of a kept text field
+
+
+def _short(value: Any) -> bool:
+    return isinstance(value, bool) or (isinstance(value, str) and len(value) <= _MAX_KEPT)
+
+
+def stub_of(event: dict[str, Any], *, blocks: bool = True) -> dict[str, Any]:
+    """What is left of an event that isn't kept whole: its type (and subtype) and what
+    places it (PLACING), and with `blocks` its tool calls' and results' ids. Used for
+    step 4 and for the events stored as stubs once a job holds 5 MB (ingest.py)."""
     stub: dict[str, Any] = {"type": event.get("type")}
     if "subtype" in event:
         stub["subtype"] = event["subtype"]
-    stub["anemo_trimmed"] = "too large"
+    for key in PLACING:
+        if key in event and _short(event[key]):
+            stub[key] = event[key]
+    if not blocks:
+        return stub
     message = event.get("message")
     content = message.get("content") if isinstance(message, dict) else None
     if isinstance(content, list):
-        calls = [
-            {k: block[k] for k in ("type", "name", "id") if k in block}
+        kept = [
+            {
+                k: block[k]
+                for k in _KEPT_BLOCK_FIELDS[block["type"]]
+                if k in block and _short(block[k])
+            }
             for block in content
-            if isinstance(block, dict) and block.get("type") == "tool_use"
+            if isinstance(block, dict) and block.get("type") in _KEPT_BLOCK_FIELDS
         ]
-        if calls:
-            stub["message"] = {"content": calls}
+        if kept:
+            stub["message"] = {"content": kept}
+    return stub
+
+
+def _stub(event: dict[str, Any]) -> dict[str, Any]:
+    """Step 4: what is left of an event that is still too large."""
+    stub = stub_of(event)
+    stub["anemo_trimmed"] = "too large"
     return stub
 
 

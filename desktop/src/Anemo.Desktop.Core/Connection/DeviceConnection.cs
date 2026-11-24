@@ -36,7 +36,11 @@ public sealed class DeviceConnectionOptions
 
     public Func<Backoff> Backoff { get; init; } = Connection.Backoff.Default;
 
-    public int MaxMessageBytes { get; init; } = 4 * 1024 * 1024;
+    /// <summary>
+    /// The largest message taken from Anemo. A <c>code_start</c> with images (up to 10 MB of
+    /// them, as base64) is the largest there is.
+    /// </summary>
+    public int MaxMessageBytes { get; init; } = 16 * 1024 * 1024;
 }
 
 /// <summary>

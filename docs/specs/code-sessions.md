@@ -37,6 +37,7 @@ claude_code.py`, `claude-runner/`) is unrelated and is not used.
 | D12 | The branch is taken from the events (`git checkout -b`, `git switch -c`, `git push -u <remote> <branch>`, "Switched to a new branch '…'") and otherwise from the client, which reads `<dir>\.git\HEAD` when it sends `code.job`. Events win. | Free, needs no process on the computer. |
 | D13 | `total_cost_usd` is shown as **API-equivalent cost**, never as money spent. | Artem uses a Claude subscription. |
 | D14 | Phase 2 commands are `device.command` actions (`code_projects`, `code_start`, `code_cancel`) and need a second desktop setting, "Let Anemo start Claude Code jobs" (off by default), advertised in `device.offer`. | Starting a job with `bypassPermissions` is as strong as PowerShell; it gets its own switch. |
+| D15 | Images with a prompt are files in the job's folder whose paths the prompt lists (§13), not `--input-format stream-json` image blocks. | Works for a new job and `--resume` alike with the `claude -p` command line, `prompt.txt` and the folder format unchanged; easy to port. |
 
 ## 3. Protocol (phase 1)
 
@@ -227,9 +228,13 @@ with Pydantic (`Field` limits), open a session, do the work, commit, publish, ac
   (`https://github\.com/[\w.-]+/[\w.-]+/pull/\d+` in tool results, assistant text and the
   result), branch (D12), and the `result` fields. A `result` event makes the job
   terminal (`done` / `failed`).
-- **Over 5 MB** (`stored_bytes`): later events are stored as stubs
-  `{"type": <type>}` with `dropped: true`, except `result` events and assistant events
-  holding a `TodoWrite` call, which are still stored (trimmed). `truncated` is set.
+- **Over 5 MB** (`stored_bytes`): later events are stored as stubs with `dropped: true`:
+  `{"type": <type>}` plus what places the event (the fields step 4 of §6 keeps:
+  `parent_tool_use_id`, `tool_use_id`, `status`, the ids of its tool calls and results),
+  so the page still files it under its sub-agent (§7.5). Still stored whole (trimmed):
+  `result` events, assistant events holding a `TodoWrite` call, and what starts or ends
+  a sub-agent (a `Task` / `Agent` call, a tool result with `tool_use_result.agentId`,
+  `system/task_started`, `task_notification`, `task_updated`). `truncated` is set.
 - **Publishing** (after commit): `code:{job_id}` stream (maxlen 2000, TTL 24 h) gets
   `code.events` `{job_id, events: [CodeEventOut]}` and `code.job` `{job: CodeJobOut}`
   on every change; the global stream gets `code.job` `{job_id, thread_id, state,
@@ -296,7 +301,11 @@ Applied to one event; `limit` = 16 000 bytes of compact UTF-8 JSON.
 3. If still over: starting again from step 1's result, cut every string longer than 600
    characters to its first 400 and last 100.
 4. If still over: replace the event with `{"type", "subtype"?, "anemo_trimmed": "too
-   large"}` (plus `message.content[].{type,name,id}` of tool calls when present).
+   large"}`, plus what places it: `parent_tool_use_id`, `tool_use_id` and `status` when
+   each is a text of at most 200 characters (or a boolean), `message.content[].{type,
+   name,id}` of tool calls and `message.content[].{type,tool_use_id,is_error}` of tool
+   results (each field only when short, as above). Without these a sub-agent's events
+   would move to the main agent's timeline, and its end would be lost (§7.5).
 
 `trimmed` is true when any step changed the event. Phase 1 server limits: 16 000 bytes
 per event, 5 MB per job (§5.2).
@@ -344,7 +353,8 @@ keywords "claude code jobs sessions"). Ukrainian and Russian texts.
     `tool_use_result.structuredPatch`, else from `old_string`/`new_string`, else the
     content), Read (path, lines), Grep / Glob (pattern, path), WebFetch / WebSearch (URL
     / query), TodoWrite (the list), Task / Agent (description; its events — those with
-    `parent_tool_use_id` = the call's id — nested inside), anything else (name, input
+    `parent_tool_use_id` = the call's id — nested inside, or, when the thread lists its
+    sub-agents (§7.5), a link to the sub-agent's own view), anything else (name, input
     JSON, result text). A call without a result yet shows a spinner while running.
   - `is_error` results highlighted.
   - `raw` → plain text; dropped events collapse into "N events not stored (over
@@ -358,6 +368,39 @@ keywords "claude code jobs sessions"). Ukrainian and Russian texts.
 - Live: the latest running job's SSE stream; on open (and after a gap in seq) the page
   fetches `events?after_seq=<last seq it has>` and merges by seq.
 - Everything from a job is untrusted: Markdown or plain text, never raw HTML.
+
+### 7.5 Sub-agents
+
+A job whose main agent starts sub-agents (`Task` / `Agent` calls) gets a list of its
+agents, so their work isn't mixed into one timeline (`agents.ts`, pure and tested
+against a shortened real job, `agents.fixture.json`).
+
+- **Grouping**: every event a sub-agent writes carries `parent_tool_use_id` = the id of
+  the call that started it; a sub-agent's own sub-agents carry *their* call's id (made
+  inside the outer one), so the agents form a tree. "Main" holds the events without a
+  parent, and those whose parent isn't a known call (its event wasn't stored).
+- **State**: a foreground sub-agent ends with its call's `tool_result` (`is_error` →
+  failed; `tool_use_result.totalDurationMs`, `totalToolUseCount`). A background one
+  (`run_in_background`) gets a `tool_result` at once (`tool_use_result.status:
+  "async_launched"`) and ends with `system/task_notification` (`tool_use_id` = the call,
+  `status: "completed"` → done, anything else → failed; or `task_updated` with
+  `patch.status`). While it runs, `system/task_progress` (same `tool_use_id`) reports
+  `usage.duration_ms` and `usage.tool_uses`. Still running when the job ended →
+  "stopped". Times come from the events' own `timestamp`, else from `created_at`.
+- **Layout**: from `xl` up, a 256 px column right of the thread lists "Main agent" and
+  every sub-agent (indented by depth): state icon (a spinner while running),
+  description (the call's `description`, else its prompt's first line), `subagent_type`,
+  duration (counting up while it runs) and its own tool calls. Below `xl`, a compact
+  switcher in the thread's top bar opens the same list (a popup from `md` up, a bottom
+  sheet on a phone). No list for a job without sub-agents.
+- **Selection**: `?agent=<call id>` in the address (a reload keeps it; links to other
+  jobs and to the list drop it). A sub-agent's view shows its description, state and
+  prompt (from the call), its own events, and its answer when it was a foreground one.
+  In "Main", each Agent call has "Open this sub-agent", and its row shows the
+  sub-agent's state instead of a spinner. The follow-up box stays.
+- **Live**: the job's events are read from the same queries the timeline keeps live, so a
+  new sub-agent or a sub-agent's end shows as its event arrives.
+- Branch and pull request stay in the header; the column doesn't repeat them.
 
 ### 7.4 Phase 2 controls
 
@@ -596,3 +639,38 @@ makes those exact.
 - A 504 or a network error while starting: a toast says the job may have started, and
   the list and devices are refetched.
 - `device_busy` is shown with the server's message, like the other codes.
+
+## 13. Images with a prompt
+
+The New job dialog, the follow-up box and a queued message take images: PNG, JPEG, WebP
+or GIF, picked with a button, dropped on the box or pasted into its text, shown as
+thumbnails that can be removed before sending (the chat's `AttachmentChip`).
+
+- **Upload first**: each image is uploaded as soon as it is added (`POST
+  /api/attachments`, as in the chat), so a request only carries ids: `POST
+  /api/code/jobs` and `POST /api/code/jobs/{id}/follow-up` take `image_ids` (at most 8).
+  A queued message keeps the ids (in the browser, with its text) until it is sent; so
+  does a thread's draft and the New job dialog's.
+- **Checks** (`code_sessions/images.py`): each id must be an image attachment (by its
+  content) of at most 10 MB; it is scaled down to what a model looks at (≤ 1568 px,
+  ≤ 3 MB; `attachments/images.py`), and all of one message to ≤ 8 MB together. Errors:
+  `bad_image`, `too_many_images`, `images_too_large` (422) with a sentence; the computer
+  must offer `code_images` (`images_unsupported`, 409: "update Anemo Desktop to 1.3.0").
+  The page checks type, size and count before uploading and says why it refused a file.
+- **Names**: the server names each file `<n>-<safe part of the uploaded name>.<real
+  type>` (only letters, digits, `.`, `_`, `-`; no path, no leading dot); the computer
+  checks the same pattern again.
+- **Transport** (D15, `docs/device-contracts.md` §7.4): the `code_start` command carries
+  the images as base64; the computer writes them to `<job>\images\` and lists their full
+  paths after the prompt in `prompt.txt`; Claude Code opens them with its Read tool.
+  Rejected alternative: `--input-format stream-json` with image content blocks would have
+  needed a JSON prompt on stdin for every job, changed what `prompt.txt` holds (which
+  `cc.ps1`, agents and the page read), put the image bytes in the session transcript sent
+  again with every resumed turn, and needed the same JSON building in every port.
+- **The row**: `code_jobs.images` (`[{id, name}]`, migration 0075) for a job Anemo started
+  with images; `CodeJobOut.images`. While it has any, the job's `prompt` and `title` stay
+  what Anemo sent (the computer's `prompt.txt` also has the list of paths). The thread
+  shows them as thumbnails in the prompt's bubble (a tap shows one large); a queued
+  message shows them too.
+- **Retention**: pruning a job (§5.3) deletes its images' attachments unless a chat or a
+  job that stays has them.

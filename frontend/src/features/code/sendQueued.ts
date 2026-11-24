@@ -49,7 +49,7 @@ export async function sendQueued(qc: QueryClient, threadId: string, job: CodeJob
       const message = await codeQueue.take(threadId)
       if (!message) return
       try {
-        await sendFollowUp(qc, job.id, message.text)
+        await sendFollowUp(qc, job.id, message.text, message.images ?? [])
         toast({ message: t('Queued message sent: “{title}”', { title: named(title) }) })
       } catch (err) {
         holdQueued(threadId, message, startErrorMessage(err), title)

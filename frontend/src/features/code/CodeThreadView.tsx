@@ -3,9 +3,13 @@
  * §7.3): the header, the todo list (pinned while the job runs), and each job's prompt,
  * timeline and result, with a separator per follow-up. A running job follows its live
  * stream; the view sticks to the bottom until the user scrolls up.
+ *
+ * When the jobs started sub-agents (agents.ts), their work isn't mixed into the main
+ * timeline: a list beside the thread (a switcher in the top bar on narrower screens)
+ * picks the agent whose events are shown, kept in the address as `?agent=<call id>`.
  */
-import { type ReactNode, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { type ReactNode, useCallback, useMemo, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import {
   ArrowDown, ArrowLeft, CheckCircle2, ChevronRight, Copy, GitBranch, GitPullRequest, Loader2, Monitor, Ban, TriangleAlert, XCircle, Folder,
 } from 'lucide-react'
@@ -20,12 +24,16 @@ import { Avatar } from '@/features/profile/Avatar'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
-import { useCodeEvents, useCodeJob } from './api'
+import { AGENT_PARAM, type AgentInfo, MAIN, agentTree, agentsOf, eventsOfAgent } from './agents'
+import { type AgentNav, AgentNavContext, type ThreadAgent } from './agentNav'
+import { AgentFacts, AgentSidebar, AgentStatusIcon, AgentSwitcher } from './AgentSidebar'
+import { useCodeEvents, useCodeJob, useThreadEvents } from './api'
 import { CodeTimeline } from './CodeTimeline'
 import { CancelJobButton, FollowUpBox, FromChat } from './controls'
 import { JobContext } from './jobContext'
 import { StateBadge, TodoChecklist } from './parts'
 import { type CodeJob, jobDurationMs, pullRequest, toThreads } from './threads'
+import { PromptImages } from './ImageAttachments'
 import { useFollowEnd } from './useFollowEnd'
 import { type ResultInfo, buildTimeline, num, resultOf, todoProgress, toTodos } from './timeline'
 
@@ -93,8 +101,8 @@ function ResultCard({ job, result }: { job: CodeJob; result?: ResultInfo }) {
   )
 }
 
-/** The prompt that started a job, as the user's message. Long ones fold. */
-function Prompt({ text }: { text: string }) {
+/** The prompt that started a job, as the user's message, with the images sent with it. Long ones fold. */
+function Prompt({ text, images = [] }: { text: string; images?: readonly { id: string; name: string }[] }) {
   const [all, setAll] = useState(false)
   const long = text.length > 800 || text.split('\n').length > 14
   return (
@@ -107,18 +115,72 @@ function Prompt({ text }: { text: string }) {
             {all ? t('Show less') : t('Show all')}
           </button>
         )}
+        <PromptImages images={images} className="mt-2" />
       </div>
       <Avatar size={28} className="max-md:hidden" />
     </div>
   )
 }
 
-/** One job of the thread: its prompt, its timeline (live while it runs) and its result. */
-function JobPart({ job, index }: { job: CodeJob; index: number }) {
+/** A sub-agent's view starts with what it was asked, and the way back to the main agent. */
+function AgentHead({ agent, onMain }: { agent: AgentInfo; onMain: () => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 text-[12.5px] text-muted">
+        <button type="button" onClick={onMain} className="inline-flex items-center gap-1 rounded px-1 font-medium text-accent hover:underline">
+          <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />{t('Main agent')}
+        </button>
+        <span aria-hidden="true">/</span>
+        <AgentStatusIcon status={agent.status} />
+        <span className="min-w-0 break-words font-medium text-text">{agent.description}</span>
+        {agent.type && <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px]">{agent.type}</span>}
+        <span className="text-subtle"><AgentFacts agent={agent} /></span>
+      </div>
+      {agent.prompt && <Prompt text={agent.prompt} />}
+    </div>
+  )
+}
+
+/**
+ * One job of the thread: its prompt, its timeline (live while it runs) and its result.
+ * `agent`: the agent shown (MAIN, or a sub-agent's call id); `agents`: this job's
+ * sub-agents. A part whose job didn't start the sub-agent shown draws nothing (it still
+ * keeps its events live).
+ */
+function JobPart({ job, index, agent, agents, onMain }: { job: CodeJob; index: number; agent: string; agents: AgentInfo[]; onMain: () => void }) {
   const running = job.state === 'running'
   const events = useCodeEvents(job.id, { live: running, lastSeq: job.last_seq })
-  const items = useMemo(() => buildTimeline(events.data ?? []), [events.data])
+  const own = agent === MAIN ? undefined : agents.find((a) => a.id === agent)
+  const shown = useMemo(() => {
+    const all = events.data ?? []
+    return agents.length ? eventsOfAgent(all, agents, own?.id ?? MAIN) : all
+  }, [events.data, agents, own?.id])
+  const items = useMemo(() => buildTimeline(shown), [shown])
   const view = useMemo(() => ({ job, running }), [job, running])
+  if (agent !== MAIN && !own) return null
+  if (own) {
+    return (
+      <JobContext.Provider value={view}>
+        <div data-testid="code-agent" className="flex flex-col gap-2">
+          <AgentHead agent={own} onMain={onMain} />
+          <div className="min-w-0">
+            <CodeTimeline items={items} />
+            {own.status === 'running' && (
+              <p className="flex items-center gap-2 px-2 py-1.5 text-[12.5px] text-muted">
+                <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin text-tool-running" />
+                <span className="shimmer">{items.length ? t('Working…') : t('Waiting for the first events…')}</span>
+              </p>
+            )}
+            {own.resultText && (
+              <section aria-label={t('Result')} className={cn('mx-2 mt-3 rounded-xl border bg-surface p-3', own.status === 'failed' ? 'border-error/40' : 'border-border')}>
+                <div className="min-w-0 text-[14px]"><Markdown text={own.resultText} /></div>
+              </section>
+            )}
+          </div>
+        </div>
+      </JobContext.Provider>
+    )
+  }
   return (
     <JobContext.Provider value={view}>
       <div data-testid="code-job" className="flex flex-col gap-2">
@@ -130,7 +192,7 @@ function JobPart({ job, index }: { job: CodeJob; index: number }) {
           </div>
         )}
         <FromChat job={job} />
-        <Prompt text={job.prompt} />
+        <Prompt text={job.prompt} images={job.images ?? []} />
         <div className="min-w-0">
           {events.isPending && <p className="px-2 py-1 text-[12.5px] text-muted">{t('Loading…')}</p>}
           {events.isError && (
@@ -249,7 +311,7 @@ function Header({ thread }: { thread: CodeJob[] }) {
  * header (the app's top bar with the "Code" title is hidden there, see `ownPhoneHeader`
  * in app/router.tsx): one row as tall as a chat's header.
  */
-function TopBar({ thread, backTo }: { thread: CodeJob[]; backTo: string }) {
+function TopBar({ thread, backTo, switcher }: { thread: CodeJob[]; backTo: string; switcher?: ReactNode }) {
   const location = useLocation()
   const latest = thread.at(-1)
   // A phone while the Dynamic Island shows: it floats over the middle of this bar, so the
@@ -261,6 +323,7 @@ function TopBar({ thread, backTo }: { thread: CodeJob[]; backTo: string }) {
       <StateBadge state={latest.state} />
       {latest.state === 'running' && <Elapsed since={latest.started_at} className="shrink-0 text-[12.5px] text-muted max-sm:hidden" />}
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{thread[0].title || t('(no title)')}</span>
+      {switcher}
       <CancelJobButton job={latest} />
     </>
   )
@@ -278,6 +341,27 @@ function TopBar({ thread, backTo }: { thread: CodeJob[]; backTo: string }) {
   )
 }
 
+/** Wide enough for the list of agents as a column of its own (`xl`); narrower, it is a switcher in the top bar. */
+const WIDE = '(min-width: 1280px)'
+
+/** The sub-agents of every job of the thread: per job, and all of them in the order they are listed. */
+function useThreadAgents(thread: CodeJob[]) {
+  const ids = useMemo(() => thread.map((j) => j.id), [thread])
+  const events = useThreadEvents(ids)
+  return useMemo(() => {
+    const perJob = new Map<string, AgentInfo[]>()
+    const all: ThreadAgent[] = []
+    for (const job of thread) {
+      const agents = agentsOf(events[job.id] ?? [], job.state === 'running')
+      perJob.set(job.id, agents)
+      all.push(...agentTree(agents).map((a) => ({ ...a, jobId: job.id })))
+    }
+    return { perJob, all }
+  }, [thread, events])
+}
+
+const NO_AGENTS: AgentInfo[] = []
+
 /** The thread of the job `jobId`. `backTo` is the list's address (narrow screens show a back link). */
 export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: string }) {
   const detail = useCodeJob(jobId)
@@ -292,38 +376,66 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
   // follow what comes until the user scrolls up.
   const { scroller, content, away, toEnd } = useFollowEnd()
 
+  // The agent shown: from the address; one this thread doesn't have (yet) shows the main one.
+  const { perJob, all: agents } = useThreadAgents(thread)
+  const [params, setParams] = useSearchParams()
+  const wanted = params.get(AGENT_PARAM)
+  const selected = wanted && agents.some((a) => a.id === wanted) ? wanted : MAIN
+  const select = useCallback((agent: string) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (agent === MAIN) next.delete(AGENT_PARAM)
+      else next.set(AGENT_PARAM, agent)
+      return next
+    })
+  }, [setParams])
+  const nav = useMemo<AgentNav | null>(
+    () => (agents.length ? { byId: new Map(agents.map((a) => [a.id, a])), select } : null),
+    [agents, select],
+  )
+  const wide = useMediaQuery(WIDE)
+  const showMain = useCallback(() => select(MAIN), [select])
+
   return (
     // The thread scrolls; the bar over it and the follow-up box under it stay.
     <div className="flex h-full flex-col">
-      <TopBar thread={thread} backTo={backTo} />
-      <div className="relative min-h-0 flex-1">
-        <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
-          <div ref={content} className="mx-auto max-w-3xl px-2 pb-6 pt-4 md:px-6">
-            {detail.isPending && <p className="p-2 text-[13px] text-muted">{t('Loading…')}</p>}
-            {detail.isError && (
-              <div className="p-2 text-[13px]">
-                <p className="text-error">{errorMessage(detail.error)}</p>
-                <Button size="sm" className="mt-2" onClick={() => void detail.refetch()}>{t('Try again')}</Button>
+      <TopBar thread={thread} backTo={backTo}
+        switcher={nav && !wide ? <AgentSwitcher agents={agents} selected={selected} onSelect={select} /> : undefined} />
+      <AgentNavContext.Provider value={nav}>
+        <div className="flex min-h-0 flex-1">
+          <div className="relative min-h-0 min-w-0 flex-1">
+            <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
+              <div ref={content} className="mx-auto max-w-3xl px-2 pb-6 pt-4 md:px-6">
+                {detail.isPending && <p className="p-2 text-[13px] text-muted">{t('Loading…')}</p>}
+                {detail.isError && (
+                  <div className="p-2 text-[13px]">
+                    <p className="text-error">{errorMessage(detail.error)}</p>
+                    <Button size="sm" className="mt-2" onClick={() => void detail.refetch()}>{t('Try again')}</Button>
+                  </div>
+                )}
+                {latest && (
+                  <>
+                    <Header thread={thread} />
+                    <Todos job={latest} />
+                    <div className="flex flex-col">
+                      {thread.map((job, i) => (
+                        <JobPart key={job.id} job={job} index={i} agent={selected} agents={perJob.get(job.id) ?? NO_AGENTS} onMain={showMain} />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-            {latest && (
-              <>
-                <Header thread={thread} />
-                <Todos job={latest} />
-                <div className="flex flex-col">
-                  {thread.map((job, i) => <JobPart key={job.id} job={job} index={i} />)}
-                </div>
-              </>
+            </div>
+            {away && (
+              <Button size="sm" icon={<ArrowDown className="h-3.5 w-3.5" />} className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-border shadow-float"
+                onClick={() => toEnd(true)}>
+                {latest?.state === 'running' ? t('Jump to latest') : t('Jump to the end')}
+              </Button>
             )}
           </div>
+          {nav && wide && <AgentSidebar agents={agents} selected={selected} onSelect={select} />}
         </div>
-        {away && (
-          <Button size="sm" icon={<ArrowDown className="h-3.5 w-3.5" />} className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-border shadow-float"
-            onClick={() => toEnd(true)}>
-            {latest?.state === 'running' ? t('Jump to latest') : t('Jump to the end')}
-          </Button>
-        )}
-      </div>
+      </AgentNavContext.Provider>
       {latest && <div className="shrink-0"><FollowUpBox job={latest} title={thread[0]?.title} onSent={toEnd} /></div>}
     </div>
   )

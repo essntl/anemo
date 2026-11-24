@@ -66,7 +66,7 @@ security-sensitive (no re-auth).
 
 ### Uploaded files: one table, files on disk
 
-`appearance_assets` (migration 0075): `kind` (`background`, `font`, `avatar`), `media`
+`appearance_assets` (migration 0076): `kind` (`background`, `font`, `avatar`), `media`
 (`image`, `animated`, `video`, `font`), `mime`, `size`, original `filename`, `has_poster`.
 Bytes live under `DATA_PATH/appearance/<id>/` (so they are in the backups).
 

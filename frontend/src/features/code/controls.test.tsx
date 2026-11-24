@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,13 +10,28 @@ import { codeJob } from './testJobs'
 type Callbacks = { onSuccess?: (v: unknown) => void; onError?: (e: unknown) => void }
 const cancelJob = vi.fn()
 const followUp = vi.fn()
+/** The images of each follow-up sent (by the box or by the queue), as ids. */
+const sentImages: string[][] = []
 let fail: unknown = null
 vi.mock('./api', async (importOriginal) => ({
   startErrorMessage: (await importOriginal<typeof import('./api')>()).startErrorMessage,
   useCancelJob: () => ({ isPending: false, mutate: (id: string, cb: Callbacks) => { cancelJob(id); if (fail) cb.onError?.(fail); else cb.onSuccess?.({}) } }),
-  useFollowUp: (jobId: string) => ({ isPending: false, mutate: (prompt: string, cb: Callbacks) => { followUp(jobId, prompt); if (fail) cb.onError?.(fail); else cb.onSuccess?.({}) } }),
+  useFollowUp: (jobId: string) => ({
+    isPending: false,
+    mutate: ({ prompt, images = [] }: { prompt: string; images?: { id: string }[] }, cb: Callbacks) => {
+      followUp(jobId, prompt)
+      sentImages.push(images.map((i) => i.id))
+      if (fail) cb.onError?.(fail)
+      else cb.onSuccess?.({})
+    },
+  }),
   // The queue's own way to send (CodeQueueRunner).
-  sendFollowUp: async (_qc: unknown, jobId: string, prompt: string) => { followUp(jobId, prompt); if (fail) throw fail; return {} },
+  sendFollowUp: async (_qc: unknown, jobId: string, prompt: string, images: { id: string }[] = []) => {
+    followUp(jobId, prompt)
+    sentImages.push(images.map((i) => i.id))
+    if (fail) throw fail
+    return {}
+  },
   useCodeJob: () => ({ data: undefined, isError: false }),
 }))
 const toasts = vi.hoisted(() => [] as string[])
@@ -24,6 +39,18 @@ const undo = vi.hoisted(() => [] as (() => void)[])
 vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string; action?: { onClick: () => void } }) => { toasts.push(o.message); if (o.action) undo.push(o.action.onClick) } }))
 const confirm = vi.fn()
 vi.mock('@/components/ui/dialogs', () => ({ confirmDialog: (...a: unknown[]) => confirm(...a) }))
+
+// An image upload (the chat's POST /api/attachments): answered with an id, or held until `release`.
+const uploads = vi.hoisted(() => ({ n: 0, hold: false, waiting: [] as (() => void)[] }))
+vi.mock('@/features/chat/useAttachments', () => ({
+  uploadAttachment: (file: File) => new Promise((resolve) => {
+    uploads.n += 1
+    const done = () => resolve({ id: `att-${uploads.n}`, filename: file.name, mime: file.type, size: file.size, kind: 'image', extraction_note: null })
+    if (uploads.hold) uploads.waiting.push(done)
+    else done()
+  }),
+}))
+const png = (name: string, size = 100) => new File([new Uint8Array(size)], name, { type: 'image/png' })
 
 // `coarse`: a touch screen (the only media query the follow-up box asks).
 const media = vi.hoisted(() => ({ coarse: false }))
@@ -43,7 +70,13 @@ beforeEach(() => {
   fail = null
   media.coarse = false
   localStorage.clear()
-  useCodeQueue.setState({ byThread: {}, drafts: {} })
+  useCodeQueue.setState({ byThread: {}, drafts: {}, draftImages: {} })
+  sentImages.length = 0
+  uploads.n = 0
+  uploads.hold = false
+  uploads.waiting.length = 0
+  URL.createObjectURL = vi.fn(() => 'blob:preview')
+  URL.revokeObjectURL = vi.fn()
 })
 
 describe('Cancel', () => {
@@ -283,5 +316,92 @@ describe('From chat', () => {
     expect(screen.getByRole('link')).toHaveTextContent('From chat: Untitled')
     rerender(wrap(<FromChat job={codeJob()} />))
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('Images in the follow-up box', () => {
+  const ended = () => codeJob({ id: 'j9', thread_id: 't1', state: 'done', session_id: 'sess-1' })
+  const running = () => codeJob({ id: 'r1', thread_id: 't1', state: 'running', session_id: 'sess-1' })
+  const pick = (...files: File[]) => userEvent.upload(screen.getByTestId('code-image-input'), files)
+
+  it('picks images, shows them, and sends them with the follow-up', async () => {
+    show(<FollowUpBox job={ended()} />)
+    await pick(png('shot.png'), png('second.png'))
+    expect(await screen.findByText('shot.png')).toBeInTheDocument()
+    expect(screen.getByText('second.png')).toBeInTheDocument()
+    // Kept with the thread's draft (by id), like the text.
+    expect(useCodeQueue.getState().draftImages?.t1?.map((i) => i.id)).toEqual(['att-1', 'att-2'])
+    await userEvent.type(screen.getByRole('textbox'), 'Make it look like this')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(followUp).toHaveBeenCalledWith('j9', 'Make it look like this')
+    expect(sentImages).toEqual([['att-1', 'att-2']])
+    // The box is empty again.
+    expect(screen.queryByTestId('code-images')).not.toBeInTheDocument()
+    expect(useCodeQueue.getState().draftImages?.t1).toBeUndefined()
+  })
+
+  it('takes a pasted image and a dropped one, and removes one before sending', async () => {
+    show(<FollowUpBox job={ended()} />)
+    const box = screen.getByRole('textbox')
+    fireEvent.paste(box, { clipboardData: { files: [png('image.png')], items: [] } })
+    // Uploaded: from then on in the thread's draft, its chip named as pastes are.
+    await waitFor(() => expect(useCodeQueue.getState().draftImages?.t1).toHaveLength(1))
+    expect(screen.getByText(/^Pasted image .*\.png$/)).toBeInTheDocument()
+    const form = box.closest('form')!
+    fireEvent.drop(form, { dataTransfer: { files: [png('dropped.png')], types: ['Files'] } })
+    await waitFor(() => expect(useCodeQueue.getState().draftImages?.t1).toHaveLength(2))
+    expect(screen.getByText('dropped.png')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Remove dropped.png' }))
+    await userEvent.type(box, 'Look')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(sentImages).toEqual([['att-1']])
+  })
+
+  it('refuses what isn’t a PNG, JPEG, WebP or GIF, too large, or too many, and says why', async () => {
+    show(<FollowUpBox job={ended()} />)
+    await userEvent.upload(screen.getByTestId('code-image-input'), new File(['x'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false })
+    expect(toasts.at(-1)).toBe('“notes.txt” isn’t a PNG, JPEG, WebP or GIF image.')
+    await pick(png('huge.png', 10 * 1024 * 1024 + 1))
+    expect(toasts.at(-1)).toBe('“huge.png” is larger than 10.0 MB.')
+    await pick(...Array.from({ length: 9 }, (_, i) => png(`${i}.png`)))
+    expect(toasts.at(-1)).toBe('At most 8 images can go with one message.')
+    expect(useCodeQueue.getState().draftImages?.t1).toHaveLength(8)
+    expect(screen.getByRole('button', { name: 'Add images' })).toBeDisabled()
+  })
+
+  it('waits for an upload before it sends', async () => {
+    uploads.hold = true
+    show(<FollowUpBox job={ended()} />)
+    await pick(png('slow.png'))
+    await userEvent.type(screen.getByRole('textbox'), 'Look')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(screen.getByText('Uploading…')).toBeInTheDocument()
+    await act(async () => uploads.waiting.forEach((done) => done()))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled())
+  })
+
+  it('keeps images with a queued message until it is sent, and Edit puts them back', async () => {
+    show(<FollowUpBox job={running()} />)
+    await pick(png('shot.png'))
+    await screen.findByText('shot.png')
+    await userEvent.type(screen.getByRole('textbox'), 'Then this')
+    await userEvent.click(screen.getByRole('button', { name: 'Queue message' }))
+    expect(useCodeQueue.getState().byThread.t1).toEqual({ jobId: 'r1', text: 'Then this', images: [{ id: 'att-1', name: 'shot.png', size: 100 }] })
+    // The queued message shows its image; the box is empty.
+    const card = screen.getByTestId('queued-message')
+    expect(card.querySelector('img')).toHaveAttribute('src', '/api/attachments/att-1/content')
+    expect(screen.queryByTestId('code-images')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getByText('shot.png')).toBeInTheDocument()
+    expect(useCodeQueue.getState().draftImages?.t1?.map((i) => i.id)).toEqual(['att-1'])
+  })
+
+  it('the queue sends a message with its images when the job ends', async () => {
+    codeQueue.add('t1', 'r1', 'Then this', [{ id: 'att-7', name: 'a.png', size: 1 }])
+    const { sendQueued } = await import('./sendQueued')
+    await sendQueued(client, 't1', ended(), 'Title')
+    expect(followUp).toHaveBeenCalledWith('j9', 'Then this')
+    expect(sentImages).toEqual([['att-7']])
+    expect(useCodeQueue.getState().byThread.t1).toBeUndefined()
   })
 })

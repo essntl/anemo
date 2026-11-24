@@ -5797,6 +5797,21 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
+        };
+        /** CodeImageOut */
+        CodeImageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** CodeJobDetailOut */
         CodeJobDetailOut: {
@@ -5828,6 +5843,11 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
         };
         /** CodeJobListOut */
         CodeJobListOut: {
@@ -5915,6 +5935,11 @@ export interface components {
             run_id?: string | null;
             /** Conversation Title */
             conversation_title?: string | null;
+            /**
+             * Images
+             * @default []
+             */
+            images: components["schemas"]["CodeImageOut"][];
         };
         /** CodeProjectOut */
         CodeProjectOut: {

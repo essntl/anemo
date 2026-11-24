@@ -172,6 +172,7 @@ async def start_job(body: CodeJobIn, db: Db) -> CodeJobOut:
         new=body.new,
         model=body.model,
         max_turns=body.max_turns,
+        image_ids=body.image_ids,
     )
 
 
@@ -179,7 +180,12 @@ async def start_job(body: CodeJobIn, db: Db) -> CodeJobOut:
 async def follow_up(job_id: uuid.UUID, body: CodeFollowUpIn, db: Db) -> CodeJobOut:
     """Resume the session of the thread's last job (it must have ended): the new job."""
     return await control.follow_up(
-        db, job_id, prompt=body.prompt, model=body.model, max_turns=body.max_turns
+        db,
+        job_id,
+        prompt=body.prompt,
+        model=body.model,
+        max_turns=body.max_turns,
+        image_ids=body.image_ids,
     )
 
 

@@ -11,6 +11,9 @@ internal sealed class Args
 
     public bool Has(string key) => _command[key] is not null;
 
+    /// <summary>The field as it came (a list or an object to read further), or null.</summary>
+    public JsonNode? Node(string key) => _command[key];
+
     public string? OptionalString(string key)
     {
         var node = _command[key];

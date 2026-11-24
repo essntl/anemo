@@ -227,3 +227,24 @@ def test_untrusted_values_are_checked():
     weird = {"type": "assistant", "message": {"content": "not a list"}}
     assert parse.pull_outs(weird) == parse.PullOuts()
     assert parse.pull_outs({"type": "user", "message": None}) == parse.PullOuts()
+
+
+def test_what_holds_a_sub_agent_s_state():
+    agent_call = {
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Agent", "input": {}}]},
+    }
+    assert parse.holds_sub_agent_state(agent_call)
+    launched = {
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]},
+        "tool_use_result": {"status": "async_launched", "agentId": "a1"},
+    }
+    assert parse.holds_sub_agent_state(launched)
+    for subtype in ("task_started", "task_notification", "task_updated"):
+        assert parse.holds_sub_agent_state({"type": "system", "subtype": subtype})
+    # Progress reports come often and say nothing that lasts; ordinary calls neither.
+    assert not parse.holds_sub_agent_state({"type": "system", "subtype": "task_progress"})
+    bash = {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash"}]}}
+    assert not parse.holds_sub_agent_state(bash)
+    assert not parse.holds_sub_agent_state({"type": "user", "tool_use_result": {"stdout": ""}})
