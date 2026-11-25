@@ -107,7 +107,7 @@ row is filled in by its own pull request.
 
 | What | Spec | Pull request |
 | --- | --- | --- |
-| **Event triggers**: automations and chats woken by events (tasks, calendar, documents, Claude Code jobs, devices, files, failures, approvals) and signed webhooks; wake me | [16](specs/16-event-triggers.md) | PR_LINK |
+| **Event triggers**: automations and chats woken by events (tasks, calendar, documents, Claude Code jobs, devices, files, failures, approvals) and signed webhooks; wake me | [16](specs/16-event-triggers.md) | #99 |
 | **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
 | **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
 | **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
