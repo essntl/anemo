@@ -24,6 +24,7 @@ adapter), and searching inside workspace files that are not documents.
 - [Music](#music)
 - [Dynamic Island](#dynamic-island)
 - [Stats](#stats)
+- [Activity](#activity)
 - [Notifications](#notifications)
 - [Automations](#automations)
 - [MCP servers](#mcp-servers)
@@ -548,6 +549,23 @@ default), and start the timer or queue music on the device you used last (*Contr
 the timer and music*, asks first). With no Anemo tab open anywhere they say so. A
 ready-made **Daily summary** automation (Automations → *Start from a template*)
 sums up your focus and tasks each evening; it does nothing until you save it.
+
+## Activity
+
+**Activity** lists what was changed, by whom, newest first: tasks, calendar events,
+documents, workspace files and projects, changed by you, the assistant in a chat, an
+automation, a script, a plugin or a run an event started. Each entry names the item (with
+a link while it exists), what changed (the fields) and when; a batch, such as one tool call
+that moved twelve tasks, is one row that opens. Filter by who, by kind of item and by time;
+**History** in a task, an event or a document's details opens the page for that item only.
+
+**Undo** puts a change back where it can: a task's, event's or project's fields return to
+what they were, a deleted task or event comes back from the trash, something created goes
+to the trash, a document gets its earlier text back from its revisions, a moved document or
+file goes back, an agent's file change is reverted. If the item was changed since, Anemo
+says what differs and asks before overwriting it. *Undo all* does a whole batch. Undo is
+yours only: agents have no tool for it. Entries are kept for 90 days. Details:
+[spec 19](specs/19-activity-log.md).
 
 ## Notifications
 

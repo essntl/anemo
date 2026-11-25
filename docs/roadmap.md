@@ -110,7 +110,7 @@ row is filled in by its own pull request.
 | **Event triggers** (in progress) | [16](specs/16-event-triggers.md) | – |
 | **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
 | **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
-| **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
+| **Activity log with undo** (done) | [19](specs/19-activity-log.md) | #PR |
 | **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
 | **Waiting on a code job** (in progress) | [21](specs/21-code-wait.md) | – |
 | **Files between devices and the workspace** (in progress) | [22](specs/22-device-files.md) | – |
@@ -133,30 +133,6 @@ Windows client's manual tests (`desktop/MANUAL-TESTS.md`).
 ## Next
 
 Proposals that are still open, with what of each exists today. Order is a suggestion.
-
-### Activity log with undo
-
-**Status: not built as such; the pieces exist.** There is no single list of "what was
-done, by whom, and undo it". What exists:
-
-- `audit_log` (`features/audit/`): security-relevant actions only (logins, settings,
-  tokens, devices, MCP servers, approvals by voice), actor `user | agent | system`.
-- Provenance on documents, tasks and events: who created them and who changed them last
-  (`created_by` / `updated_by` as actor references `user`, `chat:<id>`,
-  `automation:<id>/<run>`), shown as "the assistant in ‹chat›".
-- Per run: the timeline of tool calls; for automation runs, the list of changes the
-  server recorded (`runs.changes`, at most 200, `{tool, summary, ref}`).
-- **Undo** exists for files an agent changed (each change is kept and can be reverted
-  while the file is still as the agent left it: `workspace/revert.py`), for deletions
-  (the trash), and for a memory just saved (a notice with *Undo*). Task, event and
-  document edits can't be undone from one place (documents have revisions).
-
-What it would take: one `activity` table written where `record_change` and the
-provenance helpers already run, a page that lists it with filters (by actor, by
-object), and undo per entry where an inverse exists (file revert, trash restore, a
-task/event field change from a stored before-value). Scripts (#82)
-record their actions with provenance through the same
-paths, so they show up there once it exists.
 
 ### Inbox for loose items
 
