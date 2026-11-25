@@ -24,13 +24,17 @@ public sealed class CodeJobControlOptions
     /// <summary>How long a cancel waits for a stopped clone to end before it answers.</summary>
     public TimeSpan CancelWait { get; init; } = TimeSpan.FromSeconds(20);
 
+    /// <summary>Each git command of a <c>code_git_*</c> read gets this long (1.5.0).</summary>
+    public TimeSpan GitTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
     /// <summary>The 4 characters after the time in a new job's id (random by default).</summary>
     public Func<string>? NewIdSuffix { get; init; }
 }
 
 /// <summary>
 /// The <c>code_projects</c>, <c>code_start</c> and <c>code_cancel</c> actions
-/// (device-contracts.md §7.4, code-sessions.md §12.1). A job is started as <c>cc.ps1</c>
+/// (device-contracts.md §7.4, code-sessions.md §12.1), and the read-only git of
+/// <c>code_git_graph</c> and <c>code_git_commit</c> (§7.5, <see cref="GitReads"/>). A job is started as <c>cc.ps1</c>
 /// does it, in the same folder format, so the sharing loop finds it like any other.
 /// Programs run only through <see cref="ICodeHost"/>, with arguments made from validated
 /// values; the prompt goes through <c>prompt.txt</c>, never the command line.
@@ -86,7 +90,8 @@ public sealed partial class CodeJobControl
         _platform = platform ?? DesktopPlatform.Windows;
     }
 
-    public static bool Handles(string action) => action is "code_projects" or "code_start" or "code_cancel";
+    public static bool Handles(string action) =>
+        action is "code_projects" or "code_start" or "code_cancel" or "code_git_graph" or "code_git_commit";
 
     private string ProjectsFolder => Setting(_settings().CodeProjectsFolder) ?? _platform.DefaultProjectsFolder;
 
@@ -138,6 +143,12 @@ public sealed partial class CodeJobControl
             case "code_cancel":
                 RequireStart(device);
                 return await CancelAsync(args);
+            case "code_git_graph":
+                RequireShare(device);
+                return await GitGraphAsync(args, ct);
+            case "code_git_commit":
+                RequireShare(device);
+                return await GitCommitAsync(args, ct);
             default:
                 throw CommandException.Failed($"Unknown action “{action}”");
         }
@@ -157,7 +168,8 @@ public sealed partial class CodeJobControl
             return ShareOffMessage;
         }
 
-        return action != "code_projects" && !settings.StartCodeJobs ? StartOffMessage : null;
+        // Listing the projects and reading their git history need sharing only.
+        return action is "code_start" or "code_cancel" && !settings.StartCodeJobs ? StartOffMessage : null;
     }
 
     private void RequireShare(DeviceInfo device)
@@ -242,6 +254,103 @@ public sealed partial class CodeJobControl
         return CodeProjects.ParseRepoList(result.Stdout) is { } list
             ? (list, null)
             : ([], "gh's list of repositories couldn't be read, so only local projects are listed.");
+    }
+
+    // -- code_git_graph, code_git_commit --------------------------------------------------
+
+    private Task<JsonObject> GitGraphAsync(Args args, CancellationToken ct)
+    {
+        var git = Git(args);
+        var limit = args.Int("limit", 1, GitReads.MaxLimit, GitReads.DefaultLimit);
+        return git.GraphAsync(limit, args.Bool("all", true), ct);
+    }
+
+    private Task<JsonObject> GitCommitAsync(Args args, CancellationToken ct)
+    {
+        var git = Git(args);
+        var hash = args.String("hash", 40);
+        if (!GitOutput.IsCommitRef(hash))
+        {
+            throw CommandException.Failed("“hash” must be 7 to 40 lower-case hexadecimal digits.");
+        }
+
+        return git.CommitAsync(hash, ct);
+    }
+
+    /// <summary>The git reads of the project the command names, once its folder checks out.</summary>
+    private GitReads Git(Args args)
+    {
+        var project = args.String("project", CodeJobLimits.MaxProjectChars);
+        var dir = ProjectFolder(project);
+        var git = Tool("git") ?? throw CommandException.Failed("git isn't on this computer's PATH.");
+        return new GitReads(_host, git, dir, _options.GitTimeout);
+    }
+
+    /// <summary>
+    /// The folder <c>&lt;projects&gt;\&lt;project&gt;</c> for a read: a plain folder name (no
+    /// <c>..</c>, no separators, no absolute path: <see cref="CodeProjects.IsProjectName"/>), that
+    /// exists, and that is still inside the projects folder once links are followed (a symlink
+    /// or junction pointing elsewhere is refused).
+    /// </summary>
+    public string ProjectFolder(string project)
+    {
+        if (!CodeProjects.IsProjectName(project) || project.StartsWith('.'))
+        {
+            throw CommandException.Failed("“project” must be the name of a folder in the projects folder.");
+        }
+
+        var root = ProjectsFolder;
+        var dir = Path.Combine(root, project);
+        if (!Directory.Exists(dir))
+        {
+            throw CommandException.NotFound($"There is no project “{project}” in {root}.");
+        }
+
+        if (!IsInside(Resolved(root), Resolved(dir)))
+        {
+            throw CommandException.Refused($"“{project}” leads out of the projects folder (a link), so Anemo doesn't read it.");
+        }
+
+        return dir;
+    }
+
+    /// <summary>The folder's full path with every link on the way followed (the folder itself and its parents).</summary>
+    private static string Resolved(string folder)
+    {
+        var full = Path.GetFullPath(folder);
+        var parts = new Stack<string>();
+        var current = full;
+        while (true)
+        {
+            try
+            {
+                if (Directory.ResolveLinkTarget(current, returnFinalTarget: true) is { } target)
+                {
+                    var resolved = Path.GetFullPath(target.FullName);
+                    return parts.Aggregate(resolved, Path.Combine);
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // A link that can't be followed is not a way out; the folder check fails later.
+            }
+
+            var parent = Path.GetDirectoryName(current);
+            if (parent is null)
+            {
+                return full;
+            }
+
+            parts.Push(Path.GetFileName(current));
+            current = parent;
+        }
+    }
+
+    private static bool IsInside(string root, string dir)
+    {
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var prefix = Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar;
+        return dir.StartsWith(prefix, comparison) && dir.Length > prefix.Length;
     }
 
     // -- code_start ----------------------------------------------------------------------

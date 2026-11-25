@@ -35,6 +35,8 @@ public static class CommandSummary
                 + (Str("follow_job_id") is { } follow ? $"a follow-up of job {Short(follow)}" : $"project {Short(Str("project"))}")
                 + $", a prompt of {Length("prompt")} characters",
             "code_cancel" => $"job {Short(Str("job_id"))}",
+            "code_git_graph" => $"project {Short(Str("project"))}",
+            "code_git_commit" => $"project {Short(Str("project"))}, commit {Short(Str("hash"))}",
             _ => "unknown action",
         };
     }
