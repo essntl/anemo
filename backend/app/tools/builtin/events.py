@@ -380,68 +380,74 @@ class UpdateEvent(Tool):
             event = await db.get(CalendarEvent, event_id) if event_id else None
             if event is None:
                 return ToolResult(content=f"No event with id {args.id}.", is_error=True)
-            tz = event.tz
-            current = service.event_out(event)
-            all_day = current.all_day if args.all_day is None else args.all_day
-            start = args.start or (
-                datetime.combine(current.start_date, time.min)
-                if current.start_date
-                else current.start_at
-            )
-            # Keep the length when only the start moves.
-            end = args.end
-            if end is None and current.end_date is not None and current.start_date is not None:
-                end = datetime.combine(
-                    start.date() + (current.end_date - current.start_date), time.min
-                )
-            elif end is None:
-                end = _instant(start, tz).astimezone(UTC) + (event.end_at - event.start_at)
-            merged = CreateEventInput(
-                title=args.title or event.title,
-                start=start,
-                end=end,
-                all_day=all_day,
-                description=event.description if args.description is None else args.description,
-                location=event.location if args.location is None else args.location,
-                rrule=event.rrule if args.rrule is None else (args.rrule or None),
-                remind_minutes=event.remind_minutes
-                if args.remind_minutes is None
-                else args.remind_minutes,
-            )
-            try:
-                body = _event_in(merged, tz).model_copy(
-                    update={
-                        "color": event.color,
-                        "task_id": event.task_id,
-                        "project_id": event.project_id,
-                        "properties": args.properties,
-                    }
-                )
-                source = src.source_in(None, None, args.source_url)
-                if isinstance(source, str):
-                    return ToolResult(content=f"Invalid event: {source}", is_error=True)
-                if hidden := await linking.hidden_document(db, ctx, args.links_add):
-                    return ToolResult(content=hidden, is_error=True)
-                dropped: list[str] = []
-                event = await service.update_event(
-                    db,
-                    event,
-                    body,
-                    source_url=source.source_url,
-                    links_add=args.links_add,
-                    links_remove=args.links_remove,
-                    create_values=args.create_value,
-                    dropped=dropped,
-                )
-            except ValidationError as exc:
-                return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
-            except AppError as exc:
-                return ToolResult(content=exc.message, is_error=True)
-            line = _describe(service.base_occurrence(event, event.start_at), tz)
-            line += linking.dropped_note(dropped)
+            outcome = await change_event(db, event, args, ctx)
+        if isinstance(outcome, ToolResult):
+            return outcome
+        event, line = outcome
         return ToolResult(
             content=f"Updated: {line}", data={"event": {"id": str(event.id), "title": event.title}}
         )
+
+
+async def change_event(
+    db: Any, event: CalendarEvent, args: UpdateEventInput, ctx: ToolContext
+) -> tuple[CalendarEvent, str] | ToolResult:
+    """Apply update_event's arguments to one event: the changed event and its line for
+    the model, or the error result."""
+    tz = event.tz
+    current = service.event_out(event)
+    all_day = current.all_day if args.all_day is None else args.all_day
+    start = args.start or (
+        datetime.combine(current.start_date, time.min) if current.start_date else current.start_at
+    )
+    # Keep the length when only the start moves.
+    end = args.end
+    if end is None and current.end_date is not None and current.start_date is not None:
+        end = datetime.combine(start.date() + (current.end_date - current.start_date), time.min)
+    elif end is None:
+        end = _instant(start, tz).astimezone(UTC) + (event.end_at - event.start_at)
+    merged = CreateEventInput(
+        title=args.title or event.title,
+        start=start,
+        end=end,
+        all_day=all_day,
+        description=event.description if args.description is None else args.description,
+        location=event.location if args.location is None else args.location,
+        rrule=event.rrule if args.rrule is None else (args.rrule or None),
+        remind_minutes=event.remind_minutes if args.remind_minutes is None else args.remind_minutes,
+    )
+    try:
+        body = _event_in(merged, tz).model_copy(
+            update={
+                "color": event.color,
+                "task_id": event.task_id,
+                "project_id": event.project_id,
+                "properties": args.properties,
+            }
+        )
+        source = src.source_in(None, None, args.source_url)
+        if isinstance(source, str):
+            return ToolResult(content=f"Invalid event: {source}", is_error=True)
+        if hidden := await linking.hidden_document(db, ctx, args.links_add):
+            return ToolResult(content=hidden, is_error=True)
+        dropped: list[str] = []
+        event = await service.update_event(
+            db,
+            event,
+            body,
+            source_url=source.source_url,
+            links_add=args.links_add,
+            links_remove=args.links_remove,
+            create_values=args.create_value,
+            dropped=dropped,
+        )
+    except ValidationError as exc:
+        return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
+    except AppError as exc:
+        return ToolResult(content=exc.message, is_error=True)
+    line = _describe(service.base_occurrence(event, event.start_at), tz)
+    line += linking.dropped_note(dropped)
+    return event, line
 
 
 class DeleteEventInput(BaseModel):

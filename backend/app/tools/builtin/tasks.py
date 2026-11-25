@@ -462,80 +462,90 @@ class UpdateTask(Tool):
             task = await db.get(Task, task_id) if task_id else None
             if task is None:
                 return ToolResult(content=f"No task with id {args.id}.", is_error=True)
-            changes = args.model_dump(
-                exclude_unset=True,
-                exclude={
-                    "id",
-                    "project",
-                    "clear_due",
-                    "tags",
-                    "parent_id",
-                    "clear_parent",
-                    "blocked_by",
-                    "source_url",
-                    "properties",
-                    "links_add",
-                    "links_remove",
-                    "create_value",
-                },
-            )
-            changes = {k: v for k, v in changes.items() if v is not None}
-            if changes.get("rrule") == "":
-                changes["rrule"] = None
-            if args.tags is not None:
-                changes["tags"] = clean_tags(args.tags)
-            if args.project is not None:
-                changes["project_id"] = await _project_id(db, args.project)
-            if args.clear_due:
-                changes["due_date"] = None
-            if args.clear_parent:
-                changes["parent_id"] = None
-            elif args.parent_id:
-                parent_id = _id(args.parent_id)
-                if parent_id is None:
-                    return ToolResult(content=f"No task with id {args.parent_id}.", is_error=True)
-                changes["parent_id"] = parent_id
-            if args.blocked_by is not None:
-                blocked_by = _ids(args.blocked_by)
-                if isinstance(blocked_by, str):
-                    return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
-                changes["blocked_by"] = blocked_by
-            if args.properties is not None:
-                changes["properties"] = args.properties
-            source = src.source_in(None, None, args.source_url)
-            if isinstance(source, str):
-                return ToolResult(content=source, is_error=True)
-            if hidden := await linking.hidden_document(db, ctx, args.links_add):
-                return ToolResult(content=hidden, is_error=True)
-            repeats = task.rrule is not None and task.status != "done"
-            dropped: list[str] = []
-            try:
-                task = await service.update_task(
-                    db,
-                    task,
-                    changes,
-                    source_url=source.source_url,
-                    links_add=args.links_add,
-                    links_remove=args.links_remove,
-                    create_values=args.create_value,
-                    dropped=dropped,
-                )
-            except AppError as exc:
-                hint = (
-                    " Call update_task again with subtasks='finish' or 'keep'."
-                    if exc.code == "open_subtasks"
-                    else ""
-                )
-                return ToolResult(content=exc.message + hint, is_error=True, data=_problems(exc))
-            line = task_line(
-                task, await _projects(db), (await _waits_on(db, [task])).get(task.id, 0)
-            )
-            if repeats and task.status == "done":
-                line += " It repeats, so the next one was added."
-            line += linking.dropped_note(dropped)
+            outcome = await change_task(db, task, args, ctx)
+        if isinstance(outcome, ToolResult):
+            return outcome
+        task, line = outcome
         return ToolResult(
             content=f"Updated: {line}", data={"task": {"id": str(task.id), "title": task.title}}
         )
+
+
+async def change_task(
+    db: Any, task: Task, args: UpdateTaskInput, ctx: ToolContext, *, tool: str = "update_task"
+) -> tuple[Task, str] | ToolResult:
+    """Apply update_task's arguments to one task: the changed task and its line for the
+    model, or the error result. `tool`: the tool to call again (named in a hint)."""
+    changes = args.model_dump(
+        exclude_unset=True,
+        exclude={
+            "id",
+            "project",
+            "clear_due",
+            "tags",
+            "parent_id",
+            "clear_parent",
+            "blocked_by",
+            "source_url",
+            "properties",
+            "links_add",
+            "links_remove",
+            "create_value",
+        },
+    )
+    changes = {k: v for k, v in changes.items() if v is not None}
+    if changes.get("rrule") == "":
+        changes["rrule"] = None
+    if args.tags is not None:
+        changes["tags"] = clean_tags(args.tags)
+    if args.project is not None:
+        changes["project_id"] = await _project_id(db, args.project)
+    if args.clear_due:
+        changes["due_date"] = None
+    if args.clear_parent:
+        changes["parent_id"] = None
+    elif args.parent_id:
+        parent_id = _id(args.parent_id)
+        if parent_id is None:
+            return ToolResult(content=f"No task with id {args.parent_id}.", is_error=True)
+        changes["parent_id"] = parent_id
+    if args.blocked_by is not None:
+        blocked_by = _ids(args.blocked_by)
+        if isinstance(blocked_by, str):
+            return ToolResult(content=f"No task with id {blocked_by}.", is_error=True)
+        changes["blocked_by"] = blocked_by
+    if args.properties is not None:
+        changes["properties"] = args.properties
+    source = src.source_in(None, None, args.source_url)
+    if isinstance(source, str):
+        return ToolResult(content=source, is_error=True)
+    if hidden := await linking.hidden_document(db, ctx, args.links_add):
+        return ToolResult(content=hidden, is_error=True)
+    repeats = task.rrule is not None and task.status != "done"
+    dropped: list[str] = []
+    try:
+        task = await service.update_task(
+            db,
+            task,
+            changes,
+            source_url=source.source_url,
+            links_add=args.links_add,
+            links_remove=args.links_remove,
+            create_values=args.create_value,
+            dropped=dropped,
+        )
+    except AppError as exc:
+        hint = (
+            f" Call {tool} again with subtasks='finish' or 'keep'."
+            if exc.code == "open_subtasks"
+            else ""
+        )
+        return ToolResult(content=exc.message + hint, is_error=True, data=_problems(exc))
+    line = task_line(task, await _projects(db), (await _waits_on(db, [task])).get(task.id, 0))
+    if repeats and task.status == "done":
+        line += " It repeats, so the next one was added."
+    line += linking.dropped_note(dropped)
+    return task, line
 
 
 def _problems(exc: Exception) -> dict[str, Any] | None:
