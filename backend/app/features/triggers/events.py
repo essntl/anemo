@@ -111,6 +111,15 @@ def listened_query(types: set[str]) -> Any:
     return select(exists().where(Trigger.enabled, Trigger.event_type.in_(sorted(types))))
 
 
+def listened_types(types: set[str]) -> Any:
+    """Which of these types an enabled trigger waits for."""
+    return (
+        select(Trigger.event_type)
+        .where(Trigger.enabled, Trigger.event_type.in_(sorted(types)))
+        .distinct()
+    )
+
+
 def needs_dispatch_job(session: Session) -> bool:
     """Whether this transaction still has to queue its dispatch job (one per transaction).
     Marks it as queued."""

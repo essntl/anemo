@@ -173,6 +173,26 @@ CATEGORIES: list[Category] = [
         # anything in it runs, not before it is written.
         "autonomous",
     ),
+    # Event triggers (docs/specs/16-event-triggers.md). Adding a trigger to an automation
+    # (or a webhook), and changing what or when one fires, always asks in code, whatever
+    # this level says (tools/builtin/triggers.py, schedules.py); turning one off or
+    # deleting it follows the level.
+    Category(
+        "triggers.manage",
+        "Event triggers",
+        "Make automations run when something happens (a task is created, a Claude Code "
+        "job ends, a webhook is called). Adding one or changing it always asks.",
+        "ask",
+    ),
+    # Wake me: a one-shot trigger on an internal event that waits at most 24 hours is
+    # safe; repeating or longer is moderate.
+    Category(
+        "triggers.wake",
+        "Wake this chat on events",
+        "Let the assistant continue a chat when something it waits for happens (“tell me "
+        "when the job ends”).",
+        "ask_dangerous",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 

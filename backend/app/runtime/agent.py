@@ -1255,6 +1255,9 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         except NoModelAvailable as exc:
             await finalize(db, run, "failed", error=exc.message)
             return None
+        # An event trigger started it (or the run it works for, for a sub-agent).
+        top = await db.get(Run, run.root_run_id) if run.root_run_id else run
+        event_started = bool((top or run).options.get("event"))
         tools = registry.toolset_for(
             run.kind,
             policy,
@@ -1273,6 +1276,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
             has_phone=run.depth == 0
             and run.options.get("source") == "voice"
             and bool(run.options.get("device_id")),
+            event_started=event_started,
             ancestors=ancestors,
             off=run.policy.get("off") or (),
         )

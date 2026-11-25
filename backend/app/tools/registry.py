@@ -29,6 +29,7 @@ from app.tools.builtin.scripts import SCRIPT_TOOLS
 from app.tools.builtin.shell import RunShell
 from app.tools.builtin.subagent import RunSubagent
 from app.tools.builtin.tasks import TASK_TOOLS
+from app.tools.builtin.triggers import TRIGGER_TOOLS, TRIGGER_WRITE_TOOLS
 from app.tools.builtin.voice import VoiceStop
 from app.tools.builtin.web import HttpRequest, ReadWebPage, VideoTranscript, WebSearch
 from app.tools.builtin.workspace import (
@@ -74,6 +75,7 @@ BUILTIN_TOOLS: list[Tool] = [
     *MEMORY_TOOLS,
     *AUTOMATION_TOOLS,
     *SCHEDULE_TOOLS,
+    *TRIGGER_TOOLS,
     CurrentTime(),
     LoadSkill(),
     RunSubagent(),
@@ -94,7 +96,7 @@ FEATURE_TOOLS: dict[str, frozenset[str]] = {
     "calendar": frozenset(t.name for t in EVENT_TOOLS),
     "focus": frozenset(t.name for t in FOCUS_TOOLS) - MUSIC_TOOL_NAMES,
     "music": MUSIC_TOOL_NAMES,
-    "automations": frozenset(t.name for t in [*SCHEDULE_TOOLS, *SCRIPT_TOOLS]),
+    "automations": frozenset(t.name for t in [*SCHEDULE_TOOLS, *SCRIPT_TOOLS, *TRIGGER_TOOLS]),
     "code": CODE_TOOL_NAMES,
 }
 
@@ -147,6 +149,7 @@ def toolset_for(
     can_ask: bool = False,
     has_chat: bool = False,
     has_phone: bool = False,
+    event_started: bool = False,
     ancestors: Iterable[Policy] = (),
     off: Iterable[str] = (),
 ) -> list[Tool]:
@@ -160,7 +163,9 @@ def toolset_for(
     (Settings > Pages); their tools are not offered. `has_computer`: a computer that
     runs Anemo Desktop is online (for an unattended run: and the automation lists one of
     the computer tools). `has_phone`: a phone started the run by voice (it gets
-    `voice_stop`; docs/specs/07-voice-mode-android.md)."""
+    `voice_stop`; docs/specs/07-voice-mode-android.md). `event_started`: an event trigger
+    started the run (or the run above it): like a scheduled run, it doesn't set up
+    schedules or triggers."""
     offered = []
     turned_off = tools_of(off)
     for tool in BUILTIN_TOOLS:
@@ -172,8 +177,10 @@ def toolset_for(
             or (tool.name == "web_search" and not has_search)
             or (is_memory and not has_memory)
             or (tool in AUTOMATION_TOOLS and not is_automation)
-            # A run started by a schedule does not make, change or delete schedules.
-            or (tool.name in SCHEDULE_WRITE_TOOLS and unattended)
+            # A run started by a schedule or an event does not make, change or delete
+            # schedules or triggers (no chains of work nobody asked for).
+            or (tool.name in SCHEDULE_WRITE_TOOLS | TRIGGER_WRITE_TOOLS and unattended)
+            or (tool.name in SCHEDULE_WRITE_TOOLS | TRIGGER_WRITE_TOOLS and event_started)
             or (tool in BROWSER_TOOLS and not has_browser)
             # A tab the user shared from their Chrome: not for unattended runs.
             or (tool.name == "browser_current_tab" and unattended)

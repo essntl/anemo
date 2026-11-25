@@ -37,6 +37,7 @@ from app.features.documents.models import Document
 from app.features.projects.service import DOCUMENTS_ROOT
 from app.features.tasks.models import Project, Task
 from app.features.triggers import events
+from app.features.triggers.models import TriggerEvent
 from app.jobs import queue
 from app.jobs.models import Job
 
@@ -44,6 +45,10 @@ log = logging.getLogger(__name__)
 
 _PENDING = "trigger_events_pending"  # session.info: events of the last flush
 _CODE_INSERTS = "trigger_code_inserts"  # session.info: {job id: state it was inserted with}
+# session.info: {subject: its "created" outbox row, or None} for rows made in this
+# transaction: changing them before the commit is part of making them, not a change.
+_CREATED = "trigger_created_rows"
+_UPDATES = "trigger_created_updates"  # session.info: newer data for those rows
 
 # What a change to these is not: bookkeeping, not something the user would call a change.
 _IGNORED = {
@@ -61,6 +66,7 @@ class _Pending:
 
     def __init__(self, type: str, subject: str, data: dict[str, Any]) -> None:
         self.type, self.subject, self.data = type, subject, data
+        self.created = type.endswith(".created")
         # Who caused it and at what depth, as of the flush (-1: it can't be stored).
         self.actor_ref_and_depth: tuple[str, int] | None = None
 
@@ -147,9 +153,35 @@ def _code_job_change(obj: CodeJob, inserts: dict[str, str]) -> _Pending | None:
     return _code_job(obj, "ended")
 
 
+def _made_now(session: Session, obj: Any, again: _Pending) -> bool:
+    """`obj` was created in this transaction: its "created" event takes the newest data
+    (`again`) instead of a "changed" event coming after it."""
+    created: dict[str, Any] = session.info.get(_CREATED, {})
+    if again.subject not in created:
+        return False
+    # (Written after the flush: a change made to a row during it would be lost.)
+    session.info.setdefault(_UPDATES, []).append(again)
+    return True
+
+
+def _update_created(session: Session) -> None:
+    created: dict[str, Any] = session.info.get(_CREATED, {})
+    for again in session.info.pop(_UPDATES, []):
+        row = created.get(again.subject)
+        if not isinstance(row, TriggerEvent):
+            continue
+        updated = events.prepare(row.type, again.data, again.subject)
+        if updated is not None:
+            data = dict(updated.data)
+            if row.type.startswith("document."):  # its project was looked up already
+                data["project_id"] = row.data.get("project_id")
+            row.data = data
+
+
 def _after_flush(session: Session, _ctx: UOWTransaction) -> None:
     pending: list[_Pending] = session.info.setdefault(_PENDING, [])
     inserts: dict[str, str] = session.info.get(_CODE_INSERTS, {})
+    created: dict[str, Any] = session.info.setdefault(_CREATED, {})
     try:
         for obj in session.new:
             if isinstance(obj, Task):
@@ -158,6 +190,11 @@ def _after_flush(session: Session, _ctx: UOWTransaction) -> None:
                 pending.append(_calendar_event(obj, "created"))
             elif isinstance(obj, Document):
                 pending.append(_document(obj, "created"))
+            elif isinstance(obj, CodeJob) and obj.state == "running":
+                pending.append(_code_job(obj, "started"))  # (ingest uses a Core INSERT)
+        for p in pending:
+            if p.created:
+                created.setdefault(p.subject, None)
         for obj in session.dirty:
             if isinstance(obj, Task):
                 found = _task_change(obj)
@@ -172,6 +209,15 @@ def _after_flush(session: Session, _ctx: UOWTransaction) -> None:
                 found = _code_job_change(obj, inserts)
             else:
                 continue
+            if found is not None and found.type.endswith((".changed", ".completed")):
+                verb = found.type.split(".")[0]
+                again = {
+                    "task": lambda: _task(obj, "created"),
+                    "calendar_event": lambda: _calendar_event(obj, "created"),
+                    "document": lambda: _document(obj, "created"),
+                }.get(verb)
+                if again is not None and _made_now(session, obj, again()):
+                    continue
             if found is not None:
                 pending.append(found)
         for obj in session.deleted:
@@ -221,9 +267,12 @@ def _write(session: Session, pending: list[_Pending]) -> None:
     if not pending:
         return
     with session.no_autoflush:
-        if not session.scalar(events.listened_query({p.type for p in pending})):
+        listened = set(session.scalars(events.listened_types({p.type for p in pending})))
+        pending = [p for p in pending if p.type in listened]
+        if not pending:
             return
         _enrich(session, pending)
+        created: dict[str, Any] = session.info.setdefault(_CREATED, {})
         for p in pending:
             row = events.prepare(p.type, p.data, p.subject)
             if row is None:
@@ -231,6 +280,8 @@ def _write(session: Session, pending: list[_Pending]) -> None:
             assert p.actor_ref_and_depth is not None
             row.actor_ref, row.depth = p.actor_ref_and_depth
             session.add(row)
+            if p.created:
+                created[p.subject] = row
         if events.needs_dispatch_job(session):
             session.add(
                 Job(
@@ -250,6 +301,7 @@ def _write(session: Session, pending: list[_Pending]) -> None:
 def _after_flush_postexec(session: Session, _ctx: UOWTransaction) -> None:
     pending = session.info.pop(_PENDING, [])
     try:
+        _update_created(session)
         _write(session, pending)
     except Exception:  # noqa: BLE001
         log.warning("events not written", exc_info=True)
@@ -300,6 +352,8 @@ def _on_execute(state: ORMExecuteState) -> Any:
 def _forget(session: Session, *_: Any) -> None:
     session.info.pop(_PENDING, None)
     session.info.pop(_CODE_INSERTS, None)
+    session.info.pop(_CREATED, None)
+    session.info.pop(_UPDATES, None)
 
 
 _HANDLERS: list[tuple[str, Any]] = [
@@ -307,6 +361,7 @@ _HANDLERS: list[tuple[str, Any]] = [
     ("after_flush_postexec", _after_flush_postexec),
     ("before_commit", _before_commit),
     ("do_orm_execute", _on_execute),
+    ("after_commit", _forget),
     ("after_rollback", _forget),
 ]
 
