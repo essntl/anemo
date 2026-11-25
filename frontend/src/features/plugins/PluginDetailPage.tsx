@@ -186,7 +186,9 @@ export function PluginDetailPage() {
       : <p className="text-[13px] text-muted">{t('There is no version {version} to preview.', { version: previewParam })}</p>
   ) : (
     <>
-      <div className="no-scrollbar -mx-(--card-x) overflow-x-auto px-(--card-x)">
+      {/* shrink-0: on a phone the sheet is a column of the screen's height, and a box that
+          scrolls sideways may otherwise shrink below its own height (cutting the tabs off). */}
+      <div className="no-scrollbar -mx-(--card-x) shrink-0 overflow-x-auto px-(--card-x)">
         <Segmented kind="tabs" label={t('About this plugin')} controls="plugin-tab" value={tab} onChange={setTab} className="max-w-none"
           options={tabs.map((x) => ({ value: x.id, label: t(x.label) }))} />
       </div>

@@ -81,6 +81,18 @@ describe('a plugin’s page', () => {
     expect(screen.getByText('Adds a panel to documents')).toBeInTheDocument()
   })
 
+  it('keeps the tabs at their height in the phone sheet', async () => {
+    // On a phone the sheet is a column of the screen's height; the tabs' sideways-scrolling
+    // box would otherwise shrink below its own height there and cut the labels off.
+    mockApi({
+      'GET /api/plugins/anemo.word-count': () => detailOut(),
+      'GET /api/plugins': () => ({ plugins: [pluginOut()], disabled_all: false }),
+    })
+    renderRoutes(routes, '/settings/plugins/anemo.word-count')
+    const tabs = await screen.findByRole('tablist', { name: 'About this plugin' })
+    expect(tabs.closest('.overflow-x-auto')).toHaveClass('shrink-0')
+  })
+
   it('says what uninstalling does with its data, for each choice', async () => {
     mockApi({
       'GET /api/plugins/anemo.word-count': () => detailOut(),
