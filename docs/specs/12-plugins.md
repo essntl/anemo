@@ -1,6 +1,6 @@
 # Plugins
 
-Status: built in `feat/plugins` (one PR). The contract a plugin is written against is
+Status: built in `feat/plugins` (one PR); §8 says what was settled while building. The contract a plugin is written against is
 `CONTRACTS-plugins.md`; this file says what plugins are for, how the design came about, the
 security model, and how the round was split. Where the two disagree, the contract wins.
 
@@ -171,7 +171,46 @@ orchestration log and the PR.
 7. Disable, uninstall (keep / remove data) and the kill switch behave as in contract §5.
 8. The three examples work using only the contract.
 
-## 8. Not in this round
+## 8. As built
+
+Settled while building (the contract records each in place, and §7 lists the HTTP side):
+
+- Reads are checked as their tool's call and then read the same data as JSON; writes run
+  the tool. A tool's own "dangerous" actions (`delete_task`) ask even when the permission
+  is granted.
+- The host answers `context.get` and `ui.*` itself; the server refuses them.
+- `init.timeZone` (the user's Settings → General zone), because a frame's "today" (the
+  browser's) and the server's could differ; the *Today board* uses it.
+- `tasks:read` covers listing projects, in the page and on the server.
+- A plugin script's calls follow the user's agent permission levels on top of the
+  plugin's coverage, so with the defaults the *Weekly review* asks before writing its
+  document. Kept on purpose: a script runs unattended.
+- Removing a plugin's data switches its automations off at once and deletes them with a
+  background job (as `delete_schedule` does), so the tools layer doesn't import the
+  agent runtime.
+- The document side panel shows a plugin panel as a tab; tasks and events show panels
+  under their details.
+
+Where the files are: `backend/app/features/plugins/` (`manifest.py`, `package.py`,
+`store.py`, `permissions.py`, `registry.py`, `calls.py`, `shapes.py`, `service.py`,
+`router.py`, `frame_router.py`, `frame/`, `bundled/`, `guide.md`, `chat.py`),
+`backend/app/tools/builtin/plugins.py`, `frontend/src/features/plugins/` (`host/` is the
+frame host), migration `0079_plugins`.
+
+| | |
+| --- | --- |
+| Settings → Plugins ![](12-plugins/1-plugins-grid.webp) | The card on its way to the page ![](12-plugins/3-transition-desktop-mid.webp) |
+| The plugin's page ![](12-plugins/4-detail-overview.webp) | Permissions by risk ![](12-plugins/5-detail-permissions.webp) |
+| A plugin waiting for review ![](12-plugins/6-review-needs-approval.webp) | *Today board*, a plugin page ![](12-plugins/9-today-board.webp) |
+| *Word count* beside a document ![](12-plugins/11-word-count-panel.webp) | Plugin commands in Ctrl+K ![](12-plugins/12-palette-commands.webp) |
+| Phone: the page as a full-screen sheet ![](12-plugins/8-detail-phone.webp) | Phone: mid-transition ![](12-plugins/7-transition-phone-mid.webp) |
+
+The transition as a sequence (frames taken at a tenth of the speed):
+[desktop, open](12-plugins/transition-desktop-open.webp),
+[desktop, back](12-plugins/transition-desktop-back.webp),
+[phone, open](12-plugins/transition-phone-open.webp).
+
+## 9. Not in this round
 
 - A marketplace, signatures, automatic update checks.
 - Optional (per-item) permissions; plugin tools implemented by scripts (contract §2.3).

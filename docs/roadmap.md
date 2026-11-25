@@ -89,6 +89,16 @@ went is in [specs/ORCHESTRATION-LOG-round3.md](specs/ORCHESTRATION-LOG-round3.md
 Merged alongside, from other sessions: the Code page's sub-agent sidebar and images in
 prompts (#77), appearance and profile customisation (#79).
 
+### Plugins (2026-11-25)
+
+Designed as a public contract first ([specs/CONTRACTS-plugins.md](specs/CONTRACTS-plugins.md)),
+then built in parallel; how it went is in
+[specs/ORCHESTRATION-LOG-plugins.md](specs/ORCHESTRATION-LOG-plugins.md).
+
+| What | Spec | Pull request |
+| --- | --- | --- |
+| **Plugins.** Packages with a manifest (stable id, semver, a hash per version) installed from a zip, a Git URL, the bundled examples or an assistant's chat; reviewed and approved per version with the password; UI in sealed iframes in four slots (panels on tasks/documents/events, pages, a plugin's settings, chat blocks), declarative contributions (properties, views, templates, automations, scripts, MCP servers, profiles, skills, themes, commands), every call checked as a tool call with the plugin as the actor; a kill switch. Settings → Plugins with cards that grow into the plugin's page; agent tools to build plugins in a chat. Examples: *Word count*, *Today board*, *Weekly review*. | [12](specs/12-plugins.md) | (this round's PR) |
+
 ---
 
 ## In progress
@@ -177,6 +187,21 @@ documents, tasks or projects.
 - Voice notes without a run: "note: …" straight into the daily note.
 - A realtime voice model for real back-and-forth (the phone would get a short-lived
   key; tools "start a run" and "check a run").
+
+### Plugins, after version 1
+
+From spec 12 §8 and what building the examples showed:
+
+- A marketplace: listing, signatures over the package hash, update checks.
+- Optional (per-item) permissions; agent tools implemented by a plugin's script.
+- Scripts get JSON results: today `anemo.call` gives a script the text a tool writes for
+  models (`list_tasks` returns no `data`), so a script parses lines no contract promises.
+  Either tools return `data` in the plugin shapes, or the script SDK gets the frame's
+  methods. Also error codes for failed calls, and the user's time zone in a script's input.
+- Templates with placeholders (date, week) and a chosen folder and name.
+- More slots: editor blocks in documents, Home widgets, the run timeline; plugin
+  keyboard shortcuts; translations of plugin texts.
+- An e2e spec for install → approve → panel (needs the Docker stack).
 
 ### Automations
 
