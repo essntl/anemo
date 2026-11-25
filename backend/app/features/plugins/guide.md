@@ -61,7 +61,10 @@ word-count/
 | Text | UTF-8 |
 | Pictures and fonts | checked by their content (a `.png` must really be a PNG) |
 
-A zip may wrap everything in one top-level folder; it is removed on install.
+A zip may wrap everything in one top-level folder; it is removed on install. A plugin
+installed from a **Git** repository (https, public) must have `anemo-plugin.json` at the
+repository's root; hidden entries (names starting with a dot: `.git`, `.github`,
+`.gitignore`…) are skipped, so they don't break the path rules.
 
 Every version is stored with the SHA-256 of each file and a **package hash** over all of
 them. The user approves that hash; the files are checked against it whenever they are
@@ -95,7 +98,8 @@ allowed in the real file; they are here to explain):
 
 **`id`**: lowercase letters, digits and `-`, in at least two parts separated by dots
 (`^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$`), 3–64 characters. The first part names the
-author (`artem.today-board`); `anemo.` is reserved for plugins shipped with Anemo. The id
+author (`artem.today-board`); ids starting with `anemo.` are reserved for the plugins
+shipped with Anemo (bundled) and are refused from any other source. The id
 is how Anemo recognises an update of the same plugin; it never changes, even when the
 plugin is renamed.
 
@@ -170,10 +174,10 @@ user can see and change them in their usual place.
 | Kind | Notes |
 | --- | --- |
 | `properties` | `type`: `select multi_select text date number checkbox`; `appliesTo`: any of `document task event`. If the `key` exists with the same type the plugin uses it (and doesn't own it); a different type refuses the install. |
-| `views` | `layout`: `list table board`; `query` as a saved view's query (types, text, properties, sort, group_by, columns). Its property keys must exist or be declared above. |
+| `views` | `layout`: `list table board` (default `list`); `query` is a saved view's query and its keys are the saved view's own, **snake_case**: `{types?, text?, properties?, sort?: [{key, desc?}], group_by?, columns?}` (`types` defaults to `["document"]`). Its property keys must exist or be declared above. |
 | `templates` | `kind: "document"` takes a Markdown `file` (front matter allowed); `kind: "task"` takes `task: {title, description?, priority?, tags?, checklist?}`. Used by commands and `templates.apply`. |
-| `automations` | Created **switched off**; the user turns them on. `schedule` as for a schedule an assistant creates; `tools` is the tool allowlist. |
-| `scripts` | TypeScript for Anemo's Deno sandbox (no network, no files); it acts only through tool calls. Its `tools` and `hosts` must be covered by the plugin's permissions (section 7). `schedule` defaults to manual. `secrets` are names; the user sets the values after install. |
+| `automations` | Created **switched off**; the user turns them on. `schedule` is required: `{rrule?, at?}` (at least one; `rrule` an RFC 5545 rule such as `FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0`, repeating from `at` or from now; `at` an ISO time, for once; in the user's time zone). `tools` is the tool allowlist. |
+| `scripts` | TypeScript for Anemo's Deno sandbox (no network, no files); it acts only through tool calls. Its `tools` and `hosts` must be covered by the plugin's permissions (section 7). `schedule` is `"manual"` (the default: started by a command, the plugin's UI or the user) or `{rrule?, at?}` as for automations. `thinkTools` lists tools it may use while thinking. `secrets` are names; the user sets the values after install. |
 | `mcpServers` | `transport`: `http`, `sse` (the URL's host needs a `network:` permission) or `stdio` (`command`, `args`; runs in the mcp-host container and is reviewed as critical). Header and env values are set by the user. Every tool of a plugin's server asks each time until the user changes that. |
 | `profiles` | Name, description, instructions, optional `icon` and `skills` (of this plugin). No permission levels or limits: those stay the user's. |
 | `skills` | `file` is the Markdown instructions; the slug is the `id` (an existing slug refuses the install). |
@@ -220,9 +224,12 @@ before showing it as HTML).
 
 Anemo loads the entry HTML into a sandboxed frame together with the `.js` and `.css` files
 it references by relative path (`<script src="panel.js"></script>`,
-`<link rel="stylesheet" href="panel.css">`). Scripts run in document order. There is no
-module loader and no network: put everything the UI needs into the package (a small
-library can be copied in as a `.js` file).
+`<link rel="stylesheet" href="panel.css">`). Scripts run in document order, and only the
+ones the HTML names run. A `<script type="module">` may import other `.js`/`.mjs` files of
+the package by a relative path (`import { count } from './count.js'`); every script of the
+version is handed to the frame for that. Imports in a circle and bare names
+(`import 'lodash'`) don't work. There is no network: put everything the UI needs into the
+package (a small library can be copied in as a `.js` file).
 
 The SDK is the global `window.anemo`:
 
@@ -235,18 +242,23 @@ const { plugin, slot, ui, context, theme, locale, preview } = await anemo.ready
 const result = await anemo.call('tasks.list', { status: 'todo' })   // any method of section 6
 anemo.on('context.changed', (ctx) => render(ctx))                    // events, below
 
+const stop = anemo.on('theme.changed', (theme) => {})   // anemo.on returns a function that stops listening
+
 anemo.ui.resize(320)                       // = anemo.call('ui.resize', {height: 320})
 anemo.ui.toast('Saved', 'success')         // = anemo.call('ui.toast', {message, tone})
 anemo.ui.open('document', id)              // = anemo.call('ui.open', {type, id})
 
-await anemo.storage.set('lastTab', 'stats')   // the plugin's own storage (JSON values)
-const tab = await anemo.storage.get('lastTab')   // the value, or null
-await anemo.storage.delete('lastTab')
-const { keys } = await anemo.storage.list('last')   // keys starting with a prefix
+await anemo.storage.set('lastTab', 'stats')        // = anemo.call('storage.set', {key, value}); JSON values
+const tab = await anemo.storage.get('lastTab')     // = anemo.call('storage.get', {key}): the value, or null
+await anemo.storage.delete('lastTab')              // = anemo.call('storage.delete', {key})
+const { keys } = await anemo.storage.list('last')  // = anemo.call('storage.list', {prefix}); no argument: every key
 ```
 
+`context.get` and the `ui.*` methods are answered by Anemo's page itself (it knows the
+frame's context and shows the toast); every other method is carried out by the server.
+
 `anemo.call` returns a promise of the method's result. A failed call rejects with an
-`Error` that has a `code`:
+`Error` (its `name` is `AnemoError`) that has a `code`:
 
 | Code | Meaning |
 | --- | --- |
@@ -258,6 +270,7 @@ const { keys } = await anemo.storage.list('last')   // keys starting with a pref
 | `unavailable` | the plugin is disabled, the kill switch is on, or the server is unreachable |
 | `failed` | the underlying action failed; `message` says why |
 | `unknown_method` | no such method in this Anemo version |
+| `timeout` | no answer within 150 seconds (set by the SDK, not by Anemo's server) |
 
 ```js
 try {
@@ -286,29 +299,32 @@ Params and results are JSON. Fields are **camelCase**, ids are strings, times ar
 | `storage.get` | `{key}` → the value or `null` | – |
 | `storage.set` | `{key, value}` → `{}` | – |
 | `storage.delete` | `{key}` → `{}` | – |
-| `storage.list` | `{prefix?}` → `{keys: [string]}` | – |
-| `tasks.list` | `{status?, projectId?, due?, query?, limit?}` → `{tasks: [Task]}` | `tasks:read` |
+| `storage.list` | `{prefix?}` → `{keys: [string]}` (sorted) | – |
+| `tasks.list` | `{status?, projectId?, due?, query?, limit?}` → `{tasks: [Task]}`. `status`: a task status, `open` (the default: todo, in progress, waiting, blocked) or `all`; `due`: a date, due on or before it; `limit` 1–500 (default 100) | `tasks:read` |
 | `tasks.get` | `{id}` → `Task` | `tasks:read` |
-| `tasks.create` | `{title, description?, status?, priority?, due?, dueTime?, tags?, projectId?, checklist?}` → `Task` | `tasks:write` |
-| `tasks.update` | `{id, …the fields to change}` → `Task` | `tasks:write` |
-| `documents.list` | `{folder?, projectId?, limit?}` → `{documents: [DocumentSummary]}` | `documents:read` |
-| `documents.search` | `{query, limit?}` → `{documents: [DocumentSummary]}` | `documents:read` |
-| `documents.get` | `{id}` → `Document` | `documents:read` |
+| `tasks.create` | `{title, description?, dueDate?, dueTime?, priority?, projectId?, tags?, checklist?}` → `Task`. `checklist` is a list of texts; a new task is `todo` | `tasks:write` |
+| `tasks.update` | `{id, title?, description?, status?, dueDate?, dueTime?, priority?, projectId?, tags?, checklist?}` → `Task`; only the fields given change (`projectId: null` takes it out of its project); `checklist` replaces the list: `[{id?, text, done?}]` | `tasks:write` |
+| `documents.list` | `{folder?, projectId?, limit?}` → `{documents: [DocumentSummary]}`; `limit` 1–500 (default 100) | `documents:read` |
+| `documents.search` | `{query, limit?}` → `{documents: [DocumentSummary]}`; `limit` 1–20 (default 8) | `documents:read` |
+| `documents.get` | `{id}` → `Document` (`id` may also be the document's path) | `documents:read` |
 | `documents.create` | `{path, markdown}` → `DocumentSummary` | `documents:write` |
-| `documents.update` | `{id, markdown}` → `DocumentSummary` | `documents:write` |
-| `events.list` | `{from, to}` (dates or times) → `{events: [Event]}`, repeating events expanded | `events:read` |
+| `documents.update` | `{id, markdown}` → `DocumentSummary` (the whole text is replaced) | `documents:write` |
+| `events.list` | `{from, to}`: dates (`YYYY-MM-DD`, `to` included, at most a year apart) → `{events: [Event]}`, repeating events expanded (one entry per occurrence, with `originalStart`) | `events:read` |
 | `events.get` | `{id}` → `Event` | `events:read` |
-| `events.create` | `{title, start, end, allDay?, description?, location?}` → `Event` | `events:write` |
-| `events.update` | `{id, …the fields to change}` → `Event` | `events:write` |
-| `projects.list` | `{}` → `{projects: [{id, name, color}]}` | `projects:read` |
-| `notifications.send` | `{title, body?}` → `{}` | `notifications:send` |
-| `http.fetch` | `{url, method?, headers?, body?}` → `{status, headers, body}` (body as text, at most 1 MB) | `network:<host of url>` |
-| `tools.call` | `{name, args}` → `{content, data?, isError}` | `tools:<name>` |
-| `scripts.run` | `{script, input?}` → `{runId}` (the result is in the run log later) | the script is this plugin's |
-| `templates.apply` | `{template}` → `{type, id}` of what was created | `documents:write` or `tasks:write` |
-| `ui.resize` | `{height}` → `{}` (40–2000; panels and blocks) | – |
-| `ui.toast` | `{message, tone?}` → `{}` (plain text, at most 200 characters; tone `info success warning error`) | – |
+| `events.create` | `{title, start, end?, allDay?, description?, location?}` → `Event` (`start`, `end`: ISO times) | `events:write` |
+| `events.update` | `{id, title?, start?, end?, allDay?, description?, location?}` → `Event`; only the fields given change | `events:write` |
+| `projects.list` | `{}` → `{projects: [{id, name, color}]}` (archived ones left out) | `projects:read` |
+| `notifications.send` | `{title, body?}` → `{}` (title at most 120 characters) | `notifications:send` |
+| `http.fetch` | `{url, method?, headers?, body?}` → `{status, headers, body}`; `method` one of `GET HEAD POST PUT PATCH DELETE OPTIONS` (default `GET`), `body` is text; the answer's body comes back as text, at most 1 MB | `network:<host of url>` |
+| `tools.call` | `{name, args?}` → `{content, data, isError}` (`data` may be `null`) | `tools:<name>` |
+| `scripts.run` | `{script, input?}` → `{runId}` (the result is in the run log later; not in a preview) | the script is this plugin's |
+| `templates.apply` | `{template}` → `{type: "task"\|"document", id}` of what was created | `documents:write` or `tasks:write` |
+| `ui.resize` | `{height}` → `{}` (40–2000; panels and blocks only, pages and settings fill their box) | – |
+| `ui.toast` | `{message, tone?}` → `{}` (plain text, at most 200 characters; shown with the plugin's name) | – |
 | `ui.open` | `{type: "task"\|"document"\|"event"\|"page", id}` → `{}` | the matching `:read`, or a page of this plugin |
+
+Parameter names are camelCase, and an unknown parameter is an `invalid_params` error (so a
+typo doesn't silently do nothing).
 
 Storage: keys at most 100 characters, JSON values, 1 MB per plugin in total.
 
@@ -321,15 +337,17 @@ Storage: keys at most 100 characters, JSON values, 1 MB per plugin in total.
   "description": "Markdown",
   "status": "todo",              // todo | in_progress | waiting | blocked | done | cancelled
   "priority": 0,                 // 0 none, 1 low, 2 medium, 3 high
-  "due": "2026-11-27",           // date or null
-  "dueTime": "14:00",            // HH:MM or null (only with due)
-  "tags": ["work"],
+  "dueDate": "2026-11-27",       // date or null
+  "dueTime": "14:00",            // HH:MM or null
   "projectId": "0193…",          // or null
   "parentId": null,              // the parent task of a subtask
+  "tags": ["work"],
   "checklist": [{ "id": "a1b2c3d4", "text": "Outline", "done": true }],
+  "properties": { "mood": "good" },  // property key -> value
   "completedAt": null,           // ISO time or null
-  "createdAt": "2026-11-20T08:00:00Z",
-  "updatedAt": "2026-11-24T17:12:03Z"
+  "createdAt": "2026-11-20T08:00:00+00:00",
+  "updatedAt": "2026-11-24T17:12:03+00:00",
+  "url": "/tasks?task=0193b0c2-…"    // its address in Anemo (ui.open takes the id)
 }
 ```
 
@@ -341,9 +359,11 @@ Storage: keys at most 100 characters, JSON values, 1 MB per plugin in total.
   "id": "0193…",
   "path": "documents/notes/idea.md",   // where it is in the workspace
   "title": "Idea",
-  "folder": "notes",                   // inside documents/; "" for the top level
   "wordCount": 412,
-  "updatedAt": "2026-11-24T17:12:03Z"
+  "properties": {},
+  "createdAt": "2026-11-20T08:00:00+00:00",
+  "updatedAt": "2026-11-24T17:12:03+00:00",
+  "url": "/documents/0193…"
 }
 // Document = DocumentSummary plus
 {
@@ -355,15 +375,20 @@ Storage: keys at most 100 characters, JSON values, 1 MB per plugin in total.
 
 ```jsonc
 {
-  "id": "0193…",                 // for an expanded repeating event: the same id for every occurrence
+  "id": "0193…",                 // an occurrence of a repeating event has the event's id
   "title": "Dentist",
   "description": "",
   "location": "",
   "start": "2026-11-27T09:30:00+01:00",
   "end": "2026-11-27T10:15:00+01:00",
-  "allDay": false,               // all-day events: start and end are dates, end inclusive
+  "allDay": false,               // all-day: start is midnight of the first day, end midnight after the last (in timeZone)
+  "timeZone": "Europe/Kyiv",
+  "recurring": false,            // true when the event repeats
   "projectId": null,
-  "repeats": false               // true for an occurrence of a repeating event
+  "taskId": null,                // the task it was planned for, if any
+  "properties": {},
+  "url": "/calendar?event=0193…",
+  "originalStart": "2026-11-27T09:30:00+01:00"   // events.list only: when this occurrence was due by the rule
 }
 ```
 
@@ -436,20 +461,37 @@ frame's `:root`, so CSS can use them directly; they change with `theme.changed`.
 
 | Variable | Use |
 | --- | --- |
-| `--bg`, `--surface`, `--surface-2`, `--card` | backgrounds, from the page to raised cards |
+| `--bg`, `--surface`, `--surface-2`, `--surface-hover`, `--card` | backgrounds, from the page to raised cards, and hover |
 | `--text`, `--muted`, `--subtle` | text, secondary text, hints |
-| `--border` | lines and outlines |
-| `--accent`, `--accent-contrast` | the user's accent colour and text on it |
-| `--success`, `--warning`, `--error` | states |
+| `--border`, `--border-strong` | lines and outlines |
+| `--accent`, `--accent-hover`, `--accent-soft`, `--accent-contrast` | the user's accent colour, its hover and soft forms, and text on it |
+| `--success`, `--warning`, `--error`, `--info` | states |
 | `--radius-card`, `--radius-control` | corner radii |
-| `--card-x` | horizontal padding of a card at the current density |
-| `--font-ui`, `--font-mono` | the user's fonts |
+| `--font-ui`, `--font-code` | the user's fonts |
+| `--shadow-soft` | a soft shadow for raised things |
+| `--card-x`, `--card-y`, `--row-y`, `--card-gap`, `--stack-gap`, `--item-x`, `--item-y` | spacing at the current density |
+| `--btn-h`, `--btn-sm-h` | the height of buttons and of small buttons |
+
+The mode is also on `:root` as `data-theme="light|dark"`, the density as
+`data-density="comfortable|compact"`.
 
 A small base stylesheet is added before the plugin's own CSS: the body uses the UI font,
-text colour and a transparent background; `button`, `input`, `select` and `textarea` look
-like Anemo's controls; `.card` is a card, `.muted` is secondary text. Style on top of it
-with your own CSS, using the variables instead of fixed colours so light and dark both
-work.
+text colour and a transparent background; headings, links, `code`/`pre`, tables, `button`,
+`input`, `select`, `textarea` and `label` look like Anemo's. Classes:
+
+| Class | What |
+| --- | --- |
+| `.card` | a card |
+| `.muted`, `.subtle` | secondary text, hints |
+| `.small`, `.num` | smaller text; tabular numbers |
+| `.stack` | a column with gaps |
+| `.row` | a line of items with gaps |
+| `.list` | a `<ul>` of rows with lines between them |
+| `.badge`, `.badge.accent` | a small label |
+| `button.primary`, `button.ghost`, `button.danger`, `button.small` | button kinds (a plain `button` is secondary) |
+
+Style on top of it with your own CSS, using the variables instead of fixed colours so light
+and dark both work.
 
 ## 10. Example: a document panel
 
@@ -535,7 +577,7 @@ Note `textContent` (not `innerHTML`): document text is shown as text, never as H
 | `anemo-plugin.json` is missing | The manifest must be at the package root, with exactly that name. |
 | Not valid JSON | No comments, no trailing commas, double quotes only. |
 | Unknown field `x` | Remove it, or check its spelling and place (e.g. `objects` belongs to a `ui` item, not to `contributes`). Fields are camelCase (`manifestVersion`, `appliesTo`). |
-| Invalid `id` | Lowercase, at least two dot-separated parts: `yourname.plugin-name`. Don't use `anemo.`. |
+| Invalid `id` | Lowercase, at least two dot-separated parts: `yourname.plugin-name`. Don't use `anemo.` (only plugins shipped with Anemo may). |
 | Invalid `version` / not higher | Use `MAJOR.MINOR.PATCH`; after an approval every change needs a higher version than every stored one. |
 | Unknown permission | Use one of section 7; `network:` needs a host (`network:api.example.com`), `tools:` a tool name. |
 | A referenced file doesn't exist | `entry`, `icon`, `readme`, template and script `file`s must be paths inside the package, exactly as written (case matters). |
@@ -576,3 +618,8 @@ A good way to work:
    Settings → Plugins before it runs. You can't approve or enable it.
 5. For changes, `plugin_read` first, then `plugin_update_files` with only the files that
    change. If the plugin has an approved version, raise `version` in the manifest.
+
+On a plugin's page the user can also press **Continue building with the assistant**: it
+opens a new Agent-mode chat linked to the plugin (`POST /api/plugins/{id}/chat`, with an
+optional `{message}` saying what they want changed) whose first message asks you to read
+the plugin. That chat counts as one of the plugin's own chats.
