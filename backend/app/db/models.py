@@ -32,6 +32,7 @@ from app.features.shares import models as shares_models
 from app.features.skills import models as skills_models
 from app.features.tasks import models as tasks_models
 from app.features.trash import models as trash_models
+from app.features.triggers import models as triggers_models
 from app.features.usage import models as usage_models
 from app.features.views import models as views_models
 from app.jobs import models as jobs_models
@@ -69,6 +70,7 @@ __all__ = [
     "skills_models",
     "tasks_models",
     "trash_models",
+    "triggers_models",
     "usage_models",
     "views_models",
 ]

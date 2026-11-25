@@ -21,11 +21,17 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.features.documents import properties as documents
     from app.features.notifications import service as notifications
     from app.features.runs import service as runs
+    from app.features.triggers import dispatch as triggers
+    from app.features.triggers import service as trigger_service
     from app.features.updates import service as updates
 
     return [
         ("reminders", reminders.fire_due),
         ("automations", automations.fire_due),
+        # Events whose dispatch job was lost, and firings whose debounce window closed or
+        # whose run ended.
+        ("triggers", triggers.dispatch),
+        ("triggers.prune", trigger_service.prune_if_due),  # at most every 10 minutes
         ("automations.prune", automation_removal.prune_run_chats),  # run chats past keeping
         ("notifications.prune", notifications.prune),
         ("approvals.expire", runs.expire_stale_approvals),

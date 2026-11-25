@@ -103,7 +103,13 @@ def default_handlers() -> dict[str, Handler]:
 
         await research_writeup.run(uuid.UUID(payload["session_id"]), str(payload["format"]))
 
+    async def triggers_dispatch(payload: dict[str, Any]) -> None:
+        from app.features.triggers import dispatch
+
+        await dispatch.dispatch()
+
     return {
+        "triggers.dispatch": triggers_dispatch,
         "automation.retry": automation_retry,
         "automation.check": automation_check,
         "automation.delete": automation_delete,

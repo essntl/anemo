@@ -19,6 +19,7 @@ from app.features.conversations.models import ChatMessage, Conversation
 from app.features.conversations.schemas import (
     AttachmentSummary,
     ConversationOut,
+    EventSummary,
     MessageOut,
     MessageVersion,
     PageContentOut,
@@ -155,6 +156,7 @@ def message_out(
             if isinstance(b, dict) and b.get("type") == "conversation"
         ],
         page=_page_summary(m.content),
+        event=_event_summary(m.content),
         skill=SkillSummary.model_validate(m.skill) if m.skill else None,
         mode=mode if mode is not None else (info[0] if info else None),
         questions=_questions(info),
@@ -536,6 +538,19 @@ def _page(content: list[Any]) -> dict[str, Any] | None:
     return next((b for b in content if isinstance(b, dict) and b.get("type") == "page"), None)
 
 
+def _event_summary(content: list[Any]) -> EventSummary | None:
+    block = next((b for b in content if isinstance(b, dict) and b.get("type") == "event"), None)
+    if block is None:
+        return None
+    return EventSummary(
+        event_type=str(block.get("event_type", "")),
+        summary=str(block.get("summary", "")),
+        at=datetime.fromisoformat(str(block["at"])),
+        coalesced=int(block.get("coalesced") or 1),
+        trigger_id=uuid.UUID(block["trigger_id"]) if block.get("trigger_id") else None,
+    )
+
+
 def _page_summary(content: list[Any]) -> PageSummary | None:
     block = _page(content)
     if block is None:
@@ -861,3 +876,36 @@ async def save_as_document(db: AsyncSession, conv: Conversation) -> Document:
     folder = project.slug if project else ""
     path = await asyncio.to_thread(documents.unique_path, folder, conv.title)
     return await documents.create(db, path, await export_markdown(db, conv), author="user")
+
+
+async def send_event_turn(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    block: dict[str, Any],
+    request: str,
+    options: dict[str, Any],
+) -> Run:
+    """A turn that an event adds to the chat (a "wake me" trigger, features/triggers): a
+    user-role message whose only content is the event `block` (never the user's words;
+    the app shows it as an event card), answered by an agent run with `options`.
+    Raises Conflict while the chat is answering. The caller commits."""
+    conv = await _lock_idle_conversation(db, conversation_id)
+    seq = await _next_seq(db, conv.id)
+    user = ChatMessage(
+        conversation_id=conv.id, seq=seq, role="user", content=[block], text_plain=""
+    )
+    assistant = ChatMessage(
+        conversation_id=conv.id,
+        seq=seq + 1,
+        role="assistant",
+        content=[],
+        text_plain="",
+        status="streaming",
+    )
+    db.add_all([user, assistant])
+    await db.flush()
+    run = await _start_run(
+        db, conv, assistant, request, conv.model_id, user.id, "agent", options=options
+    )
+    conv.last_message_at = func.now()
+    return run

@@ -96,8 +96,10 @@ def parse_operations(text: str) -> list[dict[str, Any]]:
 
 
 def _has_page(message: ChatMessage | None) -> bool:
+    # An event that woke the chat (a webhook body, a title an agent wrote) is outside
+    # content too, just like a page.
     return message is not None and any(
-        isinstance(b, dict) and b.get("type") == "page" for b in message.content or []
+        isinstance(b, dict) and b.get("type") in ("page", "event") for b in message.content or []
     )
 
 

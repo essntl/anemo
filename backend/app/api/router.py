@@ -4,9 +4,10 @@ Routers in `protected` require a logged-in session for every endpoint.
 Only health checks, the login flow, viewing a share link (a frozen copy the owner
 chose to share, see features/shares/public_router.py) and the one-time approval buttons
 on push notifications (see features/notifications/push_router.py) and the plugin frame
-document (the same static page for every plugin, features/plugins/frame_router.py) are
-reachable without one. The browser extension's WebSocket (features/extension/router.py) checks its
-API token itself, in its first message.
+document (the same static page for every plugin, features/plugins/frame_router.py) and
+incoming webhooks (signed with the trigger's secret, features/triggers/hooks_router.py)
+are reachable without one. The browser extension's WebSocket
+(features/extension/router.py) checks its API token itself, in its first message.
 """
 
 from fastapi import APIRouter, Depends
@@ -63,6 +64,8 @@ from app.features.stats.router import router as stats_router
 from app.features.system_router import router as system_router
 from app.features.tasks.router import router as tasks_router
 from app.features.trash.router import router as trash_router
+from app.features.triggers.hooks_router import router as hooks_router
+from app.features.triggers.router import router as triggers_router
 from app.features.updates.router import router as updates_router
 from app.features.usage.router import router as usage_router
 from app.features.views.router import router as views_router
@@ -77,6 +80,7 @@ api_router.include_router(push_public_router)  # one-time approval buttons, by s
 api_router.include_router(extension_router)  # WebSocket; authenticates with an API token
 api_router.include_router(devices_ws_router)  # WebSocket; authenticates with a device's token
 api_router.include_router(plugin_frame_router)  # the plugin frame document: static, no data
+api_router.include_router(hooks_router)  # incoming webhooks; each request is signed (HMAC)
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
@@ -116,6 +120,7 @@ protected.include_router(code_router)
 protected.include_router(research_router)
 protected.include_router(automations_router)
 protected.include_router(scripts_router)
+protected.include_router(triggers_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)
 protected.include_router(search_router)

@@ -57,6 +57,9 @@ class AutomationSettings(BaseModel):
     paused: bool = False
     # A scheduled run is stopped after this long, whatever the agent's own limit says.
     max_run_minutes: int = Field(30, ge=1, le=24 * 60)
+    # Event triggers, all together: firings beyond this many in an hour are dropped
+    # (each trigger also has its own limit).
+    max_trigger_firings_per_hour: int = Field(60, ge=1, le=1000)
 
 
 class FocusSettings(BaseModel):

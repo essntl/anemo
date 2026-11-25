@@ -20,6 +20,7 @@ from app.providers.base import (
     AttachmentRef,
     ChatRequest,
     ConversationRef,
+    EventRef,
     Message,
     ProviderError,
     ReasoningBlock,
@@ -98,6 +99,8 @@ def render(messages: list[Message], max_chars: int) -> str:
                     lines.append(f"[attached {b.kind or 'file'}: {b.filename}]")
                 elif isinstance(b, ConversationRef):
                     lines.append(f"[referenced another chat: {b.title}]")
+                elif isinstance(b, EventRef):
+                    lines.append(f"[an event woke the chat (not the user): {b.summary}]")
                 elif isinstance(b, ReasoningBlock):
                     continue  # the agent's own reasoning is not needed to continue
             if lines:
