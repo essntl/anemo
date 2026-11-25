@@ -11,6 +11,14 @@ export interface FrameTheme {
   mode: 'light' | 'dark'
   density: 'comfortable' | 'compact'
   vars: Record<string, string>
+  /** The user asked for less motion (the system's prefers-reduced-motion). */
+  reducedMotion: boolean
+}
+
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia(REDUCED_MOTION).matches
 }
 
 const VARS: [plugin: string, anemo: string][] = [
@@ -60,12 +68,14 @@ export function currentTheme(root: HTMLElement = document.documentElement): Fram
     mode: root.dataset.theme === 'dark' ? 'dark' : 'light',
     density: root.dataset.density === 'compact' ? 'compact' : 'comfortable',
     vars,
+    reducedMotion: prefersReducedMotion(),
   }
 }
 
 /**
  * Calls `onChange` with the new theme whenever the appearance changes (Settings >
- * Appearance writes its variables and data attributes on <html>, see appearance/apply.ts).
+ * Appearance writes its variables and data attributes on <html>, see appearance/apply.ts)
+ * and when the system's reduced-motion setting changes.
  * Only real changes are reported. Returns a function that stops watching.
  */
 export function watchTheme(onChange: (theme: FrameTheme) => void, root: HTMLElement = document.documentElement): () => void {
@@ -84,8 +94,15 @@ export function watchTheme(onChange: (theme: FrameTheme) => void, root: HTMLElem
     if (!frame) frame = requestAnimationFrame(check)
   })
   observer.observe(root, { attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-density'] })
+  // The system's motion setting can change while Anemo is open.
+  const motion = typeof window.matchMedia === 'function' ? window.matchMedia(REDUCED_MOTION) : null
+  const onMotion = () => {
+    if (!frame) frame = requestAnimationFrame(check)
+  }
+  motion?.addEventListener?.('change', onMotion)
   return () => {
     observer.disconnect()
+    motion?.removeEventListener?.('change', onMotion)
     if (frame) cancelAnimationFrame(frame)
   }
 }

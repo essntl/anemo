@@ -43,7 +43,8 @@ export function UninstallDialog({ plugin, onClose, onDone }: { plugin: PluginOut
   const adopted = names(adoptedResources(data.data))
   const written = writtenText(data.data)
   const storageKeys = data.data?.storage_keys ?? 0
-  const storage = data.data?.storage_bytes ?? 0
+  const storage = (data.data?.storage_bytes ?? 0) + (data.data?.asset_bytes ?? 0)
+  const assets = data.data?.asset_count ?? 0
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} className="md:w-[min(96vw,520px)]"
@@ -68,7 +69,7 @@ export function UninstallDialog({ plugin, onClose, onDone }: { plugin: PluginOut
           {t('What it registered is deleted; tasks, documents and events it created go to the Trash; its own storage is deleted.')}
           {owned && <span className="mt-1 block text-text">{t('Deleted: {list}', { list: owned })}</span>}
           {written && <span className="mt-1 block text-text">{t('To the Trash: {list}', { list: written })}</span>}
-          {storageKeys > 0 && <span className="mt-1 block text-text">{t('Its storage: {size}', { size: formatSize(storage) })}</span>}
+          {(storageKeys > 0 || assets > 0) && <span className="mt-1 block text-text">{t('Its storage: {size}', { size: formatSize(storage) })}</span>}
           {adopted && <span className="mt-1 block text-text">{t('Stays, as it was yours before: {list}', { list: adopted })}</span>}
         </Option>
         {data.isPending && <p className="text-[12.5px] text-muted">{t('Looking at what it made…')}</p>}

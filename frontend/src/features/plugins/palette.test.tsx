@@ -79,3 +79,22 @@ describe('plugins in the command palette', () => {
     expect(toast).toHaveBeenCalledWith({ message: 'Today board: this command needs a newer version of Anemo.' })
   })
 })
+
+describe('sendToUi commands', () => {
+  afterEach(() => toast.mockReset())
+
+  it('deliver the event to the plugin’s open frame of that UI, and say so when it isn’t open', async () => {
+    const { registerFrame } = await import('./host/frames')
+    const emit = vi.fn()
+    const stop = registerFrame({ pluginId: 'anemo.today-board', ui: 'layer', emit })
+    const toggle = command({ type: 'sendToUi', ui: 'layer', event: 'toggle' }, { title: 'Toggle' })
+    await runCommand(toggle, null, vi.fn())
+    expect(emit).toHaveBeenCalledWith('command', { event: 'toggle' })
+    expect(toast).not.toHaveBeenCalled()
+    expect(call).not.toHaveBeenCalled()
+    stop()
+    await runCommand(toggle, null, vi.fn())
+    expect(emit).toHaveBeenCalledTimes(1)
+    expect(toast).toHaveBeenCalledWith({ message: expect.stringContaining('Toggle') })
+  })
+})

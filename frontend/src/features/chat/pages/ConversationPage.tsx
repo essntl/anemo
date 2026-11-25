@@ -22,6 +22,7 @@ import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
 import { useProjects } from '@/features/tasks/api'
+import { useReportAssistantActivity } from '@/lib/assistantActivity'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { useIslandVisible } from '@/features/island/islandStore'
@@ -191,6 +192,8 @@ function Conversation() {
   const actionError = send.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
+  // What the assistant is doing (only the state), for anything that shows it, e.g. plugins.
+  useReportAssistantActivity(Boolean(activeRunId) && !paused && !question, live.text.length)
 
   // Phones while the Dynamic Island shows: the header takes two rows (see below).
   const stacked = island && !desktop

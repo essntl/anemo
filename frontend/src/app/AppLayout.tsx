@@ -11,6 +11,7 @@ import { CodeQueueRunner } from '@/features/code/CodeQueueRunner'
 import { AppBackground } from '@/features/appearance/AppBackground'
 import { useServiceWorkerLinks } from '@/features/notifications/useServiceWorkerLinks'
 import { Island } from '@/features/island/Island'
+import { PluginOverlays } from '@/features/plugins/overlays'
 import { PluginFences } from '@/features/plugins/slots'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { isOffAddress, useOffPages } from '@/features/settings/navigation'
@@ -120,6 +121,8 @@ export function AppLayout() {
         {!ownHeader && <MobileTabBar />}
       </div>
       <PersistentLayer />
+      {/* Plugins' overlays: over the pages, under every dialog; outside the routes, so they stay. */}
+      <PluginOverlays />
       <ReauthDialog />
       <DialogHost />
       <MoveChatsDialog />

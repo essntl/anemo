@@ -341,6 +341,8 @@ export function Composer({
   return (
     <div
       ref={rootRef}
+      // Where the message box is, for plugins (layout.get anchors.composer; no content).
+      data-plugin-anchor="composer"
       onFocus={() => setFocused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget) && !pressedInside.current) setFocused(false)

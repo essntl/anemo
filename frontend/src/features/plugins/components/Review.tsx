@@ -213,7 +213,8 @@ export function VersionReview({ plugin, version, onDone, onClose }: {
     approve.mutate({ id: plugin.id, version: version.version, hash: version.hash, enable }, { onSuccess: () => onDone?.() })
   const files = version.files.reduce((sum, f) => sum + f.size, 0)
   return (
-    <div className="flex flex-col gap-(--stack-gap)">
+    // No plugin overlay is drawn while a review is on screen (host/dialogWatch.ts).
+    <div data-hides-plugin-overlays="" className="flex flex-col gap-(--stack-gap)">
       <p className="text-[13px] text-muted">
         {plugin.made_by_assistant
           ? t('An assistant made this version. Nothing of it runs until you approve it, exactly as shown here.')
