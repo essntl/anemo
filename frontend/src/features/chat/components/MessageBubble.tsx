@@ -10,7 +10,6 @@ import { rich, t } from '@/lib/i18n'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
-import { Avatar } from '@/features/profile/Avatar'
 import { SkillIcon } from '@/features/skills/icons'
 import { AnswerDuration, LiveTiming } from './AnswerTiming'
 import { AttachmentChip } from './AttachmentChip'
@@ -81,20 +80,17 @@ export function UserBubble({ text, attachments = [], references = [], skill, pag
         </div>
       )}
       {/* A message can be just files (or a page): then no empty bubble under them. */}
+      {/* No avatar beside your own messages: the bubble on the right already says who wrote it. */}
       {(text || skill) && (
-      // Your avatar (Settings > Profile) beside the text; phones keep the width for the text.
-      <div className="flex w-full items-start justify-end gap-2">
-      <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
-        {skill && (
-          <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-medium text-accent" title={t('Answered with the /{slug} skill', { slug: skill.slug })}>
-            <SkillIcon name={skill.icon} className="h-[15px] w-[15px]" />
-            {skill.name}
-          </span>
-        )}
-        {text}
-      </div>
-      <Avatar size={28} className="max-md:hidden" />
-      </div>
+        <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
+          {skill && (
+            <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-medium text-accent" title={t('Answered with the /{slug} skill', { slug: skill.slug })}>
+              <SkillIcon name={skill.icon} className="h-[15px] w-[15px]" />
+              {skill.name}
+            </span>
+          )}
+          {text}
+        </div>
       )}
       {onEdit && (
         <button type="button" onClick={() => setDraft(text)}

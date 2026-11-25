@@ -75,9 +75,6 @@
 
   --shadow-soft: 0 1px 2px rgb(18 28 56 / 0.07), 0 4px 14px rgb(18 28 56 / 0.06);
   --shadow-float: 0 2px 6px rgb(18 28 56 / 0.08), 0 14px 36px rgb(18 28 56 / 0.12);
-
-  /* Density: spacing multiplier used by a few layout primitives */
-  --density: 1;
 }
 
 [data-theme='dark'] {
@@ -120,8 +117,58 @@
   --shadow-float: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.45);
 }
 
+/*
+ * Density (Settings > Appearance > Density): the spacing of rows, lists, cards and the
+ * chat. Components use these through Tailwind's variable shorthand, e.g. `py-(--row-y)`,
+ * `h-(--nav-row-h)`, `gap-(--msg-gap)`. Compact fits more on screen.
+ */
+:root {
+  --nav-row-h: 2rem; /* sidebar pages, the chat list (+0.25rem) */
+  --list-row-y: 0.5rem; /* a row in a list: a task, a document, a run */
+  --row-y: 0.875rem; /* a setting row in a card */
+  --card-x: 1rem;
+  --card-y: 1.25rem;
+  --card-gap: 1.25rem; /* between the cards of a settings page */
+  --item-x: 1rem; /* a card in a list (an automation) */
+  --item-y: 0.75rem;
+  --stack-gap: 0.5rem; /* between the cards of a list */
+  --item-gap: 0.5rem; /* between the lines inside such a card */
+  --msg-gap: 1.5rem; /* between the messages of a chat */
+  --btn-h: 2.5rem; /* Button md */
+  --btn-sm-h: 2rem; /* Button sm */
+}
+@media (min-width: 768px) {
+  :root {
+    --card-x: 1.5rem;
+  }
+}
 [data-density='compact'] {
-  --density: 0.8;
+  --nav-row-h: 1.625rem;
+  --list-row-y: 0.1875rem;
+  --row-y: 0.4375rem;
+  --card-x: 0.875rem;
+  --card-y: 0.75rem;
+  --card-gap: 0.625rem;
+  --item-x: 0.875rem;
+  --item-y: 0.375rem;
+  --stack-gap: 0.25rem;
+  --item-gap: 0.25rem;
+  --msg-gap: 0.75rem;
+  --btn-h: 2.125rem;
+  --btn-sm-h: 1.625rem;
+}
+@media (min-width: 768px) {
+  [data-density='compact'] {
+    --card-x: 1rem;
+  }
+}
+/* Touch screens: rows keep a finger-sized height whatever the density (elements with a
+   pointer-coarse: height of their own keep it too). */
+@media (pointer: coarse) {
+  [data-density='compact'] {
+    --list-row-y: 0.5rem;
+    --row-y: 0.75rem;
+  }
 }
 
 /* Syntax highlighting (code blocks) */

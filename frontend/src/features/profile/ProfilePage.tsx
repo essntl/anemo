@@ -4,7 +4,7 @@ import { Trash2, Upload } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
-import { Field, Input } from '@/components/ui/Input'
+import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/toast'
 import { useRemoveAvatar, useSetAvatar } from '@/features/appearance/api'
 import { useMe } from '@/features/auth/api'
@@ -30,13 +30,16 @@ function NameForm({ initial, username }: { initial: string; username: string }) 
     })
   }
   return (
-    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); submit() }}>
-      <Field label={t('Display name')} hint={t('Shown next to your messages and in the sidebar. Empty: your login name ({username}).', { username })}>
-        <Input value={name} maxLength={60} placeholder={username} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <div>
-        <Button type="submit" variant="primary" size="sm" disabled={!dirty} loading={save.isPending}>{t('Save')}</Button>
+    <form className="flex flex-col gap-1.5" onSubmit={(e) => { e.preventDefault(); submit() }}>
+      <label htmlFor="profile-display-name" className="text-[13px] font-medium">{t('Display name')}</label>
+      {/* The field is as wide as a name needs, with its Save button beside it. */}
+      <div className="flex max-w-md items-center gap-2">
+        <Input id="profile-display-name" value={name} maxLength={60} placeholder={username} onChange={(e) => setName(e.target.value)}
+          className="min-w-0 flex-1" />
+        {/* Quiet until there is something to save, then the accent: not a washed-out blue. */}
+        <Button type="submit" variant={dirty ? 'primary' : 'secondary'} disabled={!dirty} loading={save.isPending}>{t('Save')}</Button>
       </div>
+      <span className="text-[12px] text-muted">{t('Shown in the sidebar. Empty: your login name ({username}).', { username })}</span>
     </form>
   )
 }
@@ -52,9 +55,9 @@ function AvatarForm({ hasAvatar }: { hasAvatar: boolean }) {
   const setAvatar = useSetAvatar()
   const remove = useRemoveAvatar()
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      <Avatar size={72} />
-      <div className="flex flex-col gap-2">
+    <div className="flex items-center gap-4">
+      <Avatar size={64} className="shrink-0" />
+      <div className="flex min-w-0 flex-col gap-2">
         <div className="flex flex-wrap gap-2">
           <input ref={input} type="file" accept={AVATAR_ACCEPT} className="hidden" aria-hidden tabIndex={-1}
             onChange={(e) => { pick(e.target.files?.[0]); e.target.value = '' }} />
@@ -85,11 +88,12 @@ export function ProfilePage() {
   const me = useMe()
   const profile = settings.data?.profile
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
-        <CardHeader title={t('Profile')} description={t('How you appear in Anemo: in your chats, on the Code page and in the sidebar.')} />
-        <CardBody className="flex flex-col gap-6">
+        <CardHeader title={t('Profile')} description={t('Your name and picture, shown in the sidebar’s account row.')} />
+        <CardBody className="flex flex-col gap-(--card-y)">
           <AvatarForm hasAvatar={Boolean(profile?.avatar_id)} />
+          <div aria-hidden className="-mx-(--card-x) h-px bg-border" />
           {profile && <NameForm key={profile.display_name} initial={profile.display_name} username={me.data?.username ?? ''} />}
         </CardBody>
       </Card>

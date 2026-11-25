@@ -20761,10 +20761,14 @@
             "enum": [
               "aurora",
               "dusk",
-              "lagoon"
+              "lagoon",
+              "custom"
             ],
             "title": "Gradient",
             "default": "aurora"
+          },
+          "custom_gradient": {
+            "$ref": "#/components/schemas/CustomGradient"
           },
           "asset_id": {
             "anyOf": [
@@ -20877,6 +20881,13 @@
             "type": "boolean",
             "title": "Glass",
             "default": false
+          },
+          "glass_strength": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Glass Strength",
+            "default": 50
           }
         },
         "type": "object",
@@ -24415,6 +24426,49 @@
           "title"
         ],
         "title": "CreateIn"
+      },
+      "CustomGradient": {
+        "properties": {
+          "colors": {
+            "items": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 2,
+            "title": "Colors"
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "drift",
+              "linear"
+            ],
+            "title": "Style",
+            "default": "drift"
+          },
+          "angle": {
+            "type": "integer",
+            "maximum": 359.0,
+            "minimum": 0.0,
+            "title": "Angle",
+            "default": 135
+          },
+          "speed": {
+            "type": "string",
+            "enum": [
+              "slow",
+              "normal",
+              "fast"
+            ],
+            "title": "Speed",
+            "default": "normal"
+          }
+        },
+        "type": "object",
+        "title": "CustomGradient",
+        "description": "The user's own animated gradient (Background > Animated gradient > Custom)."
       },
       "DailyNoteIn": {
         "properties": {

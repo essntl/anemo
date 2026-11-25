@@ -9,11 +9,12 @@
  * is worked out here.
  */
 import type { Schemas } from '@/api/client'
-import { AA_TEXT, AA_UI, accentShades, contrast, isHex, mix } from '@/lib/color'
+import { AA_TEXT, AA_UI, accentShades, contrast, isHex, mix, readableOn } from '@/lib/color'
 import { fontStack } from './fonts'
 
 /** The server's settings; fields it fills with a default are always there. */
-export type Background = Required<Schemas['AppearanceBackground']>
+export type CustomGradient = Required<Schemas['CustomGradient']>
+export type Background = Required<Omit<Schemas['AppearanceBackground'], 'custom_gradient'>> & { custom_gradient: CustomGradient }
 export type Appearance = Required<Omit<Schemas['AppearanceSettings'], 'background'>> & { background: Background }
 export type ThemeMode = Appearance['mode']
 export type Density = Appearance['density']
@@ -21,9 +22,18 @@ export type Resolved = 'light' | 'dark'
 
 export const DEFAULT_ACCENT = '#2a6df4'
 
+/** The same defaults as the server's CustomGradient. */
+export const DEFAULT_CUSTOM_GRADIENT: CustomGradient = {
+  colors: ['#2a6df4', '#00c2d4', '#c04fe0'],
+  style: 'drift',
+  angle: 135,
+  speed: 'normal',
+}
+
 export const DEFAULT_BACKGROUND: Background = {
   kind: 'none',
   gradient: 'aurora',
+  custom_gradient: DEFAULT_CUSTOM_GRADIENT,
   asset_id: null,
   blur: 0,
   dim: 35,
@@ -42,6 +52,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   code_font: 'default',
   background: DEFAULT_BACKGROUND,
   glass: false,
+  glass_strength: 50,
 }
 
 /** As the server sends it (or an older cache has it): fields with a default may be missing. */
@@ -50,7 +61,12 @@ export type StoredAppearance = Partial<Schemas['AppearanceSettings']>
 /** Fill in what an older or partial value (a cache, the server's answer) leaves out. */
 export function withDefaults(value: StoredAppearance | null | undefined): Appearance {
   const v = value ?? {}
-  const background = { ...DEFAULT_BACKGROUND, ...v.background, asset_id: v.background?.asset_id ?? null }
+  const background = {
+    ...DEFAULT_BACKGROUND,
+    ...v.background,
+    asset_id: v.background?.asset_id ?? null,
+    custom_gradient: { ...DEFAULT_CUSTOM_GRADIENT, ...v.background?.custom_gradient },
+  }
   return { ...DEFAULT_APPEARANCE, ...v, tint: v.tint ?? null, background }
 }
 
@@ -90,10 +106,30 @@ export function surfaces(a: Appearance, mode: Resolved): Record<Surface, string>
 
 /** Every variable this module may set, so one left from an earlier choice is removed. */
 const MANAGED = [
-  '--accent', '--accent-hover', '--accent-active', '--accent-contrast',
+  '--accent', '--accent-hover', '--accent-active', '--accent-contrast', '--accent-text',
   '--bg', '--surface', '--surface-2', '--surface-hover', '--card',
   '--font-ui', '--font-code',
+  '--glass-blur', '--glass-opacity',
 ]
+
+/**
+ * Frosted glass at a strength of 0–100: the blur, and how opaque the panel stays. 50 is
+ * the look glass had before it had a strength. The panel never gets more see-through than
+ * 70 % opaque (65 % in dark), so text on it keeps its contrast whatever is behind it.
+ * Between the three points the values are interpolated in a straight line.
+ */
+const GLASS: Record<Resolved, { blur: [number, number, number]; opacity: [number, number, number] }> = {
+  //            strength:  0   50   100
+  light: { blur: [6, 18, 32], opacity: [90, 72, 70] },
+  dark: { blur: [6, 18, 32], opacity: [88, 66, 65] },
+}
+
+export function glassLook(strength: number, mode: Resolved): { blur: number; opacity: number } {
+  const s = Math.min(100, Math.max(0, strength))
+  const at = ([a, b, c]: [number, number, number]) => (s <= 50 ? a + ((b - a) * s) / 50 : b + ((c - b) * (s - 50)) / 50)
+  const { blur, opacity } = GLASS[mode]
+  return { blur: Math.round(at(blur)), opacity: Math.round(at(opacity)) }
+}
 
 export type Vars = Record<string, string>
 
@@ -109,10 +145,19 @@ export function cssVariables(a: Appearance, mode: Resolved): Vars {
   if (a.tint && isHex(a.tint) && a.tint_strength > 0) {
     for (const [name, value] of Object.entries(surfaces(a, mode))) vars[`--${name}`] = value
   }
+  // Links and other text in the accent colour: lightened (dark) or darkened (light) just
+  // enough to read on every surface. The plain accent stays for buttons and fills.
+  const s = surfaces(a, mode)
+  vars['--accent-text'] = readableOn(accent, [s.bg, s.surface, s['surface-2'], s.card], mode === 'dark' ? '#ffffff' : '#000000')
   const ui = fontStack(a.ui_font, 'ui')
   if (ui) vars['--font-ui'] = ui
   const code = fontStack(a.code_font, 'code')
   if (code) vars['--font-code'] = code
+  if (a.glass) {
+    const glass = glassLook(a.glass_strength, mode)
+    vars['--glass-blur'] = `${glass.blur}px`
+    vars['--glass-opacity'] = `${glass.opacity}%`
+  }
   return vars
 }
 

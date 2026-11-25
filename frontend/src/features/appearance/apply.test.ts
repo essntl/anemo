@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { contrast } from '@/lib/color'
-import { applyLook, BASE, contrastWarnings, cssVariables, DEFAULT_APPEARANCE, lookFor, withDefaults } from './apply'
+import { applyLook, BASE, contrastWarnings, cssVariables, DEFAULT_APPEARANCE, glassLook, lookFor, withDefaults } from './apply'
 
 // Read from disk: with `css: false` (vite.config.ts) even a `?raw` CSS import is empty in tests.
 const tokens = readFileSync(join(process.cwd(), 'src/styles/tokens.css'), 'utf8')
@@ -25,9 +25,20 @@ describe('the copy of the theme colours', () => {
 describe('cssVariables', () => {
   it('sets the accent and its shades, and nothing else by default', () => {
     const vars = cssVariables(DEFAULT_APPEARANCE, 'light')
-    expect(Object.keys(vars).sort()).toEqual(['--accent', '--accent-active', '--accent-contrast', '--accent-hover'])
+    expect(Object.keys(vars).sort()).toEqual(['--accent', '--accent-active', '--accent-contrast', '--accent-hover', '--accent-text'])
     expect(vars['--accent']).toBe('#2a6df4')
     expect(vars['--accent-contrast']).toBe('#ffffff')
+  })
+
+  it('makes text in the accent colour readable on every surface, in both themes', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      for (const accent of ['#2a6df4', '#5f6b7a', '#ffe14d', '#1f9d6b']) {
+        const text = cssVariables({ ...DEFAULT_APPEARANCE, accent }, mode)['--accent-text']
+        for (const bg of [BASE[mode].bg, BASE[mode].surface, BASE[mode]['surface-2'], BASE[mode].card]) expect(contrast(text, bg), `${mode} ${accent} on ${bg}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+    // Already readable: unchanged (a dark blue on white).
+    expect(cssVariables({ ...DEFAULT_APPEARANCE, accent: '#1a3c8c' }, 'light')['--accent-text']).toBe('#1a3c8c')
   })
 
   it('picks dark text on a light accent', () => {
@@ -97,5 +108,56 @@ describe('applying a look', () => {
     expect(a.background.kind).toBe('none')
     expect(a.tint).toBeNull()
     expect(withDefaults({ background: { kind: 'gradient' } as never }).background.dim).toBe(35)
+  })
+})
+
+describe('frosted glass strength', () => {
+  it('looks as it always did at the default strength', () => {
+    expect(glassLook(50, 'light')).toEqual({ blur: 18, opacity: 72 })
+    expect(glassLook(50, 'dark')).toEqual({ blur: 18, opacity: 66 })
+  })
+
+  it('never lets a panel get more see-through than 70 % (65 % in dark)', () => {
+    for (let s = 0; s <= 100; s += 5) {
+      expect(glassLook(s, 'light').opacity).toBeGreaterThanOrEqual(70)
+      expect(glassLook(s, 'dark').opacity).toBeGreaterThanOrEqual(65)
+    }
+    expect(glassLook(0, 'light').blur).toBeLessThan(glassLook(100, 'light').blur)
+  })
+
+  it('sets the glass variables only while glass is on', () => {
+    expect(cssVariables({ ...DEFAULT_APPEARANCE, glass: false, glass_strength: 90 }, 'light')['--glass-blur']).toBeUndefined()
+    const vars = cssVariables({ ...DEFAULT_APPEARANCE, glass: true, glass_strength: 100 }, 'dark')
+    expect(vars['--glass-blur']).toBe('32px')
+    expect(vars['--glass-opacity']).toBe('65%')
+  })
+})
+
+describe('density', () => {
+  /** Every `--name:` set inside the blocks for `selector` (there may be several, in media queries). */
+  function declared(selector: string): Set<string> {
+    const names = new Set<string>()
+    for (let at = tokens.indexOf(`${selector} {`); at !== -1; at = tokens.indexOf(`${selector} {`, at + 1)) {
+      const body = tokens.slice(at, tokens.indexOf('}', at))
+      for (const m of body.matchAll(/(--[\w-]+):/g)) names.add(m[1])
+    }
+    return names
+  }
+
+  it('has a compact value for every spacing token', () => {
+    const spacing = ['--nav-row-h', '--list-row-y', '--row-y', '--card-x', '--card-y', '--card-gap', '--item-x', '--item-y', '--stack-gap', '--item-gap', '--msg-gap', '--btn-h', '--btn-sm-h']
+    const compact = declared("[data-density='compact']")
+    for (const name of spacing) {
+      expect(tokens, name).toContain(`${name}:`)
+      expect(compact.has(name), name).toBe(true)
+    }
+  })
+
+  it('is switched on <html>, before the first paint too', () => {
+    const root = document.createElement('html')
+    applyLook(lookFor({ ...DEFAULT_APPEARANCE, density: 'compact' }), 'light', root)
+    expect(root.dataset.density).toBe('compact')
+    applyLook(lookFor(DEFAULT_APPEARANCE), 'light', root)
+    expect(root.dataset.density).toBe('comfortable')
   })
 })

@@ -273,7 +273,7 @@ export function PropertiesSettingsPage() {
   const reindex = useReindexDocuments()
   const definitions = properties.data ?? []
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Properties')}
           description={t('What a document is about: its type, status, tags, client… A folder says where a document lives; properties say what it is, and views and search filter by them. They are written at the top of each file.')} />

@@ -19,6 +19,24 @@ describe('export and import', () => {
     expect(parseImport(exportJson(look), [FONT, PICTURE])).toEqual(look)
   })
 
+  it('carries a custom gradient and the glass strength, and checks them', () => {
+    const custom = { colors: ['#111111', '#abcdef'], style: 'linear' as const, angle: 45, speed: 'fast' as const }
+    const look = {
+      ...DEFAULT_APPEARANCE,
+      background: { ...DEFAULT_APPEARANCE.background, kind: 'gradient' as const, gradient: 'custom' as const, custom_gradient: custom },
+      glass: true,
+      glass_strength: 80,
+    }
+    expect(parseImport(exportJson(look), [])).toEqual(look)
+
+    const bad = JSON.parse(exportJson(look))
+    bad.appearance.background.custom_gradient = { colors: ['#111111', 'url(x)'], style: 'spiral', angle: 900, speed: 'warp' }
+    bad.appearance.glass_strength = 500
+    const imported = parseImport(JSON.stringify(bad), [])
+    expect(imported.background.custom_gradient).toEqual({ colors: DEFAULT_APPEARANCE.background.custom_gradient.colors, style: 'drift', angle: 359, speed: 'normal' })
+    expect(imported.glass_strength).toBe(100)
+  })
+
   it('drops uploads this server does not have', () => {
     const look = {
       ...DEFAULT_APPEARANCE,

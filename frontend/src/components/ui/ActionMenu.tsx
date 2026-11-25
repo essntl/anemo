@@ -26,17 +26,30 @@ export interface MenuAction {
  * low for it). On phones it is a sheet along the bottom edge instead, like the dialogs:
  * a popup next to a button low in a list had no room and ran off the screen.
  */
-export function ActionMenu({ actions, label = t('More actions'), className }: { actions: MenuAction[]; label?: string; className?: string }) {
+export function ActionMenu({ actions, label = t('More actions'), className, icon, heading }: {
+  actions: MenuAction[]
+  label?: string
+  className?: string
+  /** A small title over the list, e.g. "Start from a template". */
+  heading?: string
+  /** The button's icon (default "⋯"), e.g. a chevron for the menu half of a split button. */
+  icon?: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const desktop = useMediaQuery(DESKTOP)
   useCloseOnScroll(open && desktop, useCallback(() => setOpen(false), []))
   const trigger = (
     <button type="button" aria-label={label}
       className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text', className)}>
-      <MoreHorizontal className="h-4.5 w-4.5" />
+      {icon ?? <MoreHorizontal className="h-4.5 w-4.5" />}
     </button>
   )
-  const list = <ActionList actions={actions} large={!desktop} onDone={() => setOpen(false)} />
+  const list = (
+    <>
+      {heading && <div className="px-3 pb-1 pt-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-muted">{heading}</div>}
+      <ActionList actions={actions} large={!desktop} onDone={() => setOpen(false)} />
+    </>
+  )
 
   if (!desktop) {
     return (

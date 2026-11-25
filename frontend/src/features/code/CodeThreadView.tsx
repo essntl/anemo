@@ -20,7 +20,6 @@ import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
 import { useIslandVisible } from '@/features/island/islandStore'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
-import { Avatar } from '@/features/profile/Avatar'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
@@ -106,8 +105,8 @@ function Prompt({ text, images = [] }: { text: string; images?: readonly { id: s
   const [all, setAll] = useState(false)
   const long = text.length > 800 || text.split('\n').length > 14
   return (
-    // Your avatar (Settings > Profile) beside it, as in a chat; phones keep the width for the text.
-    <div className="flex items-start justify-end gap-2">
+    // As in a chat, no avatar beside your own message: its place on the right says who wrote it.
+    <div className="flex justify-end">
       <div className="max-w-[min(42rem,92%)] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[13.5px]">
         <p className={cn('whitespace-pre-wrap break-words', long && !all && 'line-clamp-[12]')}>{text}</p>
         {long && (
@@ -117,7 +116,6 @@ function Prompt({ text, images = [] }: { text: string; images?: readonly { id: s
         )}
         <PromptImages images={images} className="mt-2" />
       </div>
-      <Avatar size={28} className="max-md:hidden" />
     </div>
   )
 }

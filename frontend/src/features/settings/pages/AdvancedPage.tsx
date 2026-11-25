@@ -69,7 +69,7 @@ export function AdvancedPage() {
   const problems = (status.data?.checks ?? []).filter((c) => !c.ok && !c.optional).length
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <Wrench className="h-5 w-5" />

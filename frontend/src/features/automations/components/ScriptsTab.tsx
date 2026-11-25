@@ -6,13 +6,12 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { ChevronDown, Code2, FileCode, History, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, FileCode, History, Pencil, Play, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { confirmDialog } from '@/components/ui/dialogs'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { Lingering } from '@/components/ui/Lingering'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
@@ -28,7 +27,6 @@ import {
   useSetAutomationEnabled,
 } from '../api'
 import { RunHistory } from './RunHistory'
-import { ScriptDialog } from './ScriptDialog'
 import { ScriptReviewDialog } from './ScriptReviewDialog'
 
 /** Who wrote the script: you, the assistant in a chat (a link to it), or an automation. */
@@ -73,7 +71,7 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
   }
 
   return (
-    <div className={cn('rounded-card border border-border bg-card px-4 py-3 shadow-soft', !automation.enabled && 'opacity-90')}
+    <div className={cn('rounded-card border border-border bg-card px-(--item-x) py-(--item-y) shadow-soft', !automation.enabled && 'opacity-90')}
       data-testid="script-card">
       <div className="flex items-start gap-3">
         <div className="pt-1" title={blocked ? why : undefined}>
@@ -88,12 +86,12 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
           </div>
           <p className="mt-0.5 text-[13px] text-muted">
             {automation.schedule_text}
-            {automation.enabled && automation.next_run_at && <> · {t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</>}
+            {automation.enabled && automation.next_run_at && <> <span className="whitespace-nowrap">· {t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</span></>}
             {!automation.enabled && <> · {t('off')}</>}
             {automation.last_run_at && <> · {t('last ran {when}', { when: formatWhen(automation.last_run_at) })}</>}
           </p>
           {automation.prompt !== automation.name && (
-            <p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-[13px] text-subtle">{automation.prompt}</p>
+            <p className="mt-(--item-gap) line-clamp-2 whitespace-pre-wrap break-words text-[13px] text-subtle">{automation.prompt}</p>
           )}
           <p className="mt-1 text-[12.5px] text-muted"><Owner automation={automation} /></p>
           {blocked && why && <p className="mt-1 text-[12.5px] text-muted">{why}</p>}
@@ -106,7 +104,8 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
           { label: t('Delete'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
         ]} />
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
+      {/* Under the text on wider screens; from the card's edge on a phone, so the buttons fit one line. */}
+      <div className="mt-(--item-gap) flex flex-wrap items-center gap-2 sm:pl-12">
         <Button size="sm" variant={waiting ? 'primary' : 'secondary'} icon={<FileCode className="h-3.5 w-3.5" />} onClick={onReview}>
           {waiting ? t('Review change') : t('Code')}
         </Button>
@@ -126,37 +125,28 @@ function ScriptCard({ automation, onEdit, onReview, highlight }: {
           </Link>
         )}
       </div>
-      {error && <p className="mt-2 pl-12 text-[12.5px] text-error">{errorMessage(error)}</p>}
+      {error && <p className="mt-2 text-[12.5px] text-error sm:pl-12">{errorMessage(error)}</p>}
       {showHistory && <div className="mt-2 border-t border-border pt-2 md:pl-10"><RunHistory automation={automation} highlight={highlight ?? null} /></div>}
     </div>
   )
 }
 
-export function ScriptsTab({ scripts, linked, linkedRun }: { scripts: Automation[]; linked: string | null; linkedRun: string | null }) {
-  // null: closed. { automation: null }: a new one.
-  const [editing, setEditing] = useState<{ automation: Automation | null } | null>(null)
+/** The list of scripts. The page has the New button, the empty state and the edit dialog. */
+export function ScriptsTab({ scripts, linked, linkedRun, onEdit }: {
+  scripts: Automation[]
+  linked: string | null
+  linkedRun: string | null
+  onEdit: (automation: Automation) => void
+}) {
   const [reviewing, setReviewing] = useState<Automation | null>(null)
   const current = reviewing ? (scripts.find((s) => s.id === reviewing.id) ?? reviewing) : null
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <p className="min-w-0 flex-1 text-[13px] text-muted">
-          {t('Scripts are code that runs without a model and acts only through Anemo’s tools, with the same permissions and approvals. Code an assistant writes or changes stays off until you approve it here.')}
-        </p>
-        <Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ automation: null })}>{t('New script')}</Button>
-      </div>
-      {scripts.length === 0 && (
-        <EmptyState icon={<Code2 className="h-5 w-5" />} title={t('No scripts yet')}
-          description={t('Ask the assistant to write one, e.g. “every morning, turn new bookings into tasks”, or write one yourself.')} />
-      )}
-      <div className="flex flex-col gap-2">
-        {scripts.map((s) => (
-          <ScriptCard key={s.id} automation={s} onEdit={() => setEditing({ automation: s })} onReview={() => setReviewing(s)}
-            highlight={s.id === linked ? linkedRun : undefined} />
-        ))}
-      </div>
-      <Lingering value={editing}>{(shown) => <ScriptDialog automation={shown.automation} onClose={() => setEditing(null)} />}</Lingering>
+    <div className="flex flex-col gap-(--stack-gap)">
+      {scripts.map((s) => (
+        <ScriptCard key={s.id} automation={s} onEdit={() => onEdit(s)} onReview={() => setReviewing(s)}
+          highlight={s.id === linked ? linkedRun : undefined} />
+      ))}
       <Lingering value={current}>{(shown) => <ScriptReviewDialog automation={shown} onClose={() => setReviewing(null)} />}</Lingering>
     </div>
   )

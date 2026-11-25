@@ -81,7 +81,7 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
             {groups.get(folder)?.map((doc) => (
               <NavLink key={doc.id} to={`/documents/${doc.id}`}
                 className={({ isActive }) =>
-                  cn('flex items-start gap-2 rounded-control px-2 py-2 text-[13.5px] transition-colors',
+                  cn('flex items-start gap-2 rounded-control px-2 py-(--list-row-y) text-[13.5px] transition-colors',
                     isActive ? 'bg-accent-soft text-accent' : 'hover:bg-surface-hover')}>
                 <FileText className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
                 <span className="min-w-0 flex-1">

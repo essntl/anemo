@@ -132,3 +132,16 @@ export function accentShades(accent: string, dark: boolean): AccentShades {
   const text = bestTextOn([accent])
   return { accent, hover, active, contrastText: text.color, textRatio: text.ratio }
 }
+
+/**
+ * `color`, moved toward `towards` (white on dark pages, black on light ones) just far
+ * enough to be readable as text (WCAG 4.5:1) on every one of `backgrounds`. Unchanged
+ * when it already is; the closest it can get when nothing reaches 4.5:1.
+ */
+export function readableOn(color: string, backgrounds: string[], towards: string): string {
+  for (let step = 0; step <= 20; step++) {
+    const candidate = mix(color, towards, step / 20)
+    if (Math.min(...backgrounds.map((bg) => contrast(candidate, bg))) >= AA_TEXT) return candidate
+  }
+  return towards
+}

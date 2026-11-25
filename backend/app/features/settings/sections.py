@@ -188,11 +188,26 @@ UI_FONT = rf"^(default|system|serif|rounded|inter|plex-sans|nunito|source-serif|
 CODE_FONT = rf"^(default|system|jetbrains-mono|fira-code|plex-mono|{_CUSTOM_FONT})$"
 
 
+class CustomGradient(BaseModel):
+    """The user's own animated gradient (Background > Animated gradient > Custom)."""
+
+    # 2 to 4 colour stops.
+    colors: list[Annotated[str, StringConstraints(pattern=HEX_COLOUR)]] = Field(
+        default_factory=lambda: ["#2a6df4", "#00c2d4", "#c04fe0"], min_length=2, max_length=4
+    )
+    # drift: soft colour spots that move slowly; linear: bands at `angle` that slide.
+    style: Literal["drift", "linear"] = "drift"
+    angle: int = Field(135, ge=0, le=359)  # degrees
+    speed: Literal["slow", "normal", "fast"] = "normal"
+
+
 class AppearanceBackground(BaseModel):
     """What is behind the app: nothing, a built-in animated gradient, or an upload."""
 
     kind: Literal["none", "gradient", "upload"] = "none"
-    gradient: Literal["aurora", "dusk", "lagoon"] = "aurora"
+    # "custom": the colours in `custom_gradient`.
+    gradient: Literal["aurora", "dusk", "lagoon", "custom"] = "aurora"
+    custom_gradient: CustomGradient = Field(default_factory=CustomGradient)
     # An `appearance_assets` row of kind "background" (image, animated image or video).
     asset_id: uuid.UUID | None = None
     blur: int = Field(0, ge=0, le=40)  # px
@@ -218,6 +233,9 @@ class AppearanceSettings(BaseModel):
     background: AppearanceBackground = Field(default_factory=AppearanceBackground)
     # Panels, cards, dialogs and the message box turn translucent over the background.
     glass: bool = False
+    # How strong the glass is: more blur and more see-through (the panel never drops
+    # under 70 % opaque, 65 % in dark; frontend/src/features/appearance/apply.ts).
+    glass_strength: int = Field(50, ge=0, le=100)
 
 
 class ProfileSettings(BaseModel):

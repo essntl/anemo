@@ -18,6 +18,12 @@ async def test_settings_have_defaults(authed):
         "background": {
             "kind": "none",
             "gradient": "aurora",
+            "custom_gradient": {
+                "colors": ["#2a6df4", "#00c2d4", "#c04fe0"],
+                "style": "drift",
+                "angle": 135,
+                "speed": "normal",
+            },
             "asset_id": None,
             "blur": 0,
             "dim": 35,
@@ -25,6 +31,7 @@ async def test_settings_have_defaults(authed):
             "animate_on_phones": False,
         },
         "glass": False,
+        "glass_strength": 50,
     }
     assert body["profile"] == {"display_name": "", "avatar_id": None}
     assert body["general"]["default_chat_mode"] == "chat"

@@ -14,8 +14,6 @@ const messages: Messages = {
   "Watch it work": "Спостерігати за роботою",
   "New##automation": "Нова",
   "Things an agent does by itself on a schedule, and reports back as a <a>notification</a>.": "Те, що агент робить сам за розкладом і про що звітує у <a>сповіщенні</a>.",
-  "All automations are paused": "Усі автоматизації призупинено",
-  "Pause all automations": "Призупинити всі автоматизації",
   "Nothing starts on a schedule until you resume. A run that is going on finishes.": "За розкладом нічого не запускатиметься, доки ви не відновите роботу. Запуск, який уже триває, завершиться.",
   "Stops every schedule from starting, without switching them off one by one. A scheduled run is stopped after {minutes} minutes.": "Зупиняє запуски за всіма розкладами, не вимикаючи їх поодинці. Запуск за розкладом зупиняється через {minutes} хв.",
   "No automations yet": "Автоматизацій поки немає",
@@ -184,5 +182,8 @@ const messages: Messages = {
   "Write and change automation scripts (code that runs without a model). They stay off until you approve the code on the Automations page.": "Написання та змінення скриптів автоматизацій (коду, що працює без моделі). Вони залишаються вимкненими, доки ви не дозволите код на сторінці «Автоматизації».",
   "Run scripts": "Запуск скриптів",
   "Start a script you approved and switched on.": "Запуск скрипту, який ви дозволили й увімкнули.",
+  "Or start from a template": "Або почніть із шаблону",
+  "Pause all automations and scripts": "Призупинити всі автоматизації та скрипти",
+  "All automations and scripts are paused": "Усі автоматизації та скрипти призупинено",
 }
 export default messages

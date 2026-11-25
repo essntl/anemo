@@ -46,7 +46,7 @@ function WorkspaceForm({ initial }: { initial: WorkspaceSettings }) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader
           title={t('Agent access by folder')}
@@ -127,7 +127,7 @@ function FilesPageCard() {
 export function WorkspaceSettingsPage() {
   const settings = useSettings()
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div>
         <h2 className="text-lg font-semibold">{t('Workspace')}</h2>
         <p className="text-[13px] text-muted">

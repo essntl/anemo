@@ -22,7 +22,8 @@ test('automations: create, see the schedule, turn off, edit and delete', async (
   await login(page)
   try {
     await page.goto('/automations')
-    await page.getByRole('button', { name: 'New', exact: true }).click()
+    // In the page's header once there are automations, in the empty state before: one at a time.
+    await page.getByRole('button', { name: 'New automation', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByLabel('Name', { exact: true }).fill(name)
     await dialog.getByLabel('What should it do?').fill('Say hello.')

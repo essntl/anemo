@@ -43,7 +43,7 @@ const version = (over: Record<string, unknown> = {}) => ({
 const chat = { ref: 'chat:c1', kind: 'chat', label: 'Planning', url: '/c/c1' }
 
 const show = (scripts = [automation()]) =>
-  render(<MemoryRouter><ScriptsTab scripts={scripts as never} linked={null} linkedRun={null} /></MemoryRouter>)
+  render(<MemoryRouter><ScriptsTab scripts={scripts as never} linked={null} linkedRun={null} onEdit={() => undefined} /></MemoryRouter>)
 
 describe('the scripts tab', () => {
   beforeEach(() => {

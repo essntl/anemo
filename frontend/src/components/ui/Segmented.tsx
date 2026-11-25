@@ -99,7 +99,8 @@ export function Segmented<T extends string>({
               <motion.span
                 layoutId={`segmented-${id}`}
                 transition={spring.snappy}
-                className="absolute inset-0 rounded-[8px] bg-card shadow-soft"
+                // Dark: a step lighter than the track, so the chosen option looks raised, not pressed in.
+                className="absolute inset-0 rounded-[8px] bg-card shadow-soft dark:bg-surface-hover dark:ring-1 dark:ring-border-strong"
               />
             )}
             <span className="relative flex min-w-0 items-center gap-1.5 truncate">{o.label}</span>

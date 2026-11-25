@@ -29,7 +29,8 @@ current background):
    4 MB). Bundled fonts are npm `@fontsource` packages built into the app, so nothing is
    fetched from Google Fonts or any other site. No font-size scale (see *Not built*).
 5. **Background**: none, an animated gradient (three built in, drawn by CSS from the accent
-   or a fixed palette), or an upload: PNG, JPEG, WebP, AVIF, GIF (still or animated), WebM or
+   or a fixed palette, or a custom one: 2–4 colours, drifting spots or sliding bands, an angle
+   and a speed, with a live preview; a preset can be the starting point), or an upload: PNG, JPEG, WebP, AVIF, GIF (still or animated), WebM or
    MP4. Settings: blur, dim (a layer of the page colour over it, so text stays readable in
    light and dark), fit (cover / contain / tile; video tiles as cover). It is behind the whole
    app, so the chat sits right on it.
@@ -38,7 +39,8 @@ current background):
      narrow screen) show the still frame unless *Animate on phones too* is on. Video is muted,
      looped, inline, without controls or picture-in-picture.
 6. **Frosted glass**: the sidebar, cards, dialogs, menus and the message box become
-   translucent with a backdrop blur. Off when the OS asks for reduced transparency, solid
+   translucent with a backdrop blur, at a chosen strength (more blur and more see-through,
+   with a live preview). Off when the OS asks for reduced transparency, solid
    where `backdrop-filter` isn't supported, a lighter blur on phones. The panel stays at least
    70 % opaque (dark: 65 %) so text keeps its contrast whatever is behind it.
 7. **This device**: *Use a different appearance on this device*. When on, this browser keeps
@@ -52,8 +54,15 @@ current background):
 avatar is cropped to a square in the browser (drag to move, slider or +/− to zoom, arrow keys
 work) and the crop box is sent with the original; the server does the crop and makes 64, 128
 and 256 px WebP copies. Without one, initials on the accent colour. The name and avatar show
-in the sidebar's account row, next to your chat messages, and next to your prompts on the
-Code page.
+in the sidebar's account row. (They were next to your chat messages and Code prompts too;
+that was taken out in the design polish round: the bubble on the right already says who
+wrote it.)
+
+**Density** (Settings → Appearance): *Compact* tightens the spacing tokens in
+`styles/tokens.css` (`--nav-row-h`, `--list-row-y`, `--row-y`, `--card-x/y`, `--card-gap`,
+`--item-x/y`, `--stack-gap`, `--msg-gap`), which the sidebar, the chat list, tasks,
+documents, chat messages, cards, settings rows and the automation cards use. Touch screens
+keep finger-sized rows.
 
 ## Design
 
@@ -159,7 +168,7 @@ get it.
   refused with a clear error; a JPEG with GPS EXIF comes back without it.
 - Reduced motion shows a still frame; a hidden tab pauses video; reduced transparency turns
   glass off.
-- Name and avatar show in the sidebar, chat and Code page; without an avatar, initials.
+- Name and avatar show in the sidebar; without an avatar, initials.
 - Keyboard: every picker, slider and the avatar cropper work without a mouse, and focus rings
   are visible on any accent.
 

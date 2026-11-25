@@ -157,7 +157,7 @@ export function TaskRow({ task, projects, info, onOpen, notesShown, onToggleNote
 
   return (
     <div ref={row} aria-current={linked || undefined} className={cn('rounded-control', linked && 'flash')}>
-      <div className="group flex items-start gap-3 rounded-control px-2 py-2 hover:bg-surface-hover">
+      <div className="group flex items-start gap-3 rounded-control px-2 py-(--list-row-y) hover:bg-surface-hover">
         <button type="button" role="checkbox" aria-checked={done} aria-label={done ? t('Reopen “{title}”', { title: task.title }) : t('Complete “{title}”', { title: task.title })}
           onClick={() => void toggle(task)}
           className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors pointer-coarse:h-6 pointer-coarse:w-6',

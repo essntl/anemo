@@ -11,7 +11,7 @@ import { useEffect, useRef, type CSSProperties } from 'react'
 import { useThemeStore } from '@/features/settings/theme'
 import { type AppearanceAsset, assetUrl, useAsset } from './api'
 import type { Background } from './apply'
-import { gradientColors } from './gradients'
+import { gradientLayer } from './gradients'
 import { usePageVisible, useStill } from './motion'
 
 export function AppBackground() {
@@ -39,7 +39,7 @@ export function AppBackground() {
   return (
     <div className="app-background" aria-hidden data-still={still || undefined} data-testid="app-background" style={style}>
       {background.kind === 'gradient' ? (
-        <Gradient id={background.gradient} accent={accent} />
+        <Gradient background={background} accent={accent} />
       ) : (
         <Media asset={asset!} fit={background.fit} still={still} visible={visible} />
       )}
@@ -48,11 +48,11 @@ export function AppBackground() {
   )
 }
 
-function Gradient({ id, accent }: { id: Background['gradient']; accent: string }) {
-  const [g1, g2, g3] = gradientColors(id, accent)
+function Gradient({ background, accent }: { background: Background; accent: string }) {
+  const layer = gradientLayer(background, accent)
   return (
     <div className="app-background-media">
-      <div className="app-gradient" style={{ '--g1': g1, '--g2': g2, '--g3': g3 } as CSSProperties} />
+      <div className="app-gradient" data-style={layer.dataStyle} data-testid="app-gradient" style={layer.style} />
     </div>
   )
 }

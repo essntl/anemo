@@ -39,11 +39,26 @@ export function SettingsIndex() {
  */
 export function SettingsLayout() {
   const isIndex = useMatch('/settings') !== null
+  const desktop = useMediaQuery(DESKTOP)
   const sections = visibleSections(useOffPages())
+  const section = useMatch('/settings/:section')?.params.section
+  const current = sections.find((s) => s.to === section)
+  // A phone shows one section at a time: its name is the title, with the way back before it.
+  const phoneSection = !desktop && !isIndex && current
   return (
     <div className="mx-auto flex max-w-5xl gap-8 p-4 md:px-8 md:pb-8 md:pt-2">
-      <div className={cn('w-full shrink-0 md:block md:w-52', !isIndex && 'hidden')}>
+      {phoneSection ? (
+        <PageHeader title={t(current.label)}
+          before={
+            <Link to="/settings" aria-label={t('Back to Settings')}
+              className="-ml-2 flex h-10 w-8 items-center justify-center rounded-control text-muted hover:text-text">
+              <ChevronLeft className="h-5 w-5" />
+            </Link>
+          } />
+      ) : (
         <PageHeader title={t('Settings')} />
+      )}
+      <div className={cn('w-full shrink-0 md:block md:w-52', !isIndex && 'hidden')}>
         <nav className="flex flex-col gap-0.5">
           {sections.map((s) => (
             <SectionLink key={s.to} to={s.to} sensitive={s.sensitive}>
@@ -53,9 +68,6 @@ export function SettingsLayout() {
         </nav>
       </div>
       <div className={cn('min-w-0 flex-1', isIndex && 'hidden md:block')}>
-        <Link to="/settings" className="-ml-1 mb-3 inline-flex h-10 items-center gap-1 pr-2 text-[14px] text-muted hover:text-text md:hidden">
-          <ChevronLeft className="h-4 w-4" /> {t('Settings')}
-        </Link>
         <Outlet />
       </div>
     </div>
