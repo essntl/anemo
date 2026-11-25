@@ -860,3 +860,18 @@ async def test_documents(authed):
     assert r.json()["result"]["markdown"].endswith("Changed")
     r = await call(authed, "artem.docs", "documents.list")
     assert [d["id"] for d in r.json()["result"]["documents"]] == [doc["id"]]
+
+
+async def test_switched_off_scripts_and_huge_params(authed):
+    await approve(authed, await install_zip(authed, maker()), "1.0.0")
+    async with get_sessionmaker()() as db:
+        row = await db.scalar(select(PluginResource).where(PluginResource.kind == "scripts"))
+        assert row is not None
+        script = await db.get(Automation, row.object_id)
+        assert script is not None
+        script.enabled = False  # the user switched it off in Automations
+        await db.commit()
+    r = await call(authed, "artem.maker", "scripts.run", {"script": "count"})
+    assert r.status_code == 503 and code_of(r) == "unavailable"
+    r = await call(authed, "artem.maker", "storage.set", {"key": "k", "value": "x" * 1_100_000})
+    assert r.status_code == 400 and code_of(r) == "invalid_params"

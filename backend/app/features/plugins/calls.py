@@ -76,6 +76,7 @@ RATE_LIMIT = 120  # calls a minute per plugin
 CONFIRM_TTL_S = 120
 MAX_STORAGE_BYTES = 1024 * 1024
 MAX_HTTP_BYTES = 1024 * 1024
+MAX_MESSAGE_CHARS = 1024 * 1024  # a message on the port is at most 1 MB (§6.2)
 HOST_ONLY = frozenset({"context.get", "ui.resize", "ui.toast", "ui.open"})
 # Set by the client itself (and never a cookie of Anemo's).
 DROPPED_HEADERS = {"host", "content-length", "transfer-encoding", "connection", "cookie"}
@@ -787,6 +788,8 @@ async def scripts_run(call: Call) -> Any:
     automation = await call.db.get(Automation, row.object_id) if row is not None else None
     if automation is None:
         raise CallError("not_found", f"This plugin has no script “{p.script}”.")
+    if not automation.enabled:
+        raise CallError("unavailable", "The script is switched off (Automations).")
     if await automations.busy_run(call.db, automation.id) is not None:
         raise CallError("unavailable", "The script is running already.")
     try:
@@ -915,6 +918,8 @@ async def call(
         raise CallError("not_found", f"The plugin has no UI “{ui}”.")
     if await _rate_limited(plugin):
         raise CallError("rate_limited", "Too many calls: at most 120 a minute.")
+    if len(json.dumps(params, default=str)) > MAX_MESSAGE_CHARS:
+        raise CallError("invalid_params", "A call's parameters can be at most 1 MB.")
     if method in HOST_ONLY:
         raise CallError("unknown_method", f"{method} is answered by Anemo's page, not the server.")
     handler = METHODS.get(method)
