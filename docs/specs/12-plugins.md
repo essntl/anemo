@@ -43,7 +43,7 @@ reviews; it can't approve, enable or grant.
 | **The plugin's own policy, not the agent permission levels** | Apply Settings → Agent permissions to plugins | Those levels describe how much a *model* may do unattended; a plugin's reach was decided by the user at review. Critical capabilities stay per-call approval either way. |
 | **Approvals for UI calls in Anemo's page, with a one-time token** | The run approvals table | Approvals there belong to runs (`approvals.run_id`, `tool_call_id` are required). A UI call has a user looking at it, so a synchronous confirmation is the honest model; the token is bound to the exact call and never reaches the frame. |
 | **Scripts and MCP for logic** | WebAssembly or JS in the worker; a plugin's own container | Both sandboxes exist, are reviewed and documented (security.md), and already route every action through the policy engine. A new sandbox is a new attack surface. |
-| **Approve per version, all or nothing, with the password** | Per-permission toggles; auto-apply updates that don't add permissions | One reviewed thing (the package hash) is what runs: simple to reason about and what a marketplace signature will cover. A code change can be as dangerous as a new permission, so every update is reviewed; for an upload the review is the next screen, so it costs one click. |
+| **Permissions granted to the plugin, all or nothing, with the password** | Per-permission toggles; a review of every version | The first approval grants the plugin its permissions; an update the user installs that asks for nothing more (and changes no MCP server) applies at once, anything wider waits for review. Changes an assistant saves are always reviewed. (Originally every version was reviewed; Artem chose grants per plugin.) |
 | **Settings → Plugins, shield section** (not its own page in the sidebar) | A top-level Plugins page | Installing and approving plugins is configuration with the same weight as MCP servers (re-auth, security log); the sidebar is for daily work. Plugin *pages* do appear in the sidebar, under their own group. |
 | **Templates and command actions exist only as plugin contributions in v1** | Build general document/task templates first | They are small and the examples need them; a general templates feature can reuse the same model later (roadmap). |
 
@@ -182,9 +182,12 @@ Settled while building (the contract records each in place, and §7 lists the HT
 - `init.timeZone` (the user's Settings → General zone), because a frame's "today" (the
   browser's) and the server's could differ; the *Today board* uses it.
 - `tasks:read` covers listing projects, in the page and on the server.
-- A plugin script's calls follow the user's agent permission levels on top of the
-  plugin's coverage, so with the defaults the *Weekly review* asks before writing its
-  document. Kept on purpose: a script runs unattended.
+- Decided by Artem after the first review: permissions are granted to the **plugin**
+  (`plugins.granted_permissions`), not to a version, so an update he installs that asks
+  for nothing new (and changes no MCP server) applies at once; a plugin's **scripts** act
+  on the plugin's permissions too, not on the agent levels; assistants save plugin
+  drafts without asking (`plugins.build` defaults to fully autonomous). Plugins stay on
+  one origin, so they work on `localhost` with no subdomains.
 - Removing a plugin's data switches its automations off at once and deletes them with a
   background job (as `delete_schedule` does), so the tools layer doesn't import the
   agent runtime.

@@ -97,7 +97,7 @@ def test_the_plugin_tools_are_registered_with_their_capabilities() -> None:
 
 def test_reading_is_always_allowed_and_saving_a_draft_goes_ahead_by_default() -> None:
     category = CATEGORY_BY_CAP["plugins.build"]
-    assert category.label == "Build plugins" and category.default == "ask_dangerous"
+    assert category.label == "Build plugins" and category.default == "autonomous"
     policy = compile_policy(PermissionSettings())
     ctx = make_ctx()
     read = tools.PluginRead().actions(tools.ReadInput(plugin="artem.word-count"), ctx)

@@ -205,15 +205,19 @@ highest risk of its tools, an automation is medium (it is created switched off).
 
 ### 4.2 Granting
 
-- **All or nothing per version.** The review lists every permission and contribution of
-  the version; approving it grants them, rejecting it grants nothing. (Optional, per-item
-  permissions are a later addition; they need a plugin to cope with a refusal of each.)
+- **Granted to the plugin, not to a version.** The review lists every permission and
+  contribution; approving grants the permissions to the plugin (`granted_permissions`),
+  all or nothing. (Optional, per-item permissions are a later addition; they need a
+  plugin to cope with a refusal of each.)
 - **Approving needs the password** (entered in the last 15 minutes, as for MCP servers and
   scripts), because it can give network access and unattended code. A device token can't
   approve.
-- **An update never widens silently.** A new version is stored as *pending*; the plugin
-  keeps running the approved version until the user approves the new one in the plugin's
-  page, which shows the manifest diff, the added and removed permissions and the code diff.
+- **An update never widens silently.** An update the user installs (zip, Git, bundled)
+  that asks for no permission beyond what the plugin was granted, and adds or changes no
+  MCP server, applies at once. Any other update is stored as *pending*; the plugin keeps
+  running the approved version until the user approves the new one in the plugin's page,
+  which shows the manifest diff, the added and removed permissions and the code diff.
+  Every change an assistant saves is pending, whatever it asks for.
 - **Only the user approves.** An assistant can create a plugin and change its files; it can
   never approve a version, enable a plugin or grant a permission (§5).
 
@@ -243,11 +247,10 @@ unless the tool's own risk rules call the action dangerous (e.g. `delete_task`);
 for those and for critical capabilities; **deny** everything else; plus Anemo's fixed rules (paths
 outside the workspace, settings and secrets). The user's *agent* permission levels don't
 apply to plugin UI calls: they are about what models may do, and a plugin's grants were
-decided by the user at review. A plugin **script** runs as a script automation and so goes
-through the script path of spec 08 (its tool list, its hosts, the automation's permission
-levels and `on_ask`), on top of these coverage rules: approving the plugin decides what
-its script *may* call, and the user's levels decide whether each call asks first (with the
-defaults, a script that edits documents waits for approval each time).
+decided by the user at review. A plugin **script** runs as a script automation through the
+script path of spec 08 (its tool list, its hosts, `on_ask` when a call asks), evaluated
+with **this same plugin policy** instead of the agent levels: a plugin acts on its own
+permissions wherever it runs.
 
 ## 5. Lifecycle
 
@@ -283,7 +286,7 @@ match their hash; the plugin is stopped and the message shown) and `made_by_assi
 | Install | Files checked (§1) and stored; manifest validated; version 1 is `pending`; the plugin is disabled. Source recorded: `zip` (file name), `git` (URL, ref, commit), `assistant` (the chat), `bundled`. |
 | Approve | Password confirmed; the request carries the package hash the user reviewed (a newer upload meanwhile → refused, 409). Contributions are created or updated to match the version, then it becomes `approved` (the previous one `superseded`). "Approve and enable" also switches the plugin on. |
 | Enable / disable | Only a plugin with an approved version can be enabled. Disabled: no frame is shown, no call is answered, its commands and pages are hidden, its scripts and automations don't start (they are switched off and back on with it), its MCP servers are switched off. Its data stays. |
-| Update | Like install, for the same `id` and a higher `version`: a new `pending` version. Same rules for every source; for an upload in the app the review screen is the next step, so it's one flow. |
+| Update | Like install, for the same `id` and a higher `version`. From the user (zip, Git, bundled) it applies at once when it needs nothing new (§4.2); otherwise it is a `pending` version, and for an upload the review screen is the next step, so it's one flow. |
 | Assistant changes | Every change an assistant saves is a new `pending` version (consecutive unapproved changes replace the pending version rather than piling up). It never changes the approved version, and it never enables, approves or grants. |
 | Uninstall | Choice: **keep its data** (the objects it created stay as the user's: properties, views, automations, scripts (switched off), profiles, skills; tasks, documents and events it wrote stay) or **remove its data** (the objects it registered are deleted; an automation is switched off at once and removed with its run chats by a background job; tasks, documents and events it created go to the trash; its storage is deleted). The confirmation lists what each choice affects. Files and versions are deleted either way. |
 | Kill switch | One switch (`plugins.disabled_all`) that the host and the server both check before anything else: no frames, no calls, no commands, scripts and plugin MCP tools refused. It doesn't change each plugin's own switch, so turning it off restores the previous state. |
@@ -505,8 +508,8 @@ As built (phase 2), in addition to the above:
 
 ## 8. Internal: agent tools (workstream C)
 
-Capability `plugins.build` (label "Build plugins", default **ask for dangerous actions**:
-saving a draft is moderate and goes ahead; nothing a draft contains runs until the user
+Capability `plugins.build` (label "Build plugins", default **fully autonomous**:
+an assistant saves drafts without asking; nothing a draft contains runs until the user
 approves it). Reading is internal-allowed (`plugins.read`).
 
 `plugin_guide` (the authoring guide and this contract's plugin-facing part), `plugin_list`,

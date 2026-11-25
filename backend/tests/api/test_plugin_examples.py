@@ -295,13 +295,6 @@ def fake_sandbox():
     script_sandbox.set_runner(previous)
 
 
-async def allow_document_writes(authed) -> None:
-    """The script writes through the automations' permission levels; "Edit documents" asks
-    by default (the run would wait for approval)."""
-    r = await authed.put("/api/settings/permissions", json={"levels": {"docs.write": "autonomous"}})
-    assert r.status_code == 200, r.text
-
-
 async def test_weekly_review_contributions_and_its_script(authed):
     await install_example(authed, WEEKLY_REVIEW)
     ui, commands = await contributions(authed, WEEKLY_REVIEW)
@@ -354,7 +347,6 @@ async def test_weekly_review_run_with_the_fake_sandbox(authed, fake_sandbox):
     its manifest, with the script's arguments) are allowed and write the review. The real
     TypeScript runs in the Deno test below."""
     await install_example(authed, WEEKLY_REVIEW)
-    await allow_document_writes(authed)
     await new_task(authed, "Plan the trip")
     seen: dict[str, str] = {}
 
@@ -391,10 +383,13 @@ async def test_weekly_review_run_with_the_fake_sandbox(authed, fake_sandbox):
     assert text is not None and text.startswith("# Week 2026-W47")
 
 
-async def test_weekly_review_waits_for_approval_to_write_by_default(authed, fake_sandbox):
-    """As its README says: with the default "Edit documents: Always ask", the run asks
-    before the review is written."""
+async def test_weekly_review_writes_on_the_plugins_own_permissions(authed, fake_sandbox):
+    """As its README says: a plugin's script acts on the plugin's permissions, not on the
+    agent levels. Even with "Edit documents" set to Never, the approved plugin (granted
+    documents:write) writes its review without asking."""
     await install_example(authed, WEEKLY_REVIEW)
+    r = await authed.put("/api/settings/permissions", json={"levels": {"docs.write": "deny"}})
+    assert r.status_code == 200, r.text
 
     async def weekly_review(input: dict[str, Any], anemo: Sdk) -> Any:
         await anemo.call("list_tasks")
@@ -404,8 +399,8 @@ async def test_weekly_review_waits_for_approval_to_write_by_default(authed, fake
     PROGRAMS[script_code()] = weekly_review
     started = await call(authed, WEEKLY_REVIEW, None, "scripts.run", {"script": "weekly-review"})
     await execute_run(uuid.UUID(started["runId"]))
-    assert (await run_of(authed, started["runId"]))["status"] == "waiting_approval"
-    assert await document_text("documents/Reviews/Week 2026-W46.md") is None
+    assert (await run_of(authed, started["runId"]))["status"] == "completed"
+    assert await document_text("documents/Reviews/Week 2026-W46.md") is not None
 
 
 DENO = shutil.which(get_settings().deno_path)
@@ -418,7 +413,6 @@ async def test_weekly_review_runs_in_deno(authed):
     previous = script_sandbox.set_runner(script_sandbox.DenoRunner(DENO))
     try:
         await install_example(authed, WEEKLY_REVIEW)
-        await allow_document_writes(authed)
         _, zone = await user_today()
         work = (await authed.post("/api/projects", json={"name": "Work"})).json()
         await new_task(authed, "Send the invoice", due_date="2026-11-20", project_id=work["id"])

@@ -74,7 +74,7 @@ const messages: Messages = {
   "Review “{name}”": "Перевірка «{name}»",
   "“{name}” is installed": "«{name}» встановлено",
   "Version {version}. Check what it may do before you turn it on.": "Версія {version}. Перевірте, що вона може робити, перш ніж її вмикати.",
-  "These exact files are installed already, so there is nothing new to review.": "Саме ці файли вже встановлено, тож перевіряти нічого нового.",
+  "Version {version} is in use. It asks for nothing this plugin wasn't allowed already, so there is nothing new to review.": "Використовується версія {version}. Вона не просить нічого, чого цьому плагіну ще не дозволено, тож перевіряти нічого нового.",
   "Install a plugin": "Встановити плагін",
   "Nothing of it runs until you have reviewed and approved it.": "Ніщо з нього не запуститься, доки ви його не перевірите й не схвалите.",
   "Install from": "Звідки встановити",

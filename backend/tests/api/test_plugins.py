@@ -19,6 +19,7 @@ from app.features.automations import removal
 from app.features.automations.models import Automation, ScriptVersion
 from app.features.plugins import package, store
 from app.features.plugins import router as plugins_router
+from app.features.plugins import service as plugins_service
 from app.features.plugins.frame_router import FRAME
 from app.features.plugins.models import Plugin, PluginResource
 from app.features.properties.models import PropertyDefinition
@@ -915,3 +916,37 @@ async def test_switched_off_scripts_and_huge_params(authed):
     assert r.status_code == 503 and code_of(r) == "unavailable"
     r = await call(authed, "artem.maker", "storage.set", {"key": "k", "value": "x" * 1_100_000})
     assert r.status_code == 400 and code_of(r) == "invalid_params"
+
+
+async def test_permissions_belong_to_the_plugin_not_to_a_version(authed):
+    """An update the user installs that asks for nothing new applies at once; one that
+    asks for more waits for review while the old version keeps running; a change an
+    assistant saves waits whatever it asks for."""
+    detail = await approve(authed, await install_zip(authed, package_files(manifest())), "1.0.0")
+    assert detail["approved_version"] == "1.0.0"
+
+    # 1.1.0: the same permission, new code. Applied at once, the switch left as it was.
+    detail = await install_zip(authed, package_files(manifest(version="1.1.0"), js="x()"))
+    assert detail["approved_version"] == "1.1.0" and detail["pending_version"] is None
+    assert detail["enabled"] is True and detail["update_pending"] is False
+    assert [e["automatic"] for e in await audit("plugin.approve")] == [False, True]
+
+    # 1.2.0 asks for tasks:write too: it waits, and 1.1.0 keeps running.
+    wider = manifest(version="1.2.0", permissions=["tasks:read", "tasks:write"])
+    detail = await install_zip(authed, package_files(wider))
+    assert detail["approved_version"] == "1.1.0" and detail["pending_version"] == "1.2.0"
+    assert detail["update_pending"] is True
+    await approve(authed, detail, "1.2.0")
+
+    # Now the plugin holds tasks:write: 1.3.0 that drops it and keeps tasks:read applies.
+    detail = await install_zip(authed, package_files(manifest(version="1.3.0")))
+    assert detail["approved_version"] == "1.3.0"
+
+    # An assistant's change waits even when it asks for nothing new.
+    async with get_sessionmaker()() as db:
+        plugin = await plugins_service.get_plugin(db, "artem.counter")
+        files = package_files(manifest(version="1.4.0"), js="y()")
+        await plugins_service.save_pending_files(db, plugin, files, by="chat:x")
+        await db.commit()
+    detail = (await authed.get("/api/plugins/artem.counter")).json()
+    assert detail["approved_version"] == "1.3.0" and detail["pending_version"] == "1.4.0"

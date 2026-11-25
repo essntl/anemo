@@ -305,8 +305,15 @@ def policy_for(manifest: Manifest) -> Policy:
     permissions cover, ask for critical capabilities, deny everything else. The caller
     first checks that the called tool itself is covered (two tools can share a
     capability)."""
-    rules = _critical_rules() + _rules_for_tools(covered_tools(manifest.permissions), "allow")
-    return Policy(name=f"plugin {manifest.id}", default="deny", rules=rules)
+    return grants_policy(manifest.id, manifest.permissions)
+
+
+def grants_policy(plugin_id: str, permissions: list[str]) -> Policy:
+    """The same policy from a plugin's id and the permissions it was granted: used for
+    its UI's calls (policy_for) and for its scripts' runs (runtime/script_run.py), so a
+    plugin acts on its own permissions wherever it runs, not on the agent levels."""
+    rules = _critical_rules() + _rules_for_tools(covered_tools(permissions), "allow")
+    return Policy(name=f"plugin {plugin_id}", default="deny", rules=rules)
 
 
 def preview_policy(manifest: Manifest) -> Policy:

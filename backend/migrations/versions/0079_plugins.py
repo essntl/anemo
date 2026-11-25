@@ -64,6 +64,7 @@ def upgrade() -> None:
         sa.Column("enabled", sa.Boolean(), nullable=False),
         sa.Column("source", _json(), nullable=False),
         sa.Column("approved_version_id", sa.UUID(), nullable=True),
+        sa.Column("granted_permissions", _json(), nullable=False),
         sa.Column("error", sa.Text(), nullable=True),
         sa.Column("created_by", sa.String(length=120), nullable=False),
         *_timestamps(),

@@ -169,7 +169,9 @@ CATEGORIES: list[Category] = [
         "Build plugins",
         "Write and change plugins. They stay off until you review and approve them in "
         "Settings > Plugins.",
-        "ask_dangerous",
+        # Saving a draft never asks (the owner's decision): the review happens before
+        # anything in it runs, not before it is written.
+        "autonomous",
     ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}

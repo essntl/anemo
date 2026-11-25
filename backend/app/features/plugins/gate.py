@@ -34,6 +34,17 @@ async def owner_of(db: AsyncSession, object_type: str, object_id: uuid.UUID) -> 
     )
 
 
+async def owner_grants(
+    db: AsyncSession, object_type: str, object_id: uuid.UUID
+) -> tuple[str, list[str]] | None:
+    """(plugin id, the permissions the user granted it) for an object a plugin created,
+    or None for anything else."""
+    plugin = await owner_of(db, object_type, object_id)
+    if plugin is None:
+        return None
+    return plugin.plugin_id, list(plugin.granted_permissions or [])
+
+
 async def blocked_reason(db: AsyncSession, object_type: str, object_id: uuid.UUID) -> str | None:
     """Why a plugin's object may not run now (None: it may, or it isn't a plugin's)."""
     plugin = await owner_of(db, object_type, object_id)

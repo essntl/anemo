@@ -656,12 +656,15 @@ section: installing and approving ask for your password again).
 - **Install** from a `.zip`, a public Git repository (https), or one of the examples
   shipped with Anemo (*Word count*, *Today board*, *Weekly review*). An assistant can also
   build one for you in a chat (below).
-- **Nothing runs until you approve it.** A new plugin, and every new version of one,
-  waits for review. The review lists what it may do, grouped by risk (read-only; writes
-  your data; network, notifications and tools; devices and shell, which ask every time),
-  what it adds, and for an update the differences in permissions, manifest and every file.
-  Approving needs your password; until you approve an update, the version you approved
-  before keeps running.
+- **Nothing runs until you approve it.** A new plugin waits for review. The review
+  lists what it may do, grouped by risk (read-only; writes your data; network,
+  notifications and tools; devices and shell, which ask every time) and what it adds.
+  Approving needs your password and grants those permissions to the plugin.
+- **Updates.** An update you install yourself that asks for nothing the plugin wasn't
+  already allowed (and adds or changes no MCP server) applies at once. One that asks for
+  more waits for review, with the differences in permissions, manifest and every file,
+  while the version you approved before keeps running. Changes an assistant makes always
+  wait for review.
 - **Its page** (click a card: it grows into the page) shows the readme, permissions,
   contributions, versions, where it came from (the zip, the Git address and commit, or
   the chat that built it), what it stores, and its own settings if it has any. Switch it
@@ -682,6 +685,10 @@ server, and asks Anemo for everything through a short list of methods, each chec
 against what you approved. What it writes is marked as made by "the plugin X". How a
 plugin is written: `docs/specs/CONTRACTS-plugins.md` and the authoring guide
 (`backend/app/features/plugins/guide.md`).
+
+A plugin acts on its own permissions wherever it runs, its scripts included: your agent
+permission levels are about what models may do, not plugins. Plugins work on a plain
+`localhost` install; they need no extra domain.
 
 ## Search
 

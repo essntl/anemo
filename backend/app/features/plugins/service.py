@@ -540,6 +540,7 @@ async def install_zip(db: AsyncSession, data: bytes, filename: str, *, ip: str) 
         db, files, source=PluginSource(kind="zip", label=filename[:300] or "upload.zip"), by="user"
     )
     await _installed(db, version, ip)
+    await _apply_if_granted(db, version, ip)
     return version
 
 
@@ -550,6 +551,7 @@ async def install_git(
     source = PluginSource(kind="git", label=url[:300], url=url, ref=ref, commit=fetched.commit)
     version = await install_files(db, fetched.files, source=source, by="user")
     await _installed(db, version, ip)
+    await _apply_if_granted(db, version, ip)
     return version
 
 
@@ -560,7 +562,42 @@ async def install_bundled(db: AsyncSession, plugin_id: str, *, ip: str) -> Plugi
     source = PluginSource(kind="bundled", label="Shipped with Anemo")
     version = await install_files(db, files, source=source, by="user")
     await _installed(db, version, ip)
+    await _apply_if_granted(db, version, ip)
     return version
+
+
+async def applies_without_review(db: AsyncSession, plugin: Plugin, version: PluginVersion) -> bool:
+    """Whether an update the user installed (zip, Git, bundled) applies at once.
+
+    Permissions are granted to the plugin, not to a version (plugin.granted_permissions):
+    an update runs without a new review when the plugin has an approved version, the
+    update asks for no permission the plugin wasn't granted, and it adds or changes no
+    MCP server (a server, a `stdio` one above all, runs code that isn't in the package).
+    Anything else waits for the user. Changes an assistant saves never come through here:
+    they always wait (save_pending_files)."""
+    if version.status != "pending" or plugin.approved_version_id is None:
+        return False
+    approved = await db.get(PluginVersion, plugin.approved_version_id)
+    if approved is None:
+        return False
+    if not set(version.manifest.get("permissions", [])) <= set(plugin.granted_permissions or []):
+        return False
+    return bool(_mcp_servers(version.manifest) == _mcp_servers(approved.manifest))
+
+
+def _mcp_servers(manifest: dict[str, Any]) -> Any:
+    return manifest.get("contributes", {}).get("mcpServers", [])
+
+
+async def _apply_if_granted(db: AsyncSession, version: PluginVersion, ip: str) -> None:
+    """Approve an update the user installed when it needs nothing new (see
+    applies_without_review). The plugin keeps its switch as it was. Commits."""
+    plugin = await db.get(Plugin, version.plugin_id)
+    assert plugin is not None
+    if await applies_without_review(db, plugin, version):
+        await approve(
+            db, plugin, version.version, version.hash, enable=False, ip=ip, automatic=True
+        )
 
 
 async def _installed(db: AsyncSession, version: PluginVersion, ip: str) -> None:
@@ -586,11 +623,20 @@ async def _stop(db: AsyncSession, plugin: Plugin, message: str) -> None:
 
 
 async def approve(
-    db: AsyncSession, plugin: Plugin, version: str, digest: str, *, enable: bool, ip: str
+    db: AsyncSession,
+    plugin: Plugin,
+    version: str,
+    digest: str,
+    *,
+    enable: bool,
+    ip: str,
+    automatic: bool = False,
 ) -> None:
     """The user approves the version they reviewed (`digest`: its package hash, 409
     plugin_changed if it isn't). Its contributions are created or updated, then it is
-    the one that runs (the previous one superseded). Commits."""
+    the one that runs (the previous one superseded), and its permissions are what the
+    plugin is granted from now on. `automatic`: an update that asked for nothing new
+    (applies_without_review), recorded as such. Commits."""
     row = await version_row(db, plugin, version)
     if row.hash != digest:
         raise Conflict(
@@ -618,13 +664,19 @@ async def approve(
                 other.status = "superseded"
         row.status, row.approved_at = "approved", datetime.now(UTC)
         plugin.approved_version_id, plugin.name, plugin.error = row.id, manifest.name, None
+        plugin.granted_permissions = list(manifest.permissions)
     audit.record(
         db,
         "plugin.approve",
         target_type="plugin",
         target_id=plugin.plugin_id,
         ip=ip,
-        details={"plugin": plugin.plugin_id, "version": row.version, "hash": row.hash},
+        details={
+            "plugin": plugin.plugin_id,
+            "version": row.version,
+            "hash": row.hash,
+            "automatic": automatic,
+        },
     )
     await db.flush()
     if enable and not plugin.enabled:

@@ -252,11 +252,15 @@ document), so drawing one can't do more than show a picture:
 A plugin (Settings → Plugins, spec `docs/specs/12-plugins.md`) is code and settings
 someone else wrote, so it gets nothing by default:
 
-- **Nothing runs unreviewed.** Every version (a new plugin, an update, any change an
-  assistant saves) waits until you approve it with your password; the approval names the
-  hash of the exact files you reviewed, and a newer upload in between is refused. An
-  update that you haven't approved never replaces the running version. An assistant's
-  tools can create and change plugins, never approve, enable or grant.
+- **Nothing runs unreviewed, nothing widens silently.** A new plugin waits until you
+  approve it with your password; the approval names the hash of the exact files you
+  reviewed (a newer upload in between is refused) and grants its permissions to the
+  plugin. An update you install yourself applies at once only when it asks for nothing
+  beyond those grants and adds or changes no MCP server; anything wider waits, and the
+  running version stays until you approve. Every change an assistant saves waits for
+  review: its tools can create and change plugins, never approve, enable or grant. (So
+  an update you upload can change a plugin's code without a second look: install
+  updates only from where you got the plugin.)
 - **Its UI is sealed off.** Each panel or page runs in an `<iframe sandbox="allow-scripts">`
   with an opaque origin, loaded from one fixed document whose Content-Security-Policy
   blocks every request (`default-src 'none'`, `connect-src 'none'`, pictures and fonts

@@ -16,9 +16,8 @@ The script appears in **Automations** as "Weekly review", where you can see its 
 its runs, or give it a schedule (for example every Friday at 17:00). It is approved
 together with the plugin, so it needs no second review.
 
-When the script writes the document, Anemo applies your permission levels for
-automations: if "Edit documents" is set to *Always ask* (the default), the run waits for
-your approval before the document is written.
+The script acts on the permissions you granted this plugin (below), not on your agent
+permission levels: once the plugin is approved, it writes the review without asking.
 
 ## Permissions
 

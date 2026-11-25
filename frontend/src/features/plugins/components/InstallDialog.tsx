@@ -159,7 +159,7 @@ export function InstallDialog({ onClose, onOpen, start }: {
           <VersionReview plugin={installed} version={pending} onClose={onClose} onDone={onClose} />
         ) : (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] text-muted">{t('These exact files are installed already, so there is nothing new to review.')}</p>
+            <p className="text-[13px] text-muted">{t("Version {version} is in use. It asks for nothing this plugin wasn't allowed already, so there is nothing new to review.", { version: installed.version })}</p>
             <div className="flex justify-end"><Button variant="primary" onClick={() => onOpen(installed.id)}>{t('Open')}</Button></div>
           </div>
         )}

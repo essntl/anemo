@@ -35,6 +35,11 @@ class Plugin(Base, IdMixin, TimestampMixin):
     # The version that runs. Not a foreign key (the two tables would point at each
     # other); the version row's status says the same ("approved").
     approved_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # What the user granted this plugin (permission strings): the permissions of the version
+    # they approved last. Grants belong to the plugin, not to a version: an update the user
+    # uploads that asks for nothing more is applied without a new review
+    # (service.applies_without_review).
+    granted_permissions: Mapped[list[str]] = mapped_column(JSONB, default=list)
     # Set when the approved version couldn't be registered or its files no longer match
     # their hashes: the plugin is stopped until a version is approved again.
     error: Mapped[str | None] = mapped_column(Text)
