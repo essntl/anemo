@@ -41,6 +41,7 @@ ID_PATTERN = PLUGIN_ID.pattern
 VERSION_PATTERN = PLUGIN_VERSION.pattern
 ITEM_ID_PATTERN = r"^[a-z][a-z0-9-]{0,39}$"
 FENCE_PATTERN = r"^[a-z][a-z0-9-]{2,39}$"
+EVENT_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_.:-]{0,39}$"  # a sendToUi command's event name
 ICON_PATTERN = r"^[a-z0-9]+(-[a-z0-9]+)*$"  # a lucide icon name, e.g. calendar-check
 TOOL_NAME_PATTERN = r"^[a-zA-Z0-9_.-]+$"
 HOST_PATTERN = r"^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
@@ -260,7 +261,17 @@ class NewFromTemplate(Strict):
     template: ItemId
 
 
-CommandAction = Annotated[OpenPage | RunScript | NewFromTemplate, Field(discriminator="type")]
+class SendToUi(Strict):
+    """Delivers `anemo.on('command', {event})` to one of the plugin's own open frames."""
+
+    type: Literal["sendToUi"]
+    ui: ItemId
+    event: str = Field(min_length=1, max_length=40, pattern=EVENT_PATTERN)
+
+
+CommandAction = Annotated[
+    OpenPage | RunScript | NewFromTemplate | SendToUi, Field(discriminator="type")
+]
 
 
 class CommandItem(Item):
@@ -273,7 +284,7 @@ class CommandItem(Item):
 
 
 class UiItem(Item):
-    slot: Literal["object.panel", "page", "settings", "chat.block"]
+    slot: Literal["object.panel", "page", "settings", "chat.block", "overlay"]
     objects: list[ObjectKind] | None = Field(None, min_length=1, max_length=3)
     title: str | None = Field(None, min_length=1, max_length=60)
     icon: IconName | None = None
@@ -344,6 +355,9 @@ _PATTERN_HINTS = {
     "license": "A license is an SPDX id such as MIT or Apache-2.0",
     "uiFont": "One of default, system, serif, rounded, inter, plex-sans, nunito, source-serif",
     "codeFont": "One of default, system, jetbrains-mono, fira-code, plex-mono",
+    "event": (
+        "An event name is 1 to 40 letters, digits, _ . : or -, starting with a letter, e.g. toggle"
+    ),
 }
 _ID_HINT = (
     "A plugin id is 3 to 64 characters: at least two parts separated by dots, each of "
@@ -376,7 +390,7 @@ def _hint(loc: tuple[int | str, ...], pattern: str) -> str:
     if len(loc) == 1 and name == "id":
         return _ID_HINT
     if name == "id" or (
-        name in ("skills", "page", "script", "template") and pattern == ITEM_ID_PATTERN
+        name in ("skills", "page", "script", "template", "ui") and pattern == ITEM_ID_PATTERN
     ):
         return _ITEM_ID_HINT
     if "permissions" in loc:
@@ -419,7 +433,15 @@ def _message(error: Any) -> str:
 def _strip_union_tags(loc: tuple[int | str, ...]) -> tuple[int | str, ...]:
     """Pydantic puts the chosen union member in the location ("action", "openPage",
     "page"); the JSON has no such level."""
-    tags = {"openPage", "runScript", "newFromTemplate", "str", "Schedule", "literal['manual']"}
+    tags = {
+        "openPage",
+        "runScript",
+        "newFromTemplate",
+        "sendToUi",
+        "str",
+        "Schedule",
+        "literal['manual']",
+    }
     return tuple(
         p for p in loc if not (isinstance(p, str) and (p in tags or p.startswith("literal[")))
     )
@@ -475,6 +497,7 @@ def check_references(manifest: Manifest, paths: set[str]) -> list[ManifestProble
     found += _file(paths, "readme", manifest.readme, (".md",), "The readme")
 
     settings_slots = 0
+    overlay_slots = 0
     for i, ui in enumerate(c.ui):
         at = f"contributes.ui[{i}]"
         found += _file(paths, f"{at}.entry", ui.entry, (".html",), "A UI entry")
@@ -508,6 +531,10 @@ def check_references(manifest: Manifest, paths: set[str]) -> list[ManifestProble
             settings_slots += 1
             if settings_slots > 1:
                 found.append(ManifestProblem(f"{at}.slot", "A plugin has at most one settings UI."))
+        if ui.slot == "overlay":
+            overlay_slots += 1
+            if overlay_slots > 1:
+                found.append(ManifestProblem(f"{at}.slot", "A plugin has at most one overlay UI."))
         if ui.slot == "page" and not ui.title:
             found.append(
                 ManifestProblem(f"{at}.title", "A page needs a title (the menu shows it).")
@@ -567,6 +594,7 @@ def check_references(manifest: Manifest, paths: set[str]) -> list[ManifestProble
                 )
 
     pages = {u.id for u in c.ui if u.slot == "page"}
+    uis = {u.id for u in c.ui}
     scripts = {s.id for s in c.scripts}
     templates = {t.id for t in c.templates}
     for i, command in enumerate(c.commands):
@@ -590,6 +618,10 @@ def check_references(manifest: Manifest, paths: set[str]) -> list[ManifestProble
                 found.append(
                     ManifestProblem(f"{at}.input", "The input is too large (10,000 characters).")
                 )
+        if isinstance(action, SendToUi) and action.ui not in uis:
+            found.append(
+                ManifestProblem(f"{at}.ui", f"There is no UI “{action.ui}” in contributes.ui.")
+            )
         if isinstance(action, NewFromTemplate) and action.template not in templates:
             found.append(
                 ManifestProblem(

@@ -336,9 +336,18 @@ def contributions(manifest: Manifest) -> list[ContributionOut]:
             "page": f"Adds a page “{ui.title}”",
             "settings": "Adds a settings tab",
             "chat.block": f"Draws “{ui.fence}” blocks in chat answers",
+            # A layer over the whole window could imitate Anemo's own controls: it is
+            # reviewed as more than a box of its own (the host's rules: docs, §4).
+            "overlay": "Draws over Anemo's window (click-through)",
         }[ui.slot]
         out.append(
-            ContributionOut(kind="ui", id=ui.id, label=ui.title or ui.id, risk="low", detail=where)
+            ContributionOut(
+                kind="ui",
+                id=ui.id,
+                label=ui.title or ui.id,
+                risk="medium" if ui.slot == "overlay" else "low",
+                detail=where,
+            )
         )
     for server in c.mcp_servers:
         local = server.transport == "stdio"

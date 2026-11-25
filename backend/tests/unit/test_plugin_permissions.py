@@ -101,3 +101,26 @@ def test_plugin_actor_reference() -> None:
     for bad in ("plugin:nodots@1.0.0", "plugin:a.b@1.0", "plugin:a.b", "plugin:A.b@1.0.0"):
         with pytest.raises(ValueError):
             Actor.parse(bad)
+
+
+def test_an_overlay_is_reviewed_as_medium_risk() -> None:
+    found = Manifest.model_validate(
+        {
+            "manifestVersion": 1,
+            "id": "artem.layer",
+            "version": "1.0.0",
+            "name": "Layer",
+            "description": "A layer.",
+            "author": {"name": "Artem"},
+            "contributes": {
+                "ui": [
+                    {"id": "layer", "slot": "overlay", "entry": "ui/layer.html"},
+                    {"id": "s", "slot": "settings", "entry": "ui/s.html"},
+                ]
+            },
+        }
+    )
+    items = {c.id: c for c in permissions.contributions(found)}
+    assert items["layer"].risk == "medium"
+    assert items["layer"].detail == "Draws over Anemo's window (click-through)"
+    assert items["s"].risk == "low"

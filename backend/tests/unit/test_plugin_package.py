@@ -111,7 +111,39 @@ def test_pictures_are_checked_by_content() -> None:
     assert errors_of(files(**{"a.png": png()})) == []
     assert errors_of(files(**{"a.webp": png("WEBP")})) == []
     assert any("WebP" in p or "WEBP" in p for p in errors_of(files(**{"a.webp": png()})))
-    assert any("PNG or WebP" in p for p in errors_of(files(**{"a.png": b"not a picture"})))
+    assert any(
+        "PNG, WebP, GIF or JPEG" in p for p in errors_of(files(**{"a.png": b"not a picture"}))
+    )
+
+
+def test_gif_and_jpeg_pictures_are_allowed_and_checked_by_content() -> None:
+    assert errors_of(files(**{"sprites__idle.gif": png("GIF")})) == []
+    assert errors_of(files(**{"a.jpg": png("JPEG"), "b.jpeg": png("JPEG")})) == []
+    # The content must be what the name says.
+    assert any(
+        "content is PNG, not what its name says (GIF)" in p
+        for p in errors_of(files(**{"a.gif": png()}))
+    )
+    assert any(
+        "content is GIF, not what its name says (JPEG)" in p
+        for p in errors_of(files(**{"a.jpg": png("GIF")}))
+    )
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    assert any("SVG" in p for p in errors_of(files(**{"a.gif": svg})))
+    assert any("isn't allowed" in p for p in errors_of(files(**{"a.svg": svg})))
+
+
+def test_the_icon_stays_png_or_webp() -> None:
+    data = manifest(icon="icon.gif")
+    found = {**files(**{"icon.gif": png("GIF")}), "anemo-plugin.json": json.dumps(data).encode()}
+    assert any("The icon must be a .png or .webp file" in p for p in errors_of(found))
+
+
+def test_image_kind() -> None:
+    assert package.image_kind(png("GIF")) == "GIF"
+    assert package.image_kind(png("JPEG")) == "JPEG"
+    assert package.image_kind(b"<svg/>") is None
+    assert package.image_kind(b"GIF89a broken") is None
 
 
 def test_text_must_be_utf8_and_fonts_woff2() -> None:

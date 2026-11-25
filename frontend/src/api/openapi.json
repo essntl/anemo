@@ -21337,7 +21337,9 @@
             "content": {
               "text/plain": {},
               "image/png": {},
-              "image/webp": {}
+              "image/webp": {},
+              "image/gif": {},
+              "image/jpeg": {}
             }
           },
           "422": {
@@ -28314,6 +28316,25 @@
         ],
         "title": "FrameFileOut"
       },
+      "FramePictureOut": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "data_url": {
+            "type": "string",
+            "title": "Data Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "data_url"
+        ],
+        "title": "FramePictureOut",
+        "description": "A picture of the package, for `<img src>`, CSS `url()` and `anemo.files.url()`."
+      },
       "GeneralSettings": {
         "properties": {
           "timezone": {
@@ -32580,6 +32601,16 @@
             "type": "integer",
             "title": "Storage Bytes"
           },
+          "asset_count": {
+            "type": "integer",
+            "title": "Asset Count",
+            "default": 0
+          },
+          "asset_bytes": {
+            "type": "integer",
+            "title": "Asset Bytes",
+            "default": 0
+          },
           "tasks": {
             "type": "integer",
             "title": "Tasks"
@@ -32856,6 +32887,13 @@
           "hash": {
             "type": "string",
             "title": "Hash"
+          },
+          "pictures": {
+            "items": {
+              "$ref": "#/components/schemas/FramePictureOut"
+            },
+            "type": "array",
+            "title": "Pictures"
           }
         },
         "type": "object",

@@ -46,7 +46,7 @@ word-count/
 | Paths are relative, `/`-separated, without `..`, `.` segments, backslashes, a leading `/`, or names starting with `.` | The same path rules as the workspace; no file can land outside the plugin's folder. |
 | No symlinks, devices or empty directories; a zip may wrap everything in one top-level folder (it is removed) | Zips made by "compress folder" on any OS work. |
 | From Git, the plugin is the repository's root; dot-files and dot-folders (`.git`, `.github`, `.gitignore`) are skipped, not refused | A repository naturally has them, and they are never part of the plugin. |
-| Allowed file types: `.json .md .txt .html .css .js .mjs .ts .png .webp .woff2` | Text files can be reviewed and diffed; the only binaries are pictures and fonts, checked by their content like appearance uploads. No `.svg` (it can carry script), no executables, no `node_modules`. |
+| Allowed file types: `.json .md .txt .html .css .js .mjs .ts .png .webp .gif .jpg .jpeg .woff2` | Text files can be reviewed and diffed; the only binaries are pictures and fonts, checked by their content like appearance uploads (a `.gif` must be a GIF, a `.jpg`/`.jpeg` a JPEG). No `.svg` (it can carry script), no executables, no `node_modules`. The icon stays PNG or WebP. |
 | Text files are UTF-8 | So diffs and reviews are exact. |
 
 **Integrity.** For each installed version the server records the SHA-256 of every file and
@@ -108,7 +108,7 @@ never gets a handle to edit them at run time except through its permissions.
 | `profiles` | `{id, name, description, instructions, icon?, skills?}` | an agent profile | **No permission levels, limits or plan-review settings**: those stay the user's; a plugin profile uses the defaults. `skills` names skills of the same plugin. |
 | `skills` | `{id, name, description, file, icon?, hint?, userInvocable?, modelInvocable?}` | a skill (slash command) | `file` is the Markdown instructions. The slug is the `id`; an existing slug refuses the install. |
 | `themes` | `{id, name, appearance}` | an appearance preset the user can apply | `appearance` is the subset of Settings → Appearance without uploads: `mode? accent? tint? tintStrength? uiFont? codeFont? glass? glassStrength? background?` (background `none` or `gradient`), checked like the appearance settings. Never applied automatically. |
-| `commands` | `{id, title, icon?, keywords?, action}` | an entry in the command palette (Ctrl+K) | `action` is one of `{type: "openPage", page}`, `{type: "runScript", script, input?}`, `{type: "newFromTemplate", template}`. `page`, `script` and `template` are ids from this manifest. |
+| `commands` | `{id, title, icon?, keywords?, action}` | an entry in the command palette (Ctrl+K) | `action` is one of `{type: "openPage", page}`, `{type: "runScript", script, input?}`, `{type: "newFromTemplate", template}`, `{type: "sendToUi", ui, event}`. `page`, `script`, `template` and `ui` are ids from this manifest. `sendToUi` delivers the event `command` (`{event}`) to that UI's open frame, or says in a toast that it isn't open. |
 
 Why these and not more: each maps onto something Anemo already has (except templates and
 command actions, which are small and needed by the examples), so a plugin can't do anything
@@ -154,7 +154,8 @@ server.
   { "id": "today", "slot": "page", "title": "Today board", "icon": "calendar-check",
     "entry": "ui/today.html" },
   { "id": "settings", "slot": "settings", "entry": "ui/settings.html" },
-  { "id": "kanban", "slot": "chat.block", "fence": "today-kanban", "entry": "ui/block.html" }
+  { "id": "kanban", "slot": "chat.block", "fence": "today-kanban", "entry": "ui/block.html" },
+  { "id": "layer", "slot": "overlay", "title": "Clock", "entry": "ui/layer.html" }
 ]
 ```
 
@@ -170,6 +171,7 @@ server.
 | `page` | A full page at `/plugins/<id>/<ui id>`, listed under **Plugins** in the sidebar's page list and in Ctrl+K | `{page: "<ui id>", params: {…query string}}` | any |
 | `settings` | The **Settings** tab of the plugin's own page in Settings → Plugins | `{}` | at most 1 |
 | `chat.block` | In a chat answer, in place of a fenced code block whose language is `fence` | `{block: {lang, text}}` | any |
+| `overlay` | A transparent, window-sized layer over Anemo's pages, mounted once per session outside the routes | `{overlay: true}` | at most 1 |
 
 - A slot is used only if declared; the install review lists each one ("Adds a panel to
   documents").
@@ -178,6 +180,14 @@ server.
   A `chat.block` frame only gets the block's text: it's the model's output, so it is
   **untrusted input for the plugin**, and nothing the frame shows goes back to a model.
 - Commands are not frames: they are declarative (§2.2).
+- `overlay` (added in the same contract version, additively): `pointer-events: none` except
+  while the pointer is inside the rectangles of `ui.setHitRegions` (≤ 8, each ≤ 320 × 320
+  px; touches always pass through); z-index above the page and below every dialog, toast
+  and the command palette; **hidden** while any dialog, the opened Island or a plugin
+  review is on screen; never in the Tab order; all overlays can be hidden from Ctrl+K
+  (stored by Anemo per device, not reachable by plugins). Reviewed as **medium** risk
+  ("Draws over Anemo's window (click-through)"); an update that adds one always waits for
+  a review; not run in a preview.
 
 ## 4. Permissions
 
@@ -383,6 +393,11 @@ anemo.ui.resize(320)                                       // short forms for th
 | `ui.resize` | `{height}` → `{}` (40–2000 px; panels and blocks only) | – |
 | `ui.toast` | `{message, tone?}` → `{}` (plain text, ≤ 200 chars) | – |
 | `ui.open` | `{type: "task"\|"document"\|"event"\|"page", id}` → `{}` (opens it in Anemo) | the matching `:read`, or own page |
+| `assets.get` / `assets.set` / `assets.delete` / `assets.list` | `{key}` / `{key, dataUrl}` / `{key}` / `{}` → `{dataUrl}` or null / `{}` / `{}` / `{assets: [{key, type, size}]}` | – (own pictures: PNG, WebP, GIF, JPEG data: URLs checked by content on the server, ≤ 10 MB each, 25 MB per plugin, deleted with the plugin) |
+| `layout.get` | `{}` → `{viewport: {width, height}, anchors: {composer?, sidebar?, …: Rect}, route}` (Rect `{x, y, width, height}` in the top page's viewport pixels; answered by the host) | – |
+| `ui.setHitRegions` | `{regions: [Rect]}` → `{}` (overlay only; ≤ 8, each ≤ 320 × 320) | – |
+| `ui.setVisible` | `{visible}` → `{}` (overlay only) | – |
+| `ui.pickFile` | `{accept?, maxBytes?}` → `{name, type, size, dataUrl}` (pictures only, ≤ 10 MB; the host opens the file picker after a user gesture; `declined` when cancelled) | – |
 
 The object shapes (`Task`, `DocumentSummary`, `Document`, `Event`) are plain JSON with
 **camelCase** fields, ids as strings, times as ISO 8601; they are defined in the authoring
@@ -392,10 +407,15 @@ ever added to them. Unknown params are refused (`invalid_params`), so a typo isn
 silently ignored.
 
 **Events** (host → plugin): `context.changed` (the panel's object or page params changed),
-`theme.changed` (light/dark, accent, density), `object.changed` (`{type, id}`: the object the
-panel shows was changed elsewhere; re-read it).
+`theme.changed` (light/dark, accent, density, reduced motion), `object.changed` (`{type, id}`: the object the
+panel shows was changed elsewhere; re-read it), `layout.changed` (the `layout.get` shape;
+once per animation frame at most), `composer.activity` (`{state: focused|blurred|typing|idle}`)
+and `assistant.activity` (`{state: thinking|streaming|idle}`; states only, never text, so no
+permission), `storage.changed` / `assets.changed` (`{key}`: another open frame of the same
+plugin wrote it), `command` (`{event}`: a `sendToUi` command). An anchor is any element of
+the app marked `data-plugin-anchor="<name>"`; names are only ever added.
 
-**Theme.** `init.theme` is `{mode, density, vars}`; `vars` are the values of Anemo's colour,
+**Theme.** `init.theme` is `{mode, density, vars, reducedMotion}`; `vars` are the values of Anemo's colour,
 radius, font and density tokens (`--accent`, `--surface`, `--text`, `--muted`, `--border`,
 `--card-x`, `--font-ui`…). The bootstrap sets them on the frame's `:root` and adds a small
 base stylesheet (body font and colour, inputs, `button` with `.primary .ghost .danger

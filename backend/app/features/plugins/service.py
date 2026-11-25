@@ -19,6 +19,7 @@ save_pending_files, link_chat) don't, as their docstrings say.
 """
 
 import asyncio
+import base64
 import logging
 import posixpath
 import uuid
@@ -50,6 +51,7 @@ from app.features.plugins.manifest import (
 )
 from app.features.plugins.models import (
     Plugin,
+    PluginAsset,
     PluginChat,
     PluginResource,
     PluginStorage,
@@ -64,6 +66,7 @@ from app.features.plugins.schemas import (
     ContributedUiOut,
     DiffFileOut,
     FrameFileOut,
+    FramePictureOut,
     ManifestDiffOut,
     PermissionDiffOut,
     PluginAuthorOut,
@@ -571,8 +574,9 @@ async def applies_without_review(db: AsyncSession, plugin: Plugin, version: Plug
 
     Permissions are granted to the plugin, not to a version (plugin.granted_permissions):
     an update runs without a new review when the plugin has an approved version, the
-    update asks for no permission the plugin wasn't granted, and it adds or changes no
-    MCP server (a server, a `stdio` one above all, runs code that isn't in the package).
+    update asks for no permission the plugin wasn't granted, it adds or changes no
+    MCP server (a server, a `stdio` one above all, runs code that isn't in the package),
+    and it adds no overlay (a layer over Anemo's whole window is reviewed on its own).
     Anything else waits for the user. Changes an assistant saves never come through here:
     they always wait (save_pending_files)."""
     if version.status != "pending" or plugin.approved_version_id is None:
@@ -582,11 +586,17 @@ async def applies_without_review(db: AsyncSession, plugin: Plugin, version: Plug
         return False
     if not set(version.manifest.get("permissions", [])) <= set(plugin.granted_permissions or []):
         return False
+    if _has_overlay(version.manifest) and not _has_overlay(approved.manifest):
+        return False
     return bool(_mcp_servers(version.manifest) == _mcp_servers(approved.manifest))
 
 
 def _mcp_servers(manifest: dict[str, Any]) -> Any:
     return manifest.get("contributes", {}).get("mcpServers", [])
+
+
+def _has_overlay(manifest: dict[str, Any]) -> bool:
+    return any(u.get("slot") == "overlay" for u in manifest.get("contributes", {}).get("ui", []))
 
 
 async def _apply_if_granted(db: AsyncSession, version: PluginVersion, ip: str) -> None:
@@ -769,6 +779,13 @@ async def data_summary(db: AsyncSession, plugin: Plugin) -> PluginDataOut:
             )
         )
     ).one()
+    assets = (
+        await db.execute(
+            select(func.count(), func.coalesce(func.sum(PluginAsset.size), 0)).where(
+                PluginAsset.plugin_id == plugin.id
+            )
+        )
+    ).one()
 
     async def count(model: Any) -> int:
         return int(
@@ -794,6 +811,8 @@ async def data_summary(db: AsyncSession, plugin: Plugin) -> PluginDataOut:
         ],
         storage_keys=int(storage[0]),
         storage_bytes=int(storage[1]),
+        asset_count=int(assets[0]),
+        asset_bytes=int(assets[1]),
         tasks=await count(Task),
         documents=await count(Document),
         events=await count(CalendarEvent),
@@ -1049,18 +1068,37 @@ async def frame_bundle(
             if path not in named and posixpath.splitext(path.lower())[1] in (".js", ".mjs")
         )
         scripts += files_for_paths(others)
+        pictures = [
+            FramePictureOut(
+                path=path,
+                data_url=f"data:{MEDIA_TYPES[posixpath.splitext(path.lower())[1]]};base64,"
+                + base64.b64encode(
+                    store.read_file(plugin.plugin_id, row.hash, path, row.files)
+                ).decode(),
+            )
+            for path in sorted(row.files)
+            if path.lower().endswith(package.PICTURE_TYPES)
+        ]
     except store.FilesChanged as exc:
         if row.status == "approved":
             await _stop(db, plugin, exc.message)
         raise
     return PluginFrameBundleOut(
-        entry=ui["entry"], html=html, scripts=scripts, styles=styles, hash=row.hash
+        entry=ui["entry"],
+        html=html,
+        scripts=scripts,
+        styles=styles,
+        hash=row.hash,
+        pictures=pictures,
     )
 
 
 MEDIA_TYPES = {
     ".png": "image/png",
     ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
     ".woff2": "font/woff2",
 }
 

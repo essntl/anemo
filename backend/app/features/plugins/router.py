@@ -140,7 +140,17 @@ async def version_diff(
 @router.get(
     "/{plugin}/versions/{version}/files/{path:path}",
     response_class=Response,
-    responses={200: {"content": {"text/plain": {}, "image/png": {}, "image/webp": {}}}},
+    responses={
+        200: {
+            "content": {
+                "text/plain": {},
+                "image/png": {},
+                "image/webp": {},
+                "image/gif": {},
+                "image/jpeg": {},
+            }
+        }
+    },
 )
 async def version_file(plugin: str, version: str, path: str, db: Db) -> Response:
     """One file of a version, for the host and the code view. Never rendered: text is

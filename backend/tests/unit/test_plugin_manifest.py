@@ -309,3 +309,65 @@ def test_semver_order() -> None:
     ]
     assert sorted(order, key=m.semver_key) == order
     assert m.is_higher("1.0.1", "1.0.0") and not m.is_higher("1.0.0", "1.0.0")
+
+
+# -- the overlay slot and sendToUi (contract v1, added) ---------------------------------------
+
+
+def overlay(**item: Any) -> dict[str, Any]:
+    return {"id": "layer", "slot": "overlay", "entry": "ui/panel.html", **item}
+
+
+def send_to_ui(ui_id: str, event: str = "toggle") -> dict[str, Any]:
+    return {
+        "id": "toggle",
+        "title": "T",
+        "action": {"type": "sendToUi", "ui": ui_id, "event": event},
+    }
+
+
+def test_an_overlay_and_a_command_for_it_are_accepted() -> None:
+    data = manifest(contributes={"ui": [overlay(title="Layer")], "commands": [send_to_ui("layer")]})
+    assert problems(data) == []
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (
+            manifest(contributes={"ui": [overlay(id="a"), overlay(id="b")]}),
+            "contributes.ui[1].slot: A plugin has at most one overlay UI.",
+        ),
+        (
+            manifest(contributes={"ui": [overlay(height=200)]}),
+            "contributes.ui[0].height: Only panels and chat blocks have a height.",
+        ),
+        (
+            manifest(contributes={"ui": [overlay(objects=["task"])]}),
+            "contributes.ui[0].objects: Only an object.panel has objects.",
+        ),
+        (
+            manifest(contributes={"ui": [overlay()], "commands": [send_to_ui("nope")]}),
+            "contributes.commands[0].action.ui: There is no UI “nope” in contributes.ui.",
+        ),
+        (
+            manifest(
+                contributes={"ui": [overlay()], "commands": [send_to_ui("layer", "no spaces")]}
+            ),
+            "contributes.commands[0].action.event: “no spaces” isn't valid. An event name is",
+        ),
+        (
+            manifest(contributes={"ui": [overlay()], "commands": [send_to_ui("Layer")]}),
+            "contributes.commands[0].action.ui: “Layer” isn't valid. An item id is",
+        ),
+    ],
+)
+def test_overlay_and_send_to_ui_rules(data: dict[str, Any], expected: str) -> None:
+    found = problems(data)
+    assert any(expected in p for p in found), found
+
+
+def test_send_to_ui_may_name_any_ui_of_the_plugin() -> None:
+    data = manifest()
+    data["contributes"]["commands"] = [send_to_ui("panel", "refresh:all")]
+    assert problems(data) == []

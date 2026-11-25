@@ -18,7 +18,7 @@ def section(key: str) -> str:
 
 def test_the_guide_lists_every_method() -> None:
     methods = section("methods")
-    listed = set(re.findall(r"^\| `([a-z]+\.[a-z]+)` \|", methods, flags=re.MULTILINE))
+    listed = set(re.findall(r"^\| `([a-z]+\.[a-zA-Z]+)` \|", methods, flags=re.MULTILINE))
     expected = set(calls.METHODS) | set(calls.HOST_ONLY)
     assert listed == expected
 
