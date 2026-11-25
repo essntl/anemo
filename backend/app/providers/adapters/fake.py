@@ -8,7 +8,8 @@ Enabled only when ENABLE_FAKE_PROVIDER=true (or ENV=test). Behaviour by model:
   slow       like echo but slower (for testing cancel / reconnect)
   agent      a tiny tool-using agent: plans, lists the workspace, then summarizes
              (asked to "ask me" something: asks the user a question, then repeats
-             the answer)
+             the answer; asked to "rename task <id> to <title>": renames that task
+             with update_task, for the activity log's e2e test)
   no-tools   refuses any request that carries tools (like a server without tool
              calling), otherwise echoes
   scripted   replays FakeAdapter.scripts[<first user text>] (tests only). A script is a
@@ -43,6 +44,7 @@ from app.providers.base import (
 )
 
 TURN_CONTEXT_OPEN = "<turn_context>"  # see runtime/turn_context.py
+_RENAME_TASK = re.compile(r"rename task ([0-9a-f-]{36}) to (.+)", re.IGNORECASE)
 _STOPWORDS = {"the", "a", "an", "is", "are", "to", "of", "and", "i", "my", "in", "do", "what"}
 
 
@@ -181,6 +183,7 @@ class FakeAdapter:
             if b.type == "tool_result"
         ]
         asks = "ask me" in _last_user_text(req).lower()
+        rename = _RENAME_TASK.search(_last_user_text(req))
         if not req.tools:
             yield TextDelta("(The agent model needs Agent mode to use tools.)")
         elif asks and not answers and any(t.name == "ask_user" for t in req.tools):
@@ -194,6 +197,12 @@ class FakeAdapter:
             return
         elif asks:
             yield TextDelta(f"Thanks. {answers[-1]}")
+        elif rename and not answers:
+            yield ToolCall("rename1", "update_task", {"id": rename[1], "title": rename[2].strip()})
+            yield Done("tool_use")
+            return
+        elif rename:
+            yield TextDelta(f"Renamed it. {answers[-1]}")
         elif turn == 0:
             yield TextDelta("Let me look at your workspace.")
             yield ToolCall(

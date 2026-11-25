@@ -545,3 +545,19 @@ async def test_cancelling_one_occurrence_is_undone_from_the_trash(authed):
     assert cancelled["action"] == "deleted" and "2026-12-02" in cancelled["summary"]
     assert (await undo(authed, cancelled["id"])).status_code == 200
     assert (await authed.get("/api/trash")).json() == []
+
+
+async def test_the_demo_agent_renames_a_task_for_the_e2e_test(authed):
+    """The fake provider's "agent" model renames a task when asked (e2e/tests/activity.spec.ts)."""
+    pid = (await authed.post("/api/providers", json={"name": "F", "type": "fake"})).json()["id"]
+    model = await authed.post(
+        "/api/models",
+        json={"provider_id": pid, "model_key": "agent", "capabilities": {"tools": True}},
+    )
+    await authed.put("/api/settings/models", json={"chat": model.json()["id"]})
+    cid = (await authed.post("/api/conversations", json={})).json()["id"]
+    task = await new_task(authed)
+    await agent_turn(authed, cid, f"Please rename task {task['id']} to Buy bread")
+    assert (await get_task(authed, task["id"]))["title"] == "Buy bread"
+    [changed] = await entries(authed, actor_kind="assistant")
+    assert changed["fields"] == ["title"]
