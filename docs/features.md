@@ -1005,6 +1005,12 @@ the agent sees which ones are, with their trust level, in its turn context.
 | `computer_shell` | One command in the computer's shell (PowerShell on Windows, zsh or bash on a Mac) on a trusted computer with the shell switched on in the client, with a timeout (60 s by default, at most 10 minutes) |
 | `computer_shared_screen` | What you shared last with *Share this screen with Anemo* |
 
+On a trusted computer that shares its Claude Code jobs, the agent starts and follows jobs
+with the `code_*` tools instead (`code_start`, `code_status`, `code_cancel`; the jobs are on
+the Code page). `code_status` with `wait_s` (up to 5 minutes) waits until the job ends and
+then answers, so the agent doesn't keep asking; stopping the run ends the wait at once
+([spec 21](specs/21-code-wait.md)).
+
 PowerShell commands are rated like shell commands: one that deletes, formats, changes
 users, services, the firewall or the registry, or downloads and runs something, is
 dangerous; one that uses the network counts as reaching people. A Mac's zsh commands are
