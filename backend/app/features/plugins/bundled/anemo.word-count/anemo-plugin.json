@@ -1,0 +1,24 @@
+{
+  "manifestVersion": 1,
+  "id": "anemo.word-count",
+  "version": "1.0.0",
+  "name": "Word count",
+  "description": "Words, characters, paragraphs, reading and speaking time for the document you have open.",
+  "author": { "name": "Anemo" },
+  "license": "MIT",
+  "icon": "icon.png",
+  "readme": "README.md",
+  "permissions": ["documents:read"],
+  "contributes": {
+    "ui": [
+      {
+        "id": "panel",
+        "slot": "object.panel",
+        "objects": ["document"],
+        "title": "Word count",
+        "entry": "ui/panel.html",
+        "height": 280
+      }
+    ]
+  }
+}
