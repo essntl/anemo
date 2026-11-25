@@ -173,6 +173,16 @@ CATEGORIES: list[Category] = [
         # anything in it runs, not before it is written.
         "autonomous",
     ),
+    # Files between the workspace and the computers that run Anemo Desktop
+    # (docs/specs/22-device-files.md). Only trusted computers that allow it in Anemo
+    # Desktop; replacing a file on a computer is dangerous (tools/builtin/device_files.py).
+    Category(
+        "device.files",
+        "Files on your computers",
+        "Copy files between the workspace and trusted computers that allow it in Anemo "
+        "Desktop. Replacing a file on a computer counts as dangerous.",
+        "ask",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 

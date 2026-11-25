@@ -14,6 +14,7 @@ from app.tools.builtin.automation import AUTOMATION_TOOLS, STATE_ALIASES
 from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
 from app.tools.builtin.code import CODE_TOOL_NAMES, CODE_TOOLS
 from app.tools.builtin.computer import COMPUTER_TOOLS
+from app.tools.builtin.device_files import DEVICE_FILE_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
 from app.tools.builtin.events import EVENT_TOOLS
 from app.tools.builtin.file_exchange import FILE_EXCHANGE_TOOLS
@@ -81,6 +82,7 @@ BUILTIN_TOOLS: list[Tool] = [
     *SCRIPT_TOOLS,
     VoiceStop(),
     *PLUGIN_TOOLS,
+    *DEVICE_FILE_TOOLS,
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 # Tools that only work in a run that answers in a chat.
@@ -159,8 +161,8 @@ def toolset_for(
     attach files to the answer. `off`: the parts of the app the user turned off
     (Settings > Pages); their tools are not offered. `has_computer`: a computer that
     runs Anemo Desktop is online (for an unattended run: and the automation lists one of
-    the computer tools). `has_phone`: a phone started the run by voice (it gets
-    `voice_stop`; docs/specs/07-voice-mode-android.md)."""
+    the computer tools); it also gates the device file tools. `has_phone`: a phone started
+    the run by voice (it gets `voice_stop`; docs/specs/07-voice-mode-android.md)."""
     offered = []
     turned_off = tools_of(off)
     for tool in BUILTIN_TOOLS:
@@ -178,6 +180,8 @@ def toolset_for(
             # A tab the user shared from their Chrome: not for unattended runs.
             or (tool.name == "browser_current_tab" and unattended)
             or (tool in COMPUTER_TOOLS and not has_computer)
+            # They need the same per-step list of devices as the computer tools.
+            or (tool in DEVICE_FILE_TOOLS and not has_computer)
             or (tool.name == "run_subagent" and not can_spawn)
             or (tool.name == "ask_user" and not can_ask)
             or (tool.name in CHAT_FILE_TOOLS and not has_chat)

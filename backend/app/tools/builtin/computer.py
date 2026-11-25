@@ -87,6 +87,7 @@ def _info(device: relay.DeviceInfo) -> dict[str, Any]:
         "shell": device.shell,
         "platform": device.platform,
         "shell_kind": device.shell_kind,
+        "files": device.files,
     }
 
 
@@ -132,11 +133,13 @@ def line(device: relay.DeviceInfo) -> str:
         control = f"control allowed, {shell} on"
     else:
         control = f"control allowed, {shell} off"
+    # Files (device_file_get / device_file_put) work only on a trusted computer that offers them.
+    files = ", files on" if device.trust == "trusted" and device.files else ""
     if device.platform == "windows" and is_powershell(device.shell_kind):
         # A Windows computer reads as it always did: its shell is PowerShell.
-        return f"- {device.name}: computer, {device.trust}, {control}"
+        return f"- {device.name}: computer, {device.trust}, {control}{files}"
     system = _OS_NAMES.get(device.platform, device.platform)
-    return f"- {device.name}: computer ({system}, shell: {shell}), {device.trust}, {control}"
+    return f"- {device.name}: computer ({system}, shell: {shell}), {device.trust}, {control}{files}"
 
 
 def turn_context_section(lines: list[str]) -> str:
@@ -147,7 +150,8 @@ def turn_context_section(lines: list[str]) -> str:
         "## Devices online now\n"
         "Use a computer with computer_look, computer_act and computer_shell (device = its "
         "name). A computer runs Windows with PowerShell unless its line names another system "
-        "and shell.\n" + "\n".join(lines)
+        "and shell. Copy files between a computer and the workspace with device_file_get "
+        "and device_file_put when its line says files on.\n" + "\n".join(lines)
     )
 
 
@@ -158,7 +162,7 @@ def _known(ctx: ToolContext, name: str) -> dict[str, Any] | None:
 
 def known_device(ctx: ToolContext, name: str) -> dict[str, Any] | None:
     """What the last refresh saw of the device of this name ({id, name, kind, trust,
-    control, shell, platform, shell_kind}), or None (not online then, or no computer tool
+    control, shell, platform, shell_kind, files}), or None (not online then, or no computer tool
     was offered)."""
     return _known(ctx, name)
 
