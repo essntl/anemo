@@ -58,6 +58,7 @@
     "mermaid": "^12.3.0",
     "motion": "^14.1.0",
     "openapi-fetch": "^0.17.0",
+    "perfect-freehand": "^1.2.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
