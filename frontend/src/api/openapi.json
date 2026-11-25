@@ -10203,6 +10203,317 @@
         }
       }
     },
+    "/api/documents/{document_id}/sketch": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Save Sketch",
+        "description": "Save the drawing (properties and transcription stay). 409 conflict_base_hash when\nthe file changed since `base_hash`; 400 sketch_invalid / too_large write nothing.",
+        "operationId": "save_sketch_api_documents__document_id__sketch_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SketchSaveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentContent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/sketch/preview": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload Preview",
+        "description": "The editor's rendering of the drawing version `drawing_hash` (PNG or WebP, at most\n4 MB and 4096 px a side). 409 preview_outdated when the drawing changed since.",
+        "operationId": "upload_preview_api_documents__document_id__sketch_preview_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_preview_api_documents__document_id__sketch_preview_put"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Preview",
+        "description": "The sketch's image (the last one uploaded; GET /documents/{id} says whether it is\ncurrent). Served by the app itself, so Markdown can show it where a sketch is embedded.",
+        "operationId": "preview_api_documents__document_id__sketch_preview_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/sketch/attachment": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Sketch Attachment",
+        "description": "The sketch's image as a chat attachment (send its id with a message, as with an\nupload). 409 preview_outdated when the image isn't current: upload it first.",
+        "operationId": "sketch_attachment_api_documents__document_id__sketch_attachment_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/sketch/transcribe": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Transcribe",
+        "description": "Ask a model that can view images to transcribe the drawing (in the background;\n`sketch.transcription_status` says how it goes). 409 preview_outdated or\nno_model_available.",
+        "operationId": "transcribe_api_documents__document_id__sketch_transcribe_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/daily-notes/{day}": {
       "get": {
         "tags": [
@@ -23806,6 +24117,27 @@
         ],
         "title": "Body_upload_asset_api_documents_assets_post"
       },
+      "Body_upload_preview_api_documents__document_id__sketch_preview_put": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "drawing_hash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Drawing Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "drawing_hash"
+        ],
+        "title": "Body_upload_preview_api_documents__document_id__sketch_preview_put"
+      },
       "Body_upload_task_files_api_tasks__task_id__files_upload_post": {
         "properties": {
           "files": {
@@ -26272,6 +26604,24 @@
               }
             ],
             "title": "Properties"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "sketch"
+            ],
+            "title": "Kind",
+            "default": "markdown"
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "infinite",
+              "pages"
+            ],
+            "title": "Layout",
+            "default": "infinite"
           }
         },
         "type": "object",
@@ -27254,6 +27604,16 @@
             "type": "string",
             "title": "Title"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "sketch"
+            ],
+            "title": "Kind",
+            "description": "sketch: a drawing sheet (a .sketch.md file)",
+            "default": "markdown"
+          },
           "word_count": {
             "type": "integer",
             "title": "Word Count"
@@ -27313,6 +27673,17 @@
           "hash": {
             "type": "string",
             "title": "Hash"
+          },
+          "sketch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SketchOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A sketch's drawing and its state"
           }
         },
         "type": "object",
@@ -27371,6 +27742,16 @@
           "title": {
             "type": "string",
             "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "sketch"
+            ],
+            "title": "Kind",
+            "description": "sketch: a drawing sheet (a .sketch.md file)",
+            "default": "markdown"
           },
           "word_count": {
             "type": "integer",
@@ -34103,6 +34484,30 @@
         ],
         "title": "PresenceIn"
       },
+      "PreviewOut": {
+        "properties": {
+          "drawing_hash": {
+            "type": "string",
+            "title": "Drawing Hash",
+            "description": "The drawing version the image shows"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "drawing_hash",
+          "width",
+          "height"
+        ],
+        "title": "PreviewOut"
+      },
       "ProfileIn": {
         "properties": {
           "name": {
@@ -34988,6 +35393,19 @@
         "title": "QuestionMark",
         "description": "The agent stopped to ask something: `at` is where in the answer's text (a\ncharacter offset, before the text that came after the answer)."
       },
+      "QueuedOut": {
+        "properties": {
+          "queued": {
+            "type": "boolean",
+            "title": "Queued"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queued"
+        ],
+        "title": "QueuedOut"
+      },
       "RecentDocument": {
         "properties": {
           "id": {
@@ -35006,6 +35424,16 @@
           "title": {
             "type": "string",
             "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "sketch"
+            ],
+            "title": "Kind",
+            "description": "sketch: a drawing sheet (a .sketch.md file)",
+            "default": "markdown"
           },
           "word_count": {
             "type": "integer",
@@ -37752,6 +38180,76 @@
         ],
         "title": "SetupStatus"
       },
+      "Shape": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Id"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^(#[0-9a-fA-F]{6}|ink)$",
+            "title": "Color"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "line",
+              "arrow",
+              "rect",
+              "ellipse"
+            ],
+            "title": "Type"
+          },
+          "width": {
+            "type": "number",
+            "maximum": 200.0,
+            "minimum": 0.1,
+            "title": "Width"
+          },
+          "x1": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "X1"
+          },
+          "y1": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "Y1"
+          },
+          "x2": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "X2"
+          },
+          "y2": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "Y2"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "color",
+          "type",
+          "width",
+          "x1",
+          "y1",
+          "x2",
+          "y2"
+        ],
+        "title": "Shape",
+        "description": "A line or arrow from (x1, y1) to (x2, y2), or a rectangle or ellipse in that box."
+      },
       "ShareIn": {
         "properties": {
           "kind": {
@@ -38447,6 +38945,202 @@
         "type": "object",
         "title": "SharedWindow"
       },
+      "SketchData": {
+        "properties": {
+          "v": {
+            "type": "integer",
+            "const": 1,
+            "title": "V",
+            "default": 1
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "infinite",
+              "pages"
+            ],
+            "title": "Layout",
+            "default": "infinite"
+          },
+          "background": {
+            "type": "string",
+            "enum": [
+              "plain",
+              "grid",
+              "dots",
+              "lines"
+            ],
+            "title": "Background",
+            "default": "plain"
+          },
+          "pages": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Pages",
+            "default": 1
+          },
+          "items": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Stroke"
+                },
+                {
+                  "$ref": "#/components/schemas/Shape"
+                },
+                {
+                  "$ref": "#/components/schemas/TextBox"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "arrow": "#/components/schemas/Shape",
+                  "ellipse": "#/components/schemas/Shape",
+                  "line": "#/components/schemas/Shape",
+                  "rect": "#/components/schemas/Shape",
+                  "stroke": "#/components/schemas/Stroke",
+                  "text": "#/components/schemas/TextBox"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SketchData",
+        "description": "The drawing (version 1). Coordinates are in sheet units (CSS pixels at 100 %)."
+      },
+      "SketchOut": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SketchData"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The drawing; None when it can't be read"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Why the drawing can't be read"
+          },
+          "drawing_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawing Hash",
+            "description": "This version of the drawing"
+          },
+          "transcription": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcription",
+            "description": "Text a model read from the drawing"
+          },
+          "transcription_current": {
+            "type": "boolean",
+            "title": "Transcription Current",
+            "description": "The transcription was made from the drawing as it is now",
+            "default": false
+          },
+          "transcription_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcription Status",
+            "description": "queued | failed | None"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreviewOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview_current": {
+            "type": "boolean",
+            "title": "Preview Current",
+            "description": "The image shows the drawing as it is now",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SketchOut"
+      },
+      "SketchSaveIn": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SketchData"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "base_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Hash",
+            "description": "Hash of the version being edited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SketchSaveIn"
+      },
       "SkillIn": {
         "properties": {
           "slug": {
@@ -38797,6 +39491,64 @@
           "agents"
         ],
         "title": "StatsOut"
+      },
+      "Stroke": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Id"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^(#[0-9a-fA-F]{6}|ink)$",
+            "title": "Color"
+          },
+          "type": {
+            "type": "string",
+            "const": "stroke",
+            "title": "Type"
+          },
+          "tool": {
+            "type": "string",
+            "enum": [
+              "pen",
+              "highlighter"
+            ],
+            "title": "Tool"
+          },
+          "width": {
+            "type": "number",
+            "maximum": 200.0,
+            "minimum": 0.1,
+            "title": "Width"
+          },
+          "points": {
+            "items": {
+              "type": "number",
+              "maximum": 1000000.0,
+              "minimum": -1000000.0
+            },
+            "type": "array",
+            "maxItems": 15000,
+            "minItems": 3,
+            "title": "Points"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "color",
+          "type",
+          "tool",
+          "width",
+          "points"
+        ],
+        "title": "Stroke",
+        "description": "A freehand line: `points` is flat, three numbers a point (x, y, pressure 0-1)."
       },
       "SuggestionIds": {
         "properties": {
@@ -39930,6 +40682,76 @@
           "message"
         ],
         "title": "TestResult"
+      },
+      "TextBox": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Id"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^(#[0-9a-fA-F]{6}|ink)$",
+            "title": "Color"
+          },
+          "type": {
+            "type": "string",
+            "const": "text",
+            "title": "Type"
+          },
+          "x": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "Y"
+          },
+          "size": {
+            "type": "number",
+            "maximum": 400.0,
+            "minimum": 4.0,
+            "title": "Size"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Text"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000.0,
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "color",
+          "type",
+          "x",
+          "y",
+          "size",
+          "text"
+        ],
+        "title": "TextBox",
+        "description": "Text at (x, y) (its top left), `size` the font size; `width` wraps it."
       },
       "TimelineOut": {
         "properties": {

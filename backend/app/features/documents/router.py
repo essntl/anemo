@@ -15,9 +15,10 @@ from sqlalchemy import select
 
 from app.api.deps import Db
 from app.core.errors import AppError, NotFound
-from app.features.documents import paths, references, service
+from app.features.documents import paths, references, service, sketch, sketches
 from app.features.documents import properties as doc_properties
 from app.features.documents.models import Document, DocumentRevision
+from app.features.documents.sketch_schemas import SketchOut, sketch_out
 from app.features.links import service as links
 from app.features.properties import service as properties
 from app.features.provenance import service as provenance
@@ -34,6 +35,9 @@ class DocumentOut(BaseModel):
     path: str  # workspace-relative, e.g. documents/notes/idea.md
     folder: str  # inside documents/, "" for the top level
     title: str
+    kind: Literal["markdown", "sketch"] = Field(
+        "markdown", description="sketch: a drawing sheet (a .sketch.md file)"
+    )
     word_count: int
     last_editor: str
     updated_at: datetime
@@ -46,6 +50,7 @@ class DocumentOut(BaseModel):
 class DocumentContent(DocumentOut):
     content: str
     hash: str
+    sketch: SketchOut | None = Field(None, description="A sketch's drawing and its state")
 
 
 class DocumentList(BaseModel):
@@ -68,6 +73,7 @@ def _out(d: Document, actors: dict[str, ActorOut] | None = None) -> DocumentOut:
         path=d.path,
         folder=folder,
         title=d.title,
+        kind="sketch" if sketch.is_sketch(d.path) else "markdown",
         word_count=d.word_count,
         last_editor=d.last_editor,
         updated_at=d.updated_at,
@@ -78,11 +84,11 @@ def _out(d: Document, actors: dict[str, ActorOut] | None = None) -> DocumentOut:
     )
 
 
-def _content(
-    d: Document, content: str, actors: dict[str, ActorOut] | None = None
-) -> DocumentContent:
-    out = _out(d, actors)
-    return DocumentContent(**out.model_dump(), content=content, hash=d.content_hash)
+async def document_content(db: Db, d: Document, content: str) -> DocumentContent:
+    """A document with its text (and, for a sketch, its drawing and state)."""
+    out = _out(d, await _actors(db, [d]))
+    state = sketch_out(await sketches.state(db, d, content)) if sketch.is_sketch(d.path) else None
+    return DocumentContent(**out.model_dump(), content=content, hash=d.content_hash, sketch=state)
 
 
 class RecentDocument(DocumentOut):
@@ -181,22 +187,29 @@ class CreateIn(BaseModel):
     content: str | None = Field(None, max_length=2_000_000)  # default: a heading with the title
     # Written into its front matter, with the folder's default properties.
     properties: dict[str, Any] | None = Field(None, max_length=30)
+    kind: Literal["markdown", "sketch"] = "markdown"
+    # A sketch: one endless sheet, or A4-like pages.
+    layout: Literal["infinite", "pages"] = "infinite"
 
 
 @router.post("", response_model=DocumentContent, status_code=201)
 async def create_document(body: CreateIn, db: Db) -> DocumentContent:
     title = body.title.strip()
-    path = service.unique_path(body.folder, title)
-    content = body.content if body.content is not None else f"# {title}\n\n"
+    if body.kind == "sketch":
+        path = service.unique_path(body.folder, title, sketch.SUFFIX)
+        content = sketches.new_content(title, body.layout)
+    else:
+        path = service.unique_path(body.folder, title)
+        content = body.content if body.content is not None else f"# {title}\n\n"
     content = await doc_properties.with_defaults(db, path, content, body.properties)
     doc = await service.create(db, path, content, author="user")
-    return _content(doc, content, await _actors(db, [doc]))
+    return await document_content(db, doc, content)
 
 
 @router.get("/{document_id}", response_model=DocumentContent)
 async def get_document(document_id: uuid.UUID, db: Db) -> DocumentContent:
     doc = await service.get(db, document_id)
-    return _content(doc, await service.read(db, doc), await _actors(db, [doc]))
+    return await document_content(db, doc, await service.read(db, doc))
 
 
 class SaveIn(BaseModel):
@@ -208,7 +221,7 @@ class SaveIn(BaseModel):
 async def save_document(document_id: uuid.UUID, body: SaveIn, db: Db) -> DocumentContent:
     doc = await service.get(db, document_id)
     doc = await service.save(db, doc, body.content, base_hash=body.base_hash, author="user")
-    return _content(doc, body.content, await _actors(db, [doc]))
+    return await document_content(db, doc, body.content)
 
 
 class MoveIn(BaseModel):
@@ -222,7 +235,8 @@ async def move_document(document_id: uuid.UUID, body: MoveIn, db: Db) -> Documen
     doc = await service.get(db, document_id)
     current = _out(doc)
     folder = current.folder if body.folder is None else body.folder.strip("/")
-    name = posixpath.basename(doc.path) if body.name is None else f"{body.name.strip()}.md"
+    suffix = sketch.SUFFIX if sketch.is_sketch(doc.path) else ".md"  # a sketch stays one
+    name = posixpath.basename(doc.path) if body.name is None else f"{body.name.strip()}{suffix}"
     if "/" in name or name.startswith("."):
         raise AppError("Not a valid file name", code="invalid_path")
     target = "/".join(p for p in (service.DOCS_DIR, folder, name) if p)
@@ -309,7 +323,7 @@ async def restore_revision(
     doc = await service.save(
         db, doc, revision.content, base_hash=doc.content_hash, author="user", new_revision=True
     )
-    return _content(doc, revision.content, await _actors(db, [doc]))
+    return await document_content(db, doc, revision.content)
 
 
 # -- properties ------------------------------------------------------------------------------
@@ -335,7 +349,7 @@ async def set_properties(document_id: uuid.UUID, body: PropertiesIn, db: Db) -> 
         author="user",
         create_values=body.create_values,
     )
-    return _content(doc, await service.read(db, doc), await _actors(db, [doc]))
+    return await document_content(db, doc, await service.read(db, doc))
 
 
 @router.get("/{document_id}/folder-defaults", response_model=dict[str, Any])

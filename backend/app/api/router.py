@@ -29,6 +29,7 @@ from app.features.devices.router import router as devices_router
 from app.features.devices.ws import router as devices_ws_router
 from app.features.dictation.router import router as dictation_router
 from app.features.documents.router import router as documents_router
+from app.features.documents.sketch_router import router as sketch_router
 from app.features.extension.http_router import router as extension_http_router
 from app.features.extension.router import router as extension_router
 from app.features.files.router import router as files_router
@@ -95,6 +96,7 @@ protected.include_router(skills_router)
 protected.include_router(web_router)
 protected.include_router(memory_router)
 protected.include_router(documents_router)
+protected.include_router(sketch_router)
 protected.include_router(daily_notes_router)
 protected.include_router(tasks_router)
 protected.include_router(trash_router)

@@ -2559,6 +2559,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{document_id}/sketch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Sketch
+         * @description Save the drawing (properties and transcription stay). 409 conflict_base_hash when
+         *     the file changed since `base_hash`; 400 sketch_invalid / too_large write nothing.
+         */
+        put: operations["save_sketch_api_documents__document_id__sketch_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/sketch/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview
+         * @description The sketch's image (the last one uploaded; GET /documents/{id} says whether it is
+         *     current). Served by the app itself, so Markdown can show it where a sketch is embedded.
+         */
+        get: operations["preview_api_documents__document_id__sketch_preview_get"];
+        /**
+         * Upload Preview
+         * @description The editor's rendering of the drawing version `drawing_hash` (PNG or WebP, at most
+         *     4 MB and 4096 px a side). 409 preview_outdated when the drawing changed since.
+         */
+        put: operations["upload_preview_api_documents__document_id__sketch_preview_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/sketch/attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sketch Attachment
+         * @description The sketch's image as a chat attachment (send its id with a message, as with an
+         *     upload). 409 preview_outdated when the image isn't current: upload it first.
+         */
+        post: operations["sketch_attachment_api_documents__document_id__sketch_attachment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/sketch/transcribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transcribe
+         * @description Ask a model that can view images to transcribe the drawing (in the background;
+         *     `sketch.transcription_status` says how it goes). 409 preview_outdated or
+         *     no_model_available.
+         */
+        post: operations["transcribe_api_documents__document_id__sketch_transcribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/daily-notes/{day}": {
         parameters: {
             query?: never;
@@ -5928,6 +6018,13 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_preview_api_documents__document_id__sketch_preview_put */
+        Body_upload_preview_api_documents__document_id__sketch_preview_put: {
+            /** File */
+            file: string;
+            /** Drawing Hash */
+            drawing_hash: string;
+        };
         /** Body_upload_task_files_api_tasks__task_id__files_upload_post */
         Body_upload_task_files_api_tasks__task_id__files_upload_post: {
             /** Files */
@@ -6830,6 +6927,18 @@ export interface components {
             properties?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Kind
+             * @default markdown
+             * @enum {string}
+             */
+            kind: "markdown" | "sketch";
+            /**
+             * Layout
+             * @default infinite
+             * @enum {string}
+             */
+            layout: "infinite" | "pages";
         };
         /**
          * CustomGradient
@@ -7187,6 +7296,13 @@ export interface components {
             folder: string;
             /** Title */
             title: string;
+            /**
+             * Kind
+             * @description sketch: a drawing sheet (a .sketch.md file)
+             * @default markdown
+             * @enum {string}
+             */
+            kind: "markdown" | "sketch";
             /** Word Count */
             word_count: number;
             /** Last Editor */
@@ -7213,6 +7329,8 @@ export interface components {
             content: string;
             /** Hash */
             hash: string;
+            /** @description A sketch's drawing and its state */
+            sketch?: components["schemas"]["SketchOut"] | null;
         };
         /** DocumentList */
         DocumentList: {
@@ -7234,6 +7352,13 @@ export interface components {
             folder: string;
             /** Title */
             title: string;
+            /**
+             * Kind
+             * @description sketch: a drawing sheet (a .sketch.md file)
+             * @default markdown
+             * @enum {string}
+             */
+            kind: "markdown" | "sketch";
             /** Word Count */
             word_count: number;
             /** Last Editor */
@@ -9861,6 +9986,18 @@ export interface components {
             /** Tab */
             tab: string;
         };
+        /** PreviewOut */
+        PreviewOut: {
+            /**
+             * Drawing Hash
+             * @description The drawing version the image shows
+             */
+            drawing_hash: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+        };
         /** ProfileIn */
         ProfileIn: {
             /** Name */
@@ -10198,6 +10335,11 @@ export interface components {
             /** Answer */
             answer: string | null;
         };
+        /** QueuedOut */
+        QueuedOut: {
+            /** Queued */
+            queued: boolean;
+        };
         /** RecentDocument */
         RecentDocument: {
             /**
@@ -10211,6 +10353,13 @@ export interface components {
             folder: string;
             /** Title */
             title: string;
+            /**
+             * Kind
+             * @description sketch: a drawing sheet (a .sketch.md file)
+             * @default markdown
+             * @enum {string}
+             */
+            kind: "markdown" | "sketch";
             /** Word Count */
             word_count: number;
             /** Last Editor */
@@ -11205,6 +11354,31 @@ export interface components {
             /** Offer Setup */
             offer_setup: boolean;
         };
+        /**
+         * Shape
+         * @description A line or arrow from (x1, y1) to (x2, y2), or a rectangle or ellipse in that box.
+         */
+        Shape: {
+            /** Id */
+            id: string;
+            /** Color */
+            color: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "arrow" | "ellipse" | "line" | "rect";
+            /** Width */
+            width: number;
+            /** X1 */
+            x1: number;
+            /** Y1 */
+            y1: number;
+            /** X2 */
+            x2: number;
+            /** Y2 */
+            y2: number;
+        };
         /** ShareIn */
         ShareIn: {
             /**
@@ -11495,6 +11669,86 @@ export interface components {
              */
             app: string;
         };
+        /**
+         * SketchData
+         * @description The drawing (version 1). Coordinates are in sheet units (CSS pixels at 100 %).
+         */
+        SketchData: {
+            /**
+             * V
+             * @default 1
+             * @constant
+             */
+            v: 1;
+            /**
+             * Layout
+             * @default infinite
+             * @enum {string}
+             */
+            layout: "infinite" | "pages";
+            /**
+             * Background
+             * @default plain
+             * @enum {string}
+             */
+            background: "plain" | "grid" | "dots" | "lines";
+            /**
+             * Pages
+             * @default 1
+             */
+            pages: number;
+            /** Items */
+            items?: (components["schemas"]["Stroke"] | components["schemas"]["Shape"] | components["schemas"]["TextBox"])[];
+        };
+        /** SketchOut */
+        SketchOut: {
+            /** @description The drawing; None when it can't be read */
+            data: components["schemas"]["SketchData"] | null;
+            /**
+             * Error
+             * @description Why the drawing can't be read
+             */
+            error?: string | null;
+            /**
+             * Drawing Hash
+             * @description This version of the drawing
+             */
+            drawing_hash?: string | null;
+            /**
+             * Transcription
+             * @description Text a model read from the drawing
+             */
+            transcription?: string | null;
+            /**
+             * Transcription Current
+             * @description The transcription was made from the drawing as it is now
+             * @default false
+             */
+            transcription_current: boolean;
+            /**
+             * Transcription Status
+             * @description queued | failed | None
+             */
+            transcription_status?: string | null;
+            preview?: components["schemas"]["PreviewOut"] | null;
+            /**
+             * Preview Current
+             * @description The image shows the drawing as it is now
+             * @default false
+             */
+            preview_current: boolean;
+        };
+        /** SketchSaveIn */
+        SketchSaveIn: {
+            data: components["schemas"]["SketchData"];
+            /** Title */
+            title?: string | null;
+            /**
+             * Base Hash
+             * @description Hash of the version being edited
+             */
+            base_hash?: string | null;
+        };
         /** SkillIn */
         SkillIn: {
             /** Slug */
@@ -11663,6 +11917,30 @@ export interface components {
             /** Projects */
             projects: components["schemas"]["ProjectStats"][];
             agents: components["schemas"]["AgentStats"];
+        };
+        /**
+         * Stroke
+         * @description A freehand line: `points` is flat, three numbers a point (x, y, pressure 0-1).
+         */
+        Stroke: {
+            /** Id */
+            id: string;
+            /** Color */
+            color: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "stroke";
+            /**
+             * Tool
+             * @enum {string}
+             */
+            tool: "pen" | "highlighter";
+            /** Width */
+            width: number;
+            /** Points */
+            points: number[];
         };
         /** SuggestionIds */
         SuggestionIds: {
@@ -12035,6 +12313,31 @@ export interface components {
             latency_ms?: number | null;
             /** Detail */
             detail?: string | null;
+        };
+        /**
+         * TextBox
+         * @description Text at (x, y) (its top left), `size` the font size; `width` wraps it.
+         */
+        TextBox: {
+            /** Id */
+            id: string;
+            /** Color */
+            color: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Size */
+            size: number;
+            /** Text */
+            text: string;
+            /** Width */
+            width?: number | null;
         };
         /** TimelineOut */
         TimelineOut: {
@@ -18446,6 +18749,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_sketch_api_documents__document_id__sketch_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SketchSaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_documents__document_id__sketch_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_preview_api_documents__document_id__sketch_preview_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_preview_api_documents__document_id__sketch_preview_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sketch_attachment_api_documents__document_id__sketch_attachment_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcribe_api_documents__document_id__sketch_transcribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueuedOut"];
                 };
             };
             /** @description Validation Error */
