@@ -260,6 +260,21 @@ public sealed class UpdaterTests : IDisposable
     }
 
     [Fact]
+    public async Task A_newer_release_that_fails_keeps_the_ready_one()
+    {
+        Release("desktop-v1.9.0");
+        var updater = Create();
+        await updater.CheckNowAsync(default);
+
+        _feed.ETag = "\"v2\"";
+        Release("desktop-v1.9.1", exe: Text("damaged"));
+        await updater.CheckNowAsync(default);
+
+        Assert.Equal(new UpdateState(UpdatePhase.Ready, new AppVersion(1, 9, 0), CheckedAt: _time.Now), updater.State);
+        Assert.Equal(NewExe, File.ReadAllBytes(_platform.Staged));
+    }
+
+    [Fact]
     public async Task Restart_to_update_waits_until_the_agent_is_done()
     {
         Release("desktop-v1.9.0");

@@ -477,10 +477,10 @@ public sealed class Updater
     {
         _nextCheck = _time.GetUtcNow() + retry;
         _log.Info($"update: {message}");
-        if (Ready is null)
-        {
-            Set(new UpdateState(UpdatePhase.Failed, Message: message, CheckedAt: _checkedAt));
-        }
+        // A newer version that failed doesn't take away the one that is ready.
+        Set(Ready is { } ready
+            ? new UpdateState(UpdatePhase.Ready, ready.Version, CheckedAt: _checkedAt)
+            : new UpdateState(UpdatePhase.Failed, Message: message, CheckedAt: _checkedAt));
     }
 
     private void DeleteStaged(StagedUpdate staged) => TryDelete(staged.Paths.Staged);
