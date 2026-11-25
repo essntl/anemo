@@ -12,7 +12,7 @@ import uuid
 from datetime import date, time
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
@@ -588,6 +588,9 @@ class DeleteTask(Tool):
         )
 
 
+MAX_TAGS = 20  # as UpdateTaskInput.tags allows
+
+
 class TaskChangeInput(BaseModel):
     id: str = Field(description="The task's id (from list_tasks)")
     title: str | None = Field(None, min_length=1, max_length=300)
@@ -725,12 +728,23 @@ class UpdateTasks(Tool):
                 if item.add_tags or item.remove_tags:
                     dropping = set(clean_tags(item.remove_tags))
                     kept = [t for t in task.tags or [] if t not in dropping]
-                    fields["tags"] = kept + clean_tags(item.add_tags)
+                    # A tag it has already isn't added twice.
+                    tags = list(dict.fromkeys(kept + clean_tags(item.add_tags)))
+                    if len(tags) > MAX_TAGS:
+                        return batch.Outcome(
+                            item.id,
+                            False,
+                            f"[{item.id}] {task.title}: it would have {len(tags)} tags, and a "
+                            f"task can have at most {MAX_TAGS}. Remove some with remove_tags.",
+                        )
+                    fields["tags"] = tags
                 if args.create_value:
                     fields["create_value"] = True
-                outcome = await change_task(
-                    db, task, UpdateTaskInput.model_validate(fields), ctx, tool="update_tasks"
-                )
+                try:
+                    changes = UpdateTaskInput.model_validate(fields)
+                except ValidationError as exc:
+                    return batch.Outcome(item.id, False, f"[{item.id}] {batch.problems(exc)}")
+                outcome = await change_task(db, task, changes, ctx, tool="update_tasks")
             if isinstance(outcome, ToolResult):
                 return batch.Outcome(item.id, False, f"[{item.id}] {outcome.content}")
             task, line = outcome

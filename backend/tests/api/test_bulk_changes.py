@@ -115,6 +115,37 @@ async def test_update_tasks_reports_every_item_and_goes_on_after_a_failure(authe
     assert any(i["title"] == "Old idea" for i in trash)
 
 
+async def test_update_tasks_add_tags_keeps_each_tag_once_and_refuses_more_than_20(
+    authed, caplog
+):
+    full = await task(authed, "Many tags", tags=[f"t{n}" for n in range(19)])
+    plain = await task(authed, "Few tags", tags=["work"])
+
+    result = await run(
+        UpdateTasks,
+        items=[
+            {"id": full["id"], "add_tags": ["t0", "new1", "new2"]},
+            {"id": plain["id"], "add_tags": ["Work", "home", "#home"]},
+        ],
+    )
+
+    lines = result.content.splitlines()
+    assert lines[0] == "1 of 2 tasks done; 1 failed."
+    assert lines[1] == (
+        f"1. error: [{full['id']}] Many tags: it would have 21 tags, and a task can have at "
+        "most 20. Remove some with remove_tags."
+    )
+    assert "batch item failed" not in caplog.text  # a refusal, not a crash with a traceback
+    now = await tasks_by_title(authed)
+    assert now["Few tags"]["tags"] == ["work", "home"]
+    assert now["Many tags"]["tags"] == full["tags"]
+
+    # 19 tags, one of them added again and one new: 20, allowed.
+    again = await run(UpdateTasks, items=[{"id": full["id"], "add_tags": ["t3", "new"]}])
+    assert again.content.splitlines()[0] == "1 of 1 task done."
+    assert (await tasks_by_title(authed))["Many tags"]["tags"] == [*full["tags"], "new"]
+
+
 async def test_update_tasks_with_every_item_failing_is_an_error(authed):
     result = await run(UpdateTasks, items=[{"id": "nope", "status": "done"}])
     assert result.is_error and result.changed is False
