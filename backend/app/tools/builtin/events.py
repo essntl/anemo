@@ -74,10 +74,6 @@ def _id(value: str) -> uuid.UUID | None:
         return None
 
 
-def _problems(exc: ValidationError) -> str:
-    return "; ".join(e["msg"].removeprefix("Value error, ") for e in exc.errors()[:3])
-
-
 # list_events without a range of days lists at most this many events.
 FIND_LIMIT = 200
 
@@ -314,7 +310,7 @@ class CreateEvent(Tool):
                     create_values=args.create_value,
                 )
             except ValidationError as exc:
-                return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
+                return ToolResult(content=f"Invalid event: {batch.problems(exc)}", is_error=True)
             except ExternalKeyTaken as exc:
                 existing = (
                     _describe(service.base_occurrence(exc.item, exc.item.start_at), tz)
@@ -443,7 +439,7 @@ async def change_event(
             dropped=dropped,
         )
     except ValidationError as exc:
-        return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
+        return ToolResult(content=f"Invalid event: {batch.problems(exc)}", is_error=True)
     except AppError as exc:
         return ToolResult(content=exc.message, is_error=True)
     line = _describe(service.base_occurrence(event, event.start_at), tz)
@@ -640,7 +636,7 @@ class UpdateEvents(Tool):
                     changes = UpdateEventInput.model_validate(fields)
                     outcome = await change_event(db, event, changes, ctx)
                 except ValidationError as exc:
-                    return batch.Outcome(item.id, False, f"[{item.id}] {_problems(exc)}")
+                    return batch.Outcome(item.id, False, f"[{item.id}] {batch.problems(exc)}")
             if isinstance(outcome, ToolResult):
                 return batch.Outcome(item.id, False, f"[{item.id}] {outcome.content}")
             event, line = outcome

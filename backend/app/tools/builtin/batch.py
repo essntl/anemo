@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
 
+from pydantic import ValidationError
+
 from app.core.activity import activity_group
 from app.core.errors import AppError
 from app.policy.models import Action, Risk
@@ -43,6 +45,11 @@ class Outcome:
     ok: bool
     text: str
     title: str | None = None
+
+
+def problems(exc: ValidationError) -> str:
+    """What is wrong with an item, in a sentence for the model (no field paths or types)."""
+    return "; ".join(e["msg"].removeprefix("Value error, ") for e in exc.errors()[:3])
 
 
 def short(value: str, limit: int = 60) -> str:
