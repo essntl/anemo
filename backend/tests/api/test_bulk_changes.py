@@ -430,3 +430,29 @@ async def test_link_targets_names_references_in_order(authed):
     assert bad.status_code == 400 and bad.json()["error"]["code"] == "invalid_ref"
     too_many = await authed.post("/api/links/targets", json={"refs": refs * 26})
     assert too_many.status_code == 422
+
+
+async def test_the_fake_agent_model_postpones_tasks_in_one_batch(authed):
+    """The path the e2e test of a batch approval takes (providers/adapters/fake.py)."""
+    await setup(authed, **{"tasks.write": "ask"})
+    pid = (await authed.get("/api/providers")).json()[0]["id"]
+    model = await authed.post(
+        "/api/models",
+        json={"provider_id": pid, "model_key": "agent", "capabilities": {"tools": True}},
+    )
+    await authed.put("/api/settings/models", json={"chat": model.json()["id"]})
+    cid = (await authed.post("/api/conversations", json={})).json()["id"]
+    made = [await task(authed, f"Errand {n} stamp42") for n in range(3)]
+    await task(authed, "Something else")
+
+    run_id = await agent_turn(authed, cid, "postpone my tasks: stamp42")
+    [pending] = (await authed.get("/api/approvals")).json()
+    assert pending["summary"] == "Change 3 tasks: due → Fri 2030-01-04"
+    await authed.post(f"/api/approvals/{pending['id']}", json={"decision": "approve"})
+    await execute_run(uuid.UUID(run_id))
+    assert await run_status(authed, run_id) == "completed"
+    messages = (await authed.get(f"/api/conversations/{cid}/messages")).json()
+    assert "Postponed. 3 of 3 tasks done." in str(messages[-1])
+    now = await tasks_by_title(authed)
+    assert [now[t["title"]]["due_date"] for t in made] == ["2030-01-04"] * 3
+    assert now["Something else"]["due_date"] is None

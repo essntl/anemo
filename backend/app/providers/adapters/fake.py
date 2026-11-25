@@ -181,8 +181,23 @@ class FakeAdapter:
             if b.type == "tool_result"
         ]
         asks = "ask me" in _last_user_text(req).lower()
+        # "postpone my tasks: <words>": the tasks matching the words move to a Friday in
+        # one update_tasks call (the e2e test of a batch approval).
+        postpone = re.match(r"postpone my tasks: (.+)", _last_user_text(req).strip(), re.I)
         if not req.tools:
             yield TextDelta("(The agent model needs Agent mode to use tools.)")
+        elif postpone and not answers:
+            yield ToolCall("bulk1", "list_tasks", {"query": postpone.group(1)})
+            yield Done("tool_use")
+            return
+        elif postpone and len(answers) == 1:
+            ids = re.findall(r"^\[([0-9a-f-]{36})\]", answers[0], re.M)
+            items = [{"id": task_id, "due_date": "2030-01-04"} for task_id in ids]
+            yield ToolCall("bulk2", "update_tasks", {"items": items})
+            yield Done("tool_use")
+            return
+        elif postpone:
+            yield TextDelta(f"Postponed. {answers[-1].splitlines()[0]}")
         elif asks and not answers and any(t.name == "ask_user" for t in req.tools):
             # "... ask me ...": the agent asks which way the user wants it first.
             yield ToolCall(
