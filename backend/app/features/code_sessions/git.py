@@ -255,6 +255,7 @@ class GitStats(Shape):
 
 class GitCommitDetail(GitCommitSummary):
     committer_date: Name
+    committer_name: Name = ""  # Anemo Desktop 1.6.1 (older: "")
     body: Annotated[str, BeforeValidator(_cut(MAX_BODY))]
     files: Annotated[list[GitFile], BeforeValidator(_first(MAX_FILES))]
     stats: GitStats

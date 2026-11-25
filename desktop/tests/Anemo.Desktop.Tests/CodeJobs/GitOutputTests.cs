@@ -141,14 +141,15 @@ public sealed class GitOutputTests
     [Fact]
     public void A_commit_reads_with_its_body_and_dates()
     {
-        var output = string.Join('\0', M, $"{B} {C}", "Artem", "a@example.com", "2026-11-24T10:00:00+01:00", "2026-11-24T11:00:00+01:00", "Merge it", "Line one\n\nLine three\n") + "\0";
+        var output = string.Join('\0', M, $"{B} {C}", "Artem", "a@example.com", "2026-11-24T10:00:00+01:00", "2026-11-24T11:00:00+01:00", "GitHub", "Merge it", "Line one\n\nLine three\n") + "\0";
 
-        var (commit, committed, body) = GitOutput.ParseCommit(output)!.Value;
+        var (commit, committed, committer, body) = GitOutput.ParseCommit(output)!.Value;
 
         Assert.Equal(M, commit.Hash);
         Assert.Equal([B, C], commit.Parents);
         Assert.Equal("Merge it", commit.Subject);
         Assert.Equal("2026-11-24T11:00:00+01:00", committed);
+        Assert.Equal("GitHub", committer);
         Assert.Equal("Line one\n\nLine three", body);
         Assert.Null(GitOutput.ParseCommit(""));
         Assert.Null(GitOutput.ParseCommit("fatal: bad object"));

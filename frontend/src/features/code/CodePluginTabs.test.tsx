@@ -8,7 +8,7 @@ import { contributionsOut, mockApi, renderRoutes, renderWithProviders, stubMatch
 import { codeJobKey } from './api'
 import { noticeCodeJob } from './codeJobNotices'
 import { CodePluginPanel, CodeTabs } from './CodePluginTabs'
-import { JOB_TAB, useCodeTab } from './codeTab'
+import { GIT_TAB, JOB_TAB, useCodeTab } from './codeTab'
 import { codeJob } from './testJobs'
 
 /* Plugins' tabs on the Code page (plugin contract §3, `code.panel`): the tab row, the frame
@@ -51,12 +51,13 @@ describe('plugin tabs on the Code page', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it('shows the job first and the plugin tabs after it, with their titles', async () => {
+  it('shows the job and Git first and the plugin tabs after them, with their titles', async () => {
     const onTab = vi.fn()
     renderWithProviders(<CodeTabs tabs={tabs} tab={JOB_TAB} onTab={onTab} backTo="/code" />)
 
     const tablist = screen.getByRole('tablist')
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Job', 'Git graph'])
+    // Git is Anemo's own tab: always between the job and the plugins.
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Job', 'Git', 'Git graph'])
     expect(screen.getByRole('tab', { name: 'Job' })).toHaveAttribute('aria-selected', 'true')
     await userEvent.click(screen.getByRole('tab', { name: 'Git graph' }))
     expect(onTab).toHaveBeenCalledWith(TAB)
@@ -71,6 +72,19 @@ describe('plugin tabs on the Code page', () => {
     expect(localStorage.getItem('anemo.code.tab')).toBe(TAB)
     rerender({ list: [] }) // the plugin was turned off
     expect(result.current[0]).toBe(JOB_TAB)
+  })
+
+  it('has the Job and Git tabs with no plugin panels at all, and remembers Git', async () => {
+    const onTab = vi.fn()
+    renderWithProviders(<CodeTabs tabs={[]} tab={JOB_TAB} onTab={onTab} backTo="/code" />)
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Job', 'Git'])
+    await userEvent.click(screen.getByRole('tab', { name: 'Git' }))
+    expect(onTab).toHaveBeenCalledWith(GIT_TAB)
+
+    const { result } = renderHook(() => useCodeTab([]))
+    act(() => result.current[1](GIT_TAB))
+    expect(result.current[0]).toBe(GIT_TAB) // not a plugin's: it stays without any
+    expect(localStorage.getItem('anemo.code.tab')).toBe(GIT_TAB)
   })
 
   it('gives the frame the job’s computer and project, and keeps it when another job opens', async () => {

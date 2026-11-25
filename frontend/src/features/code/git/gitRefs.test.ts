@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Schemas } from '@/api/client'
-import { initials, laneColor, nameColor, shortHash } from './gitFormat'
+import { initials, laneColor, nameColor, reflow, shortHash } from './gitFormat'
 import { refIndex, refPills } from './gitRefs'
 
 const branch = (over: Partial<Schemas['GitBranch']> & { name: string }): Schemas['GitBranch'] => ({
   commit: 'c'.repeat(40), remote: false, upstream: null, ahead: 0, behind: 0, current: false, pullRequest: null, ...over,
 })
+
+const NL = String.fromCharCode(10)
+const CRLF = String.fromCharCode(13, 10)
 
 const pr = { number: 90, title: 'Git view', headRef: 'feat/git', url: 'https://github.com/o/r/pull/90', draft: false }
 
@@ -79,5 +82,11 @@ describe('git formatting', () => {
     expect(nameColor('x')).toBeGreaterThanOrEqual(0)
     expect(laneColor(0)).toBe('var(--git-lane-1)')
     expect(laneColor(9)).toBe('var(--git-lane-2)')
+  })
+
+  it('joins the wrapped lines of a message, keeping paragraphs, lists and trailers', () => {
+    const body = ['Images can be picked with a button,', 'dropped on the box or pasted.', '', '- one item', '- another', '  indented more', '', 'Co-Authored-By: Claude <c@example.com>', 'Signed-off-by: A <a@example.com>'].join(NL)
+    expect(reflow(body)).toBe(['Images can be picked with a button, dropped on the box or pasted.', '', '- one item', '- another', '  indented more', '', 'Co-Authored-By: Claude <c@example.com>', 'Signed-off-by: A <a@example.com>'].join(NL))
+    expect(reflow(['a', 'b'].join(CRLF))).toBe('a b')
   })
 })

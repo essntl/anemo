@@ -28814,6 +28814,11 @@
             "type": "string",
             "title": "Committerdate"
           },
+          "committerName": {
+            "type": "string",
+            "title": "Committername",
+            "default": ""
+          },
           "body": {
             "type": "string",
             "title": "Body"

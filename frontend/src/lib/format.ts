@@ -106,3 +106,23 @@ export function formatSize(bytes: number | null | undefined, opts: { kbDecimals?
   }
   return t('{n} MB', { n: (bytes / 1024 / 1024).toFixed(1) })
 }
+
+/**
+ * How long ago a time was, in the app's language: "just now", "5 min. ago", "3 days ago",
+ * "2 years ago" (Intl.RelativeTimeFormat: no dictionary entries needed).
+ */
+export function formatAgo(iso: string, now = new Date()): string {
+  const seconds = Math.round((new Date(iso).getTime() - now.getTime()) / 1000)
+  const past = Math.abs(seconds)
+  if (past < 45) return t('just now')
+  const rtf = new Intl.RelativeTimeFormat(dateLocale(), { numeric: 'always', style: 'short' })
+  const steps: [Intl.RelativeTimeFormatUnit, number][] = [['minute', 60], ['hour', 3600], ['day', 86_400], ['week', 604_800], ['month', 2_629_800], ['year', 31_557_600]]
+  let unit = steps[0]
+  for (const step of steps) if (past >= step[1] * (step[0] === 'minute' ? 0.75 : 1)) unit = step
+  return rtf.format(Math.round(seconds / unit[1]), unit[0])
+}
+
+/** A full date and time, e.g. for a tooltip: "12 Sep 2026, 14:03". */
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' })
+}

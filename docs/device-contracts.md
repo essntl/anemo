@@ -442,7 +442,7 @@ says `"code_git_remote": true` in its offer (with `code_git`); the server sends 
 | action | fields | `state` |
 |---|---|---|
 | `code_git_graph` | `project` **or** `repo` (`owner/name`), `limit`, `all`, `fetch` (bool, default false) | §7.5's, plus `"source": "local" \| "remote"`, `"repo": "owner/name" \| null`, `"fetched_at": "<ISO 8601>" \| null`, `"fetch_error": "<sentence>" \| null`, `"pull_requests": [{"number", "title", "head_ref", "url", "draft"}] \| null`; `status` is `null` for a remote repository |
-| `code_git_commit` | `project` **or** `repo`, `hash` | §7.5's (for `repo`: `additions`/`deletions` are `null`, renames aren't detected) |
+| `code_git_commit` | `project` **or** `repo`, `hash` | §7.5's plus `"committer_name"` (1.6.1) (for `repo`: `additions`/`deletions` are `null`, renames aren't detected) |
 | `code_git_cache_clear` | none | `{"removed": <repositories>, "bytes": <freed>}` |
 
 - **`repo`: only the owner's repositories.** `owner/name` must match

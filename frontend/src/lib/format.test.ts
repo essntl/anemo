@@ -1,6 +1,18 @@
-import { dayLabel, formatCost, formatCount, formatDuration, formatWhen } from './format'
+import { dayLabel, formatAgo, formatCost, formatCount, formatDateTime, formatDuration, formatWhen } from './format'
 
 describe('formatters', () => {
+  it('says how long ago a time was', () => {
+    const now = new Date(2026, 9, 10, 9, 0)
+    const ago = (seconds: number) => formatAgo(new Date(now.getTime() - seconds * 1000).toISOString(), now)
+    expect(ago(10)).toBe('just now')
+    expect(ago(5 * 60)).toMatch(/5 min/)
+    expect(ago(3 * 3600)).toMatch(/3 hr/)
+    expect(ago(86_400)).toMatch(/1 day/)
+    expect(ago(3 * 86_400)).toMatch(/3 days/)
+    expect(ago(3 * 31_557_600)).toMatch(/3 yr/)
+    expect(formatDateTime(now.toISOString())).toMatch(/2026/)
+  })
+
   it('names the day a date falls on', () => {
     const now = new Date(2026, 9, 10, 9, 0) // 10 Oct 2026, 09:00
     const at = (y: number, m: number, d: number, h = 12) => new Date(y, m, d, h).toISOString()

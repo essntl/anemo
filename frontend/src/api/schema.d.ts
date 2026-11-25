@@ -7834,6 +7834,11 @@ export interface components {
             subject: string;
             /** Committerdate */
             committerDate: string;
+            /**
+             * Committername
+             * @default
+             */
+            committerName: string;
             /** Body */
             body: string;
             /** Files */

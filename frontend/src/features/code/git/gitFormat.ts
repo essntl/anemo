@@ -23,3 +23,40 @@ export function nameColor(name: string): number {
   for (const ch of name.trim().toLowerCase()) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0
   return hash % LANE_COLORS
 }
+
+/** The width of a lane in the graph (tighter in a narrow list), and the space left of the first one (GraphCell.tsx). */
+export const LANE_W = 13
+export const NARROW_LANE_W = 9
+export const GRAPH_PAD = 10
+/** Lanes drawn at most: a wider graph is cut at the right (the rows stay readable). */
+export const MAX_LANES = 18
+
+/** How wide the graph column is for a graph of `lanes` lanes. */
+export const graphWidth = (lanes: number, laneW = LANE_W) => GRAPH_PAD * 2 + (Math.min(Math.max(lanes, 1), MAX_LANES) - 1) * laneW
+
+/** A colour of the theme as a pill's text, background and border (RefPills.tsx). */
+export function tinted(color: string, strong = false): { color: string; backgroundColor: string; borderColor: string } {
+  return {
+    color: `color-mix(in oklch, ${color}, var(--text) 38%)`,
+    backgroundColor: `color-mix(in oklch, ${color} ${strong ? 22 : 12}%, transparent)`,
+    borderColor: `color-mix(in oklch, ${color} ${strong ? 55 : 30}%, transparent)`,
+  }
+}
+
+/** A line that starts a line of its own in a message: a list item, an indented line, a trailer ("Co-Authored-By: …"). */
+const OWN_LINE = /^(\s|[-*•+]\s|\d+[.)]\s|[A-Z][\w-]*-[\w-]+:\s|>)/
+
+/**
+ * A commit message's body as paragraphs: git wraps the lines of a message at about 72
+ * characters, which reads ragged in a narrower panel. Lines of a paragraph are joined;
+ * blank lines, list items, indented lines and trailers keep their own lines.
+ */
+export function reflow(body: string): string {
+  return body
+    .replace(/\r\n?/g, '\n')
+    .split(/\n{2,}/)
+    .map((paragraph) =>
+      paragraph.split('\n').reduce((out, line, i) => (i === 0 ? line : OWN_LINE.test(line) || out.endsWith('  ') ? `${out}\n${line}` : `${out} ${line.trim()}`), ''),
+    )
+    .join('\n\n')
+}

@@ -126,7 +126,7 @@ public sealed class GitReads
             throw CommandException.NotFound($"There is no commit {hash} in this {(_bare ? "repository" : "project")}.");
         }
 
-        var (commit, committerDate, body) = parsed;
+        var (commit, committerDate, committerName, body) = parsed;
         // Against the first parent (a merge: what it brought into its branch); a first commit against nothing.
         string[] range = commit.Parents.Count > 0 ? [commit.Parents[0], commit.Hash] : ["--root", commit.Hash];
         IReadOnlyList<GitFileChange> files;
@@ -143,6 +143,7 @@ public sealed class GitReads
 
         var answer = CommitJson(commit);
         answer["committer_date"] = committerDate;
+        answer["committer_name"] = committerName;
         answer["body"] = body.Length > MaxBodyChars ? body[..MaxBodyChars] : body;
         answer["files"] = new JsonArray(files.Take(MaxFiles).Select(f => (JsonNode)new JsonObject
         {
