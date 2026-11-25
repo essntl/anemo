@@ -22,6 +22,7 @@ from app.tools.builtin.images import GenerateImage
 from app.tools.builtin.memory import MEMORY_TOOLS
 from app.tools.builtin.notify import SendNotification
 from app.tools.builtin.plan import UpdatePlan
+from app.tools.builtin.plugins import PLUGIN_TOOLS
 from app.tools.builtin.projects import PROJECT_TOOLS
 from app.tools.builtin.schedules import SCHEDULE_TOOLS, SCHEDULE_WRITE_TOOLS
 from app.tools.builtin.scripts import SCRIPT_TOOLS
@@ -79,6 +80,7 @@ BUILTIN_TOOLS: list[Tool] = [
     ReadToolOutput(),
     *SCRIPT_TOOLS,
     VoiceStop(),
+    *PLUGIN_TOOLS,
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 # Tools that only work in a run that answers in a chat.

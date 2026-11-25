@@ -179,6 +179,15 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_script",
             "update_script",
             "run_script",
+            # Plugins (spec 12): reading them and the guide, and saving drafts the user
+            # reviews (allowed by default: nothing in a draft runs before approval).
+            "plugin_guide",
+            "plugin_list",
+            "plugin_read",
+            "plugin_validate",
+            "plugin_create",
+            "plugin_update_files",
+            "plugin_preview",
             "get_current_time",
             "generate_image",
             "read_tool_output",
