@@ -253,6 +253,21 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_file_from_before_1_8_0_updates_automatically_and_off_stays_off()
+    {
+        Directory.CreateDirectory(_folder);
+        var path = Path.Combine(_folder, "settings.json");
+        File.WriteAllText(path, "{ \"address\": \"https://anemo.example.com\", \"shareFiles\": true }");
+        var store = new SettingsStore(path, new FakeProtector());
+
+        Assert.True(store.Load().AutoUpdate);
+
+        store.Save(store.Load() with { AutoUpdate = false });
+        Assert.False(store.Load().AutoUpdate);
+        Assert.Contains("\"autoUpdate\": false", File.ReadAllText(path));
+    }
+
+    [Fact]
     public void A_broken_file_gives_defaults_and_is_kept_aside()
     {
         Directory.CreateDirectory(_folder);

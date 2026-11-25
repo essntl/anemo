@@ -59,6 +59,8 @@ public sealed record SettingsDraft
     /// <summary>The allowed folders, separated by <c>;</c> (or one per line); empty: the home folder.</summary>
     public string FileFolders { get; init; } = "";
 
+    public bool AutoUpdate { get; init; } = true;
+
     public static SettingsDraft From(DesktopSettings settings) => new()
     {
         Address = settings.Address ?? "",
@@ -74,6 +76,7 @@ public sealed record SettingsDraft
         GitHubOwner = settings.GitHubOwner ?? "",
         ShareFiles = settings.ShareFiles,
         FileFolders = string.Join("; ", settings.FileFolders ?? []),
+        AutoUpdate = settings.AutoUpdate,
     };
 
     /// <summary>
@@ -135,6 +138,7 @@ public sealed record SettingsDraft
             GitHubOwner = owner.Length == 0 ? null : owner,
             ShareFiles = ShareFiles,
             FileFolders = folders.Length == 0 ? null : folders,
+            AutoUpdate = AutoUpdate,
         };
         return new SettingsCheck(settings, token.Length > 0 ? token : null, null);
     }
