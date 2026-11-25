@@ -30,7 +30,7 @@ from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin.workspace import backup_file, path_exists, path_action
+from app.tools.builtin.workspace import backup_file, path_action, path_exists
 from app.workspace import files, fs_guard, safe_fs
 from app.workspace.access import access_for
 
