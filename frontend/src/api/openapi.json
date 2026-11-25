@@ -1927,6 +1927,65 @@
         }
       }
     },
+    "/api/settings/plugins": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Plugins Settings",
+        "operationId": "put_plugins_settings_api_settings_plugins_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -8893,7 +8952,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/ApproveIn"
+                    "$ref": "#/components/schemas/app__features__memory__router__ApproveIn"
                   },
                   {
                     "type": "null"
@@ -20483,6 +20542,1019 @@
           }
         }
       }
+    },
+    "/api/plugins": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "List Plugins",
+        "operationId": "list_plugins_api_plugins_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginListOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/contributions": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Contributions",
+        "description": "What the slots render: enabled plugins' approved versions only.",
+        "operationId": "contributions_api_plugins_contributions_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginContributionsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/bundled": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "List Bundled",
+        "operationId": "list_bundled_api_plugins_bundled_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundledListOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/install/zip": {
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Install Zip",
+        "operationId": "install_zip_api_plugins_install_zip_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_install_zip_api_plugins_install_zip_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/install/git": {
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Install Git",
+        "operationId": "install_git_api_plugins_install_git_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitInstallIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/install/bundled": {
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Install Bundled",
+        "operationId": "install_bundled_api_plugins_install_bundled_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BundledInstallIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Get Plugin",
+        "operationId": "get_plugin_api_plugins__plugin__get",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Switch Plugin",
+        "operationId": "switch_plugin_api_plugins__plugin__patch",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginPatchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Uninstall",
+        "operationId": "uninstall_api_plugins__plugin__delete",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "data",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "keep",
+                "remove"
+              ],
+              "type": "string",
+              "default": "keep",
+              "title": "Data"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}/versions/{version}/approve": {
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Approve Version",
+        "operationId": "approve_version_api_plugins__plugin__versions__version__approve_post",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__features__plugins__schemas__ApproveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}/versions/{version}": {
+      "delete": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Reject Version",
+        "operationId": "reject_version_api_plugins__plugin__versions__version__delete",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}/versions/{version}/diff": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Version Diff",
+        "operationId": "version_diff_api_plugins__plugin__versions__version__diff_get",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "against",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Default: the approved one",
+              "title": "Against"
+            },
+            "description": "Default: the approved one"
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDiffOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}/versions/{version}/files/{path}": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Version File",
+        "description": "One file of a version, for the host and the code view. Never rendered: text is\ntext/plain, and nothing in it may run (CSP default-src 'none').",
+        "operationId": "version_file_api_plugins__plugin__versions__version__files__path__get",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {},
+              "image/png": {},
+              "image/webp": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}/versions/{version}/ui/{ui}": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Frame Bundle",
+        "operationId": "frame_bundle_api_plugins__plugin__versions__version__ui__ui__get",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "ui",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ui"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginFrameBundleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}/data": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Plugin Data",
+        "operationId": "plugin_data_api_plugins__plugin__data_get",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDataOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plugins/{plugin}/call": {
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Plugin Call",
+        "description": "A call from one of the plugin's frames, checked again here (\u00a76.4). An error has\nthe contract's code; `confirm_required` carries {token, summary, risk}.",
+        "operationId": "plugin_call_api_plugins__plugin__call_post",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginCallIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginCallOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -20500,14 +21572,15 @@
               "user",
               "external",
               "chat",
-              "automation"
+              "automation",
+              "plugin"
             ],
             "title": "Kind"
           },
           "label": {
             "type": "string",
             "title": "Label",
-            "description": "The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone"
+            "description": "The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone. A plugin: 'the plugin <name>' ('a removed plugin' when it is gone)"
           },
           "url": {
             "anyOf": [
@@ -20519,7 +21592,7 @@
               }
             ],
             "title": "Url",
-            "description": "Where it leads: the chat, or the automation's run"
+            "description": "Where it leads: the chat, the automation's run, or the plugin's page"
           },
           "automation_kind": {
             "anyOf": [
@@ -20643,6 +21716,9 @@
           },
           "images": {
             "$ref": "#/components/schemas/ImageSettings"
+          },
+          "plugins": {
+            "$ref": "#/components/schemas/PluginSettings"
           }
         },
         "type": "object",
@@ -20667,7 +21743,8 @@
           "dictation",
           "voice",
           "code",
-          "images"
+          "images",
+          "plugins"
         ],
         "title": "AllSettings"
       },
@@ -21022,23 +22099,6 @@
           "decided_at"
         ],
         "title": "ApprovalOut"
-      },
-      "ApproveIn": {
-        "properties": {
-          "content": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Content"
-          }
-        },
-        "type": "object",
-        "title": "ApproveIn"
       },
       "AssetOut": {
         "properties": {
@@ -22299,6 +23359,20 @@
         ],
         "title": "Body_dictate_api_dictation_post"
       },
+      "Body_install_zip_api_plugins_install_zip_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_install_zip_api_plugins_install_zip_post"
+      },
       "Body_pdf_text_api_extension_pdf_text_post": {
         "properties": {
           "file": {
@@ -22786,6 +23860,78 @@
           "changed"
         ],
         "title": "BulkOut"
+      },
+      "BundledInstallIn": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 3,
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "BundledInstallIn"
+      },
+      "BundledListOut": {
+        "properties": {
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/BundledPluginOut"
+            },
+            "type": "array",
+            "title": "Plugins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plugins"
+        ],
+        "title": "BundledListOut"
+      },
+      "BundledPluginOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "installed": {
+            "type": "boolean",
+            "title": "Installed"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionOut"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "version",
+          "installed",
+          "permissions"
+        ],
+        "title": "BundledPluginOut"
       },
       "CaptureIn": {
         "properties": {
@@ -24062,6 +25208,297 @@
         ],
         "title": "ContentOut"
       },
+      "ContributedCommandOut": {
+        "properties": {
+          "plugin": {
+            "type": "string",
+            "title": "Plugin"
+          },
+          "plugin_name": {
+            "type": "string",
+            "title": "Plugin Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "action": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plugin",
+          "plugin_name",
+          "version",
+          "id",
+          "title",
+          "icon",
+          "keywords",
+          "action"
+        ],
+        "title": "ContributedCommandOut"
+      },
+      "ContributedFenceOut": {
+        "properties": {
+          "plugin": {
+            "type": "string",
+            "title": "Plugin"
+          },
+          "fence": {
+            "type": "string",
+            "title": "Fence"
+          },
+          "ui": {
+            "type": "string",
+            "title": "Ui"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plugin",
+          "fence",
+          "ui"
+        ],
+        "title": "ContributedFenceOut"
+      },
+      "ContributedTemplateOut": {
+        "properties": {
+          "plugin": {
+            "type": "string",
+            "title": "Plugin"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plugin",
+          "id",
+          "kind",
+          "title"
+        ],
+        "title": "ContributedTemplateOut"
+      },
+      "ContributedThemeOut": {
+        "properties": {
+          "plugin": {
+            "type": "string",
+            "title": "Plugin"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "appearance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Appearance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plugin",
+          "id",
+          "name",
+          "appearance"
+        ],
+        "title": "ContributedThemeOut"
+      },
+      "ContributedUiOut": {
+        "properties": {
+          "plugin": {
+            "type": "string",
+            "title": "Plugin"
+          },
+          "plugin_name": {
+            "type": "string",
+            "title": "Plugin Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slot": {
+            "type": "string",
+            "title": "Slot"
+          },
+          "objects": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objects"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "entry": {
+            "type": "string",
+            "title": "Entry"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plugin",
+          "plugin_name",
+          "version",
+          "icon_url",
+          "id",
+          "slot",
+          "objects",
+          "title",
+          "icon",
+          "entry",
+          "height",
+          "fence"
+        ],
+        "title": "ContributedUiOut"
+      },
+      "ContributionOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "title": "Risk"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "label",
+          "risk",
+          "detail"
+        ],
+        "title": "ContributionOut"
+      },
       "ConversationIn": {
         "properties": {
           "title": {
@@ -25274,6 +26711,63 @@
         "type": "object",
         "title": "DictationSettings",
         "description": "Speaking instead of typing (features/dictation)."
+      },
+      "DiffFileOut": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "added",
+              "removed",
+              "changed",
+              "same"
+            ],
+            "title": "Status"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "status"
+        ],
+        "title": "DiffFileOut"
       },
       "DiscoveredModelOut": {
         "properties": {
@@ -26701,6 +28195,24 @@
         "title": "FolderDefaults",
         "description": "Properties a new document in `folder` (or below it) starts with."
       },
+      "FrameFileOut": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "FrameFileOut"
+      },
       "GeneralSettings": {
         "properties": {
           "timezone": {
@@ -26751,6 +28263,35 @@
         },
         "type": "object",
         "title": "GeneralSettings"
+      },
+      "GitInstallIn": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 9,
+            "title": "Url"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "GitInstallIn"
       },
       "HTTPValidationError": {
         "properties": {
@@ -27302,6 +28843,33 @@
           "password"
         ],
         "title": "LoginIn"
+      },
+      "ManifestDiffOut": {
+        "properties": {
+          "before": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "before",
+          "after"
+        ],
+        "title": "ManifestDiffOut"
       },
       "MarkReadIn": {
         "properties": {
@@ -30194,6 +31762,89 @@
         ],
         "title": "PendingApprovalOut"
       },
+      "PermissionDiffOut": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionOut"
+            },
+            "type": "array",
+            "title": "Added"
+          },
+          "removed": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionOut"
+            },
+            "type": "array",
+            "title": "Removed"
+          },
+          "kept": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionOut"
+            },
+            "type": "array",
+            "title": "Kept"
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "removed",
+          "kept"
+        ],
+        "title": "PermissionDiffOut"
+      },
+      "PermissionOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "title": "Risk"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "target",
+          "risk",
+          "label",
+          "explanation"
+        ],
+        "title": "PermissionOut"
+      },
       "PermissionSettings": {
         "properties": {
           "levels": {
@@ -30597,6 +32248,809 @@
           "track_ids"
         ],
         "title": "PlaylistTracksIn"
+      },
+      "PluginAuthorOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PluginAuthorOut"
+      },
+      "PluginCallIn": {
+        "properties": {
+          "ui": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui"
+          },
+          "method": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Method"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "confirm_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm Token"
+          },
+          "preview_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method"
+        ],
+        "title": "PluginCallIn"
+      },
+      "PluginCallOut": {
+        "properties": {
+          "result": {
+            "title": "Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "result"
+        ],
+        "title": "PluginCallOut"
+      },
+      "PluginChatOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PluginChatOut"
+      },
+      "PluginContributionsOut": {
+        "properties": {
+          "ui": {
+            "items": {
+              "$ref": "#/components/schemas/ContributedUiOut"
+            },
+            "type": "array",
+            "title": "Ui"
+          },
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/ContributedCommandOut"
+            },
+            "type": "array",
+            "title": "Commands"
+          },
+          "fences": {
+            "items": {
+              "$ref": "#/components/schemas/ContributedFenceOut"
+            },
+            "type": "array",
+            "title": "Fences"
+          },
+          "themes": {
+            "items": {
+              "$ref": "#/components/schemas/ContributedThemeOut"
+            },
+            "type": "array",
+            "title": "Themes"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/ContributedTemplateOut"
+            },
+            "type": "array",
+            "title": "Templates"
+          },
+          "disabled_all": {
+            "type": "boolean",
+            "title": "Disabled All"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ui",
+          "commands",
+          "fences",
+          "themes",
+          "templates",
+          "disabled_all"
+        ],
+        "title": "PluginContributionsOut"
+      },
+      "PluginDataOut": {
+        "properties": {
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/PluginResourceOut"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "storage_keys": {
+            "type": "integer",
+            "title": "Storage Keys"
+          },
+          "storage_bytes": {
+            "type": "integer",
+            "title": "Storage Bytes"
+          },
+          "tasks": {
+            "type": "integer",
+            "title": "Tasks"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resources",
+          "storage_keys",
+          "storage_bytes",
+          "tasks",
+          "documents",
+          "events"
+        ],
+        "title": "PluginDataOut"
+      },
+      "PluginDetailOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "needs_review",
+              "enabled",
+              "disabled",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "update_pending": {
+            "type": "boolean",
+            "title": "Update Pending"
+          },
+          "made_by_assistant": {
+            "type": "boolean",
+            "title": "Made By Assistant"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PluginSource"
+          },
+          "ui_count": {
+            "type": "integer",
+            "title": "Ui Count"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "readme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Readme"
+          },
+          "author": {
+            "$ref": "#/components/schemas/PluginAuthorOut"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "approved_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Version"
+          },
+          "pending_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Version"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/PluginVersionOut"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "chats": {
+            "items": {
+              "$ref": "#/components/schemas/PluginChatOut"
+            },
+            "type": "array",
+            "title": "Chats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "version",
+          "icon_url",
+          "enabled",
+          "status",
+          "update_pending",
+          "made_by_assistant",
+          "error",
+          "source",
+          "ui_count",
+          "updated_at",
+          "readme",
+          "author",
+          "license",
+          "approved_version",
+          "pending_version",
+          "versions",
+          "chats"
+        ],
+        "title": "PluginDetailOut"
+      },
+      "PluginDiffOut": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "title": "To"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/ManifestDiffOut"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/PermissionDiffOut"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DiffFileOut"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "manifest",
+          "permissions",
+          "files"
+        ],
+        "title": "PluginDiffOut"
+      },
+      "PluginFileOut": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "size",
+          "sha256"
+        ],
+        "title": "PluginFileOut"
+      },
+      "PluginFrameBundleOut": {
+        "properties": {
+          "entry": {
+            "type": "string",
+            "title": "Entry"
+          },
+          "html": {
+            "type": "string",
+            "title": "Html"
+          },
+          "scripts": {
+            "items": {
+              "$ref": "#/components/schemas/FrameFileOut"
+            },
+            "type": "array",
+            "title": "Scripts"
+          },
+          "styles": {
+            "items": {
+              "$ref": "#/components/schemas/FrameFileOut"
+            },
+            "type": "array",
+            "title": "Styles"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry",
+          "html",
+          "scripts",
+          "styles",
+          "hash"
+        ],
+        "title": "PluginFrameBundleOut"
+      },
+      "PluginListOut": {
+        "properties": {
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/PluginOut"
+            },
+            "type": "array",
+            "title": "Plugins"
+          },
+          "disabled_all": {
+            "type": "boolean",
+            "title": "Disabled All"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plugins",
+          "disabled_all"
+        ],
+        "title": "PluginListOut"
+      },
+      "PluginOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "needs_review",
+              "enabled",
+              "disabled",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "update_pending": {
+            "type": "boolean",
+            "title": "Update Pending"
+          },
+          "made_by_assistant": {
+            "type": "boolean",
+            "title": "Made By Assistant"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PluginSource"
+          },
+          "ui_count": {
+            "type": "integer",
+            "title": "Ui Count"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "version",
+          "icon_url",
+          "enabled",
+          "status",
+          "update_pending",
+          "made_by_assistant",
+          "error",
+          "source",
+          "ui_count",
+          "updated_at"
+        ],
+        "title": "PluginOut"
+      },
+      "PluginPatchIn": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "PluginPatchIn"
+      },
+      "PluginResourceOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "object_type": {
+            "type": "string",
+            "title": "Object Type"
+          },
+          "object_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Object Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "owned": {
+            "type": "boolean",
+            "title": "Owned"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "object_type",
+          "object_id",
+          "label",
+          "owned"
+        ],
+        "title": "PluginResourceOut"
+      },
+      "PluginSettings": {
+        "properties": {
+          "disabled_all": {
+            "type": "boolean",
+            "title": "Disabled All",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PluginSettings",
+        "description": "Settings > Plugins (docs/specs/CONTRACTS-plugins.md \u00a75). Not sensitive: switching\nevery plugin off must be quick."
+      },
+      "PluginSource": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "zip",
+              "git",
+              "assistant",
+              "bundled"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Label"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "conversation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conversation Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label"
+        ],
+        "title": "PluginSource",
+        "description": "Where a plugin came from: an uploaded zip (its file name), a Git repository (URL,\nref, the commit it was fetched at), an assistant (the chats) or Anemo itself."
+      },
+      "PluginVersionOut": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "superseded",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "manifest": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Manifest"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionOut"
+            },
+            "type": "array",
+            "title": "Permissions"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/ContributionOut"
+            },
+            "type": "array",
+            "title": "Contributions"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/PluginFileOut"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "status",
+          "hash",
+          "created_at",
+          "created_by",
+          "approved_at",
+          "manifest",
+          "permissions",
+          "contributions",
+          "files"
+        ],
+        "title": "PluginVersionOut"
       },
       "PresenceIn": {
         "properties": {
@@ -38670,6 +41124,23 @@
         ],
         "title": "SaveIn"
       },
+      "app__features__memory__router__ApproveIn": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "title": "ApproveIn"
+      },
       "app__features__memory__router__ReindexOut": {
         "properties": {
           "queued": {
@@ -38682,6 +41153,27 @@
           "queued"
         ],
         "title": "ReindexOut"
+      },
+      "app__features__plugins__schemas__ApproveIn": {
+        "properties": {
+          "hash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Hash"
+          },
+          "enable": {
+            "type": "boolean",
+            "title": "Enable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "hash"
+        ],
+        "title": "ApproveIn"
       },
       "app__features__properties__schemas__ReindexOut": {
         "properties": {

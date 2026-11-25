@@ -613,6 +613,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Plugins Settings */
+        put: operations["put_plugins_settings_api_settings_plugins_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -4890,6 +4907,257 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Plugins */
+        get: operations["list_plugins_api_plugins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contributions
+         * @description What the slots render: enabled plugins' approved versions only.
+         */
+        get: operations["contributions_api_plugins_contributions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/bundled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bundled */
+        get: operations["list_bundled_api_plugins_bundled_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/install/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Zip */
+        post: operations["install_zip_api_plugins_install_zip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/install/git": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Git */
+        post: operations["install_git_api_plugins_install_git_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/install/bundled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Bundled */
+        post: operations["install_bundled_api_plugins_install_bundled_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin */
+        get: operations["get_plugin_api_plugins__plugin__get"];
+        put?: never;
+        post?: never;
+        /** Uninstall */
+        delete: operations["uninstall_api_plugins__plugin__delete"];
+        options?: never;
+        head?: never;
+        /** Switch Plugin */
+        patch: operations["switch_plugin_api_plugins__plugin__patch"];
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Version */
+        post: operations["approve_version_api_plugins__plugin__versions__version__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Reject Version */
+        delete: operations["reject_version_api_plugins__plugin__versions__version__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version Diff */
+        get: operations["version_diff_api_plugins__plugin__versions__version__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/files/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version File
+         * @description One file of a version, for the host and the code view. Never rendered: text is
+         *     text/plain, and nothing in it may run (CSP default-src 'none').
+         */
+        get: operations["version_file_api_plugins__plugin__versions__version__files__path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/ui/{ui}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Frame Bundle */
+        get: operations["frame_bundle_api_plugins__plugin__versions__version__ui__ui__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plugin Data */
+        get: operations["plugin_data_api_plugins__plugin__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plugin Call
+         * @description A call from one of the plugin's frames, checked again here (§6.4). An error has
+         *     the contract's code; `confirm_required` carries {token, summary, risk}.
+         */
+        post: operations["plugin_call_api_plugins__plugin__call_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4908,15 +5176,15 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "user" | "external" | "chat" | "automation";
+            kind: "user" | "external" | "chat" | "automation" | "plugin";
             /**
              * Label
-             * @description The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone
+             * @description The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone. A plugin: 'the plugin <name>' ('a removed plugin' when it is gone)
              */
             label: string;
             /**
              * Url
-             * @description Where it leads: the chat, or the automation's run
+             * @description Where it leads: the chat, the automation's run, or the plugin's page
              */
             url: string | null;
             /**
@@ -4959,6 +5227,7 @@ export interface components {
             voice: components["schemas"]["VoiceSettings"];
             code: components["schemas"]["CodeSettings"];
             images: components["schemas"]["ImageSettings"];
+            plugins: components["schemas"]["PluginSettings"];
         };
         /** AppearanceAssetOut */
         AppearanceAssetOut: {
@@ -5137,11 +5406,6 @@ export interface components {
             created_at: string;
             /** Decided At */
             decided_at: string | null;
-        };
-        /** ApproveIn */
-        ApproveIn: {
-            /** Content */
-            content?: string | null;
         };
         /** AssetOut */
         AssetOut: {
@@ -5512,6 +5776,11 @@ export interface components {
              */
             target: "chat" | "text";
         };
+        /** Body_install_zip_api_plugins_install_zip_post */
+        Body_install_zip_api_plugins_install_zip_post: {
+            /** File */
+            file: string;
+        };
         /** Body_pdf_text_api_extension_pdf_text_post */
         Body_pdf_text_api_extension_pdf_text_post: {
             /** File */
@@ -5713,6 +5982,31 @@ export interface components {
         BulkOut: {
             /** Changed */
             changed: number;
+        };
+        /** BundledInstallIn */
+        BundledInstallIn: {
+            /** Id */
+            id: string;
+        };
+        /** BundledListOut */
+        BundledListOut: {
+            /** Plugins */
+            plugins: components["schemas"]["BundledPluginOut"][];
+        };
+        /** BundledPluginOut */
+        BundledPluginOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Version */
+            version: string;
+            /** Installed */
+            installed: boolean;
+            /** Permissions */
+            permissions: components["schemas"]["PermissionOut"][];
         };
         /** CaptureIn */
         CaptureIn: {
@@ -6190,6 +6484,103 @@ export interface components {
             /** Size */
             size: number;
         };
+        /** ContributedCommandOut */
+        ContributedCommandOut: {
+            /** Plugin */
+            plugin: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Version */
+            version: string;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Icon */
+            icon: string | null;
+            /** Keywords */
+            keywords: string[];
+            /** Action */
+            action: {
+                [key: string]: unknown;
+            };
+        };
+        /** ContributedFenceOut */
+        ContributedFenceOut: {
+            /** Plugin */
+            plugin: string;
+            /** Fence */
+            fence: string;
+            /** Ui */
+            ui: string;
+        };
+        /** ContributedTemplateOut */
+        ContributedTemplateOut: {
+            /** Plugin */
+            plugin: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+        };
+        /** ContributedThemeOut */
+        ContributedThemeOut: {
+            /** Plugin */
+            plugin: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Appearance */
+            appearance: {
+                [key: string]: unknown;
+            };
+        };
+        /** ContributedUiOut */
+        ContributedUiOut: {
+            /** Plugin */
+            plugin: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Version */
+            version: string;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Id */
+            id: string;
+            /** Slot */
+            slot: string;
+            /** Objects */
+            objects: string[] | null;
+            /** Title */
+            title: string | null;
+            /** Icon */
+            icon: string | null;
+            /** Entry */
+            entry: string;
+            /** Height */
+            height: number | null;
+            /** Fence */
+            fence: string | null;
+        };
+        /** ContributionOut */
+        ContributionOut: {
+            /** Kind */
+            kind: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high" | "critical";
+            /** Detail */
+            detail: string;
+        };
         /** ConversationIn */
         ConversationIn: {
             /** Title */
@@ -6613,6 +7004,22 @@ export interface components {
             language: string;
             /** Vocabulary */
             vocabulary?: string[];
+        };
+        /** DiffFileOut */
+        DiffFileOut: {
+            /** Path */
+            path: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "added" | "removed" | "changed" | "same";
+            /** Before */
+            before?: string | null;
+            /** After */
+            after?: string | null;
+            /** Sha256 */
+            sha256?: string | null;
         };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
@@ -7195,6 +7602,13 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** FrameFileOut */
+        FrameFileOut: {
+            /** Path */
+            path: string;
+            /** Text */
+            text: string;
+        };
         /** GeneralSettings */
         GeneralSettings: {
             /**
@@ -7230,6 +7644,13 @@ export interface components {
              * @enum {string}
              */
             language: "system" | "en" | "uk" | "ru";
+        };
+        /** GitInstallIn */
+        GitInstallIn: {
+            /** Url */
+            url: string;
+            /** Ref */
+            ref?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -7510,6 +7931,17 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** ManifestDiffOut */
+        ManifestDiffOut: {
+            /** Before */
+            before: {
+                [key: string]: unknown;
+            } | null;
+            /** After */
+            after: {
+                [key: string]: unknown;
+            };
         };
         /**
          * MarkReadIn
@@ -8570,6 +9002,33 @@ export interface components {
             /** Tool Name */
             tool_name: string;
         };
+        /** PermissionDiffOut */
+        PermissionDiffOut: {
+            /** Added */
+            added: components["schemas"]["PermissionOut"][];
+            /** Removed */
+            removed: components["schemas"]["PermissionOut"][];
+            /** Kept */
+            kept: components["schemas"]["PermissionOut"][];
+        };
+        /** PermissionOut */
+        PermissionOut: {
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Target */
+            target: string | null;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high" | "critical";
+            /** Label */
+            label: string;
+            /** Explanation */
+            explanation: string;
+        };
         /**
          * PermissionSettings
          * @description Stored in app_settings["permissions"] (security-sensitive section).
@@ -8750,6 +9209,284 @@ export interface components {
         PlaylistTracksIn: {
             /** Track Ids */
             track_ids: string[];
+        };
+        /** PluginAuthorOut */
+        PluginAuthorOut: {
+            /** Name */
+            name: string;
+            /** Url */
+            url?: string | null;
+        };
+        /** PluginCallIn */
+        PluginCallIn: {
+            /** Ui */
+            ui?: string | null;
+            /** Method */
+            method: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Confirm Token */
+            confirm_token?: string | null;
+            /** Preview Version */
+            preview_version?: string | null;
+        };
+        /** PluginCallOut */
+        PluginCallOut: {
+            /** Result */
+            result: unknown;
+        };
+        /** PluginChatOut */
+        PluginChatOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** PluginContributionsOut */
+        PluginContributionsOut: {
+            /** Ui */
+            ui: components["schemas"]["ContributedUiOut"][];
+            /** Commands */
+            commands: components["schemas"]["ContributedCommandOut"][];
+            /** Fences */
+            fences: components["schemas"]["ContributedFenceOut"][];
+            /** Themes */
+            themes: components["schemas"]["ContributedThemeOut"][];
+            /** Templates */
+            templates: components["schemas"]["ContributedTemplateOut"][];
+            /** Disabled All */
+            disabled_all: boolean;
+        };
+        /** PluginDataOut */
+        PluginDataOut: {
+            /** Resources */
+            resources: components["schemas"]["PluginResourceOut"][];
+            /** Storage Keys */
+            storage_keys: number;
+            /** Storage Bytes */
+            storage_bytes: number;
+            /** Tasks */
+            tasks: number;
+            /** Documents */
+            documents: number;
+            /** Events */
+            events: number;
+        };
+        /** PluginDetailOut */
+        PluginDetailOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Version */
+            version: string;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "needs_review" | "enabled" | "disabled" | "error";
+            /** Update Pending */
+            update_pending: boolean;
+            /** Made By Assistant */
+            made_by_assistant: boolean;
+            /** Error */
+            error: string | null;
+            source: components["schemas"]["PluginSource"];
+            /** Ui Count */
+            ui_count: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Readme */
+            readme: string | null;
+            author: components["schemas"]["PluginAuthorOut"];
+            /** License */
+            license: string | null;
+            /** Approved Version */
+            approved_version: string | null;
+            /** Pending Version */
+            pending_version: string | null;
+            /** Versions */
+            versions: components["schemas"]["PluginVersionOut"][];
+            /** Chats */
+            chats: components["schemas"]["PluginChatOut"][];
+        };
+        /** PluginDiffOut */
+        PluginDiffOut: {
+            /** From */
+            from: string | null;
+            /** To */
+            to: string;
+            manifest: components["schemas"]["ManifestDiffOut"];
+            permissions: components["schemas"]["PermissionDiffOut"];
+            /** Files */
+            files: components["schemas"]["DiffFileOut"][];
+        };
+        /** PluginFileOut */
+        PluginFileOut: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** PluginFrameBundleOut */
+        PluginFrameBundleOut: {
+            /** Entry */
+            entry: string;
+            /** Html */
+            html: string;
+            /** Scripts */
+            scripts: components["schemas"]["FrameFileOut"][];
+            /** Styles */
+            styles: components["schemas"]["FrameFileOut"][];
+            /** Hash */
+            hash: string;
+        };
+        /** PluginListOut */
+        PluginListOut: {
+            /** Plugins */
+            plugins: components["schemas"]["PluginOut"][];
+            /** Disabled All */
+            disabled_all: boolean;
+        };
+        /** PluginOut */
+        PluginOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Version */
+            version: string;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "needs_review" | "enabled" | "disabled" | "error";
+            /** Update Pending */
+            update_pending: boolean;
+            /** Made By Assistant */
+            made_by_assistant: boolean;
+            /** Error */
+            error: string | null;
+            source: components["schemas"]["PluginSource"];
+            /** Ui Count */
+            ui_count: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** PluginPatchIn */
+        PluginPatchIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** PluginResourceOut */
+        PluginResourceOut: {
+            /** Kind */
+            kind: string;
+            /** Id */
+            id: string;
+            /** Object Type */
+            object_type: string;
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /** Label */
+            label: string;
+            /** Owned */
+            owned: boolean;
+        };
+        /**
+         * PluginSettings
+         * @description Settings > Plugins (docs/specs/CONTRACTS-plugins.md §5). Not sensitive: switching
+         *     every plugin off must be quick.
+         */
+        PluginSettings: {
+            /**
+             * Disabled All
+             * @default false
+             */
+            disabled_all: boolean;
+        };
+        /**
+         * PluginSource
+         * @description Where a plugin came from: an uploaded zip (its file name), a Git repository (URL,
+         *     ref, the commit it was fetched at), an assistant (the chats) or Anemo itself.
+         */
+        PluginSource: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "zip" | "git" | "assistant" | "bundled";
+            /** Label */
+            label: string;
+            /** Url */
+            url?: string | null;
+            /** Ref */
+            ref?: string | null;
+            /** Commit */
+            commit?: string | null;
+            /**
+             * Conversation Ids
+             * @default []
+             */
+            conversation_ids: string[];
+        };
+        /** PluginVersionOut */
+        PluginVersionOut: {
+            /** Version */
+            version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "superseded" | "rejected";
+            /** Hash */
+            hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["ActorOut"] | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Manifest */
+            manifest: {
+                [key: string]: unknown;
+            };
+            /** Permissions */
+            permissions: components["schemas"]["PermissionOut"][];
+            /** Contributions */
+            contributions: components["schemas"]["ContributionOut"][];
+            /** Files */
+            files: components["schemas"]["PluginFileOut"][];
         };
         /** PresenceIn */
         PresenceIn: {
@@ -11771,10 +12508,25 @@ export interface components {
             /** Base Hash */
             base_hash?: string | null;
         };
+        /** ApproveIn */
+        app__features__memory__router__ApproveIn: {
+            /** Content */
+            content?: string | null;
+        };
         /** ReindexOut */
         app__features__memory__router__ReindexOut: {
             /** Queued */
             queued: boolean;
+        };
+        /** ApproveIn */
+        app__features__plugins__schemas__ApproveIn: {
+            /** Hash */
+            hash: string;
+            /**
+             * Enable
+             * @default false
+             */
+            enable: boolean;
         };
         /** ReindexOut */
         app__features__properties__schemas__ReindexOut: {
@@ -12965,6 +13717,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_plugins_settings_api_settings_plugins_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettings"];
                 };
             };
             /** @description Validation Error */
@@ -16643,7 +17430,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["ApproveIn"] | null;
+                "application/json": components["schemas"]["app__features__memory__router__ApproveIn"] | null;
             };
         };
         responses: {
@@ -22831,6 +23618,556 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceReplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugins_api_plugins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contributions_api_plugins_contributions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginContributionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bundled_api_plugins_bundled_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundledListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_zip_api_plugins_install_zip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_install_zip_api_plugins_install_zip_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_git_api_plugins_install_git_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitInstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_bundled_api_plugins_install_bundled_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundledInstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plugin_api_plugins__plugin__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uninstall_api_plugins__plugin__delete: {
+        parameters: {
+            query?: {
+                data?: "keep" | "remove";
+            };
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    switch_plugin_api_plugins__plugin__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_version_api_plugins__plugin__versions__version__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__features__plugins__schemas__ApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_version_api_plugins__plugin__versions__version__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_diff_api_plugins__plugin__versions__version__diff_get: {
+        parameters: {
+            query?: {
+                /** @description Default: the approved one */
+                against?: string | null;
+            };
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_file_api_plugins__plugin__versions__version__files__path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+                path: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": unknown;
+                    "image/png": unknown;
+                    "image/webp": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    frame_bundle_api_plugins__plugin__versions__version__ui__ui__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+                ui: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginFrameBundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plugin_data_api_plugins__plugin__data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plugin_call_api_plugins__plugin__call_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginCallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginCallOut"];
                 };
             };
             /** @description Validation Error */

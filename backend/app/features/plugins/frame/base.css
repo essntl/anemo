@@ -1,0 +1,7 @@
+/* Placeholder for the plugin frame's base stylesheet (contract §6.3, Theme); the UI
+   workstream's version replaces this file. */
+body {
+  margin: 0;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  color: var(--text, #111);
+}
