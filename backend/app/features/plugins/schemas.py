@@ -244,7 +244,7 @@ class PluginPatchIn(BaseModel):
     enabled: bool
 
 
-class ApproveIn(BaseModel):
+class PluginApproveIn(BaseModel):
     hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     enable: bool = False
 
@@ -268,3 +268,18 @@ class PluginCallIn(BaseModel):
 
 class PluginCallOut(BaseModel):
     result: Any
+
+
+class PluginChatIn(BaseModel):
+    message: str = Field(
+        "",
+        max_length=4000,
+        description="What the user wants changed. Left out: the assistant reads the plugin "
+        "and asks.",
+    )
+
+
+class PluginBuildChatOut(BaseModel):
+    """The chat "Continue building with the assistant" started (POST /{plugin}/chat)."""
+
+    conversation_id: uuid.UUID
