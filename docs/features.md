@@ -1057,6 +1057,18 @@ SHA-256 on both ends, and a copy onto the computer only gets its name once it is
 The largest file is set in **Settings → Devices** (50 MB by default, up to 200 MB). Stop
 stops copies too. Design: [docs/specs/22-device-files.md](specs/22-device-files.md).
 
+**Anemo Desktop updates itself** (1.8.0, Windows and macOS). A minute after it starts and every
+6 hours, the client looks for a newer `desktop-v…` Release on GitHub (no Anemo server involved),
+downloads it, checks it (the SHA-256 from the release's checksum file, the release signature once
+the repository has a signing key, the exe's version and a test start on Windows, the code
+signature on the Mac) and installs it when you quit. The tray or menu bar then shows **Update to
+X ready: Restart to update**, which restarts as soon as the agent is done (no command in the last
+minute, no file copy, no Claude Code job running). In the client's Settings, *Update
+automatically* (on by default) turns it off and **Check now** looks at once. If the new version
+doesn't come up, the old one is put back and started again. An ad hoc signed Mac build has to be
+given Screen Recording and Accessibility again after each update. Design:
+[docs/specs/23-desktop-auto-update.md](specs/23-desktop-auto-update.md).
+
 Automations get the computer tools only when the automation lists them. What a screen
 shows is untrusted content for the model, like a web page. Installing the client:
 [deployment.md](deployment.md#anemo-desktop-and-anemo-voice). Design:

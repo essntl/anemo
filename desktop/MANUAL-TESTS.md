@@ -294,6 +294,59 @@ On the VM (trusted) and on a watched PC. In Anemo, *Files on your computers* at 
     with overwrite: Windows may refuse, a sentence comes back) behave.
 80. The command log: `file_*` lines have paths, offsets and sizes, never contents.
 
+## Updates (Anemo Desktop 1.8.0)
+
+1.7.0 has no updater: install 1.8.0 by hand first. So as not to touch the real Releases, use a
+**test repository** (public, e.g. `<you>/anemo-update-test`, no code needed) and builds that point at
+it. In `desktop/` (Git Bash):
+
+```
+dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r win-x64 -o t/old -p:Version=1.8.0 -p:AnemoUpdateRepository=<you>/anemo-update-test
+dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r win-x64 -o t/new -p:Version=1.8.1 -p:AnemoUpdateRepository=<you>/anemo-update-test
+cp "t/new/Anemo Desktop.exe" t/Anemo-Desktop-win-x64.exe && (cd t && sha256sum Anemo-Desktop-win-x64.exe > SHA256SUMS-desktop.txt)
+gh release create desktop-v1.8.1 t/Anemo-Desktop-win-x64.exe t/SHA256SUMS-desktop.txt --repo <you>/anemo-update-test --title t --notes t
+```
+
+Copy `t/old/Anemo Desktop.exe` to `%LOCALAPPDATA%\Programs\Anemo Desktop\` (the real client quit)
+and start it.
+
+81. **Found and ready**: within about a minute Settings → This computer → Updates says "1.8.1 is
+    ready…", the tray menu shows *Update to 1.8.1 ready: Restart to update* at the top, the tooltip
+    adds "update to 1.8.1 ready". Beside the exe: `Anemo Desktop.new.exe`, no `.download` left. The
+    connection log has `update 1.8.1: downloading …` and `ready`.
+82. **Install at quit**: Quit. Expected: `Anemo Desktop.exe` is 1.8.1 (Properties → Details),
+    `Anemo Desktop.old.exe` is 1.8.0, no `.new.exe`. Start it: Settings says "1.8.1 is the newest
+    version", the Startup shortcut still works after a sign-out.
+83. **Restart to update, waiting**: back to 1.8.0 (quit, rename `.old.exe` back), wait for *ready*.
+    Let the agent run a long `computer_*` task, click *Restart to update*: nothing restarts while it
+    works; Settings says what it waits for; about a minute after the last command the client restarts
+    as 1.8.1 by itself, with a "was updated to 1.8.1" balloon. With a shared Claude Code job running:
+    it waits until the job ended. Quit during the wait: installed at once, not started.
+84. **A corrupted download is refused**: make a release `desktop-v1.8.2` whose
+    `SHA256SUMS-desktop.txt` has a wrong hash (edit one digit). *Check now*: "The download of 1.8.2
+    didn't match the release's checksum, so it was deleted and not installed"; nothing beside the exe.
+    A release whose exe is some other program with the right checksum: refused ("isn't Anemo Desktop
+    1.8.2"). A draft or pre-release `desktop-v1.9.0`, and a `voice-v9.0.0`: never offered.
+85. **Turned off**: untick *Update automatically*, Save, publish `desktop-v1.8.3`, restart the client
+    and wait 10 minutes: no request (the connection log has no `update` line), nothing downloaded.
+    *Check now*: it is fetched and installed at quit. Turning the switch off while an automatically
+    fetched update is ready removes it (`.new.exe` gone within a few seconds).
+86. **A failed swap recovers**: while ready, open `Anemo Desktop.exe` in a program that locks it
+    against renaming (or make the folder read-only for a moment after the download), quit: the old
+    exe is still there and starts; the log says "couldn't be moved aside; not installed". Then: make
+    a `desktop-v1.8.4` from a build that exits at once (e.g. `Environment.Exit(3)` at the top of
+    `TrayApp`'s constructor, version 1.8.4), *Restart to update*: within a minute the old version is
+    back and running, `updates\failed` says 1.8.4, and it isn't fetched again by itself; *Check now*
+    tries again.
+87. **Not where it can't**: the exe under `C:\Program Files\…` (installed as admin): Settings says
+    it can't write there and how to move it, and nothing is ever requested. A `dotnet build` output
+    (`bin\Release\…`): "a development build", no requests.
+88. **With the release key** (after desktop/README.md *Signing updates*, in the test repository with
+    its own key and builds made with `-p:AnemoUpdatePublicKey=…`): a release without `.sig` files is
+    refused before the exe is downloaded; one signed with another key is refused; a correctly signed
+    one installs. GitHub offline (unplug the network): "GitHub couldn't be reached", retried after an
+    hour, nothing else changes.
+
 ## Platforms
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a
