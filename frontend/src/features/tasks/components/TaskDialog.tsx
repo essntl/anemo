@@ -13,6 +13,7 @@ import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
 import { focusOnTask } from '@/features/focus/focusOnTask'
 import { LinksPanel } from '@/features/links/LinksPanel'
+import { PluginPanels } from '@/features/plugins/slots'
 import { TaskAttachments } from '@/features/links/TaskAttachments'
 import { droppedLabels } from '@/features/links/linkTypes'
 import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/features/properties/api'
@@ -254,6 +255,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
           <BlockedByEditor task={task} all={all} blockedBy={blockedBy} onChange={setBlockedBy} onOpen={openTask} />
           <TaskAttachments taskId={task?.id ?? null} projectId={projectId || null} />
           {task && <LinksPanel type="task" id={task.id} editable onOpen={openLink} />}
+          {task && <PluginPanels type="task" id={task.id} revision={task.updated_at} />}
           {task && (
             <SourceDetails item={synced} detaching={detach.isPending}
               onDetach={() => detach.mutate(task.id, { onSuccess: (detached) => setSynced(detached) })} />

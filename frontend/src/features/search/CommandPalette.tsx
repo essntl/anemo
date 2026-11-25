@@ -7,7 +7,7 @@
  * see-through panel. Before anything is typed it suggests three pages at a time and
  * moves on to the next three every few seconds.
  */
-import { type KeyboardEvent, useEffect, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useEffect, useState } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { useNavigate } from 'react-router'
 import { CornerDownLeft, type LucideIcon, Search, X } from 'lucide-react'
@@ -24,12 +24,15 @@ import { useOffPages } from '@/features/settings/navigation'
 import { matchingActions } from './actions'
 import { matchingPages, pageLabel } from './pages'
 import { usePalette } from './paletteStore'
+import { usePluginPalette } from '@/features/plugins/palette'
 
 interface Item {
   key: string
   /** Shown above the first item of each section. */
   section: string
-  icon: LucideIcon
+  icon?: LucideIcon
+  /** An icon that is already drawn (a plugin's), instead of `icon`. */
+  iconNode?: ReactNode
   title: string
   detail?: string
   to?: string
@@ -106,10 +109,14 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
     return () => window.clearInterval(t)
   }, [cycling, held, rounds])
   const shownPages = cycling ? pages.slice(round * SUGGESTIONS, (round + 1) * SUGGESTIONS) : pages.slice(0, typed ? 4 : 30)
+  // Plugins' commands and pages: offered once something matching is typed.
+  const fromPlugins = usePluginPalette(typed)
 
   const items: Item[] = [
     ...matchingActions(typed, offPages).map((a) => ({ key: `action:${a.label}`, section: t('Actions'), icon: a.icon, title: t(a.label), run: a.run })),
+    ...fromPlugins.actions.map((a) => ({ ...a, section: t('Actions') })),
     ...shownPages.map((p) => ({ key: `page:${p.to}`, section: typed ? t('Go to') : t('Suggestions'), icon: p.icon, title: pageLabel(p), to: p.to })),
+    ...fromPlugins.pages.map((p) => ({ ...p, section: t('Go to') })),
     ...(typed ? (results.data?.groups ?? []) : []).flatMap((group) =>
       group.hits.map((hit) => ({
         key: `${hit.kind}:${hit.id}`,
@@ -192,7 +199,7 @@ function PaletteBody({ onDone }: { onDone: () => void }) {
                 i === active && 'bg-surface-hover shadow-soft')}>
               <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
                 i === active ? 'bg-accent text-accent-contrast' : 'bg-accent-soft text-accent')}>
-                <item.icon className="h-[18px] w-[18px]" />
+                {item.iconNode ?? (item.icon && <item.icon className="h-[18px] w-[18px]" />)}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14.5px] font-medium">{item.title}</span>
