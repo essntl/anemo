@@ -109,7 +109,7 @@ row is filled in by its own pull request.
 | --- | --- | --- |
 | **Event triggers** (in progress) | [16](specs/16-event-triggers.md) | – |
 | **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
-| **Chat recall.** Agent tools `search_chats` (by words and titles, by meaning with an embedding model; the chat's project by default, `"all"` on request) and `read_chat` (pages of messages by seq, text only) under the new permission *Read earlier chats*; never the run's own chat, temporary chats or run chats past keeping; results marked as untrusted; automations only when their tool list names them. | [18](specs/18-chat-recall.md) | – |
+| **Chat recall.** Agent tools `search_chats` (by words and titles, by meaning with an embedding model; the chat's project by default, `"all"` on request) and `read_chat` (pages of messages by seq, text only) under the new permission *Read earlier chats*; never the run's own chat, temporary chats or run chats past keeping; results marked as untrusted; automations only when their tool list names them. | [18](specs/18-chat-recall.md) | #97 |
 | **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
 | **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
 | **Waiting on a code job** (in progress) | [21](specs/21-code-wait.md) | – |
