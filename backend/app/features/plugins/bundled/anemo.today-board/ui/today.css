@@ -1,0 +1,322 @@
+/*
+ * Today board: the page's own styles, on top of Anemo's base stylesheet (.card, .badge,
+ * .list, buttons…). Colours come only from Anemo's theme variables.
+ */
+
+body {
+  /* The page frame fills Anemo's page below its header; this frame scrolls on its own. */
+  padding: 2px 2px 16px;
+}
+
+/* ---- The day and the summary --------------------------------------------------------- */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.day {
+  margin: 0;
+  font-size: 17px;
+}
+
+#summary {
+  margin: 2px 0 0;
+}
+
+/* ---- Two columns, one on a narrow screen --------------------------------------------- */
+
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+.column-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.column-title .badge:empty {
+  display: none;
+}
+
+.note {
+  margin: 0;
+}
+
+.note:empty {
+  display: none;
+}
+
+/* Buttons that are really links: the text of an event or a task. */
+.event-body,
+.task-title,
+.chip {
+  justify-content: flex-start;
+  height: auto;
+  padding: 0;
+  border-radius: 6px;
+  font-weight: inherit;
+  text-align: left;
+  background: transparent;
+}
+
+.event-body:hover,
+.task-title:hover {
+  background: transparent;
+  color: var(--accent, #2a6df4);
+}
+
+/* ---- The schedule -------------------------------------------------------------------- */
+
+ul.all-day {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.all-day:empty {
+  display: none;
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--accent, #2a6df4);
+  background: var(--accent-soft, rgb(42 109 244 / 0.12));
+}
+
+.chip:hover {
+  background: var(--accent-soft, rgb(42 109 244 / 0.12));
+  text-decoration: underline;
+}
+
+/*
+ * The time line: a column of times, a thin vertical line with a dot per event, and the
+ * event. Three grid columns per row; the line is each row's ::before, so it is unbroken.
+ */
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 4.5rem 12px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+}
+
+.timeline > li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(4.5rem + 10px + 5.5px);
+  width: 1px;
+  background: var(--border, rgb(15 20 30 / 0.1));
+}
+
+.timeline > li:first-child::before {
+  top: 10px;
+}
+
+.timeline > li:last-child::before {
+  bottom: calc(100% - 10px);
+}
+
+.when {
+  display: flex;
+  flex-direction: column;
+  padding: 1px 0 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--text, #15171c);
+}
+
+.when .until {
+  font-size: 11.5px;
+  color: var(--subtle, #555c69);
+}
+
+.dot {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border: 2px solid var(--accent, #2a6df4);
+  border-radius: 50%;
+  background: var(--card, #fff);
+}
+
+.event-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.event-body .title {
+  font-weight: 500;
+}
+
+.event-body .meta {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  color: var(--muted, #3d434e);
+}
+
+/* What is over is quieter; what is on now is filled in. */
+.event.past .when,
+.event.past .event-body {
+  opacity: 0.55;
+}
+
+.event.past .dot {
+  border-color: var(--border-strong, rgb(15 20 30 / 0.2));
+}
+
+.event.current .dot {
+  background: var(--accent, #2a6df4);
+}
+
+/* The "now" line: the time in the accent colour and a line across the column. */
+.now {
+  align-items: center !important;
+  margin: -4px 0 6px;
+}
+
+.now .when {
+  padding: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent, #2a6df4);
+}
+
+.now .rule {
+  grid-column: 2 / 4;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent, #2a6df4);
+}
+
+/* ---- The tasks ----------------------------------------------------------------------- */
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.groups:empty {
+  display: none;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted, #3d434e);
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tasks > li {
+  padding: 7px 0;
+}
+
+.task input[type='checkbox'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.task-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.facts {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.badge.prio-3 {
+  color: var(--error, #dc3b3b);
+  background: color-mix(in oklch, var(--error, #dc3b3b) 12%, transparent);
+}
+
+.badge.prio-2 {
+  color: var(--warning, #d97706);
+  background: color-mix(in oklch, var(--warning, #d97706) 14%, transparent);
+}
+
+.badge.overdue {
+  color: var(--error, #dc3b3b);
+  background: transparent;
+  padding: 0 2px;
+}
+
+/* A task that was just ticked off: struck through and fading, until the list redraws. */
+.task.done .task-title {
+  text-decoration: line-through;
+  color: var(--subtle, #555c69);
+}
+
+.task.done {
+  opacity: 0.6;
+  transition: opacity 300ms ease;
+}
+
+@media (max-width: 640px) {
+  /* On a phone the facts go under the title, so long titles keep their room. */
+  .tasks > .task {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .facts {
+    flex-basis: 100%;
+    padding-left: 26px;
+  }
+
+  .facts:empty {
+    display: none;
+  }
+}

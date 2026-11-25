@@ -32,6 +32,7 @@ from app.features.projects import service as projects
 from app.features.properties import frontmatter
 from app.features.properties import items as item_properties
 from app.features.properties import service as properties
+from app.features.provenance import service as provenance
 from app.features.tasks.models import Project
 from app.knowledge import index
 from app.policy.models import Action
@@ -325,12 +326,14 @@ class ReadDocument(Tool):
                 backlinks = await linking.backlinks_text(
                     db, ObjectRef("document", found.doc.id), ctx
                 )
-            path = found.doc.path
-            content, _ = await asyncio.to_thread(files.read_text, path, service.MAX_DOC_BYTES)
+                path = found.doc.path
+                content, _ = await asyncio.to_thread(files.read_text, path, service.MAX_DOC_BYTES)
+                text = content[args.start : args.start + args.max_chars]
+                end = args.start + len(text)
+                # A plugin wrote it last: its text is data (CONTRACTS-plugins.md §6.4).
+                text = await provenance.plugin_text(db, found.doc.updated_by_ref, text)
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
-        text = content[args.start : args.start + args.max_chars]
-        end = args.start + len(text)
         note = (
             f"\n\n[Characters {args.start:,}-{end:,} of {len(content):,}. "
             f"Call read_document again with start={end} for more.]"

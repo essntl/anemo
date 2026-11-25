@@ -645,6 +645,51 @@ you have looked at it, and runs already in progress do not get the changed tool.
 Only add servers you trust: a server sees what agents send to its tools, and its
 answers can try to steer the agent.
 
+## Plugins
+
+Plugins extend Anemo: a panel on tasks, documents or events, a page of its own in the
+sidebar, a way to draw a kind of block in chat answers, commands in Ctrl+K, and ready-made
+things Anemo already has (properties, saved views, templates, automations, scripts, MCP
+servers, agent profiles, skills, themes). Manage them in **Settings → Plugins** (a shield
+section: installing and approving ask for your password again).
+
+- **Install** from a `.zip`, a public Git repository (https), or one of the examples
+  shipped with Anemo (*Word count*, *Today board*, *Weekly review*). An assistant can also
+  build one for you in a chat (below).
+- **Nothing runs until you approve it.** A new plugin waits for review. The review
+  lists what it may do, grouped by risk (read-only; writes your data; network,
+  notifications and tools; devices and shell, which ask every time) and what it adds.
+  Approving needs your password and grants those permissions to the plugin.
+- **Updates.** An update you install yourself that asks for nothing the plugin wasn't
+  already allowed (and adds or changes no MCP server) applies at once. One that asks for
+  more waits for review, with the differences in permissions, manifest and every file,
+  while the version you approved before keeps running. Changes an assistant makes always
+  wait for review.
+- **Its page** (click a card: it grows into the page) shows the readme, permissions,
+  contributions, versions, where it came from (the zip, the Git address and commit, or
+  the chat that built it), what it stores, and its own settings if it has any. Switch it
+  off, approve or reject an update, or uninstall it there; uninstalling asks whether to
+  keep what it made (its properties, views, automations, documents…) or remove it (things
+  it wrote go to the trash).
+- **Turn off all plugins**, at the top of the section, stops every plugin at once
+  without changing each one's own switch.
+- **Building with the assistant.** In Agent mode the assistant has plugin tools (an
+  authoring guide, create, change, validate, preview). What it builds lands switched off
+  and waiting for your review, marked *Made by the assistant* with a link to the chat; it
+  can never approve or switch on a plugin. *Continue building with the assistant* on the
+  plugin's page opens a chat linked to it. *Preview* tries a version before you approve
+  it: it can read what it asks to read, and everything else asks you first.
+
+What a plugin draws runs in a sealed frame: it can't see your login, can't reach any
+server, and asks Anemo for everything through a short list of methods, each checked
+against what you approved. What it writes is marked as made by "the plugin X". How a
+plugin is written: `docs/specs/CONTRACTS-plugins.md` and the authoring guide
+(`backend/app/features/plugins/guide.md`).
+
+A plugin acts on its own permissions wherever it runs, its scripts included: your agent
+permission levels are about what models may do, not plugins. Plugins work on a plain
+`localhost` install; they need no extra domain.
+
 ## Search
 
 Press **Ctrl+K** (⌘K on a Mac) anywhere, or the search button next to *New chat*,

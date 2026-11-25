@@ -40,6 +40,8 @@ from app.events import bus
 from app.features.automations import scripts
 from app.features.automations import service as automations
 from app.features.automations.models import Automation, ScriptVersion
+from app.features.plugins import gate as plugin_gate
+from app.features.plugins import permissions as plugin_permissions
 from app.features.profiles import service as profiles
 from app.features.profiles.models import AgentProfile
 from app.features.runs import service as runs
@@ -754,6 +756,11 @@ async def snapshot_script(db: AsyncSession, run: Run, automation: Automation) ->
     limits: Limits = settings.limits.model_copy(update=own)
     settings = settings.model_copy(update={"limits": limits, "plan_review": "off"})
     policy, ceiling = compile_policy(settings), compile_ceiling(settings)
+    # A plugin's script acts on the permissions the user granted the plugin, not on the
+    # agent levels (docs/specs/CONTRACTS-plugins.md §4.3): they are what the user reviewed
+    # for it. The ceiling, the fixed rules and the automation's on_ask still apply.
+    if owner := await plugin_gate.owner_grants(db, "automation", automation.id):
+        policy = plugin_permissions.grants_policy(*owner)
     mcp_refs: list[dict[str, str]] = []
     if level_for(settings, "mcp.*") != "deny":
         mcp_refs, mcp_rules = await mcp_tool.snapshot(db)

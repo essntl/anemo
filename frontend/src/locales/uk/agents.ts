@@ -227,6 +227,8 @@ const messages: Messages = {
   "End voice mode on your phone when a spoken conversation is over.": "Завершення голосового режиму на вашому телефоні, коли розмову закінчено.",
   "Generate images": "Створення зображень",
   "Make pictures with the image model chosen in Settings > Providers & Models (each one costs money at the provider). Automations ask first.": "Створювати зображення моделлю, вибраною в Налаштування > Провайдери й моделі (кожне коштує грошей у провайдера). Автоматизації спершу питають.",
+  "Build plugins": "Створення плагінів",
+  "Write and change plugins. They stay off until you review and approve them in Settings > Plugins.": "Написання та змінення плагінів. Вони залишаються вимкненими, доки ви не переглянете й не схвалите їх у Налаштування > Плагіни.",
   "Open in Files: {path}": "Відкрити у «Файлах»: {path}",
 }
 export default messages

@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="today.css" />
+  </head>
+  <body>
+    <!-- The day, a one-line summary, and a button to read everything again. -->
+    <header class="head">
+      <div>
+        <h2 id="day" class="day">Today</h2>
+        <p id="summary" class="muted small" role="status">Loading…</p>
+      </div>
+      <button id="refresh" class="ghost small" type="button" title="Refresh" aria-label="Refresh">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+          <path d="M21 3v6h-6" />
+        </svg>
+      </button>
+    </header>
+
+    <!-- Two columns: the calendar on the left, the tasks on the right (one column on a phone). -->
+    <main class="board">
+      <section class="card column" aria-labelledby="schedule-title">
+        <h3 id="schedule-title" class="column-title">Schedule <span id="event-count" class="badge num"></span></h3>
+        <ul id="all-day" class="all-day" aria-label="All day"></ul>
+        <ol id="timeline" class="timeline" aria-label="Events by time"></ol>
+        <p id="events-note" class="note muted small"></p>
+      </section>
+
+      <section class="card column" aria-labelledby="tasks-title">
+        <h3 id="tasks-title" class="column-title">Tasks <span id="task-count" class="badge num"></span></h3>
+        <div id="groups" class="groups"></div>
+        <p id="tasks-note" class="note muted small"></p>
+      </section>
+    </main>
+
+    <script src="today.js"></script>
+  </body>
+</html>

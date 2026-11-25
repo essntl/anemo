@@ -22,7 +22,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---- 3. Runtime image (used by both `app` and `worker`) --------------------
 FROM python:3.13-slim AS runtime
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PATH="/opt/venv/bin:$PATH"
-RUN apt-get update && apt-get install -y --no-install-recommends curl tini \
+# git: plugins installed from a public Git repository (features/plugins/package.py).
+RUN apt-get update && apt-get install -y --no-install-recommends curl tini git \
     && rm -rf /var/lib/apt/lists/*
 ARG PUID=1000
 ARG PGID=1000

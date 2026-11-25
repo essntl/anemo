@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { History, X } from 'lucide-react'
 import { allLinks, useLinks } from '@/features/links/api'
 import { TYPE_ICONS } from '@/features/links/linkTypes'
+import { PluginDocumentPanel } from '@/features/plugins/slots'
+import { usePluginDocumentTabs } from '@/features/plugins/slotData'
 import { ActorLine } from '@/features/provenance/Provenance'
 import { actorLabel } from '@/features/provenance/labels'
 import { cn } from '@/lib/cn'
@@ -11,16 +13,20 @@ import { dateLocale, msg, plural, t } from '@/lib/i18n'
 import { useDocuments, useRevisions } from '../api'
 import type { OutlineItem } from '../outline'
 
-type Tab = 'outline' | 'details' | 'chat'
+/** A built-in tab, or a plugin's panel: "plugin:<plugin id>/<ui id>" (features/plugins/slots.tsx). */
+type Tab = 'outline' | 'details' | 'chat' | `plugin:${string}`
 const TABS = [['outline', msg('Outline')], ['details', msg('Details')], ['chat', msg('Chat')]] as const
 
 /** Browser storage: the tab of the panel beside a document that was open last. */
 const TAB = 'anemo.docPanelTab'
 
+const isPluginTab = (tab: string): tab is `plugin:${string}` => tab.startsWith('plugin:')
+
 function lastTab(): Tab {
   try {
-    const stored = localStorage.getItem(TAB)
-    return TABS.some(([id]) => id === stored) ? (stored as Tab) : 'outline'
+    const stored = localStorage.getItem(TAB) ?? ''
+    // A plugin's tab is kept too: it shows once the plugins have loaded (or the outline, if it is gone).
+    return TABS.some(([id]) => id === stored) || isPluginTab(stored) ? (stored as Tab) : 'outline'
   } catch {
     return 'outline'
   }
@@ -133,21 +139,27 @@ export function DocumentInfo({ documentId, path, words, outline, active, onJump,
   /** Set when the panel lies over the text: a button to put it away. */
   onClose?: () => void
 }) {
-  const [tab, setTabState] = useState<Tab>(lastTab)
+  const [chosen, setTabState] = useState<Tab>(lastTab)
   const setTab = (next: Tab) => {
     try { localStorage.setItem(TAB, next) } catch { /* no storage: just not remembered */ }
     setTabState(next)
   }
+  // Plugins' panels for documents, one tab each, after the built-in ones.
+  const pluginTabs = usePluginDocumentTabs()
+  const tabs: (readonly [Tab, string, boolean])[] = [...TABS.map(([id, label]) => [id, label, true] as const), ...pluginTabs.map((p) => [p.id as Tab, p.label, false] as const)]
+  // A plugin's tab that isn't there (turned off, or still loading) shows the outline.
+  const tab: Tab = isPluginTab(chosen) && !pluginTabs.some((p) => p.id === chosen) ? 'outline' : chosen
   return (
     <div className="flex h-full min-h-0 flex-col">
       {notice}
       <div className="flex shrink-0 items-center gap-1 border-b border-border p-2">
         <div role="tablist" aria-label={t('About this document')} className="flex min-w-0 flex-1 rounded-lg bg-surface-2 p-0.5">
-          {TABS.map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-              className={cn('flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:text-[13.5px]',
+          {tabs.map(([id, label, translated]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} title={translated ? undefined : label}
+              className={cn('flex h-7 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-md px-1 text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:text-[13.5px]',
                 tab === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
-              {t(label)}
+              {/* A plugin's own title is shown as it is (plugin texts aren't translated). */}
+              <span className="truncate">{translated ? t(label) : label}</span>
               {id === 'outline' && outline.length > 0 && <span className="text-[11px] font-normal tabular-nums text-subtle">{outline.length}</span>}
             </button>
           ))}
@@ -162,6 +174,7 @@ export function DocumentInfo({ documentId, path, words, outline, active, onJump,
       {tab === 'outline' && <Outline outline={outline} active={active} onJump={onJump} />}
       {tab === 'details' && <Details documentId={documentId} path={path} words={words} onHistory={onHistory} />}
       {tab === 'chat' && chat}
+      {isPluginTab(tab) && <PluginDocumentPanel tabId={tab} documentId={documentId} />}
     </div>
   )
 }

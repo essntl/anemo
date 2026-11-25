@@ -1,4 +1,4 @@
-import { createContext, memo, useContext, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
+import { createContext, createElement, memo, useContext, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
 import ReactMarkdown, { type ExtraProps, type Options } from 'react-markdown'
 import { Link } from 'react-router'
 import rehypeHighlight from 'rehype-highlight'
@@ -10,12 +10,16 @@ import { isFenceClosed } from '@/components/diagrams/fence'
 import { isDiagramLanguage } from '@/components/diagrams/languages'
 import { useMath } from '@/components/diagrams/useMath'
 import { isAppLink } from '@/lib/appLinks'
+import { useFenceRenderer } from '@/lib/fenceRenderers'
 import { stripCitationMarkup } from '@/lib/citations'
 import { t } from '@/lib/i18n'
 import { imageHost, loadsWithoutAsking } from '@/lib/remoteImages'
 
-/** The Markdown being shown, for code blocks that need their own source. */
-const SourceContext = createContext<{ text: string; streaming: boolean }>({ text: '', streaming: false })
+/**
+ * The Markdown being shown, for code blocks that need their own source. `fences`: blocks
+ * may be drawn by a renderer from lib/fenceRenderers (plugins), only in chat answers.
+ */
+const SourceContext = createContext<{ text: string; streaming: boolean; fences: boolean }>({ text: '', streaming: false, fences: false })
 
 /** The text of a code element's children (react-markdown passes it as a string). */
 function textOf(children: unknown): string {
@@ -27,20 +31,20 @@ function textOf(children: unknown): string {
 function CodeBlock({ children, node, ...rest }: ComponentPropsWithoutRef<'pre'> & ExtraProps) {
   const ref = useRef<HTMLPreElement>(null)
   const [copied, setCopied] = useState(false)
-  const { text, streaming } = useContext(SourceContext)
+  const { text, streaming, fences } = useContext(SourceContext)
   // The language comes from the `language-xyz` class on the inner <code>.
   const child = Array.isArray(children) ? children[0] : children
   const childProps = (child as { props?: { className?: string; children?: unknown } })?.props
   const className = childProps?.className ?? ''
   const language = /language-([\w-]+)/.exec(className)?.[1] ?? 'text'
+  const Renderer = useFenceRenderer(language)
+  // While an answer is being written, a block is drawn once its closing fence is there.
+  const start = node?.position?.start.offset
+  const end = node?.position?.end.offset
+  const complete = !streaming || (start !== undefined && end !== undefined && isFenceClosed(text.slice(start, end)))
+  const source = textOf(childProps?.children).replace(/\n$/, '')
 
-  if (isDiagramLanguage(language)) {
-    // While an answer is being written, a block is drawn once its closing fence is there.
-    const start = node?.position?.start.offset
-    const end = node?.position?.end.offset
-    const complete = !streaming || (start !== undefined && end !== undefined && isFenceClosed(text.slice(start, end)))
-    if (complete) return <DiagramBlock lang={language} source={textOf(childProps?.children).replace(/\n$/, '')} />
-  }
+  if (isDiagramLanguage(language) && complete) return <DiagramBlock lang={language} source={source} />
 
   const copy = async () => {
     await navigator.clipboard.writeText(ref.current?.innerText ?? '')
@@ -48,7 +52,7 @@ function CodeBlock({ children, node, ...rest }: ComponentPropsWithoutRef<'pre'> 
     window.setTimeout(() => setCopied(false), 1500)
   }
 
-  return (
+  const code = (
     <div className="my-3 overflow-hidden rounded-xl border border-border bg-surface-2">
       <div className="flex items-center justify-between border-b border-border px-3 py-1.5 text-[11px] text-muted">
         <span className="font-mono">{language}</span>
@@ -62,6 +66,10 @@ function CodeBlock({ children, node, ...rest }: ComponentPropsWithoutRef<'pre'> 
       </pre>
     </div>
   )
+  // A plugin's block (chat answers only): it shows the plain code until it has drawn.
+  // (createElement: the renderer is a component registered once, not one made here.)
+  if (fences && Renderer && complete) return createElement(Renderer, { lang: language, text: source, fallback: code })
+  return code
 }
 
 /** A link to a page of the app opens here; a link to another site opens in a new tab. */
@@ -101,13 +109,15 @@ const HIGHLIGHT: NonNullable<Options['rehypePlugins']>[number] = [rehypeHighligh
 /**
  * Renders Markdown: GFM tables and task lists, highlighted code, ```mermaid diagrams,
  * ```chart charts and math ($…$, $$…$$). `streaming` is set while an answer is still
- * being written, so diagrams are only drawn once their block is complete.
+ * being written, so diagrams are only drawn once their block is complete. `fences`: code
+ * blocks whose language has a renderer in lib/fenceRenderers are drawn by it (chat
+ * answers; a plugin's `chat.block`).
  */
-export const Markdown = memo(function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
+export const Markdown = memo(function Markdown({ text, streaming = false, fences = false }: { text: string; streaming?: boolean; fences?: boolean }) {
   const cleaned = stripCitationMarkup(text)
   const math = useMath(cleaned.includes('$'))
   const source = useMemo(() => (math ? protectDollars(cleaned) : cleaned), [math, cleaned])
-  const context = useMemo(() => ({ text: source, streaming }), [source, streaming])
+  const context = useMemo(() => ({ text: source, streaming, fences }), [source, streaming, fences])
   const remarkPlugins = useMemo(() => [remarkGfm, ...(math?.remarkPlugins ?? [])], [math])
   const rehypePlugins = useMemo(() => [...(math?.rehypePlugins ?? []), HIGHLIGHT], [math])
   return (

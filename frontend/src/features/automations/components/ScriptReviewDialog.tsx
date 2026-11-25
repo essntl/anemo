@@ -9,9 +9,9 @@ import { Link } from 'react-router'
 import { errorMessage } from '@/api/client'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { DiffView } from '@/components/ui/DiffView'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
-import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { msg, t } from '@/lib/i18n'
 import {
@@ -22,7 +22,7 @@ import {
   useScript,
   useScriptSecret,
 } from '../api'
-import { lineDiff, listDiff } from '../lineDiff'
+import { listDiff } from '@/lib/lineDiff'
 
 const LISTS: { key: 'tools' | 'hosts' | 'secrets' | 'think_tools'; label: string }[] = [
   { key: 'tools', label: msg('Tools it may call') },
@@ -61,24 +61,6 @@ function Lists({ before, after }: { before: ScriptVersion | null; after: ScriptV
         )
       })}
     </dl>
-  )
-}
-
-function Code({ before, after }: { before: string | null; after: string }) {
-  const lines = before === null ? after.split('\n').map((text) => ({ kind: 'same' as const, text })) : lineDiff(before, after)
-  return (
-    <pre aria-label={t('Code')} className="max-h-[50vh] overflow-auto rounded-control border border-border bg-surface-2 py-2 font-mono text-[12px] leading-relaxed">
-      {lines.map((line, i) => (
-        <div key={i} className={cn('whitespace-pre px-3',
-          line.kind === 'added' && 'bg-success/12 text-success',
-          line.kind === 'removed' && 'bg-error/12 text-error')}>
-          <span aria-hidden className="mr-2 inline-block w-3 select-none text-subtle">{line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '}</span>
-          {line.kind === 'removed' && <span className="sr-only">{t('removed:')} </span>}
-          {line.kind === 'added' && <span className="sr-only">{t('added:')} </span>}
-          {line.text || ' '}
-        </div>
-      ))}
-    </pre>
   )
 }
 
@@ -160,7 +142,7 @@ export function ScriptReviewDialog({ automation, onClose }: { automation: Automa
             <Author version={shown} />
           </div>
           <Lists before={pending ? approved : null} after={shown} />
-          <Code before={pending && approved ? approved.code : null} after={shown.code} />
+          <DiffView before={pending && approved ? approved.code : null} after={shown.code} />
           {data && <Secrets automation={automation} names={data.secrets} />}
         </div>
       )}

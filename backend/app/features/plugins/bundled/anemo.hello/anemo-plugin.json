@@ -1,0 +1,35 @@
+{
+  "manifestVersion": 1,
+  "id": "anemo.hello",
+  "version": "1.0.0",
+  "name": "Hello",
+  "description": "A tiny plugin for Anemo's tests: a panel on tasks, a page, a command and a task template.",
+  "author": { "name": "Anemo" },
+  "license": "MIT",
+  "readme": "README.md",
+  "permissions": ["tasks:read", "tasks:write"],
+  "contributes": {
+    "templates": [
+      {
+        "id": "follow-up",
+        "kind": "task",
+        "title": "Follow up",
+        "task": { "title": "Follow up", "priority": 2, "checklist": ["Write", "Send"] }
+      }
+    ],
+    "commands": [
+      { "id": "open", "title": "Open Hello", "action": { "type": "openPage", "page": "page" } }
+    ],
+    "ui": [
+      {
+        "id": "panel",
+        "slot": "object.panel",
+        "objects": ["task"],
+        "title": "Hello",
+        "entry": "ui/panel.html",
+        "height": 80
+      },
+      { "id": "page", "slot": "page", "title": "Hello", "icon": "hand", "entry": "ui/panel.html" }
+    ]
+  }
+}

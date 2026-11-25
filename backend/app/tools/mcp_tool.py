@@ -86,6 +86,9 @@ class McpToolBase(Tool):
     remote_name: str
     risk: Risk
     schema: dict[str, Any]
+    # A plugin's server: what it returns is the plugin's run-time output, always data
+    # (docs/specs/CONTRACTS-plugins.md §6.4 rule 5).
+    from_plugin: bool = False
     timeout_s = CALL_TIMEOUT_S + client.CONNECT_TIMEOUT_S + 10
 
     def spec(self) -> ToolSpec:
@@ -125,14 +128,14 @@ class McpToolBase(Tool):
         unattended = ctx.actor.kind == "automation"
         return ToolResult(
             content=untrusted(f"{self.server_name}: {self.remote_name}", result.text)
-            if unattended
+            if unattended or self.from_plugin
             else result.text,
             is_error=result.is_error,
             data={"mcp": {"server": self.server_name, "tool": self.remote_name}},
         )
 
 
-def build(server: McpServer, tool: McpTool) -> Tool:
+def build(server: McpServer, tool: McpTool, *, from_plugin: bool = False) -> Tool:
     risk = service.risk_of(tool)
     description = tool.description[:MAX_DESCRIPTION] or tool.name
     attributes = {
@@ -147,6 +150,7 @@ def build(server: McpServer, tool: McpTool) -> Tool:
         "remote_name": tool.name,
         "risk": risk,
         "schema": provider_schema(tool.input_schema),
+        "from_plugin": from_plugin,
     }
     return type("McpTool", (McpToolBase,), attributes)()  # type: ignore[no-any-return]
 
@@ -165,8 +169,9 @@ async def for_run(db: Any, refs: list[dict[str, str]]) -> list[Tool]:
     wanted = {ref["id"]: ref["hash"] for ref in refs}
     if not wanted:
         return []
+    plugin_servers = await service.plugin_servers(db)
     return [
-        build(server, tool)
+        build(server, tool, from_plugin=server.id in plugin_servers)
         for server, tool in await service.usable_tools(db)
         if wanted.get(str(tool.id)) == tool.schema_hash
     ]

@@ -247,6 +247,49 @@ document), so drawing one can't do more than show a picture:
   `\includegraphics` don't work. KaTeX, its fonts and Mermaid are part of the app;
   nothing comes from a CDN.
 
+## Plugins
+
+A plugin (Settings → Plugins, spec `docs/specs/12-plugins.md`) is code and settings
+someone else wrote, so it gets nothing by default:
+
+- **Nothing runs unreviewed, nothing widens silently.** A new plugin waits until you
+  approve it with your password; the approval names the hash of the exact files you
+  reviewed (a newer upload in between is refused) and grants its permissions to the
+  plugin. An update you install yourself applies at once only when it asks for nothing
+  beyond those grants and adds or changes no MCP server; anything wider waits, and the
+  running version stays until you approve. Every change an assistant saves waits for
+  review: its tools can create and change plugins, never approve, enable or grant. (So
+  an update you upload can change a plugin's code without a second look: install
+  updates only from where you got the plugin.)
+- **Its UI is sealed off.** Each panel or page runs in an `<iframe sandbox="allow-scripts">`
+  with an opaque origin, loaded from one fixed document whose Content-Security-Policy
+  blocks every request (`default-src 'none'`, `connect-src 'none'`, pictures and fonts
+  only `data:`/`blob:`). It has no access to your cookies, the app's storage or the page,
+  and it receives its own files from the app over a private message channel. It asks the
+  app for data through named methods; the page checks each against the approved
+  permissions, then the server checks it again.
+- **Every call is a tool call.** On the server a plugin call goes through the same
+  permission engine as an agent's tool call, with only what the approved permissions
+  cover allowed. Shell, computer, browser and device tools are *critical*: a plugin may
+  hold them, but every single call asks you in Anemo's own dialog (never in the plugin's
+  frame), with no "for this run" or "always". What a plugin writes carries
+  `plugin:<id>@<version>`, and its writes, confirmations and refusals are in the security
+  log.
+- **Its output is data.** Results of plugin scripts and plugin MCP tools reach models
+  marked as untrusted, and when an agent reads a task, document or event a plugin wrote
+  last, the text is labelled with the plugin and marked as untrusted. (Static text you
+  reviewed as part of a version, such as a skill's instructions, is used as written.)
+- **Logic runs in existing sandboxes**: plugin scripts in the Deno sandbox (see
+  *Scripts* above), plugin MCP servers in the MCP host or remotely; their tools ask every
+  time until you change that. Never in the app's own processes.
+- **Packages** are checked before anything is stored: at most 500 files and 5 MB, safe
+  paths only (no `..`, no links), a fixed list of file types (no SVG, no executables),
+  pictures and fonts recognised by their content. Every file's SHA-256 is recorded and
+  checked again when it is used. A Git address must be https and public; it is cloned
+  without credentials, after the host is checked like any web address.
+- **Kill switch.** *Turn off all plugins* stops every frame, call, command, script and
+  plugin MCP tool at once.
+
 ## Permission levels
 
 **Settings → Agent Permissions** has one level per kind of action:
@@ -369,6 +412,15 @@ searching every response, record and stored file for it.
   container: a flaw in Deno or V8 would reach the worker. And a secret in a custom
   header (not `Authorization`) follows a redirect from a declared host to another one;
   declare only hosts you trust.
+- **What a plugin can read, a malicious plugin could send out.** Its frame can't make
+  requests, but a browser can't stop a sandboxed frame from navigating itself to another
+  address, which can carry data. Anemo removes a frame the moment it does that (and says
+  so on the plugin's page), but that first request has gone. WebRTC is outside the
+  Content-Security-Policy too; the frame's startup code removes it, which slows a plugin
+  down rather than stopping it. Keep read permissions narrow and install plugins you
+  trust; the review shows the code.
+- **A plugin's local MCP server runs code that isn't in the package** (for example
+  `npx some-server`), which is why the review marks it critical.
 - **A trusted computer is the agent's computer.** On a computer marked trusted, with
   acting or PowerShell set to fully autonomous, the agent does what that Windows user
   can, without asking, steered partly by what is on the screen. Keep your own logins,

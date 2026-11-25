@@ -219,7 +219,8 @@ class GetTask(Tool):
             lines = [task_line(task, projects, waits)]
             if parent is not None:
                 lines.append(f"Subtask of: {task_line(parent, projects)}")
-            lines.append("Notes:\n" + (task.description.strip() or "(none)"))
+            notes = task.description.strip() or "(none)"
+            lines.append("Notes:\n" + await provenance.plugin_text(db, task.updated_by_ref, notes))
             if task.checklist:
                 lines.append(
                     "Checklist:\n"

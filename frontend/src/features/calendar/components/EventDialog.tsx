@@ -24,6 +24,7 @@ import { type Synced } from '@/features/provenance/labels'
 import { ActorLine, SourceDetails } from '@/features/provenance/Provenance'
 import { useCreateMeetingNotes } from '@/features/links/api'
 import { LinksPanel } from '@/features/links/LinksPanel'
+import { PluginPanels } from '@/features/plugins/slots'
 import { NotesWithLinks } from '@/features/links/NotesWithLinks'
 import { droppedLabels } from '@/features/links/linkTypes'
 import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/features/properties/api'
@@ -261,6 +262,7 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
         {mode === 'event' && eventId && (
           <LinksPanel type="event" id={eventId} editable onOpen={(path) => { onClose(); void navigate(path) }} />
         )}
+        {mode === 'event' && eventId && <PluginPanels type="event" id={eventId} />}
         {mode !== 'new' && eventId && (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" icon={<FilePlus2 className="h-3.5 w-3.5" />} loading={meetingNotes.isPending}

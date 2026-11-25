@@ -12,6 +12,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.features.automations import scripts, service
@@ -33,17 +34,22 @@ async def delete_with_runs(automation_id: uuid.UUID) -> None:
             return
         if await service.active_run(db, automation.id) is not None:
             raise RuntimeError("the automation's run is still going")
-        chats = list(
-            await db.scalars(
-                select(Conversation.id).where(Conversation.automation_id == automation.id)
-            )
-        )
-        await conversations.delete_conversations(db, chats)
-        await scripts.forget_secrets(db, automation.id)
-        await db.delete(automation)
+        await delete(db, automation)
         await db.commit()
     scripts.remove_folder(automation_id)
     await service.notify_changed()
+
+
+async def delete(db: AsyncSession, automation: Automation) -> None:
+    """Delete an automation with the chats of its runs and its script's secrets. Adds to
+    the caller's transaction; after the commit, the caller removes the script's folder
+    (scripts.remove_folder) and calls service.notify_changed()."""
+    chats = list(
+        await db.scalars(select(Conversation.id).where(Conversation.automation_id == automation.id))
+    )
+    await conversations.delete_conversations(db, chats)
+    await scripts.forget_secrets(db, automation.id)
+    await db.delete(automation)
 
 
 async def forget_old_check_results(now: datetime) -> None:
