@@ -11,6 +11,7 @@ import { CodeQueueRunner } from '@/features/code/CodeQueueRunner'
 import { AppBackground } from '@/features/appearance/AppBackground'
 import { useServiceWorkerLinks } from '@/features/notifications/useServiceWorkerLinks'
 import { Island } from '@/features/island/Island'
+import { PluginFences } from '@/features/plugins/slots'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { isOffAddress, useOffPages } from '@/features/settings/navigation'
 import { useAppearanceSync } from '@/features/settings/useAppearanceSync'
@@ -126,6 +127,8 @@ export function AppLayout() {
       <ToastHost />
       <CodeQueueRunner />
       <CommandPalette />
+      {/* Plugins' chat.block fences, registered for chat answers to draw. */}
+      <PluginFences />
       <ShortcutSheet />
       <DictationHost />
     </div>

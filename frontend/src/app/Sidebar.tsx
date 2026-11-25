@@ -24,6 +24,7 @@ import { usePalette } from '@/features/search/paletteStore'
 import { shortcutText } from '@/features/shortcuts/registry'
 import { ShortcutKeys } from '@/features/shortcuts/ShortcutKeys'
 import { ViewLinks } from '@/features/views/ViewLinks'
+import { PluginLinks } from '@/features/plugins/slots'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { InboxBadge } from './badges'
@@ -216,6 +217,8 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </nav>
       )}
       {!onClose && <ViewLinks />}
+      {/* The pages of plugins, in a group of their own (not part of Settings > Pages). */}
+      {!onClose && <PluginLinks />}
 
       {/* The chats take all the free height and are the only thing that scrolls. */}
       {!onClose && <Divider className="-mx-3 mt-2.5" />}
@@ -234,6 +237,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <>
           <Divider className="-mx-3 my-2" />
           <ViewLinks onNavigate={onClose} />
+          <PluginLinks onNavigate={onClose} />
           {/* The Inbox is an icon in this menu's header, so the card doesn't repeat it. */}
           <PagesFolder pages={[...pinned, ...more].filter((p) => p.to !== '/notifications')} onNavigate={onClose} />
         </>

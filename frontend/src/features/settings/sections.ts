@@ -25,6 +25,8 @@ export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'workspace', label: msg('Workspace'), sensitive: true },
   { to: 'web', label: msg('Web & Search'), sensitive: true },
   { to: 'mcp', label: msg('MCP'), sensitive: true },
+  // Installing and approving plugins weighs as much as adding an MCP server (password, security log).
+  { to: 'plugins', label: msg('Plugins'), sensitive: true },
   { to: 'notifications', label: msg('Notifications') },
   { to: 'memory', label: msg('Memory') },
   { to: 'properties', label: msg('Properties'), of: ['documents'] },

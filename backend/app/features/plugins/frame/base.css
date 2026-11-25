@@ -1,7 +1,259 @@
-/* Placeholder for the plugin frame's base stylesheet (contract §6.3, Theme); the UI
-   workstream's version replaces this file. */
+/*
+ * The base stylesheet of every plugin frame (contract §6.3 "Theme").
+ *
+ * The frame document (GET /api/plugin-frame) inlines this before any plugin style, so a
+ * plugin looks like part of Anemo with no work: Anemo's fonts, colours, radii and spacing
+ * come in as CSS variables (set on :root by bootstrap.js from `init.theme` and updated on
+ * `theme.changed`), and the few rules below use them. A plugin's own styles come later and
+ * win; it can use the same variables:
+ *
+ *   --accent --accent-hover --accent-soft --accent-contrast
+ *   --bg --surface --surface-2 --surface-hover --card
+ *   --text --muted --subtle --border --border-strong
+ *   --success --warning --error --info
+ *   --radius-control --radius-card --font-ui --font-code --shadow-soft
+ *   --card-x --card-y --row-y --card-gap --stack-gap --item-x --item-y --btn-h --btn-sm-h
+ *
+ * Classes: .card, .muted, .subtle, .list (rows with dividers), .row (a line of items),
+ * .stack (a column with gaps), .badge; buttons are secondary by default, `.primary`,
+ * `.ghost` and `.danger` change that. Every value has a fallback, so the frame is
+ * readable even before init arrives.
+ */
+
+:root {
+  color-scheme: light;
+  font-family: var(--font-ui, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text, #15171c);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Transparent: the frame sits on Anemo's card or panel and shows its colour (and glass). */
+html,
 body {
   margin: 0;
-  font-family: var(--font-ui, system-ui, sans-serif);
-  color: var(--text, #111);
+  background: transparent;
+}
+
+body {
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 0.4em;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+h1 { font-size: 19px; font-weight: 700; }
+h2 { font-size: 16px; }
+h3 { font-size: 14.5px; }
+h4 { font-size: 13.5px; }
+
+p { margin: 0 0 0.6em; }
+p:last-child { margin-bottom: 0; }
+
+a {
+  color: var(--accent, #2a6df4);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+code,
+pre,
+kbd {
+  font-family: var(--font-code, ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace);
+  font-size: 12.5px;
+}
+code {
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+  background: var(--surface-2, #e9ebf0);
+}
+pre {
+  margin: 0 0 0.6em;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--border, rgb(15 20 30 / 0.1));
+  border-radius: var(--radius-control, 10px);
+  background: var(--surface-2, #e9ebf0);
+}
+pre code { padding: 0; background: none; }
+
+hr {
+  height: 1px;
+  margin: 12px 0;
+  border: 0;
+  background: var(--border, rgb(15 20 30 / 0.1));
+}
+
+::selection { background: color-mix(in oklch, var(--accent, #2a6df4) 22%, transparent); }
+
+/* ---- Text ---------------------------------------------------------------------------- */
+
+.muted { color: var(--muted, #3d434e); }
+.subtle { color: var(--subtle, #555c69); }
+.small { font-size: 12.5px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- Layout -------------------------------------------------------------------------- */
+
+.card {
+  padding: var(--card-y, 16px) var(--card-x, 18px);
+  border: 1px solid var(--border, rgb(15 20 30 / 0.1));
+  border-radius: var(--radius-card, 14px);
+  background: var(--card, #fff);
+  box-shadow: var(--shadow-soft, none);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap, 12px);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted, #3d434e);
+  background: var(--surface-2, #e9ebf0);
+}
+.badge.accent { color: var(--accent, #2a6df4); background: var(--accent-soft, rgb(42 109 244 / 0.12)); }
+
+/* A list of rows with lines between them, as Anemo's settings and task lists. */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.list > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--row-y, 10px) 0;
+  border-top: 1px solid var(--border, rgb(15 20 30 / 0.1));
+}
+.list > li:first-child { border-top: 0; }
+
+ul:not(.list),
+ol { margin: 0 0 0.6em; padding-left: 1.3em; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th,
+td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, rgb(15 20 30 / 0.1));
+}
+th { font-weight: 600; color: var(--muted, #3d434e); }
+
+/* ---- Controls ------------------------------------------------------------------------ */
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--btn-h, 36px);
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-control, 10px);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text, #15171c);
+  background: var(--surface-2, #e9ebf0);
+  cursor: pointer;
+  transition: background-color 120ms ease, opacity 120ms ease;
+}
+button:hover { background: var(--surface-hover, #dfe2e8); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.small { height: var(--btn-sm-h, 30px); padding: 0 10px; font-size: 13px; }
+
+button.primary {
+  color: var(--accent-contrast, #fff);
+  background: var(--accent, #2a6df4);
+}
+button.primary:hover { background: var(--accent-hover, var(--accent, #2a6df4)); }
+
+button.ghost {
+  color: var(--muted, #3d434e);
+  background: transparent;
+}
+button.ghost:hover { color: var(--text, #15171c); background: var(--surface-hover, #dfe2e8); }
+
+button.danger {
+  color: #fff;
+  background: var(--error, #dc3b3b);
+}
+button.danger:hover { opacity: 0.9; }
+
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+textarea {
+  width: 100%;
+  min-height: var(--btn-h, 36px);
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong, rgb(15 20 30 / 0.2));
+  border-radius: var(--radius-control, 10px);
+  background: var(--surface, #fff);
+  font-size: 13.5px;
+}
+textarea { resize: vertical; }
+input::placeholder,
+textarea::placeholder { color: var(--subtle, #555c69); }
+
+input[type='checkbox'],
+input[type='radio'],
+input[type='range'] { accent-color: var(--accent, #2a6df4); }
+
+label { font-size: 13px; color: var(--muted, #3d434e); }
+
+:focus-visible {
+  outline: 2px solid var(--accent, #2a6df4);
+  outline-offset: 2px;
+}
+
+/* Less movement for people who asked their system for it, as in Anemo. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
