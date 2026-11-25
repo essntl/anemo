@@ -17,6 +17,7 @@ public static class CommandSummary
         string? Str(string key) => Wire.Str(command, key);
         int Length(string key) => Str(key)?.Length ?? 0;
         string Target() => Str("ref") is { } r ? $"control {Short(r)}" : $"at {Num("x")}, {Num("y")}";
+        string GitTarget() => Str("repo") is { } repo ? $"repository {Short(repo)}" : $"project {Short(Str("project"))}";
         string Num(string key) => Wire.Number(command[key]) is { } d ? d.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) : "?";
 
         return action switch
@@ -35,8 +36,9 @@ public static class CommandSummary
                 + (Str("follow_job_id") is { } follow ? $"a follow-up of job {Short(follow)}" : $"project {Short(Str("project"))}")
                 + $", a prompt of {Length("prompt")} characters",
             "code_cancel" => $"job {Short(Str("job_id"))}",
-            "code_git_graph" => $"project {Short(Str("project"))}",
-            "code_git_commit" => $"project {Short(Str("project"))}, commit {Short(Str("hash"))}",
+            "code_git_graph" => GitTarget() + (command["fetch"] is JsonValue f && f.TryGetValue<bool>(out var fetch) && fetch ? ", fetch" : ""),
+            "code_git_commit" => $"{GitTarget()}, commit {Short(Str("hash"))}",
+            "code_git_cache_clear" => "",
             _ => "unknown action",
         };
     }

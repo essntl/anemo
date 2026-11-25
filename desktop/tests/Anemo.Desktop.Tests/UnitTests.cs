@@ -487,10 +487,10 @@ public sealed class WireTests
         Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.0.0","last_id":null,"platform":"windows"}""", Wire.Hello("anemo_t", "1.0.0", null));
         Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.4.0","last_id":"1-0","platform":"macos"}""", Wire.Hello("anemo_t", "1.4.0", "1-0", "macos"));
         Assert.Equal("""{"type":"ping"}""", Wire.Ping());
-        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false,"code_images":false,"code_git":false,"shell_kind":"powershell"}""", Wire.Offer(true, false, false, false));
+        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false,"code_images":false,"code_git":false,"code_git_remote":false,"shell_kind":"powershell"}""", Wire.Offer(true, false, false, false));
         // Images with code_start (1.3.0) come with starting.
-        Assert.Equal("""{"type":"device.offer","control":false,"shell":false,"code":true,"code_start":true,"code_images":true,"code_git":true,"shell_kind":"powershell"}""", Wire.Offer(false, false, true, true));
-        Assert.Equal("""{"type":"device.offer","control":true,"shell":true,"code":false,"code_start":false,"code_images":false,"code_git":false,"shell_kind":"zsh"}""", Wire.Offer(true, true, false, false, "zsh"));
+        Assert.Equal("""{"type":"device.offer","control":false,"shell":false,"code":true,"code_start":true,"code_images":true,"code_git":true,"code_git_remote":true,"shell_kind":"powershell"}""", Wire.Offer(false, false, true, true));
+        Assert.Equal("""{"type":"device.offer","control":true,"shell":true,"code":false,"code_start":false,"code_images":false,"code_git":false,"code_git_remote":false,"shell_kind":"zsh"}""", Wire.Offer(true, true, false, false, "zsh"));
         Assert.Equal("""{"type":"device.stopped"}""", Wire.Stopped());
         Assert.Equal("""{"type":"device.result","id":"1","ok":true,"state":{}}""", Wire.Result("1", CommandOutcome.Success(new JsonObject())));
         Assert.Equal("""{"type":"device.result","id":"2","ok":false,"error":"No.","code":"refused"}""", Wire.Result("2", CommandOutcome.Fail("refused", "No.")));

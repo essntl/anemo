@@ -31,6 +31,9 @@ public sealed record DesktopAgentParts(
 
     /// <summary>The Claude Code jobs' state file, beside <c>settings.json</c>.</summary>
     public string CodeJobsStateFile => Path.Combine(Path.GetDirectoryName(Store.Path) ?? ".", "code-jobs.json");
+
+    /// <summary>The cache of remote repositories for the git reads (device-contracts.md §7.6), beside <c>settings.json</c>, never in the projects folder.</summary>
+    public string GitCacheFolder => Path.Combine(Path.GetDirectoryName(Store.Path) ?? ".", "git-cache");
 }
 
 /// <summary>
@@ -72,7 +75,8 @@ public sealed class DesktopAgent
                 parts.Processes ?? NoProcesses.Instance,
                 parts.Time,
                 parts.CodeJobControlOptions,
-                parts.Os));
+                parts.Os,
+                parts.GitCacheFolder));
         CodeJobs = new CodeJobSharing(
             () => Settings,
             new CodeJobStore(parts.CodeJobsStateFile, parts.Time, parts.Log),

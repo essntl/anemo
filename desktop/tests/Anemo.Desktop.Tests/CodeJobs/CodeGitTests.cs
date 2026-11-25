@@ -307,7 +307,7 @@ public sealed class CodeGitTests : IDisposable
     }
 
     /// <summary>The real git on PATH, run as the app's hosts run it (argument lists, UTF-8 output).</summary>
-    private sealed class RealGit(string git) : ICodeHost
+    internal sealed class RealGit(string git) : ICodeHost
     {
         public static string? Find()
         {

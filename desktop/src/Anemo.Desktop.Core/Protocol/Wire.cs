@@ -51,7 +51,9 @@ public static class Wire
     /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4). <c>code_images</c>:
     /// a <c>code_start</c> may carry images (1.3.0); always so where starting is offered.
     /// <c>code_git</c>: the read-only git actions <c>code_git_graph</c> and <c>code_git_commit</c>
-    /// are there (§7.5, 1.5.0); offered with sharing, which they need.
+    /// are there (§7.5, 1.5.0); offered with sharing, which they need. <c>code_git_remote</c>: they
+    /// also take <c>repo</c> and <c>fetch</c>, and <c>code_git_cache_clear</c> is there (§7.6, 1.6.0);
+    /// always with <c>code_git</c>.
     /// <paramref name="shellKind"/>: powershell, pwsh, zsh or bash (§2, 1.4.0).
     /// </summary>
     public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell") => Json(new JsonObject
@@ -63,6 +65,7 @@ public static class Wire
         ["code_start"] = codeStart,
         ["code_images"] = codeStart,
         ["code_git"] = code,
+        ["code_git_remote"] = code,
         ["shell_kind"] = shellKind,
     });
 
