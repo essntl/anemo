@@ -361,6 +361,15 @@ class CodeSettings(BaseModel):
     keep_days: int = Field(30, ge=1, le=365)
 
 
+class PluginSettings(BaseModel):
+    """Settings > Plugins (docs/specs/CONTRACTS-plugins.md §5). Not sensitive: switching
+    every plugin off must be quick."""
+
+    # The kill switch: every plugin stops at once (no frames, calls, commands, scripts or
+    # plugin MCP tools), whatever its own switch says; turning it off restores them.
+    disabled_all: bool = False
+
+
 @dataclass(frozen=True)
 class SectionSpec:
     model: type[BaseModel]
@@ -389,4 +398,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "voice": SectionSpec(VoiceSettings),
     "code": SectionSpec(CodeSettings),
     "images": SectionSpec(ImageSettings, sensitive=True),
+    "plugins": SectionSpec(PluginSettings),
 }
