@@ -4,6 +4,7 @@ The API never runs model calls for chat/agent turns itself; it enqueues work
 for the worker and streams events back to the browser.
 """
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,11 +25,14 @@ from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
 from app.core.redis import close_redis
 from app.features.auth.service import warn_if_plaintext_password
+from app.features.triggers import files_hook
+from app.features.triggers import listener as trigger_listener
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     warn_if_plaintext_password()
+    files_hook.install(asyncio.get_running_loop())  # file.created events
     yield
     await dispose_engine()
     await close_redis()
@@ -37,6 +41,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    trigger_listener.install()  # events about tasks, calendar events, documents, code jobs
     app = FastAPI(
         title="anemo",
         version=__version__,

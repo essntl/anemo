@@ -16,6 +16,8 @@ from app.core.db import dispose_engine
 from app.core.logging import configure_logging
 from app.core.redis import close_redis, get_redis
 from app.features import parts
+from app.features.triggers import files_hook
+from app.features.triggers import listener as trigger_listener
 from app.jobs import scheduler
 from app.jobs.runner import JobRunner
 
@@ -73,6 +75,8 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
+    trigger_listener.install()  # events about tasks, calendar events, documents, code jobs
+    files_hook.install(loop)  # file.created events
     log.info("worker starting", extra={"ctx": {"worker_id": wid}})
     beat = asyncio.create_task(heartbeat_loop(wid, stop))
     runner_status = asyncio.create_task(runner_status_loop(stop))

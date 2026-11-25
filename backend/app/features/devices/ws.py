@@ -48,6 +48,7 @@ from app.features.code_sessions import ingest as code_ingest
 from app.features.devices import relay, service
 from app.features.devices.models import Device
 from app.features.devices.phone_events import PhoneFilter
+from app.features.triggers import events as trigger_events
 from app.features.voice import mode as voice_mode
 
 log = logging.getLogger(__name__)
@@ -359,6 +360,11 @@ class Connection:
                 await service.seen(db, self.device_id)
 
 
+def _device_event(device: Device) -> dict[str, Any]:
+    """The data of a device.online / device.offline event (features/triggers)."""
+    return {"device_id": str(device.id), "name": device.name, "kind": device.kind}
+
+
 async def _close(ws: WebSocket, code: int, reason: str) -> None:
     with contextlib.suppress(Exception):
         await ws.close(code=code, reason=reason)
@@ -420,7 +426,12 @@ async def device_socket(ws: WebSocket) -> None:
         pubsub = None
     tasks: list[asyncio.Task[None]] = []
     try:
+        was_online = device.id in await relay.connected([device.id])
         await relay.connect(device.id, connection.conn)
+        if not was_online:  # not a new connection replacing one that was still open
+            await trigger_events.emit_now(
+                "device.online", _device_event(device), subject=str(device.id)
+            )
         if device.kind == "phone":
             cursor = last_id or await _head()
             missed = await _missed(last_id)
@@ -470,6 +481,11 @@ async def device_socket(ws: WebSocket) -> None:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await relay.disconnect(device.id, connection.conn)
-        if connection.sent_code and device.id not in await relay.connected([device.id]):
+        still_online = device.id in await relay.connected([device.id])
+        if connection.sent_code and not still_online:
             await code_ingest.device_offline(device.id)
+        if not still_online:
+            await trigger_events.emit_now(
+                "device.offline", _device_event(device), subject=str(device.id)
+            )
         log.info("device disconnected", extra={"ctx": {"device_id": str(device.id), "ip": ip}})
