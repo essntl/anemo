@@ -124,3 +124,37 @@ def test_an_overlay_is_reviewed_as_medium_risk() -> None:
     assert items["layer"].risk == "medium"
     assert items["layer"].detail == "Draws over Anemo's window (click-through)"
     assert items["s"].risk == "low"
+
+
+def test_code_read_is_high_risk_and_covers_only_the_read_tools() -> None:
+    info = permissions.permission_info("code:read")
+    assert (info.kind, info.risk) == ("code:read", "high")
+    assert info.label == "Read projects and git history on your computers"
+    assert permissions.READ_WARNING in info.explanation
+    assert permissions.covered_tools(["code:read"]) == {"code_projects", "code_git_graph"}
+    # A read permission: a preview may use it without asking.
+    assert permissions.read_tools(["code:read"]) == {"code_projects", "code_git_graph"}
+    allowed = permissions.policy_for(parsed(["code:read"]))
+    assert evaluate(Action(capability="code.see", risk="safe"), allowed).decision == "allow"
+    assert evaluate(Action(capability="code.run", risk="moderate"), allowed).decision == "ask"
+
+
+def test_a_code_panel_is_reviewed_as_low_risk() -> None:
+    found = Manifest.model_validate(
+        {
+            "manifestVersion": 1,
+            "id": "artem.git-graph",
+            "version": "1.0.0",
+            "name": "Git graph",
+            "description": "A graph.",
+            "author": {"name": "Artem"},
+            "permissions": ["code:read"],
+            "contributes": {
+                "ui": [
+                    {"id": "graph", "slot": "code.panel", "title": "Git graph", "entry": "a.html"}
+                ]
+            },
+        }
+    )
+    (item,) = permissions.contributions(found)
+    assert (item.risk, item.detail) == ("low", "Adds a tab “Git graph” to the Code page")

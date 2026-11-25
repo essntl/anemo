@@ -9,6 +9,10 @@ How the page follows a job:
      are stored. A `code.job` whose last_seq is past the events the page has means it
      missed some: it fetches events?after_seq=… again. Without Valkey, the stream sends
      the job from the database every few seconds instead.
+
+The Git view reads a repository's graph and commits from a computer (git.py): POST
+/api/code/devices/{id}/git/graph and …/git/commit, with `project` (a local checkout) or
+`repo` (owner/name of a GitHub repository not cloned there).
 """
 
 import asyncio
@@ -19,13 +23,14 @@ from datetime import datetime
 
 from fastapi import APIRouter, Header, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import Field
 from redis.exceptions import RedisError
 
 from app.api.deps import Db
 from app.api.sse import comment, frame, sse_response
 from app.core.db import get_sessionmaker
 from app.events import bus
-from app.features.code_sessions import control, service
+from app.features.code_sessions import control, git, service
 from app.features.code_sessions.models import State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -193,3 +198,37 @@ async def follow_up(job_id: uuid.UUID, body: CodeFollowUpIn, db: Db) -> CodeJobO
 async def cancel_job(job_id: uuid.UUID, db: Db) -> CodeJobOut:
     """Cancel a running job; one that has ended is returned as it is."""
     return await control.cancel_job(db, job_id)
+
+
+# -- git: the Git view (local checkouts and the owner's GitHub repositories) -------------------
+
+
+class CodeGitGraphIn(git.GitWhere):
+    limit: int = Field(git.DEFAULT_LIMIT, ge=1, le=git.MAX_LIMIT)
+    all: bool = Field(True, description="Every branch; false: what HEAD can reach")
+    fetch: bool = Field(False, description="git fetch --prune first (slower)")
+
+
+class CodeGitCommitIn(git.GitWhere):
+    hash: str = Field(pattern=git.HASH)
+
+
+@router.post("/devices/{device_id}/git/graph", response_model=git.GitGraph)
+async def git_graph(device_id: uuid.UUID, body: CodeGitGraphIn, db: Db) -> git.GitGraph:
+    """A repository's graph, in the same shape as the plugin method `code.gitGraph`. A
+    POST: a fetch changes what the computer has (its remote branches, its cache)."""
+    return await git.graph(
+        db, device_id, body, limit=body.limit, all_refs=body.all, fetch=body.fetch
+    )
+
+
+@router.post("/devices/{device_id}/git/commit", response_model=git.GitCommitDetail)
+async def git_commit(device_id: uuid.UUID, body: CodeGitCommitIn, db: Db) -> git.GitCommitDetail:
+    """One commit's metadata and the files it changed (no diff), as `code.gitCommit`."""
+    return await git.commit(db, device_id, body, body.hash)
+
+
+@router.post("/devices/{device_id}/git/cache/clear", response_model=git.GitCacheCleared)
+async def git_cache_clear(device_id: uuid.UUID, db: Db) -> git.GitCacheCleared:
+    """Remove the computer's cached clones of repositories that aren't cloned there."""
+    return await git.clear_cache(db, device_id)

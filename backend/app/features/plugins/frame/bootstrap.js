@@ -27,6 +27,10 @@
  *   const picked = await anemo.ui.pickFile({ accept: ['image/gif'] })   // after a click
  *   const { viewport, anchors, route } = await anemo.layout.get()
  *   anemo.files.url('sprites/idle.gif')      // a picture of the package, as a data: URL
+ *   anemo.on('code.job', ({ jobId, state }) => refresh())   // a code.panel: a job of its project
+ *
+ * The slots: "object.panel", "page", "settings", "chat.block", "overlay" and "code.panel"
+ * (a tab on the Code page; its context is {code: {device, project, jobId}}).
  *
  * An overlay (slot "overlay") is a transparent layer over Anemo's whole window that lets
  * every click through, except inside the rectangles it names with

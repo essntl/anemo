@@ -558,6 +558,7 @@ async def _publish(db: AsyncSession, job: CodeJob, changes: _Changes) -> None:
             {
                 "job_id": str(job.id),
                 "thread_id": str(job.thread_id),
+                "device_id": str(job.device_id),
                 "state": job.state,
                 "project": job.project,
             },

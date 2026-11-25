@@ -36,6 +36,33 @@ in `err.txt`. **`bypassPermissions` means Anemo's agents can make Claude Code
 do anything it can on this computer**: tick it only on a computer you'd give PowerShell to.
 Needs `claude` on PATH, and `gh` (signed in) or `git` for cloning.
 
+**Reading git history (1.5.0).** With sharing on, a trusted computer also answers Anemo's
+read-only git requests for a project in the projects folder: its branches (with ahead and
+behind), tags, recent commits, whether there are uncommitted changes, and one commit's
+changed file names and line counts. Plugins on the Code page (`code:read`) and the agent
+tool `code_git_graph` use them. Only a fixed set of read-only git commands runs, with its
+arguments as a list (never through a shell), in a folder that must be inside the projects
+folder (no `..`, no links out of it); never file contents or diffs. Contract:
+`docs/device-contracts.md` §7.5.
+
+**Remote repositories, fetching and pull requests (1.6.0).** The same reads also take a
+GitHub repository of the owner (`repo: "owner/name"`) that isn't cloned on the computer: only
+one in the owner's `gh repo list` (the owner set in Settings, else gh's account), cloned from
+the URL in that list, never one Anemo sends. It is read from a *blobless bare clone* (commits
+and trees, no file contents) in Anemo Desktop's own data folder, `%APPDATA%\Anemo
+Desktop\git-cache\<owner>\<name>.git` (`~/Library/Application Support/Anemo
+Desktop/git-cache/…` on the Mac), never in the projects folder, so no job and no project list
+sees it. A clone is made in a temporary folder beside it and moved into place only once it is
+complete; it is fetched again when Anemo asks (`fetch`) or when its last fetch is more than
+10 minutes old. A repository over 1 GB (or whose clone takes over 3 minutes) is removed and
+not read; past 3 GB in all, the least recently read repositories are removed. Anemo can clear the git
+cache (the `code_git_cache_clear` action), or quit Anemo Desktop and delete the
+`git-cache` folder. A local project can be fetched too (`git fetch --prune --all`, hooks off,
+60 s; a failure still answers, with what was there). Where `gh` is signed in, the graph also
+lists the repository's open pull requests (`gh pr list`, kept 2 minutes). A clone or fetch
+git refuses for want of a sign-in answers `unauthenticated`: run `gh auth login` and
+`gh auth setup-git`. Contract: `docs/device-contracts.md` §7.6.
+
 ## Layout
 
 ```
@@ -135,6 +162,7 @@ Windows 10 1903 or later is needed (Windows.Graphics.Capture).
 | Connection log | `%APPDATA%\Anemo Desktop\logs\connection-<day>.log`: connects, drops, close codes, "code job discovered/ended" with the job id only; tokens are redacted; 7 days |
 | Startup | `shell:startup\Anemo Desktop.lnk` |
 | PowerShell's folder | `%USERPROFILE%\AnemoWork` unless set in Settings |
+| Git cache (1.6.0) | `%APPDATA%\Anemo Desktop\git-cache\<owner>\<name>.git`: blobless bare clones of the owner's GitHub repositories for the remote git reads (no file contents); each repository's `anemo-fetched` and `anemo-read` files keep its last fetch and read; at most 1 GB each, 3 GB in all. `git-no-hooks` beside it is an empty folder git uses as `core.hooksPath` for every clone and fetch |
 | Claude Code jobs | `%APPDATA%\Anemo Desktop\code-jobs.json`: per job only how far Anemo acked it (`acked_seq`, `acked_offset`), the last state sent and whether it is settled; jobs older than 14 days are forgotten; a damaged file starts empty (Anemo's acks repair it) |
 
 ## macOS
@@ -228,3 +256,12 @@ its jobs show on the Code page too. Tests: `node --test bridge/cc.test.mjs`.
   patterns; the prompt goes to Claude Code through `prompt.txt`, never on a command line.
   Cancelling ends the job's process tree only when that process is still the job's (a pid
   another program got since is left alone).
+- Git reads (1.5.0) need sharing on and a trusted device, not control. They run git by its
+  full path (never a `.cmd`/`.bat`) with `core.fsmonitor`, signature checks, optional locks
+  and lazy fetches off, 10 s per command, and answer metadata only; credentials in remote
+  URLs are removed.
+- Remote git reads (1.6.0) clone only the owner's repositories, from the URL gh lists, into the
+  git cache (checked to stay inside it once links are followed), with hooks, `ext::` and
+  `file://` transports, submodules and automatic maintenance off and `GIT_TERMINAL_PROMPT=0`.
+  A fetch never touches a working tree or a local branch. git's and gh's own error text is
+  never passed on.

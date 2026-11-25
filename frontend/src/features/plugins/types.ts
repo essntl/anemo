@@ -37,7 +37,7 @@ export type ActorOut = Schemas['ActorOut']
 export type Risk = PermissionOut['risk']
 export type PluginStatus = PluginOut['status']
 export type VersionStatus = PluginVersionOut['status']
-export type Slot = 'object.panel' | 'page' | 'settings' | 'chat.block' | 'overlay'
+export type Slot = 'object.panel' | 'page' | 'settings' | 'chat.block' | 'overlay' | 'code.panel'
 export type ObjectType = 'task' | 'document' | 'event'
 
 const OBJECT_TYPES: readonly string[] = ['task', 'document', 'event']

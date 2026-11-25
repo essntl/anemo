@@ -3780,6 +3780,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/devices/{device_id}/git/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Git Graph
+         * @description A repository's graph, in the same shape as the plugin method `code.gitGraph`. A
+         *     POST: a fetch changes what the computer has (its remote branches, its cache).
+         */
+        post: operations["git_graph_api_code_devices__device_id__git_graph_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices/{device_id}/git/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Git Commit
+         * @description One commit's metadata and the files it changed (no diff), as `code.gitCommit`.
+         */
+        post: operations["git_commit_api_code_devices__device_id__git_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices/{device_id}/git/cache/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Git Cache Clear
+         * @description Remove the computer's cached clones of repositories that aren't cloned there.
+         */
+        post: operations["git_cache_clear_api_code_devices__device_id__git_cache_clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research/sessions": {
         parameters: {
             query?: never;
@@ -6316,6 +6377,51 @@ export interface components {
              */
             image_ids?: string[];
         };
+        /** CodeGitCommitIn */
+        CodeGitCommitIn: {
+            /**
+             * Project
+             * @description A folder in the computer's projects folder (a local checkout)
+             */
+            project?: string | null;
+            /**
+             * Repo
+             * @description owner/name of one of the owner's GitHub repositories that isn't cloned there (read from a cache on the computer)
+             */
+            repo?: string | null;
+            /** Hash */
+            hash: string;
+        };
+        /** CodeGitGraphIn */
+        CodeGitGraphIn: {
+            /**
+             * Project
+             * @description A folder in the computer's projects folder (a local checkout)
+             */
+            project?: string | null;
+            /**
+             * Repo
+             * @description owner/name of one of the owner's GitHub repositories that isn't cloned there (read from a cache on the computer)
+             */
+            repo?: string | null;
+            /**
+             * Limit
+             * @default 300
+             */
+            limit: number;
+            /**
+             * All
+             * @description Every branch; false: what HEAD can reach
+             * @default true
+             */
+            all: boolean;
+            /**
+             * Fetch
+             * @description git fetch --prune first (slower)
+             * @default false
+             */
+            fetch: boolean;
+        };
         /** CodeImageOut */
         CodeImageOut: {
             /**
@@ -6462,6 +6568,8 @@ export interface components {
             dir: string;
             /** Remote */
             remote: string | null;
+            /** Repo */
+            repo?: string | null;
         };
         /** CodeProjectsOut */
         CodeProjectsOut: {
@@ -6478,6 +6586,8 @@ export interface components {
             name: string;
             /** Url */
             url: string;
+            /** Repo */
+            repo?: string | null;
         };
         /**
          * CodeSettings
@@ -7683,12 +7793,185 @@ export interface components {
              */
             language: "system" | "en" | "uk" | "ru";
         };
+        /** GitBranch */
+        GitBranch: {
+            /** Name */
+            name: string;
+            /** Commit */
+            commit: string;
+            /** Remote */
+            remote: boolean;
+            /** Upstream */
+            upstream: string | null;
+            /** Ahead */
+            ahead: number;
+            /** Behind */
+            behind: number;
+            /** Current */
+            current: boolean;
+            pullRequest?: components["schemas"]["GitPullRequest"] | null;
+        };
+        /** GitCacheCleared */
+        GitCacheCleared: {
+            /** Removed */
+            removed: number;
+            /** Bytes */
+            bytes: number;
+        };
+        /** GitCommitDetail */
+        GitCommitDetail: {
+            /** Hash */
+            hash: string;
+            /** Parents */
+            parents: string[];
+            /** Authorname */
+            authorName: string;
+            /** Authoremail */
+            authorEmail: string;
+            /** Date */
+            date: string;
+            /** Subject */
+            subject: string;
+            /** Committerdate */
+            committerDate: string;
+            /** Body */
+            body: string;
+            /** Files */
+            files: components["schemas"]["GitFile"][];
+            stats: components["schemas"]["GitStats"];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** GitFile */
+        GitFile: {
+            /** Path */
+            path: string;
+            /** Status */
+            status: string;
+            /** Additions */
+            additions: number | null;
+            /** Deletions */
+            deletions: number | null;
+        };
+        /** GitGraph */
+        GitGraph: {
+            head: components["schemas"]["GitHead"];
+            /** Branches */
+            branches: components["schemas"]["GitBranch"][];
+            /** Tags */
+            tags: components["schemas"]["GitTag"][];
+            /** Commits */
+            commits: components["schemas"]["GitGraphCommit"][];
+            status: components["schemas"]["GitStatus"] | null;
+            /** Remotes */
+            remotes: components["schemas"]["GitRemote"][];
+            /** Truncated */
+            truncated: boolean;
+            /**
+             * Source
+             * @default local
+             * @enum {string}
+             */
+            source: "local" | "remote";
+            /** Repo */
+            repo?: string | null;
+            /** Fetchedat */
+            fetchedAt?: string | null;
+            /** Fetcherror */
+            fetchError?: string | null;
+            /** Pullrequests */
+            pullRequests?: components["schemas"]["GitPullRequest"][] | null;
+        };
+        /** GitGraphCommit */
+        GitGraphCommit: {
+            /** Hash */
+            hash: string;
+            /** Parents */
+            parents: string[];
+            /** Authorname */
+            authorName: string;
+            /** Authoremail */
+            authorEmail: string;
+            /** Date */
+            date: string;
+            /** Subject */
+            subject: string;
+            /**
+             * Refs
+             * @default []
+             */
+            refs: string[];
+        };
+        /** GitHead */
+        GitHead: {
+            /** Branch */
+            branch: string | null;
+            /** Commit */
+            commit: string | null;
+            /** Detached */
+            detached: boolean;
+        };
         /** GitInstallIn */
         GitInstallIn: {
             /** Url */
             url: string;
             /** Ref */
             ref?: string | null;
+        };
+        /** GitPullRequest */
+        GitPullRequest: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /** Headref */
+            headRef: string;
+            /** Url */
+            url: string;
+            /**
+             * Draft
+             * @default false
+             */
+            draft: boolean;
+        };
+        /** GitRemote */
+        GitRemote: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+        };
+        /** GitStats */
+        GitStats: {
+            /** Files */
+            files: number;
+            /** Additions */
+            additions: number;
+            /** Deletions */
+            deletions: number;
+        };
+        /** GitStatus */
+        GitStatus: {
+            /** Dirty */
+            dirty: boolean;
+            /** Staged */
+            staged: number;
+            /** Unstaged */
+            unstaged: number;
+            /** Untracked */
+            untracked: number;
+            /** Conflicted */
+            conflicted: number;
+        };
+        /** GitTag */
+        GitTag: {
+            /** Name */
+            name: string;
+            /** Commit */
+            commit: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -21107,6 +21390,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_graph_api_code_devices__device_id__git_graph_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeGitGraphIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitGraph"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_commit_api_code_devices__device_id__git_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeGitCommitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitCommitDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_cache_clear_api_code_devices__device_id__git_cache_clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitCacheCleared"];
                 };
             };
             /** @description Validation Error */

@@ -148,7 +148,12 @@ async def test_projects_through_the_computer(authed):
     await ws.send({"type": "device.result", "id": command["id"], "ok": True, "state": answer})
     r = await asking
     assert r.status_code == 200, r.text
-    assert r.json() == answer
+    # As the computer said, with the GitHub repository each one is (the Git view's `repo`).
+    assert r.json() == {
+        "projects": [{**answer["projects"][0], "repo": None}],
+        "remote": [{**answer["remote"][0], "repo": "essntl/site"}],
+        "note": None,
+    }
     await ws.disconnect()
 
 

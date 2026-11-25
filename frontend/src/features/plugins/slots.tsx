@@ -5,6 +5,8 @@
  *  - `PluginPanels`: the `object.panel` frames on a task or an event;
  *  - `PluginDocumentPanel` (with `usePluginDocumentTabs` in slotData.ts): one tab per panel
  *    beside a document;
+ *  - `PluginCodePanel` (with `usePluginCodeTabs` in slotData.ts): one tab per `code.panel`
+ *    beside a job on the Code page;
  *  - `PluginLinks`: the plugins' pages, in their own group of the sidebar;
  *  - `PluginFences`: registers each `chat.block` fence with lib/fenceRenderers, so chat
  *    answers draw it (mounted once in AppLayout);
@@ -18,9 +20,9 @@ import { cn } from '@/lib/cn'
 import { type FenceRendererProps, registerFenceRenderer } from '@/lib/fenceRenderers'
 import { t } from '@/lib/i18n'
 import { usePluginContributions } from './api'
-import { PluginFrame } from './host/PluginFrame'
+import { PluginFrame, type PluginFrameProps } from './host/PluginFrame'
 import { NamedIcon, PluginIcon } from './PluginIcon'
-import { activeFences, documentTabId, framePlugin, pagesOf, panelsFor, pluginPageLink, usePluginUis } from './slotData'
+import { activeFences, codeTabId, documentTabId, framePlugin, pagesOf, panelsFor, pluginPageLink, usePluginUis } from './slotData'
 import type { ContributionUi, ObjectType } from './types'
 
 /** A plugin's small heading above its panel: its icon and the panel's title. */
@@ -67,6 +69,27 @@ export function PluginDocumentPanel({ tabId, documentId, revision }: { tabId: st
         permissions={ui.permissions} pages={pagesOf(all, ui.plugin)} context={{ object: { type: 'document', id: documentId } }}
         active height={ui.height} revision={revision} title={ui.title ?? ui.plugin_name} />
     </div>
+  )
+}
+
+/** What a `code.panel` frame is about (contract §3): the open job's computer and project. */
+export interface CodePanelContext {
+  code: { device: string; project: string; jobId: string | null }
+}
+
+/**
+ * The content of a plugin's tab on the Code page: its frame, filling the box. It stays
+ * while another job is opened (the frame gets `context.changed`); `events` sends it the
+ * page's `code.job`.
+ */
+export function PluginCodePanel({ tabId, context, events }: { tabId: string; context: CodePanelContext; events?: PluginFrameProps['events'] }) {
+  const all = usePluginUis()
+  const ui = all.find((u) => u.slot === 'code.panel' && codeTabId(u) === tabId)
+  if (!ui) return null
+  return (
+    <PluginFrame key={`${ui.plugin}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="code.panel"
+      permissions={ui.permissions} pages={pagesOf(all, ui.plugin)} context={context} events={events}
+      active fill title={ui.title ?? ui.plugin_name} />
   )
 }
 

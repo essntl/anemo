@@ -5,9 +5,11 @@ computers that run Anemo Desktop (docs/specs/code-sessions.md §8, §12.3).
   code_start(device, project, prompt, …)   starts a job (`claude -p` in the project)
   code_status(job_id)     state, todo list, last activities, result
   code_cancel(job_id)     cancels a running job
+  code_git_graph(device, project | repo)   branches, ahead/behind, pull requests, recent
+                          commits, dirty state; also of a GitHub repository not cloned
 
-Permissions: `code.see` (projects, status; "safe") and `code.run` (start, cancel;
-"moderate"). Jobs are only started on and cancelled on a trusted computer that allows it
+Permissions: `code.see` (projects, status, git history; "safe") and `code.run` (start,
+cancel; "moderate"). Jobs are only started on and cancelled on a trusted computer that allows it
 in Anemo Desktop: a watched computer is refused by `run()`, never asked about (its jobs
 run with bypassPermissions, as strong as PowerShell). The service (features/code_sessions/
 control.py) checks the computer live before every command.
@@ -23,9 +25,9 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
-from app.features.code_sessions import control, ingest, service
+from app.features.code_sessions import control, git, ingest, service
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent
-from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName
+from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName, RepoName
 from app.features.devices import service as devices
 from app.features.devices.models import Device
 from app.policy.models import Action
@@ -152,8 +154,14 @@ class CodeProjects(Tool):
             lines.append(f"- {project.name} ({project.dir}{remote})")
         if not found.projects:
             lines.append("(none)")
-        lines += ["", "On GitHub, not cloned yet (code_start clones them):"]
-        lines += [f"- {r.name} ({r.url})" for r in found.remote[:MAX_LISTED]] or ["(none)"]
+        lines += [
+            "",
+            "On GitHub, not cloned yet (code_start clones them; code_git_graph reads them "
+            "with repo=owner/name):",
+        ]
+        lines += [f"- {r.name} ({r.repo or r.url})" for r in found.remote[:MAX_LISTED]] or [
+            "(none)"
+        ]
         if found.note:
             lines.append(f"Note: {found.note}")
         return ToolResult(content="\n".join(lines))
@@ -430,5 +438,143 @@ class CodeCancel(Tool):
         return ToolResult(content=f"Claude Code job {job.id} is {state} now.", data=_data(job.id))
 
 
-CODE_TOOLS: list[Tool] = [CodeProjects(), CodeStart(), CodeStatus(), CodeCancel()]
+# -- code_git_graph --------------------------------------------------------------------------
+
+GRAPH_COMMITS = 30  # the commits code_git_graph shows by default
+MAX_GRAPH_COMMITS = 200
+MAX_LISTED_REFS = 40
+
+
+class GitGraphInput(git.GitWhere):
+    device: str = Field(min_length=1, max_length=100, description=DEVICE_DESCRIPTION)
+    project: ProjectName | None = Field(
+        None, description="A project's folder name (see code_projects); or give repo"
+    )
+    repo: RepoName | None = Field(
+        None,
+        description="owner/name of a GitHub repository listed by code_projects as not cloned "
+        "yet; read without cloning it into the projects folder",
+    )
+    limit: int = Field(
+        GRAPH_COMMITS, ge=1, le=MAX_GRAPH_COMMITS, description="How many recent commits to show"
+    )
+    fetch: bool = Field(
+        False, description="git fetch first, so the remote branches are current (slower)"
+    )
+
+
+def _short(commit: str | None) -> str:
+    return commit[:7] if commit else "none"
+
+
+def _tracking(branch: git.GitBranch) -> str:
+    if branch.upstream is None:
+        return "no upstream"
+    if branch.ahead == branch.behind == 0:
+        return f"up to date with {branch.upstream}"
+    return f"{branch.ahead} ahead, {branch.behind} behind {branch.upstream}"
+
+
+def _working_tree(status: git.GitStatus | None) -> str:
+    if status is None:
+        return "none (read from a cache on the computer, not cloned there)"
+    if not status.dirty:
+        return "clean"
+    counts = [
+        (status.staged, "staged"),
+        (status.unstaged, "changed, not staged"),
+        (status.untracked, "untracked"),
+        (status.conflicted, "conflicted"),
+    ]
+    return "uncommitted changes: " + ", ".join(f"{n} {what}" for n, what in counts if n)
+
+
+def git_summary(found: git.GitGraph) -> str:
+    """The graph as a model reads it: HEAD, the working tree, branches with ahead/behind,
+    and the commits as a list, newest first, with each merge's parents."""
+    head = found.head
+    if head.commit is None:
+        at = f"on {head.branch or '?'}, no commits yet"
+    elif head.detached:
+        at = f"detached at {_short(head.commit)}"
+    else:
+        at = f"on {head.branch} at {_short(head.commit)}"
+    lines = [f"HEAD: {at}", f"Working tree: {_working_tree(found.status)}"]
+    if found.repo:
+        lines.append(f"GitHub: {found.repo}")
+    if found.fetched_at:
+        lines.append(f"Last fetched: {found.fetched_at}")
+    if found.fetch_error:
+        lines.append(f"Fetch: {found.fetch_error}")
+    if found.remotes:
+        lines.append("Remotes: " + ", ".join(f"{r.name} {r.url}" for r in found.remotes[:5]))
+    local = [b for b in found.branches if not b.remote]
+    lines.append(f"Local branches ({len(local)}):" if local else "No local branches.")
+    for branch in local[:MAX_LISTED_REFS]:
+        mark = "*" if branch.current else "-"
+        pr = branch.pull_request
+        open_pr = f", pull request #{pr.number} “{_one_line(pr.title, 100)}”" if pr else ""
+        lines.append(
+            f"{mark} {branch.name} at {_short(branch.commit)}, {_tracking(branch)}{open_pr}"
+        )
+    remote = [b.name for b in found.branches if b.remote]
+    if remote:
+        shown = ", ".join(remote[:MAX_LISTED_REFS])
+        lines.append(f"Remote branches: {shown}" + (" …" if len(remote) > MAX_LISTED_REFS else ""))
+    if found.tags:
+        lines.append("Tags: " + ", ".join(t.name for t in found.tags[:MAX_LISTED_REFS]))
+    more = " (more before these)" if found.truncated else ""
+    lines.append(f"Commits, newest first{more}:" if found.commits else "No commits.")
+    for c in found.commits:
+        refs = f" ({', '.join(c.refs)})" if c.refs else ""
+        merge = (
+            f" [merge of {', '.join(_short(p) for p in c.parents)}]" if len(c.parents) > 1 else ""
+        )
+        line = f"{_short(c.hash)} {c.date[:10]} {c.author_name}: {c.subject}{refs}{merge}"
+        lines.append(_one_line(line, 300))
+    return "\n".join(lines)
+
+
+class CodeGitGraph(Tool):
+    name = "code_git_graph"
+    description = (
+        "Read a project's git state on a computer (Anemo Desktop): the current branch, the "
+        "branches with how far ahead and behind their upstream they are, tags, the recent "
+        "commits (merges marked) and whether there are uncommitted changes. Read-only, no "
+        "shell; use it to check what a Claude Code job committed."
+    )
+    capability = SEE
+    Input = GitGraphInput
+    timeout_s = git.REMOTE_TIMEOUT_S + 15
+
+    def actions(self, args: GitGraphInput, ctx: ToolContext) -> list[Action]:
+        where = f"project:{args.project}" if args.project else f"repo:{args.repo}"
+        return [
+            Action(
+                capability=SEE,
+                resource=f"{_resource(ctx, args.device)}/{where}",
+                risk="safe",
+                summary=f"Read the git history of {args.label} on {args.device}"
+                + _watched_note(ctx, args.device),
+            )
+        ]
+
+    async def run(self, args: GitGraphInput, ctx: ToolContext) -> ToolResult:
+        device = await _computer(args.device)
+        if isinstance(device, ToolResult):
+            return device
+        if (refused := _refuse_watched(device)) is not None:
+            return refused
+        try:
+            async with get_sessionmaker()() as db:
+                found = await git.graph(db, device.id, args, limit=args.limit, fetch=args.fetch)
+        except AppError as exc:
+            return _error(exc)
+        summary = untrusted(f"git of {args.label} on {device.name}", git_summary(found))
+        return ToolResult(
+            content=f"Git of {args.label} on {device.name} {FROM_COMPUTER}\n{summary}"
+        )
+
+
+CODE_TOOLS: list[Tool] = [CodeProjects(), CodeStart(), CodeStatus(), CodeCancel(), CodeGitGraph()]
 CODE_TOOL_NAMES = frozenset(t.name for t in CODE_TOOLS)

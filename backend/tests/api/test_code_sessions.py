@@ -182,9 +182,11 @@ async def test_a_trusted_computer_shares_a_job(authed):
     assert await announce(ws) == 3
     # The lists hear about it on the global stream.
     notices = await global_notices()
+    # With its computer, so a plugin's Code panel hears of the jobs of its project.
     assert notices[0] == {
         "job_id": shared["id"],
         "thread_id": shared["id"],
+        "device_id": device["id"],
         "state": "running",
         "project": "anemo",
     }

@@ -24,13 +24,43 @@ public sealed class CodeJobControlOptions
     /// <summary>How long a cancel waits for a stopped clone to end before it answers.</summary>
     public TimeSpan CancelWait { get; init; } = TimeSpan.FromSeconds(20);
 
+    /// <summary>Each git command of a <c>code_git_*</c> read gets this long (1.5.0).</summary>
+    public TimeSpan GitTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary><c>fetch: true</c> on a local checkout, and a fetch of the git cache, gets this long (1.6.0).</summary>
+    public TimeSpan GitFetchTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>A clone into the git cache gets this long; one that takes longer is removed (1.6.0).</summary>
+    public TimeSpan GitCacheCloneTimeout { get; init; } = TimeSpan.FromMinutes(3);
+
+    /// <summary>A repository of the git cache is fetched again when its last fetch is older than this (1.6.0).</summary>
+    public TimeSpan GitCacheFetchAge { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>A repository of the git cache larger than this is removed and not read (1.6.0).</summary>
+    public long GitCacheRepositoryMaxBytes { get; init; } = 1L << 30;
+
+    /// <summary>After a clone, the least recently read repositories go until the git cache is at most this (1.6.0).</summary>
+    public long GitCacheMaxBytes { get; init; } = 3L << 30;
+
+    /// <summary>The owner's <c>gh repo list</c> is kept this long for the <c>repo</c> check (1.6.0).</summary>
+    public TimeSpan RepoListAge { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary><c>gh pr list</c> gets this long (1.6.0).</summary>
+    public TimeSpan PullRequestsTimeout { get; init; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>A repository's open pull requests are kept this long, unless a read fetches (1.6.0).</summary>
+    public TimeSpan PullRequestsAge { get; init; } = TimeSpan.FromMinutes(2);
+
     /// <summary>The 4 characters after the time in a new job's id (random by default).</summary>
     public Func<string>? NewIdSuffix { get; init; }
 }
 
 /// <summary>
 /// The <c>code_projects</c>, <c>code_start</c> and <c>code_cancel</c> actions
-/// (device-contracts.md §7.4, code-sessions.md §12.1). A job is started as <c>cc.ps1</c>
+/// (device-contracts.md §7.4, code-sessions.md §12.1), and the read-only git of
+/// <c>code_git_graph</c> and <c>code_git_commit</c> (§7.5, <see cref="GitReads"/>), also of the owner's
+/// GitHub repositories through a cache of blobless bare clones (§7.6, <see cref="GitRepoCache"/>),
+/// and <c>code_git_cache_clear</c>. A job is started as <c>cc.ps1</c>
 /// does it, in the same folder format, so the sharing loop finds it like any other.
 /// Programs run only through <see cref="ICodeHost"/>, with arguments made from validated
 /// values; the prompt goes through <c>prompt.txt</c>, never the command line.
@@ -60,6 +90,9 @@ public sealed partial class CodeJobControl
     };
 
     private const int PreviewChars = 200;
+
+    /// <summary>The longest <c>repo</c> taken: a 39-character owner, a slash and a 100-character name.</summary>
+    private const int MaxRepoChars = 140;
     private const string IdAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
 
     private readonly Func<DesktopSettings> _settings;
@@ -69,14 +102,27 @@ public sealed partial class CodeJobControl
     private readonly CodeJobControlOptions _options;
     private readonly DesktopPlatform _platform;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Starting> _starting = new(StringComparer.Ordinal);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTimeOffset At, IReadOnlyList<RemoteProject> List)> _repoLists =
+        new(StringComparer.Ordinal);
 
+    private readonly GitRepoCache? _cache;
+    private readonly string? _hooksFolder;
+    private readonly GitHubPullRequests _pullRequests;
+
+    /// <param name="gitCacheFolder">
+    /// Where remote repositories are cloned for reading (§7.6): the client's own data folder's
+    /// <c>git-cache</c>, never the projects folder. An empty <c>git-no-hooks</c> folder beside it
+    /// is git's <c>core.hooksPath</c> for every clone and fetch. Without it, <c>repo</c> reads and
+    /// fetches don't run.
+    /// </param>
     public CodeJobControl(
         Func<DesktopSettings> settings,
         ICodeHost host,
         IProcessProbe probe,
         TimeProvider time,
         CodeJobControlOptions? options = null,
-        DesktopPlatform? platform = null)
+        DesktopPlatform? platform = null,
+        string? gitCacheFolder = null)
     {
         _settings = settings;
         _host = host;
@@ -84,9 +130,27 @@ public sealed partial class CodeJobControl
         _time = time;
         _options = options ?? new CodeJobControlOptions();
         _platform = platform ?? DesktopPlatform.Windows;
+        _pullRequests = new GitHubPullRequests(host, time, _options.PullRequestsTimeout, _options.PullRequestsAge);
+        if (gitCacheFolder is not null)
+        {
+            var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(gitCacheFolder));
+            _hooksFolder = Path.Combine(Path.GetDirectoryName(full) ?? full, "git-no-hooks");
+            _cache = new GitRepoCache(
+                host,
+                time,
+                full,
+                _hooksFolder,
+                new GitCacheLimits(
+                    _options.GitCacheCloneTimeout,
+                    _options.GitFetchTimeout,
+                    _options.GitCacheFetchAge,
+                    _options.GitCacheRepositoryMaxBytes,
+                    _options.GitCacheMaxBytes));
+        }
     }
 
-    public static bool Handles(string action) => action is "code_projects" or "code_start" or "code_cancel";
+    public static bool Handles(string action) =>
+        action is "code_projects" or "code_start" or "code_cancel" or "code_git_graph" or "code_git_commit" or "code_git_cache_clear";
 
     private string ProjectsFolder => Setting(_settings().CodeProjectsFolder) ?? _platform.DefaultProjectsFolder;
 
@@ -131,13 +195,22 @@ public sealed partial class CodeJobControl
         {
             case "code_projects":
                 RequireShare(device);
-                return await ProjectsAsync(ct);
+                return await ProjectsAsync(args.Bool("local_only", false), ct);
             case "code_start":
                 RequireStart(device);
                 return Start(args);
             case "code_cancel":
                 RequireStart(device);
                 return await CancelAsync(args);
+            case "code_git_graph":
+                RequireShare(device);
+                return await GitGraphAsync(args, ct);
+            case "code_git_commit":
+                RequireShare(device);
+                return await GitCommitAsync(args, ct);
+            case "code_git_cache_clear":
+                RequireShare(device);
+                return CacheClear();
             default:
                 throw CommandException.Failed($"Unknown action “{action}”");
         }
@@ -157,7 +230,8 @@ public sealed partial class CodeJobControl
             return ShareOffMessage;
         }
 
-        return action != "code_projects" && !settings.StartCodeJobs ? StartOffMessage : null;
+        // Listing the projects and reading their git history need sharing only.
+        return action is "code_start" or "code_cancel" && !settings.StartCodeJobs ? StartOffMessage : null;
     }
 
     private void RequireShare(DeviceInfo device)
@@ -178,11 +252,12 @@ public sealed partial class CodeJobControl
 
     // -- code_projects -------------------------------------------------------------------
 
-    private async Task<JsonNode> ProjectsAsync(CancellationToken ct)
+    /// <param name="localOnly">The projects folder only, without asking gh for the repositories (1.5.0).</param>
+    private async Task<JsonNode> ProjectsAsync(bool localOnly, CancellationToken ct)
     {
         var folder = ProjectsFolder;
         var local = CodeProjects.Local(folder);
-        var (remote, note) = await RemoteAsync(folder, ct);
+        var (remote, note) = localOnly ? ([], null) : await RemoteAsync(folder, ct);
         if (note is null && !Directory.Exists(folder))
         {
             note = $"The projects folder {folder} doesn't exist yet.";
@@ -221,6 +296,15 @@ public sealed partial class CodeJobControl
             return ([], NoOwnerNote);
         }
 
+        return await ListReposAsync(gh, owner, folder, ct);
+    }
+
+    /// <summary>
+    /// <c>gh repo list</c> of <paramref name="owner"/>, or none and a sentence why. A list that
+    /// reads is kept for the <c>repo</c> check of the git reads (<see cref="CodeJobControlOptions.RepoListAge"/>).
+    /// </summary>
+    private async Task<(IReadOnlyList<RemoteProject> Remote, string? Note)> ListReposAsync(string gh, string owner, string folder, CancellationToken ct)
+    {
         ToolResult result;
         try
         {
@@ -239,9 +323,189 @@ public sealed partial class CodeJobControl
             return ([], $"gh couldn't list the repositories of {owner} (is it signed in? gh auth login), so only local projects are listed.");
         }
 
-        return CodeProjects.ParseRepoList(result.Stdout) is { } list
-            ? (list, null)
-            : ([], "gh's list of repositories couldn't be read, so only local projects are listed.");
+        if (CodeProjects.ParseRepoList(result.Stdout) is not { } list)
+        {
+            return ([], "gh's list of repositories couldn't be read, so only local projects are listed.");
+        }
+
+        _repoLists[owner.ToLowerInvariant()] = (_time.GetUtcNow(), list);
+        return (list, null);
+    }
+
+    // -- code_git_graph, code_git_commit, code_git_cache_clear ----------------------------
+
+    private async Task<JsonObject> GitGraphAsync(Args args, CancellationToken ct)
+    {
+        var limit = args.Int("limit", 1, GitReads.MaxLimit, GitReads.DefaultLimit);
+        var all = args.Bool("all", true);
+        var fetch = args.Bool("fetch", false);
+        var target = GitTarget(args);
+        if (target.Project is { } project)
+        {
+            var dir = ProjectFolder(project);
+            var git = GitPath();
+            var origin = GitHubRepo.FromUrl(CodeProjects.OriginUrl(dir));
+            var pullRequests = PullRequestsAsync(origin, fetch, ct);
+            var fetchError = fetch ? await GitFetch.LocalAsync(_host, git, dir, _hooksFolder, _options.GitFetchTimeout, ct) : null;
+            var graph = await new GitReads(_host, git, dir, _options.GitTimeout).GraphAsync(limit, all, ct);
+            return WithSource(graph, "local", origin, CodeProjects.FetchHeadTime(dir), fetchError, await pullRequests);
+        }
+
+        var remote = await RemoteRepoAsync(target.Repo!, ct);
+        var remoteGit = GitPath();
+        var cache = Cache();
+        var remotePullRequests = PullRequestsAsync(remote.Repo, fetch, ct);
+        using var lease = await cache.OpenAsync(remoteGit, remote.Owner, remote.Entry.Name, remote.Entry.Url, fetch, ct);
+        var remoteGraph = await new GitReads(_host, remoteGit, lease.Dir, _options.GitTimeout, bare: true).GraphAsync(limit, all, ct);
+        return WithSource(remoteGraph, "remote", remote.Repo, lease.FetchedAt, lease.FetchError, await remotePullRequests);
+    }
+
+    private async Task<JsonObject> GitCommitAsync(Args args, CancellationToken ct)
+    {
+        var target = GitTarget(args);
+        var hash = args.String("hash", 40);
+        if (!GitOutput.IsCommitRef(hash))
+        {
+            throw CommandException.Failed("“hash” must be 7 to 40 lower-case hexadecimal digits.");
+        }
+
+        if (target.Project is { } project)
+        {
+            var dir = ProjectFolder(project);
+            return await new GitReads(_host, GitPath(), dir, _options.GitTimeout).CommitAsync(hash, ct);
+        }
+
+        var remote = await RemoteRepoAsync(target.Repo!, ct);
+        var git = GitPath();
+        using var lease = await Cache().OpenAsync(git, remote.Owner, remote.Entry.Name, remote.Entry.Url, fetch: false, ct);
+        return await new GitReads(_host, git, lease.Dir, _options.GitTimeout, bare: true).CommitAsync(hash, ct);
+    }
+
+    /// <summary><c>code_git_cache_clear</c>: every repository of the git cache that no read is using goes.</summary>
+    private JsonObject CacheClear()
+    {
+        var (removed, bytes) = _cache?.Clear() ?? (0, 0);
+        return new JsonObject { ["removed"] = removed, ["bytes"] = bytes };
+    }
+
+    /// <summary>The <c>project</c> or the <c>repo</c> a read names: exactly one of them (1.6.0).</summary>
+    private static (string? Project, string? Repo) GitTarget(Args args)
+    {
+        if (args.Has("project") == args.Has("repo"))
+        {
+            throw CommandException.Failed("Name either “project” (a folder in the projects folder) or “repo” (owner/name on GitHub), not both.");
+        }
+
+        return args.Has("project")
+            ? (args.String("project", CodeJobLimits.MaxProjectChars), null)
+            : (null, args.String("repo", MaxRepoChars));
+    }
+
+    private string GitPath() => Tool("git") ?? throw CommandException.Failed("git isn't on this computer's PATH.");
+
+    private GitRepoCache Cache() =>
+        _cache ?? throw CommandException.Failed("Anemo Desktop has no folder of its own to keep remote repositories in.");
+
+    /// <summary>The open pull requests of <paramref name="repo"/> through gh, or null (no gh, no GitHub repository, any failure).</summary>
+    private Task<JsonArray?> PullRequestsAsync(string? repo, bool fetch, CancellationToken ct) =>
+        repo is null ? Task.FromResult<JsonArray?>(null) : _pullRequests.ListAsync(Tool("gh"), repo, fetch, ct);
+
+    /// <summary>§7.5's graph with the fields of §7.6.</summary>
+    private static JsonObject WithSource(JsonObject graph, string source, string? repo, DateTimeOffset? fetchedAt, string? fetchError, JsonArray? pullRequests)
+    {
+        graph["source"] = source;
+        graph["repo"] = repo;
+        graph["fetched_at"] = fetchedAt?.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        graph["fetch_error"] = fetchError;
+        graph["pull_requests"] = pullRequests;
+        return graph;
+    }
+
+    /// <summary>A remote repository a read may clone: its owner, <c>owner/name</c> as GitHub spells it, and the owner's list entry (whose URL is cloned).</summary>
+    private sealed record RemoteRepo(string Owner, string Repo, RemoteProject Entry);
+
+    /// <summary>
+    /// <c>owner/name</c> checked as §7.6 says: the pattern, the owner of Settings (else gh's
+    /// account), and a name in the owner's <c>gh repo list</c>. The URL to clone is the list's,
+    /// never one from the command. Anything else is <c>not_found</c>.
+    /// </summary>
+    private async Task<RemoteRepo> RemoteRepoAsync(string repo, CancellationToken ct)
+    {
+        var shown = JobFolder.Cut(repo, 120);
+        if (!GitHubRepo.IsRepo(repo))
+        {
+            throw CommandException.NotFound($"“{shown}” isn't a GitHub repository name (owner/name).");
+        }
+
+        var slash = repo.IndexOf('/');
+        var (owner, name) = (repo[..slash], repo[(slash + 1)..]);
+        if (await OwnerAsync(ct) is not { } known)
+        {
+            throw CommandException.NotFound(
+                "No GitHub owner is known on this computer (sign in to gh with gh auth login, or set an owner in Anemo Desktop's settings), so no remote repository is read.");
+        }
+
+        if (!string.Equals(owner, known, StringComparison.OrdinalIgnoreCase))
+        {
+            throw CommandException.NotFound($"Only repositories of {known} are read, not “{shown}”.");
+        }
+
+        var list = await RepoListAsync(known, ct);
+        var entry = list.FirstOrDefault(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase))
+            ?? throw CommandException.NotFound($"{known} has no repository “{name}” on GitHub.");
+        if (!entry.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || !GitHubRepo.IsRepo($"{known}/{entry.Name}"))
+        {
+            throw CommandException.NotFound($"gh's entry for {known}/{name} isn't one Anemo Desktop clones.");
+        }
+
+        return new RemoteRepo(known, $"{known}/{entry.Name}", entry);
+    }
+
+    /// <summary>The owner's repositories, kept <see cref="CodeJobControlOptions.RepoListAge"/>.</summary>
+    private async Task<IReadOnlyList<RemoteProject>> RepoListAsync(string owner, CancellationToken ct)
+    {
+        if (_repoLists.TryGetValue(owner.ToLowerInvariant(), out var kept) && _time.GetUtcNow() - kept.At < _options.RepoListAge)
+        {
+            return kept.List;
+        }
+
+        if (Tool("gh") is not { } gh)
+        {
+            throw CommandException.NotFound("GitHub's command line tool (gh) isn't on this computer's PATH, so the owner's repositories can't be checked.");
+        }
+
+        var (list, note) = await ListReposAsync(gh, owner, ProjectsFolder, ct);
+        return note is null
+            ? list
+            : throw CommandException.NotFound($"gh couldn't list the repositories of {owner} (is it signed in? gh auth login), so no remote repository is read.");
+    }
+
+    /// <summary>
+    /// The folder <c>&lt;projects&gt;\&lt;project&gt;</c> for a read: a plain folder name (no
+    /// <c>..</c>, no separators, no absolute path: <see cref="CodeProjects.IsProjectName"/>), that
+    /// exists, and that is still inside the projects folder once links are followed (a symlink
+    /// or junction pointing elsewhere is refused).
+    /// </summary>
+    public string ProjectFolder(string project)
+    {
+        if (!CodeProjects.IsProjectName(project) || project.StartsWith('.'))
+        {
+            throw CommandException.Failed("“project” must be the name of a folder in the projects folder.");
+        }
+
+        var root = ProjectsFolder;
+        var dir = Path.Combine(root, project);
+        if (!Directory.Exists(dir))
+        {
+            throw CommandException.NotFound($"There is no project “{project}” in {root}.");
+        }
+
+        if (!FolderLinks.IsInsideResolved(root, dir))
+        {
+            throw CommandException.Refused($"“{project}” leads out of the projects folder (a link), so Anemo doesn't read it.");
+        }
+
+        return dir;
     }
 
     // -- code_start ----------------------------------------------------------------------

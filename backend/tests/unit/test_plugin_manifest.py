@@ -371,3 +371,54 @@ def test_send_to_ui_may_name_any_ui_of_the_plugin() -> None:
     data = manifest()
     data["contributes"]["commands"] = [send_to_ui("panel", "refresh:all")]
     assert problems(data) == []
+
+
+# -- the code.panel slot (contract v1, added) ------------------------------------------------
+
+
+def code_panel(**item: Any) -> dict[str, Any]:
+    return {
+        "id": "graph",
+        "slot": "code.panel",
+        "title": "Git graph",
+        "entry": "ui/panel.html",
+        **item,
+    }
+
+
+def test_code_panels_and_code_read_are_accepted() -> None:
+    data = manifest(
+        permissions=["code:read"],
+        contributes={"ui": [code_panel(icon="git-branch"), code_panel(id="second")]},
+    )
+    assert problems(data) == []
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (
+            manifest(contributes={"ui": [code_panel(title=None)]}),
+            "contributes.ui[0].title: A code.panel needs a title",
+        ),
+        (
+            manifest(contributes={"ui": [code_panel(height=200)]}),
+            "contributes.ui[0].height: Only panels and chat blocks have a height.",
+        ),
+        (
+            manifest(contributes={"ui": [code_panel(objects=["task"])]}),
+            "contributes.ui[0].objects: Only an object.panel has objects.",
+        ),
+        (
+            manifest(contributes={"ui": [code_panel(fence="git-log")]}),
+            "contributes.ui[0].fence: Only a chat.block has a fence.",
+        ),
+        (
+            manifest(permissions=["code:write"]),
+            "permissions[0]: Anemo doesn't know the permission “code:write”.",
+        ),
+    ],
+)
+def test_code_panel_rules(data: dict[str, Any], expected: str) -> None:
+    found = problems(data)
+    assert any(expected in p for p in found), found

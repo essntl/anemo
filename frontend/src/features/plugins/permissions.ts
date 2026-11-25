@@ -40,6 +40,7 @@ const KNOWN: Record<string, { label: string; explanation: string }> = {
   'tasks:write': { label: msg('Create and change tasks'), explanation: msg('Add tasks and change them. A task it deletes goes to the Trash.') },
   'documents:write': { label: msg('Create and change documents'), explanation: msg('Write new documents and change existing ones. Every change is kept in the document’s history.') },
   'events:write': { label: msg('Create and change events'), explanation: msg('Add calendar events and change them. An event it deletes goes to the Trash.') },
+  'code:read': { label: msg('Read projects and git history on your computers'), explanation: msg('List the projects on your computers that share Claude Code jobs, and read their git history: branches, commits, authors, the names of changed files and whether there are uncommitted changes. Never file contents or diffs.') },
   'notifications:send': { label: msg('Send you notifications'), explanation: msg('Show notifications in your Inbox and on your devices.') },
 }
 

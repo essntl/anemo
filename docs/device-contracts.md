@@ -85,19 +85,25 @@ sends them after the next `welcome`.
 
 ```
 client → {"type": "device.offer", "control": bool, "shell": bool, "code": bool,
-          "code_start": bool, "code_images": bool,
-          "shell_kind": "powershell" | "pwsh" | "zsh" | "bash"}
+          "code_start": bool, "code_images": bool, "code_git": bool,
+          "code_git_remote": bool, "shell_kind": "powershell" | "pwsh" | "zsh" | "bash"}
           on connect and every 30 s; control: "Allow control" is on;
           shell: the shell is switched on in the client (PowerShell on Windows, zsh on
           macOS); code: "Share Claude Code jobs with Anemo" is on (§7); code_start: "Let
           Anemo start Claude Code jobs" is on (§7, phase 2); code_images: a code_start may
-          carry images (§7.4, 1.3.0). A missing code, code_start or code_images means
-          false. shell_kind (1.4.0): the shell `shell` runs in; missing, or any other
+          carry images (§7.4, 1.3.0); code_git: the read-only git actions are there
+          (§7.5, 1.5.0); code_git_remote: they also take `repo`, `fetch`, answer pull
+          requests, and `code_git_cache_clear` is there (§7.6, 1.6.0). A missing code,
+          code_start, code_images, code_git or code_git_remote means false. shell_kind (1.4.0): the shell `shell` runs in; missing, or any other
           value, means "powershell".
 server → {"type": "device.command", "id": "<uuid>", "action": "<action>", …fields}
 client → {"type": "device.result", "id": "<uuid>", "ok": true, "state": {…}}
 client → {"type": "device.result", "id": "<uuid>", "ok": false, "error": "<one sentence>",
-          "code": "stopped" | "refused" | "unavailable" | "failed"}
+          "code": "stopped" | "refused" | "unavailable" | "failed" | "not_found"
+                  | "unauthenticated"}
+          not_found (1.5.0): what the command named isn't there (a project, a commit);
+          unauthenticated (1.6.0): git or gh on the computer isn't signed in to the
+          remote (§7.6). An older server takes either as failed.
 client → {"type": "device.stopped"}   the user pressed the stop hotkey or chose Pause
 ```
 
@@ -246,7 +252,11 @@ The `version` in `hello` is the client's. Anemo Desktop 1.1.0 adds Claude Code j
 (§7, `code.*` messages and the `code` offer field); 1.2.0 adds the `code_*` actions
 (§7.4); 1.3.0 adds images to `code_start` (the `code_images` offer field, §7.4) and takes
 messages from the server of up to 16 MB (4 MB before). 1.4.0 adds `hello.platform` and the `shell_kind` offer field
-(§2) and the macOS client (`09-desktop-macos.md`). The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
+(§2) and the macOS client (`09-desktop-macos.md`). 1.5.0 adds the read-only git actions
+(§7.5, the `code_git` offer field), `local_only` for `code_projects` and the `not_found`
+result code. 1.6.0 adds remote repositories and fetching to the git actions (§7.6, the
+`code_git_remote` offer field, `code_git_cache_clear`, the `unauthenticated` result code).
+The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
 `{"type": "notice", "text": "…"}` once per connection when a client is older than the
 oldest version it supports; it keeps working where it can. A client that gets an action it
 doesn't know answers `failed` with "Unknown action “…”", so an old client fails loudly.
@@ -382,3 +392,91 @@ to such a client and otherwise answers the user with `images_unsupported` (409).
   (with the list), and the server keeps the prompt as it sent it for such a job.
 - A port (macOS, Linux) does the same with its own folder separators; nothing else
   depends on the platform. `cc.ps1` doesn't take images.
+
+**Only the projects folder (Anemo Desktop 1.5.0).** `code_projects` with
+`"local_only": true` lists the folders without asking `gh` for the repositories (`remote`
+is then `[]`); an older client ignores the field, and the server leaves its `remote` out.
+
+### 7.5 Read-only git (Anemo Desktop 1.5.0)
+
+For plugins on the Code page (`code.gitGraph`, `code.gitCommit`) and the `code_git_graph`
+agent tool. A client that has these says `"code_git": true` in its offer (Anemo Desktop:
+whenever it shares jobs); the server sends them only then, and otherwise answers
+"Update Anemo Desktop on <device>". Like `code_projects` they need a trusted device with
+sharing on (not "Let Anemo start Claude Code jobs", not control).
+
+| action | fields | `state` |
+|---|---|---|
+| `code_git_graph` | `project`, `limit` (1–1000, default 300), `all` (bool, default true) | `{"head": {"branch", "commit", "detached"}, "branches": [{"name", "commit", "remote", "upstream", "ahead", "behind", "current"}], "tags": [{"name", "commit"}], "commits": [{"hash", "parents", "author_name", "author_email", "date", "subject", "refs"}], "status": {"dirty", "staged", "unstaged", "untracked", "conflicted"}, "remotes": [{"name", "url"}], "truncated"}` |
+| `code_git_commit` | `project`, `hash` (`^[0-9a-f]{7,40}$`) | `{"hash", "parents", "author_name", "author_email", "date", "committer_date", "subject", "body", "files": [{"path", "status", "additions", "deletions"}], "stats": {"files", "additions", "deletions"}, "truncated"}` |
+
+- `project` is a folder name as for `code_start` (no `..`, no separators, not starting
+  with a dot), of a folder that exists in the projects folder (`not_found` otherwise)
+  and is still inside it once links are followed (a symlink or junction out of it is
+  `refused`). No clone, no match by the remote's name.
+- The client runs only these git commands, by git's full path (never a `.cmd`/`.bat`),
+  with the arguments as a list (never a shell): `rev-parse`, `symbolic-ref`,
+  `for-each-ref`, `log --topo-order`, `status --porcelain=v2`, `remote -v`, `show -s`
+  and `diff-tree --numstat/--name-status`. Each gets 10 s. Every run has
+  `-c core.quotepath=off -c core.fsmonitor=false -c log.showSignature=false
+  -c color.ui=never --no-optional-locks`, `GIT_TERMINAL_PROMPT=0`, `GIT_NO_LAZY_FETCH=1`
+  and `LC_ALL=C`, so a repository's config can't make a read run a program, fetch, or
+  take a lock a job's git would wait for.
+- Output is NUL-separated (`-z`, `%x00`, `%00`) and parsed field by field; a record that
+  doesn't read is left out. Commits are newest first in topological order, `limit + 1`
+  are read so `truncated` can be told. `refs` are `HEAD`, branch names and `tag: <name>`.
+  A merge's files are against its first parent; `additions`/`deletions` are null for a
+  binary file; at most 1000 files.
+- Only metadata: never file contents or diffs. Credentials in http(s) remote URLs are
+  removed (the server removes them again, and holds the whole answer to its shapes,
+  with every list and string capped).
+- A commit that isn't in the repository is `not_found`; a folder that isn't a repository,
+  or a git command that fails or takes too long, is `failed` (never git's own error text).
+
+### 7.6 Remote repositories, fetching and pull requests (Anemo Desktop 1.6.0)
+
+For the Code page's Git view and the same plugin methods and tool. A client that has these
+says `"code_git_remote": true` in its offer (with `code_git`); the server sends `repo`,
+`fetch` and `code_git_cache_clear` only then ("Update Anemo Desktop on <device> to 1.6.0").
+
+| action | fields | `state` |
+|---|---|---|
+| `code_git_graph` | `project` **or** `repo` (`owner/name`), `limit`, `all`, `fetch` (bool, default false) | §7.5's, plus `"source": "local" \| "remote"`, `"repo": "owner/name" \| null`, `"fetched_at": "<ISO 8601>" \| null`, `"fetch_error": "<sentence>" \| null`, `"pull_requests": [{"number", "title", "head_ref", "url", "draft"}] \| null`; `status` is `null` for a remote repository |
+| `code_git_commit` | `project` **or** `repo`, `hash` | §7.5's (for `repo`: `additions`/`deletions` are `null`, renames aren't detected) |
+| `code_git_cache_clear` | none | `{"removed": <repositories>, "bytes": <freed>}` |
+
+- **`repo`: only the owner's repositories.** `owner/name` must match
+  `^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$` (name not `.`/`..`, not ending in
+  `.git`), `owner` must be the GitHub owner of §7.4 (Settings, else `gh api user`), and
+  `name` must be in that owner's `gh repo list` (the list `code_projects` answers under
+  `remote`, kept 10 minutes). The clone URL is the one in that list, never one sent by the
+  server. Anything else is `not_found`. `project` and `repo` together, or neither, is
+  `failed`.
+- **The cache.** A remote repository is read from a blobless bare clone in the client's own
+  data folder (`<app data>/git-cache/<owner>/<name>.git`, lower case; never the projects
+  folder, so neither `code_projects` nor a job sees it), made with
+  `git clone --bare --filter=blob:none --no-tags <url> <dir>` and brought up to date with
+  `git fetch --prune --filter=blob:none origin +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*`.
+  It is fetched when it is made, when `fetch` is true, and when its last fetch is more than
+  10 minutes old. The folder must still be inside the cache folder once links are
+  followed. A clone gets 3 minutes and a fetch 60 s; a clone that takes longer or grows
+  past 1 GB is removed and answered `failed` ("too large to read without cloning").
+  After each clone the least recently read repositories are removed until the cache holds
+  at most 3 GB (never the one just read). `code_git_cache_clear` removes all of it.
+- **`fetch` on a local checkout**: `git fetch --prune --all --no-recurse-submodules` before
+  reading (60 s), with hooks turned off (`core.hooksPath` set to an empty folder of the
+  client's), `protocol.ext.allow=never` and `protocol.file.allow=never`. It changes only
+  remote-tracking refs and FETCH_HEAD, never the working tree or a branch. When it fails or
+  times out the graph is still answered, from what is there, with `fetch_error` saying so
+  (never git's own text). `fetched_at` is FETCH_HEAD's time (null when never fetched).
+- **Credentials**: git and gh use the computer's own (gh as git's credential helper);
+  `GIT_TERMINAL_PROMPT=0`, so a missing sign-in fails at once: a clone or fetch that is
+  refused for that is `unauthenticated` (for a local `fetch`: a `fetch_error`).
+  Credentials never leave the computer; URLs in answers have them removed.
+- **Pull requests**: when gh is on the computer and signed in, and the repository is on
+  github.com (a local checkout: its `origin`), `gh pr list --repo <owner/name> --state open
+  --limit 100 --json number,title,headRefName,url,isDraft,state` (argv, 15 s, kept 2 minutes
+  unless `fetch`). `pull_requests` is null when it can't be read: no gh, not signed in, not
+  on GitHub, a timeout. The server attaches them to the branches by `head_ref`.
+- In a bare cache, `branches` are the remote's branches (`remote: false`, no upstream),
+  `head.branch` its default branch; nothing returns file contents or diffs here either.

@@ -56,6 +56,8 @@ from app.features.automations.models import Automation
 from app.features.calendar import recurrence
 from app.features.calendar import service as calendar
 from app.features.calendar.models import CalendarEvent
+from app.features.code_sessions import control as code_control
+from app.features.code_sessions import git
 from app.features.documents import paths as document_paths
 from app.features.documents import search as doc_search
 from app.features.documents import service as documents
@@ -837,6 +839,113 @@ async def events_update(call: Call) -> Any:
     return await _event_out(call, await call.run("update_event", args, "change events"))
 
 
+# -- code (projects and git history on the user's computers) ---------------------------------
+
+
+class CodeDeviceParams(Params):
+    device: str = Field(min_length=1, max_length=100)
+
+
+class CodeProjectsParams(CodeDeviceParams):
+    # Also the owner's GitHub repositories that aren't cloned (gh asks GitHub: slower).
+    remote: bool = True
+
+
+class GitWhereParams(CodeDeviceParams, git.GitWhere):
+    """`project` (a local checkout) or `repo` (owner/name, not cloned): exactly one."""
+
+
+class GitGraphParams(GitWhereParams):
+    limit: int = Field(git.DEFAULT_LIMIT, ge=1, le=git.MAX_LIMIT)
+    all: bool = True
+    fetch: bool = False
+
+
+class GitCommitParams(GitWhereParams):
+    hash: str = Field(pattern=git.HASH)
+
+
+# What the computer's state means for a plugin (the control errors' codes).
+_CODE_ERRORS: dict[str, ErrorCode] = {
+    "not_found": "not_found",
+    "device_failed": "failed",
+    "device_refused": "failed",
+}
+
+
+async def _on_computer[T](
+    call: Call, device_name: str, read: Callable[[uuid.UUID], Awaitable[T]]
+) -> T:
+    """Run a read on the named computer; its errors as a plugin's: not_found, failed, or
+    unavailable (watched, offline, sharing off, busy, not signed in to GitHub, an Anemo
+    Desktop without the git reads)."""
+    try:
+        device = await git.computer_named(call.db, device_name)
+        return await read(device.id)
+    except AppError as exc:
+        raise CallError(_CODE_ERRORS.get(exc.code, "unavailable"), exc.message) from exc
+
+
+def _git_args(p: GitWhereParams) -> dict[str, Any]:
+    """The code_git_graph tool's arguments for the policy (its actions don't depend on
+    the limit or a fetch, as for tasks.list)."""
+    return {"device": p.device, **p.fields()}
+
+
+async def code_projects(call: Call) -> Any:
+    p = _params(CodeProjectsParams, call)
+    await call.check("code_projects", {"device": p.device}, "read projects on your computers")
+    found = await _on_computer(
+        call,
+        p.device,
+        lambda device_id: code_control.projects(call.db, device_id, local_only=not p.remote),
+    )
+    local = [
+        {
+            "name": x.name,
+            "path": x.dir,
+            "remote": git.without_credentials(x.remote) if x.remote else None,
+            "repo": x.repo,
+            "cloned": True,
+        }
+        for x in found.projects
+    ]
+    remote = [
+        {
+            "name": x.name,
+            "path": None,
+            "remote": git.without_credentials(x.url),
+            "repo": x.repo,
+            "cloned": False,
+        }
+        for x in found.remote
+        if x.repo  # only what the git reads can take as `repo`
+    ]
+    return {"projects": local + remote}
+
+
+async def code_git_graph(call: Call) -> Any:
+    p = _params(GitGraphParams, call)
+    await call.check("code_git_graph", _git_args(p), "read git history on your computers")
+    found = await _on_computer(
+        call,
+        p.device,
+        lambda device_id: git.graph(
+            call.db, device_id, p, limit=p.limit, all_refs=p.all, fetch=p.fetch
+        ),
+    )
+    return found.out()
+
+
+async def code_git_commit(call: Call) -> Any:
+    p = _params(GitCommitParams, call)
+    await call.check("code_git_graph", _git_args(p), "read git history on your computers")
+    found = await _on_computer(
+        call, p.device, lambda device_id: git.commit(call.db, device_id, p, p.hash)
+    )
+    return found.out()
+
+
 # -- the rest -------------------------------------------------------------------------------
 
 
@@ -1026,6 +1135,9 @@ METHODS: dict[str, Handler] = {
     "events.create": events_create,
     "events.update": events_update,
     "projects.list": projects_list,
+    "code.projects": code_projects,
+    "code.gitGraph": code_git_graph,
+    "code.gitCommit": code_git_commit,
     "notifications.send": notifications_send,
     "http.fetch": http_fetch,
     "tools.call": tools_call,
