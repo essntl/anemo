@@ -272,6 +272,28 @@ public static partial class GitOutput
         return files;
     }
 
+    /// <summary>
+    /// The files of <c>git diff-tree -r -z --no-renames --name-status</c> alone (a bare cache
+    /// repository, which has no file contents to count lines in): <c>M path </c>, line counts null.
+    /// </summary>
+    public static IReadOnlyList<GitFileChange> ParseNameStatus(string nameStatus)
+    {
+        var files = new List<GitFileChange>();
+        var ns = Tokens(nameStatus);
+        for (var i = 0; i + 1 < ns.Count; i += 2)
+        {
+            var letter = ns[i][..1];
+            if (letter is "R" or "C" && i + 2 < ns.Count)
+            {
+                i++; // not asked for, but a rename names its old path first
+            }
+
+            files.Add(new GitFileChange(ns[i + 1], letter, null, null));
+        }
+
+        return files;
+    }
+
     /// <summary>A full or abbreviated commit hash, as the server sends one: 7 to 40 lower-case hex digits.</summary>
     public static bool IsCommitRef(string value) => CommitRefPattern().IsMatch(value);
 

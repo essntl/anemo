@@ -141,29 +141,65 @@ public static partial class CodeProjects
         local.Any(p => string.Equals(p.Name, project, StringComparison.OrdinalIgnoreCase)
             || string.Equals(RepositoryName(p.Remote), project, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// The folder's own git folder: <c>.git</c>, or for a worktree the folder its <c>.git</c>
+    /// file points at (where its HEAD and FETCH_HEAD are); null when there is none. Reads only
+    /// the <c>.git</c> file, never runs git.
+    /// </summary>
+    public static string? GitDir(string dir)
+    {
+        try
+        {
+            var git = Path.Combine(dir, ".git");
+            if (Directory.Exists(git))
+            {
+                return git;
+            }
+
+            if (!File.Exists(git))
+            {
+                return null;
+            }
+
+            var pointer = File.ReadAllText(git).Trim();
+            if (!pointer.StartsWith("gitdir:", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var gitDir = pointer["gitdir:".Length..].Trim();
+            return Path.IsPathRooted(gitDir) ? gitDir : Path.GetFullPath(Path.Combine(dir, gitDir));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>When the folder's FETCH_HEAD was last written (its last fetch), or null when it was never fetched.</summary>
+    public static DateTimeOffset? FetchHeadTime(string dir)
+    {
+        if (GitDir(dir) is not { } gitDir)
+        {
+            return null;
+        }
+
+        try
+        {
+            var fetchHead = Path.Combine(gitDir, "FETCH_HEAD");
+            return File.Exists(fetchHead) ? new DateTimeOffset(File.GetLastWriteTimeUtc(fetchHead), TimeSpan.Zero) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
     private static string? ConfigPath(string dir)
     {
-        var git = Path.Combine(dir, ".git");
-        if (Directory.Exists(git))
-        {
-            return Path.Combine(git, "config");
-        }
-
-        if (!File.Exists(git))
+        if (GitDir(dir) is not { } gitDir)
         {
             return null;
-        }
-
-        var pointer = File.ReadAllText(git).Trim();
-        if (!pointer.StartsWith("gitdir:", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var gitDir = pointer["gitdir:".Length..].Trim();
-        if (!Path.IsPathRooted(gitDir))
-        {
-            gitDir = Path.GetFullPath(Path.Combine(dir, gitDir));
         }
 
         // A worktree's gitdir names the main repository's folder in "commondir".

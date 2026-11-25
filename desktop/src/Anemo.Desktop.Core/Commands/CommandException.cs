@@ -10,6 +10,9 @@ public static class ResultCodes
 
     /// <summary>What the command names isn't there (a project, a commit; 1.5.0).</summary>
     public const string NotFound = "not_found";
+
+    /// <summary>git or gh refused for want of a sign-in (a clone or fetch of a remote repository; 1.6.0).</summary>
+    public const string Unauthenticated = "unauthenticated";
 }
 
 /// <summary>A command that can't be done; the message is the one sentence the agent sees.</summary>
@@ -26,4 +29,6 @@ public sealed class CommandException : Exception
     public static CommandException Unavailable(string message) => new(ResultCodes.Unavailable, message);
 
     public static CommandException NotFound(string message) => new(ResultCodes.NotFound, message);
+
+    public static CommandException Unauthenticated(string message) => new(ResultCodes.Unauthenticated, message);
 }

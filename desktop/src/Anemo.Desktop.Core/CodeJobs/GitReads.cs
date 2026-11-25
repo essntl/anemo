@@ -15,6 +15,11 @@ namespace Anemo.Desktop.Core.CodeJobs;
 /// (fsmonitor, signature checks, lazy fetches of a partial clone), takes no optional locks
 /// (a read never blocks a job's git), and runs with LC_ALL=C so the words git prints
 /// (<c>ahead 2, behind 1</c>) are always English.
+///
+/// The same reads work on a blobless bare clone of the git cache (§7.6, <c>bare</c>): there is
+/// no working tree, so <c>status</c> is null, and a commit's files come from
+/// <c>--name-status</c> alone (line counts and rename detection would need the file contents,
+/// which the cache doesn't have and, with GIT_NO_LAZY_FETCH, never downloads).
 /// </summary>
 public sealed class GitReads
 {
@@ -49,26 +54,29 @@ public sealed class GitReads
     private readonly string _git;
     private readonly string _dir;
     private readonly TimeSpan _timeout;
+    private readonly bool _bare;
 
     /// <param name="git">git's full path (never a .cmd or .bat).</param>
-    /// <param name="dir">The project folder, checked to be inside the projects folder.</param>
+    /// <param name="dir">The project folder, checked to be inside the projects folder (or a bare repository of the git cache, inside it).</param>
     /// <param name="timeout">How long each git command may take.</param>
-    public GitReads(ICodeHost host, string git, string dir, TimeSpan timeout)
+    /// <param name="bare">A bare repository of the git cache (1.6.0).</param>
+    public GitReads(ICodeHost host, string git, string dir, TimeSpan timeout, bool bare = false)
     {
         _host = host;
         _git = git;
         _dir = dir;
         _timeout = timeout;
+        _bare = bare;
     }
 
-    /// <summary>The <c>code_git_graph</c> answer: HEAD, branches, tags, the newest <paramref name="limit"/> commits (topological order), the working tree's state and the remotes.</summary>
+    /// <summary>The <c>code_git_graph</c> answer: HEAD, branches, tags, the newest <paramref name="limit"/> commits (topological order), the working tree's state (null in a bare repository) and the remotes.</summary>
     public async Task<JsonObject> GraphAsync(int limit, bool all, CancellationToken ct)
     {
         await RequireRepositoryAsync(ct);
         var head = await HeadAsync(ct);
         var (branches, tags) = GitOutput.ParseRefs(await GitAsync(["for-each-ref", GitOutput.RefFormat, "refs/heads", "refs/remotes", "refs/tags"], ct));
         var commits = await LogAsync(limit, all, head.Commit is not null, ct);
-        var status = GitOutput.ParseStatus(await GitAsync(["status", "--porcelain=v2", "-z", "--untracked-files=normal"], ct));
+        var status = _bare ? null : GitOutput.ParseStatus(await GitAsync(["status", "--porcelain=v2", "-z", "--untracked-files=normal"], ct));
         var remotes = GitOutput.ParseRemotes(await GitAsync(["remote", "-v"], ct));
 
         var refs = RefsByCommit(head, branches, tags);
@@ -95,7 +103,7 @@ public sealed class GitReads
             }).ToArray()),
             ["tags"] = new JsonArray(tags.Take(MaxRefs).Select(t => (JsonNode)new JsonObject { ["name"] = t.Name, ["commit"] = t.Commit }).ToArray()),
             ["commits"] = commitList,
-            ["status"] = new JsonObject
+            ["status"] = status is null ? null : new JsonObject
             {
                 ["dirty"] = status.Dirty,
                 ["staged"] = status.Staged,
@@ -115,15 +123,23 @@ public sealed class GitReads
         var shown = await RunAsync(["show", "-s", "-z", "--no-show-signature", GitOutput.CommitFormat, hash, "--"], ct);
         if (shown.ExitCode != 0 || GitOutput.ParseCommit(shown.Stdout) is not { } parsed)
         {
-            throw CommandException.NotFound($"There is no commit {hash} in this project.");
+            throw CommandException.NotFound($"There is no commit {hash} in this {(_bare ? "repository" : "project")}.");
         }
 
         var (commit, committerDate, body) = parsed;
         // Against the first parent (a merge: what it brought into its branch); a first commit against nothing.
         string[] range = commit.Parents.Count > 0 ? [commit.Parents[0], commit.Hash] : ["--root", commit.Hash];
-        var numstat = await GitAsync(["diff-tree", "-r", "-z", "-M", "--no-commit-id", "--numstat", .. range], ct);
-        var nameStatus = await GitAsync(["diff-tree", "-r", "-z", "-M", "--no-commit-id", "--name-status", .. range], ct);
-        var files = GitOutput.ParseFiles(numstat, nameStatus);
+        IReadOnlyList<GitFileChange> files;
+        if (_bare)
+        {
+            files = GitOutput.ParseNameStatus(await GitAsync(["diff-tree", "-r", "-z", "--no-renames", "--no-commit-id", "--name-status", .. range], ct));
+        }
+        else
+        {
+            var numstat = await GitAsync(["diff-tree", "-r", "-z", "-M", "--no-commit-id", "--numstat", .. range], ct);
+            var nameStatus = await GitAsync(["diff-tree", "-r", "-z", "-M", "--no-commit-id", "--name-status", .. range], ct);
+            files = GitOutput.ParseFiles(numstat, nameStatus);
+        }
 
         var answer = CommitJson(commit);
         answer["committer_date"] = committerDate;
@@ -149,7 +165,7 @@ public sealed class GitReads
 
     private async Task RequireRepositoryAsync(CancellationToken ct)
     {
-        var inside = await RunAsync(["rev-parse", "--is-inside-work-tree"], ct);
+        var inside = await RunAsync(["rev-parse", _bare ? "--is-bare-repository" : "--is-inside-work-tree"], ct);
         if (inside.ExitCode != 0 || inside.Stdout.Trim() != "true")
         {
             throw CommandException.Failed($"“{Path.GetFileName(_dir)}” isn't a git repository.");
