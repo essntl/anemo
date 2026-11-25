@@ -12,7 +12,7 @@ import uuid
 from datetime import date, time
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
@@ -36,7 +36,7 @@ from app.features.tasks.schemas import (
 )
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin import linking
+from app.tools.builtin import batch, linking
 from app.tools.builtin import sources as src
 from app.tools.builtin.workspace import path_action
 
@@ -444,7 +444,7 @@ class UpdateTask(Tool):
     name = "update_task"
     description = (
         "Change a task: complete it, rename it, move its due date, and so on. A synced "
-        "task's source and external_key can't be changed."
+        "task's source and external_key can't be changed. Several tasks at once: update_tasks."
     )
     capability = "tasks.write"
     Input = UpdateTaskInput
@@ -588,6 +588,159 @@ class DeleteTask(Tool):
         )
 
 
+class TaskChangeInput(BaseModel):
+    id: str = Field(description="The task's id (from list_tasks)")
+    title: str | None = Field(None, min_length=1, max_length=300)
+    status: TaskStatus | None = Field(None, description="Use 'done' to complete a task")
+    priority: int | None = Field(None, ge=0, le=3, description="0 none, 1 low, 2 medium, 3 high")
+    due_date: date | None = None
+    due_time: time | None = None
+    clear_due: bool = Field(False, description="Remove the due date")
+    project: str | None = Field(None, description="Project name (created if new); '' for none")
+    tags: list[str] | None = Field(None, max_length=20, description="Replaces all its tags")
+    add_tags: list[str] = Field(default_factory=list, max_length=20)
+    remove_tags: list[str] = Field(default_factory=list, max_length=20)
+    remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    parent_id: str | None = Field(None, description="Make it a subtask of this task")
+    clear_parent: bool = Field(False, description="Make a subtask an ordinary task again")
+    subtasks: SubtasksChoice | None = Field(
+        None, description="Completing a task with open subtasks: 'finish' them too or 'keep' them"
+    )
+    properties: dict[str, Any] | None = Field(
+        None, max_length=30, description=linking.PROPERTIES_CHANGE
+    )
+    trash: bool = Field(False, description="Move it to the trash (nothing else may be set)")
+
+    @model_validator(mode="after")
+    def _one_kind_of_change(self) -> "TaskChangeInput":
+        given = self.model_fields_set - {"id", "trash"}
+        if self.trash and given:
+            raise ValueError("an item that goes to the trash changes nothing else")
+        if not self.trash and not given:
+            raise ValueError("the item changes nothing")
+        if self.tags is not None and (self.add_tags or self.remove_tags):
+            raise ValueError("give tags, or add_tags / remove_tags, not both")
+        return self
+
+
+def _task_change(item: TaskChangeInput) -> str:
+    """What changes on one task, in words (for the approval and the activity log)."""
+    if item.trash:
+        return "move to the trash"
+    parts: list[str] = []
+    if item.title is not None:
+        parts.append(f"title → “{batch.short(item.title)}”")
+    if item.status is not None:
+        parts.append(f"status → {item.status.replace('_', ' ')}")
+    if item.clear_due:
+        parts.append("no due date")
+    elif item.due_date is not None:
+        at = f" {batch.clock(item.due_time)}" if item.due_time else ""
+        parts.append(f"due → {batch.day(item.due_date)}{at}")
+    elif item.due_time is not None:
+        parts.append(f"due time → {batch.clock(item.due_time)}")
+    if item.priority is not None:
+        parts.append(f"priority → {PRIORITY[item.priority] or 'none'}")
+    if item.project is not None:
+        parts.append(f"project → {batch.short(item.project, 40)}" if item.project else "no project")
+    if item.tags is not None:
+        parts.append("tags → " + (", ".join(clean_tags(item.tags)) or "none"))
+    parts += [f"+tag {t}" for t in clean_tags(item.add_tags)]
+    parts += [f"−tag {t}" for t in clean_tags(item.remove_tags)]
+    if item.remind_minutes is not None:
+        parts.append(f"reminder {item.remind_minutes} min before")
+    if item.clear_parent:
+        parts.append("no longer a subtask")
+    elif item.parent_id:
+        parts.append(f"subtask of [{item.parent_id.strip()}]")
+    if item.subtasks is not None:
+        parts.append(f"open subtasks: {item.subtasks}")
+    if item.properties:
+        parts.append(batch.properties_text(item.properties))
+    return "; ".join(parts)
+
+
+class UpdateTasksInput(BaseModel):
+    items: list[TaskChangeInput] = Field(
+        min_length=1,
+        max_length=batch.MAX_ITEMS,
+        description="One entry per task, each with only what changes on it",
+    )
+    create_value: bool = Field(False, description=linking.CREATE_VALUE)
+
+    @model_validator(mode="after")
+    def _each_task_once(self) -> "UpdateTasksInput":
+        ids = [item.id.strip().lower() for item in self.items]
+        if len(set(ids)) != len(ids):
+            raise ValueError("each task may appear only once")
+        return self
+
+
+class UpdateTasks(Tool):
+    name = "update_tasks"
+    description = (
+        f"Change many tasks in one call (up to {batch.MAX_ITEMS}): status, due date, project, "
+        "tags, priority, or move them to the trash. The user approves the whole batch once; "
+        "each task is reported on its own. For notes, checklists, links or blockers of one "
+        "task use update_task."
+    )
+    capability = "tasks.write"
+    Input = UpdateTasksInput
+    idempotent = False  # a batch cut short must not be applied again blindly
+    timeout_s = 180.0
+
+    def _planned(self, args: UpdateTasksInput) -> list[batch.Planned]:
+        return [
+            batch.Planned(
+                text=_task_change(item),
+                ref=f"/tasks?task={task_id}" if (task_id := _id(item.id)) else None,
+                # As for one task: deleting is dangerous, any other change is not.
+                risk="dangerous" if item.trash else "safe",
+                trash=item.trash,
+            )
+            for item in args.items
+        ]
+
+    def actions(self, args: UpdateTasksInput, ctx: ToolContext) -> list[Action]:
+        found = batch.actions(self.capability, "task", self._planned(args))
+        found[0] = linking.create_value_note(found[0], args.create_value)
+        return found
+
+    async def run(self, args: UpdateTasksInput, ctx: ToolContext) -> ToolResult:
+        async def apply(item: TaskChangeInput) -> batch.Outcome:
+            task_id = _id(item.id)
+            async with get_sessionmaker()() as db:
+                task = await db.get(Task, task_id) if task_id else None
+                if task is None:
+                    return batch.Outcome(item.id, False, f"No task with id {item.id}.")
+                if item.trash:
+                    title = task.title
+                    await service.delete_task(db, task, deleted_by="agent")
+                    return batch.Outcome(
+                        str(task_id), True, f"[{task_id}] {title}: moved to the trash", title
+                    )
+                fields = item.model_dump(
+                    exclude_unset=True, exclude={"add_tags", "remove_tags", "trash"}
+                )
+                if item.add_tags or item.remove_tags:
+                    dropping = set(clean_tags(item.remove_tags))
+                    kept = [t for t in task.tags or [] if t not in dropping]
+                    fields["tags"] = kept + clean_tags(item.add_tags)
+                if args.create_value:
+                    fields["create_value"] = True
+                outcome = await change_task(
+                    db, task, UpdateTaskInput.model_validate(fields), ctx, tool="update_tasks"
+                )
+            if isinstance(outcome, ToolResult):
+                return batch.Outcome(item.id, False, f"[{item.id}] {outcome.content}")
+            task, line = outcome
+            return batch.Outcome(str(task.id), True, line, task.title)
+
+        return await batch.apply_all(
+            "task", args.items, self._planned(args), apply, lambda item: item.id
+        )
+
+
 class TaskFilesInput(BaseModel):
     task_id: str = Field(description="The task's id (from list_tasks)")
 
@@ -655,6 +808,7 @@ TASK_TOOLS: list[Tool] = [
     CreateTask(),
     UpdateTask(),
     DeleteTask(),
+    UpdateTasks(),
     ListTaskFiles(),
     AttachFileToTask(),
 ]

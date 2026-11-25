@@ -1705,6 +1705,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/links/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link Targets
+         * @description What these references point to now (title, state), in the order given: the approval
+         *     of a batch change names its tasks or events this way.
+         */
+        post: operations["link_targets_api_links_targets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/links/{object_type}/{object_id}": {
         parameters: {
             query?: never;
@@ -12059,6 +12080,14 @@ export interface components {
             /** Titles */
             titles: string[];
         };
+        /** TargetsIn */
+        TargetsIn: {
+            /**
+             * Refs
+             * @description References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>
+             */
+            refs: string[];
+        };
         /** TaskFileOut */
         TaskFileOut: {
             /** Path */
@@ -16713,6 +16742,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrokenLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_targets_api_links_targets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkItem"][];
                 };
             };
             /** @description Validation Error */

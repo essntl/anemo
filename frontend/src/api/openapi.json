@@ -6512,6 +6512,70 @@
         }
       }
     },
+    "/api/links/targets": {
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Link Targets",
+        "description": "What these references point to now (title, state), in the order given: the approval\nof a batch change names its tasks or events this way.",
+        "operationId": "link_targets_api_links_targets_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LinkItem"
+                  },
+                  "title": "Response Link Targets Api Links Targets Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/links/{object_type}/{object_id}": {
       "get": {
         "tags": [
@@ -39877,6 +39941,27 @@
         ],
         "title": "TagValueOut",
         "description": "A tag that names a value of another property (`ludmyla-doula` -> client), with the\nitems that have the tag: turning it into the value is offered, never done unasked."
+      },
+      "TargetsIn": {
+        "properties": {
+          "refs": {
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Refs",
+            "description": "References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refs"
+        ],
+        "title": "TargetsIn"
       },
       "TaskFileOut": {
         "properties": {

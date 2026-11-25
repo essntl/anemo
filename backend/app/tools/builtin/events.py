@@ -12,7 +12,7 @@ import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
@@ -28,7 +28,7 @@ from app.features.tasks.models import Project, Task
 from app.features.trash.models import TrashedItem
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin import linking
+from app.tools.builtin import batch, linking
 from app.tools.builtin import sources as src
 
 
@@ -361,7 +361,8 @@ class UpdateEvent(Tool):
     name = "update_event"
     description = (
         "Change an event. For a repeating event this changes the whole series. A synced "
-        "event's source and external_key can't be changed."
+        "event's source and external_key can't be changed. Several events at once: "
+        "update_events."
     )
     capability = "calendar.write"
     Input = UpdateEventInput
@@ -509,4 +510,152 @@ class DeleteEvent(Tool):
         )
 
 
-EVENT_TOOLS: list[Tool] = [ListEvents(), GetEvent(), CreateEvent(), UpdateEvent(), DeleteEvent()]
+class EventChangeInput(BaseModel):
+    id: str = Field(description="The event's id (from list_events)")
+    title: str | None = Field(None, min_length=1, max_length=300)
+    start: datetime | None = Field(None, description="New start; the length stays if no end")
+    end: datetime | None = None
+    all_day: bool | None = None
+    location: str | None = Field(None, max_length=300)
+    remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    properties: dict[str, Any] | None = Field(
+        None, max_length=30, description=linking.PROPERTIES_CHANGE
+    )
+    trash: bool = Field(
+        False, description="Move it (a repeating one: the whole series) to the trash"
+    )
+    occurrence: datetime | None = Field(
+        None,
+        description="With trash: cancel only the occurrence of a repeating event starting "
+        "at this time (from list_events)",
+    )
+
+    @model_validator(mode="after")
+    def _one_kind_of_change(self) -> "EventChangeInput":
+        given = self.model_fields_set - {"id", "trash", "occurrence"}
+        if self.occurrence is not None and not self.trash:
+            raise ValueError("occurrence is only for cancelling one (with trash)")
+        if self.trash and given:
+            raise ValueError("an item that goes to the trash changes nothing else")
+        if not self.trash and not given:
+            raise ValueError("the item changes nothing")
+        return self
+
+
+def _event_change(item: EventChangeInput) -> str:
+    """What changes on one event, in words (for the approval and the activity log)."""
+    if item.trash and item.occurrence is not None:
+        return f"cancel the occurrence of {batch.moment(item.occurrence)}"
+    if item.trash:
+        return "move to the trash"
+    parts: list[str] = []
+    if item.title is not None:
+        parts.append(f"title → “{batch.short(item.title)}”")
+    if item.all_day is not None:
+        parts.append("all day" if item.all_day else "not all day")
+    if item.start is not None:
+        parts.append(f"starts → {batch.moment(item.start)}")
+    if item.end is not None:
+        parts.append(f"ends → {batch.moment(item.end)}")
+    if item.location is not None:
+        parts.append(f"at → {batch.short(item.location, 40)}" if item.location else "no location")
+    if item.remind_minutes is not None:
+        parts.append(f"reminder {item.remind_minutes} min before")
+    if item.properties:
+        parts.append(batch.properties_text(item.properties))
+    return "; ".join(parts)
+
+
+class UpdateEventsInput(BaseModel):
+    items: list[EventChangeInput] = Field(
+        min_length=1,
+        max_length=batch.MAX_ITEMS,
+        description="One entry per event, each with only what changes on it",
+    )
+    create_value: bool = Field(False, description=linking.CREATE_VALUE)
+
+    @model_validator(mode="after")
+    def _each_event_once(self) -> "UpdateEventsInput":
+        keys = [(i.id.strip().lower(), i.occurrence) for i in self.items]
+        if len(set(keys)) != len(keys):
+            raise ValueError("each event (or occurrence) may appear only once")
+        return self
+
+
+class UpdateEvents(Tool):
+    name = "update_events"
+    description = (
+        f"Change many calendar events in one call (up to {batch.MAX_ITEMS}): time, title, "
+        "location, reminder, properties, or move them to the trash (or cancel single "
+        "occurrences). A repeating event changes as a whole series. The user approves the "
+        "whole batch once; each event is reported on its own. Times without an offset are "
+        "the user's local time."
+    )
+    capability = "calendar.write"
+    Input = UpdateEventsInput
+    idempotent = False  # a batch cut short must not be applied again blindly
+    timeout_s = 180.0
+
+    def _planned(self, args: UpdateEventsInput) -> list[batch.Planned]:
+        return [
+            batch.Planned(
+                text=_event_change(item),
+                ref=ref_url("event", event_id) if (event_id := _id(item.id)) else None,
+                # As for one event: a change or a cancelled occurrence is moderate,
+                # deleting a whole event (or series) dangerous.
+                risk="dangerous" if item.trash and item.occurrence is None else "moderate",
+                trash=item.trash,
+            )
+            for item in args.items
+        ]
+
+    def actions(self, args: UpdateEventsInput, ctx: ToolContext) -> list[Action]:
+        found = batch.actions(self.capability, "event", self._planned(args))
+        found[0] = linking.create_value_note(found[0], args.create_value)
+        return found
+
+    async def run(self, args: UpdateEventsInput, ctx: ToolContext) -> ToolResult:
+        async def apply(item: EventChangeInput) -> batch.Outcome:
+            event_id = _id(item.id)
+            async with get_sessionmaker()() as db:
+                event = await db.get(CalendarEvent, event_id) if event_id else None
+                if event is None:
+                    return batch.Outcome(item.id, False, f"No event with id {item.id}.")
+                title = event.title
+                if item.trash and item.occurrence is not None:
+                    start = _instant(item.occurrence, event.tz)
+                    await service.set_occurrence(
+                        db, event, start, OccurrenceIn(cancelled=True), changed_by="agent"
+                    )
+                    text = f"[{event_id}] {title}: cancelled on {start:%Y-%m-%d %H:%M}"
+                    return batch.Outcome(str(event_id), True, text, title)
+                if item.trash:
+                    await service.delete_event(db, event, deleted_by="agent")
+                    text = f"[{event_id}] {title}: moved to the trash"
+                    return batch.Outcome(str(event_id), True, text, title)
+                fields = item.model_dump(exclude_unset=True, exclude={"trash", "occurrence"})
+                if args.create_value:
+                    fields["create_value"] = True
+                try:
+                    changes = UpdateEventInput.model_validate(fields)
+                    outcome = await change_event(db, event, changes, ctx)
+                except ValidationError as exc:
+                    return batch.Outcome(item.id, False, f"[{item.id}] {_problems(exc)}")
+            if isinstance(outcome, ToolResult):
+                return batch.Outcome(item.id, False, f"[{item.id}] {outcome.content}")
+            event, line = outcome
+            return batch.Outcome(str(event.id), True, line, event.title)
+
+        return await batch.apply_all(
+            "event", args.items, self._planned(args), apply, lambda item: item.id
+        )
+
+
+EVENT_TOOLS: list[Tool] = [
+    ListEvents(),
+    GetEvent(),
+    CreateEvent(),
+    UpdateEvent(),
+    DeleteEvent(),
+    UpdateEvents(),
+]
