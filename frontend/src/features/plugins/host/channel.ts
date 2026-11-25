@@ -17,8 +17,7 @@
  * No React and no DOM here (only the port), so the rules can be tested on their own.
  */
 import { ApiError } from '@/api/client'
-import type { PluginCallBody } from '../api'
-import type { Risk, Slot } from '../types'
+import type { PluginCallBody, Risk, Slot } from '../types'
 import { checkCall, type FrameError, type FrameErrorCode, isLocal, OPEN_NEEDS } from './methods'
 
 /** Requests a frame may send in a minute, and how many may wait for an answer at once. */
@@ -176,12 +175,15 @@ export class PluginChannel {
       return this.reply(id, { error: { code: 'invalid_params', message: 'The params must be plain JSON.' } })
     }
     if (size > MAX_MESSAGE) return this.reply(id, { error: { code: 'invalid_params', message: 'A message may be at most 1 MB.' } })
+    if (typeof params !== 'object' || params === null || Array.isArray(params)) {
+      return this.reply(id, { error: { code: 'invalid_params', message: 'The params must be an object.' } })
+    }
     const refused = checkCall(method, params, o.permissions)
     if (refused) return this.reply(id, { error: refused })
 
     this.inFlight++
     try {
-      const result = isLocal(method) ? this.local(method, params as Record<string, unknown>) : await this.remote(method, params)
+      const result = isLocal(method) ? this.local(method, params as Record<string, unknown>) : await this.remote(method, params as Record<string, unknown>)
       this.reply(id, { result: result ?? null })
     } catch (err) {
       this.reply(id, { error: err instanceof FrameFailure ? { code: err.code, message: err.message } : frameError(err) })
@@ -190,7 +192,7 @@ export class PluginChannel {
     }
   }
 
-  private remote(method: string, params: unknown): Promise<unknown> {
+  private remote(method: string, params: Record<string, unknown>): Promise<unknown> {
     const o = this.options
     const body: PluginCallBody = { ui: o.ui, method, params, ...(o.previewVersion ? { preview_version: o.previewVersion } : {}) }
     return callWithConfirm(body, o.call, o.confirm)

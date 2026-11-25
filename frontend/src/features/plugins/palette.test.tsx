@@ -15,11 +15,11 @@ vi.mock('@/components/ui/toast', () => ({ toast }))
 const { pluginPaletteItems, runCommand } = await import('./palette')
 
 const page: ContributionUi = {
-  plugin_id: 'anemo.today-board', plugin_name: 'Today board', icon_url: null, version: '1.0.0', permissions: ['tasks:read'],
-  id: 'today', slot: 'page', title: 'Today', icon: 'calendar-check', objects: [], fence: null, height: null,
+  plugin: 'anemo.today-board', plugin_name: 'Today board', icon_url: null, version: '1.0.0', permissions: ['tasks:read'],
+  id: 'today', slot: 'page', title: 'Today', icon: 'calendar-check', objects: null, fence: null, height: null, entry: 'ui/today.html',
 }
 const command = (action: ContributionCommand['action'], over: Partial<ContributionCommand> = {}): ContributionCommand => ({
-  plugin_id: 'anemo.today-board', plugin_name: 'Today board', id: 'open', title: 'Open Today board', icon: null, keywords: ['agenda'], action, ...over,
+  plugin: 'anemo.today-board', plugin_name: 'Today board', version: '1.0.0', id: 'open', title: 'Open Today board', icon: null, keywords: ['agenda'], action, ...over,
 })
 
 describe('plugins in the command palette', () => {
@@ -59,7 +59,7 @@ describe('plugins in the command palette', () => {
 
   it('creates from a template, asking first when the server says so, and offers to open it', async () => {
     call
-      .mockRejectedValueOnce(new ApiError(403, 'confirm_required', 'OK?', { token: 'tok', summary: 'Create a document', risk: 'medium' }))
+      .mockRejectedValueOnce(new ApiError(409, 'confirm_required', 'OK?', { token: 'tok', summary: 'Create a document', risk: 'medium' }))
       .mockResolvedValueOnce({ type: 'document', id: 'd7' })
     const navigate = vi.fn()
     await runCommand(command({ type: 'newFromTemplate', template: 'review' }, { title: 'New weekly review' }), null, navigate)
@@ -69,5 +69,13 @@ describe('plugins in the command palette', () => {
     expect(shown.message).toBe('Created from “New weekly review”.')
     shown.action.onClick()
     expect(navigate).toHaveBeenCalledWith('/documents/d7')
+  })
+
+  it('does nothing but say so for an action this app does not know', async () => {
+    const navigate = vi.fn()
+    await runCommand(command({ type: 'openWindow', url: 'https://example.com' }), null, navigate)
+    expect(navigate).not.toHaveBeenCalled()
+    expect(call).not.toHaveBeenCalled()
+    expect(toast).toHaveBeenCalledWith({ message: 'Today board: this command needs a newer version of Anemo.' })
   })
 })

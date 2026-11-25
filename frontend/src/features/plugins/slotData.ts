@@ -4,7 +4,7 @@
  */
 import { usePluginContributions } from './api'
 import type { FramePlugin } from './host/PluginFrame'
-import type { ContributionUi, ObjectType, PluginContributionsOut } from './types'
+import { type ContributionUi, type ObjectType, objectsOf, type PluginContributionsOut } from './types'
 
 const NONE: ContributionUi[] = []
 
@@ -16,21 +16,21 @@ export function usePluginUis(): ContributionUi[] {
 
 /** What a frame needs to know about the plugin behind a contribution. */
 export function framePlugin(ui: ContributionUi): FramePlugin {
-  return { id: ui.plugin_id, name: ui.plugin_name, iconUrl: ui.icon_url, version: ui.version }
+  return { id: ui.plugin, name: ui.plugin_name, iconUrl: ui.icon_url, version: ui.version }
 }
 
 /** The ids of a plugin's pages (what its frames may open with `ui.open`). */
 export function pagesOf(all: ContributionUi[], pluginId: string): string[] {
-  return all.filter((u) => u.plugin_id === pluginId && u.slot === 'page').map((u) => u.id)
+  return all.filter((u) => u.plugin === pluginId && u.slot === 'page').map((u) => u.id)
 }
 
 /** The panels for an object of a type. */
 export function panelsFor(all: ContributionUi[], type: ObjectType): ContributionUi[] {
-  return all.filter((u) => u.slot === 'object.panel' && u.objects.includes(type))
+  return all.filter((u) => u.slot === 'object.panel' && objectsOf(u).includes(type))
 }
 
 /** The id of a document side-panel tab for a plugin panel ("plugin:<plugin id>/<ui id>"). */
-export const documentTabId = (ui: ContributionUi): string => `plugin:${ui.plugin_id}/${ui.id}`
+export const documentTabId = (ui: ContributionUi): string => `plugin:${ui.plugin}/${ui.id}`
 
 /** The tabs plugins add beside a document: their ids and names. */
 export function usePluginDocumentTabs(): { id: string; label: string }[] {

@@ -1,25 +1,19 @@
 /**
  * Every request of the plugins feature: the queries and mutations of Settings > Plugins,
- * the slots' contributions and the host's calls (contract §7).
- *
- * The plugins API is being built in parallel (workstream A), so the generated client
- * doesn't know these routes yet: `request()` below sends them with `fetch` and reads the
- * answer through the same `unwrap()` as the typed client (same ApiError, same "signed
- * out" handling). Once A is merged and `make gen-api` has run, `request()` is replaced by
- * `api.GET('/api/plugins', …)` and friends; nothing outside this file sends a request.
+ * the slots' contributions and the host's calls (contract §7). JSON goes through the typed
+ * `api` client; only the zip upload uses `fetch` (multipart), answered through the same
+ * `unwrap()` (same ApiError, same "signed out" handling). Nothing outside this file sends
+ * a request.
  */
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError, unwrap } from '@/api/client'
-import { type AllSettings, settingsKey } from '@/features/settings/api'
+import { api, ApiError, unwrap } from '@/api/client'
+import { useSaveSection } from '@/features/settings/api'
 import { withReauth } from '@/features/auth/reauthStore'
 import { t } from '@/lib/i18n'
 import type {
-  BundledPluginOut,
+  PluginCallBody,
   PluginContributionsOut,
-  PluginDataOut,
   PluginDetailOut,
-  PluginDiffOut,
-  PluginFrameBundleOut,
   PluginListOut,
   PluginOut,
 } from './types'
@@ -31,31 +25,7 @@ export const pluginKey = (id: string) => [...pluginsKey, 'detail', id] as const
 export const contributionsKey = [...pluginsKey, 'contributions'] as const
 export const bundledKey = [...pluginsKey, 'bundled'] as const
 
-const enc = encodeURIComponent
-
-/**
- * A JSON request to the server, answered like the typed client's: the parsed body, or an
- * ApiError with the server's code. (Temporary, see the top of this file.)
- */
-async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, body?: unknown): Promise<T> {
-  const response = await fetch(url, {
-    method,
-    credentials: 'same-origin',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  // A 204 (or any empty answer) has no body to read.
-  const text = response.status === 204 ? '' : await response.text()
-  let parsed: unknown = undefined
-  try {
-    parsed = text ? JSON.parse(text) : undefined
-  } catch {
-    parsed = undefined
-  }
-  return unwrap<T>(response.ok ? { data: parsed as T, response } : { error: parsed, response })
-}
-
-/** A multipart upload (the zip); errors as ApiError, like `request`. */
+/** A multipart upload (the zip); errors as ApiError, like the typed client's. */
 async function upload<T>(url: string, form: FormData): Promise<T> {
   const response = await fetch(url, { method: 'POST', body: form, credentials: 'same-origin' })
   const parsed = await response.json().catch(() => undefined)
@@ -68,7 +38,7 @@ async function upload<T>(url: string, form: FormData): Promise<T> {
 export function usePlugins() {
   return useQuery({
     queryKey: pluginListKey,
-    queryFn: () => request<PluginListOut>('GET', '/api/plugins'),
+    queryFn: async () => unwrap(await api.GET('/api/plugins')),
   })
 }
 
@@ -81,7 +51,7 @@ export function detailFromListItem(item: PluginOut): PluginDetailOut {
   return {
     ...item,
     readme: null,
-    author: null,
+    author: { name: '' },
     license: null,
     approved_version: null,
     pending_version: null,
@@ -94,7 +64,7 @@ function listItem(qc: QueryClient, id: string): PluginOut | undefined {
   return qc.getQueryData<PluginListOut>(pluginListKey)?.plugins.find((p) => p.id === id)
 }
 
-const fetchDetail = (id: string) => request<PluginDetailOut>('GET', `/api/plugins/${enc(id)}`)
+const fetchDetail = async (id: string) => unwrap(await api.GET('/api/plugins/{plugin}', { params: { path: { plugin: id } } }))
 
 export function usePlugin(id: string) {
   const qc = useQueryClient()
@@ -117,7 +87,7 @@ export function prefetchPlugin(qc: QueryClient, id: string): void {
 export function useBundledPlugins(enabled = true) {
   return useQuery({
     queryKey: bundledKey,
-    queryFn: async () => (await request<{ plugins: BundledPluginOut[] }>('GET', '/api/plugins/bundled')).plugins,
+    queryFn: async () => unwrap(await api.GET('/api/plugins/bundled')).plugins,
     enabled,
     staleTime: 5 * 60_000,
   })
@@ -131,7 +101,7 @@ export function useBundledPlugins(enabled = true) {
 export function usePluginContributions() {
   return useQuery({
     queryKey: contributionsKey,
-    queryFn: () => request<PluginContributionsOut>('GET', '/api/plugins/contributions'),
+    queryFn: async () => unwrap(await api.GET('/api/plugins/contributions')),
     staleTime: 60_000,
   })
 }
@@ -139,10 +109,12 @@ export function usePluginContributions() {
 export function usePluginDiff(id: string, version: string | null, against?: string | null) {
   return useQuery({
     queryKey: [...pluginsKey, 'diff', id, version, against ?? null],
-    queryFn: () => {
-      const query = against ? `?against=${enc(against)}` : ''
-      return request<PluginDiffOut>('GET', `/api/plugins/${enc(id)}/versions/${enc(version ?? '')}/diff${query}`)
-    },
+    queryFn: async () =>
+      unwrap(
+        await api.GET('/api/plugins/{plugin}/versions/{version}/diff', {
+          params: { path: { plugin: id, version: version ?? '' }, query: against ? { against } : {} },
+        }),
+      ),
     enabled: version !== null,
     staleTime: Infinity, // a version's files never change
   })
@@ -151,32 +123,29 @@ export function usePluginDiff(id: string, version: string | null, against?: stri
 export function usePluginData(id: string, enabled = true) {
   return useQuery({
     queryKey: [...pluginsKey, 'data', id],
-    queryFn: () => request<PluginDataOut>('GET', `/api/plugins/${enc(id)}/data`),
+    queryFn: async () => unwrap(await api.GET('/api/plugins/{plugin}/data', { params: { path: { plugin: id } } })),
     enabled,
   })
 }
 
 /** The files a frame is built from. A version never changes, so it is fetched once. */
-export function fetchFrameBundle(qc: QueryClient, id: string, version: string, ui: string): Promise<PluginFrameBundleOut> {
+export function fetchFrameBundle(qc: QueryClient, id: string, version: string, ui: string) {
   return qc.fetchQuery({
     queryKey: [...pluginsKey, 'bundle', id, version, ui],
-    queryFn: () => request<PluginFrameBundleOut>('GET', `/api/plugins/${enc(id)}/versions/${enc(version)}/ui/${enc(ui)}`),
+    queryFn: async () =>
+      unwrap(await api.GET('/api/plugins/{plugin}/versions/{version}/ui/{ui}', { params: { path: { plugin: id, version, ui } } })),
     staleTime: Infinity,
   })
 }
 
-/** The body of a plugin call (contract §7). `ui` is null for a command from Ctrl+K. */
-export interface PluginCallBody {
-  ui: string | null
-  method: string
-  params: unknown
-  confirm_token?: string
-  preview_version?: string
-}
-
-/** One call of a plugin, carried out by the server (contract §6.4). Errors as ApiError. */
+/**
+ * One call of a plugin, carried out by the server (contract §6.4). Errors as ApiError:
+ * 409 `confirm_required` (details `{token, summary, risk}`), 403 `permission_denied` or
+ * `declined`, 404 `not_found`/`unknown_method`, 400 `invalid_params`, 429 `rate_limited`,
+ * 503 `unavailable`, 422 `failed`.
+ */
 export async function callPlugin(id: string, body: PluginCallBody): Promise<unknown> {
-  const answer = await request<{ result?: unknown }>('POST', `/api/plugins/${enc(id)}/call`, body)
+  const answer = unwrap(await api.POST('/api/plugins/{plugin}/call', { params: { path: { plugin: id } }, body }))
   return answer?.result ?? null
 }
 
@@ -200,7 +169,8 @@ function useKeepDetail() {
 export function useSetPluginEnabled() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (v: { id: string; enabled: boolean }) => request<PluginOut>('PATCH', `/api/plugins/${enc(v.id)}`, { enabled: v.enabled }),
+    mutationFn: async (v: { id: string; enabled: boolean }) =>
+      unwrap(await api.PATCH('/api/plugins/{plugin}', { params: { path: { plugin: v.id } }, body: { enabled: v.enabled } })),
     onMutate: async (v) => {
       await qc.cancelQueries({ queryKey: pluginListKey })
       const before = qc.getQueryData<PluginListOut>(pluginListKey)
@@ -221,8 +191,13 @@ export function useApproveVersion() {
   const keep = useKeepDetail()
   return useMutation({
     mutationFn: (v: { id: string; version: string; hash: string; enable: boolean }) =>
-      withReauth(() =>
-        request<PluginDetailOut>('POST', `/api/plugins/${enc(v.id)}/versions/${enc(v.version)}/approve`, { hash: v.hash, enable: v.enable }),
+      withReauth(async () =>
+        unwrap(
+          await api.POST('/api/plugins/{plugin}/versions/{version}/approve', {
+            params: { path: { plugin: v.id, version: v.version } },
+            body: { hash: v.hash, enable: v.enable },
+          }),
+        ),
       ),
     onSuccess: keep,
   })
@@ -232,7 +207,8 @@ export function useApproveVersion() {
 export function useRejectVersion() {
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: (v: { id: string; version: string }) => request<void>('DELETE', `/api/plugins/${enc(v.id)}/versions/${enc(v.version)}`),
+    mutationFn: async (v: { id: string; version: string }) =>
+      unwrap(await api.DELETE('/api/plugins/{plugin}/versions/{version}', { params: { path: { plugin: v.id, version: v.version } } })),
     onSuccess: refresh,
   })
 }
@@ -240,7 +216,8 @@ export function useRejectVersion() {
 export function useUninstallPlugin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (v: { id: string; data: 'keep' | 'remove' }) => request<void>('DELETE', `/api/plugins/${enc(v.id)}?data=${v.data}`),
+    mutationFn: async (v: { id: string; data: 'keep' | 'remove' }) =>
+      unwrap(await api.DELETE('/api/plugins/{plugin}', { params: { path: { plugin: v.id }, query: { data: v.data } } })),
     onSuccess: (_answer, v) => {
       qc.setQueryData<PluginListOut>(pluginListKey, (old) => old && { ...old, plugins: old.plugins.filter((p) => p.id !== v.id) })
       qc.removeQueries({ queryKey: pluginKey(v.id) })
@@ -256,50 +233,54 @@ export function useInstallPlugin() {
   const keep = useKeepDetail()
   return useMutation({
     mutationFn: (v: InstallRequest) =>
-      withReauth(() => {
+      withReauth(async (): Promise<PluginDetailOut> => {
         if (v.kind === 'zip') {
           const form = new FormData()
           form.append('file', v.file)
           return upload<PluginDetailOut>('/api/plugins/install/zip', form)
         }
-        if (v.kind === 'git') return request<PluginDetailOut>('POST', '/api/plugins/install/git', { url: v.url, ref: v.ref || null })
-        return request<PluginDetailOut>('POST', '/api/plugins/install/bundled', { id: v.id })
+        if (v.kind === 'git') return unwrap(await api.POST('/api/plugins/install/git', { body: { url: v.url, ref: v.ref || null } }))
+        return unwrap(await api.POST('/api/plugins/install/bundled', { body: { id: v.id } }))
       }),
     onSuccess: keep,
   })
 }
 
-/** "Continue building with the assistant": a chat linked to the plugin. */
+/** "Continue building with the assistant": a chat linked to the plugin (201 `{conversation_id}`). */
 export function useStartPluginChat() {
   return useMutation({
-    mutationFn: (id: string) => request<{ conversation_id: string }>('POST', `/api/plugins/${enc(id)}/chat`),
+    mutationFn: async (id: string) => unwrap(await api.POST('/api/plugins/{plugin}/chat', { params: { path: { plugin: id } } })),
   })
 }
 
 /**
  * The kill switch: the `plugins` settings section, `{disabled_all}` (not sensitive, so
- * switching everything off is one click). Shown at once in the list and the slots.
+ * switching everything off is one click). Saved like any settings section; the list and
+ * the slots show it at once too.
  */
 export function useSetPluginsKillSwitch() {
   const qc = useQueryClient()
-  const set = (off: boolean) => {
+  const save = useSaveSection('plugins')
+  const show = (off: boolean) => {
     qc.setQueryData<PluginListOut>(pluginListKey, (old) => old && { ...old, disabled_all: off })
     qc.setQueryData<PluginContributionsOut>(contributionsKey, (old) => old && { ...old, disabled_all: off })
   }
-  return useMutation({
-    mutationFn: (off: boolean) => request<{ disabled_all: boolean }>('PUT', '/api/settings/plugins', { disabled_all: off }),
-    onMutate: (off) => {
+  return {
+    isPending: save.isPending,
+    isError: save.isError,
+    error: save.error,
+    mutate: (off: boolean) => {
       const before = qc.getQueryData<PluginListOut>(pluginListKey)?.disabled_all
-      set(off)
-      return { before }
+      show(off)
+      save.mutate(
+        { disabled_all: off },
+        {
+          onError: () => {
+            if (before !== undefined) show(before)
+          },
+          onSettled: () => void qc.invalidateQueries({ queryKey: pluginsKey }),
+        },
+      )
     },
-    onError: (_err, _off, context) => {
-      if (context?.before !== undefined) set(context.before)
-    },
-    onSuccess: (section) => {
-      // The section isn't in the generated settings types yet (workstream A adds it).
-      qc.setQueryData<AllSettings>(settingsKey, (old) => (old ? ({ ...old, plugins: section } as AllSettings) : old))
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: pluginsKey }),
-  })
+  }
 }

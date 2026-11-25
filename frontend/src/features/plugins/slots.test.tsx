@@ -11,13 +11,13 @@ import type { ContributionUi } from './types'
  * chat fences; and nowhere with the kill switch on. */
 
 const ui = (over: Partial<ContributionUi>): ContributionUi => ({
-  plugin_id: 'anemo.word-count', plugin_name: 'Word count', icon_url: null, version: '1.0.0', permissions: ['documents:read'],
-  id: 'panel', slot: 'object.panel', title: 'Words', icon: null, objects: ['document', 'task'], fence: null, height: 120, ...over,
+  plugin: 'anemo.word-count', plugin_name: 'Word count', icon_url: null, version: '1.0.0', permissions: ['documents:read'],
+  id: 'panel', slot: 'object.panel', title: 'Words', icon: null, objects: ['document', 'task'], fence: null, height: 120, entry: 'ui/panel.html', ...over,
 })
 
 const contributions = contributionsOut({
   ui: [ui({}), ui({ id: 'today', slot: 'page', title: 'Today board', objects: [] }), ui({ id: 'kanban', slot: 'chat.block', fence: 'today-kanban', objects: [] })],
-  fences: [{ plugin_id: 'anemo.word-count', ui: 'kanban', fence: 'today-kanban' }],
+  fences: [{ plugin: 'anemo.word-count', ui: 'kanban', fence: 'today-kanban' }],
 })
 
 describe('plugin slots', () => {

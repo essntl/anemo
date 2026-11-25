@@ -20,7 +20,7 @@ export function PluginPage() {
   const navigate = useNavigate()
   const contributions = usePluginContributions()
   const all = usePluginUis()
-  const ui = all.find((u) => u.plugin_id === pluginId && u.id === uiId && u.slot === 'page')
+  const ui = all.find((u) => u.plugin === pluginId && u.id === uiId && u.slot === 'page')
 
   if (!ui) {
     if (contributions.isPending) return <div aria-busy className="m-4 h-64 animate-pulse rounded-card bg-surface-2 motion-reduce:animate-none md:mx-8" />
@@ -40,8 +40,8 @@ export function PluginPage() {
         before={<NamedIcon name={ui.icon} className="h-5 w-5 shrink-0 text-accent" fallback={<PluginIcon url={ui.icon_url} size={24} className="rounded-md" />} />}
         detail={title !== ui.plugin_name ? ui.plugin_name : undefined} />
       <div className="min-h-[24rem] flex-1">
-        <PluginFrame key={`${ui.plugin_id}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="page"
-          permissions={ui.permissions} pages={pagesOf(all, ui.plugin_id)} active fill title={title}
+        <PluginFrame key={`${ui.plugin}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="page"
+          permissions={ui.permissions} pages={pagesOf(all, ui.plugin)} active fill title={title}
           context={{ page: ui.id, params: Object.fromEntries(search.entries()) }} />
       </div>
     </div>

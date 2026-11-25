@@ -11,7 +11,8 @@ import { cn } from '@/lib/cn'
 import { formatSize } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { usePluginData, useUninstallPlugin } from '../api'
-import type { PluginDataOut, PluginOut } from '../types'
+import { adoptedResources, ownedResources, resourceText, writtenText } from '../data'
+import type { PluginOut, PluginResourceOut } from '../types'
 
 type Choice = 'keep' | 'remove'
 
@@ -32,18 +33,16 @@ function Option({ value, choice, onChoose, title, children }: { value: Choice; c
   )
 }
 
-/** "3 properties, 1 automation" from the data summary, for the items `pick` selects. */
-function listOf(data: PluginDataOut | undefined, pick: (onRemove: 'delete' | 'trash') => boolean): string {
-  return (data?.items ?? []).filter((i) => i.count > 0 && pick(i.on_remove)).map((i) => `${i.count} × ${i.label}`).join(', ')
-}
+const names = (resources: PluginResourceOut[]): string => resources.map(resourceText).join(', ')
 
 export function UninstallDialog({ plugin, onClose, onDone }: { plugin: PluginOut; onClose: () => void; onDone: () => void }) {
   const [choice, setChoice] = useState<Choice>('keep')
   const data = usePluginData(plugin.id)
   const uninstall = useUninstallPlugin()
-  const made = listOf(data.data, () => true)
-  const deleted = listOf(data.data, (r) => r === 'delete')
-  const trashed = listOf(data.data, (r) => r === 'trash')
+  const owned = names(ownedResources(data.data))
+  const adopted = names(adoptedResources(data.data))
+  const written = writtenText(data.data)
+  const storageKeys = data.data?.storage_keys ?? 0
   const storage = data.data?.storage_bytes ?? 0
 
   return (
@@ -62,13 +61,15 @@ export function UninstallDialog({ plugin, onClose, onDone }: { plugin: PluginOut
       <div role="radiogroup" aria-label={t('What happens to its data')} className="flex flex-col gap-2">
         <Option value="keep" choice={choice} onChoose={setChoice} title={t('Keep its data')}>
           {t('What it created stays, as yours: properties, views, automations and scripts (switched off), profiles, skills, and the tasks, documents and events it wrote.')}
-          {made && <span className="mt-1 block text-text">{made}</span>}
+          {(owned || adopted) && <span className="mt-1 block text-text">{names(data.data?.resources ?? [])}</span>}
+          {written && <span className="mt-1 block text-text">{t('It created: {list}', { list: written })}</span>}
         </Option>
         <Option value="remove" choice={choice} onChoose={setChoice} title={t('Remove its data')}>
           {t('What it registered is deleted; tasks, documents and events it created go to the Trash; its own storage is deleted.')}
-          {deleted && <span className="mt-1 block text-text">{t('Deleted: {list}', { list: deleted })}</span>}
-          {trashed && <span className="mt-1 block text-text">{t('To the Trash: {list}', { list: trashed })}</span>}
-          {storage > 0 && <span className="mt-1 block text-text">{t('Its storage: {size}', { size: formatSize(storage) })}</span>}
+          {owned && <span className="mt-1 block text-text">{t('Deleted: {list}', { list: owned })}</span>}
+          {written && <span className="mt-1 block text-text">{t('To the Trash: {list}', { list: written })}</span>}
+          {storageKeys > 0 && <span className="mt-1 block text-text">{t('Its storage: {size}', { size: formatSize(storage) })}</span>}
+          {adopted && <span className="mt-1 block text-text">{t('Stays, as it was yours before: {list}', { list: adopted })}</span>}
         </Option>
         {data.isPending && <p className="text-[12.5px] text-muted">{t('Looking at what it made…')}</p>}
       </div>

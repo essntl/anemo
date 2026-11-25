@@ -27,6 +27,19 @@ const update: PluginDetailOut = detailOut({
   ],
 })
 
+/** A data summary as the server sends it (PluginDataOut). */
+const DATA = {
+  resources: [
+    { kind: 'properties', id: 'stage', object_type: 'property', object_id: 'p1', label: 'Stage', owned: true },
+    { kind: 'properties', id: 'tags', object_type: 'property', object_id: 'p2', label: 'Tags', owned: false },
+  ],
+  storage_keys: 3,
+  storage_bytes: 2048,
+  tasks: 2,
+  documents: 0,
+  events: 1,
+}
+
 describe('a plugin’s page', () => {
   beforeEach(() => stubMatchMedia())
   afterEach(() => vi.unstubAllGlobals())
@@ -48,7 +61,7 @@ describe('a plugin’s page', () => {
     mockApi({
       'GET /api/plugins/anemo.word-count': () => detailOut({ source: { kind: 'git', label: 'repo', url: 'https://github.com/a/b', ref: 'main', commit: 'abc123', conversation_ids: [] } }),
       'GET /api/plugins': () => ({ plugins: [pluginOut()], disabled_all: false }),
-      'GET /api/plugins/anemo.word-count/data': () => ({ items: [{ kind: 'properties', label: 'Properties', count: 2, on_remove: 'delete' }], storage_bytes: 0 }),
+      'GET /api/plugins/anemo.word-count/data': () => DATA,
     })
     renderRoutes(routes, '/settings/plugins/anemo.word-count')
     const tabs = await screen.findByRole('tablist', { name: 'About this plugin' })
@@ -57,9 +70,31 @@ describe('a plugin’s page', () => {
     expect(screen.getByText('https://github.com/a/b')).toBeInTheDocument()
     expect(screen.getByText('abc123')).toBeInTheDocument()
     await userEvent.click(within(tabs).getByRole('tab', { name: 'Data' }))
-    expect(await screen.findByText('Properties')).toBeInTheDocument()
+    const added = await screen.findByRole('region', { name: 'What it added' })
+    expect(within(added).getByText('Stage')).toBeInTheDocument()
+    expect(within(added).getAllByText('Properties')).toHaveLength(2)
+    // Adopted (it existed before): marked, as it stays when the plugin goes.
+    expect(within(added).getAllByText('Was already yours')).toHaveLength(1)
+    expect(screen.getByText('Created through its calls: 2 tasks, 1 event')).toBeInTheDocument()
+    expect(screen.getByText('Its own storage: 3 keys, 2 KB')).toBeInTheDocument()
     await userEvent.click(within(tabs).getByRole('tab', { name: 'Contributions' }))
     expect(screen.getByText('Adds a panel to documents')).toBeInTheDocument()
+  })
+
+  it('says what uninstalling does with its data, for each choice', async () => {
+    mockApi({
+      'GET /api/plugins/anemo.word-count': () => detailOut(),
+      'GET /api/plugins': () => ({ plugins: [pluginOut()], disabled_all: false }),
+      'GET /api/plugins/anemo.word-count/data': () => DATA,
+    })
+    renderRoutes(routes, '/settings/plugins/anemo.word-count')
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Uninstall' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('Deleted: Stage (Properties)')).toBeInTheDocument()
+    expect(within(dialog).getByText('To the Trash: 2 tasks, 1 event')).toBeInTheDocument()
+    expect(within(dialog).getByText('Its storage: 2 KB')).toBeInTheDocument()
+    expect(within(dialog).getByText('Stays, as it was yours before: Tags (Properties)')).toBeInTheDocument()
   })
 
   it('groups permissions by risk, in the app’s own words, with the warning about reading', async () => {

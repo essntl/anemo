@@ -33,6 +33,7 @@ import { usePluginIncidents } from './host/incidents'
 import { PluginBadges } from './PluginBadges'
 import { PluginIcon } from './PluginIcon'
 import { beginPluginTransition, HERO, HERO_ICON, HERO_NAME, heroLayoutId, heroStyle, transitionMode } from './transition'
+import { manifestOf } from './types'
 
 const TABS = [
   { id: 'overview', label: msg('Overview') },
@@ -66,7 +67,7 @@ export function PluginDetailPage() {
   const killed = list.data?.disabled_all ?? false
   const approved = plugin?.versions.find((v) => v.status === 'approved') ?? null
   const pending = plugin?.versions.find((v) => v.status === 'pending') ?? null
-  const settingsUi = approved?.manifest.contributes?.ui?.find((u) => u.slot === 'settings') ?? null
+  const settingsUi = (approved && manifestOf(approved).contributes?.ui?.find((u) => u.slot === 'settings')) || null
   const tabs = TABS.filter((tab) => tab.id !== 'settings' || settingsUi)
   const tabParam = params.get('tab')
   const tab: Tab = tabs.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'overview'
@@ -136,7 +137,7 @@ export function PluginDetailPage() {
             {plugin.name}
           </motion.h2>
           <p className="text-[13px] text-muted">
-            {plugin.author?.name && <>{plugin.author.name} · </>}
+            {plugin.author.name && <>{plugin.author.name} · </>}
             <span className="tabular-nums">{t('Version {version}', { version: plugin.version })}</span>
           </p>
           <div className="mt-1.5 flex min-h-5 flex-wrap items-center gap-1.5">
@@ -156,7 +157,7 @@ export function PluginDetailPage() {
           <Button variant="primary" size="sm" icon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={() => setTab('versions')}>
             {plugin.approved_version ? t('Review update') : t('Review and approve')}
           </Button>
-          {(pending.manifest.contributes?.ui?.length ?? 0) > 0 && (
+          {(manifestOf(pending).contributes?.ui?.length ?? 0) > 0 && (
             <Button size="sm" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => setPreview(pending.version)}>{t('Preview')}</Button>
           )}
         </div>

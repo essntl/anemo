@@ -44,10 +44,10 @@ export function PluginPanels({ type, id, revision, className }: { type: ObjectTy
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {panels.map((ui) => (
-        <section key={`${ui.plugin_id}/${ui.id}`} aria-label={ui.title ?? ui.plugin_name}>
+        <section key={`${ui.plugin}/${ui.id}`} aria-label={ui.title ?? ui.plugin_name}>
           <PanelHeading ui={ui} />
-          <PluginFrame key={`${ui.plugin_id}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="object.panel"
-            permissions={ui.permissions} pages={pagesOf(all, ui.plugin_id)} context={{ object: { type, id } }}
+          <PluginFrame key={`${ui.plugin}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="object.panel"
+            permissions={ui.permissions} pages={pagesOf(all, ui.plugin)} context={{ object: { type, id } }}
             active height={ui.height} revision={revision} title={ui.title ?? ui.plugin_name} />
         </section>
       ))}
@@ -63,8 +63,8 @@ export function PluginDocumentPanel({ tabId, documentId, revision }: { tabId: st
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-3">
       <PanelHeading ui={ui} />
-      <PluginFrame key={`${ui.plugin_id}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="object.panel"
-        permissions={ui.permissions} pages={pagesOf(all, ui.plugin_id)} context={{ object: { type: 'document', id: documentId } }}
+      <PluginFrame key={`${ui.plugin}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="object.panel"
+        permissions={ui.permissions} pages={pagesOf(all, ui.plugin)} context={{ object: { type: 'document', id: documentId } }}
         active height={ui.height} revision={revision} title={ui.title ?? ui.plugin_name} />
     </div>
   )
@@ -78,7 +78,7 @@ export function PluginLinks({ onNavigate }: { onNavigate?: () => void }) {
     <nav aria-label={t('Plugins')} className="mt-1 flex shrink-0 flex-col gap-0.5">
       <div className="px-2.5 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-subtle">{t('Plugins')}</div>
       {pages.map((ui) => (
-        <NavLink key={`${ui.plugin_id}/${ui.id}`} to={pluginPageLink(ui.plugin_id, ui.id)} onClick={onNavigate}
+        <NavLink key={`${ui.plugin}/${ui.id}`} to={pluginPageLink(ui.plugin, ui.id)} onClick={onNavigate}
           className={({ isActive }) =>
             cn('flex h-(--nav-row-h) min-w-0 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors pointer-coarse:h-10',
               isActive ? 'bg-surface-2 font-semibold text-text [&>svg]:text-accent' : 'text-text hover:bg-surface-hover [&>svg]:text-muted')}>
@@ -97,8 +97,8 @@ function PluginFenceBlock({ lang, text, fallback }: FenceRendererProps) {
   if (!ui) return <>{fallback}</>
   return (
     <div className="my-3">
-      <PluginFrame key={`${ui.plugin_id}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="chat.block"
-        permissions={ui.permissions} pages={pagesOf(all, ui.plugin_id)} context={{ block: { lang, text } }}
+      <PluginFrame key={`${ui.plugin}@${ui.version}/${ui.id}`} plugin={framePlugin(ui)} ui={ui.id} slot="chat.block"
+        permissions={ui.permissions} pages={pagesOf(all, ui.plugin)} context={{ block: { lang, text } }}
         active height={ui.height} fallback={fallback} title={ui.title ?? ui.plugin_name} />
     </div>
   )

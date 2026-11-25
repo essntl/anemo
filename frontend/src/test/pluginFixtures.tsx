@@ -7,7 +7,10 @@ import type { ReactElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router'
+import createClient from 'openapi-fetch'
 import { vi } from 'vitest'
+import { api } from '@/api/client'
+import type { paths } from '@/api/schema'
 import type { PermissionOut, PluginContributionsOut, PluginDetailOut, PluginOut, PluginVersionOut } from '@/features/plugins/types'
 
 export const pluginOut = (over: Partial<PluginOut> = {}): PluginOut => ({
@@ -70,6 +73,8 @@ export const contributionsOut = (over: Partial<PluginContributionsOut> = {}): Pl
   ui: [],
   commands: [],
   fences: [],
+  themes: [],
+  templates: [],
   disabled_all: false,
   ...over,
 })
@@ -77,24 +82,37 @@ export const contributionsOut = (over: Partial<PluginContributionsOut> = {}): Pl
 type Handler = (request: { method: string; path: string; search: string; body: unknown }) => unknown
 
 /**
- * Replace `fetch` with answers by "METHOD /path" (the query string is passed along).
- * A handler may return `{ status, body }` via `answer(...)` for errors; anything else is
- * sent as a 200 JSON body. Unknown routes answer 404.
+ * Replace `fetch` with answers by "METHOD /path" (the query string is passed along), for
+ * both the typed `api` client (its methods are pointed at a client that uses this fetch)
+ * and plain `fetch` (the zip upload). A handler may return `{ status, body }` via
+ * `answer(...)` for errors; anything else is sent as a 200 JSON body. Unknown routes
+ * answer 404.
  */
 export function mockApi(routes: Record<string, Handler>) {
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : null
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost')
-    const method = (init?.method ?? 'GET').toUpperCase()
+    const method = (init?.method ?? request?.method ?? 'GET').toUpperCase()
     const handler = routes[`${method} ${url.pathname}`]
     if (!handler) return new Response(JSON.stringify({ error: { code: 'not_found', message: 'Not found' } }), { status: 404 })
     let body: unknown = undefined
     if (typeof init?.body === 'string') body = JSON.parse(init.body)
+    else if (request && request.body !== null) {
+      const text = await request.text()
+      body = text ? JSON.parse(text) : undefined
+    }
     const result = await handler({ method, path: url.pathname, search: url.search, body })
     if (result instanceof Response) return result
     if (result === undefined) return new Response(null, { status: 204 })
     return new Response(JSON.stringify(result), { status: 200, headers: { 'Content-Type': 'application/json' } })
   })
   vi.stubGlobal('fetch', fetch)
+  // The typed client keeps the fetch it was made with: its methods go through one that
+  // calls the stub (an absolute base, as Node's Request needs one).
+  const client = createClient<paths>({ baseUrl: 'http://localhost', fetch: (r: Request) => fetch(r) })
+  for (const m of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+    vi.spyOn(api, m).mockImplementation(client[m] as never)
+  }
   return fetch
 }
 

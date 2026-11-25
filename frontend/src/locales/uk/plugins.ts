@@ -52,7 +52,6 @@ const messages: Messages = {
   "approved {when}": "схвалено {when}",
   "What this plugin created in Anemo and keeps for itself. You can see and change these like anything else.": "Що цей плагін створив в Anemo і що зберігає для себе. Ви можете переглядати й змінювати це, як і все інше.",
   "Nothing yet.": "Поки нічого.",
-  "Its own storage: {size}": "Власне сховище: {size}",
   "Turn the plugin on to change its settings.": "Увімкніть плагін, щоб змінити його налаштування.",
   "Settings of {name}": "Налаштування {name}",
   "Panel": "Панель",
@@ -167,6 +166,13 @@ const messages: Messages = {
   "Agent profiles": "Профілі агентів",
   "Themes": "Теми",
   "Saved views": "Збережені подання",
+  "What it added": "Що він додав",
+  "Was already yours": "Уже був вашим",
+  "Created through its calls: {list}": "Створено через його виклики: {list}",
+  "Its own storage: {n} key, {size} | Its own storage: {n} keys, {size}": "Власне сховище: {n} ключ, {size} | Власне сховище: {n} ключі, {size} | Власне сховище: {n} ключів, {size}",
+  "It created: {list}": "Він створив: {list}",
+  "Stays, as it was yours before: {list}": "Залишиться, бо було вашим раніше: {list}",
+  "{name}: this command needs a newer version of Anemo.": "{name}: для цієї команди потрібна новіша версія Anemo.",
 }
 
 export default messages
