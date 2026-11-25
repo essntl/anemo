@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <!-- Shown while counting, when the document is empty, or when it can't be read. -->
+    <p id="status" class="muted small" role="status">Counting…</p>
+
+    <section id="stats" hidden>
+      <!-- Six numbers in a grid of small tiles. -->
+      <dl class="tiles">
+        <div class="tile">
+          <dt>Words</dt>
+          <dd id="words" class="num"></dd>
+        </div>
+        <div class="tile">
+          <dt>Paragraphs</dt>
+          <dd id="paragraphs" class="num"></dd>
+        </div>
+        <div class="tile">
+          <dt>Characters</dt>
+          <dd id="chars" class="num"></dd>
+        </div>
+        <div class="tile">
+          <dt>Without spaces</dt>
+          <dd id="chars-no-spaces" class="num"></dd>
+        </div>
+        <div class="tile">
+          <dt>Reading time</dt>
+          <dd id="reading" class="num"></dd>
+        </div>
+        <div class="tile">
+          <dt>Speaking time</dt>
+          <dd id="speaking" class="num"></dd>
+        </div>
+      </dl>
+
+      <!-- The longest paragraph: its first words, and how long it is. -->
+      <div id="longest" class="longest" hidden>
+        <div class="longest-head">
+          <span class="label">Longest paragraph</span>
+          <span id="longest-words" class="badge num"></span>
+        </div>
+        <p id="longest-text" class="longest-text"></p>
+      </div>
+    </section>
+
+    <script src="panel.js"></script>
+  </body>
+</html>
