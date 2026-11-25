@@ -47,7 +47,7 @@ public static partial class GitOutput
     /// <summary><c>git for-each-ref --format=…</c>: the ref, its object, the commit an annotated tag points at, its upstream, how far ahead and behind, whether it is HEAD.</summary>
     public const string RefFormat = "--format=%(refname)%00%(objectname)%00%(*objectname)%00%(upstream)%00%(upstream:track,nobracket)%00%(HEAD)";
 
-    /// <summary><c>git show -s -z --format=…</c> of one commit: as <see cref="LogFormat"/>, plus the committer's date and name and the body (1.6.0: the name).</summary>
+    /// <summary><c>git show -s -z --format=…</c> of one commit: as <see cref="LogFormat"/>, plus the committer's date and name and the body (1.6.1: the name).</summary>
     public const string CommitFormat = "--format=%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%cn%x00%s%x00%b";
 
     /// <summary>
