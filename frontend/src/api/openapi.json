@@ -20483,6 +20483,82 @@
           }
         }
       }
+    },
+    "/api/plugins/{plugin}/chat": {
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Start Chat",
+        "description": "A new chat in Agent mode, linked to the plugin, whose first message asks the\nassistant to read the plugin. The answer is already queued.",
+        "operationId": "start_chat_api_plugins__plugin__chat_post",
+        "parameters": [
+          {
+            "name": "plugin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PluginChatIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -30597,6 +30673,33 @@
           "track_ids"
         ],
         "title": "PlaylistTracksIn"
+      },
+      "PluginChatIn": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Message",
+            "description": "What the user wants changed. Left out: the assistant reads the plugin and asks.",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "PluginChatIn"
+      },
+      "PluginChatOut": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id"
+        ],
+        "title": "PluginChatOut"
       },
       "PresenceIn": {
         "properties": {

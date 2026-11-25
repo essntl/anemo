@@ -4890,6 +4890,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/{plugin}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Chat
+         * @description A new chat in Agent mode, linked to the plugin, whose first message asks the
+         *     assistant to read the plugin. The answer is already queued.
+         */
+        post: operations["start_chat_api_plugins__plugin__chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8750,6 +8771,23 @@ export interface components {
         PlaylistTracksIn: {
             /** Track Ids */
             track_ids: string[];
+        };
+        /** PluginChatIn */
+        PluginChatIn: {
+            /**
+             * Message
+             * @description What the user wants changed. Left out: the assistant reads the plugin and asks.
+             * @default
+             */
+            message: string;
+        };
+        /** PluginChatOut */
+        PluginChatOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
         };
         /** PresenceIn */
         PresenceIn: {
@@ -22831,6 +22869,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceReplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_chat_api_plugins__plugin__chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PluginChatIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginChatOut"];
                 };
             };
             /** @description Validation Error */

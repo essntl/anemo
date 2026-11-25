@@ -41,6 +41,7 @@ from app.features.notifications.push_router import public_router as push_public_
 from app.features.notifications.push_router import router as push_router
 from app.features.notifications.router import router as notifications_router
 from app.features.permissions_router import router as permissions_router
+from app.features.plugins.chat_router import router as plugin_chat_router
 from app.features.profiles.router import router as profiles_router
 from app.features.projects.router import router as projects_router
 from app.features.properties.router import router as properties_router
@@ -119,4 +120,5 @@ protected.include_router(updates_router)
 protected.include_router(properties_router)
 protected.include_router(views_router)
 protected.include_router(voice_router)
+protected.include_router(plugin_chat_router)  # "Continue building with the assistant"
 api_router.include_router(protected)
