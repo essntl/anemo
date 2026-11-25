@@ -96,7 +96,7 @@ describe('the host channel', () => {
   it('asks the user when the server needs a confirmation, and sends the token only to the server', async () => {
     const token = 'one-time-secret-token'
     const call = vi.fn()
-      .mockRejectedValueOnce(new ApiError(403, 'confirm_required', 'Needs your OK', { token, summary: 'Run shell command “ls”', risk: 'critical' }))
+      .mockRejectedValueOnce(new ApiError(409, 'confirm_required', 'Needs your OK', { token, summary: 'Run shell command “ls”', risk: 'critical' }))
       .mockResolvedValueOnce({ content: 'done' })
     const confirm = vi.fn(async () => true)
     const { host, sent } = channel({ call, confirm, permissions: ['tools:shell_run'] })
@@ -109,7 +109,7 @@ describe('the host channel', () => {
   })
 
   it('answers "declined" when the user says no', async () => {
-    const call = vi.fn().mockRejectedValue(new ApiError(403, 'confirm_required', 'Needs your OK', { token: 't', summary: 'Send it', risk: 'high' }))
+    const call = vi.fn().mockRejectedValue(new ApiError(409, 'confirm_required', 'Needs your OK', { token: 't', summary: 'Send it', risk: 'high' }))
     const { host, sent } = channel({ call, confirm: async () => false, permissions: ['notifications:send'] })
     await host.receive({ id: 10, method: 'notifications.send', params: { title: 'Hi' } })
     expect(call).toHaveBeenCalledTimes(1)
@@ -158,6 +158,24 @@ describe('the host channel', () => {
     expect(options.open).toHaveBeenCalledTimes(2)
     expect(sent).toContainEqual({ id: 18, error: { code: 'permission_denied', message: expect.any(String) } })
     expect(sent).toContainEqual({ id: 20, error: { code: 'not_found', message: expect.any(String) } })
+  })
+
+  it('answers context.get and ui.* itself and never forwards them (the server refuses them)', async () => {
+    const { host, options, sent } = channel({ permissions: ['documents:read'] })
+    await host.receive({ id: 30, method: 'context.get' })
+    await host.receive({ id: 31, method: 'ui.resize', params: { height: 200 } })
+    await host.receive({ id: 32, method: 'ui.toast', params: { message: 'Saved', tone: 'success' } })
+    await host.receive({ id: 33, method: 'ui.open', params: { type: 'document', id: 'd9' } })
+    expect(options.call).not.toHaveBeenCalled()
+    expect(sent).toEqual([
+      { id: 30, result: { object: { type: 'document', id: 'd1' } } },
+      { id: 31, result: {} },
+      { id: 32, result: {} },
+      { id: 33, result: {} },
+    ])
+    expect(options.resize).toHaveBeenCalledWith(200)
+    expect(options.toast).toHaveBeenCalledWith('Saved', 'success')
+    expect(options.open).toHaveBeenCalledWith('document', 'd9')
   })
 
   it('stops answering once closed', async () => {

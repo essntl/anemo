@@ -18,10 +18,10 @@ from app.core.errors import AppError
 from app.features.plugins import bundled, calls, package, service
 from app.features.plugins.models import Plugin
 from app.features.plugins.schemas import (
-    ApproveIn,
     BundledInstallIn,
     BundledListOut,
     GitInstallIn,
+    PluginApproveIn,
     PluginCallIn,
     PluginCallOut,
     PluginContributionsOut,
@@ -112,7 +112,7 @@ async def switch_plugin(plugin: str, body: PluginPatchIn, request: Request, db: 
 
 @router.post("/{plugin}/versions/{version}/approve", response_model=PluginDetailOut)
 async def approve_version(
-    plugin: str, version: str, body: ApproveIn, request: Request, db: Db, _: RecentAuth
+    plugin: str, version: str, body: PluginApproveIn, request: Request, db: Db, _: RecentAuth
 ) -> PluginDetailOut:
     row = await service.get_plugin(db, plugin)
     await service.approve(db, row, version, body.hash, enable=body.enable, ip=client_ip(request))

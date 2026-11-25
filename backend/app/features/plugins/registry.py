@@ -30,7 +30,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
-from app.features.automations import removal as automation_removal
 from app.features.automations import scripts as scripts_service
 from app.features.automations import service as automations
 from app.features.automations.models import Automation
@@ -56,6 +55,7 @@ from app.features.skills.models import Skill
 from app.features.views import service as views
 from app.features.views.models import SavedView
 from app.features.views.schemas import ViewIn, ViewPatch, ViewQuery
+from app.jobs import queue
 
 # The manifest key -> the object type stored in plugin_resources.
 OBJECT_TYPES = {
@@ -389,7 +389,17 @@ async def remove(db: AsyncSession, row: PluginResource) -> None:
         elif row.object_type == "automation":
             automation = await db.get(Automation, row.object_id)
             if automation is not None:
-                await automation_removal.delete(db, automation)
+                # It stops at once; the worker removes it with the chats of its runs and
+                # its script's folder (automations.removal needs conversations.service,
+                # which reaches into the runtime: the agent tools reach this module).
+                automation.enabled, automation.next_run_at = False, None
+                await queue.enqueue(
+                    db,
+                    "automation.delete",
+                    {"automation_id": str(automation.id)},
+                    lane="background",
+                    dedupe_key=f"automation.delete:{automation.id}",
+                )
         elif row.object_type == "mcp_server":
             server = await db.get(McpServer, row.object_id)
             if server is not None:

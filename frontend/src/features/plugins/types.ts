@@ -1,85 +1,50 @@
 /**
- * The plugins API's shapes, written by hand from docs/specs/CONTRACTS-plugins.md §7.
+ * The plugins API's shapes, from the generated schema (`make gen-api`), plus the few
+ * narrower types the UI needs where the server's model is looser than what it sends:
  *
- * Workstream A builds these endpoints at the same time as this UI, so the generated
- * `schema.d.ts` doesn't have them yet. Once A is merged, `make gen-api` adds them and these
- * become aliases of `Schemas['PluginOut']` and friends. Keep every field name exactly as in
- * the contract (snake_case, as the server sends it).
- *
- * Where the contract leaves a shape open ("ui: [...]" of the contributions, the data
- * summary), the fields used here are marked "(assumed)": the UI needs them, and phase 2
- * checks them against A's real models.
+ *  - a version's manifest is stored as plain JSON (`dict` on the server): `manifestOf()`
+ *    reads it as a `Manifest` (the server validated it before storing it);
+ *  - a contributed UI's `slot`/`objects` are strings on the wire: `Slot`/`ObjectType` name
+ *    the values the contract allows;
+ *  - a command's `action` is an untyped object: `commandAction()` narrows it.
  */
 import type { Schemas } from '@/api/client'
 
-export type Risk = 'low' | 'medium' | 'high' | 'critical'
-export type PluginStatus = 'needs_review' | 'enabled' | 'disabled' | 'error'
-export type VersionStatus = 'pending' | 'approved' | 'superseded' | 'rejected'
-export type Slot = 'object.panel' | 'page' | 'settings' | 'chat.block'
-export type ObjectType = 'task' | 'document' | 'event'
+export type PluginOut = Schemas['PluginOut']
+export type PluginListOut = Schemas['PluginListOut']
+export type PluginSource = Schemas['PluginSource']
+export type PluginDetailOut = Schemas['PluginDetailOut']
+export type PluginVersionOut = Schemas['PluginVersionOut']
+export type PermissionOut = Schemas['PermissionOut']
+export type ContributionOut = Schemas['ContributionOut']
+export type PluginFileOut = Schemas['PluginFileOut']
+export type PluginDiffOut = Schemas['PluginDiffOut']
+export type PluginDiffFile = Schemas['DiffFileOut']
+export type PluginFrameBundleOut = Schemas['PluginFrameBundleOut']
+export type PluginDataOut = Schemas['PluginDataOut']
+export type PluginResourceOut = Schemas['PluginResourceOut']
+export type PluginContributionsOut = Schemas['PluginContributionsOut']
+export type ContributionUi = Schemas['ContributedUiOut']
+export type ContributionCommand = Schemas['ContributedCommandOut']
+export type ContributionFence = Schemas['ContributedFenceOut']
+export type BundledPluginOut = Schemas['BundledPluginOut']
+/** The body of a plugin call (contract §7). `ui` is null for a command from Ctrl+K. */
+export type PluginCallBody = Schemas['PluginCallIn']
 
 /** Who made a version (the same shape as everywhere else that names an actor). */
 export type ActorOut = Schemas['ActorOut']
 
-export interface PluginSource {
-  kind: 'zip' | 'git' | 'assistant' | 'bundled'
-  label: string
-  url?: string | null
-  ref?: string | null
-  commit?: string | null
-  conversation_ids: string[]
-}
+export type Risk = PermissionOut['risk']
+export type PluginStatus = PluginOut['status']
+export type VersionStatus = PluginVersionOut['status']
+export type Slot = 'object.panel' | 'page' | 'settings' | 'chat.block'
+export type ObjectType = 'task' | 'document' | 'event'
 
-export interface PluginOut {
-  /** The manifest id, e.g. "anemo.word-count". */
-  id: string
-  name: string
-  description: string
-  /** The approved version, or the newest one while none is approved. */
-  version: string
-  icon_url: string | null
-  enabled: boolean
-  status: PluginStatus
-  update_pending: boolean
-  made_by_assistant: boolean
-  error: string | null
-  source: PluginSource
-  ui_count: number
-  updated_at: string
-}
+const OBJECT_TYPES: readonly string[] = ['task', 'document', 'event']
 
-export interface PluginListOut {
-  plugins: PluginOut[]
-  disabled_all: boolean
-}
-
-export interface PermissionOut {
-  /** The whole string, e.g. "network:api.example.com". */
-  name: string
-  /** "network" or "tools" for those two, the whole name otherwise ("tasks:read"). */
-  kind: string
-  /** The host or tool name of a network/tools permission. */
-  target: string | null
-  risk: Risk
-  /** The server's English text; the app shows its own translation per kind (permissions.ts). */
-  label: string
-  explanation: string
-}
-
-export interface ContributionOut {
-  /** "ui", "commands", "scripts", "automations", "mcpServers", "profiles", "skills", "themes", "templates", "properties", "views". */
-  kind: string
-  id: string
-  label: string
-  risk: Risk
-  detail: string
-}
-
-export interface PluginFileOut {
-  path: string
-  size: number
-  sha256: string
-}
+/** The object types a contributed panel is for (the server sends them as strings). */
+export const objectsOf = (ui: Pick<ContributionUi, 'objects'>): ObjectType[] =>
+  (ui.objects ?? []).filter((o): o is ObjectType => OBJECT_TYPES.includes(o))
 
 /** The manifest as stored (validated by the server); only the parts the UI reads are typed. */
 export interface Manifest {
@@ -129,122 +94,19 @@ export interface ManifestTheme {
   }
 }
 
-export interface PluginVersionOut {
-  version: string
-  status: VersionStatus
-  /** The package hash: what "Approve" names, so a newer upload in between is refused. */
-  hash: string
-  created_at: string
-  created_by: ActorOut | null
-  approved_at: string | null
-  manifest: Manifest
-  permissions: PermissionOut[]
-  contributions: ContributionOut[]
-  files: PluginFileOut[]
-}
+/** A version's manifest. The schema types it as a plain object; the server validated it. */
+export const manifestOf = (version: Pick<PluginVersionOut, 'manifest'>): Manifest => version.manifest as unknown as Manifest
 
-export interface PluginDetailOut extends PluginOut {
-  readme: string | null
-  author: { name: string; url?: string | null } | null
-  license: string | null
-  approved_version: string | null
-  pending_version: string | null
-  versions: PluginVersionOut[]
-  chats: { id: string; title: string }[]
-}
-
-export interface PluginDiffFile {
-  path: string
-  status: 'added' | 'removed' | 'changed' | 'same'
-  before?: string | null
-  after?: string | null
-  /** Binary files (pictures, fonts) come with their hash instead of text. */
-  sha256?: string | null
-}
-
-export interface PluginDiffOut {
-  from: string | null
-  to: string
-  manifest: { before: Manifest | null; after: Manifest }
-  permissions: { added: PermissionOut[]; removed: PermissionOut[]; kept: PermissionOut[] }
-  files: PluginDiffFile[]
-}
-
-/** What the host hands the frame: the entry's HTML and the files it references. */
-export interface PluginFrameBundleOut {
-  entry: string
-  html: string
-  scripts: { path: string; text: string; module?: boolean }[]
-  styles: { path: string; text: string }[]
-  hash: string
-}
-
-/** One thing a plugin created or keeps (assumed: the contract names the route, not the shape). */
-export interface PluginDataItem {
-  kind: string
-  label: string
-  count: number
-  /** What "remove its data" does to it: deleted, or moved to the trash. */
-  on_remove: 'delete' | 'trash'
-}
-
-export interface PluginDataOut {
-  items: PluginDataItem[]
-  storage_bytes: number
-}
-
-/** A UI contribution of an enabled plugin (assumed fields: what a slot needs to draw it). */
-export interface ContributionUi {
-  plugin_id: string
-  plugin_name: string
-  icon_url: string | null
-  /** The approved version that runs. */
-  version: string
-  /** Its permissions, for the host's own check before a call (contract §6.4). */
-  permissions: string[]
-  id: string
-  slot: Slot
-  title: string | null
-  icon: string | null
-  objects: ObjectType[]
-  fence: string | null
-  height: number | null
-}
-
+/** A command's action (contract §2.2 `commands`). */
 export type CommandAction =
   | { type: 'openPage'; page: string }
   | { type: 'runScript'; script: string; input?: unknown }
   | { type: 'newFromTemplate'; template: string }
 
-export interface ContributionCommand {
-  plugin_id: string
-  plugin_name: string
-  id: string
-  title: string
-  icon: string | null
-  keywords: string[]
-  action: CommandAction
-}
-
-export interface ContributionFence {
-  plugin_id: string
-  ui: string
-  fence: string
-}
-
-export interface PluginContributionsOut {
-  ui: ContributionUi[]
-  commands: ContributionCommand[]
-  fences: ContributionFence[]
-  disabled_all: boolean
-}
-
-export interface BundledPluginOut {
-  id: string
-  name: string
-  description: string
-  version: string
-  icon_url: string | null
-  /** Whether it is installed already (then "Install" becomes "Open"). (assumed) */
-  installed: boolean
+/** The command's action, or null for one this version of the app doesn't know. */
+export function commandAction(action: ContributionCommand['action']): CommandAction | null {
+  if (action.type === 'openPage' && typeof action.page === 'string') return { type: 'openPage', page: action.page }
+  if (action.type === 'runScript' && typeof action.script === 'string') return { type: 'runScript', script: action.script, input: action.input }
+  if (action.type === 'newFromTemplate' && typeof action.template === 'string') return { type: 'newFromTemplate', template: action.template }
+  return null
 }

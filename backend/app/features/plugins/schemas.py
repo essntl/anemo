@@ -145,7 +145,9 @@ class FrameFileOut(BaseModel):
 class PluginFrameBundleOut(BaseModel):
     entry: str
     html: str
-    scripts: list[FrameFileOut]  # in the order the HTML names them
+    # The ones the HTML names, in its order, then the version's other .js/.mjs files
+    # (module scripts import them; the frame runs only the named ones).
+    scripts: list[FrameFileOut]
     styles: list[FrameFileOut]
     hash: str  # the version's package hash
 
@@ -182,6 +184,8 @@ class ContributedUiOut(BaseModel):
     entry: str
     height: int | None
     fence: str | None
+    # The approved manifest's permissions: the host checks a call against them first.
+    permissions: list[str]
 
 
 class ContributedCommandOut(BaseModel):
@@ -244,7 +248,7 @@ class PluginPatchIn(BaseModel):
     enabled: bool
 
 
-class ApproveIn(BaseModel):
+class PluginApproveIn(BaseModel):
     hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     enable: bool = False
 
@@ -268,3 +272,18 @@ class PluginCallIn(BaseModel):
 
 class PluginCallOut(BaseModel):
     result: Any
+
+
+class PluginChatIn(BaseModel):
+    message: str = Field(
+        "",
+        max_length=4000,
+        description="What the user wants changed. Left out: the assistant reads the plugin "
+        "and asks.",
+    )
+
+
+class PluginBuildChatOut(BaseModel):
+    """The chat "Continue building with the assistant" started (POST /{plugin}/chat)."""
+
+    conversation_id: uuid.UUID

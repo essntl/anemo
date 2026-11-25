@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detailOut, mockApi, pluginOut, renderRoutes, stubMatchMedia, versionOut } from '@/test/pluginFixtures'
+import { detailOut, mockApi, permission, pluginOut, renderRoutes, stubMatchMedia, versionOut } from '@/test/pluginFixtures'
 import { PluginsSettingsPage } from './PluginsSettingsPage'
 import type { PluginListOut } from './types'
 
@@ -88,7 +88,7 @@ describe('Settings > Plugins', () => {
     })
     mockApi({
       'GET /api/plugins': () => ({ plugins: [], disabled_all: false }),
-      'GET /api/plugins/bundled': () => ({ plugins: [{ id: 'anemo.word-count', name: 'Word count', description: 'Counts words', version: '1.0.0', icon_url: null, installed: false }] }),
+      'GET /api/plugins/bundled': () => ({ plugins: [{ id: 'anemo.word-count', name: 'Word count', description: 'Counts words', version: '1.0.0', installed: false, permissions: [permission('documents:read', 'low')] }] }),
       'POST /api/plugins/install/bundled': () => installed,
     })
     show()

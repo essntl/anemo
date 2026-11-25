@@ -20,7 +20,7 @@ import { callWithConfirm } from './host/channel'
 import { confirmPluginCall } from './host/confirm'
 import { NamedIcon, PluginIcon } from './PluginIcon'
 import { pluginPageLink } from './slotData'
-import type { ContributionCommand, ContributionUi, PluginContributionsOut } from './types'
+import { commandAction, type ContributionCommand, type ContributionUi, type PluginContributionsOut } from './types'
 
 export interface PluginPaletteItem {
   key: string
@@ -46,20 +46,24 @@ const matches = (words: string[], text: string) => {
 
 /** Carry out a command (see the top of this file). */
 export async function runCommand(command: ContributionCommand, iconUrl: string | null, navigate: (to: string) => void): Promise<void> {
-  const action = command.action
+  const action = commandAction(command.action)
+  if (!action) {
+    toast({ message: t('{name}: this command needs a newer version of Anemo.', { name: command.plugin_name }) })
+    return
+  }
   if (action.type === 'openPage') {
-    navigate(pluginPageLink(command.plugin_id, action.page))
+    navigate(pluginPageLink(command.plugin, action.page))
     return
   }
   const confirm = (request: Parameters<typeof confirmPluginCall>[1]) =>
-    confirmPluginCall({ id: command.plugin_id, name: command.plugin_name, iconUrl }, request)
+    confirmPluginCall({ id: command.plugin, name: command.plugin_name, iconUrl }, request)
   try {
     if (action.type === 'runScript') {
-      await callWithConfirm({ ui: null, method: 'scripts.run', params: { script: action.script, input: action.input ?? null } }, (body) => callPlugin(command.plugin_id, body), confirm)
+      await callWithConfirm({ ui: null, method: 'scripts.run', params: { script: action.script, input: action.input ?? null } }, (body) => callPlugin(command.plugin, body), confirm)
       toast({ message: t('“{title}” started. Its result will be in the run history.', { title: command.title }) })
       return
     }
-    const made = (await callWithConfirm({ ui: null, method: 'templates.apply', params: { template: action.template } }, (body) => callPlugin(command.plugin_id, body), confirm)) as { type?: string; id?: string } | null
+    const made = (await callWithConfirm({ ui: null, method: 'templates.apply', params: { template: action.template } }, (body) => callPlugin(command.plugin, body), confirm)) as { type?: string; id?: string } | null
     const link = made?.id ? (made.type === 'task' ? taskLink(made.id) : made.type === 'event' ? eventLink(made.id) : documentLink(made.id)) : null
     toast({ message: t('Created from “{title}”.', { title: command.title }), action: link ? { label: t('Open'), onClick: () => navigate(link) } : undefined })
   } catch (err) {
@@ -71,24 +75,24 @@ export async function runCommand(command: ContributionCommand, iconUrl: string |
 export function pluginPaletteItems(data: PluginContributionsOut | undefined, query: string): { actions: PluginPaletteItem[]; pages: PluginPaletteItem[] } {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   if (!data || data.disabled_all || words.length === 0) return { actions: [], pages: [] }
-  const pictures = new Map<string, string | null>(data.ui.map((u) => [u.plugin_id, u.icon_url]))
+  const pictures = new Map<string, string | null>(data.ui.map((u) => [u.plugin, u.icon_url]))
   const pages = data.ui
     .filter((u: ContributionUi) => u.slot === 'page' && matches(words, `${u.title ?? ''} ${u.plugin_name}`))
     .map((u) => ({
-      key: `plugin-page:${u.plugin_id}/${u.id}`,
+      key: `plugin-page:${u.plugin}/${u.id}`,
       title: u.title ?? u.plugin_name,
       detail: u.plugin_name,
       iconNode: iconNode(u.icon, u.icon_url),
-      to: pluginPageLink(u.plugin_id, u.id),
+      to: pluginPageLink(u.plugin, u.id),
     }))
   const actions = data.commands
     .filter((c) => matches(words, `${c.title} ${c.keywords.join(' ')} ${c.plugin_name}`))
     .map((c) => ({
-      key: `plugin-command:${c.plugin_id}/${c.id}`,
+      key: `plugin-command:${c.plugin}/${c.id}`,
       title: c.title,
       detail: c.plugin_name,
-      iconNode: iconNode(c.icon, pictures.get(c.plugin_id) ?? null),
-      run: (navigate: (to: string) => void) => void runCommand(c, pictures.get(c.plugin_id) ?? null, navigate),
+      iconNode: iconNode(c.icon, pictures.get(c.plugin) ?? null),
+      run: (navigate: (to: string) => void) => void runCommand(c, pictures.get(c.plugin) ?? null, navigate),
     }))
   return { actions, pages }
 }

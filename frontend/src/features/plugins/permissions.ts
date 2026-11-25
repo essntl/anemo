@@ -66,6 +66,11 @@ export function groupByRisk<T extends { risk: Risk }>(items: T[]): { risk: Risk;
   return RISKS.map((risk) => ({ risk, items: items.filter((i) => i.risk === risk) })).filter((g) => g.items.length > 0)
 }
 
+/** The riskiest of some permissions, or null for none. */
+export function highestRisk(permissions: { risk: Risk }[]): Risk | null {
+  return [...RISKS].reverse().find((risk) => permissions.some((p) => p.risk === risk)) ?? null
+}
+
 /** True when any of them lets the plugin read your data (then READ_WARNING is shown). */
 export const readsData = (permissions: PermissionOut[]): boolean => permissions.some((p) => p.kind.endsWith(':read') || p.kind === 'network')
 

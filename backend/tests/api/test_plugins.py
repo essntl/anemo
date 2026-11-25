@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.features.audit.models import AuditLog
+from app.features.automations import removal
 from app.features.automations.models import Automation, ScriptVersion
 from app.features.plugins import package, store
 from app.features.plugins import router as plugins_router
@@ -25,6 +26,7 @@ from app.features.provenance import service as provenance
 from app.features.tasks.models import Task
 from app.features.trash.models import TrashedItem
 from app.features.views.models import SavedView
+from app.jobs.models import Job
 from tests.api.test_scripts import age_password
 from tests.conftest import requires_db
 
@@ -175,6 +177,8 @@ async def test_install_review_approve_enable(authed):
     shown = (await authed.get("/api/plugins/contributions")).json()
     assert shown["disabled_all"] is False
     assert sorted(u["id"] for u in shown["ui"]) == ["page", "panel"]
+    # The host checks a call against the approved permissions before sending it.
+    assert all(u["permissions"] == ["tasks:read", "tasks:write"] for u in shown["ui"])
     assert shown["commands"][0]["action"] == {"type": "openPage", "page": "page"}
     assert shown["templates"][0]["id"] == "follow-up"
     listed = (await authed.get("/api/plugins")).json()
@@ -580,11 +584,18 @@ async def test_uninstall_removing_its_data(authed):
             is not None
         )
         assert await db.scalar(select(SavedView).where(SavedView.name == "Stages")) is None
-        assert list(await db.scalars(select(Automation))) == []
+        # Its script stops at once; the worker's job deletes it with its runs' chats.
+        (script,) = list(await db.scalars(select(Automation)))
+        assert script.enabled is False and script.next_run_at is None
+        jobs = list(await db.scalars(select(Job).where(Job.type == "automation.delete")))
+        assert [j.payload for j in jobs] == [{"automation_id": str(script.id)}]
         assert await db.get(Task, task_id) is None
         trashed = await db.scalar(select(TrashedItem).where(TrashedItem.item_id == task_id))
         assert trashed is not None
     assert [d["data"] for d in await audit("plugin.uninstall")] == ["remove"]
+    await removal.delete_with_runs(script.id)
+    async with get_sessionmaker()() as db:
+        assert list(await db.scalars(select(Automation))) == []
 
 
 async def test_plugin_mcp_tools_ask_and_stop_with_the_kill_switch(authed, monkeypatch):
@@ -728,6 +739,32 @@ async def test_frame_bundle_files_and_tampering(authed):
     detail = (await authed.get(f"/api/plugins/{HELLO}")).json()
     assert detail["status"] == "error" and detail["error"]
     assert code_of(await call(authed, HELLO, "tasks.list")) == "unavailable"
+
+
+async def test_frame_bundle_carries_the_modules_a_script_imports(authed):
+    files = package_files(
+        manifest(plugin_id="artem.modules"),
+        **{
+            "ui/panel.html": b'<script type="module" src="main.js"></script>'
+            b'<script src="panel.js"></script>',
+            "ui/main.js": b"import { add } from './util.js'\nconsole.log(add(1, 2))",
+            "ui/util.js": b"export const add = (a, b) => a + b",
+            "lib/deep.mjs": b"export default 1",
+        },
+    )
+    await approve(authed, await install_zip(authed, files), "1.0.0")
+    r = await authed.get("/api/plugins/artem.modules/versions/1.0.0/ui/panel")
+    assert r.status_code == 200, r.text
+    scripts = r.json()["scripts"]
+    # The ones the HTML names first, in its order; then every other script of the version.
+    assert [s["path"] for s in scripts] == [
+        "ui/main.js",
+        "ui/panel.js",
+        "lib/deep.mjs",
+        "ui/util.js",
+    ]
+    assert scripts[3]["text"] == "export const add = (a, b) => a + b"
+    assert all(set(s) == {"path", "text"} for s in scripts)
 
 
 # -- output is data -------------------------------------------------------------------------

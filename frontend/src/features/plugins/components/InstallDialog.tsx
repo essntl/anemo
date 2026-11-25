@@ -7,6 +7,7 @@
 import { type DragEvent, useRef, useState } from 'react'
 import { FileArchive, GitBranch, Upload } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
+import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Input'
@@ -15,6 +16,7 @@ import { cn } from '@/lib/cn'
 import { formatSize } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { type InstallRequest, useBundledPlugins, useInstallPlugin } from '../api'
+import { highestRisk, RISK_GROUPS, RISK_LABELS } from '../permissions'
 import { PluginIcon } from '../PluginIcon'
 import type { PluginDetailOut } from '../types'
 import { VersionReview } from './Review'
@@ -109,9 +111,13 @@ export function BundledList({ onInstall, busyId }: { onInstall: (id: string) => 
     <ul className="flex flex-col divide-y divide-border text-left">
       {bundled.data.map((p) => (
         <li key={p.id} className="flex items-center gap-3 py-(--item-y)">
-          <PluginIcon url={p.icon_url} size={36} />
+          <PluginIcon url={null} size={36} />
           <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] font-medium">{p.name} <span className="font-normal text-subtle">{p.version}</span></div>
+            <div className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-medium">
+              {p.name} <span className="font-normal text-subtle">{p.version}</span>
+              {/* How far it reaches: the riskiest permission it asks for. */}
+              {highestRisk(p.permissions) && <Badge tone={RISK_GROUPS[highestRisk(p.permissions)!].tone}>{t(RISK_LABELS[highestRisk(p.permissions)!])}</Badge>}
+            </div>
             <p className="line-clamp-2 text-[12.5px] text-muted">{p.description}</p>
           </div>
           <Button size="sm" disabled={p.installed || (busyId !== null && busyId !== p.id)} loading={busyId === p.id} onClick={() => onInstall(p.id)}>
