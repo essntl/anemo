@@ -84,13 +84,12 @@ def _count(n: int, noun: str) -> str:
     return f"{n} {noun}{'' if n == 1 else 's'}"
 
 
-def describe(noun: str, planned: Sequence[Planned], *, past: bool) -> str:
-    """The batch in one line: "Change 30 tasks: due → Fri 2026-11-27", "Move 3 events to
-    the trash", "Change 4 tasks, move 2 to the trash". `past`: as the activity log
-    names it afterwards ("Changed 30 tasks: ...")."""
+def describe(noun: str, planned: Sequence[Planned]) -> str:
+    """The batch in one line, as it was asked for: "Change 30 tasks: due → Fri
+    2026-11-27", "Move 3 events to the trash", "Change 4 tasks, move 2 to the trash"."""
     changes = [p for p in planned if not p.trash]
     trashed = len(planned) - len(changes)
-    change, move = ("Changed", "moved") if past else ("Change", "move")
+    change, move = "Change", "move"
     common = {p.text for p in changes}
     parts = []
     if changes:
@@ -111,7 +110,7 @@ def actions(capability: str, noun: str, planned: Sequence[Planned]) -> list[Acti
     """The call's summary first (with the highest risk of its items), then one action per
     item, without a summary of its own."""
     risk = max((p.risk for p in planned), key=lambda r: _RISK_ORDER[r], default="safe")
-    head = Action(capability=capability, risk=risk, summary=describe(noun, planned, past=False))
+    head = Action(capability=capability, risk=risk, summary=describe(noun, planned))
     items = [Action(capability=capability, risk=p.risk, item=p.text, ref=p.ref) for p in planned]
     return [head, *items]
 
@@ -126,7 +125,9 @@ async def apply_all[Item](
     """Apply every item in order, each on its own (one failing doesn't stop the others),
     inside one activity group, and report each one."""
     outcomes: list[Outcome] = []
-    with activity_group(describe(noun, planned, past=True)):
+    # The group is named before anything runs, so it says what was asked for (the
+    # Activity page shows it with the number of changes actually made).
+    with activity_group(describe(noun, planned)):
         for item in items:
             key = item_id(item)
             try:

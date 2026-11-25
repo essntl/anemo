@@ -127,8 +127,11 @@ open; if that fails, the references are shown instead. Days carry their weekday 
 2026-11-27") so a wrong date stands out.
 
 **One activity group.** The whole batch runs inside `activity_group(label)`
-(`app/core/activity.py`), with the label in the past tense: "Changed 12 tasks: due → Fri
-2026-11-27", "Moved 3 events to the trash". Every activity entry the service functions
+(`app/core/activity.py`), labelled with what was asked for, the same line as the
+approval's summary: "Change 12 tasks: due → Fri 2026-11-27", "Move 3 events to the
+trash". The label is fixed before anything runs (each entry stores it as it is written),
+so it can't be in the past tense without claiming items that may then fail; the Activity
+page shows it with the number of changes that were made. Every activity entry the service functions
 write meanwhile (workstream A) carries the group's id, so the Activity page lists the
 batch as one entry that can be undone together. The tools write no activity rows
 themselves.

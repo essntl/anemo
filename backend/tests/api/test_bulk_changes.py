@@ -267,7 +267,7 @@ async def test_the_batch_runs_in_one_activity_group(authed, monkeypatch):
     )
     assert len(seen) == 3 and seen[0] is not None
     assert all(g is seen[0] for g in seen)  # one group for the whole batch
-    assert seen[0].label == "Changed 2 tasks: due → Fri 2026-11-27, moved 1 to the trash"
+    assert seen[0].label == "Change 2 tasks: due → Fri 2026-11-27, move 1 to the trash"
     assert current_group() is None  # and none afterwards
 
 
@@ -371,7 +371,7 @@ async def test_update_events_run_in_one_activity_group(authed, monkeypatch):
         UpdateEvents, items=[{"id": one["id"], "title": "Uno"}, {"id": two["id"], "title": "Dos"}]
     )
     assert len(seen) == 2 and seen[0] is not None and seen[1] is seen[0]
-    assert seen[0].label == "Changed 2 events"
+    assert seen[0].label == "Change 2 events"
 
 
 # -- in an agent run ------------------------------------------------------------------
