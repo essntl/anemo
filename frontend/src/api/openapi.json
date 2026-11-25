@@ -28400,6 +28400,11 @@
             "type": "array",
             "title": "Choices",
             "default": []
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
           }
         },
         "type": "object",
