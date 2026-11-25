@@ -441,7 +441,7 @@ manifest `id`.
 | `DELETE /api/plugins/{plugin}` | `?data=keep\|remove` → 204 | |
 | `POST /api/plugins/{plugin}/call` | `{ui, method, params, confirm_token?, preview_version?}` → `{result}` or an error (`confirm_required` carries `details: {token, summary, risk}`) | §6.4 |
 | `GET /api/plugins/contributions` | → `PluginContributionsOut {ui: [...], commands: [...], fences: [...], disabled_all}` | what the slots render; only enabled, approved versions |
-| `POST /api/plugins/{plugin}/chat` | → `{conversation_id}` | "Continue building with the assistant" |
+| `POST /api/plugins/{plugin}/chat` | → `{conversation_id}` | "Continue building with the assistant"; C owns this route (`features/plugins/chat_router.py`, mounted next to A's router) |
 | `GET /api/plugin-frame` | → the frame document (public, static, headers of §6.1) | |
 | settings section `plugins` | `{disabled_all: bool}` | the kill switch; not sensitive (switching everything off must be quick) |
 
@@ -454,9 +454,11 @@ conversation_ids}`, `ui_count`, `updated_at`.
 pending_version|null, versions: [PluginVersionOut]`, `chats: [{id, title}]`.
 `PluginVersionOut`: `version, status, hash, created_at, created_by (ActorOut), approved_at,
 manifest, permissions: [PermissionOut], contributions: [ContributionOut], files: [{path,
-size, sha256}]`. `PermissionOut`: `{name, risk: "low"|"medium"|"high"|"critical", label,
-explanation}` (the plain-language text comes from the server so the review and the
-assistant's tools say the same thing). `ContributionOut`: `{kind, id, label, risk, detail}`.
+size, sha256}]`. `PermissionOut`: `{name, kind, target|null, risk: "low"|"medium"|"high"|"critical",
+label, explanation}`; `kind` is the part before the colon for `network`/`tools`
+(`target` is the host or tool name) and the whole name otherwise. `label`/`explanation`
+are the server's English text (used by the assistant's tools); the app shows its own
+translated text per `kind` (and falls back to the server's for a kind it doesn't know). `ContributionOut`: `{kind, id, label, risk, detail}`.
 `PluginDiffOut`: `{from, to, manifest: {before, after}, permissions: {added, removed, kept},
 files: [{path, status: "added"|"removed"|"changed"|"same", before?, after?}]}` (text only;
 binary files as `{status, sha256}`).
@@ -483,6 +485,33 @@ user). None of them can approve, enable, grant or uninstall. Created plugins rec
 | `frontend/src/features/plugins/**` (Settings → Plugins, cards, detail page, install, review, the host side of §6, slot components); the frame side of §6, `backend/app/features/plugins/frame/bootstrap.js` and `frame/base.css` (plain JS/CSS files that A's `/api/plugin-frame` route inlines), the slot mounts in `TaskDialog`, `DocumentInfo`, `EventDialog`, `Markdown`'s fence hook, `search/actions.ts` + `pages.ts`, `app/router.tsx`, `settings/sections.ts`, `src/locales/{uk,ru}/plugins.ts` | **B** (`feat/plugins-ui`) |
 | `backend/app/tools/builtin/plugins.py`, its `policy/presets.py` entry, `tools/registry.py` entry, `backend/app/features/plugins/guide.md`, the "Continue building" chat setup (`POST …/chat` service), its tests | **C** (`feat/plugins-agent-tools`) |
 
-A owns the `plugins` service functions C calls (`create_from_files`, `save_pending_files`,
-`validate_package`, `describe_permission`); C codes against the signatures in A's spec
-section and, where A isn't merged yet, against stubs that match them.
+A owns the service functions C calls, with exactly these signatures (in
+`app/features/plugins/service.py` unless noted; none of them commits except where said):
+
+```python
+class PluginSource(BaseModel):  # schemas.py
+    kind: Literal["zip", "git", "assistant", "bundled"]
+    label: str
+    url: str | None = None; ref: str | None = None; commit: str | None = None
+    conversation_ids: list[str] = []
+
+def validate_files(files: dict[str, bytes]) -> ValidationReport          # package.py, pure
+    # ValidationReport(ok: bool, errors: list[ValidationIssue(path, message)], manifest: Manifest | None)
+async def install_files(db, files: dict[str, bytes], *, source: PluginSource, by: str) -> PluginVersion
+    # a new plugin (needs_review) or a new pending version of the same id; raises AppError
+    # subclasses with code plugin_invalid (details.errors), plugin_version_not_higher
+async def save_pending_files(db, plugin: Plugin, changes: dict[str, bytes | None], *, by: str) -> PluginVersion
+    # starts from the pending version if there is one, else the newest; None deletes a file;
+    # replaces the pending version; the result's version must be higher than the approved one
+async def get_plugin(db, plugin_id: str) -> Plugin                       # NotFound "plugin_not_found"
+async def list_plugins(db) -> list[Plugin]
+async def version_files(db, plugin: Plugin, version: str) -> dict[str, bytes]
+async def detail(db, plugin: Plugin) -> PluginDetailOut
+async def diff(db, plugin: Plugin, version: str, against: str | None = None) -> PluginDiffOut
+async def link_chat(db, plugin: Plugin, conversation_id: uuid.UUID) -> None
+def permission_info(name: str) -> PermissionOut                          # permissions.py, pure
+```
+
+`by` is an actor reference (`user`, `chat:<id>`). C works in parallel with A: C codes
+against these names, may keep a local, uncommitted stub to try its code, and its tests run
+for real once A is merged (phase 2).
