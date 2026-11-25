@@ -307,51 +307,12 @@ public sealed partial class CodeJobControl
             throw CommandException.NotFound($"There is no project “{project}” in {root}.");
         }
 
-        if (!IsInside(Resolved(root), Resolved(dir)))
+        if (!FolderLinks.IsInsideResolved(root, dir))
         {
             throw CommandException.Refused($"“{project}” leads out of the projects folder (a link), so Anemo doesn't read it.");
         }
 
         return dir;
-    }
-
-    /// <summary>The folder's full path with every link on the way followed (the folder itself and its parents).</summary>
-    private static string Resolved(string folder)
-    {
-        var full = Path.GetFullPath(folder);
-        var parts = new Stack<string>();
-        var current = full;
-        while (true)
-        {
-            try
-            {
-                if (Directory.ResolveLinkTarget(current, returnFinalTarget: true) is { } target)
-                {
-                    var resolved = Path.GetFullPath(target.FullName);
-                    return parts.Aggregate(resolved, Path.Combine);
-                }
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                // A link that can't be followed is not a way out; the folder check fails later.
-            }
-
-            var parent = Path.GetDirectoryName(current);
-            if (parent is null)
-            {
-                return full;
-            }
-
-            parts.Push(Path.GetFileName(current));
-            current = parent;
-        }
-    }
-
-    private static bool IsInside(string root, string dir)
-    {
-        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var prefix = Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar;
-        return dir.StartsWith(prefix, comparison) && dir.Length > prefix.Length;
     }
 
     // -- code_start ----------------------------------------------------------------------
