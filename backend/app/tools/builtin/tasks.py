@@ -673,7 +673,8 @@ class UpdateTasksInput(BaseModel):
 
     @model_validator(mode="after")
     def _each_task_once(self) -> "UpdateTasksInput":
-        ids = [item.id.strip().lower() for item in self.items]
+        # The same task written two ways ("{…}", no dashes, capitals) is still one task.
+        ids = [_id(item.id) or item.id.strip().lower() for item in self.items]
         if len(set(ids)) != len(ids):
             raise ValueError("each task may appear only once")
         return self

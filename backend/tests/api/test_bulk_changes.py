@@ -182,6 +182,10 @@ def test_update_tasks_input_limits():
         UpdateTasks.Input(items=[])
     with pytest.raises(ValidationError, match="only once"):
         UpdateTasks.Input(items=[one, {**one, "id": one["id"].upper()}])
+    # The same id written another way (no dashes, braces) is the same task.
+    for other in (uuid.UUID(one["id"]).hex, "{" + one["id"] + "}"):
+        with pytest.raises(ValidationError, match="only once"):
+            UpdateTasks.Input(items=[one, {**one, "id": other}])
     with pytest.raises(ValidationError, match="changes nothing"):
         UpdateTasks.Input(items=[{"id": one["id"]}])
     with pytest.raises(ValidationError, match="changes nothing else"):
@@ -338,6 +342,9 @@ def test_update_events_actions_and_limits():
         tool.Input(items=[{"id": ids[0], "title": "x", "occurrence": "2026-11-27T10:00"}])
     with pytest.raises(ValidationError, match="only once"):
         tool.Input(items=[{"id": ids[0], "title": "x"}, {"id": ids[0], "location": "y"}])
+    with pytest.raises(ValidationError, match="only once"):
+        hex_id = uuid.UUID(ids[0]).hex
+        tool.Input(items=[{"id": ids[0], "title": "x"}, {"id": hex_id, "location": "y"}])
     # Two occurrences of one series are two items.
     tool.Input(
         items=[

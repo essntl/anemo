@@ -572,7 +572,8 @@ class UpdateEventsInput(BaseModel):
 
     @model_validator(mode="after")
     def _each_event_once(self) -> "UpdateEventsInput":
-        keys = [(i.id.strip().lower(), i.occurrence) for i in self.items]
+        # The same event written two ways ("{…}", no dashes, capitals) is still one event.
+        keys = [(_id(i.id) or i.id.strip().lower(), i.occurrence) for i in self.items]
         if len(set(keys)) != len(keys):
             raise ValueError("each event (or occurrence) may appear only once")
         return self
