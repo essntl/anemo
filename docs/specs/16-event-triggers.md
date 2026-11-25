@@ -275,9 +275,13 @@ webhook_url, has_secret, created_at`. Every change is in the audit log.
 
 ## 10. Limits and what is left
 
-- **Plugins**: a plugin's declared automations can't declare triggers yet (it would need
-  a manifest field, the registry's sync and the plugin contract); a line is in the
-  roadmap's *Plugins, after version 1*.
+- **Plugins**: a plugin's declared automations can't declare triggers yet. It would need
+  a `triggers` field on the manifest's `AutomationItem`, the registry's sync to create,
+  change and remove the rows on install, update and uninstall, and a version of the
+  plugin contract (spec 12) that the review screen shows; none of that is this
+  workstream's to change (CONTRACTS-round4 §9), and nothing here rules it out: a
+  plugin's automation is an ordinary automation, so its triggers would be ordinary rows
+  with every rail above. A line is in the roadmap's *Plugins, after version 1*.
 - **Scripts** can have triggers (the rows and the dispatcher don't care), but the Scripts
   tab has no trigger list yet; they are added through the API or `create_trigger`.
 - A device whose connection only timed out sends no `device.offline`.

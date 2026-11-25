@@ -51,7 +51,7 @@ find in chat. `extension/`, [companion-contracts.md](companion-contracts.md),
 | Spec | Status |
 | --- | --- |
 | [01 Organisation, links and sources](specs/01-organisation-links-sources.md), phases 1–3 | **Done.** Who created and last changed a document, task or event (`app/core/actor.py`, `features/provenance/`); source fields and `external_key` for synced items; document properties, views and stable paths; links and backlinks between documents, tasks and events. Known small gaps: [FINAL-REPORT.md](specs/FINAL-REPORT.md) §5. |
-| [02 Automations that reason](specs/02-automations.md) | **Done.** Quiet runs (`agent_decides`), the state note, model, tool allowlist and limits per automation, contact tools always ask, no overlapping runs, approvals that don't block later runs, the change check, the failure streak. The real artemk automation is set up by hand (FINAL-REPORT.md §4). Webhooks (§2.8) were left for later on purpose. |
+| [02 Automations that reason](specs/02-automations.md) | **Done.** Quiet runs (`agent_decides`), the state note, model, tool allowlist and limits per automation, contact tools always ask, no overlapping runs, approvals that don't block later runs, the change check, the failure streak. The real artemk automation is set up by hand (FINAL-REPORT.md §4). Webhooks (§2.8) came in round 4 with event triggers ([16](specs/16-event-triggers.md)). |
 | [03 Response timer](specs/03-response-timer.md) | **Done.** Durations on messages, runs and tool calls. |
 | [04 Dictation](specs/04-dictation.md) | **Done** (#59, #60). Speak and get tidy text where you were typing; WAV upload so whisper.cpp servers take it. |
 
