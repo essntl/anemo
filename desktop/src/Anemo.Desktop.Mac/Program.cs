@@ -1,23 +1,41 @@
 using Anemo.Desktop.Core.Storage;
+using Anemo.Desktop.Core.Updates;
+using Anemo.Desktop.Mac.UI;
 using Avalonia;
 
 namespace Anemo.Desktop.Mac;
 
 internal static class Program
 {
+    /// <summary>A copy started by an update waits this long for the old one to let go of the instance.</summary>
+    private static readonly TimeSpan HandOver = TimeSpan.FromSeconds(30);
+
+    public static string Version => typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+    /// <summary>Started by an update (<c>--updated</c>).</summary>
+    public static bool Updated { get; private set; }
+
+    /// <summary>Set by the menu bar app as it closes: the update to swap in once the instance lock is let go.</summary>
+    public static MenuBarApp.Install? PendingInstall { get; set; }
+
     [STAThread]
     private static int Main(string[] args)
     {
+        // The updater's check of a downloaded app, before anything else (no window, no instance lock).
+        if (args.Contains(UpdateInstaller.SelfTestArgument))
+        {
+            Console.Out.Write("Anemo Desktop " + Version);
+            Console.Out.Flush();
+            return 0;
+        }
+
+        Updated = args.Contains(UpdateInstaller.UpdatedArgument);
         Directory.CreateDirectory(AppPaths.Folder);
 
         // One copy per user. Finder already brings a running app to the front instead of
         // starting it again; this covers a start from Terminal.
-        FileStream instance;
-        try
-        {
-            instance = new FileStream(AppPaths.InstanceLock, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        }
-        catch (IOException)
+        var instance = TakeInstance(Updated ? HandOver : TimeSpan.Zero);
+        if (instance is null)
         {
             Console.Error.WriteLine("Anemo Desktop is already running: its mark is in the menu bar.");
             return 0;
@@ -37,7 +55,40 @@ internal static class Program
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args, Avalonia.Controls.ShutdownMode.OnExplicitShutdown);
         }
 
+        // The lock is let go: a restarted copy can take it.
+        if (PendingInstall is { } install)
+        {
+            if (install.Restart)
+            {
+                install.Installer.InstallAndRestartAsync(install.Update).GetAwaiter().GetResult();
+            }
+            else
+            {
+                install.Installer.InstallOnQuit(install.Update);
+            }
+        }
+
         return 0;
+    }
+
+    private static FileStream? TakeInstance(TimeSpan wait)
+    {
+        var until = DateTimeOffset.UtcNow + wait;
+        while (true)
+        {
+            try
+            {
+                return new FileStream(AppPaths.InstanceLock, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException) when (DateTimeOffset.UtcNow < until)
+            {
+                Thread.Sleep(250);
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+        }
     }
 
     /// <summary>Also used by Avalonia's designer.</summary>
@@ -69,4 +120,7 @@ internal static class AppPaths
     public static string DefaultWorkFolder => Path.Combine(Home, "AnemoWork");
 
     public static string HomeFolder => Home;
+
+    /// <summary>The updater's download and marks.</summary>
+    public static string UpdatesFolder => Path.Combine(Folder, "updates");
 }
