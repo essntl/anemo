@@ -651,7 +651,7 @@ async def test_status_marks_all_that_the_job_wrote(authed):
     )
     status = code_tools.CodeStatus()
     ctx = code_tools.ToolContext(run_id=uuid.uuid4(), emit=None)  # type: ignore[arg-type]
-    out = await status.run(code_tools.JobInput(job_id=KEY), ctx)
+    out = await status.run(code_tools.StatusInput(job_id=KEY), ctx)
     content = out.content
     assert "from the web" not in content
     assert "written by a Claude Code job" in content
