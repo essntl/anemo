@@ -165,6 +165,8 @@ async def test_agent_uses_tools_and_plan(authed):
             "get_music_queue",
             "music_control",
             "send_notification",
+            "search_chats",  # earlier chats (chat recall)
+            "read_chat",
             "remember",
             "update_memory",
             "forget_memory",

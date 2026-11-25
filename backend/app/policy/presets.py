@@ -173,6 +173,15 @@ CATEGORIES: list[Category] = [
         # anything in it runs, not before it is written.
         "autonomous",
     ),
+    # search_chats and read_chat (tools/builtin/chats.py): reading only, so "safe".
+    # Automations get them only when their tool list names them (tools/registry.py).
+    Category(
+        "chats.read",
+        "Read earlier chats",
+        "Search your earlier chats and read them (never the one it is in, or temporary "
+        "chats). Automations only when their tool list names these tools.",
+        "autonomous",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 
