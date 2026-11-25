@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.features.audit.models import AuditLog
+from app.features.automations import removal
 from app.features.automations.models import Automation, ScriptVersion
 from app.features.plugins import package, store
 from app.features.plugins import router as plugins_router
@@ -25,6 +26,7 @@ from app.features.provenance import service as provenance
 from app.features.tasks.models import Task
 from app.features.trash.models import TrashedItem
 from app.features.views.models import SavedView
+from app.jobs.models import Job
 from tests.api.test_scripts import age_password
 from tests.conftest import requires_db
 
@@ -582,11 +584,18 @@ async def test_uninstall_removing_its_data(authed):
             is not None
         )
         assert await db.scalar(select(SavedView).where(SavedView.name == "Stages")) is None
-        assert list(await db.scalars(select(Automation))) == []
+        # Its script stops at once; the worker's job deletes it with its runs' chats.
+        (script,) = list(await db.scalars(select(Automation)))
+        assert script.enabled is False and script.next_run_at is None
+        jobs = list(await db.scalars(select(Job).where(Job.type == "automation.delete")))
+        assert [j.payload for j in jobs] == [{"automation_id": str(script.id)}]
         assert await db.get(Task, task_id) is None
         trashed = await db.scalar(select(TrashedItem).where(TrashedItem.item_id == task_id))
         assert trashed is not None
     assert [d["data"] for d in await audit("plugin.uninstall")] == ["remove"]
+    await removal.delete_with_runs(script.id)
+    async with get_sessionmaker()() as db:
+        assert list(await db.scalars(select(Automation))) == []
 
 
 async def test_plugin_mcp_tools_ask_and_stop_with_the_kill_switch(authed, monkeypatch):
