@@ -11,7 +11,7 @@ import { cn } from '@/lib/cn'
 import { plural, t } from '@/lib/i18n'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
-import { focusOnTask } from '@/features/focus/focusOnTask'
+import { useFocusOnTask } from '@/features/focus/focusOnTask'
 import { LinksPanel } from '@/features/links/LinksPanel'
 import { PluginPanels } from '@/features/plugins/slots'
 import { TaskAttachments } from '@/features/links/TaskAttachments'
@@ -70,6 +70,7 @@ const withoutTags = (values: Record<string, unknown> | undefined) =>
 
 export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskDialogProps) {
   const projects = useProjects()
+  const focusOnTask = useFocusOnTask()
   const all = useTasks().data ?? []
   const create = useCreateTask()
   const update = useUpdateTask()

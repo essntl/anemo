@@ -6,7 +6,7 @@ import {
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Markdown } from '@/components/ui/Markdown'
 import { toast } from '@/components/ui/toast'
-import { focusOnTask } from '@/features/focus/focusOnTask'
+import { useFocusOnTask } from '@/features/focus/focusOnTask'
 import { cn } from '@/lib/cn'
 import { plural, t } from '@/lib/i18n'
 import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask } from '../api'
@@ -111,6 +111,7 @@ interface TaskRowProps {
  */
 export function TaskRow({ task, projects, info, onOpen, notesShown, onToggleNotes, linkedId = null, nested = false }: TaskRowProps) {
   const { toggle } = useToggleDone()
+  const focusOnTask = useFocusOnTask()
   const remove = useDeleteTask()
   const create = useCreateTask()
   const done = task.status === 'done'
