@@ -32573,7 +32573,8 @@
               "code",
               "automations",
               "agents",
-              "memory"
+              "memory",
+              "activity"
             ]
           },
           "off": {

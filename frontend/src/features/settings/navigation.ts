@@ -5,7 +5,7 @@
  * not in search, its address leads Home, and the agents don't get its tools.
  */
 import {
-  Bot, Brain, CalendarDays, CheckSquare, Clock, FileText, FolderKanban, FolderOpen, History, House, Inbox, type LucideIcon, Music, SquareTerminal, Timer,
+  Bot, Brain, CalendarDays, CheckSquare, Clock, FileText, FolderKanban, FolderOpen, History, House, Inbox, type LucideIcon, Music, SquareTerminal, Timer, Undo2,
 } from 'lucide-react'
 import type { Schemas } from '@/api/client'
 import { msg } from '@/lib/i18n'
@@ -49,6 +49,7 @@ export const PAGE_INFO: Record<PageId, PageInfo> = {
   automations: { to: '/automations', icon: Clock, label: msg('Automations'), hasTools: true },
   agents: { to: '/agents', icon: Bot, label: msg('Agents'), title: msg('Profiles & Skills') },
   memory: { to: '/memory', icon: Brain, label: msg('Memory') },
+  activity: { to: '/activity', icon: Undo2, label: msg('Activity') },
 }
 export const PAGE_IDS = Object.keys(PAGE_INFO) as PageId[]
 
@@ -57,7 +58,7 @@ export const ALWAYS_ON: readonly PageId[] = ['home', 'notifications']
 
 export const DEFAULT_NAVIGATION: Navigation = {
   pinned: ['home', 'notifications', 'tasks', 'calendar', 'documents', 'files'],
-  more: ['projects', 'focus', 'music', 'runs', 'code', 'automations', 'agents', 'memory'],
+  more: ['projects', 'focus', 'music', 'runs', 'code', 'automations', 'agents', 'memory', 'activity'],
   off: [],
 }
 

@@ -38,7 +38,7 @@ describe('Settings > Pages', () => {
   it('lists every page where it is', () => {
     show()
     expect(names('Sidebar')).toEqual(['Home', 'Inbox', 'Tasks', 'Calendar', 'Documents', 'Files'])
-    expect(names('More')).toEqual(['Projects', 'Focus', 'Music', 'Runs', 'Code', 'Automations', 'Profiles & Skills', 'Memory'])
+    expect(names('More')).toEqual(['Projects', 'Focus', 'Music', 'Runs', 'Code', 'Automations', 'Profiles & Skills', 'Memory', 'Activity'])
     expect(screen.getByText('Every page is on.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled()
   })

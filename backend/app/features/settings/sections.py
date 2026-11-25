@@ -159,6 +159,7 @@ class NavigationSettings(BaseModel):
             "automations",
             "agents",
             "memory",
+            "activity",
         ],
         max_length=20,
     )

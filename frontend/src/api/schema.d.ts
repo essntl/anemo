@@ -9141,7 +9141,8 @@ export interface components {
              *       "code",
              *       "automations",
              *       "agents",
-             *       "memory"
+             *       "memory",
+             *       "activity"
              *     ]
              */
             more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];

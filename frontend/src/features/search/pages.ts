@@ -19,6 +19,7 @@ import {
   Settings,
   SquarePen,
   SquareTerminal,
+  Undo2,
 } from 'lucide-react'
 import { isOffAddress, type PageId } from '@/features/settings/navigation'
 import { visibleSections } from '@/features/settings/sections'
@@ -55,6 +56,7 @@ export const PAGES: PageLink[] = [
   { label: msg('Profiles & Skills'), to: '/agents', icon: Bot, keywords: msg('agent profile skill') },
   { label: msg('Memory'), to: '/memory', icon: Brain, keywords: msg('remember') },
   { label: msg('Inbox'), to: '/notifications', icon: Bell, keywords: msg('notifications reminders alerts approvals needs you') },
+  { label: msg('Activity'), to: '/activity', icon: Undo2, keywords: msg('activity log history changes undo who changed') },
   { label: msg('Settings'), to: '/settings', icon: Settings, keywords: msg('preferences') },
   ...visibleSections([]).map((s) => ({
     label: `Settings: ${s.label}`, section: s.label, to: `/settings/${s.to}`, icon: Settings, keywords: msg('preferences'), onlyWhenSearching: true,
