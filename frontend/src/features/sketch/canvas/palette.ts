@@ -61,8 +61,38 @@ export function readTheme(root: HTMLElement = document.documentElement): SketchT
   }
 }
 
-/** The colour to draw `color` in: "ink" becomes the theme's text colour. */
-export const resolveColor = (color: string, theme: SketchTheme): string => (color === INK ? theme.ink : color)
+/** How light a "#rrggbb" colour looks (relative luminance, 0 black – 1 white). */
+export function luminance(hex: string): number {
+  const channel = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)
+}
+
+/** Colours darker than this are drawn lighter on a dark sheet, so they stay readable. */
+const DARK_SHEET_MIN_LUMINANCE = 0.3
+
+/** `hex` mixed with white by `amount` (0–1), as "#rrggbb". */
+function lighten(hex: string, amount: number): string {
+  const mix = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16)
+    return Math.round(c + (255 - c) * amount).toString(16).padStart(2, '0')
+  }
+  return `#${mix(1)}${mix(3)}${mix(5)}`
+}
+
+/**
+ * The colour to draw `color` in: "ink" becomes the theme's text colour, and on a dark
+ * sheet a dark colour (a deep blue, a red) is drawn lighter. The saved colour and the
+ * preview (always light) don't change.
+ */
+export function resolveColor(color: string, theme: SketchTheme): string {
+  if (color === INK) return theme.ink
+  if (!theme.dark || !/^#[0-9a-f]{6}$/i.test(color)) return color
+  const l = luminance(color)
+  return l < DARK_SHEET_MIN_LUMINANCE ? lighten(color, 0.45 * (1 - l / DARK_SHEET_MIN_LUMINANCE) + 0.15) : color
+}
 
 export interface Swatch {
   color: string

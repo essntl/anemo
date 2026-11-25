@@ -1,11 +1,13 @@
 import { AlertTriangle, Loader2, ScanText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Markdown } from '@/components/ui/Markdown'
 import { t } from '@/lib/i18n'
 import type { SketchState } from './api'
 
 /**
  * The text a model read from the drawing, in the panel beside the sketch. It is derived
- * (and may be wrong), so it says so; it is shown as plain text, never as Markdown.
+ * (and may be wrong), so it says so. It is shown with the app's Markdown renderer, as
+ * a chat answer is (no raw HTML; an image from another site waits for a click).
  */
 export function Transcription({ sketch, busy, onTranscribe }: {
   sketch: SketchState | null | undefined
@@ -36,7 +38,7 @@ export function Transcription({ sketch, busy, onTranscribe }: {
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t('Made from an earlier version of the drawing.')}
             </p>
           )}
-          <p className="whitespace-pre-wrap break-words rounded-control border border-border bg-surface-2 px-3 py-2 text-[13px] leading-relaxed">{text}</p>
+          <div className="break-words rounded-control border border-border bg-surface-2 px-3 py-2 text-[13px] leading-relaxed"><Markdown text={text} /></div>
         </div>
       ) : !queued && (
         <p className="px-1 text-[13px] leading-relaxed text-muted">

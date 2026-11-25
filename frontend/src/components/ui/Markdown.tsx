@@ -115,7 +115,7 @@ function SketchEmbed({ id, alt, title }: { id: string; alt?: string; title?: str
         </span>
       ) : (
         <img src={sketchPreviewUrl(id)} alt={alt} onError={() => setMissing(true)}
-          className="rounded-md border border-border bg-white" />
+          className="rounded-md border border-border" />
       )}
     </Link>
   )
