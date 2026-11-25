@@ -156,7 +156,7 @@ export function DocumentInfo({ documentId, path, words, outline, active, onJump,
         <div role="tablist" aria-label={t('About this document')} className="flex min-w-0 flex-1 rounded-lg bg-surface-2 p-0.5">
           {tabs.map(([id, label, translated]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} title={translated ? undefined : label}
-              className={cn('flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-1 text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:text-[13.5px]',
+              className={cn('flex h-7 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-md px-1 text-[12.5px] font-medium transition-colors pointer-coarse:h-9 pointer-coarse:text-[13.5px]',
                 tab === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
               {/* A plugin's own title is shown as it is (plugin texts aren't translated). */}
               <span className="truncate">{translated ? t(label) : label}</span>
