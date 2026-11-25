@@ -3,7 +3,7 @@
  * it: never read as HTML or Markdown), who wrote and committed it and when, its parents
  * (a click selects that row) and the files it changed with their added and removed lines.
  */
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Copy, FileDiff, GitCommitHorizontal, GitMerge, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
@@ -12,7 +12,7 @@ import { cn } from '@/lib/cn'
 import { formatAgo, formatDateTime } from '@/lib/format'
 import { plural, t } from '@/lib/i18n'
 import { type GitCommit, type GitCommitDetail, type GitRepoChoice, useGitCommit } from './gitApi'
-import { shortHash } from './gitFormat'
+import { reflow, shortHash } from './gitFormat'
 import { Avatar } from './GitGraphList'
 
 type GitFile = GitCommitDetail['files'][number]
@@ -68,8 +68,10 @@ function FileRow({ file, most, remote }: { file: GitFile; most: number; remote: 
         style={{ color, backgroundColor: `color-mix(in oklch, ${color} 14%, transparent)` }}>
         {file.status[0]}
       </span>
-      <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
-        <span className="text-subtle">{dir}</span><span className="text-text">{name}</span>
+      {/* The folder gives way first: the file's name stays whole. */}
+      <span className="flex min-w-0 flex-1 font-mono text-[12px]">
+        <span className="min-w-0 truncate text-subtle">{dir}</span>
+        <span className="max-w-full shrink-0 truncate text-text">{name}</span>
       </span>
       {counted ? (
         <>
@@ -94,22 +96,25 @@ function Section({ title, children, className }: { title: string; children: Reac
   )
 }
 
-function Person({ role, name, email, date }: { role: string; name: string; email?: string; date: string }) {
+/** Who wrote it and when, on one line (the e-mail and the full date on hover). */
+function Author({ name, email, date, committed }: { name: string; email: string; date: string; committed?: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-2.5 px-4 py-1">
-      <Avatar name={name} className="h-7 w-7 text-[11px]" />
-      <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-[13px]">
-          <span className="font-medium">{name}</span>
-          {email && <span className="text-muted"> &lt;{email}&gt;</span>}
-        </div>
-        <div className="truncate text-[11.5px] text-muted">
-          {role} · <time dateTime={date} title={formatDateTime(date)}>{formatAgo(date)}</time> · {formatDateTime(date)}
-        </div>
-      </div>
+    <div className="flex min-w-0 items-center gap-2 text-[12.5px]">
+      <Avatar name={name} className="h-6 w-6 text-[10px]" />
+      <span className="min-w-0 truncate font-medium" title={email ? `${name} <${email}>` : name}>{name}</span>
+      <span className="shrink-0 text-muted">·</span>
+      <time dateTime={date} title={formatDateTime(date)} className="shrink-0 text-muted">{formatAgo(date)}</time>
+      {committed && committed !== date && (
+        <span className="min-w-0 truncate text-[11.5px] text-subtle" title={formatDateTime(committed)}>
+          ({t('Committed {when}', { when: formatAgo(committed) })})
+        </span>
+      )}
     </div>
   )
 }
+
+/** A long message is shown in part, with a button for the rest. */
+const LONG_BODY = 420
 
 export function CommitPanel({ choice, hash, commit, remote, known, onJump, onClose }: {
   choice: GitRepoChoice
@@ -128,6 +133,9 @@ export function CommitPanel({ choice, hash, commit, remote, known, onJump, onClo
   const parents = detail?.parents ?? commit?.parents ?? []
   const files = detail?.files ?? []
   const most = Math.max(0, ...files.map((f) => (f.additions ?? 0) + (f.deletions ?? 0)))
+  const body = detail?.body ? reflow(detail.body) : ''
+  const long = body.length > LONG_BODY
+  const [expanded, setExpanded] = useState(false)
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(hash)
@@ -155,42 +163,35 @@ export function CommitPanel({ choice, hash, commit, remote, known, onJump, onClo
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="px-4 pb-3 pt-3">
+        <div className="space-y-2.5 px-4 pb-3.5 pt-3">
           {/* Untrusted text: shown as text, line breaks kept. */}
           <h2 className="whitespace-pre-wrap break-words text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{subject || t('(no message)')}</h2>
-          {detail?.body && (
-            <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-muted [overflow-wrap:anywhere]">{detail.body}</p>
+          {(detail ?? commit) && (
+            <Author name={(detail ?? commit)!.authorName} email={(detail ?? commit)!.authorEmail} date={(detail ?? commit)!.date} committed={detail?.committerDate} />
           )}
-        </div>
-
-        <Section title={t('Who and when')} className="py-2">
-          {detail ? (
-            <>
-              <Person role={t('authored')} name={detail.authorName} email={detail.authorEmail} date={detail.date} />
-              {detail.committerDate !== detail.date && (
-                <p className="px-4 pt-1 text-[11.5px] text-muted">
-                  {t('Committed {when}', { when: formatDateTime(detail.committerDate) })}
-                </p>
-              )}
-            </>
-          ) : commit ? (
-            <Person role={t('authored')} name={commit.authorName} email={commit.authorEmail} date={commit.date} />
-          ) : null}
-        </Section>
-
-        {parents.length > 0 && (
-          <Section title={plural(parents.length, 'Parent', 'Parents')}>
-            <div className="flex flex-wrap gap-1.5 px-4">
+          {parents.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted">
+              <span>{plural(parents.length, 'Parent', 'Parents')}</span>
               {parents.map((p) => (
                 <button key={p} type="button" onClick={() => onJump(p)} title={known(p) ? t('Show {hash} in the graph', { hash: shortHash(p) }) : t('{hash} is older than the loaded history', { hash: shortHash(p) })}
-                  className={cn('rounded-md border border-border px-1.5 py-0.5 font-mono text-[12px] hover:border-border-strong hover:bg-surface-hover',
+                  className={cn('rounded-md border border-border px-1.5 py-px font-mono text-[11.5px] hover:border-border-strong hover:bg-surface-hover',
                     known(p) ? 'text-accent' : 'text-muted')}>
                   {shortHash(p)}
                 </button>
               ))}
             </div>
-          </Section>
-        )}
+          )}
+          {body && (
+            <div>
+              <p className={cn('whitespace-pre-wrap break-words text-[13px] leading-relaxed text-muted [overflow-wrap:anywhere]', long && !expanded && 'line-clamp-6')}>{body}</p>
+              {long && (
+                <button type="button" onClick={() => setExpanded((e) => !e)} className="mt-1 text-[12px] font-medium text-accent hover:underline">
+                  {expanded ? t('Show less') : t('Show the whole message')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         <Section title={t('Changes')} className="pb-4">
           {query.isPending ? (

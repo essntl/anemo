@@ -7,7 +7,7 @@ describe('formatters', () => {
     expect(ago(10)).toBe('just now')
     expect(ago(5 * 60)).toMatch(/5 min/)
     expect(ago(3 * 3600)).toMatch(/3 hr/)
-    expect(ago(86_400)).toBe('yesterday')
+    expect(ago(86_400)).toMatch(/1 day/)
     expect(ago(3 * 86_400)).toMatch(/3 days/)
     expect(ago(3 * 31_557_600)).toMatch(/3 yr/)
     expect(formatDateTime(now.toISOString())).toMatch(/2026/)

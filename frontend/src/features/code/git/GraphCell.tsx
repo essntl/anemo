@@ -11,22 +11,25 @@ import { memo, useId } from 'react'
 import { GRAPH_PAD, LANE_W, laneColor } from './gitFormat'
 import type { LaneEdge, LaneRow } from './gitLanes'
 
-const x = (lane: number) => GRAPH_PAD + lane * LANE_W
+type X = (lane: number) => number
+const lanesAt = (laneW: number): X => (lane) => GRAPH_PAD + lane * laneW
 
-function topPath(e: LaneEdge, mid: number): string {
+function topPath(x: X, e: LaneEdge, mid: number): string {
   if (e.from === e.to) return `M${x(e.from)} 0V${mid}`
   // Down its lane, then level into the dot.
   return `M${x(e.from)} 0C${x(e.from)} ${mid}, ${x(e.from)} ${mid}, ${x(e.to)} ${mid}`
 }
 
-function bottomPath(e: LaneEdge, mid: number, height: number): string {
+function bottomPath(x: X, e: LaneEdge, mid: number, height: number): string {
   if (e.from === e.to) return `M${x(e.from)} ${mid}V${height}`
   // Level out of the dot, then down into its lane.
   return `M${x(e.from)} ${mid}C${x(e.to)} ${mid}, ${x(e.to)} ${mid}, ${x(e.to)} ${height}`
 }
 
-export const GraphCell = memo(function GraphCell({ row, width, height, head }: {
+export const GraphCell = memo(function GraphCell({ row, width, height, head, laneW = LANE_W }: {
   row: LaneRow
+  /** The width of a lane (gitFormat.ts). */
+  laneW?: number
   /** The graph column's width (graphWidth). */
   width: number
   height: number
@@ -34,6 +37,7 @@ export const GraphCell = memo(function GraphCell({ row, width, height, head }: {
   head: boolean
 }) {
   const id = useId()
+  const x = lanesAt(laneW)
   const mid = height / 2
   const cx = x(row.lane)
   const color = laneColor(row.color)
@@ -51,8 +55,8 @@ export const GraphCell = memo(function GraphCell({ row, width, height, head }: {
         </defs>
       )}
       <g fill="none" strokeWidth={2} strokeLinecap="round">
-        {row.top.map((e, i) => <path key={`t${i}`} d={topPath(e, mid)} style={{ stroke: laneColor(e.color) }} />)}
-        {row.bottom.filter((e) => !e.missing).map((e, i) => <path key={`b${i}`} d={bottomPath(e, mid, height)} style={{ stroke: laneColor(e.color) }} />)}
+        {row.top.map((e, i) => <path key={`t${i}`} d={topPath(x, e, mid)} style={{ stroke: laneColor(e.color) }} />)}
+        {row.bottom.filter((e) => !e.missing).map((e, i) => <path key={`b${i}`} d={bottomPath(x, e, mid, height)} style={{ stroke: laneColor(e.color) }} />)}
         {row.bottom.filter((e) => e.missing).map((e, i) => (
           <path key={`m${i}`} d={`M${x(e.from)} ${mid}V${mid + stub}`} strokeDasharray="2 3" stroke={`url(#${id}-fade-${i})`} />
         ))}

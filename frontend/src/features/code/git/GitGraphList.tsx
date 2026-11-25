@@ -16,7 +16,7 @@ import { cn } from '@/lib/cn'
 import { formatAgo, formatDateTime } from '@/lib/format'
 import { plural, t } from '@/lib/i18n'
 import type { GitCommit } from './gitApi'
-import { graphWidth, initials, laneColor, nameColor, shortHash } from './gitFormat'
+import { LANE_W, NARROW_LANE_W, graphWidth, initials, laneColor, nameColor, shortHash } from './gitFormat'
 import type { LaneLayout } from './gitLanes'
 import type { RefPill } from './gitRefs'
 import { GraphCell } from './GraphCell'
@@ -54,12 +54,13 @@ async function copyHash(hash: string) {
   }
 }
 
-const Row = memo(function Row({ commit, index, top, height, width, layout, pills, selected, flashing, head, remoteRepo, rowId, onPick }: {
+const Row = memo(function Row({ commit, index, top, height, width, laneW, layout, pills, selected, flashing, head, remoteRepo, rowId, onPick }: {
   commit: GitCommit
   index: number
   top: number
   height: number
   width: number
+  laneW: number
   layout: LaneLayout
   pills: readonly RefPill[]
   selected: boolean
@@ -78,7 +79,7 @@ const Row = memo(function Row({ commit, index, top, height, width, layout, pills
         selected ? 'bg-accent-soft group-focus-visible/list:shadow-[inset_2px_0_0_var(--accent)]' : 'hover:bg-surface-hover',
         flashing && 'flash')}
       style={{ top, height }}>
-      <GraphCell row={row} width={width} height={height} head={head} />
+      <GraphCell row={row} width={width} height={height} head={head} laneW={laneW} />
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <RefPills pills={pills} color={row.color} remoteRepo={remoteRepo} />
         <span className={cn('min-w-0 truncate', merge ? 'text-muted' : 'text-text', head && 'font-medium')} title={commit.subject}>
@@ -130,16 +131,23 @@ export function GitGraphList({ ref, commits, layout, pills, selected, flash, hea
   const scroller = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState(0)
-  const width = graphWidth(layout.lanes)
+  const [listWidth, setListWidth] = useState(0)
+  // A narrow list (a phone) draws its lanes closer together.
+  const laneW = listWidth > 0 && listWidth < 520 ? NARROW_LANE_W : LANE_W
+  const width = graphWidth(layout.lanes, laneW)
   const index = useMemo(() => new Map(commits.map((c, i) => [c.hash, i])), [commits])
   const selectedIndex = selected ? index.get(selected) ?? -1 : -1
 
   useLayoutEffect(() => {
     const el = scroller.current
     if (!el) return
-    setViewport(el.clientHeight)
+    const measure = () => {
+      setViewport(el.clientHeight)
+      setListWidth(el.clientWidth)
+    }
+    measure()
     if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => setViewport(el.clientHeight))
+    const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
@@ -214,7 +222,7 @@ export function GitGraphList({ ref, commits, layout, pills, selected, flash, hea
         {commits.slice(first, last).map((commit, i) => {
           const at = first + i
           return (
-            <Row key={commit.hash} commit={commit} index={at} top={at * height} height={height} width={width} layout={layout}
+            <Row key={commit.hash} commit={commit} index={at} top={at * height} height={height} width={width} laneW={laneW} layout={layout}
               pills={pills.get(commit.hash) ?? NO_PILLS} selected={at === selectedIndex} flashing={!still && flash === commit.hash}
               head={commit.hash === headCommit} remoteRepo={remoteRepo} rowId={`${listId}-${at}`} onPick={pick} />
           )

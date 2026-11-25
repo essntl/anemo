@@ -115,7 +115,7 @@ export function formatAgo(iso: string, now = new Date()): string {
   const seconds = Math.round((new Date(iso).getTime() - now.getTime()) / 1000)
   const past = Math.abs(seconds)
   if (past < 45) return t('just now')
-  const rtf = new Intl.RelativeTimeFormat(dateLocale(), { numeric: 'auto', style: 'short' })
+  const rtf = new Intl.RelativeTimeFormat(dateLocale(), { numeric: 'always', style: 'short' })
   const steps: [Intl.RelativeTimeFormatUnit, number][] = [['minute', 60], ['hour', 3600], ['day', 86_400], ['week', 604_800], ['month', 2_629_800], ['year', 31_557_600]]
   let unit = steps[0]
   for (const step of steps) if (past >= step[1] * (step[0] === 'minute' ? 0.75 : 1)) unit = step

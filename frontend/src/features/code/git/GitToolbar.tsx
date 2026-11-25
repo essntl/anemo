@@ -118,10 +118,10 @@ export function GitToolbar({ devices, choice, onChoice, graph, refreshing, onRef
             </span>
           )}
           {current?.upstream && !remote && (
-            <span className="min-w-0 truncate text-[11.5px] text-subtle">{t('tracking {upstream}', { upstream: current.upstream })}</span>
+            <span className="min-w-0 truncate text-[11.5px] text-subtle max-sm:hidden">{t('tracking {upstream}', { upstream: current.upstream })}</span>
           )}
           {remote && <span className="text-[11.5px] text-subtle">{t('default branch')}</span>}
-          {graph.status && <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-border-strong" />}
+          {graph.status && <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-border-strong max-sm:hidden" />}
           {graph.status && <WorkingTree status={graph.status} />}
         </div>
       )}

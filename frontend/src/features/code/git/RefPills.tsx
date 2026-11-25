@@ -54,7 +54,7 @@ function Pill({ pill, color, remoteRepo, head = false }: { pill: RefPill; color:
     case 'branch':
       return (
         <>
-          <span className={cn(PILL, 'shrink', head ? 'min-w-[9rem] overflow-hidden pl-0' : 'min-w-[3rem]', pill.current && 'font-semibold')} style={tinted(color, pill.current || head)}
+          <span className={cn(PILL, 'shrink', head ? 'min-w-[5.5rem] overflow-hidden pl-0' : 'min-w-[3rem]', pill.current && 'font-semibold')} style={tinted(color, pill.current || head)}
             title={pill.synced ? t('{branch}, in sync with {upstream}', { branch: pill.name, upstream: pill.upstream ?? '' }) : pill.name}>
             {head && (
               <span className="-my-px mr-0.5 flex h-[18px] shrink-0 items-center gap-1 bg-accent pl-1.5 pr-1.5 text-accent-contrast" title={headTitle(false, remoteRepo)}>
@@ -63,8 +63,9 @@ function Pill({ pill, color, remoteRepo, head = false }: { pill: RefPill; color:
             )}
             <GitBranch aria-hidden="true" className="h-3 w-3 shrink-0" />
             <span className="min-w-0 truncate">{pill.name}</span>
-            {pill.synced && <CloudCheck aria-label={t('in sync with {upstream}', { upstream: pill.upstream ?? '' })} className="h-3 w-3 shrink-0 opacity-80" />}
-            <AheadBehind ahead={pill.ahead} behind={pill.behind} className="ml-0.5 shrink-0" />
+            {!head && pill.synced && <CloudCheck aria-label={t('in sync with {upstream}', { upstream: pill.upstream ?? '' })} className="h-3 w-3 shrink-0 opacity-80" />}
+            {/* With HEAD on it, the bar over the graph says how far it is from its upstream. */}
+            {!head && <AheadBehind ahead={pill.ahead} behind={pill.behind} className="ml-0.5 shrink-0" />}
           </span>
           {pill.pullRequest && <PullRequestBadge pr={pill.pullRequest} />}
         </>
@@ -100,7 +101,7 @@ export function RefPills({ pills, color, remoteRepo, max = 4 }: { pills: readonl
   const shown = list.slice(0, max)
   const rest = list.slice(max)
   return (
-    <span className="flex min-w-0 max-w-[80%] shrink-0 items-center gap-1 overflow-hidden">
+    <span className="flex min-w-0 max-w-[calc(100%-5rem)] shrink-0 items-center gap-1 overflow-hidden">
       {shown.map((pill, i) => <Pill key={keyOf(pill)} pill={pill} color={laneColor(color)} remoteRepo={remoteRepo} head={fused && i === 0} />)}
       {rest.length > 0 && (
         <span className={cn(PILL, 'shrink-0 border-border bg-surface-2 text-muted')} title={rest.map((p) => (p.kind === 'head' ? 'HEAD' : p.name)).join(', ')}>

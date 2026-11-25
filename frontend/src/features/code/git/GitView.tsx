@@ -8,7 +8,7 @@
  * is wide, over it when not. It is read again when a Claude Code job of the project
  * changes state, and on Refresh (which fetches first).
  */
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CloudOff, FolderGit2, GitBranch, Info, KeyRound, Laptop, Lock, RefreshCw, SearchX, ShieldAlert, Unplug, Download } from 'lucide-react'
@@ -38,6 +38,22 @@ import { useRowHeight } from './useRowHeight'
 /** How many commits are read: more with each "Load more". */
 const LIMITS = [300, 600, 1000] as const
 const MAX_LIMIT = LIMITS[LIMITS.length - 1]
+/** From this width (px) of the view, the branches stay open beside the graph. */
+const WIDE_VIEW = 960
+
+/** An element's width, kept up to date (0 until measured, or where nothing is laid out). */
+function useWidth(ref: RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth))
+    observer.observe(el)
+    setWidth(el.clientWidth)
+    return () => observer.disconnect()
+  }, [ref])
+  return width
+}
 
 const ERROR_ICON: Record<GitErrorKind, ReactNode> = {
   update: <Download className="h-5 w-5" />,
@@ -136,7 +152,12 @@ function RepoGraph({ choice, devices, onChoice }: { choice: GitRepoChoice; devic
   const qc = useQueryClient()
   const device = devices.find((d) => d.id === choice.deviceId) as CodeDevice
   const remote = choice.repo !== undefined
-  const wide = useMediaQuery('(min-width: 1024px)')
+  // The branches sit beside the graph when the view itself is wide (not the window: the
+  // job list may take a third of it); otherwise they open over it, when asked for.
+  const root = useRef<HTMLDivElement>(null)
+  const roomy = useMediaQuery('(min-width: 1024px)')
+  const width = useWidth(root)
+  const wide = width ? width >= WIDE_VIEW : roomy
   const still = useMediaQuery(REDUCED_MOTION)
   const { allBranches, setAllBranches, branchesOpen: storedOpen, setBranchesOpen } = useGitViewStore()
   // On a narrow screen the branches are over the graph, closed until asked for.
@@ -297,7 +318,7 @@ function RepoGraph({ choice, devices, onChoice }: { choice: GitRepoChoice; devic
   }
 
   return (
-    <div className="@container/git flex h-full min-h-0 flex-col">
+    <div ref={root} className="@container/git flex h-full min-h-0 flex-col">
       {toolbar}
       {body}
     </div>
