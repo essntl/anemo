@@ -15,6 +15,7 @@ from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
+from app.features.conversations import recall
 from app.features.conversations import search as chat_search
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.conversations.schemas import (
@@ -375,6 +376,7 @@ async def delete_conversations(db: AsyncSession, ids: list[uuid.UUID]) -> None:
         run_ids += list(await db.scalars(select(Run.id).where(Run.conversation_id == conv.id)))
         await db.delete(conv)
         await browser_client.close(conv.id)  # its browser session, if it has one
+    await recall.forget(db, ids)  # its messages in the index (chat recall)
     await db.flush()
     outputs.delete_for_runs(run_ids)
 

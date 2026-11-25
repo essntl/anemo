@@ -17,6 +17,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.features.automations import service as automations
     from app.features.calendar import reminders
     from app.features.code_sessions import service as code_sessions
+    from app.features.conversations import recall as chat_recall
     from app.features.conversations import service as conversations
     from app.features.documents import properties as documents
     from app.features.notifications import service as notifications
@@ -30,6 +31,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
         ("notifications.prune", notifications.prune),
         ("approvals.expire", runs.expire_stale_approvals),
         ("chats.temporary", conversations.delete_expired_temporary),
+        ("chats.index", chat_recall.index_due),  # chats quiet for a while, by meaning
         ("code.prune", code_sessions.prune_if_due),  # at most every 10 minutes
         ("updates.check", updates.check_if_due),  # about once a day
         # Once per worker start: documents changed while Anemo wasn't running.
