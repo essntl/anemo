@@ -28444,6 +28444,13 @@
             "type": "boolean",
             "title": "Show Documents Folder",
             "default": false
+          },
+          "device_file_max_mb": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Device File Max Mb",
+            "default": 50
           }
         },
         "type": "object",

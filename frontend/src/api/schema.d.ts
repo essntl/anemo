@@ -7601,6 +7601,11 @@ export interface components {
              * @default false
              */
             show_documents_folder: boolean;
+            /**
+             * Device File Max Mb
+             * @default 50
+             */
+            device_file_max_mb: number;
         };
         /**
          * FilterChip

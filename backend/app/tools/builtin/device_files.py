@@ -213,18 +213,16 @@ async def read_device_file(device: Any, path: str, max_bytes: int) -> tuple[byte
         what = "a folder" if stat.get("kind") == "folder" else "not a file"
         return f"{path} on {device.name} is {what}: only files are copied."
     size, whole = stat.get("size"), stat.get("sha256")
-    if (
-        not isinstance(size, int)
-        or size < 0
-        or not isinstance(whole, str)
-        or not _SHA256.match(whole.lower())
-    ):
+    if not isinstance(size, int) or size < 0:
         return f"{device.name} didn't say how large {path} is."
     if size > max_bytes:
         return (
             f"{path} is {_size(size)}, more than the {_size(max_bytes)} files may have "
             "(Settings > Devices)."
         )
+    if not isinstance(whole, str) or not _SHA256.match(whole.lower()):
+        # The client leaves the hash out only for a file larger than it copies at all.
+        return f"{device.name} didn't give the SHA-256 of {path}."
     data = bytearray()
     while len(data) < size:
         length = min(CHUNK_BYTES, size - len(data))
