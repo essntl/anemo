@@ -23,6 +23,16 @@
  *   const stop = anemo.on('context.changed', (ctx) => render(ctx))
  *   anemo.ui.resize(320); anemo.ui.toast('Saved'); anemo.ui.open('task', id)
  *   await anemo.storage.set('layout', { columns: 2 }); await anemo.storage.get('layout')
+ *   await anemo.assets.set('sprite', dataUrl); const { dataUrl } = await anemo.assets.get('sprite')
+ *   const picked = await anemo.ui.pickFile({ accept: ['image/gif'] })   // after a click
+ *   const { viewport, anchors, route } = await anemo.layout.get()
+ *   anemo.files.url('sprites/idle.gif')      // a picture of the package, as a data: URL
+ *
+ * An overlay (slot "overlay") is a transparent layer over Anemo's whole window that lets
+ * every click through, except inside the rectangles it names with
+ * anemo.ui.setHitRegions([...]). So that Anemo's page knows where the pointer is while the
+ * frame has it, this script reports the pointer's position over the port (and only that);
+ * Anemo's page decides from it, never the plugin's own code.
  *
  * A failed call rejects with an AnemoError: `err.code` is one of the contract's codes
  * (permission_denied, not_found, invalid_params, declined, rate_limited, unavailable,
@@ -49,6 +59,20 @@
     }
   })
 
+  // ---- Before any plugin code: what the pointer reports use ------------------------------
+  // An overlay's pointer reports decide when it may take clicks, so they must not be
+  // fakeable: the functions they use are taken now, before a plugin could replace them
+  // (on MessagePort.prototype, MouseEvent.prototype or Reflect).
+  var apply = Reflect.apply
+  var portPost = MessagePort.prototype.postMessage
+  function getter(proto, name) {
+    return Object.getOwnPropertyDescriptor(proto, name).get
+  }
+  var clientXOf = getter(MouseEvent.prototype, 'clientX')
+  var clientYOf = getter(MouseEvent.prototype, 'clientY')
+  var relatedTargetOf = getter(MouseEvent.prototype, 'relatedTarget')
+  var pointerTypeOf = getter(PointerEvent.prototype, 'pointerType')
+
   // ---- The SDK ---------------------------------------------------------------------------
 
   /** An error from a call, with a code from the contract. */
@@ -68,6 +92,7 @@
   var pending = {} // id -> { resolve, reject, timer }
   var listeners = {} // event name -> [functions]
   var initData = null
+  var pictures = {} // package path -> data: URL (the version's pictures)
   var resolveReady
   var ready = new Promise(function (resolve) {
     resolveReady = resolve
@@ -79,6 +104,7 @@
     // An event from Anemo: { event, data }.
     if (typeof message.event === 'string') {
       if (message.event === 'context.changed' && initData) initData.context = message.data
+      if (message.event === 'layout.changed' && initData) initData.layout = message.data
       if (message.event === 'theme.changed' && initData) {
         initData.theme = message.data
         applyTheme(message.data)
@@ -137,7 +163,7 @@
   }
 
   var anemo = Object.freeze({
-    /** Resolves with the init data: { plugin, slot, ui, context, theme, locale, timeZone, preview }. */
+    /** Resolves with the init data: { plugin, slot, ui, context, theme, locale, timeZone, preview, layout }. */
     ready: ready,
     call: call,
     on: on,
@@ -150,6 +176,41 @@
       },
       open: function (type, id) {
         return call('ui.open', { type: type, id: id })
+      },
+      setHitRegions: function (regions) {
+        return call('ui.setHitRegions', { regions: regions || [] })
+      },
+      setVisible: function (visible) {
+        return call('ui.setVisible', { visible: visible !== false })
+      },
+      pickFile: function (options) {
+        return call('ui.pickFile', options || {})
+      },
+    }),
+    layout: Object.freeze({
+      get: function () {
+        return call('layout.get', {})
+      },
+    }),
+    assets: Object.freeze({
+      get: function (key) {
+        return call('assets.get', { key: key })
+      },
+      set: function (key, dataUrl) {
+        return call('assets.set', { key: key, dataUrl: dataUrl })
+      },
+      delete: function (key) {
+        return call('assets.delete', { key: key })
+      },
+      list: function () {
+        return call('assets.list', {})
+      },
+    }),
+    files: Object.freeze({
+      /** A picture of the package (a path from its root) as a data: URL, or null. */
+      url: function (path) {
+        var key = resolvePath('', String(path || ''))
+        return Object.prototype.hasOwnProperty.call(pictures, key) ? pictures[key] : null
       },
     }),
     storage: Object.freeze({
@@ -242,10 +303,18 @@
     })
   }
 
+  /** url(...) in a stylesheet that names a picture of the package: its data: URL. */
+  function withPictures(text, path) {
+    return text.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, function (whole, quote, ref) {
+      var target = resolvePath(path || '', ref.trim())
+      return target !== null && Object.prototype.hasOwnProperty.call(pictures, target) ? 'url("' + pictures[target] + '")' : whole
+    })
+  }
+
   function addStyle(text, path) {
     var style = document.createElement('style')
     if (path) style.setAttribute('data-path', path)
-    style.textContent = text
+    style.textContent = withPictures(text, path)
     document.head.appendChild(style)
   }
 
@@ -262,6 +331,12 @@
     })
     var parsed = new DOMParser().parseFromString(files.html || '', 'text/html')
     var loadModule = moduleLoader(scripts)
+
+    // <img src="sprites/idle.gif">: the package's pictures, as data: URLs.
+    parsed.querySelectorAll('img[src]').forEach(function (el) {
+      var path = resolvePath(entry, el.getAttribute('src') || '')
+      if (path !== null && Object.prototype.hasOwnProperty.call(pictures, path)) el.setAttribute('src', pictures[path])
+    })
 
     // Styles: <link rel="stylesheet"> and <style> of the entry, in their order, after base.css.
     parsed.querySelectorAll('link[rel~="stylesheet"], style').forEach(function (el) {
@@ -318,6 +393,41 @@
     }, Promise.resolve())
   }
 
+  // ---- The pointer, for an overlay ---------------------------------------------------------
+
+  /**
+   * While an overlay frame receives pointer events (the pointer is in one of its hit
+   * regions), Anemo's page doesn't see the pointer move; this tells it where the pointer
+   * is, so it can let clicks through again the moment the pointer leaves the regions.
+   * Registered before any plugin script runs, in the capture phase: a plugin can't stop it.
+   */
+  function reportPointer() {
+    function send(x, y) {
+      try {
+        apply(portPost, port, [{ pointer: x === null ? null : { x: x, y: y } }])
+      } catch (e) {
+        /* the port is closed */
+      }
+    }
+    function move(event) {
+      // A touch has no pointer that hovers: overlays don't take touches (see the guide).
+      if (apply(pointerTypeOf, event, []) !== 'touch') send(apply(clientXOf, event, []), apply(clientYOf, event, []))
+    }
+    window.addEventListener('pointermove', move, true)
+    window.addEventListener('pointerdown', move, true)
+    // Out of the window altogether.
+    document.addEventListener(
+      'pointerout',
+      function (event) {
+        if (!apply(relatedTargetOf, event, [])) send(null)
+      },
+      true,
+    )
+    window.addEventListener('blur', function () {
+      send(null)
+    })
+  }
+
   // ---- 2. The handshake --------------------------------------------------------------------
 
   function onWindowMessage(event) {
@@ -331,6 +441,10 @@
 
     applyTheme(data.theme)
     var files = data.files || {}
+    ;(files.pictures || []).forEach(function (p) {
+      if (p && typeof p.path === 'string' && typeof p.data_url === 'string') pictures[p.path] = p.data_url
+    })
+    if (data.slot === 'overlay') reportPointer()
     initData = {
       plugin: data.plugin,
       slot: data.slot,
@@ -341,6 +455,8 @@
       // The user's IANA time zone (Settings > General): "today" as Anemo's server means it.
       timeZone: data.timeZone,
       preview: data.preview === true,
+      // Where things are on Anemo's screen (anemo.layout.get; layout.changed follows it).
+      layout: data.layout || null,
     }
     // The plugin's scripts see `anemo.ready` resolved as soon as they run.
     resolveReady(initData)
