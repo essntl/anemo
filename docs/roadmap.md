@@ -3,8 +3,8 @@
 Where Anemo stands, what is being built now, and what comes next. Each item links to
 its spec or to the section of [features.md](features.md) that says how it works.
 
-Last audited against the code and the git history on **2026-11-24**, and updated at
-the end of round 3 (pull requests up to #82).
+Last audited against the code and the git history on **2026-11-24**, updated at
+the end of round 3 (pull requests up to #82), and at the start of round 4 (2026-11-25).
 
 - [Done](#done): built and merged into `main`.
 - [In progress](#in-progress): open pull requests.
@@ -98,6 +98,23 @@ then built in parallel; how it went is in
 | What | Spec | Pull request |
 | --- | --- | --- |
 | **Plugins.** Packages with a manifest (stable id, semver, a hash per version) installed from a zip, a Git URL, the bundled examples or an assistant's chat; reviewed and approved per version with the password; UI in sealed iframes in four slots (panels on tasks/documents/events, pages, a plugin's settings, chat blocks), declarative contributions (properties, views, templates, automations, scripts, MCP servers, profiles, skills, themes, commands), every call checked as a tool call with the plugin as the actor; a kill switch. Settings → Plugins with cards that grow into the plugin's page; agent tools to build plugins in a chat. Examples: *Word count*, *Today board*, *Weekly review*. | [12](specs/12-plugins.md) | #87 |
+
+### Round 4 (2026-11-25)
+
+Built in parallel from [specs/CONTRACTS-round4.md](specs/CONTRACTS-round4.md); how it
+went is in [specs/ORCHESTRATION-LOG-round4.md](specs/ORCHESTRATION-LOG-round4.md). Each
+row is filled in by its own pull request.
+
+| What | Spec | Pull request |
+| --- | --- | --- |
+| **Event triggers** (in progress) | [16](specs/16-event-triggers.md) | – |
+| **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
+| **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
+| **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
+| **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
+| **Waiting on a code job** (in progress) | [21](specs/21-code-wait.md) | – |
+| **Files between devices and the workspace** (in progress) | [22](specs/22-device-files.md) | – |
+| **Anemo Desktop updates itself** (in progress) | [23](specs/23-desktop-auto-update.md) | – |
 
 ---
 
