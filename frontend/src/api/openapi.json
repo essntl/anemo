@@ -2051,6 +2051,358 @@
         }
       }
     },
+    "/api/activity": {
+      "get": {
+        "tags": [
+          "activity"
+        ],
+        "summary": "List Activity",
+        "description": "What was changed, newest first. `actor_kind`: who (`trigger`: runs an event\nstarted); `since` / `until`: a time range (until is exclusive).",
+        "operationId": "list_activity_api_activity_get",
+        "parameters": [
+          {
+            "name": "actor_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "user",
+                    "assistant",
+                    "automation",
+                    "script",
+                    "plugin",
+                    "trigger",
+                    "external"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Kind"
+            }
+          },
+          {
+            "name": "actor_ref",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Ref"
+            }
+          },
+          {
+            "name": "object_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "task",
+                    "event",
+                    "document",
+                    "file",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Object Type"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/activity/{entry_id}/undo": {
+      "post": {
+        "tags": [
+          "activity"
+        ],
+        "summary": "Undo Entry",
+        "description": "Undo one change. 409 `activity_conflict` (with `details.differs`) when the item\nwas changed since; `force=true` undoes it anyway.",
+        "operationId": "undo_entry_api_activity__entry_id__undo_post",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/activity/groups/{group_id}/undo": {
+      "post": {
+        "tags": [
+          "activity"
+        ],
+        "summary": "Undo Group",
+        "description": "Undo a batch, newest change first, each on its own: the results say which were\nundone and why the others weren't.",
+        "operationId": "undo_group_api_activity_groups__group_id__undo_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupUndoOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/provider-types": {
       "get": {
         "tags": [
@@ -22148,6 +22500,208 @@
   },
   "components": {
     "schemas": {
+      "ActivityOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who did it (None: an actor that can't be read)"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "created | changed | completed | deleted | restored | reverted | moved | undone"
+          },
+          "object_type": {
+            "type": "string",
+            "title": "Object Type"
+          },
+          "object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Id",
+            "description": "A UUID, or a workspace path for a file"
+          },
+          "object_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Label",
+            "description": "The object's name now (None when it is gone: the summary names it)"
+          },
+          "object_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Url",
+            "description": "Where the object is in the app"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fields",
+            "description": "What a change changed, e.g. title, properties.client"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "group_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Label"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "undone_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undone At"
+          },
+          "undone_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undone By"
+          },
+          "undo_blocked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Blocked",
+            "description": "Why it can't be undone (undone | is_undo | not_undoable | too_large), None when it can be tried"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "actor",
+          "action",
+          "object_type",
+          "object_id",
+          "object_label",
+          "object_url",
+          "summary",
+          "fields",
+          "group_id",
+          "group_label",
+          "run_id",
+          "undone_at",
+          "undone_by",
+          "undo_blocked"
+        ],
+        "title": "ActivityOut"
+      },
+      "ActivityPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ActivityPage"
+      },
       "ActorOut": {
         "properties": {
           "ref": {
@@ -29655,6 +30209,23 @@
         ],
         "title": "GitTag"
       },
+      "GroupUndoOut": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/UndoItemOut"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "One per entry tried, newest first"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "title": "GroupUndoOut"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -31954,7 +32525,8 @@
                 "code",
                 "automations",
                 "agents",
-                "memory"
+                "memory",
+                "activity"
               ]
             },
             "type": "array",
@@ -31986,7 +32558,8 @@
                 "code",
                 "automations",
                 "agents",
-                "memory"
+                "memory",
+                "activity"
               ]
             },
             "type": "array",
@@ -32020,7 +32593,8 @@
                 "code",
                 "automations",
                 "agents",
-                "memory"
+                "memory",
+                "activity"
               ]
             },
             "type": "array",
@@ -41590,6 +42164,63 @@
           "document_id"
         ],
         "title": "Undo"
+      },
+      "UndoItemOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "The error code when it wasn't undone"
+          },
+          "details": {
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ok",
+          "message",
+          "code"
+        ],
+        "title": "UndoItemOut"
+      },
+      "UndoOut": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/ActivityOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "entry"
+        ],
+        "title": "UndoOut"
       },
       "UpdateMentionsIn": {
         "properties": {

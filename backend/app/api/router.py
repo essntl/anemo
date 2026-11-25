@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 
 from app.api import health
 from app.api.deps import require_session
+from app.features.activity.router import router as activity_router
 from app.features.appearance.router import router as appearance_router
 from app.features.attachments.router import router as attachments_router
 from app.features.audit.router import router as audit_router
@@ -81,6 +82,7 @@ api_router.include_router(plugin_frame_router)  # the plugin frame document: sta
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
 protected.include_router(audit_router)
+protected.include_router(activity_router)
 protected.include_router(providers_router)
 protected.include_router(conversations_router)
 protected.include_router(runs_router)
