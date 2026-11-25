@@ -258,6 +258,7 @@ class Connection:
                 code=bool(message.get("code")),  # older clients don't send these
                 code_start=bool(message.get("code_start")),
                 code_images=bool(message.get("code_images")),
+                code_git=bool(message.get("code_git")),
                 platform=self.platform,
                 shell_kind=relay.shell_kind_of(message.get("shell_kind")),
             )

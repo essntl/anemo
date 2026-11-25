@@ -284,7 +284,7 @@ class CommandItem(Item):
 
 
 class UiItem(Item):
-    slot: Literal["object.panel", "page", "settings", "chat.block", "overlay"]
+    slot: Literal["object.panel", "page", "settings", "chat.block", "overlay", "code.panel"]
     objects: list[ObjectKind] | None = Field(None, min_length=1, max_length=3)
     title: str | None = Field(None, min_length=1, max_length=60)
     icon: IconName | None = None
@@ -369,8 +369,8 @@ _ITEM_ID_HINT = (
 )
 _PERMISSION_HINT = (
     "A permission is one of tasks:read, tasks:write, documents:read, documents:write, "
-    "events:read, events:write, projects:read, notifications:send, network:<host> or "
-    "tools:<tool name>"
+    "events:read, events:write, projects:read, code:read, notifications:send, network:<host> "
+    "or tools:<tool name>"
 )
 
 
@@ -538,6 +538,12 @@ def check_references(manifest: Manifest, paths: set[str]) -> list[ManifestProble
         if ui.slot == "page" and not ui.title:
             found.append(
                 ManifestProblem(f"{at}.title", "A page needs a title (the menu shows it).")
+            )
+        if ui.slot == "code.panel" and not ui.title:
+            found.append(
+                ManifestProblem(
+                    f"{at}.title", "A code.panel needs a title (its tab on the Code page shows it)."
+                )
             )
         if ui.height is not None and ui.slot not in ("object.panel", "chat.block"):
             found.append(

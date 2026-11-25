@@ -8,6 +8,9 @@ from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
 from typing import Any
 
+from pydantic import BaseModel
+
+from app.features.code_sessions import git
 from app.features.plugins import calls, permissions, shapes
 from app.tools.builtin import plugins as plugin_tools
 
@@ -111,3 +114,20 @@ def test_the_guide_shows_every_field_of_the_shapes() -> None:
     assert _keys_in("### Task", text) - {"mood", "text", "done"} == set(shapes.task(_task()))
     assert document_keys == set(shapes.document(_document(), "# a"))
     assert event_keys == set(shapes.occurrence(occurrence))  # type: ignore[arg-type]
+
+
+def _aliases(model: type[BaseModel]) -> set[str]:
+    """The camelCase keys of a git shape and of the shapes inside it."""
+    keys: set[str] = set()
+    for name, field in model.model_fields.items():
+        keys.add(field.alias or name)
+        for inner in (field.annotation, *getattr(field.annotation, "__args__", ())):
+            for kind in (inner, *getattr(inner, "__args__", ())):
+                if isinstance(kind, type) and issubclass(kind, BaseModel):
+                    keys |= _aliases(kind)
+    return keys
+
+
+def test_the_guide_shows_every_field_of_the_git_shapes() -> None:
+    documented = _keys_in("### GitGraph and GitCommit", section("methods"))
+    assert documented == _aliases(git.GitGraph) | _aliases(git.GitCommitDetail)

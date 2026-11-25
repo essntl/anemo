@@ -76,6 +76,16 @@ PERMISSIONS: dict[str, Permission] = {
         "Create and change your calendar events. Deleting one moves it to the trash.",
         ("create_event", "update_event", "delete_event"),
     ),
+    # A fixed set of read-only git commands on the user's computers (not a shell, so not
+    # critical), but what it reads is the user's code history: high.
+    "code:read": Permission(
+        "high",
+        "Read projects and git history on your computers",
+        "List the projects on your computers that share Claude Code jobs, and read their "
+        "git history: branches, commits, authors, the names of changed files and whether "
+        "there are uncommitted changes. Never file contents or diffs. " + READ_WARNING,
+        ("code_projects", "code_git_graph"),
+    ),
     "notifications:send": Permission(
         "high",
         "Send you notifications",
@@ -339,6 +349,7 @@ def contributions(manifest: Manifest) -> list[ContributionOut]:
             # A layer over the whole window could imitate Anemo's own controls: it is
             # reviewed as more than a box of its own (the host's rules: docs, §4).
             "overlay": "Draws over Anemo's window (click-through)",
+            "code.panel": f"Adds a tab “{ui.title}” to the Code page",
         }[ui.slot]
         out.append(
             ContributionOut(

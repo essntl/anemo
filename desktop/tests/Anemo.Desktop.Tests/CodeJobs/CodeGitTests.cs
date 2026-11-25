@@ -179,6 +179,17 @@ public sealed class CodeGitTests : IDisposable
         Assert.Equal("“anemo” isn't a git repository.", outcome.Error);
     }
 
+    [Fact]
+    public async Task Local_only_projects_skip_asking_github()
+    {
+        var outcome = await RunAsync("code_projects", new JsonObject { ["local_only"] = true });
+
+        Assert.True(outcome.Ok, outcome.Error);
+        Assert.Equal("anemo", (string?)outcome.State!["projects"]![0]!["name"]);
+        Assert.Empty(outcome.State!["remote"]!.AsArray());
+        Assert.Empty(Fake.Runs);
+    }
+
     // -- against a real git, where there is one ----------------------------------------------
 
     [Fact]

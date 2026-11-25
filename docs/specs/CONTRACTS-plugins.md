@@ -155,7 +155,9 @@ server.
     "entry": "ui/today.html" },
   { "id": "settings", "slot": "settings", "entry": "ui/settings.html" },
   { "id": "kanban", "slot": "chat.block", "fence": "today-kanban", "entry": "ui/block.html" },
-  { "id": "layer", "slot": "overlay", "title": "Clock", "entry": "ui/layer.html" }
+  { "id": "layer", "slot": "overlay", "title": "Clock", "entry": "ui/layer.html" },
+  { "id": "graph", "slot": "code.panel", "title": "Git graph", "icon": "git-branch",
+    "entry": "ui/graph.html" }
 ]
 ```
 
@@ -172,6 +174,7 @@ server.
 | `settings` | The **Settings** tab of the plugin's own page in Settings → Plugins | `{}` | at most 1 |
 | `chat.block` | In a chat answer, in place of a fenced code block whose language is `fence` | `{block: {lang, text}}` | any |
 | `overlay` | A transparent, window-sized layer over Anemo's pages, mounted once per session outside the routes | `{overlay: true}` | at most 1 |
+| `code.panel` | A tab beside the open job on the **Code** page (labelled with `title`, required, and `icon`), for that job's project | `{code: {device: "<computer name>", project: "<folder name>", jobId: "<id>"\|null}}` | any |
 
 - A slot is used only if declared; the install review lists each one ("Adds a panel to
   documents").
@@ -188,6 +191,13 @@ server.
   (stored by Anemo per device, not reachable by plugins). Reviewed as **medium** risk
   ("Draws over Anemo's window (click-through)"); an update that adds one always waits for
   a review; not run in a preview.
+- `code.panel` (added in the same contract version, additively): fills its box like a
+  page (no `height`, `ui.resize` does nothing); shown only while a job is open on the Code
+  page (no job: no tabs, Anemo's own view). Opening another job sends `context.changed`
+  (the frame stays). It gets `code.job` (`{device, project, jobId, state}`, states only)
+  when a job of its project changes state. Reviewed as **low** risk ("Adds a tab … to the
+  Code page"); reading the project needs `code:read`. In a preview from the plugin's page
+  `device` and `project` are null.
 
 ## 4. Permissions
 
@@ -206,6 +216,7 @@ nothing more.
 | `tasks:write` | create and change tasks (deleting goes to the trash) | medium |
 | `documents:write` | create and change documents | medium |
 | `events:write` | create and change events (deleting goes to the trash) | medium |
+| `code:read` | list the projects on the user's computers and read their git history (`code.projects`, `code.gitGraph`, `code.gitCommit`): a fixed set of read-only git commands run by Anemo Desktop 1.5.0 on a trusted computer that shares its jobs; metadata only, never file contents or diffs | high |
 | `notifications:send` | send you a notification | high |
 | `network:<host>` | HTTP requests to that host, made by the server through the guarded client (`*.example.com` = its subdomains) | high |
 | `tools:<tool name>` | call that agent tool (built-in, or `mcp__<server>__<tool>`) | high, or **critical** (below) |
@@ -258,6 +269,7 @@ tool allowed for that plugin:
 | `events:read` | `list_events`, `get_event` |
 | `events:write` | `create_event`, `update_event`, `delete_event` |
 | `projects:read` | `list_projects` (also covered by `tasks:read`: tasks belong to projects) |
+| `code:read` | `code_projects`, `code_git_graph` |
 | `notifications:send` | `send_notification` |
 | `network:<host>` | `http_request`, `read_web_page` (to that host only) |
 | `tools:<name>` | `<name>` |
@@ -385,6 +397,9 @@ anemo.ui.resize(320)                                       // short forms for th
 | `events.get` | `{id}` → `Event` | `events:read` |
 | `events.create` / `events.update` | `{title, start, end, allDay?, …}` / `{id, …changes}` → `Event` | `events:write` |
 | `projects.list` | `{}` → `{projects: [{id, name, color}]}` | `projects:read` or `tasks:read` |
+| `code.projects` | `{device}` → `{projects: [{name, path, remote}]}` | `code:read` |
+| `code.gitGraph` | `{device, project, limit?: 1–1000 = 300, all?: bool = true}` → `GitGraph` (the guide, §6) | `code:read` |
+| `code.gitCommit` | `{device, project, hash: ^[0-9a-f]{7,40}$}` → `GitCommit` (the guide, §6) | `code:read` |
 | `notifications.send` | `{title, body?}` → `{}` | `notifications:send` |
 | `http.fetch` | `{url, method?, headers?, body?}` → `{status, headers, body}` (text, ≤ 1 MB) | `network:<host of url>` |
 | `tools.call` | `{name, args}` → `{content, data?, isError}` | `tools:<name>` |
@@ -412,7 +427,9 @@ panel shows was changed elsewhere; re-read it), `layout.changed` (the `layout.ge
 once per animation frame at most), `composer.activity` (`{state: focused|blurred|typing|idle}`)
 and `assistant.activity` (`{state: thinking|streaming|idle}`; states only, never text, so no
 permission), `storage.changed` / `assets.changed` (`{key}`: another open frame of the same
-plugin wrote it), `command` (`{event}`: a `sendToUi` command). An anchor is any element of
+plugin wrote it), `command` (`{event}`: a `sendToUi` command), `code.job`
+(`{device, project, jobId, state}`, `code.panel` only: a Claude Code job of its project
+changed state; never its text). An anchor is any element of
 the app marked `data-plugin-anchor="<name>"`; names are only ever added.
 
 **Theme.** `init.theme` is `{mode, density, vars, reducedMotion}`; `vars` are the values of Anemo's colour,

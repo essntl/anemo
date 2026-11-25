@@ -136,7 +136,7 @@ public sealed partial class CodeJobControl
         {
             case "code_projects":
                 RequireShare(device);
-                return await ProjectsAsync(ct);
+                return await ProjectsAsync(args.Bool("local_only", false), ct);
             case "code_start":
                 RequireStart(device);
                 return Start(args);
@@ -190,11 +190,12 @@ public sealed partial class CodeJobControl
 
     // -- code_projects -------------------------------------------------------------------
 
-    private async Task<JsonNode> ProjectsAsync(CancellationToken ct)
+    /// <param name="localOnly">The projects folder only, without asking gh for the repositories (1.5.0).</param>
+    private async Task<JsonNode> ProjectsAsync(bool localOnly, CancellationToken ct)
     {
         var folder = ProjectsFolder;
         var local = CodeProjects.Local(folder);
-        var (remote, note) = await RemoteAsync(folder, ct);
+        var (remote, note) = localOnly ? ([], null) : await RemoteAsync(folder, ct);
         if (note is null && !Directory.Exists(folder))
         {
             note = $"The projects folder {folder} doesn't exist yet.";

@@ -56,6 +56,9 @@ from app.features.automations.models import Automation
 from app.features.calendar import recurrence
 from app.features.calendar import service as calendar
 from app.features.calendar.models import CalendarEvent
+from app.features.code_sessions import control as code_control
+from app.features.code_sessions import git
+from app.features.code_sessions.schemas import ProjectName
 from app.features.documents import paths as document_paths
 from app.features.documents import search as doc_search
 from app.features.documents import service as documents
@@ -837,6 +840,85 @@ async def events_update(call: Call) -> Any:
     return await _event_out(call, await call.run("update_event", args, "change events"))
 
 
+# -- code (projects and git history on the user's computers) ---------------------------------
+
+
+class CodeDeviceParams(Params):
+    device: str = Field(min_length=1, max_length=100)
+
+
+class GitGraphParams(CodeDeviceParams):
+    project: ProjectName
+    limit: int = Field(git.DEFAULT_LIMIT, ge=1, le=git.MAX_LIMIT)
+    all: bool = True
+
+
+class GitCommitParams(CodeDeviceParams):
+    project: ProjectName
+    hash: str = Field(pattern=git.HASH)
+
+
+# What the computer's state means for a plugin (the control errors' codes).
+_CODE_ERRORS: dict[str, ErrorCode] = {
+    "not_found": "not_found",
+    "device_failed": "failed",
+    "device_refused": "failed",
+}
+
+
+async def _on_computer[T](
+    call: Call, device_name: str, read: Callable[[uuid.UUID], Awaitable[T]]
+) -> T:
+    """Run a read on the named computer; its errors as a plugin's: not_found, failed, or
+    unavailable (watched, offline, sharing off, busy, an Anemo Desktop without git reads)."""
+    try:
+        device = await git.computer_named(call.db, device_name)
+        return await read(device.id)
+    except AppError as exc:
+        raise CallError(_CODE_ERRORS.get(exc.code, "unavailable"), exc.message) from exc
+
+
+async def code_projects(call: Call) -> Any:
+    p = _params(CodeDeviceParams, call)
+    await call.check("code_projects", {"device": p.device}, "read projects on your computers")
+    found = await _on_computer(
+        call, p.device, lambda device_id: code_control.projects(call.db, device_id, local_only=True)
+    )
+    return {
+        "projects": [
+            {
+                "name": x.name,
+                "path": x.dir,
+                "remote": git.without_credentials(x.remote) if x.remote else None,
+            }
+            for x in found.projects
+        ]
+    }
+
+
+async def code_git_graph(call: Call) -> Any:
+    p = _params(GitGraphParams, call)
+    # The tool's actions don't depend on the limit (as for tasks.list).
+    args = {"device": p.device, "project": p.project}
+    await call.check("code_git_graph", args, "read git history on your computers")
+    found = await _on_computer(
+        call,
+        p.device,
+        lambda device_id: git.graph(call.db, device_id, p.project, limit=p.limit, all_refs=p.all),
+    )
+    return found.out()
+
+
+async def code_git_commit(call: Call) -> Any:
+    p = _params(GitCommitParams, call)
+    args = {"device": p.device, "project": p.project}
+    await call.check("code_git_graph", args, "read git history on your computers")
+    found = await _on_computer(
+        call, p.device, lambda device_id: git.commit(call.db, device_id, p.project, p.hash)
+    )
+    return found.out()
+
+
 # -- the rest -------------------------------------------------------------------------------
 
 
@@ -1026,6 +1108,9 @@ METHODS: dict[str, Handler] = {
     "events.create": events_create,
     "events.update": events_update,
     "projects.list": projects_list,
+    "code.projects": code_projects,
+    "code.gitGraph": code_git_graph,
+    "code.gitCommit": code_git_commit,
     "notifications.send": notifications_send,
     "http.fetch": http_fetch,
     "tools.call": tools_call,

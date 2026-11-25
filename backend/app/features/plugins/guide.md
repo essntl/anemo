@@ -1,8 +1,8 @@
 # Writing an Anemo plugin
 
-A plugin adds things to Anemo: a panel on tasks, documents or events, a page, a renderer
-for a kind of code block in chat answers, a click-through layer over the window (an
-overlay), command-palette entries, and ready-made objects
+A plugin adds things to Anemo: a panel on tasks, documents or events, a page, a tab on
+the Code page, a renderer for a kind of code block in chat answers, a click-through layer
+over the window (an overlay), command-palette entries, and ready-made objects
 Anemo already knows (properties, saved views, templates, automations, scripts, MCP
 servers, agent profiles, skills, themes). This guide is the practical side of the plugin
 contract (version 1); it is written for an assistant building a plugin inside Anemo and
@@ -208,6 +208,7 @@ Each item of `contributes.ui` is one frame. `entry` is an HTML file of the packa
 | `settings` | The Settings tab of the plugin's own page in Settings → Plugins | `{}` | at most 1 |
 | `chat.block` | In a chat answer, instead of a fenced code block whose language is `fence` | `{block: {lang, text}}` | any |
 | `overlay` | A transparent layer over Anemo's whole window, for the whole session (it stays across pages) | `{overlay: true}` | at most 1 |
+| `code.panel` | A tab beside the job on the Code page, for the project of the job the user has open | `{code: {device, project, jobId}}` | any |
 
 ```jsonc
 "ui": [
@@ -217,7 +218,9 @@ Each item of `contributes.ui` is one frame. `entry` is an HTML file of the packa
     "entry": "ui/today.html" },
   { "id": "settings", "slot": "settings", "entry": "ui/settings.html" },
   { "id": "kanban", "slot": "chat.block", "fence": "today-kanban", "entry": "ui/block.html" },
-  { "id": "layer", "slot": "overlay", "title": "Clock", "entry": "ui/layer.html" }
+  { "id": "layer", "slot": "overlay", "title": "Clock", "entry": "ui/layer.html" },
+  { "id": "graph", "slot": "code.panel", "title": "Git graph", "icon": "git-branch",
+    "entry": "ui/graph.html" }
 ]
 ```
 
@@ -249,6 +252,64 @@ whole window could imitate Anemo, Anemo holds it to these rules:
 
 The overlay hides and shows itself with `ui.setVisible`. To place something beside the
 message box or the sidebar, read `layout.get` and follow `layout.changed` (section 5).
+
+### Code panels
+
+A `code.panel` is a tab on the Code page, next to the job view (labelled with its `title`,
+which it must have, and its `icon`). It fills its box like a page; `ui.resize` and
+`height` don't apply. The tabs are only there while a job is open: the job says which
+computer and project the panel is about.
+
+`context.code` is `{device, project, jobId}`: the computer's name (as in Settings >
+Devices), the project's folder name in that computer's projects folder, and the open job's
+id (`null` when there is none). When the user opens another job the frame stays and gets
+`context.changed`; it isn't reloaded. Whenever a Claude Code job of that project changes
+state the panel gets `code.job` (section 5), so it can read the project again after a job
+committed something. In a preview on the plugin's own page `device` and `project` are
+`null`.
+
+To read the project, ask for `code:read` (section 7) and call `code.gitGraph` and
+`code.gitCommit` (section 6). Anemo's server asks Anemo Desktop on that computer, which runs
+a fixed set of read-only git commands: no shell, no file contents, no diffs. The computer
+must be a trusted one that shares its Claude Code jobs, online, with Anemo Desktop 1.5.0 or
+later; otherwise the call fails with `unavailable` and a message that says why.
+
+A panel that lists the current branch and the last commits (inline, for the idea):
+
+```html
+<!-- ui/graph.html -->
+<div class="stack">
+  <div class="row"><b id="head">…</b><span id="dirty" class="badge"></span></div>
+  <ul id="commits" class="list"></ul>
+</div>
+<script>
+  async function render({ code }) {
+    if (!code.device) return                       // a preview: no project
+    try {
+      const graph = await anemo.call('code.gitGraph', { device: code.device, project: code.project, limit: 50 })
+      const head = graph.head
+      document.getElementById('head').textContent = head.detached ? 'detached at ' + head.commit.slice(0, 7) : (head.branch ?? '')
+      document.getElementById('dirty').textContent = graph.status.dirty ? 'uncommitted changes' : 'clean'
+      const list = document.getElementById('commits')
+      list.replaceChildren(...graph.commits.map((c) => {
+        const li = document.createElement('li')
+        li.textContent = c.hash.slice(0, 7) + ' ' + c.subject + (c.refs.length ? '  (' + c.refs.join(', ') + ')' : '')
+        return li
+      }))
+    } catch (err) {
+      anemo.ui.toast(err.message, 'error')         // e.g. unavailable: the computer is offline
+    }
+  }
+  anemo.ready.then(({ context }) => render(context))
+  anemo.on('context.changed', render)
+  anemo.on('code.job', async ({ state }) => {     // a job of this project changed state
+    if (state !== 'running') render(await anemo.call('context.get', {}))
+  })
+</script>
+```
+
+Commit subjects, branch names and author names are text from the repository: show them
+with `textContent`, never as HTML.
 
 A small overlay that keeps a clock above the message box (inline, for the idea):
 
@@ -291,7 +352,7 @@ The SDK is the global `window.anemo`:
 
 ```js
 const { plugin, slot, ui, context, theme, locale, timeZone, preview, layout } = await anemo.ready
-// plugin: {id, version}; slot: "object.panel" | "page" | "settings" | "chat.block" | "overlay"
+// plugin: {id, version}; slot: "object.panel" | "page" | "settings" | "chat.block" | "overlay" | "code.panel"
 // ui: the ui item's id; context: see section 4; theme: section 9
 // locale: "en" | "uk" | "ru"; timeZone: the user's IANA zone (Settings > General), use it
 // for "today" so you ask the server for the same day it means; preview: true while the user previews an unapproved version
@@ -365,7 +426,7 @@ try {
 
 | Event | Data | When |
 | --- | --- | --- |
-| `context.changed` | the new `context` | the panel now shows another object, or the page's params changed |
+| `context.changed` | the new `context` | the panel now shows another object, the page's params changed, or another job is open on the Code page |
 | `theme.changed` | the new `theme` | light/dark, accent or density changed (the variables are already updated) |
 | `object.changed` | `{type, id}` | the object the panel shows was changed elsewhere: read it again |
 | `layout.changed` | the new layout (as `layout.get`) | the window was resized, the page changed, the sidebar was folded, the message box appeared, went or grew (at most once per animation frame) |
@@ -374,6 +435,7 @@ try {
 | `storage.changed` | `{key}` | another frame of this plugin wrote or deleted that storage key |
 | `assets.changed` | `{key}` | another frame of this plugin wrote or deleted that asset |
 | `command` | `{event}` | the user ran this plugin's `sendToUi` command for this UI (section 3) |
+| `code.job` | `{device, project, jobId, state}` | `code.panel` only: a Claude Code job of the panel's project started or changed state. `state`: `running` (it started, or is running), `done`, `failed`, `cancelled` or `exited_without_result`. Sent once per change, never with the job's text |
 
 `assistant.activity` and `composer.activity` are sent once right after start, with the
 state then, and again on every change. `storage.changed` and `assets.changed` reach the
@@ -419,6 +481,9 @@ Params and results are JSON. Fields are **camelCase**, ids are strings, times ar
 | `events.create` | `{title, start, end?, allDay?, description?, location?}` → `Event` (`start`, `end`: ISO times) | `events:write` |
 | `events.update` | `{id, title?, start?, end?, allDay?, description?, location?}` → `Event`; only the fields given change | `events:write` |
 | `projects.list` | `{}` → `{projects: [{id, name, color}]}` (archived ones left out) | `projects:read` |
+| `code.projects` | `{device}` → `{projects: [{name, path, remote}]}`: the folders in that computer's projects folder (`remote`: its `origin` URL or `null`) | `code:read` |
+| `code.gitGraph` | `{device, project, limit?, all?}` → `GitGraph` (below). `limit` 1–1000 commits (default 300); `all` (default `true`): the history of every local and remote-tracking branch, `false`: of HEAD only | `code:read` |
+| `code.gitCommit` | `{device, project, hash}` → `GitCommit` (below); `hash` is 7 to 40 lower-case hex digits | `code:read` |
 | `notifications.send` | `{title, body?}` → `{}` (title at most 120 characters) | `notifications:send` |
 | `http.fetch` | `{url, method?, headers?, body?}` → `{status, headers, body}`; `method` one of `GET HEAD POST PUT PATCH DELETE OPTIONS` (default `GET`), `body` is text; the answer's body comes back as text, at most 1 MB | `network:<host of url>` |
 | `tools.call` | `{name, args?}` → `{content, data, isError}` (`data` may be `null`) | `tools:<name>` |
@@ -505,6 +570,56 @@ and are deleted when the plugin is uninstalled.
 }
 ```
 
+### GitGraph and GitCommit
+
+`code.gitGraph` and `code.gitCommit` read a project on a computer through Anemo Desktop
+(section 4, Code panels). The device is the computer's name, the project its folder name
+(`code.projects`); hashes are full 40 hex digits (64 in a SHA-256 repository).
+
+```jsonc
+// GitGraph
+{
+  "head": { "branch": "main",        // null when detached; in an empty repository, the branch to be
+            "commit": "3f2a…",       // null in a repository without commits
+            "detached": false },
+  "branches": [{ "name": "main",            // a remote-tracking one: "origin/main"
+                 "commit": "3f2a…",
+                 "remote": false,
+                 "upstream": "origin/main",  // or null
+                 "ahead": 2, "behind": 0,    // commits ahead of and behind its upstream
+                 "current": true }],         // HEAD is on it
+  "tags": [{ "name": "v1.0", "commit": "9b1c…" }],   // an annotated tag: the commit it points at
+  "commits": [{ "hash": "3f2a…",
+                "parents": ["9b1c…", "77de…"],       // two or more for a merge; [] for a first commit
+                "authorName": "Artem",
+                "authorEmail": "artem@example.com",
+                "date": "2026-11-25T09:30:00+01:00", // the author's date
+                "subject": "Merge branch 'feature'",
+                "refs": ["HEAD", "main", "origin/main", "tag: v1.0"] }],
+  "status": { "dirty": true,         // any of the four below
+              "staged": 1, "unstaged": 2, "untracked": 3, "conflicted": 0 },
+  "remotes": [{ "name": "origin", "url": "https://github.com/artem/anemo.git" }],  // credentials removed
+  "truncated": false                 // there are more commits than limit
+}
+// GitCommit
+{
+  "hash": "3f2a…", "parents": ["9b1c…"], "authorName": "Artem", "authorEmail": "artem@example.com",
+  "date": "2026-11-25T09:30:00+01:00",
+  "committerDate": "2026-11-25T09:31:00+01:00",
+  "subject": "Fix the login",
+  "body": "The rest of the message.",
+  "files": [{ "path": "src/login.ts",
+              "status": "M",         // git's letter: A M D R C T
+              "additions": 12, "deletions": 3 }],   // null for a binary file
+  "stats": { "files": 1, "additions": 12, "deletions": 3 },
+  "truncated": false                 // more than 1000 files: the list is cut, stats are not
+}
+```
+
+Commits come newest first in topological order (`git log --topo-order`: a commit before its
+parents), so a graph can be laid out from the list as it is. A merge is compared with its
+first parent. Nothing else is read: no file contents, no diffs.
+
 Fields are only ever **added** to these shapes, so ignore fields you don't know.
 
 ## 7. Permissions and risk
@@ -518,6 +633,7 @@ Fields are only ever **added** to these shapes, so ignore fields you don't know.
 | `tasks:write` | create and change tasks | medium |
 | `documents:write` | create and change documents | medium |
 | `events:write` | create and change events | medium |
+| `code:read` | list the projects on your computers and read their git history (`code.*`): branches, commits, changed file names, whether there are uncommitted changes. A fixed set of read-only git commands run by Anemo Desktop; never file contents or diffs | high |
 | `notifications:send` | send the user a notification | high |
 | `network:<host>` | `http.fetch` to that host (`network:*.example.com` = its subdomains) | high |
 | `tools:<tool name>` | call that agent tool (built-in, or `mcp__<server>__<tool>`) | high, or critical |
@@ -539,7 +655,8 @@ covers `create_task`, `update_task`, `delete_task`; `documents:read` covers
 `list_documents`, `read_document`, `search_documents`, `list_properties`;
 `documents:write` covers `write_document`, `edit_document`, `set_document_properties`;
 `events:read` covers `list_events`, `get_event`; `events:write` covers `create_event`,
-`update_event`, `delete_event`; `notifications:send` covers `send_notification`;
+`update_event`, `delete_event`; `code:read` covers `code_projects`, `code_git_graph`;
+`notifications:send` covers `send_notification`;
 `network:<host>` covers `http_request` and `read_web_page` to that host; `tools:<name>`
 covers that tool), and its `hosts` need matching `network:` permissions.
 
@@ -707,7 +824,8 @@ Note `textContent` (not `innerHTML`): document text is shown as text, never as H
 | Path not allowed | Relative, `/`, no `..`, no leading `/`, no hidden names (`.env`, `.gitignore`). |
 | File too large / too many files | At most 1 MB per file, 5 MB and 500 files in total. Remove bundled libraries you don't need. |
 | A picture doesn't match its type | The bytes of `icon.png` must be a real PNG, of `x.gif` a GIF, of `x.jpg` a JPEG (send binary files as base64, see section 12). The icon itself is PNG or WebP. |
-| `slot` unknown / `objects` missing | Slots: `object.panel` (needs `objects`), `page`, `settings` (at most one), `chat.block` (needs `fence`), `overlay` (at most one). |
+| `slot` unknown / `objects` missing | Slots: `object.panel` (needs `objects`), `page`, `settings` (at most one), `chat.block` (needs `fence`), `overlay` (at most one), `code.panel` (needs a `title`). |
+| `unavailable` from `code.gitGraph` | The computer is offline, watched (not trusted), doesn't share its Claude Code jobs, or has an Anemo Desktop older than 1.5.0: the message says which. `not_found`: no computer, project or commit of that name. |
 | A command names an unknown UI | `sendToUi`'s `ui` must be the `id` of one of this plugin's `contributes.ui`. |
 | `invalid_params` from `ui.setHitRegions` | At most 8 regions of `{x, y, width, height}` (no other fields), each larger than 0 and at most 320 × 320; only an overlay has them. |
 | `permission_denied` from `ui.pickFile` | Call it straight from a click (or key) handler in the frame, not from a timer or after a slow call. |

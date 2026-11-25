@@ -3,9 +3,10 @@
 the agent tools (tools/builtin/code.py) alike.
 
 Every command goes to the computer through the relay (`device.command` actions
-`code_projects`, `code_start`, `code_cancel`). A computer must be a trusted one, online
-with a fresh offer, and offer what the action needs: `code` (sharing) for the projects,
-`code_start` ("Let Anemo start Claude Code jobs") for starting and cancelling.
+`code_projects`, `code_start`, `code_cancel`; the git reads are in git.py). A computer
+must be a trusted one, online with a fresh offer, and offer what the action needs: `code`
+(sharing) for the projects, `code_start` ("Let Anemo start Claude Code jobs") for
+starting and cancelling.
 """
 
 import logging
@@ -120,7 +121,9 @@ async def checked_computer(
     return device, offer
 
 
-async def send_command(device: Device, action: str, fields: dict[str, Any], timeout_s: float) -> dict:
+async def send_command(
+    device: Device, action: str, fields: dict[str, Any], timeout_s: float
+) -> dict:
     try:
         return await relay.send(device.id, action, fields, timeout_s=timeout_s)
     except relay.Busy as exc:
@@ -131,6 +134,8 @@ async def send_command(device: Device, action: str, fields: dict[str, Any], time
         raise DeviceOffline(str(exc) or f"“{device.name}” didn't answer.") from exc
     except (relay.Refused, relay.Stopped) as exc:
         raise DeviceRefused(str(exc) or f"“{device.name}” refused.") from exc
+    except relay.Missing as exc:
+        raise NotFound(str(exc) or f"“{device.name}” doesn't have that.") from exc
     except relay.ActionFailed as exc:
         raise DeviceFailed(str(exc) or f"“{device.name}” couldn't do that.") from exc
 
@@ -139,12 +144,21 @@ def _text(value: Any, limit: int = MAX_TEXT) -> str:
     return str(value)[:limit] if value is not None else ""
 
 
-async def projects(db: AsyncSession, device_id: uuid.UUID) -> CodeProjectsOut:
-    """The computer's projects and the owner's GitHub repositories not cloned there."""
+async def projects(
+    db: AsyncSession, device_id: uuid.UUID, *, local_only: bool = False
+) -> CodeProjectsOut:
+    """The computer's projects and the owner's GitHub repositories not cloned there.
+    `local_only`: the projects folder only (Anemo Desktop 1.5.0 then skips `gh repo
+    list`; an older one lists the repositories anyway, and they are left out here)."""
     device, _ = await checked_computer(db, device_id, need="share")
-    state = await send_command(device, "code_projects", {}, PROJECTS_TIMEOUT_S)
+    fields = {"local_only": True} if local_only else {}
+    state = await send_command(device, "code_projects", fields, PROJECTS_TIMEOUT_S)
     local = [p for p in state.get("projects") or [] if isinstance(p, dict) and p.get("name")]
-    remote = [r for r in state.get("remote") or [] if isinstance(r, dict) and r.get("name")]
+    remote = [
+        r
+        for r in ([] if local_only else state.get("remote") or [])
+        if isinstance(r, dict) and r.get("name")
+    ]
     note = state.get("note")
     return CodeProjectsOut(
         projects=[

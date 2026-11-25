@@ -141,6 +141,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "code_start",
             "code_status",
             "code_cancel",
+            "code_git_graph",
             "list_tasks",
             "get_task",
             "create_task",
