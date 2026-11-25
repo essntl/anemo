@@ -215,7 +215,6 @@ async def graph(
     """The project's graph: `limit` commits (1–1000), of every local and remote-tracking
     branch (`all_refs`) or of HEAD only. `project` is a checked ProjectName."""
     device = await _git_computer(db, device_id)
-    await db.close()  # nothing is held while the computer answers
     fields = {"project": project, "limit": max(1, min(limit, MAX_LIMIT)), "all": all_refs}
     state = await control.send_command(device, "code_git_graph", fields, GIT_TIMEOUT_S)
     found = _read(GitGraph, state, device)
@@ -232,7 +231,6 @@ async def commit(
     if not re.match(HASH, commit_hash):
         raise ValueError("not a commit hash")
     device = await _git_computer(db, device_id)
-    await db.close()
     fields = {"project": project, "hash": commit_hash}
     state = await control.send_command(device, "code_git_commit", fields, GIT_TIMEOUT_S)
     return _read(GitCommitDetail, state, device)

@@ -275,6 +275,13 @@ someone else wrote, so it gets nothing by default:
   frame), with no "for this run" or "always". What a plugin writes carries
   `plugin:<id>@<version>`, and its writes, confirmations and refusals are in the security
   log.
+- **Your computers' code is read, never run.** `code:read` (high risk) lets a plugin list
+  a trusted computer's projects and read their git history through Anemo Desktop: a fixed
+  set of read-only git commands with argument lists (no shell), in a folder inside the
+  projects folder (no `..`, no links out), with hooks such as `core.fsmonitor` turned off.
+  The server checks the project name, the commit hash and the limit before asking, and the
+  answer's shape after; only metadata comes back (no file contents, no diffs, no
+  credentials from remote URLs).
 - **Its output is data.** Results of plugin scripts and plugin MCP tools reach models
   marked as untrusted, and when an agent reads a task, document or event a plugin wrote
   last, the text is labelled with the plugin and marked as untrusted. (Static text you

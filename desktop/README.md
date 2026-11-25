@@ -36,6 +36,15 @@ in `err.txt`. **`bypassPermissions` means Anemo's agents can make Claude Code
 do anything it can on this computer**: tick it only on a computer you'd give PowerShell to.
 Needs `claude` on PATH, and `gh` (signed in) or `git` for cloning.
 
+**Reading git history (1.5.0).** With sharing on, a trusted computer also answers Anemo's
+read-only git requests for a project in the projects folder: its branches (with ahead and
+behind), tags, recent commits, whether there are uncommitted changes, and one commit's
+changed file names and line counts. Plugins on the Code page (`code:read`) and the agent
+tool `code_git_graph` use them. Only a fixed set of read-only git commands runs, with its
+arguments as a list (never through a shell), in a folder that must be inside the projects
+folder (no `..`, no links out of it); never file contents or diffs. Contract:
+`docs/device-contracts.md` §7.5.
+
 ## Layout
 
 ```
@@ -228,3 +237,7 @@ its jobs show on the Code page too. Tests: `node --test bridge/cc.test.mjs`.
   patterns; the prompt goes to Claude Code through `prompt.txt`, never on a command line.
   Cancelling ends the job's process tree only when that process is still the job's (a pid
   another program got since is left alone).
+- Git reads (1.5.0) need sharing on and a trusted device, not control. They run git by its
+  full path (never a `.cmd`/`.bat`) with `core.fsmonitor`, signature checks, optional locks
+  and lazy fetches off, 10 s per command, and answer metadata only; credentials in remote
+  URLs are removed.
