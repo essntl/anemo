@@ -111,7 +111,7 @@ row is filled in by its own pull request.
 | **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
 | **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
 | **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
-| **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
+| **Bulk task and event changes** (done) | [20](specs/20-bulk-changes.md) | [#98](https://github.com/essntl/anemo/pull/98) |
 | **Waiting on a code job** (in progress) | [21](specs/21-code-wait.md) | – |
 | **Files between devices and the workspace** (in progress) | [22](specs/22-device-files.md) | – |
 | **Anemo Desktop updates itself** (in progress) | [23](specs/23-desktop-auto-update.md) | – |
