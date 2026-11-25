@@ -30,10 +30,10 @@
   object-position: left top;
 }
 ::view-transition-old(plugin-hero) {
-  animation: fade-out 160ms var(--ease-in) both;
+  animation: fade-out 110ms var(--ease-in) both;
 }
 ::view-transition-new(plugin-hero) {
-  animation: fade-in 260ms var(--ease-out) 40ms both;
+  animation: fade-in 200ms var(--ease-out) both;
 }
 
 /* The icon and the name are the same picture at both ends: they just move (no cross-fade). */
@@ -47,14 +47,20 @@
   animation: none;
 }
 
-/* While a plugin morph runs, the rest of the page (the other cards; the settings around
-   the sheet) only fades: the usual page entrance moves up by a few pixels, which would
-   pull against the morph. */
+/* While a plugin morph runs, the rest of the page doesn't cross-fade: the new page (the
+   settings around the sheet, or the other cards on the way back) is there at once, and the
+   old one fades out underneath it. A cross-fade would dim the parts that are the same on
+   both (the list of sections), and the usual entrance moves up by a few pixels, which
+   would pull against the morph. The page has no background of its own, so the old cards
+   show through where the new page is empty. */
 html.plugin-vt::view-transition-old(page) {
-  animation: fade-out 140ms var(--ease-in) both;
+  animation: fade-out 180ms var(--ease-in) both;
+  mix-blend-mode: normal;
 }
 html.plugin-vt::view-transition-new(page) {
-  animation: fade-in 220ms var(--ease-out) 80ms both;
+  animation: none;
+  /* The browser blends a cross-fade's two pictures additively; here one simply lies on the other. */
+  mix-blend-mode: normal;
 }
 
 /* app.css already turns every view transition off for reduced motion; this is the same

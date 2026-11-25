@@ -11,6 +11,7 @@
 import { motion } from 'motion/react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Bot, ChevronLeft, Eye, ShieldAlert, Trash2, TriangleAlert, XCircle } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu, type MenuAction } from '@/components/ui/ActionMenu'
@@ -142,23 +143,24 @@ export function PluginDetailPage() {
             <PluginBadges plugin={plugin} preview={previewVersion?.version} />
           </div>
         </div>
-        <div className="pt-1">
+        <div className="-mr-2 flex items-center gap-1">
           <Switch label={t('Use {name}', { name: plugin.name })} checked={plugin.enabled}
             disabled={plugin.status === 'needs_review' || setEnabled.isPending}
             onChange={(enabled) => setEnabled.mutate({ id: plugin.id, enabled })} />
+          <ActionMenu actions={menu} className="ml-1" />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {pending && (
+      {pending && (
+        // What needs the user comes first: the review of the waiting version, and trying it.
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" size="sm" icon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={() => setTab('versions')}>
             {plugin.approved_version ? t('Review update') : t('Review and approve')}
           </Button>
-        )}
-        {pending && (pending.manifest.contributes?.ui?.length ?? 0) > 0 && (
-          <Button size="sm" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => setPreview(pending.version)}>{t('Preview')}</Button>
-        )}
-        <ActionMenu actions={menu} className="ml-auto" />
-      </div>
+          {(pending.manifest.contributes?.ui?.length ?? 0) > 0 && (
+            <Button size="sm" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => setPreview(pending.version)}>{t('Preview')}</Button>
+          )}
+        </div>
+      )}
       {plugin.status === 'error' && plugin.error && (
         <p role="alert" className="flex items-start gap-2 rounded-control bg-error/12 px-3 py-2 text-[12.5px] text-error">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /><span>{t('Stopped: {problem}', { problem: plugin.error })}</span>
@@ -199,23 +201,29 @@ export function PluginDetailPage() {
     </>
   )
 
+  const sheet = (
+    <motion.section
+      layoutId={heroLayoutId(plugin.id, 'card', mode)}
+      style={heroStyle(true, HERO, mode)}
+      aria-label={plugin.name}
+      className={cn(
+        'flex flex-col gap-(--card-gap) bg-card px-(--card-x) py-(--card-y)',
+        desktop
+          ? 'glass rounded-card border border-border shadow-soft'
+          // A phone: a sheet over the whole screen, grown from the card.
+          : 'fixed inset-0 z-40 overflow-y-auto overscroll-contain rounded-none pt-[max(var(--card-y),env(safe-area-inset-top))] pb-[max(var(--card-y),env(safe-area-inset-bottom))]',
+      )}
+    >
+      {header}
+      {content}
+    </motion.section>
+  )
+
   return (
     <>
-      <motion.section
-        layoutId={heroLayoutId(plugin.id, 'card', mode)}
-        style={heroStyle(true, HERO, mode)}
-        aria-label={plugin.name}
-        className={cn(
-          'flex flex-col gap-(--card-gap) bg-card px-(--card-x) py-(--card-y)',
-          desktop
-            ? 'glass rounded-card border border-border shadow-soft'
-            // A phone: a sheet over the whole screen, grown from the card.
-            : 'fixed inset-0 z-30 overflow-y-auto overscroll-contain rounded-none pt-[max(var(--card-y),env(safe-area-inset-top))] pb-[max(var(--card-y),env(safe-area-inset-bottom))]',
-        )}
-      >
-        {header}
-        {content}
-      </motion.section>
+      {/* A phone: the sheet lies over the whole app (the page area is a stacking context of
+          its own, for its view transition, so it is put at the end of <body>). */}
+      {desktop ? sheet : createPortal(sheet, document.body)}
       <Lingering value={uninstalling && plugin}>
         {(shown) => (
           <UninstallDialog plugin={shown} onClose={() => setUninstalling(false)}

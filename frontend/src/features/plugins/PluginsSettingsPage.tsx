@@ -8,7 +8,7 @@
  * is for daily work. A plugin's own *pages* do appear in the sidebar, in their own group
  * (spec 12-plugins.md §3).
  */
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Plus, Puzzle } from 'lucide-react'
 import { errorMessage } from '@/api/client'
@@ -47,6 +47,12 @@ export function PluginsSettingsPage() {
     root.classList.add(RUNNING_CLASS)
     const timer = window.setTimeout(() => root.classList.remove(RUNNING_CLASS), RUNNING_MS)
     return () => window.clearTimeout(timer)
+  }, [])
+
+  // The plugin page's code, loaded ahead: the router waits for it before the transition
+  // starts, so a first click would otherwise pause.
+  useEffect(() => {
+    void import('./PluginDetailPage')
   }, [])
 
   const open = (id: string) => {
