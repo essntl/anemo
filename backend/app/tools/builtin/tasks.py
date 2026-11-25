@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
-from app.core.refs import ObjectRef
+from app.core.refs import ObjectRef, ref_url
 from app.features.links import service as links
 from app.features.projects import service as projects
 from app.features.provenance import service as provenance
@@ -697,7 +697,7 @@ class UpdateTasks(Tool):
         return [
             batch.Planned(
                 text=_task_change(item),
-                ref=f"/tasks?task={task_id}" if (task_id := _id(item.id)) else None,
+                ref=ref_url("task", task_id) if (task_id := _id(item.id)) else None,
                 # As for one task: deleting is dangerous, any other change is not.
                 risk="dangerous" if item.trash else "safe",
                 trash=item.trash,
