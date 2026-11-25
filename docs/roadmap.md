@@ -97,7 +97,7 @@ then built in parallel; how it went is in
 
 | What | Spec | Pull request |
 | --- | --- | --- |
-| **Plugins.** Packages with a manifest (stable id, semver, a hash per version) installed from a zip, a Git URL, the bundled examples or an assistant's chat; reviewed and approved per version with the password; UI in sealed iframes in four slots (panels on tasks/documents/events, pages, a plugin's settings, chat blocks), declarative contributions (properties, views, templates, automations, scripts, MCP servers, profiles, skills, themes, commands), every call checked as a tool call with the plugin as the actor; a kill switch. Settings → Plugins with cards that grow into the plugin's page; agent tools to build plugins in a chat. Examples: *Word count*, *Today board*, *Weekly review*. | [12](specs/12-plugins.md) | (this round's PR) |
+| **Plugins.** Packages with a manifest (stable id, semver, a hash per version) installed from a zip, a Git URL, the bundled examples or an assistant's chat; reviewed and approved per version with the password; UI in sealed iframes in four slots (panels on tasks/documents/events, pages, a plugin's settings, chat blocks), declarative contributions (properties, views, templates, automations, scripts, MCP servers, profiles, skills, themes, commands), every call checked as a tool call with the plugin as the actor; a kill switch. Settings → Plugins with cards that grow into the plugin's page; agent tools to build plugins in a chat. Examples: *Word count*, *Today board*, *Weekly review*. | [12](specs/12-plugins.md) | #87 |
 
 ---
 
