@@ -15,6 +15,7 @@ from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
+from app.features.conversations import search as chat_search
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.conversations.schemas import (
     AttachmentSummary,
@@ -277,23 +278,8 @@ async def list_conversations(
     if active_before is not None:
         stmt = stmt.where(Conversation.last_message_at < active_before)
     if q:
-        tsq = func.websearch_to_tsquery("english", q)
-        hits = await db.execute(
-            select(
-                ChatMessage.conversation_id,
-                func.ts_headline(
-                    "english",
-                    ChatMessage.text_plain,
-                    tsq,
-                    "MaxWords=18, MinWords=6, StartSel=«, StopSel=»",
-                ),
-            )
-            .where(ChatMessage.tsv.op("@@")(tsq))
-            .order_by(func.ts_rank(ChatMessage.tsv, tsq).desc())
-            .limit(200)
-        )
-        for cid, snip in hits.all():
-            snippets.setdefault(cid, snip)
+        matches = await chat_search.matching_messages(db, q, max_words=18, min_words=6)
+        snippets = chat_search.first_snippets(matches)
         stmt = stmt.where(
             or_(Conversation.id.in_(list(snippets)), Conversation.title.ilike(f"%{q}%"))
         )

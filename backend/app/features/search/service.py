@@ -9,7 +9,6 @@ and mode "keyword", matches words.
 
 import asyncio
 import re
-import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -17,7 +16,7 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, Text, and_, cast, func, or_, select
+from sqlalchemy import ColumnElement, Text, and_, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -25,7 +24,8 @@ from app.core.errors import AppError
 from app.core.refs import ref_url
 from app.features.automations.models import Automation
 from app.features.calendar.models import CalendarEvent
-from app.features.conversations.models import ChatMessage, Conversation
+from app.features.conversations import search as chat_search
+from app.features.conversations.models import Conversation
 from app.features.documents import search as doc_search
 from app.features.documents.models import Document
 from app.features.memory.models import Memory
@@ -140,19 +140,7 @@ def snippet(text: str, words: list[str]) -> str:
 
 async def _chats(db: AsyncSession, q: Query) -> list[SearchHit]:
     """Conversations whose messages or title match (full-text search on messages)."""
-    tsq = func.websearch_to_tsquery("english", q.text)
-    headline = func.ts_headline(
-        "english", ChatMessage.text_plain, tsq, "MaxWords=24, MinWords=8, StartSel=«, StopSel=»"
-    )
-    rows = await db.execute(
-        select(ChatMessage.conversation_id, headline)
-        .where(ChatMessage.tsv.op("@@")(tsq))
-        .order_by(func.ts_rank(ChatMessage.tsv, tsq).desc())
-        .limit(200)
-    )
-    snippets: dict[uuid.UUID, str] = {}
-    for conversation_id, text in rows.all():
-        snippets.setdefault(conversation_id, text)
+    snippets = chat_search.first_snippets(await chat_search.matching_messages(db, q.text))
     stmt = (
         select(Conversation)
         .where(or_(Conversation.id.in_(list(snippets)), contains_all(q.words, Conversation.title)))
