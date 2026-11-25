@@ -178,8 +178,8 @@ CATEGORIES: list[Category] = [
     Category(
         "chats.read",
         "Read earlier chats",
-        "Search your earlier chats and read them (never the one it is in, or temporary "
-        "chats). Automations only when their tool list names these tools.",
+        "Search your earlier chats and read them (never the chat the agent is in, nor "
+        "temporary chats). Automations only when their tool list names these tools.",
         "autonomous",
     ),
 ]
