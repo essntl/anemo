@@ -19,6 +19,7 @@ export type FrameErrorCode =
   | 'unavailable'
   | 'failed'
   | 'unknown_method'
+  | 'exists'
 
 export interface FrameError {
   code: FrameErrorCode

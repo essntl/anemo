@@ -194,10 +194,6 @@ From spec 12 §8 and what building the examples showed:
 
 - A marketplace: listing, signatures over the package hash, update checks.
 - Optional (per-item) permissions; agent tools implemented by a plugin's script.
-- Scripts get JSON results: today `anemo.call` gives a script the text a tool writes for
-  models (`list_tasks` returns no `data`), so a script parses lines no contract promises.
-  Either tools return `data` in the plugin shapes, or the script SDK gets the frame's
-  methods. Also error codes for failed calls, and the user's time zone in a script's input.
 - Templates with placeholders (date, week) and a chosen folder and name.
 - More slots: editor blocks in documents, Home widgets, the run timeline; plugin
   keyboard shortcuts; translations of plugin texts.

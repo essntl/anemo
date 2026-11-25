@@ -78,6 +78,25 @@ MAX_STORAGE_BYTES = 1024 * 1024
 MAX_HTTP_BYTES = 1024 * 1024
 MAX_MESSAGE_CHARS = 1024 * 1024  # a message on the port is at most 1 MB (§6.2)
 HOST_ONLY = frozenset({"context.get", "ui.resize", "ui.toast", "ui.open"})
+# What a plugin's script can't call through anemo.api: it has anemo.call for tools,
+# anemo.fetch for the web, and a script starting scripts would be a loop.
+NOT_FOR_SCRIPTS = frozenset({"tools.call", "http.fetch", "scripts.run"})
+# Methods that change something: in a script's run they are in its change list, and one
+# that was running when the worker stopped is not repeated (its outcome is unknown).
+WRITE_METHODS = frozenset(
+    {
+        "storage.set",
+        "storage.delete",
+        "tasks.create",
+        "tasks.update",
+        "documents.create",
+        "documents.update",
+        "events.create",
+        "events.update",
+        "notifications.send",
+        "templates.apply",
+    }
+)
 # Set by the client itself (and never a cookie of Anemo's).
 DROPPED_HEADERS = {"host", "content-length", "transfer-encoding", "connection", "cookie"}
 
@@ -91,6 +110,8 @@ ErrorCode = Literal[
     "failed",
     "unknown_method",
     "confirm_required",
+    "needs_approval",
+    "exists",
 ]
 _STATUS: dict[str, int] = {
     "permission_denied": 403,
@@ -102,6 +123,8 @@ _STATUS: dict[str, int] = {
     "failed": 422,
     "unknown_method": 404,
     "confirm_required": 409,
+    "needs_approval": 409,  # a script's method that would need the user (call_from_script)
+    "exists": 409,  # documents.create: a document is at that path already
 }
 
 
@@ -128,6 +151,9 @@ class Call:
     confirm_token: str | None
     policy: Policy
     confirmed: bool = False  # the user allowed this call in Anemo's dialog
+    # False for a script's call: nobody is looking at a dialog, so a call that would ask is
+    # refused (needs_approval) instead of answered with a confirmation token.
+    can_confirm: bool = True
 
     @property
     def actor(self) -> Actor:
@@ -221,6 +247,12 @@ class Call:
                 "permission_denied", f"This plugin may not do this: {evaluation.reason}."
             )
         if evaluation.decision == "ask":
+            if not self.can_confirm:
+                raise await self.refuse(
+                    "needs_approval",
+                    "This needs the user's approval, which a plugin method in a script can't "
+                    "wait for: use anemo.call with the tool instead, so the run asks.",
+                )
             if self.confirm_token and await _use_token(self, self.confirm_token):
                 self.confirmed = True
                 return
@@ -595,6 +627,13 @@ async def _document_out(call: Call, result: Any) -> Any:
 
 async def documents_create(call: Call) -> Any:
     p = _params(DocumentCreateParams, call)
+    # Its own code, so a plugin can tell "it's there already" from a failure without
+    # reading the message (documents.update changes an existing one). Only for a plugin
+    # that may create documents: otherwise it could probe which paths exist.
+    if "write_document" not in permissions.covered_tools(call.manifest.permissions):
+        raise await call.refuse("permission_denied", "This plugin may not create documents.")
+    if await documents.by_path(call.db, p.path) is not None:
+        raise CallError("exists", f"A document is at {p.path} already.")
     args = {"path": p.path, "content": p.markdown}
     return await _document_out(call, await call.run("write_document", args, "create documents"))
 
@@ -937,5 +976,40 @@ async def call(
         policy=permissions.preview_policy(manifest)
         if preview
         else permissions.policy_for(manifest),
+    )
+    return await handler(this)
+
+
+async def call_from_script(
+    db: AsyncSession, plugin: Plugin, method: str, params: dict[str, Any]
+) -> Any:
+    """Answer one `anemo.api(method, params)` of the plugin's own script, with the same
+    JSON its panels get (docs/specs/CONTRACTS-plugins.md §2.3). The same checks as a
+    frame's call against the approved version, as the plugin, except: no rate limit (the
+    run's tool-call limit counts these), and a call that would ask the user is refused
+    with needs_approval (anemo.call has the approval path). The script runner records it
+    in the run's journal. Raises CallError."""
+    if await gate.kill_switch_on(db):
+        raise CallError("unavailable", gate.KILL_SWITCH_ON)
+    version = await _version(db, plugin, None)
+    if len(json.dumps(params, default=str)) > MAX_MESSAGE_CHARS:
+        raise CallError("invalid_params", "A call's parameters can be at most 1 MB.")
+    if method in HOST_ONLY or method in NOT_FOR_SCRIPTS:
+        raise CallError("unknown_method", f"{method} is not available to scripts.")
+    handler = METHODS.get(method)
+    if handler is None:
+        raise CallError("unknown_method", f"There is no method {method}.")
+    manifest = load(version.manifest)
+    this = Call(
+        db=db,
+        plugin=plugin,
+        version=version,
+        manifest=manifest,
+        preview=False,
+        method=method,
+        params=params,
+        confirm_token=None,
+        policy=permissions.policy_for(manifest),
+        can_confirm=False,
     )
     return await handler(this)

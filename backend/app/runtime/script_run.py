@@ -40,6 +40,7 @@ from app.events import bus
 from app.features.automations import scripts
 from app.features.automations import service as automations
 from app.features.automations.models import Automation, ScriptVersion
+from app.features.plugins import calls as plugin_calls
 from app.features.plugins import gate as plugin_gate
 from app.features.plugins import permissions as plugin_permissions
 from app.features.profiles import service as profiles
@@ -71,6 +72,9 @@ MAX_RESULT_CHARS = 64_000
 MAX_TOOL_RESULT_CHARS = 1_000_000
 MAX_THINK_DATA_CHARS = 100_000
 THINK = "think"  # the tool name a think step is recorded under
+# A plugin method (anemo.api) is recorded as a call named "plugin:<method>"
+# (tasks.list -> plugin:tasks.list).
+METHOD_PREFIX = "plugin:"
 # Capabilities that reach a web address: only the version's declared hosts.
 NET_CAPABILITIES = ("net.fetch", "http.request")
 SECRET = re.compile(r"\{\{secret:([A-Z][A-Z0-9_]*)\}\}")
@@ -108,6 +112,18 @@ def _answer(row: ToolCall) -> dict[str, Any]:
         "is_error": row.is_error or row.status != "succeeded",
         "denied": row.status == "denied",
     }
+
+
+def _method_answer(row: ToolCall) -> dict[str, Any]:
+    """The reply to anemo.api, from its journal row: {result} or {error: {code, message}}."""
+    data = row.result_data or {}
+    return {"type": "method_result", "result": data.get("result"), "error": data.get("error")}
+
+
+def _method_summary(method: str, result: Any) -> str:
+    """A line for the run's change list: the method and the title of what it wrote."""
+    title = result.get("title") if isinstance(result, dict) else None
+    return f"{method}: {title}"[:200] if title else method
 
 
 def host_declared(host: str, hosts: list[str]) -> bool:
@@ -196,6 +212,9 @@ class ScriptRun:
             "input": (run.options.get("script") or {}).get("input"),
             "state": automation.state_note,
             "change": (run.options.get("automation") or {}).get("change"),
+            # The user's time zone (Settings > General), frozen with the run so a replay
+            # after a wait gets the same input: "today" as Anemo means it.
+            "timeZone": (run.policy or {}).get("time_zone") or "UTC",
         }
         self.ctx = ToolContext(
             run_id=run.id,
@@ -270,8 +289,9 @@ class ScriptRun:
                             "failed",
                             f"The script's log is longer than {MAX_LOG_CHARS:,} characters.",
                         )
-                elif kind in ("call", "think"):
-                    reply = await (self._call if kind == "call" else self._think)(position, message)
+                elif kind in ("call", "think", "method"):
+                    handle = {"call": self._call, "think": self._think, "method": self._method}
+                    reply = await handle[kind](position, message)
                     position += 1
                     if isinstance(reply, Ended):
                         return reply
@@ -557,6 +577,95 @@ class ScriptRun:
         await self._emit("tool.completed", {"tool_call_id": str(row.id), "status": status})
         return _answer(row)
 
+    # -- plugin methods ------------------------------------------------------------------
+
+    async def _method(self, position: int, message: dict[str, Any]) -> dict[str, Any] | Ended:
+        """anemo.api(method, params): a plugin's method, answered with the contract's JSON
+        (plugins.calls.call_from_script). Like a tool call it is a row of the run's journal,
+        so after a wait the script gets the recorded answer and nothing is done twice."""
+        method = str(message.get("method") or "")[:90]
+        params = message.get("params")
+        params = params if isinstance(params, dict) else {"__invalid__": params}
+        name = METHOD_PREFIX + method
+        async with get_sessionmaker()() as db:
+            run = await _get_run(db, self.run_id)
+            row = await self._row_at(db, position)
+            if row is not None:
+                if row.tool_name != name or row.args != params:
+                    return Ended("failed", NOT_REPEATED)
+                if row.status in DONE:
+                    return _method_answer(row)
+                if method in plugin_calls.WRITE_METHODS:  # running when the worker stopped
+                    return await self._method_done(
+                        db,
+                        row,
+                        error=(
+                            "failed",
+                            "The run was interrupted during this call; its outcome is unknown.",
+                        ),
+                    )
+            else:
+                if run.pause_requested:
+                    return Ended("paused")
+                row = ToolCall(
+                    run_id=run.id,
+                    step=0,
+                    position=position,
+                    provider_call_id=f"script:{position}",
+                    tool_name=name,
+                    args=params,
+                )
+                db.add(row)
+                await db.flush()
+            plugin = await plugin_gate.owner_of(db, "automation", self.automation_id)
+            if plugin is None:
+                return await self._method_done(
+                    db, row, error=("unknown_method", "anemo.api is for a plugin's own scripts.")
+                )
+            calls = int(run.totals.get("tool_calls", 0)) + 1
+            run.totals = {**run.totals, "tool_calls": calls}
+            if calls > self.policy.limits.max_tool_calls:
+                await self._method_done(
+                    db, row, error=("rate_limited", "The tool call limit for this run is reached.")
+                )
+                return Ended("limit", "tool_calls")
+            row.status, row.started_at = "running", datetime.now(UTC)
+            row_id = row.id
+            await db.commit()  # checkpoint, as for a tool call
+            try:
+                result = await plugin_calls.call_from_script(db, plugin, method, params)
+            except plugin_calls.CallError as exc:
+                await db.rollback()  # whatever the method left half done
+                again = await db.get(ToolCall, row_id)
+                assert again is not None
+                return await self._method_done(db, again, error=(exc.code, exc.message))
+            self.checkpoint_time(run)
+            if method in plugin_calls.WRITE_METHODS:
+                await automations.record_change(
+                    db, run.id, {"tool": name, "summary": _method_summary(method, result)}
+                )
+            return await self._method_done(db, row, result=result)
+
+    async def _method_done(
+        self,
+        db: AsyncSession,
+        row: ToolCall,
+        *,
+        result: Any = None,
+        error: tuple[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Record a method's answer on its journal row (the JSON in result_data) and reply."""
+        row.status = "failed" if error else "succeeded"
+        row.is_error = error is not None
+        row.result_data = (
+            {"error": {"code": error[0], "message": error[1]}} if error else {"result": result}
+        )
+        row.result = error[1] if error else json.dumps(result, ensure_ascii=False)[:2000]
+        row.ended_at = datetime.now(UTC)
+        await db.commit()
+        await self._emit("tool.completed", {"tool_call_id": str(row.id), "status": row.status})
+        return _method_answer(row)
+
     # -- think ---------------------------------------------------------------------------
 
     async def _think(self, position: int, message: dict[str, Any]) -> dict[str, Any] | Ended:
@@ -795,6 +904,7 @@ async def snapshot_script(db: AsyncSession, run: Run, automation: Automation) ->
             "limit_fails": True,
         },
         "ancestors": [],
+        "time_zone": await settings_service.user_timezone(db),
         "default_model_id": str(profile.default_model_id)
         if profile and profile.default_model_id
         else None,

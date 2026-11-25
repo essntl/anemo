@@ -125,8 +125,18 @@ data (§6.4).
 Plugins never run code inside Anemo's server processes. Logic runs in two existing places:
 
 - **Scripts** (above): TypeScript in Deno with no network, no files except its own folder,
-  reaching Anemo only through tool calls the worker checks (spec 08). A plugin's UI or
-  command can start its own scripts; agents can run them with `run_script` like any script.
+  reaching Anemo only through requests the worker checks (spec 08). A plugin's script has
+  **the plugin's methods** (§6.3) as `await anemo.api(method, params)`, answered with the
+  same JSON a frame gets and checked the same way, as the plugin; a refusal throws a
+  `PluginError` with the contract's `code`. Not available to scripts: `context.get`,
+  `ui.*`, `tools.call`, `http.fetch` and `scripts.run` (a script has `anemo.call(tool,
+  args)` for tools and `anemo.fetch` for its declared hosts). A method that would need the
+  user's confirmation is refused with `needs_approval` (nobody is looking at a dialog; a
+  tool call through `anemo.call` takes the run's approval path instead). Every method call
+  is a row of the run's journal, so after the run waited for an approval the script gets
+  the recorded answer and nothing is done twice. The script's input carries `timeZone`
+  (the user's). A plugin's UI or command can start its own scripts; agents can run them
+  with `run_script` like any script.
 - **MCP servers** (above): a program in the mcp-host container or a remote server. Their
   tools become agent tools (`mcp__<server>__<tool>`), permission-checked per call.
 
@@ -397,8 +407,9 @@ plugin ships one.
 **Errors.** `code` is one of: `permission_denied`, `not_found`, `invalid_params`,
 `declined` (the user said no to a confirmation), `rate_limited`, `unavailable` (the plugin
 was disabled, the kill switch is on, or the server is unreachable), `failed` (the tool
-returned an error; `message` says why), `unknown_method`; the SDK adds `timeout` when no
-answer comes.
+returned an error; `message` says why), `unknown_method`, `exists` (`documents.create`:
+a document is at that path already), `needs_approval` (scripts only, see §2.3); the frame
+SDK adds `timeout` when no answer comes.
 
 ### 6.4 Rules on every call
 

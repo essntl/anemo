@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "anemo.weekly-review",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Weekly review",
   "description": "Writes a weekly review document from your open tasks and this week's events, and adds a template for writing one by hand.",
   "author": { "name": "Anemo" },
@@ -16,7 +16,7 @@
         "name": "Weekly review",
         "description": "Lists your open tasks and this week's events and writes them into documents/Reviews/Week <ISO week>.md, with empty Wins and Next week sections for you to fill in.",
         "file": "scripts/weekly-review.ts",
-        "tools": ["list_tasks", "list_events", "write_document"]
+        "tools": []
       }
     ],
     "templates": [
