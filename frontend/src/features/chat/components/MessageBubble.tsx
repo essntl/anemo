@@ -287,7 +287,7 @@ export function AssistantMessage({
             {splitAtQuestions(text, questions).map((part, i) =>
               part.kind === 'question'
                 ? <QuestionDivider key={i} mark={part.mark} />
-                : part.text && <Markdown key={i} text={part.text} streaming={live} />,
+                : part.text && <Markdown key={i} text={part.text} streaming={live} fences />,
             )}
             {live && !suspended && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
           </div>
