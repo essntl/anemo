@@ -178,6 +178,16 @@ public sealed class UpdatePartsTests
         Assert.Equal(Text("anemo-desktop-update desktop-v1.9.0\nsums"), UpdateSignature.Message("desktop-v1.9.0", Text("sums")));
     }
 
+    [Fact]
+    public void A_build_without_a_key_checks_checksums_only_and_uses_the_default_repository()
+    {
+        // The tests are built like a development build: Directory.Build.props's default repository, no key.
+        var options = UpdateOptions.FromBuild(typeof(UpdatePartsTests).Assembly);
+
+        Assert.Equal("essntl/anemo", options.Repository);
+        Assert.Null(options.PublicKey);
+    }
+
     [Theory]
     [InlineData("essntl/anemo", true)]
     [InlineData("some-one/a.repo_name", true)]

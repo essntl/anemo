@@ -552,6 +552,26 @@
                                         </StackPanel>
                                     </DockPanel>
                                 </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="Updates" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="download" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="UpdateSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Update automatically" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Update automatically" />
+                                                <TextBlock Style="{StaticResource Help}" Text="New versions come from Anemo’s releases on GitHub and are checked before they are kept. One is installed when you quit, never while the agent is working." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock x:Name="UpdateStatus" Style="{StaticResource Help}" Margin="44,12,0,0" />
+                                        <StackPanel Orientation="Horizontal" Margin="44,10,0,0">
+                                            <Button x:Name="CheckNowButton" Style="{StaticResource Button}" Content="Check now" />
+                                            <Button x:Name="RestartToUpdateButton" Style="{StaticResource Primary}" Content="Restart to update" Margin="8,0,0,0" Visibility="Collapsed" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </ContentControl>
                             </StackPanel>
 
                             <!-- Claude Code -->

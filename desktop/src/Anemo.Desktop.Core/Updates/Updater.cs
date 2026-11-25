@@ -58,6 +58,21 @@ public sealed class UpdateOptions
 
     /// <summary>How often the loop looks at the clock (and, while waiting to restart, whether the agent is done).</summary>
     public TimeSpan Tick { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>The repository and key compiled into the app (Directory.Build.props, from release.yml).</summary>
+    public static UpdateOptions FromBuild(System.Reflection.Assembly app)
+    {
+        string? Read(string key) => app.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+            .Cast<System.Reflection.AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => a.Key == key)?.Value is { Length: > 0 } value ? value.Trim() : null;
+
+        var repository = Read("AnemoUpdateRepository");
+        return new UpdateOptions
+        {
+            Repository = repository is not null && GitHubReleaseFeed.IsRepository(repository) ? repository : new UpdateOptions().Repository,
+            PublicKey = Read("AnemoUpdatePublicKey"),
+        };
+    }
 }
 
 /// <summary>
