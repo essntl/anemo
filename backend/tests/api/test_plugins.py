@@ -898,7 +898,8 @@ async def test_documents(authed):
     r = await call(authed, "artem.docs", "documents.get", {"id": doc["id"]})
     assert r.json()["result"]["markdown"].endswith("Changed")
     r = await call(authed, "artem.docs", "documents.list")
-    assert [d["id"] for d in r.json()["result"]["documents"]] == [doc["id"]]
+    # Other tests' documents may be in the workspace too (the full suite shares it).
+    assert doc["id"] in [d["id"] for d in r.json()["result"]["documents"]]
 
 
 async def test_switched_off_scripts_and_huge_params(authed):
