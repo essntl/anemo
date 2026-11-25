@@ -1,5 +1,5 @@
 /**
- * Home: a greeting and a grid of widgets (focus, music, today, daily note, tasks, …). The layout
+ * Home: a greeting and a grid of widgets (focus, music, today, daily note, tasks, the task board, …). The layout
  * is stored on the server, one for phones and one for wider screens; "Edit layout"
  * (or E) lets you move, resize, hide and add widgets. Every widget follows the
  * project switcher.
@@ -28,6 +28,7 @@ import { DocumentsWidget } from './widgets/DocumentsWidget'
 import { FocusWidget } from './widgets/FocusWidget'
 import { MusicWidget } from './widgets/MusicWidget'
 import { NeedsYouWidget } from './widgets/NeedsYouWidget'
+import { TaskBoardWidget } from './widgets/TaskBoardWidget'
 import { TasksWidget } from './widgets/TasksWidget'
 import { TodayWidget } from './widgets/TodayWidget'
 import { UpcomingWidget } from './widgets/UpcomingWidget'
@@ -73,6 +74,7 @@ export function HomePage() {
       case 'ask': return <AskWidget />
       case 'upcoming': return <UpcomingWidget item={item} />
       case 'needs': return <NeedsYouWidget item={item} onPin={(pinned) => update((l) => patchWidget(l, 'needs', { pinned }))} />
+      case 'board': return <TaskBoardWidget item={item} onOptions={(options) => update((l) => patchWidget(l, 'board', { options }))} />
       case 'briefing':
         return <BriefingWidget item={item} onChoose={(id) => update((l) => patchWidget(l, 'briefing', { options: { ...item.options, automation_id: id } }))} />
     }

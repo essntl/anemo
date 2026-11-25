@@ -10,7 +10,7 @@
  */
 import { msg } from '@/lib/i18n'
 
-export const WIDGET_IDS = ['focus', 'today', 'daily', 'music', 'needs', 'week', 'tasks', 'ask', 'documents', 'upcoming', 'briefing'] as const
+export const WIDGET_IDS = ['focus', 'today', 'daily', 'music', 'needs', 'week', 'tasks', 'ask', 'documents', 'upcoming', 'briefing', 'board'] as const
 export type WidgetId = (typeof WIDGET_IDS)[number]
 
 export interface WidgetLayout {
@@ -39,6 +39,7 @@ export const WIDGETS: Record<WidgetId, { name: string; path: string }> = {
   documents: { name: msg('Recent documents'), path: '/documents' },
   upcoming: { name: msg('Upcoming'), path: '/calendar' },
   briefing: { name: msg('Briefing'), path: '/automations' },
+  board: { name: msg('Task board'), path: '/tasks?view=board' },
 }
 
 /** The pages a widget shows something of: it leaves Home once all of them are turned off (Settings > Pages). */
@@ -47,6 +48,7 @@ const WIDGET_PAGES: Partial<Record<WidgetId, string[]>> = {
   week: ['focus'],
   music: ['music'],
   tasks: ['tasks'],
+  board: ['tasks'],
   today: ['tasks', 'calendar'],
   upcoming: ['tasks', 'calendar'],
   documents: ['documents'],
@@ -71,6 +73,7 @@ export const DEFAULT_LAYOUT: WidgetLayout[] = [
   { id: 'tasks', w: 1, h: 1 },
   { id: 'upcoming', w: 1, h: 1 },
   { id: 'documents', w: 1, h: 1 },
+  { id: 'board', w: 3, h: 2 },
   { id: 'briefing', w: 1, h: 1, hidden: true },
 ]
 
