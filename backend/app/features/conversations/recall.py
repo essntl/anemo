@@ -189,7 +189,7 @@ async def search(
         .where(Conversation.id.in_(order))
     )
     chats = {conv.id: (conv, name) for conv, name in rows.all()}
-    await _fill_roles(db, found)
+    await _fill_roles(db, {cid: found[cid] for cid in order if cid in found})
     return [
         ChatHit(
             conversation=chats[cid][0],
