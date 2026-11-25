@@ -69,6 +69,8 @@ describe('PluginFrame', () => {
       locale: 'en',
     })
     expect(message.theme).toMatchObject({ mode: expect.any(String), vars: expect.any(Object) })
+    // The user's time zone: the browser's while Settings > General isn't in the cache.
+    expect(message.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone)
     expect(transfer).toHaveLength(1)
     expect(transfer[0]).toBeInstanceOf(MessagePort)
     transfer[0].close()

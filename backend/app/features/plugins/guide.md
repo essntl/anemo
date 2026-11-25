@@ -175,9 +175,9 @@ user can see and change them in their usual place.
 | --- | --- |
 | `properties` | `type`: `select multi_select text date number checkbox`; `appliesTo`: any of `document task event`. If the `key` exists with the same type the plugin uses it (and doesn't own it); a different type refuses the install. |
 | `views` | `layout`: `list table board` (default `list`); `query` is a saved view's query and its keys are the saved view's own, **snake_case**: `{types?, text?, properties?, sort?: [{key, desc?}], group_by?, columns?}` (`types` defaults to `["document"]`). Its property keys must exist or be declared above. |
-| `templates` | `kind: "document"` takes a Markdown `file` (front matter allowed); `kind: "task"` takes `task: {title, description?, priority?, tags?, checklist?}`. Used by commands and `templates.apply`. |
+| `templates` | `kind: "document"` takes a Markdown `file` (front matter allowed); `kind: "task"` takes `task: {title, description?, priority?, tags?, checklist?}`. Used by commands and `templates.apply`. In version 1 a template is copied as it is: no placeholders (date, week), and a document template always becomes `documents/<the title as a file name>.md`. A plugin that needs a computed name or text uses a script instead. |
 | `automations` | Created **switched off**; the user turns them on. `schedule` is required: `{rrule?, at?}` (at least one; `rrule` an RFC 5545 rule such as `FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0`, repeating from `at` or from now; `at` an ISO time, for once; in the user's time zone). `tools` is the tool allowlist. |
-| `scripts` | TypeScript for Anemo's Deno sandbox (no network, no files); it acts only through tool calls. Its `tools` and `hosts` must be covered by the plugin's permissions (section 7). `schedule` is `"manual"` (the default: started by a command, the plugin's UI or the user) or `{rrule?, at?}` as for automations. `thinkTools` lists tools it may use while thinking. `secrets` are names; the user sets the values after install. |
+| `scripts` | TypeScript for Anemo's Deno sandbox (no network, no files); it acts only through tool calls. Its `tools` and `hosts` must be covered by the plugin's permissions (section 7). `schedule` is `"manual"` (the default: started by a command, the plugin's UI or the user) or `{rrule?, at?}` as for automations. `thinkTools` lists tools it may use while thinking. `secrets` are names; the user sets the values after install. A script runs as an automation of the user's, so **the user's agent permission levels still apply to its calls** (Settings → Agent permissions; e.g. "Edit documents" is "Always ask" by default, so a script that writes a document waits for approval unless the user changes that). Approving the plugin decides what the script *may* call; the levels decide whether each call asks. Tool results reach a script as the text written for models (`content`); don't rely on its exact wording for logic you can't do without. |
 | `mcpServers` | `transport`: `http`, `sse` (the URL's host needs a `network:` permission) or `stdio` (`command`, `args`; runs in the mcp-host container and is reviewed as critical). Header and env values are set by the user. Every tool of a plugin's server asks each time until the user changes that. |
 | `profiles` | Name, description, instructions, optional `icon` and `skills` (of this plugin). No permission levels or limits: those stay the user's. |
 | `skills` | `file` is the Markdown instructions; the slug is the `id` (an existing slug refuses the install). |
@@ -234,10 +234,11 @@ package (a small library can be copied in as a `.js` file).
 The SDK is the global `window.anemo`:
 
 ```js
-const { plugin, slot, ui, context, theme, locale, preview } = await anemo.ready
+const { plugin, slot, ui, context, theme, locale, timeZone, preview } = await anemo.ready
 // plugin: {id, version}; slot: "object.panel" | "page" | "settings" | "chat.block"
 // ui: the ui item's id; context: see section 4; theme: section 9
-// locale: "en" | "uk" | "ru"; preview: true while the user previews an unapproved version
+// locale: "en" | "uk" | "ru"; timeZone: the user's IANA zone (Settings > General), use it
+// for "today" so you ask the server for the same day it means; preview: true while the user previews an unapproved version
 
 const result = await anemo.call('tasks.list', { status: 'todo' })   // any method of section 6
 anemo.on('context.changed', (ctx) => render(ctx))                    // events, below
@@ -245,6 +246,11 @@ anemo.on('context.changed', (ctx) => render(ctx))                    // events, 
 const stop = anemo.on('theme.changed', (theme) => {})   // anemo.on returns a function that stops listening
 
 anemo.ui.resize(320)                       // = anemo.call('ui.resize', {height: 320})
+
+// Fit a panel to its content, growing and shrinking. Measure the body, not
+// document.documentElement.scrollHeight: that is never less than the frame's own height,
+// so a panel measured that way can grow but never shrink.
+new ResizeObserver(() => anemo.ui.resize(Math.ceil(document.body.getBoundingClientRect().height))).observe(document.body)
 anemo.ui.toast('Saved', 'success')         // = anemo.call('ui.toast', {message, tone})
 anemo.ui.open('document', id)              // = anemo.call('ui.open', {type, id})
 

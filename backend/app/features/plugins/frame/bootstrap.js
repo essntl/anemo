@@ -137,7 +137,7 @@
   }
 
   var anemo = Object.freeze({
-    /** Resolves with the init data: { plugin, slot, ui, context, theme, locale, preview }. */
+    /** Resolves with the init data: { plugin, slot, ui, context, theme, locale, timeZone, preview }. */
     ready: ready,
     call: call,
     on: on,
@@ -338,6 +338,8 @@
       context: data.context,
       theme: data.theme,
       locale: data.locale,
+      // The user's IANA time zone (Settings > General): "today" as Anemo's server means it.
+      timeZone: data.timeZone,
       preview: data.preview === true,
     }
     // The plugin's scripts see `anemo.ready` resolved as soon as they run.

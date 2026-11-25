@@ -18,6 +18,7 @@
 const $ = (id) => document.getElementById(id)
 
 let locale = 'en'
+let timeZone // the user's time zone from Anemo (init.timeZone); the browser's if missing
 let today = '' // YYYY-MM-DD of the day on the board
 let events = []
 let tasks = []
@@ -49,6 +50,17 @@ function isoDay(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+/** Today as YYYY-MM-DD in the user's Anemo time zone, so the board asks the server for
+ * the same day the server calls "today" (the browser's clock may be elsewhere). The
+ * en-CA format happens to be YYYY-MM-DD. */
+function todayInZone() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  } catch {
+    return isoDay(new Date()) // an unknown zone name: fall back to the browser's day
+  }
+}
+
 /** "YYYY-MM-DD" as a local Date at midnight (new Date("YYYY-MM-DD") would be UTC). */
 function fromIsoDay(day) {
   const [y, m, d] = day.split('-').map(Number)
@@ -73,8 +85,8 @@ function plural(n, one, many) {
 // ---- Loading ----------------------------------------------------------------------------
 
 async function load() {
-  today = isoDay(new Date())
-  $('day').textContent = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
+  today = todayInZone()
+  $('day').textContent = fromIsoDay(today).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
   // The three reads don't depend on each other: ask for them at once.
   const [eventsResult, tasksResult, projectsResult] = await Promise.allSettled([
     anemo.call('events.list', { from: today, to: today }),
@@ -261,5 +273,6 @@ document.addEventListener('visibilitychange', () => {
 
 anemo.ready.then((init) => {
   locale = init.locale || 'en'
+  timeZone = init.timeZone || undefined
   load()
 })

@@ -27,6 +27,7 @@ import { toast } from '@/components/ui/toast'
 import { documentLink, eventLink, taskLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { currentLocale, t } from '@/lib/i18n'
+import { settingsKey } from '@/features/settings/api'
 import { callPlugin, fetchFrameBundle } from '../api'
 import type { Slot } from '../types'
 import { clampHeight, PluginChannel } from './channel'
@@ -154,6 +155,7 @@ export function PluginFrame(props: PluginFrameProps) {
         context: latest.current.context,
         theme: currentTheme(),
         locale: currentLocale(),
+        timeZone: userTimeZone(qc.getQueryData(settingsKey)),
         preview,
         files,
       }
@@ -246,4 +248,14 @@ export function PluginFrame(props: PluginFrameProps) {
       )}
     </div>
   )
+}
+
+/**
+ * The user's time zone (Settings > General), so a plugin's "today" is the same day the
+ * server means; the browser's own zone while the settings aren't loaded. Read from the
+ * query cache only: a frame shouldn't wait for, or cause, a settings request.
+ */
+function userTimeZone(settings: unknown): string {
+  const zone = (settings as { general?: { timezone?: string } } | undefined)?.general?.timezone
+  return zone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 }

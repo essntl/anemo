@@ -45,6 +45,7 @@ word-count/
 | At most **500 files**, **5 MB** unpacked, **1 MB** per file, paths ≤ 200 characters | Keeps review possible and storage bounded; a plugin is small glue, not an app bundle with images. |
 | Paths are relative, `/`-separated, without `..`, `.` segments, backslashes, a leading `/`, or names starting with `.` | The same path rules as the workspace; no file can land outside the plugin's folder. |
 | No symlinks, devices or empty directories; a zip may wrap everything in one top-level folder (it is removed) | Zips made by "compress folder" on any OS work. |
+| From Git, the plugin is the repository's root; dot-files and dot-folders (`.git`, `.github`, `.gitignore`) are skipped, not refused | A repository naturally has them, and they are never part of the plugin. |
 | Allowed file types: `.json .md .txt .html .css .js .mjs .ts .png .webp .woff2` | Text files can be reviewed and diffed; the only binaries are pictures and fonts, checked by their content like appearance uploads. No `.svg` (it can carry script), no executables, no `node_modules`. |
 | Text files are UTF-8 | So diffs and reviews are exact. |
 
@@ -80,7 +81,7 @@ by a view) must resolve inside the package.
 
 - `id`: `^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$`, 3–64 characters, at least two dot
   separated parts, e.g. `artem.today-board`. The first part names the author; `anemo.` is
-  reserved for plugins shipped with Anemo. The id is how Anemo recognises an update of the
+  reserved for plugins shipped with Anemo (refused from any other source). The id is how Anemo recognises an update of the
   same plugin, how data is attributed (`plugin:<id>@<version>`) and later how a marketplace
   lists it. It never changes; a renamed plugin keeps its id.
 - `version`: semver `MAJOR.MINOR.PATCH` with an optional `-prerelease`. A package with the
@@ -99,10 +100,10 @@ never gets a handle to edit them at run time except through its permissions.
 | Key | Item | Becomes | Notes |
 | --- | --- | --- | --- |
 | `properties` | `{id, key, label, type, appliesTo, options?}` | a property definition | `type` and `appliesTo` as in Settings → Properties (`select multi_select text date number checkbox`; `document task event`). If the `key` already exists with the **same type**, the plugin uses it and doesn't own it (it is not removed on uninstall); a different type refuses the install. |
-| `views` | `{id, name, layout, query}` | a saved view | `layout`: `list table board`; `query` is the saved-view query (types, text, properties, sort, group_by, columns); its property keys must exist or be declared above. |
-| `templates` | `{id, kind, title, file?, task?}` | a template, used by commands (`newFromTemplate`) | `kind: "document"` takes a Markdown `file` (frontmatter allowed); `kind: "task"` takes `task: {title, description?, priority?, tags?, checklist?}`. |
-| `automations` | `{id, name, prompt, schedule, tools?}` | an agent automation, **created switched off** | `schedule` as `create_schedule` takes it; `tools` is its tool allowlist. It runs as any automation with the user's permission levels; the user switches it on in Automations. |
-| `scripts` | `{id, name, description, file, tools, hosts?, secrets?, thinkTools?, schedule?}` | a script automation (spec 08) | The `.ts` file is its code; it is approved together with the plugin version (same review, no second approval) and runs in the existing Deno sandbox. Its `tools` and `hosts` must be covered by the plugin's permissions (§4.3). `schedule` defaults to `manual` (started by a command, the plugin's UI or the user). Secret values are set by the user after install, never shipped. |
+| `views` | `{id, name, layout, query}` | a saved view | `layout`: `list table board`; `query` is the saved-view query with its own snake_case keys (`types text properties sort group_by columns`); its property keys must exist or be declared above. |
+| `templates` | `{id, kind, title, file?, task?}` | a template, used by commands (`newFromTemplate`) and `templates.apply` | `kind: "document"` takes a Markdown `file` (frontmatter allowed); `kind: "task"` takes `task: {title, description?, priority?, tags?, checklist?}`. Copied as it is (no placeholders yet); a document template becomes `documents/<title as a file name>.md`. |
+| `automations` | `{id, name, prompt, schedule, tools?}` | an agent automation, **created switched off** | `schedule` is `{rrule?, at?}` (at least one; the user's time zone), as `create_schedule` takes it; `tools` is its tool allowlist. It runs as any automation with the user's permission levels; the user switches it on in Automations. |
+| `scripts` | `{id, name, description, file, tools, hosts?, secrets?, thinkTools?, schedule?}` | a script automation (spec 08) | The `.ts` file is its code; it is approved together with the plugin version (same review, no second approval) and runs in the existing Deno sandbox. Its `tools` and `hosts` must be covered by the plugin's permissions (§4.3). `schedule` is `"manual"` (the default: started by a command, the plugin's UI or the user) or `{rrule?, at?}`; `thinkTools` lists the tools a `think` step may use. Secret values are set by the user after install, never shipped. |
 | `mcpServers` | `{id, name, transport, url?, command?, args?, headerNames?, envNames?}` | an MCP server | `http`/`sse`: the URL's host must be in a `network:` permission. `stdio`: runs in the mcp-host container. Header/env values are set by the user after install. Every tool of a plugin's server is **always ask** until the user changes that tool in Settings → MCP. |
 | `profiles` | `{id, name, description, instructions, icon?, skills?}` | an agent profile | **No permission levels, limits or plan-review settings**: those stay the user's; a plugin profile uses the defaults. `skills` names skills of the same plugin. |
 | `skills` | `{id, name, description, file, icon?, hint?, userInvocable?, modelInvocable?}` | a skill (slash command) | `file` is the Markdown instructions. The slug is the `id`; an existing slug refuses the install. |
@@ -218,9 +219,11 @@ highest risk of its tools, an automation is medium (it is created switched off).
 
 ### 4.3 What each permission maps to on the server
 
-Every call a plugin makes is carried out as an existing **agent tool** call, through the
-tool's own `actions()` and the policy engine, with the plugin as the actor. The permission
-is what makes a tool allowed for that plugin:
+Every call a plugin makes is checked as an existing **agent tool** call: the tool's own
+`actions()` go through the policy engine, with the plugin as the actor. Writes then run
+the tool itself; reads, once allowed, read the same data the tool would and return it as
+JSON (a tool's own result is text written for a model). The permission is what makes a
+tool allowed for that plugin:
 
 | Permission | Tools it covers (for scripts' `tools` too) |
 | --- | --- |
@@ -230,18 +233,21 @@ is what makes a tool allowed for that plugin:
 | `documents:write` | `write_document`, `edit_document`, `set_document_properties` |
 | `events:read` | `list_events`, `get_event` |
 | `events:write` | `create_event`, `update_event`, `delete_event` |
-| `projects:read` | `list_projects` |
+| `projects:read` | `list_projects` (also covered by `tasks:read`: tasks belong to projects) |
 | `notifications:send` | `send_notification` |
 | `network:<host>` | `http_request`, `read_web_page` (to that host only) |
 | `tools:<name>` | `<name>` |
 
 The policy a plugin call is evaluated with: **allow** what the approved permissions cover,
-**ask** for critical capabilities, **deny** everything else, plus Anemo's fixed rules (paths
+unless the tool's own risk rules call the action dangerous (e.g. `delete_task`); **ask**
+for those and for critical capabilities; **deny** everything else; plus Anemo's fixed rules (paths
 outside the workspace, settings and secrets). The user's *agent* permission levels don't
 apply to plugin UI calls: they are about what models may do, and a plugin's grants were
 decided by the user at review. A plugin **script** runs as a script automation and so goes
 through the script path of spec 08 (its tool list, its hosts, the automation's permission
-levels and `on_ask`), on top of these coverage rules.
+levels and `on_ask`), on top of these coverage rules: approving the plugin decides what
+its script *may* call, and the user's levels decide whether each call asks first (with the
+defaults, a script that edits documents waits for approval each time).
 
 ## 5. Lifecycle
 
@@ -279,7 +285,7 @@ match their hash; the plugin is stopped and the message shown) and `made_by_assi
 | Enable / disable | Only a plugin with an approved version can be enabled. Disabled: no frame is shown, no call is answered, its commands and pages are hidden, its scripts and automations don't start (they are switched off and back on with it), its MCP servers are switched off. Its data stays. |
 | Update | Like install, for the same `id` and a higher `version`: a new `pending` version. Same rules for every source; for an upload in the app the review screen is the next step, so it's one flow. |
 | Assistant changes | Every change an assistant saves is a new `pending` version (consecutive unapproved changes replace the pending version rather than piling up). It never changes the approved version, and it never enables, approves or grants. |
-| Uninstall | Choice: **keep its data** (the objects it created stay as the user's: properties, views, automations, scripts (switched off), profiles, skills; tasks, documents and events it wrote stay) or **remove its data** (the objects it registered are deleted; tasks, documents and events it created go to the trash; its storage is deleted). The confirmation lists what each choice affects. Files and versions are deleted either way. |
+| Uninstall | Choice: **keep its data** (the objects it created stay as the user's: properties, views, automations, scripts (switched off), profiles, skills; tasks, documents and events it wrote stay) or **remove its data** (the objects it registered are deleted; an automation is switched off at once and removed with its run chats by a background job; tasks, documents and events it created go to the trash; its storage is deleted). The confirmation lists what each choice affects. Files and versions are deleted either way. |
 | Kill switch | One switch (`plugins.disabled_all`) that the host and the server both check before anything else: no frames, no calls, no commands, scripts and plugin MCP tools refused. It doesn't change each plugin's own switch, so turning it off restores the previous state. |
 
 ## 6. The host ⇄ plugin message API
@@ -312,7 +318,9 @@ Each UI contribution is shown in an `<iframe>` that Anemo creates:
 2. The host checks that `event.source` is the `contentWindow` of the frame it made (the
    origin is `"null"` for every sandboxed frame, so the source is what identifies it), then
    transfers a `MessagePort` with the `init` message:
-   `{"anemo": 1, "type": "init", "plugin": {"id", "version"}, "slot", "ui": "<ui id>", "context": {…}, "theme": {…}, "locale": "en", "preview": false, "files": {…}}`.
+   `{"anemo": 1, "type": "init", "plugin": {"id", "version"}, "slot", "ui": "<ui id>", "context": {…}, "theme": {…}, "locale": "en", "timeZone": "Europe/Oslo", "preview": false, "files": {…}}`.
+   `timeZone` is the user's (Settings → General), so a plugin asks for the same "today"
+   the server means.
 3. From then on **everything goes over that port**. If the frame's document is replaced
    (it navigated), the new document doesn't have the port; the host also notices the second
    `load` event, removes the frame and reports it on the plugin's page.
@@ -342,18 +350,18 @@ anemo.ui.resize(320)                                       // short forms for th
 
 | Method | Params → result | Needs |
 | --- | --- | --- |
-| `context.get` | `{}` → the slot's `context` | – |
+| `context.get` | `{}` → the slot's `context` (answered by the host, as all `ui.*`) | – |
 | `storage.get` / `storage.set` / `storage.delete` / `storage.list` | `{key}` / `{key, value}` / `{key}` / `{prefix?}` → value / `{}` / `{}` / `{keys}` | – (own storage: JSON values, keys ≤ 100 chars, 1 MB per plugin in total) |
-| `tasks.list` | `{status?, projectId?, due?, query?, limit?}` → `{tasks: [Task]}` | `tasks:read` |
+| `tasks.list` | `{status?, projectId?, due?, query?, limit?}` → `{tasks: [Task]}` (no `status`: the open ones; `"all"`: every one; `due`: due on or before that date) | `tasks:read` |
 | `tasks.get` | `{id}` → `Task` | `tasks:read` |
-| `tasks.create` / `tasks.update` | `{title, …}` / `{id, …changes}` → `Task` | `tasks:write` |
+| `tasks.create` / `tasks.update` | `{title, dueDate?, dueTime?, …}` / `{id, …changes}` → `Task` | `tasks:write` |
 | `documents.list` / `documents.search` | `{folder?, projectId?, limit?}` / `{query, limit?}` → `{documents: [DocumentSummary]}` | `documents:read` |
 | `documents.get` | `{id}` → `Document` (with `markdown`) | `documents:read` |
 | `documents.create` / `documents.update` | `{path, markdown}` / `{id, markdown}` → `DocumentSummary` | `documents:write` |
-| `events.list` | `{from, to}` → `{events: [Event]}` (recurring ones expanded) | `events:read` |
+| `events.list` | `{from, to}` (dates, `to` included, at most a year apart) → `{events: [Event]}` (recurring ones expanded) | `events:read` |
 | `events.get` | `{id}` → `Event` | `events:read` |
 | `events.create` / `events.update` | `{title, start, end, allDay?, …}` / `{id, …changes}` → `Event` | `events:write` |
-| `projects.list` | `{}` → `{projects: [{id, name, color}]}` | `projects:read` |
+| `projects.list` | `{}` → `{projects: [{id, name, color}]}` | `projects:read` or `tasks:read` |
 | `notifications.send` | `{title, body?}` → `{}` | `notifications:send` |
 | `http.fetch` | `{url, method?, headers?, body?}` → `{status, headers, body}` (text, ≤ 1 MB) | `network:<host of url>` |
 | `tools.call` | `{name, args}` → `{content, data?, isError}` | `tools:<name>` |
@@ -365,8 +373,10 @@ anemo.ui.resize(320)                                       // short forms for th
 
 The object shapes (`Task`, `DocumentSummary`, `Document`, `Event`) are plain JSON with
 **camelCase** fields, ids as strings, times as ISO 8601; they are defined in the authoring
-guide (`backend/app/features/plugins/guide.md`) and are **not** the internal API's models
-(so the internal API can change). Fields are only ever added to them.
+guide (`backend/app/features/plugins/guide.md`, which a test checks against the code) and
+are **not** the internal API's models (so the internal API can change). Fields are only
+ever added to them. Unknown params are refused (`invalid_params`), so a typo isn't
+silently ignored.
 
 **Events** (host → plugin): `context.changed` (the panel's object or page params changed),
 `theme.changed` (light/dark, accent, density), `object.changed` (`{type, id}`: the object the
@@ -375,13 +385,17 @@ panel shows was changed elsewhere; re-read it).
 **Theme.** `init.theme` is `{mode, density, vars}`; `vars` are the values of Anemo's colour,
 radius, font and density tokens (`--accent`, `--surface`, `--text`, `--muted`, `--border`,
 `--card-x`, `--font-ui`…). The bootstrap sets them on the frame's `:root` and adds a small
-base stylesheet (body font and colour, buttons, inputs, `.card`, `.muted`) so a plugin looks
-native with no work. A plugin may style itself on top.
+base stylesheet (body font and colour, inputs, `button` with `.primary .ghost .danger
+.small`, and `.card .muted .subtle .small .num .stack .row .list .badge`) so a plugin
+looks native with no work. A plugin may style itself on top. Anemo's own web fonts can't
+load in the frame (fonts must be `data:`/`blob:`), so text uses the system font unless the
+plugin ships one.
 
 **Errors.** `code` is one of: `permission_denied`, `not_found`, `invalid_params`,
 `declined` (the user said no to a confirmation), `rate_limited`, `unavailable` (the plugin
 was disabled, the kill switch is on, or the server is unreachable), `failed` (the tool
-returned an error; `message` says why), `unknown_method`.
+returned an error; `message` says why), `unknown_method`; the SDK adds `timeout` when no
+answer comes.
 
 ### 6.4 Rules on every call
 
@@ -394,7 +408,7 @@ returned an error; `message` says why), `unknown_method`.
    `plugin:<id>@<version>`**. That reference is stored as `created_by`/`updated_by` on what
    it writes and shown as "the plugin Word count".
 3. **Ask → the user confirms in Anemo's page.** A call that needs approval (critical
-   capabilities; anything a tool's own risk rules make "ask") answers the host with
+   capabilities; anything a tool's own risk rules call dangerous) answers the host with
    `confirm_required` and a summary; the host shows Anemo's own dialog (never inside the
    frame), with the plugin's name and icon, what will happen, and Allow / Deny. Allow sends
    the call again with a one-time token bound to that exact call (2 minutes). The token
@@ -462,6 +476,32 @@ translated text per `kind` (and falls back to the server's for a kind it doesn't
 `PluginDiffOut`: `{from, to, manifest: {before, after}, permissions: {added, removed, kept},
 files: [{path, status: "added"|"removed"|"changed"|"same", before?, after?}]}` (text only;
 binary files as `{status, sha256}`).
+
+As built (phase 2), in addition to the above:
+
+- The three install routes answer **201**. Approving takes `PluginApproveIn {hash, enable}`.
+  `POST /{plugin}/chat` answers 201 `PluginBuildChatOut {conversation_id}` and takes an
+  optional body `{message}` (≤ 4000 characters: the user's request for the assistant).
+- `PluginContributionsOut` is `{ui, commands, fences, themes, templates, disabled_all}`;
+  every item names its plugin as `plugin`. A `ui` item: `{plugin, plugin_name, version,
+  icon_url, id, slot, objects|null, title, icon, entry, height, fence, permissions}` (the
+  approved manifest's permissions, for the host's own check). A command: `{plugin,
+  plugin_name, version, id, title, icon, keywords, action}`.
+- The frame bundle's `scripts` are the ones the entry's HTML names, in its order, then the
+  version's other `.js`/`.mjs` files (so modules can import them); the frame runs only the
+  named ones.
+- `PluginDataOut`: `{resources: [{kind, id, object_type, object_id, label, owned}],
+  storage_keys, storage_bytes, tasks, documents, events}`. `BundledPluginOut`: `{id, name,
+  description, version, installed, permissions}`. `PluginDetailOut.author` is always set.
+- Call errors as HTTP statuses: 409 `confirm_required`, 403 `permission_denied` and
+  `declined`, 404 `not_found` and `unknown_method` (also for `context.get` and `ui.*`, which
+  only the host answers), 400 `invalid_params`, 429 `rate_limited`, 503 `unavailable`,
+  422 `failed`.
+- Only one pending version exists per plugin: a newer upload replaces it. A version must be
+  higher than every stored one, rejected ones included. Rejecting the only version of a
+  plugin that was never approved uninstalls it.
+- `plugin_create` (§8) refuses an id that exists already and points the model to
+  `plugin_update_files`.
 
 ## 8. Internal: agent tools (workstream C)
 

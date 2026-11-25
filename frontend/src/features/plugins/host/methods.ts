@@ -62,7 +62,9 @@ export const METHODS: Record<string, Need> = {
   'events.get': read('events', 'read calendar events'),
   'events.create': write('events', 'create or change calendar events'),
   'events.update': write('events', 'create or change calendar events'),
-  'projects.list': read('projects', 'list projects'),
+  // Tasks belong to projects, so reading tasks covers listing them (contract §4.3), as on
+  // the server.
+  'projects.list': { kind: 'any', permissions: ['projects:read', 'tasks:read'], what: 'list projects' },
   'notifications.send': { kind: 'permission', permission: 'notifications:send', what: 'send notifications' },
   'http.fetch': { kind: 'network' },
   'tools.call': { kind: 'tool' },
