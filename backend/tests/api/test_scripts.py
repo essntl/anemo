@@ -23,7 +23,7 @@ from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta, ToolCall
 from app.runtime import script_sandbox
 from app.runtime.dispatch import execute_run
-from app.runtime.script_run import think_task
+from app.runtime.script_run import think_task, tools_for
 from app.web import safe_http
 from tests.api.test_agent import (
     agent_turn,
@@ -351,6 +351,21 @@ async def test_a_script_cant_list_tools_it_could_never_use(authed):
         )
         assert r.status_code == 400 or r.status_code == 422, r.text
         assert r.json()["error"]["code"] == code
+
+
+async def test_a_script_cant_create_or_change_triggers(authed):
+    await setup(authed)
+    names = ["create_trigger", "update_trigger", "delete_trigger"]
+    for name in names:
+        r = await authed.post(
+            "/api/automations/scripts", json={"name": "X", "code": "x", "tools": [name]}
+        )
+        assert r.status_code == 400 or r.status_code == 422, r.text
+        assert r.json()["error"]["code"] == "script_tool_refused"
+    # And the worker doesn't hand them to a version saved before they were refused.
+    async with get_sessionmaker()() as db:
+        found = await tools_for(db, {}, [*names, "create_task"])
+    assert set(found) == {"create_task"}
 
 
 async def test_code_changed_in_the_database_does_not_run(authed):
