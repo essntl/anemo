@@ -73,6 +73,10 @@ export const METHODS: Record<string, Need> = {
   // Tasks belong to projects, so reading tasks covers listing them (contract §4.3), as on
   // the server.
   'projects.list': { kind: 'any', permissions: ['projects:read', 'tasks:read'], what: 'list projects' },
+  // Projects and git history on the user's computers (read by Anemo Desktop).
+  'code.projects': read('code', 'read projects on your computers'),
+  'code.gitGraph': read('code', 'read git history on your computers'),
+  'code.gitCommit': read('code', 'read git history on your computers'),
   'notifications.send': { kind: 'permission', permission: 'notifications:send', what: 'send notifications' },
   'http.fetch': { kind: 'network' },
   'tools.call': { kind: 'tool' },

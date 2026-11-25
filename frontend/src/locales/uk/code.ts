@@ -8,6 +8,8 @@ const messages: Messages = {
   "Pick a job": "Виберіть запуск",
   "Choose a job on the left to follow what Claude Code does, step by step.": "Виберіть запуск ліворуч, щоб крок за кроком стежити, що робить Claude Code.",
   "All jobs": "Усі запуски",
+  "Job": "Запуск",
+  "What to show of this job": "Що показати для цього запуску",
   "State": "Стан",
   "All states": "Усі стани",
   "Exited without result": "Завершився без результату",

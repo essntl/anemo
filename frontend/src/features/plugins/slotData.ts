@@ -32,12 +32,30 @@ export function panelsFor(all: ContributionUi[], type: ObjectType): Contribution
 /** The id of a document side-panel tab for a plugin panel ("plugin:<plugin id>/<ui id>"). */
 export const documentTabId = (ui: ContributionUi): string => `plugin:${ui.plugin}/${ui.id}`
 
+/** The id of a plugin's tab on the Code page: the same form as a document tab's. */
+export const codeTabId = documentTabId
+
 /** The tabs plugins add beside a document: their ids and names. */
 export function usePluginDocumentTabs(): { id: string; label: string }[] {
   return panelsFor(usePluginUis(), 'document').map((ui) => ({ id: documentTabId(ui), label: ui.title ?? ui.plugin_name }))
 }
 
 export const pluginPageLink = (pluginId: string, uiId: string): string => `/plugins/${encodeURIComponent(pluginId)}/${encodeURIComponent(uiId)}`
+
+/** A plugin's tab on the Code page (`code.panel`): its id, title and icon. */
+export interface PluginCodeTab {
+  id: string
+  label: string
+  icon: string | null
+  iconUrl: string | null
+}
+
+/** The tabs plugins add beside a job on the Code page, in the order they come. */
+export function usePluginCodeTabs(): PluginCodeTab[] {
+  return usePluginUis()
+    .filter((ui) => ui.slot === 'code.panel')
+    .map((ui) => ({ id: codeTabId(ui), label: ui.title ?? ui.plugin_name, icon: ui.icon, iconUrl: ui.icon_url }))
+}
 
 /** The fences to register: those of enabled plugins, none with the kill switch on. */
 export function activeFences(data: PluginContributionsOut | undefined): string[] {

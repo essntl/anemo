@@ -193,8 +193,13 @@ function previewContext(ui: ManifestUi): unknown {
   if (ui.slot === 'page') return { page: ui.id, params: {} }
   if (ui.slot === 'object.panel') return { object: { type: ui.objects?.[0] ?? 'document', id: null } }
   if (ui.slot === 'chat.block') return { block: { lang: ui.fence ?? '', text: '' } }
+  // No job is open here: the panel shows what it does without a project.
+  if (ui.slot === 'code.panel') return { code: { device: null, project: null, jobId: null } }
   return {}
 }
+
+/** The slots whose frame fills its box (no height of its own). */
+const fills = (slot: ManifestUi['slot']): boolean => slot === 'page' || slot === 'settings' || slot === 'code.panel'
 
 const SLOT_NAMES: Record<ManifestUi['slot'], string> = {
   'object.panel': msg('Panel'),
@@ -202,6 +207,7 @@ const SLOT_NAMES: Record<ManifestUi['slot'], string> = {
   settings: msg('Settings'),
   'chat.block': msg('Chat block'),
   overlay: msg('Overlay'),
+  'code.panel': msg('Code page tab'),
 }
 
 /**
@@ -234,11 +240,11 @@ export function PreviewPanel({ plugin, version, killed, onClose }: { plugin: Plu
               {t('An overlay draws over Anemo’s window, so it only runs once this version is approved.')}
             </p>
           ) : (
-            <div className={cn(ui.slot === 'page' || ui.slot === 'settings' ? 'h-[min(60vh,560px)]' : undefined, 'rounded-control border border-border bg-surface p-2')}>
+            <div className={cn(fills(ui.slot) ? 'h-[min(60vh,560px)]' : undefined, 'rounded-control border border-border bg-surface p-2')}>
               <PluginFrame key={`${version.version}/${ui.id}`} preview active={!killed}
                 plugin={{ id: plugin.id, name: plugin.name, iconUrl: plugin.icon_url, version: version.version }}
                 ui={ui.id} slot={ui.slot} permissions={manifestOf(version).permissions} pages={pages}
-                context={previewContext(ui)} height={ui.height} fill={ui.slot === 'page' || ui.slot === 'settings'} />
+                context={previewContext(ui)} height={ui.height} fill={fills(ui.slot)} />
             </div>
           )}
         </div>

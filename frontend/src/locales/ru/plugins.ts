@@ -175,6 +175,9 @@ const messages: Messages = {
   "{name}: this command needs a newer version of Anemo.": "{name}: для этой команды нужна более новая версия Anemo.",
   "{name}: “{title}” needs the plugin’s part that isn’t open right now.": "{name}: для «{title}» нужна часть плагина, которая сейчас не открыта.",
   "Overlay": "Наложение",
+  "Code page tab": "Вкладка на странице «Код»",
+  "Read projects and git history on your computers": "Читать проекты и историю git на ваших компьютерах",
+  "List the projects on your computers that share Claude Code jobs, and read their git history: branches, commits, authors, the names of changed files and whether there are uncommitted changes. Never file contents or diffs.": "Видеть проекты на ваших компьютерах, которые делятся запусками Claude Code, и читать их историю git: ветки, коммиты, авторов, имена изменённых файлов и есть ли незакоммиченные изменения. Никогда не содержимое файлов и не различия (diff).",
   "An overlay draws over Anemo’s window, so it only runs once this version is approved.": "Наложение рисует поверх окна Anemo, поэтому оно запускается только после одобрения этой версии.",
   "Its own pictures: {n} picture, {size} | Its own pictures: {n} pictures, {size}": "Собственные изображения: {n} изображение, {size} | Собственные изображения: {n} изображения, {size} | Собственные изображения: {n} изображений, {size}",
 }

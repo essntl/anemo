@@ -20,7 +20,8 @@
  *
  * Every frame also gets the screen's layout (`layout.changed`) and what the message box and
  * the assistant are doing (`composer.activity`, `assistant.activity`; states only), and is
- * listed in frames.ts so the plugin's other frames hear of its writes. An overlay
+ * listed in frames.ts so the plugin's other frames hear of its writes. A slot's place may add
+ * its own events (`events`: the Code page's `code.job`). An overlay
  * (OverlayHost in overlays.tsx) is drawn without the box, the skeleton or the error card.
  */
 import { type CSSProperties, type ReactNode, type Ref, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -91,6 +92,12 @@ export interface PluginFrameProps {
   frameRef?: Ref<HTMLIFrameElement>
   /** Extra style for the iframe (an overlay's visibility). */
   frameStyle?: CSSProperties
+  /**
+   * Events of the slot's own place (the Code page's `code.job`): called once as the frame
+   * starts with a function that sends one to it (dropped until it has started); returns a
+   * function that stops them.
+   */
+  events?: (emit: (event: string, data: unknown) => void) => () => void
 }
 
 type Status = 'loading' | 'ready' | 'failed' | 'removed'
@@ -198,6 +205,7 @@ export function PluginFrame(props: PluginFrameProps) {
     const stopLayout = watchLayout(emit('layout.changed'))
     const stopComposer = watchComposer((state) => channel.current?.emit('composer.activity', { state }))
     const stopAssistant = watchAssistantActivity((state) => channel.current?.emit('assistant.activity', { state }))
+    const stopEvents = latest.current.events?.((event, data) => channel.current?.emit(event, data)) ?? (() => {})
     return () => {
       cancelled = true
       window.clearTimeout(timer)
@@ -206,6 +214,7 @@ export function PluginFrame(props: PluginFrameProps) {
       stopLayout()
       stopComposer()
       stopAssistant()
+      stopEvents()
       unregister()
       channel.current?.close()
       channel.current = null
