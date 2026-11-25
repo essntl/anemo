@@ -21,13 +21,22 @@ For each event and each enabled trigger of its type:
 
 A firing starts an automation run (automations.start_run, trigger "event") or adds an
 event turn to the chat (wake.py). A trigger with `once` is switched off by its firing.
+
+Each trigger's step runs in a savepoint of its own (`_guarded`): an unexpected error (a
+bug, an automation whose stored schedule no longer parses) drops that one firing, and
+the event is still marked dispatched, so one bad row can't stall the outbox.
+
+One dispatch pass at a time (`_serialise`): two workers' passes would lock the same
+triggers in different orders (each in the order of its own events) and could deadlock.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from functools import partial
+from typing import Any, TypeVar
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
@@ -43,6 +52,12 @@ from app.jobs import queue
 log = logging.getLogger(__name__)
 
 BATCH = 200  # events per pass
+# The pg advisory lock every dispatch transaction takes ("trig"). Serialising the passes
+# is simpler than locking each pass's triggers up front in id order, and costs nothing
+# that matters: a pass is short, and the passes are a few seconds apart at most.
+LOCK_KEY = 0x74726967
+
+T = TypeVar("T")
 
 
 def _now() -> datetime:
@@ -77,9 +92,20 @@ async def _owner_ready(db: AsyncSession, trigger: Trigger) -> bool:
     return automation is not None and automation.enabled
 
 
+async def _serialise(db: AsyncSession) -> None:
+    """Wait for any other dispatch pass to end (held until this transaction ends)."""
+    await db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": LOCK_KEY})
+
+
 async def _busy(db: AsyncSession, trigger: Trigger) -> bool:
     """Its automation's run is working, or its chat is answering."""
     if trigger.automation_id is not None:
+        # The automation's row is locked first, as fire_due and retry_run do: a run that
+        # another transaction is starting for it (its schedule, Run now) is waited for
+        # and seen, not missed.
+        await db.execute(
+            select(Automation.id).where(Automation.id == trigger.automation_id).with_for_update()
+        )
         return await automations.busy_run(db, trigger.automation_id) is not None
     return bool(
         await db.scalar(
@@ -175,12 +201,36 @@ def _wait(
     trigger.pending_count = count
 
 
+async def _guarded(
+    db: AsyncSession,
+    trigger: Trigger,
+    event_id: Any,
+    now: datetime,
+    step: Callable[[], Awaitable[T]],
+) -> T | None:
+    """Run one trigger's step in a savepoint. An unexpected error undoes only that step
+    and drops the firing, with the error's kind as the reason (not its message: that
+    may quote the event's data). Returns the step's result (None after an error)."""
+    try:
+        async with db.begin_nested():
+            return await step()
+    except Exception as exc:  # noqa: BLE001 - one bad trigger never stalls the others
+        error = type(exc).__name__
+        ctx = {"trigger_id": str(trigger.id), "event_id": str(event_id), "error": error}
+        log.warning("trigger step failed", extra={"ctx": ctx})
+        await db.refresh(trigger)  # the savepoint's rollback expired what the step changed
+        _drop(trigger, f"it could not be fired ({error})", now)
+        return None
+
+
 async def _consider(
     db: AsyncSession, trigger: Trigger, event: TriggerEvent, now: datetime, ceiling: int
 ) -> None:
     known = catalogue.get(event.type)
     if _expired(trigger, now) or known is None:
         return
+    if event.created_at < trigger.created_at:
+        return  # it happened before this trigger existed (another one had it stored)
     if known.addressed and (event.data or {}).get("trigger_id") != str(trigger.id):
         return
     if not matching.matches(trigger.filter or {}, event.data or {}):
@@ -232,6 +282,7 @@ async def _triggers_for(db: AsyncSession, event_type: str) -> list[Trigger]:
 async def _dispatch_events(now: datetime) -> int:
     """Match the pending events (oldest first). Returns how many were taken."""
     async with get_sessionmaker()() as db:
+        await _serialise(db)
         taken = list(
             await db.scalars(
                 select(TriggerEvent)
@@ -244,12 +295,14 @@ async def _dispatch_events(now: datetime) -> int:
         if not taken:
             return 0
         settings = await automations.protections(db)
+        ceiling = settings.max_trigger_firings_per_hour
         for event in taken:
             event.dispatched_at = now
             if settings.paused:
                 continue  # "Pause all": nothing fires
             for trigger in await _triggers_for(db, event.type):
-                await _consider(db, trigger, event, now, settings.max_trigger_firings_per_hour)
+                step = partial(_consider, db, trigger, event, now, ceiling)
+                await _guarded(db, trigger, event.id, now, step)
         await db.commit()
     return len(taken)
 
@@ -261,6 +314,8 @@ async def _fire_waiting(now: datetime) -> int:
         settings = await automations.protections(db)
         if settings.paused:
             return 0
+        await _serialise(db)
+        ceiling = settings.max_trigger_firings_per_hour
         waiting = list(
             await db.scalars(
                 select(Trigger)
@@ -273,27 +328,30 @@ async def _fire_waiting(now: datetime) -> int:
             assert trigger.pending_since is not None
             if trigger.pending_since + timedelta(seconds=trigger.debounce_s) > now:
                 continue  # its window is still open
-            event = (
-                await db.get(TriggerEvent, trigger.pending_event_id)
-                if trigger.pending_event_id
-                else None
-            )
-            if (
-                event is None
-                or not trigger.enabled
-                or _expired(trigger, now)
-                or not await _owner_ready(db, trigger)
-            ):
-                _clear_waiting(trigger)
-                continue
-            count = max(trigger.pending_count, 1)
-            if (
-                await _fire(db, trigger, event, count, now, settings.max_trigger_firings_per_hour)
-                == "fired"
-            ):
+            step = partial(_fire_waiting_one, db, trigger, now, ceiling)
+            if await _guarded(db, trigger, trigger.pending_event_id, now, step) == "fired":
                 fired += 1
         await db.commit()
     return fired
+
+
+async def _fire_waiting_one(
+    db: AsyncSession, trigger: Trigger, now: datetime, ceiling: int
+) -> str:
+    """Fire one waiting firing, or forget it when its event is gone or the trigger or its
+    owner is off. Returns fired | waiting | dropped | forgotten."""
+    event = (
+        await db.get(TriggerEvent, trigger.pending_event_id) if trigger.pending_event_id else None
+    )
+    if (
+        event is None
+        or not trigger.enabled
+        or _expired(trigger, now)
+        or not await _owner_ready(db, trigger)
+    ):
+        _clear_waiting(trigger)
+        return "forgotten"
+    return await _fire(db, trigger, event, max(trigger.pending_count, 1), now, ceiling)
 
 
 async def dispatch(now: datetime | None = None) -> int:

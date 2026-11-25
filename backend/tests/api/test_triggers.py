@@ -333,6 +333,82 @@ async def test_a_retry_carries_the_event(authed):
     assert retried.options["event"] == failed.options["event"]
 
 
+async def test_one_failing_trigger_drops_its_firing_and_the_rest_go_on(authed):
+    broken = await automation(authed, name="Broken")
+    bad = await add_trigger(authed, broken["id"])
+    good = await automation(authed, name="Fine")
+    await add_trigger(authed, good["id"])
+    async with get_sessionmaker()() as db:  # a schedule that no longer parses
+        await db.execute(
+            update(Automation)
+            .where(Automation.id == uuid.UUID(broken["id"]))
+            .values(schedule={"kind": "no such kind"})
+        )
+        await db.commit()
+    await authed.post("/api/tasks", json={"title": "x"})
+
+    assert await dispatch.dispatch() == 1
+    assert await runs_of(broken["id"]) == []
+    assert len(await runs_of(good["id"])) == 1
+    row = await trigger_row(bad["id"])
+    assert row.dropped_count == 1 and "ValidationError" in (row.last_drop_reason or "")
+    assert all(e.dispatched_at is not None for e in await stored_events())  # not stuck
+
+
+async def test_an_event_from_before_the_trigger_existed_does_not_fire_it(authed):
+    a = await automation(authed)
+    await add_trigger(authed, a["id"])
+    await authed.post("/api/tasks", json={"title": "before"})
+    b = await automation(authed, name="Later")
+    await add_trigger(authed, b["id"])
+    await dispatch.dispatch()
+    assert len(await runs_of(a["id"])) == 1
+    assert await runs_of(b["id"]) == []
+
+
+async def test_a_run_another_transaction_is_starting_is_waited_for(authed):
+    """No overlapping runs across workers: the automation's row is locked before the
+    busy check, so a run that is being started elsewhere is seen once it commits."""
+    import asyncio
+
+    from app.features.automations import service as automations
+
+    a = await automation(authed)
+    trigger = await add_trigger(authed, a["id"])
+    await authed.post("/api/tasks", json={"title": "x"})
+    async with get_sessionmaker()() as other:  # e.g. its schedule, in another worker
+        row = await other.scalar(
+            select(Automation).where(Automation.id == uuid.UUID(a["id"])).with_for_update()
+        )
+        assert row is not None
+        await automations.start_run(other, row, trigger="schedule")
+        task = asyncio.create_task(dispatch.dispatch())
+        await asyncio.sleep(1)
+        await other.commit()
+    await task
+    (run,) = await runs_of(a["id"])  # only the schedule's: the event's firing waits
+    assert run.options["automation"]["trigger"] == "schedule"
+    assert (await trigger_row(trigger["id"])).pending_since is not None
+
+
+async def test_dispatch_passes_run_one_at_a_time(authed):
+    import asyncio
+
+    from sqlalchemy import text
+
+    a = await automation(authed)
+    await add_trigger(authed, a["id"])
+    await authed.post("/api/tasks", json={"title": "x"})
+    async with get_sessionmaker()() as other:  # another worker's pass, still going
+        await other.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": dispatch.LOCK_KEY})
+        task = asyncio.create_task(dispatch.dispatch())
+        await asyncio.sleep(1)
+        assert not task.done()
+        await other.commit()
+    assert await task == 1
+    assert len(await runs_of(a["id"])) == 1
+
+
 # -- HTTP API ---------------------------------------------------------------------------------
 
 
