@@ -443,6 +443,17 @@ subtasks and what a task waits on. Changes follow the
 *Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
 action, so the default level asks you first.
 
+**Many at once.** An agent can change up to 100 tasks or events in one step ("move
+everything tagged *errands* to Friday", "finish these twelve", "cancel my standups next
+week"): their status, due date, project, tags or priority, an event's time, title or
+location, or moving them to the trash. When the change needs your approval you are asked
+once for the whole batch: the card says what it does ("Change 30 tasks: due → Fri
+2026-11-27") and **Show all 30 items** lists each one by title with what changes on it.
+Each item is changed on its own, with the same rules as a single change, and the agent is
+told which ones worked and which didn't (a task that's gone, an event that would end
+before it starts); one failing doesn't stop the others. The batch shows up in the
+activity log as one entry. See [spec 20](specs/20-bulk-changes.md).
+
 ## Appearance and profile
 
 **Settings → Appearance** changes the look of the whole app at once, and the change is
