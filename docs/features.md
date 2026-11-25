@@ -704,6 +704,17 @@ type has to match. On that page documents and memories are also found by meaning
 when an embedding model is set (Settings → Providers & Models); the quick box
 matches words only, so typing never calls a model.
 
+**Chat recall.** In Agent mode the assistant can search your earlier chats and read
+them ("what did we decide about the website last week?"): it finds them by their
+words and titles, and by meaning when an embedding model is set, then reads the one it
+needs from the matching message on. In a project chat it looks at that project's chats
+unless the request needs more; it never sees the chat it is in or temporary chats, and
+archived chats are found too. What it reads is treated as data, not instructions.
+Settings → Agent Permissions → *Read earlier chats* (default: allowed); automations only
+get it when their tool list names `search_chats` or `read_chat`. With an embedding
+model, the text of your chats is sent to it for this, as documents and memories are
+(docs/specs/18-chat-recall.md).
+
 ## Keyboard shortcuts
 
 Press **?** anywhere (outside a text field) to see every keyboard shortcut: the ones
