@@ -95,7 +95,7 @@ async def devices(db: AsyncSession) -> list[CodeDeviceOut]:
     return [found[i] for i in ids if i in found]
 
 
-async def _computer(
+async def checked_computer(
     db: AsyncSession, device_id: uuid.UUID, *, need: service.Need
 ) -> tuple[Device, relay.Offer]:
     """The device, checked for an action that needs `need` (service.can)."""
@@ -120,7 +120,7 @@ async def _computer(
     return device, offer
 
 
-async def _send(device: Device, action: str, fields: dict[str, Any], timeout_s: float) -> dict:
+async def send_command(device: Device, action: str, fields: dict[str, Any], timeout_s: float) -> dict:
     try:
         return await relay.send(device.id, action, fields, timeout_s=timeout_s)
     except relay.Busy as exc:
@@ -141,8 +141,8 @@ def _text(value: Any, limit: int = MAX_TEXT) -> str:
 
 async def projects(db: AsyncSession, device_id: uuid.UUID) -> CodeProjectsOut:
     """The computer's projects and the owner's GitHub repositories not cloned there."""
-    device, _ = await _computer(db, device_id, need="share")
-    state = await _send(device, "code_projects", {}, PROJECTS_TIMEOUT_S)
+    device, _ = await checked_computer(db, device_id, need="share")
+    state = await send_command(device, "code_projects", {}, PROJECTS_TIMEOUT_S)
     local = [p for p in state.get("projects") or [] if isinstance(p, dict) and p.get("name")]
     remote = [r for r in state.get("remote") or [] if isinstance(r, dict) and r.get("name")]
     note = state.get("note")
@@ -186,7 +186,7 @@ async def start_job(
     runs in, the project then being ignored by the computer; when not given and
     `resume_session` is, the computer's job that had that session. `image_ids`: uploaded
     images to send with the prompt (images.py)."""
-    device, offer = await _computer(db, device_id, need="start")
+    device, offer = await checked_computer(db, device_id, need="start")
     ready = await images.ready(db, image_ids or [])
     if ready and not offer.code_images:
         raise ImagesUnsupported(
@@ -213,7 +213,7 @@ async def start_job(
     if ready:
         fields["images"] = [image.command() for image in ready]
     await db.close()  # nothing is held while the computer answers
-    state = await _send(device, "code_start", fields, START_TIMEOUT_S)
+    state = await send_command(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
     if not isinstance(job_key, str) or not JOB_KEY.match(job_key):
         raise DeviceFailed(f"“{device.name}” started the job, but its answer could not be read.")
@@ -286,9 +286,9 @@ async def cancel_job(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut:
     """Cancel a running job. One that has ended is returned as it is."""
     job = await service.get(db, job_id)
     if job.state not in TERMINAL:
-        device, _ = await _computer(db, job.device_id, need="cancel")
+        device, _ = await checked_computer(db, job.device_id, need="cancel")
         await db.close()
-        state = await _send(device, "code_cancel", {"job_id": job.job_key}, CANCEL_TIMEOUT_S)
+        state = await send_command(device, "code_cancel", {"job_id": job.job_key}, CANCEL_TIMEOUT_S)
         answered = state.get("state")
         if answered in STATES:
             answered_state: State = answered
