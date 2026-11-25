@@ -3,8 +3,9 @@
 Routers in `protected` require a logged-in session for every endpoint.
 Only health checks, the login flow, viewing a share link (a frozen copy the owner
 chose to share, see features/shares/public_router.py) and the one-time approval buttons
-on push notifications (see features/notifications/push_router.py) are reachable
-without one. The browser extension's WebSocket (features/extension/router.py) checks its
+on push notifications (see features/notifications/push_router.py) and the plugin frame
+document (the same static page for every plugin, features/plugins/frame_router.py) are
+reachable without one. The browser extension's WebSocket (features/extension/router.py) checks its
 API token itself, in its first message.
 """
 
@@ -41,6 +42,8 @@ from app.features.notifications.push_router import public_router as push_public_
 from app.features.notifications.push_router import router as push_router
 from app.features.notifications.router import router as notifications_router
 from app.features.permissions_router import router as permissions_router
+from app.features.plugins.frame_router import router as plugin_frame_router
+from app.features.plugins.router import router as plugins_router
 from app.features.profiles.router import router as profiles_router
 from app.features.projects.router import router as projects_router
 from app.features.properties.router import router as properties_router
@@ -71,6 +74,7 @@ api_router.include_router(shares_public_router)  # read-only, by secret link
 api_router.include_router(push_public_router)  # one-time approval buttons, by secret token
 api_router.include_router(extension_router)  # WebSocket; authenticates with an API token
 api_router.include_router(devices_ws_router)  # WebSocket; authenticates with a device's token
+api_router.include_router(plugin_frame_router)  # the plugin frame document: static, no data
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
@@ -119,4 +123,5 @@ protected.include_router(updates_router)
 protected.include_router(properties_router)
 protected.include_router(views_router)
 protected.include_router(voice_router)
+protected.include_router(plugins_router)
 api_router.include_router(protected)

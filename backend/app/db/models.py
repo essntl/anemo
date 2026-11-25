@@ -20,6 +20,7 @@ from app.features.mcp import models as mcp_models
 from app.features.memory import models as memory_models
 from app.features.music import models as music_models
 from app.features.notifications import models as notifications_models
+from app.features.plugins import models as plugins_models
 from app.features.profiles import models as profiles_models
 from app.features.properties import models as properties_models
 from app.features.providers import models as providers_models
@@ -56,6 +57,7 @@ __all__ = [
     "memory_models",
     "music_models",
     "notifications_models",
+    "plugins_models",
     "profiles_models",
     "properties_models",
     "providers_models",

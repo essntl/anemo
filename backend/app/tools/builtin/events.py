@@ -208,7 +208,8 @@ class GetEvent(Tool):
                 return ToolResult(content=f"No event with id {args.id}.", is_error=True)
             tz = await _user_tz(db)
             lines = [_describe(service.base_occurrence(event, event.start_at), tz)]
-            lines.append("Notes:\n" + (event.description.strip() or "(none)"))
+            notes = event.description.strip() or "(none)"
+            lines.append("Notes:\n" + await provenance.plugin_text(db, event.updated_by_ref, notes))
             facts = [f"Times are in {tz}", f"reference {ref_url('event', event.id)}"]
             if event.remind_minutes is not None:
                 facts.append(f"reminder {event.remind_minutes} minutes before")

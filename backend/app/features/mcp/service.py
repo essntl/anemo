@@ -22,6 +22,7 @@ from app.core.errors import Conflict, NotFound
 from app.events import bus
 from app.features.mcp.models import McpServer, McpTool
 from app.features.mcp.schemas import McpServerIn, McpServerOut, McpServerPatch, McpToolOut, _check
+from app.features.plugins import gate
 from app.features.secrets import service as secrets
 from app.jobs import queue
 from app.mcp import client
@@ -253,6 +254,9 @@ async def refresh(server_id: uuid.UUID) -> None:
         if server is None:
             return
         first_time = server.last_connected_at is None
+        # A plugin's server: each of its tools asks until the user changes that tool
+        # (docs/specs/CONTRACTS-plugins.md §2.2).
+        from_plugin = await gate.owner_of(db, "mcp_server", server.id) is not None
         target = await target_for(db, server)
         try:
             found = await client.list_tools(target)
@@ -285,6 +289,7 @@ async def refresh(server_id: uuid.UUID) -> None:
                         schema_hash=digest,
                         # Tools that show up later are looked at before agents rely on them.
                         needs_review=not first_time,
+                        permission="ask" if from_plugin else None,
                     )
                 )
             elif row.schema_hash != digest:
@@ -303,14 +308,21 @@ async def refresh(server_id: uuid.UUID) -> None:
 
 
 async def usable_tools(db: AsyncSession) -> list[tuple[McpServer, McpTool]]:
-    """Enabled tools of enabled servers, in a stable order."""
+    """Enabled tools of enabled servers, in a stable order. A plugin's servers are left
+    out while plugins are switched off (the kill switch) or that plugin is stopped."""
+    blocked = await gate.blocked_objects(db, "mcp_server")
     rows = await db.execute(
         select(McpServer, McpTool)
         .join(McpTool, McpTool.server_id == McpServer.id)
         .where(McpServer.enabled, McpTool.enabled)
         .order_by(McpServer.slug, McpTool.name)
     )
-    return [(server, tool) for server, tool in rows.all()]
+    return [(server, tool) for server, tool in rows.all() if server.id not in blocked]
+
+
+async def plugin_servers(db: AsyncSession) -> set[uuid.UUID]:
+    """The servers a plugin added (their results always reach models as data)."""
+    return await gate.plugin_objects(db, "mcp_server")
 
 
 def policy_rules(tools: list[tuple[McpServer, McpTool]]) -> list[Rule]:

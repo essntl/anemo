@@ -54,6 +54,7 @@ from app.features.conversations.models import ChatMessage, Conversation
 from app.features.documents import service as documents
 from app.features.notifications import service as notifications
 from app.features.notifications.models import NotificationDestination
+from app.features.plugins import gate
 from app.features.profiles.models import AgentProfile
 from app.features.providers.models import Model
 from app.features.runs import service as runs
@@ -519,6 +520,9 @@ async def start_run(
     caller's transaction."""
     if automation.kind == "script" and automation.script_hash is None:
         raise Conflict("Approve the script's code first", code="script_not_approved")
+    if reason := await gate.blocked_reason(db, "automation", automation.id):
+        # A plugin's script or automation: not while plugins or that plugin are off.
+        raise Conflict(reason, code="plugin_unavailable")
     now = now or _now()
     schedule = stored(automation.schedule)
     local = now.astimezone(ZoneInfo(schedule.tz))
@@ -625,6 +629,9 @@ async def fire_due(now: datetime | None = None) -> int:
             if now - scheduled > GRACE:
                 # The app was off at the time. Catching up hours later would surprise.
                 automation.last_status = "missed"
+            elif await gate.blocked_reason(db, "automation", automation.id):
+                # A plugin's, and plugins (or that plugin) are switched off.
+                automation.last_status = "skipped"
             elif await busy_run(db, automation.id) is not None:
                 # The previous run is still going. (One waiting for approval is not.)
                 automation.last_status = "skipped"
