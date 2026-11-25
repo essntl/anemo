@@ -110,7 +110,7 @@ row is filled in by its own pull request.
 | **Event triggers** (in progress) | [16](specs/16-event-triggers.md) | – |
 | **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
 | **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
-| **Activity log with undo** (done) | [19](specs/19-activity-log.md) | #PR |
+| **Activity log with undo** (done) | [19](specs/19-activity-log.md) | #96 |
 | **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
 | **Waiting on a code job** (in progress) | [21](specs/21-code-wait.md) | – |
 | **Files between devices and the workspace** (in progress) | [22](specs/22-device-files.md) | – |
