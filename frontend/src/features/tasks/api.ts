@@ -21,6 +21,8 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   cancelled: msg('Cancelled'),
 }
 export const PRIORITY_LABELS = [msg('No priority'), msg('Low'), msg('Medium'), msg('High')]
+/** The colour of a priority's flag, by priority (0–3). */
+export const PRIORITY_TONE = ['', 'text-muted', 'text-warning', 'text-error']
 
 /** Every task (open and finished); the page filters and groups them. */
 export function useTasks() {
@@ -103,14 +105,39 @@ export function useDeleteTask() {
   })
 }
 
-/** Board: the tasks of one column in their new order. */
+/** Every task with the tasks of one column put in their new order (and moved to its status). */
+export function reorderedTasks(tasks: Task[], status: TaskStatus, orderedIds: string[], now = new Date().toISOString()): Task[] {
+  const position = new Map(orderedIds.map((id, i) => [id, i + 1]))
+  return tasks.map((task) => {
+    const at = position.get(task.id)
+    if (at === undefined) return task
+    if (task.status === status) return { ...task, sort_order: at }
+    return { ...task, status, sort_order: at, completed_at: status === 'done' ? now : null }
+  })
+}
+
+/**
+ * Board: the tasks of one column in their new order. The board shows the move at once;
+ * if the server refuses it, the tasks go back to where they were (the caller says why).
+ */
 export function useReorderTasks() {
+  const qc = useQueryClient()
   const refresh = useRefresh()
+  const key = [...tasksKey, 'all']
   return useMutation({
     mutationFn: async (v: { status: TaskStatus; orderedIds: string[]; subtasks?: 'finish' | 'keep' }) =>
       unwrap(await api.POST('/api/tasks/reorder', {
         body: { status: v.status, ordered_ids: v.orderedIds, subtasks: v.subtasks ?? null },
       })),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: key })
+      const before = qc.getQueryData<Task[]>(key)
+      if (before) qc.setQueryData<Task[]>(key, reorderedTasks(before, v.status, v.orderedIds))
+      return { before }
+    },
+    onError: (_err, _v, context) => {
+      if (context?.before) qc.setQueryData(key, context.before)
+    },
     onSettled: refresh,
   })
 }

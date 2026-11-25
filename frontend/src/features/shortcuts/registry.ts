@@ -32,7 +32,7 @@ export interface Shortcut {
   prefix?: string
 }
 
-export type AreaId = 'everywhere' | 'dictation' | 'search' | 'chat' | 'home' | 'focus' | 'music' | 'files' | 'diagram'
+export type AreaId = 'everywhere' | 'dictation' | 'search' | 'chat' | 'home' | 'board' | 'focus' | 'music' | 'files' | 'diagram'
 
 export interface Area {
   id: AreaId
@@ -47,6 +47,7 @@ export const AREAS: Area[] = [
   { id: 'search', title: msg('Search box'), pages: (p) => p === '/search' },
   { id: 'chat', title: msg('Chat'), pages: (p) => p === '/' || p.startsWith('/c/') || p === '/chats' },
   { id: 'home', title: msg('Home'), pages: (p) => p === '/home' },
+  { id: 'board', title: msg('Boards'), pages: (p) => p === '/home' || p === '/tasks' || p.startsWith('/views/') },
   { id: 'focus', title: msg('Focus'), pages: (p) => p === '/focus' },
   { id: 'music', title: msg('Music'), pages: (p) => p === '/music' },
   { id: 'files', title: msg('Files'), pages: (p) => p === '/files' },
@@ -80,6 +81,11 @@ export const SHORTCUTS = {
   'home.move': { area: 'home', keys: ARROWS.map((k) => ({ ...k, shift: false })), description: msg('While editing: move the focused widget') },
   'home.resize': { area: 'home', keys: ARROWS.map((k) => ({ ...k, shift: true })), description: msg('While editing: make the focused widget wider, narrower, taller or shorter') },
   'home.hide': { area: 'home', keys: [{ key: 'Delete', shift: false }, { key: 'Backspace', shift: false, quiet: true }], description: msg('While editing: hide the focused widget') },
+
+  'board.open': { area: 'board', keys: [{ key: 'Enter' }], description: msg('Open the focused card') },
+  'board.pickUp': { area: 'board', keys: [{ key: ' ' }], description: msg('Pick up the focused card, or put it down where it is') },
+  'board.move': { area: 'board', keys: ARROWS.map((k) => ({ ...k, shift: false })), description: msg('While a card is picked up: move it to another column or place') },
+  'board.cancel': { area: 'board', keys: [{ key: 'Escape' }], description: msg('Put a picked-up card back where it was') },
 
   'focus.toggle': { area: 'focus', keys: [{ key: ' ' }], description: msg('Start or pause the timer') },
   'focus.reset': { area: 'focus', keys: [{ key: 'r' }], description: msg('Reset the timer') },
