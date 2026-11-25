@@ -113,7 +113,7 @@ row is filled in by its own pull request.
 | **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
 | **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
 | **Waiting on a code job** (in progress) | [21](specs/21-code-wait.md) | – |
-| **Files between devices and the workspace.** `device_file_get` / `device_file_put` on trusted computers that switch it on in Anemo Desktop 1.7.0 (Windows and macOS): chunked over the device WebSocket with SHA-256 per chunk and per file on both ends, a temporary file renamed only when complete, the client's folder rule (home or listed folders, links followed, no hidden or system folders), no overwrite unless asked (dangerous on the computer), revertible in the workspace, a size limit in Settings → Devices. | [22](specs/22-device-files.md) | PR_NUMBER |
+| **Files between devices and the workspace.** `device_file_get` / `device_file_put` on trusted computers that switch it on in Anemo Desktop 1.7.0 (Windows and macOS): chunked over the device WebSocket with SHA-256 per chunk and per file on both ends, a temporary file renamed only when complete, the client's folder rule (home or listed folders, links followed, no hidden or system folders), no overwrite unless asked (dangerous on the computer), revertible in the workspace, a size limit in Settings → Devices. | [22](specs/22-device-files.md) | #101 |
 | **Anemo Desktop updates itself** (in progress) | [23](specs/23-desktop-auto-update.md) | – |
 
 ---
