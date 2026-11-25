@@ -23,3 +23,21 @@ export function nameColor(name: string): number {
   for (const ch of name.trim().toLowerCase()) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0
   return hash % LANE_COLORS
 }
+
+/** The width of a lane in the graph, and the space left of the first one (GraphCell.tsx). */
+export const LANE_W = 13
+export const GRAPH_PAD = 10
+/** Lanes drawn at most: a wider graph is cut at the right (the rows stay readable). */
+export const MAX_LANES = 18
+
+/** How wide the graph column is for a graph of `lanes` lanes. */
+export const graphWidth = (lanes: number) => GRAPH_PAD * 2 + (Math.min(Math.max(lanes, 1), MAX_LANES) - 1) * LANE_W
+
+/** A colour of the theme as a pill's text, background and border (RefPills.tsx). */
+export function tinted(color: string, strong = false): { color: string; backgroundColor: string; borderColor: string } {
+  return {
+    color: `color-mix(in oklch, ${color}, var(--text) 38%)`,
+    backgroundColor: `color-mix(in oklch, ${color} ${strong ? 22 : 12}%, transparent)`,
+    borderColor: `color-mix(in oklch, ${color} ${strong ? 55 : 30}%, transparent)`,
+  }
+}

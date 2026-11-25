@@ -65,6 +65,16 @@
   --chart-5: #d6457a;
   --chart-6: #1597a8;
 
+  /* The lines of a git graph (the Code page's Git view), in this order; author avatars too. */
+  --git-lane-1: var(--chart-1);
+  --git-lane-2: var(--chart-2);
+  --git-lane-3: var(--chart-3);
+  --git-lane-4: var(--chart-4);
+  --git-lane-5: var(--chart-5);
+  --git-lane-6: var(--chart-6);
+  --git-lane-7: #b7871a;
+  --git-lane-8: #5d6bd8;
+
   /* A live radio stream (no seeking). */
   --live: var(--error);
 
@@ -108,6 +118,8 @@
   --chart-4: #a78bfa;
   --chart-5: #ef6f9c;
   --chart-6: #33bfcf;
+  --git-lane-7: #e0b84a;
+  --git-lane-8: #8a95f2;
 
   --island-bg: #000000;
   --ring-track: #272c35;

@@ -1,9 +1,11 @@
-/** Which tab the Code page shows over the open job: the thread, or a plugin's (CodePluginTabs.tsx). */
+/** Which tab the Code page shows: the open job's thread, the Git view, or a plugin's (CodePluginTabs.tsx). */
 import { useCallback, useState } from 'react'
 import type { PluginCodeTab } from '@/features/plugins/slotData'
 
 /** The thread's own tab. */
 export const JOB_TAB = 'job'
+/** The Git view (git/GitView.tsx): Anemo's own, also open without a job at /code/git. */
+export const GIT_TAB = 'git'
 const TAB_KEY = 'anemo.code.tab'
 
 function storedTab(): string {
@@ -15,8 +17,8 @@ function storedTab(): string {
 }
 
 /**
- * The tab chosen last (remembered on this device), as one of `tabs`: one that isn't there
- * (its plugin turned off, or still loading) shows the job.
+ * The tab chosen last (remembered on this device): the job, Git, or one of the plugins'
+ * `tabs`; a plugin tab that isn't there (its plugin turned off, or still loading) shows the job.
  */
 export function useCodeTab(tabs: readonly PluginCodeTab[]): [string, (tab: string) => void] {
   const [chosen, setChosen] = useState(storedTab)
@@ -28,5 +30,5 @@ export function useCodeTab(tabs: readonly PluginCodeTab[]): [string, (tab: strin
     }
     setChosen(tab)
   }, [])
-  return [tabs.some((tab) => tab.id === chosen) ? chosen : JOB_TAB, choose]
+  return [chosen === GIT_TAB || tabs.some((tab) => tab.id === chosen) ? chosen : JOB_TAB, choose]
 }

@@ -9,7 +9,7 @@ const messages: Messages = {
   "Choose a job on the left to follow what Claude Code does, step by step.": "Виберіть запуск ліворуч, щоб крок за кроком стежити, що робить Claude Code.",
   "All jobs": "Усі запуски",
   "Job": "Запуск",
-  "What to show of this job": "Що показати для цього запуску",
+  "What to show": "Що показати",
   "State": "Стан",
   "All states": "Усі стани",
   "Exited without result": "Завершився без результату",

@@ -1,14 +1,14 @@
 /**
- * Plugins' tabs on the Code page (plugin contract §3, `code.panel`): a row of tabs over the
- * open job, "Job" (the thread, Anemo's own) first and one per plugin panel after it. A
+ * The tabs of the Code page: "Job" (the thread) and "Git" (git/GitView.tsx), Anemo's own,
+ * first, and one per plugin panel after them (plugin contract §3, `code.panel`). The row
+ * is always there; without an open job "Job" and the plugin tabs say to pick one. A
  * plugin tab shows its frame for the job's computer and project; it stays while another
  * job is opened (the frame gets `context.changed`, it isn't reloaded) and hears of the
- * project's jobs (`code.job`, codeJobNotices.ts). With no plugin panels there is no row
- * at all, and without an open job there are no tabs: the page's own empty state shows.
+ * project's jobs (`code.job`, codeJobNotices.ts).
  */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { ArrowLeft, SquareTerminal } from 'lucide-react'
+import { ArrowLeft, GitBranch, SquareTerminal } from 'lucide-react'
 import { NamedIcon, PluginIcon } from '@/features/plugins/PluginIcon'
 import { type CodePanelContext, PluginCodePanel } from '@/features/plugins/slots'
 import type { PluginCodeTab } from '@/features/plugins/slotData'
@@ -16,12 +16,12 @@ import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { useCodeJob } from './api'
 import { type CodeSelection, watchProjectJobs } from './codeJobNotices'
-import { JOB_TAB } from './codeTab'
+import { GIT_TAB, JOB_TAB } from './codeTab'
 
-/** The row of tabs over the open job. `backTo`: the list, for narrow screens (the thread's own bar has it on the job tab). */
+/** The row of tabs. `backTo`: the list, for narrow screens (the thread's own bar has it on the job tab). */
 export function CodeTabs({ tabs, tab, onTab, backTo }: { tabs: readonly PluginCodeTab[]; tab: string; onTab: (tab: string) => void; backTo: string }) {
   const location = useLocation()
-  const all = [{ id: JOB_TAB, label: t('Job'), icon: null, iconUrl: null }, ...tabs]
+  const all = [{ id: JOB_TAB, label: t('Job'), icon: null, iconUrl: null }, { id: GIT_TAB, label: t('Git'), icon: null, iconUrl: null }, ...tabs]
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border px-2.5 py-1.5 md:px-4">
       {tab !== JOB_TAB && (
@@ -30,7 +30,7 @@ export function CodeTabs({ tabs, tab, onTab, backTo }: { tabs: readonly PluginCo
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
         </Link>
       )}
-      <div role="tablist" aria-label={t('What to show of this job')} className="flex min-w-0 max-w-full overflow-x-auto rounded-lg bg-surface-2 p-0.5">
+      <div role="tablist" aria-label={t('What to show')} className="flex min-w-0 max-w-full overflow-x-auto rounded-lg bg-surface-2 p-0.5">
         {all.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => onTab(item.id)}
             // A plugin's own title is shown as it is (plugin texts aren't translated).
@@ -39,7 +39,9 @@ export function CodeTabs({ tabs, tab, onTab, backTo }: { tabs: readonly PluginCo
               tab === item.id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
             {item.id === JOB_TAB
               ? <SquareTerminal aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-              : <NamedIcon name={item.icon} className="h-3.5 w-3.5 shrink-0" fallback={<PluginIcon url={item.iconUrl} size={14} className="rounded-[4px]" />} />}
+              : item.id === GIT_TAB
+                ? <GitBranch aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                : <NamedIcon name={item.icon} className="h-3.5 w-3.5 shrink-0" fallback={<PluginIcon url={item.iconUrl} size={14} className="rounded-[4px]" />} />}
             <span className="max-w-40 truncate">{item.label}</span>
           </button>
         ))}
