@@ -139,7 +139,17 @@ themselves.
 **Not idempotent, a longer timeout.** `idempotent = False`: a batch cut short by a worker
 crash must not be applied again blindly (the runtime then reports the call as
 interrupted, and the model can check with `list_tasks` what happened). `timeout_s` is
-180 s instead of 30 s, since 100 items each take a few database round trips.
+180 s instead of 30 s (`batch.TIMEOUT_S`). Measured on a development machine, 100 task
+changes (due date, a tag, a project) took 0.7 s and 100 event moves 0.4 s, so a full
+batch fits many times over. A call that hits its timeout is cancelled by the runtime
+(`asyncio.wait_for`) and reports only "timed out": the tool can't return from a
+cancellation, and swallowing it would also swallow a user's *Stop*. So the batch keeps its
+own, earlier limit: an item not started by `batch.STOP_AFTER_S` (150 s) isn't started,
+and is reported as *not done: the batch ran out of time*, next to the results of the
+items that were done, so the model can call again with the rest. What remains is one
+item hanging for the last 30 s; then the call times out and the items done before it
+are still applied and in the activity log (each item commits on its own), but the
+model's result doesn't list them.
 
 ## Security
 
@@ -158,7 +168,10 @@ interrupted, and the model can check with `list_tasks` what happened). `timeout_
   projects, trash and cancelled occurrences; repeating tasks and finishing subtasks as
   `update_task` does; input limits (100 / 101 items, empty, duplicates, empty items,
   trash with other fields, tags with add_tags); the actions list (summary first, one item
-  per task with its ref and risk, mixed batches, `create_value`); the activity group seen
+  per task with its ref and risk, mixed batches, `create_value`); `add_tags` keeping each
+  tag once and refusing more than 20 with a sentence (no traceback); ids written another
+  way counted as duplicates; a batch that runs out of time reporting the items done and
+  the items not started; the activity group seen
   inside the service calls (one group for the batch, none afterwards); a worker-level run
   with the fake model asking once for 30 tasks, the approval's summary and actions, and
   all 30 changed after approving; a batch of plain changes running without asking;

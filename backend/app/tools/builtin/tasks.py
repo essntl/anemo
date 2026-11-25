@@ -691,7 +691,7 @@ class UpdateTasks(Tool):
     capability = "tasks.write"
     Input = UpdateTasksInput
     idempotent = False  # a batch cut short must not be applied again blindly
-    timeout_s = 180.0
+    timeout_s = batch.TIMEOUT_S
 
     def _planned(self, args: UpdateTasksInput) -> list[batch.Planned]:
         return [

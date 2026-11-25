@@ -12,6 +12,7 @@ import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from time import monotonic
 from typing import Any
 
 from pydantic import ValidationError
@@ -24,6 +25,11 @@ from app.tools.base import ToolResult
 log = logging.getLogger(__name__)
 
 MAX_ITEMS = 100
+# The batch tools' timeout, and when a batch stops starting new items so that it still
+# reports what it did before the timeout cancels it (a cancelled call reports nothing).
+# 100 items take about a second; the margin is for a slow database or a stuck item.
+TIMEOUT_S = 180.0
+STOP_AFTER_S = 150.0
 _RISK_ORDER: dict[Risk, int] = {"safe": 0, "moderate": 1, "dangerous": 2}
 
 
@@ -123,13 +129,18 @@ async def apply_all[Item](
     item_id: Callable[[Item], str],
 ) -> ToolResult:
     """Apply every item in order, each on its own (one failing doesn't stop the others),
-    inside one activity group, and report each one."""
+    inside one activity group, and report each one. Items not started by STOP_AFTER_S
+    are reported as not done, so the model can call again with them."""
+    started = monotonic()
     outcomes: list[Outcome] = []
     # The group is named before anything runs, so it says what was asked for (the
     # Activity page shows it with the number of changes actually made).
     with activity_group(describe(noun, planned)):
-        for item in items:
+        for n, item in enumerate(items):
             key = item_id(item)
+            if monotonic() - started > STOP_AFTER_S:
+                outcomes += [_out_of_time(item_id(rest)) for rest in items[n:]]
+                break
             try:
                 outcomes.append(await apply(item))
             except AppError as exc:
@@ -138,6 +149,15 @@ async def apply_all[Item](
                 log.exception("batch item failed", extra={"ctx": {"noun": noun}})
                 outcomes.append(Outcome(key, False, f"[{key}] failed: {type(exc).__name__}"))
     return result(noun, outcomes)
+
+
+def _out_of_time(key: str) -> Outcome:
+    return Outcome(
+        key,
+        False,
+        f"[{key}] not done: the batch ran out of time before this item. Call again with "
+        "the items that were not done.",
+    )
 
 
 def result(noun: str, outcomes: list[Outcome]) -> ToolResult:

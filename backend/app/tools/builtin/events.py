@@ -591,7 +591,7 @@ class UpdateEvents(Tool):
     capability = "calendar.write"
     Input = UpdateEventsInput
     idempotent = False  # a batch cut short must not be applied again blindly
-    timeout_s = 180.0
+    timeout_s = batch.TIMEOUT_S
 
     def _planned(self, args: UpdateEventsInput) -> list[batch.Planned]:
         return [

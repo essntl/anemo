@@ -13,6 +13,7 @@ from app.features.tasks import service as tasks_service
 from app.providers.base import Done, TextDelta
 from app.runtime.dispatch import execute_run
 from app.tools.base import ToolContext, ToolResult
+from app.tools.builtin import batch
 from app.tools.builtin.events import UpdateEvents
 from app.tools.builtin.tasks import UpdateTasks
 from tests.api.test_agent import (
@@ -115,9 +116,7 @@ async def test_update_tasks_reports_every_item_and_goes_on_after_a_failure(authe
     assert any(i["title"] == "Old idea" for i in trash)
 
 
-async def test_update_tasks_add_tags_keeps_each_tag_once_and_refuses_more_than_20(
-    authed, caplog
-):
+async def test_update_tasks_add_tags_keeps_each_tag_once_and_refuses_more_than_20(authed, caplog):
     full = await task(authed, "Many tags", tags=[f"t{n}" for n in range(19)])
     plain = await task(authed, "Few tags", tags=["work"])
 
@@ -518,3 +517,26 @@ async def test_an_unexpected_failure_in_one_item_is_reported_and_the_others_go_o
         f"2. ok: [{a['id']}] Keep going: moved to the trash",
     ]
     assert "disk on fire" not in result.content  # the model sees the kind, not the details
+
+
+async def test_a_batch_that_runs_out_of_time_reports_what_it_did_and_what_it_did_not(
+    authed, monkeypatch
+):
+    made = [await task(authed, f"Slow {n}") for n in range(3)]
+    # The clock: the batch starts at 0, the first item at 1 s, the second past the limit.
+    clock = iter([0.0, 1.0, batch.STOP_AFTER_S + 1])
+    monkeypatch.setattr(batch, "monotonic", lambda: next(clock))
+
+    result = await run(UpdateTasks, items=[{"id": t["id"], "due_date": FRIDAY} for t in made])
+
+    lines = result.content.splitlines()
+    assert lines[0] == "1 of 3 tasks done; 2 failed."
+    assert lines[1].startswith(f"1. ok: [{made[0]['id']}] Slow 0 (")
+    for n in (1, 2):
+        assert lines[n + 1] == (
+            f"{n + 1}. error: [{made[n]['id']}] not done: the batch ran out of time before "
+            "this item. Call again with the items that were not done."
+        )
+    now = await tasks_by_title(authed)
+    assert [now[f"Slow {n}"]["due_date"] for n in range(3)] == [FRIDAY, None, None]
+    assert batch.STOP_AFTER_S < UpdateTasks.timeout_s
