@@ -161,6 +161,16 @@ CATEGORIES: list[Category] = [
         "End voice mode on your phone when a spoken conversation is over.",
         "autonomous",
     ),
+    # Plugins (docs/specs/12-plugins.md). Whatever this level says, a plugin an agent
+    # writes or changes is a draft: nothing in it runs until you approve that version in
+    # Settings > Plugins, and no tool can approve or enable one (tools/builtin/plugins.py).
+    Category(
+        "plugins.build",
+        "Build plugins",
+        "Write and change plugins. They stay off until you review and approve them in "
+        "Settings > Plugins.",
+        "ask_dangerous",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 
@@ -175,6 +185,7 @@ INTERNAL_RULES = [
     Rule(cap="calendar.read", decision="allow"),
     Rule(cap="automation.state", decision="allow"),  # an automation's own notes
     Rule(cap="automation.read", decision="allow"),  # looking at the schedules
+    Rule(cap="plugins.read", decision="allow"),  # the plugins, their files and the guide
 ]
 
 
