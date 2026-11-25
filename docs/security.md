@@ -336,6 +336,9 @@ The kinds of action and their defaults:
 | See your computers | Ask for dangerous actions (looking is safe, so it goes ahead) |
 | Use your computers | Always ask (a watched computer asks every time whatever the level) |
 | Commands on your computers | Always ask (never offered on a watched computer) |
+| Schedules | Always ask (a new schedule, or a changed prompt, time or trigger list, asks every time) |
+| Event triggers | Always ask (adding one to an automation, or changing what or when one fires, asks every time; switching one off follows the level) |
+| Wake this chat on events | Ask for dangerous actions (a one-shot wait of at most 24 hours on an internal event is safe; repeating or longer is not) |
 
 Whether an action is "dangerous" is decided by code, not by the model: for
 example `rm -r`, `git push --force`, piping a download into a shell, or any
@@ -360,8 +363,9 @@ When a run waits for you, you can approve once, approve for the rest of that run
 (for that kind of action in that place), or deny, with a reason the agent sees.
 An approval for the run never overrides "Never" or the ceiling, and some actions are
 asked about every time regardless: clicks, hovering, typing and key presses in your own
-Chrome, and creating a schedule or changing what one does or when (the request shows the
-prompt and the times). Unanswered
+Chrome, creating a schedule or changing what one does or when (the request shows the
+prompt and the times), and adding an event trigger to an automation or changing what or
+when it fires. Unanswered
 requests expire after 24 hours and count as denied. Unattended automations follow
 their own setting for this: wait and notify you, skip the action, or stop.
 
@@ -400,6 +404,30 @@ can reach the runner (internal network plus a token). The Claude Code login stay
 `claude-config` volume, mounted in that container only: Anemo never reads, stores, logs
 or forwards it, and the CLI's environment is built from an allowlist (no Anthropic API
 key, token or base URL, none of Anemo's secrets).
+
+## Webhooks
+
+An automation can have a webhook trigger: another service calls
+`POST /api/hooks/<trigger id>` and the automation runs with the request's body as data.
+That path needs no login, so the request is checked instead:
+
+- `X-Anemo-Timestamp` (the time in Unix seconds) must be within 5 minutes of the
+  server's clock, and `X-Anemo-Signature` must be `sha256=` and the HMAC-SHA256 of
+  `<timestamp>.<raw body>` with the trigger's secret. The secret is shown once when the
+  trigger is made (or rotated, which needs your password), stored encrypted, and never
+  given to a model: a webhook an assistant sets up gets its secret from you, on the
+  Automations page.
+- A request seen before (the same signature in the last 10 minutes) is refused, so a
+  captured request can't be replayed.
+- The body may be at most 64 KB; a trigger accepts at most 30 requests a minute.
+- An unknown or switched-off trigger, a bad or missing signature, an old timestamp and a
+  replay all get the same `404`, so the endpoint doesn't tell anyone which triggers exist.
+- The body is untrusted data for the run, never instructions: it is marked as such in
+  the run's context and never put in a system prompt. Tools that reach other people
+  still ask in that run.
+
+Expose only `/api/hooks/*` to the internet for this, never the whole app (see
+`docs/deployment.md`, *Webhooks from other services*).
 
 ## Secrets
 

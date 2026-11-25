@@ -107,7 +107,7 @@ row is filled in by its own pull request.
 
 | What | Spec | Pull request |
 | --- | --- | --- |
-| **Event triggers** (in progress) | [16](specs/16-event-triggers.md) | – |
+| **Event triggers**: automations and chats woken by events (tasks, calendar, documents, Claude Code jobs, devices, files, failures, approvals) and signed webhooks; wake me | [16](specs/16-event-triggers.md) | PR_LINK |
 | **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
 | **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
 | **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
@@ -215,11 +215,8 @@ From spec 12 §8 and what building the examples showed:
 - More slots: editor blocks in documents, Home widgets, the run timeline; plugin
   keyboard shortcuts; translations of plugin texts.
 - An e2e spec for install → approve → panel (needs the Docker stack).
-
-### Automations
-
-- Webhooks (`POST /api/hooks/{id}` with an HMAC signature, behind a Cloudflare Tunnel
-  rule), spec 02 §2.8. Scripts (#82) are designed not to rule it out.
+- Triggers on a plugin's declared automations (`AutomationItem`): a `triggers` list in
+  the manifest, synced to the same `triggers` rows on install and update (spec 16 §10).
 
 ---
 

@@ -601,6 +601,31 @@ between its runs, so "tell me when this page changes" works. Failed runs can be
 retried. If the app was off when a run was due, that run is skipped rather than
 caught up later, and a run still going when the next one is due is not stacked.
 
+### Triggers
+
+An automation can also run **when something happens**, besides or instead of its
+schedule ("Only on events"): a task is created, changed, completed or deleted; a
+calendar event or a document is created, changed or deleted; a Claude Code job starts or
+ends; a computer or phone comes online or goes offline; a new file arrives in the
+workspace; an automation fails; a run waits for your approval; or another service calls
+the automation's **webhook** (a secret URL whose requests are signed). On the
+automation's card, **Add a trigger** picks the event and, optionally, which ones (a
+project, a tag, one job…), how long a burst is gathered into one run, how many runs an
+hour at most, once only, and until when. The run gets the event as data, never as
+instructions, and the run log says which event started each run. Every rail of a
+scheduled run applies: its tools, notifications, model, limits, state note, approvals,
+and never two runs at once (events that come while it runs start one more run after
+it). An automation's own changes never start it again, chains of triggers stop after
+three steps, and **Pause all** stops triggers too.
+
+In a chat, the assistant can be asked to **wake you when something happens** ("tell me
+when this Claude Code job is done"): when it does, the chat goes on by itself, with a
+card that shows the event (not as your message). Such a wait ends after one firing and
+after 24 hours unless the assistant asked for longer (at most 30 days); the Automations
+page lists the chats that wait, and **Stop waiting** cancels one. The assistant can
+propose an automation with its triggers in one step, which you confirm as you confirm a
+schedule.
+
 ### Scripts
 
 The **Scripts** tab holds automations that run code instead of asking a model: cheap,
