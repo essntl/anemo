@@ -24,7 +24,8 @@ describe('Settings > Plugins', () => {
       disabled_all: false,
       plugins: [
         pluginOut(),
-        pluginOut({ id: 'artem.today-board', name: 'Today board', status: 'needs_review', enabled: false, made_by_assistant: true, source: { kind: 'assistant', label: 'chat', conversation_ids: ['c1'] } }),
+        // The server flags a first version as pending too (update_pending), as for an update.
+        pluginOut({ id: 'artem.today-board', name: 'Today board', status: 'needs_review', update_pending: true, enabled: false, made_by_assistant: true, source: { kind: 'assistant', label: 'chat', conversation_ids: ['c1'] } }),
         pluginOut({ id: 'artem.sync', name: 'Sync', update_pending: true }),
         pluginOut({ id: 'artem.broken', name: 'Broken', status: 'error', error: 'Files changed', enabled: false }),
       ],
@@ -42,6 +43,8 @@ describe('Settings > Plugins', () => {
     expect(within(cards[0]).getByText('1.0.0')).toBeInTheDocument()
     expect(within(cards[1]).getByText('Needs review')).toBeInTheDocument()
     expect(within(cards[1]).getByText('Made by the assistant')).toBeInTheDocument()
+    // Nothing approved yet: its first version is not an update.
+    expect(within(cards[1]).queryByText('Update needs approval')).not.toBeInTheDocument()
     expect(within(cards[2]).getByText('Update needs approval')).toBeInTheDocument()
     expect(within(cards[3]).getByText('Error')).toBeInTheDocument()
     // A plugin without an approved version can't be switched on.

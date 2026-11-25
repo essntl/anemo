@@ -11,7 +11,8 @@ export function PluginBadges({ plugin, preview }: { plugin: PluginOut; preview?:
     <>
       {preview && <Badge tone="accent">{t('Preview')}</Badge>}
       {plugin.status === 'needs_review' && <Badge tone="warning">{t('Needs review')}</Badge>}
-      {plugin.update_pending && <Badge tone="accent">{t('Update needs approval')}</Badge>}
+      {/* The server flags a first version waiting for review as pending too; that is no update. */}
+      {plugin.update_pending && plugin.status !== 'needs_review' && <Badge tone="accent">{t('Update needs approval')}</Badge>}
       {plugin.status === 'error' && <Badge tone="error">{t('Error')}</Badge>}
       {plugin.made_by_assistant && <Badge>{t('Made by the assistant')}</Badge>}
     </>
