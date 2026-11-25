@@ -26606,22 +26606,34 @@
             "title": "Properties"
           },
           "kind": {
-            "type": "string",
-            "enum": [
-              "markdown",
-              "sketch"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "markdown",
+                  "sketch"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Kind",
-            "default": "markdown"
+            "title": "Kind"
           },
           "layout": {
-            "type": "string",
-            "enum": [
-              "infinite",
-              "pages"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "infinite",
+                  "pages"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Layout",
-            "default": "infinite"
+            "title": "Layout"
           }
         },
         "type": "object",

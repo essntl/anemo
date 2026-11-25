@@ -8,7 +8,7 @@ export type DocumentContent = Schemas['DocumentContent']
 export type Revision = Schemas['RevisionOut']
 /** A Markdown document, or a sketch (a drawing sheet kept as a `.sketch.md` file). */
 export type DocumentKind = DocumentSummary['kind']
-export type SketchLayout = Schemas['CreateIn']['layout']
+export type SketchLayout = NonNullable<Schemas['CreateIn']['layout']>
 
 export const documentsKey = ['documents'] as const
 export const documentKey = (id: string) => ['document', id] as const

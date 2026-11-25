@@ -187,9 +187,10 @@ class CreateIn(BaseModel):
     content: str | None = Field(None, max_length=2_000_000)  # default: a heading with the title
     # Written into its front matter, with the folder's default properties.
     properties: dict[str, Any] | None = Field(None, max_length=30)
-    kind: Literal["markdown", "sketch"] = "markdown"
-    # A sketch: one endless sheet, or A4-like pages.
-    layout: Literal["infinite", "pages"] = "infinite"
+    # None (left out) is a Markdown document; optional so existing API clients keep working.
+    kind: Literal["markdown", "sketch"] | None = None
+    # A sketch: one endless sheet (the default), or A4-like pages.
+    layout: Literal["infinite", "pages"] | None = None
 
 
 @router.post("", response_model=DocumentContent, status_code=201)
@@ -197,7 +198,7 @@ async def create_document(body: CreateIn, db: Db) -> DocumentContent:
     title = body.title.strip()
     if body.kind == "sketch":
         path = service.unique_path(body.folder, title, sketch.SUFFIX)
-        content = sketches.new_content(title, body.layout)
+        content = sketches.new_content(title, body.layout or "infinite")
     else:
         path = service.unique_path(body.folder, title)
         content = body.content if body.content is not None else f"# {title}\n\n"

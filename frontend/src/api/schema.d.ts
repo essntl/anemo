@@ -6927,18 +6927,10 @@ export interface components {
             properties?: {
                 [key: string]: unknown;
             } | null;
-            /**
-             * Kind
-             * @default markdown
-             * @enum {string}
-             */
-            kind: "markdown" | "sketch";
-            /**
-             * Layout
-             * @default infinite
-             * @enum {string}
-             */
-            layout: "infinite" | "pages";
+            /** Kind */
+            kind?: ("markdown" | "sketch") | null;
+            /** Layout */
+            layout?: ("infinite" | "pages") | null;
         };
         /**
          * CustomGradient
