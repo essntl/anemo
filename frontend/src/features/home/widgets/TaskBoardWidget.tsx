@@ -25,8 +25,8 @@ const DONE: DoneWindow = { days: 7, allTo: '/tasks' }
 /** How tall a column's cards may get before they scroll, by the widget's height in rows. */
 const CARDS_HEIGHT = ['', 'max-h-44', 'max-h-[25rem]', 'max-h-[40rem]']
 
-/** The task editor: an existing task, or a new one starting in a status. */
-type Editing = { task: Task | null; status?: TaskStatus } | null
+/** The task editor: an existing task, or a new one starting in a status (and a lane's project). */
+type Editing = { task: Task | null; status?: TaskStatus; projectId?: string } | null
 
 export function TaskBoardWidget({ item, onOptions }: { item: WidgetLayout; onOptions: (options: Record<string, string | null>) => void }) {
   const scope = useScope()
@@ -45,10 +45,10 @@ export function TaskBoardWidget({ item, onOptions }: { item: WidgetLayout; onOpt
   const shown = filterTasks(all, filters, scope, todayKey())
   const open = shown.filter((task) => isOpen(task)).length
 
-  const board = (list: Task[], label?: string) => (
-    <TaskBoard tasks={list} info={info} projects={projectMap} done={DONE} label={label}
+  const board = (list: Task[], lane?: { label: string; projectId: string }) => (
+    <TaskBoard tasks={list} info={info} projects={projectMap} done={DONE} label={lane?.label}
       cardsClassName={`${CARDS_HEIGHT[item.h]} overflow-y-auto overscroll-contain`}
-      onOpen={(task) => setEditing({ task })} onAdd={(status) => setEditing({ task: null, status })} />
+      onOpen={(task) => setEditing({ task })} onAdd={(status) => setEditing({ task: null, status, projectId: lane?.projectId })} />
   )
 
   return (
@@ -83,7 +83,7 @@ export function TaskBoardWidget({ item, onOptions }: { item: WidgetLayout; onOpt
                       : <span aria-hidden className="h-2 w-2 rounded-full border border-border-strong" />}
                     {name} <span className="font-normal text-subtle tabular-nums">{lane.tasks.length}</span>
                   </h3>
-                  {board(lane.tasks, t('{project}: tasks by status', { project: name }))}
+                  {board(lane.tasks, { label: t('{project}: tasks by status', { project: name }), projectId: lane.id })}
                 </section>
               )
             })}
@@ -95,7 +95,7 @@ export function TaskBoardWidget({ item, onOptions }: { item: WidgetLayout; onOpt
         {(current) => (
           <TaskDialog key={current.task?.id ?? 'new'} task={current.task} onClose={() => setEditing(null)}
             onOpenTask={(task) => setEditing({ task })}
-            defaults={{ status: current.status, project_id: projectId || null }} />
+            defaults={{ status: current.status, project_id: (current.projectId ?? projectId) || null }} />
         )}
       </Lingering>
     </>

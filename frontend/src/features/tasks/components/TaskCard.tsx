@@ -1,9 +1,9 @@
 /**
  * A task on a board: its title with the project's colour, and in one line what matters
  * at a glance: when it is due (red when overdue), its priority, the checklist and
- * subtasks done so far, and what it waits on.
+ * subtasks done so far, what it waits on, and the task it is a subtask of.
  */
-import { CalendarDays, Flag, ListChecks, ListTree } from 'lucide-react'
+import { CalendarDays, CornerDownRight, Flag, ListChecks, ListTree } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { PRIORITY_LABELS, PRIORITY_TONE, type Project, type Task } from '../api'
@@ -17,6 +17,7 @@ export function TaskCard({ task, project, info }: { task: Task; project?: Projec
   const checklist = checklistProgress(task.checklist)
   const subtasks = subtasksOf(info.all, task.id)
   const subtasksDone = subtasks.filter((s) => s.status === 'done').length
+  const parent = task.parent_id ? info.byId.get(task.parent_id) : undefined
   return (
     <>
       <div className="flex items-start gap-2">
@@ -48,6 +49,11 @@ export function TaskCard({ task, project, info }: { task: Task; project?: Projec
           </span>
         )}
         <BlockedBadge task={task} info={info} />
+        {parent && (
+          <span className="flex min-w-0 max-w-full items-center gap-1" title={t('Subtask of “{title}”', { title: parent.title })}>
+            <CornerDownRight className="h-3 w-3 shrink-0" aria-hidden /> <span className="truncate">{parent.title}</span>
+          </span>
+        )}
       </div>
     </>
   )

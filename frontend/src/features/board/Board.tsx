@@ -198,15 +198,16 @@ export function Board<T>({ label, columns, itemId, itemLabel, renderCard, onOpen
   return (
     <>
       <div ref={scroller} role="group" aria-label={label}
-        className="-mx-1 flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 md:snap-none">
+        // No snapping while a card is dragged: the board scrolls a little at a time near its edges.
+        className={cn('-mx-1 flex snap-x scroll-px-1 gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 md:snap-none', lifted ? 'snap-none' : 'snap-mandatory')}>
         {columns.map((column, columnIndex) => {
           const isTarget = moving && target?.column === column.id
           const columnIds = ids(column)
           return (
             <section key={column.id} data-board-column={column.id} aria-label={column.label}
-              className={cn('flex w-[min(18rem,82vw)] shrink-0 snap-start flex-col rounded-card border border-border bg-surface-2/50 p-2 transition-colors motion-reduce:transition-none md:w-72',
+              className={cn('flex w-[min(18rem,82vw)] shrink-0 snap-start flex-col rounded-card border border-border bg-surface-2/50 p-2 transition-colors motion-reduce:transition-none md:w-auto md:min-w-48 md:max-w-96 md:flex-1',
                 isTarget && 'border-accent bg-accent-soft/40')}>
-              <header className="flex items-center justify-between px-1.5 pb-2 pt-1 text-[12.5px] font-semibold text-muted">
+              <header className="flex min-h-8 items-center justify-between px-1.5 pb-2 pt-1 text-[12.5px] font-semibold text-muted">
                 <span>{column.label} <span className="font-normal text-subtle tabular-nums">{column.items.length}</span></span>
                 {column.add && (
                   <button type="button" aria-label={column.add.label} title={column.add.label} onClick={column.add.onAdd}
