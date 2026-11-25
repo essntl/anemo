@@ -10,11 +10,37 @@ export type UploadedAttachment = Schemas['AttachmentOut']
 
 export interface PendingAttachment {
   key: string
-  file: File
+  /** What the chip shows. */
+  name: string
+  size: number
   status: 'uploading' | 'ready' | 'error'
   previewUrl: string | null
   uploaded?: UploadedAttachment
   error?: string
+}
+
+/** A new chat started from elsewhere with attachments already made (e.g. a sketch's image); see NewChatPage. */
+export interface NewChatState {
+  attachments?: UploadedAttachment[]
+}
+
+/** The address of an attachment's file, as the app serves it. */
+export const attachmentUrl = (id: string) => `/api/attachments/${id}/content`
+
+const previewOf = (uploaded: UploadedAttachment) => (uploaded.kind === 'image' ? attachmentUrl(uploaded.id) : null)
+
+const readyItem = (uploaded: UploadedAttachment): PendingAttachment => ({
+  key: uploaded.id,
+  name: uploaded.filename,
+  size: uploaded.size,
+  status: 'ready',
+  previewUrl: previewOf(uploaded),
+  uploaded,
+})
+
+/** Only image previews made here (blob: addresses) need freeing. */
+function free(url: string | null) {
+  if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
 }
 
 /** Uploads one file as an attachment (also used by the Code page for its images). */
@@ -31,45 +57,64 @@ export async function uploadAttachment(file: File): Promise<UploadedAttachment> 
 
 export const MAX_ATTACHMENTS = 10
 
-export function useAttachments() {
-  const [items, setItems] = useState<PendingAttachment[]>([])
+/** `initial`: attachments already made, to start with (a chat started from a sketch). */
+export function useAttachments(initial?: UploadedAttachment[]) {
+  const [items, setItems] = useState<PendingAttachment[]>(() => (initial ?? []).slice(0, MAX_ATTACHMENTS).map(readyItem))
   const itemsRef = useRef(items)
   useEffect(() => {
     itemsRef.current = items
   })
 
   // Free image preview URLs when the composer goes away.
-  useEffect(() => () => itemsRef.current.forEach((i) => i.previewUrl && URL.revokeObjectURL(i.previewUrl)), [])
+  useEffect(() => () => itemsRef.current.forEach((i) => free(i.previewUrl)), [])
+
+  /** Shows the item at once (uploading) and fills it in when `upload` is done. */
+  const track = useCallback((item: PendingAttachment, upload: Promise<UploadedAttachment>) => {
+    upload.then(
+      (uploaded) =>
+        setItems((prev) => prev.map((i) => (i.key === item.key ? { ...i, status: 'ready', size: uploaded.size, previewUrl: i.previewUrl ?? previewOf(uploaded), uploaded } : i))),
+      (err: unknown) =>
+        setItems((prev) =>
+          prev.map((i) =>
+            i.key === item.key
+              ? { ...i, status: 'error', error: err instanceof Error ? err.message : t('Upload failed') }
+              : i,
+          ),
+        ),
+    )
+  }, [])
 
   const add = useCallback((files: FileList | File[]) => {
     const room = MAX_ATTACHMENTS - itemsRef.current.length
-    const added = Array.from(files).slice(0, Math.max(0, room)).map<PendingAttachment>((file) => ({
-      key: crypto.randomUUID(),
+    const added = Array.from(files).slice(0, Math.max(0, room)).map((file) => ({
+      item: {
+        key: crypto.randomUUID(),
+        name: file.name,
+        size: file.size,
+        status: 'uploading',
+        previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+      } satisfies PendingAttachment,
       file,
-      status: 'uploading',
-      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
     }))
-    setItems((prev) => [...prev, ...added])
-    for (const item of added) {
-      uploadAttachment(item.file).then(
-        (uploaded) =>
-          setItems((prev) => prev.map((i) => (i.key === item.key ? { ...i, status: 'ready', uploaded } : i))),
-        (err: unknown) =>
-          setItems((prev) =>
-            prev.map((i) =>
-              i.key === item.key
-                ? { ...i, status: 'error', error: err instanceof Error ? err.message : t('Upload failed') }
-                : i,
-            ),
-          ),
-      )
-    }
-  }, [])
+    setItems((prev) => [...prev, ...added.map((a) => a.item)])
+    for (const { item, file } of added) track(item, uploadAttachment(file))
+  }, [track])
+
+  /**
+   * An attachment made some other way than uploading a file (a sketch's image): shown as
+   * `name` while `make` runs.
+   */
+  const addMade = useCallback((name: string, make: () => Promise<UploadedAttachment>) => {
+    if (itemsRef.current.length >= MAX_ATTACHMENTS) return
+    const item: PendingAttachment = { key: crypto.randomUUID(), name, size: 0, status: 'uploading', previewUrl: null }
+    setItems((prev) => [...prev, item])
+    track(item, make())
+  }, [track])
 
   const remove = useCallback((key: string) => {
     setItems((prev) => {
       const gone = prev.find((i) => i.key === key)
-      if (gone?.previewUrl) URL.revokeObjectURL(gone.previewUrl)
+      if (gone) free(gone.previewUrl)
       return prev.filter((i) => i.key !== key)
     })
   }, [])
@@ -81,6 +126,7 @@ export function useAttachments() {
   return {
     items,
     add,
+    addMade,
     remove,
     clear,
     restore,

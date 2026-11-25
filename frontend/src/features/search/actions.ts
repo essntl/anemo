@@ -1,9 +1,9 @@
 /**
- * Things the search box (Ctrl+K) can do, besides finding and opening: the focus timer
- * and the music player. Offered once something matching is typed ("focus", "pause",
+ * Things the search box (Ctrl+K) can do, besides finding and opening: the focus timer,
+ * the music player, a new document or sketch. Offered once something matching is typed ("focus", "pause",
  * "next", "music"…).
  */
-import { CirclePlay, Eye, EyeOff, Keyboard, LayoutGrid, Link2, type LucideIcon, Pause, SkipForward, Timer } from 'lucide-react'
+import { CirclePlay, Eye, EyeOff, FilePlus, Keyboard, LayoutGrid, Link2, type LucideIcon, Pause, PenLine, SkipForward, Timer } from 'lucide-react'
 import { promptDialog } from '@/components/ui/dialogs'
 import { toast } from '@/components/ui/toast'
 import { msg, t } from '@/lib/i18n'
@@ -53,6 +53,9 @@ export const ACTIONS: PaletteAction[] = [
       player.add(link.trim(), { choice }).catch((err: Error) => toast({ message: err.message }))
     },
   },
+  // Documents asks for the title (and puts it in the project chosen, as its own "New" does).
+  { label: msg('New document'), icon: FilePlus, keywords: msg('new create document note write markdown'), of: 'documents', run: (navigate) => navigate('/documents?new=document') },
+  { label: msg('New sketch'), icon: PenLine, keywords: msg('new create sketch drawing draw whiteboard handwriting'), of: 'documents', run: (navigate) => navigate('/documents?new=sketch') },
   { label: msg('Edit home layout'), icon: LayoutGrid, keywords: msg('home widgets layout dashboard edit arrange'), run: (navigate) => navigate('/home?edit=1') },
   {
     label: msg('Keyboard shortcuts'),
