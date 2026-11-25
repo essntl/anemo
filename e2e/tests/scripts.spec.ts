@@ -32,7 +32,7 @@ test('scripts: write one, read its code, run it, switch it, delete it', async ({
     await dialog.getByLabel('Name', { exact: true }).fill(name)
     await dialog.getByLabel('What it does').fill('Says hello.')
     await dialog.getByLabel('Code (TypeScript)').fill(CODE)
-    await expect(dialog.getByText('It runs when you press Run now, or when an assistant starts it.')).toBeVisible()
+    await expect(dialog.getByText('It runs when you press Run now, when an assistant starts it, or when one of its event triggers fires.')).toBeVisible()
     await dialog.getByRole('button', { name: 'Create script' }).click()
     await expect(dialog).toHaveCount(0)
 
