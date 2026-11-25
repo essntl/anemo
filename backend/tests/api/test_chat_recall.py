@@ -38,6 +38,8 @@ LATER = datetime.now(UTC) + timedelta(minutes=10)  # every chat has been quiet l
 def no_scripts():
     FakeAdapter.scripts.clear()
     yield
+    # It keeps the last 50 texts only: leave it empty for tests that count new ones.
+    FakeAdapter.embedded = []
 
 
 async def _noop(*_: object) -> None:
@@ -392,9 +394,9 @@ async def test_found_by_meaning_with_an_embedding_model(authed):
         conv = await db.get(Conversation, cid)
         conv.last_message_at = datetime.now(UTC)
         await db.commit()
-    before = len(FakeAdapter.embedded)
+    FakeAdapter.embedded = []
     assert await recall.index_due(LATER) == 1
-    assert FakeAdapter.embedded[before:] == ["And the penguins?"]
+    assert FakeAdapter.embedded == ["And the penguins?"]
     assert len(await chunks(cid)) == 3
 
     # Deleting the chat removes it from the index.
