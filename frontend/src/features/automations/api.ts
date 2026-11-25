@@ -277,3 +277,66 @@ export function useScriptSecret() {
     onSuccess: (_, v) => void qc.invalidateQueries({ queryKey: scriptKey(v.id) }),
   })
 }
+
+// -- event triggers (docs/specs/16-event-triggers.md) ---------------------------------
+
+/** A trigger: an event that starts a run of an automation, or wakes a chat ("wake me"). */
+export type Trigger = Schemas['TriggerOut']
+export type TriggerInput = Schemas['TriggerIn']
+export type TriggerPatch = Schemas['TriggerPatch']
+/** An event type a trigger can wait for, with the fields its filter may name. */
+export type EventType = Schemas['EventTypeOut']
+
+/** Under the automations' key: "automations.changed" (sent when a trigger changes or
+ *  fires) refetches them. */
+export const triggersKey = [...automationsKey, 'triggers'] as const
+
+export function useTriggers() {
+  return useQuery({
+    queryKey: triggersKey,
+    queryFn: async () => unwrap(await api.GET('/api/triggers')),
+  })
+}
+
+export function useEventCatalogue() {
+  return useQuery({
+    queryKey: [...triggersKey, 'catalogue'],
+    queryFn: async () => unwrap(await api.GET('/api/triggers/catalogue')),
+    staleTime: 60 * 60_000,
+  })
+}
+
+/** Add a trigger to an automation, or change one. A new webhook comes back with its
+ *  secret, this once. */
+export function useSaveTrigger() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { id?: string; create?: TriggerInput; patch?: TriggerPatch }): Promise<{ trigger: Trigger; secret: string | null }> => {
+      if (v.id) {
+        const trigger = unwrap(await api.PATCH('/api/triggers/{trigger_id}', { params: { path: { trigger_id: v.id } }, body: v.patch ?? {} }))
+        return { trigger, secret: null }
+      }
+      const created = unwrap(await api.POST('/api/triggers', { body: v.create as TriggerInput }))
+      return { trigger: created.trigger, secret: created.secret ?? null }
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: triggersKey }),
+  })
+}
+
+export function useDeleteTrigger() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await api.DELETE('/api/triggers/{trigger_id}', { params: { path: { trigger_id: id } } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: triggersKey }),
+  })
+}
+
+/** A new signing secret for a webhook trigger (needs the password); the old one stops working. */
+export function useRotateSecret() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      withReauth(async () => unwrap(await api.POST('/api/triggers/{trigger_id}/secret', { params: { path: { trigger_id: id } } }))),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: triggersKey }),
+  })
+}

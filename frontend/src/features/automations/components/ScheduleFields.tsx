@@ -75,7 +75,7 @@ export function ScheduleFields({ form, onChange, tz, preview, fewest = 5, option
       </div>
       <div className="rounded-control bg-surface-2 px-3 py-2 text-[12.5px]" aria-live="polite">
         {form.frequency === 'manual' ? (
-          <span className="text-muted">{t('It runs when you press Run now, or when an assistant starts it.')}</span>
+          <span className="text-muted">{t('It runs when you press Run now, when an assistant starts it, or when one of its event triggers fires.')}</span>
         ) : preview.problem ? (
           <span className="text-error">{preview.problem}</span>
         ) : preview.text ? (

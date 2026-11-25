@@ -109,7 +109,7 @@ EVENT_TYPES: tuple[EventType, ...] = (
     EventType(
         "document.changed",
         "Document changed",
-        "A document's text, title or place changed.",
+        "A document’s text, title or place changed.",
         _DOCUMENT_FIELDS,
     ),
     EventType(
@@ -143,7 +143,7 @@ EVENT_TYPES: tuple[EventType, ...] = (
     EventType(
         "automation.run_failed",
         "Automation failed",
-        "An automation's run failed for good (after its retries).",
+        "An automation’s run failed for good (after its retries).",
         (EventField("automation_id", "Automation", "id"), EventField("name", "Name")),
     ),
     EventType(
@@ -159,7 +159,7 @@ EVENT_TYPES: tuple[EventType, ...] = (
     EventType(
         "webhook.received",
         "Webhook",
-        "Another service called this trigger's webhook URL (signed with its secret).",
+        "Another service called this trigger’s webhook URL (signed with its secret).",
         (EventField("content_type", "Content type"),),
         max_data=70 * 1024,  # the body may be up to 64 KB
         addressed=True,

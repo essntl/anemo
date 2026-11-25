@@ -45,6 +45,7 @@ import {
 import { useChatActions } from '../chatActions'
 import { TemporaryLabel } from '../temporary'
 import { LiveTiming } from '../components/AnswerTiming'
+import { EventCard } from '../components/EventCard'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { useChatModel } from '../chatModel'
@@ -170,7 +171,9 @@ function Conversation() {
   // make sure the finished message is reloaded once the run is no longer active.
   const previousRun = useRef(activeRunId)
   useEffect(() => {
-    if (previousRun.current && !activeRunId) {
+    // Also when a run starts that this page didn't start (an event woke the chat): its
+    // turn is not in the list yet.
+    if ((previousRun.current && !activeRunId) || (activeRunId && activeRunId !== previousRun.current)) {
       void qc.invalidateQueries({ queryKey: messagesKey(conversationId) })
     }
     previousRun.current = activeRunId
@@ -187,7 +190,7 @@ function Conversation() {
   const lastAssistant = [...list].reverse().find((m) => m.role === 'assistant')
   const lastUser = [...list].reverse().find((m) => m.role === 'user')
   // The last message can be edited when it is the one the last answer replied to.
-  const canEditLast = !activeRunId && lastUser && lastAssistant && lastAssistant.seq === lastUser.seq + 1
+  const canEditLast = !activeRunId && lastUser && !lastUser.event && lastAssistant && lastAssistant.seq === lastUser.seq + 1
   const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
   const actionError = send.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
@@ -285,6 +288,9 @@ function Conversation() {
             </Link>
           )}
           {list.map((m) => {
+            if (m.role === 'user' && m.event) {
+              return <div key={m.id} className={enter(m.id)}><EventCard event={m.event} /></div>
+            }
             if (m.role === 'user') {
               return (
                 <div key={m.id} className={enter(m.id)}>
