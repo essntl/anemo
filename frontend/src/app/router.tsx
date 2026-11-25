@@ -66,6 +66,8 @@ export const router = createBrowserRouter([
           { path: 'agents', ...page(() => import('@/features/profiles/pages/ProfilesPage'), 'ProfilesPage') },
           { path: 'memory', ...page(() => import('@/features/memory/MemoryPage'), 'MemoryPage') },
           { path: 'notifications', ...page(() => import('@/features/notifications/NotificationsPage'), 'NotificationsPage') },
+          // A plugin's own page (its `page` UI), listed under Plugins in the sidebar and Ctrl+K.
+          { path: 'plugins/:pluginId/:uiId', ...page(() => import('@/features/plugins/PluginPage'), 'PluginPage') },
           {
             path: 'settings',
             element: <SettingsLayout />,
@@ -85,6 +87,8 @@ export const router = createBrowserRouter([
               { path: 'workspace', ...page(() => import('@/features/files/WorkspaceSettingsPage'), 'WorkspaceSettingsPage') },
               { path: 'web', ...page(() => import('@/features/web/WebSettingsPage'), 'WebSettingsPage') },
               { path: 'mcp', ...page(() => import('@/features/mcp/McpSettingsPage'), 'McpSettingsPage') },
+              { path: 'plugins', ...page(() => import('@/features/plugins/PluginsSettingsPage'), 'PluginsSettingsPage') },
+              { path: 'plugins/:pluginId', ...page(() => import('@/features/plugins/PluginDetailPage'), 'PluginDetailPage') },
               { path: 'notifications', ...page(() => import('@/features/notifications/NotificationSettingsPage'), 'NotificationSettingsPage') },
               { path: 'memory', ...page(() => import('@/features/memory/MemorySettingsPage'), 'MemorySettingsPage') },
               { path: 'properties', ...page(() => import('@/features/properties/PropertiesSettingsPage'), 'PropertiesSettingsPage') },
