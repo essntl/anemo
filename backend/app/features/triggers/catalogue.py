@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 # id: an exact id; text: compared case-insensitively; tags: matches when the item has the
-# tag; enum: one of `choices`; bool: true/false.
-FieldKind = Literal["id", "text", "tags", "enum", "bool"]
+# tag; enum: one of `choices`; bool: true/false; mcp_server: the id of an MCP server (the
+# trigger dialog shows a picker of the servers).
+FieldKind = Literal["id", "text", "tags", "enum", "bool", "mcp_server"]
 
 DEFAULT_MAX_DATA = 16 * 1024  # bytes of compact JSON an event's data may take
 
@@ -22,6 +23,9 @@ class EventField:
     label: str
     kind: FieldKind = "text"
     choices: tuple[str, ...] = ()
+    # A trigger of this type must name it (mcp.notification: the server, so a server
+    # can only fire the triggers that name it).
+    required: bool = False
 
 
 @dataclass(frozen=True)
@@ -35,6 +39,9 @@ class EventType:
     max_data: int = DEFAULT_MAX_DATA
     # Only the trigger it was sent to can match it (webhook.received).
     addressed: bool = False
+    # It comes from outside Anemo (a webhook, an MCP server): waking a chat on it is not
+    # the cheap, safe kind of wake-me.
+    outside: bool = False
     field_names: frozenset[str] = field(init=False)
 
     def __post_init__(self) -> None:
@@ -43,6 +50,15 @@ class EventType:
 
 TASK_STATUSES = ("todo", "in_progress", "waiting", "blocked", "done", "cancelled")
 CODE_ENDS = ("done", "failed", "cancelled", "exited_without_result")
+# The notifications an MCP server's session delivers that a trigger can wait for
+# (app/mcp/listen.py; others are not passed on by the MCP SDK).
+MCP_METHODS = (
+    "notifications/resources/updated",
+    "notifications/resources/list_changed",
+    "notifications/tools/list_changed",
+    "notifications/prompts/list_changed",
+    "notifications/message",
+)
 
 _TASK_FIELDS = (
     EventField("task_id", "Task", "id"),
@@ -163,6 +179,19 @@ EVENT_TYPES: tuple[EventType, ...] = (
         (EventField("content_type", "Content type"),),
         max_data=70 * 1024,  # the body may be up to 64 KB
         addressed=True,
+        outside=True,
+    ),
+    # Workstream M (docs/specs/17-mcp-triggers.md): what a connected MCP server sent.
+    EventType(
+        "mcp.notification",
+        "MCP server notification",
+        "A connected MCP server sent a notification (a resource changed, its tools changed…).",
+        (
+            EventField("server_id", "MCP server", "mcp_server", required=True),
+            EventField("method", "Notification", "enum", MCP_METHODS),
+            EventField("uri", "Resource URI"),
+        ),
+        outside=True,
     ),
 )
 

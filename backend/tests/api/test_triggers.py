@@ -340,7 +340,8 @@ async def test_crud_and_validation(authed):
     a = await automation(authed)
     catalogue = (await authed.get("/api/triggers/catalogue")).json()
     task_created = next(t for t in catalogue if t["type"] == "task.created")
-    assert {"name": "tags", "label": "Tag", "kind": "tags", "choices": []} in task_created["fields"]
+    tags = {"name": "tags", "label": "Tag", "kind": "tags", "choices": [], "required": False}
+    assert tags in task_created["fields"]
 
     r = await authed.post(
         "/api/triggers", json={"automation_id": a["id"], "event_type": "nope.nope"}

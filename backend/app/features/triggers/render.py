@@ -43,6 +43,9 @@ def summary(event_type: str, data: dict[str, Any]) -> str:
         detail = data.get("summary") or data.get("tool") or ""
     elif event_type == "webhook.received":
         detail = data.get("content_type") or ""
+    elif event_type == "mcp.notification":
+        method = str(data.get("method") or "").removeprefix("notifications/")
+        detail = " ".join(str(p) for p in (data.get("server"), method, data.get("uri")) if p)
     else:
         detail = data.get("title") or data.get("path") or ""
     text = f"{label}: {_short(detail)}" if detail else label

@@ -24,8 +24,8 @@ def _scalar(value: Any) -> bool:
 
 def check_filter(event_type: EventType, filter_: dict[str, Any]) -> dict[str, Any]:
     """The filter, cleaned (strings stripped). ValueError names what is wrong: a field the
-    catalogue doesn't list for this type, or a value that isn't a string, number, boolean
-    or a short list of them."""
+    catalogue doesn't list for this type, a value that isn't a string, number, boolean
+    or a short list of them, or a required field that is missing."""
     cleaned: dict[str, Any] = {}
     for name, value in filter_.items():
         if name not in event_type.field_names:
@@ -41,6 +41,9 @@ def check_filter(event_type: EventType, filter_: dict[str, Any]) -> dict[str, An
             )
         values = [v.strip()[:MAX_FILTER_TEXT] if isinstance(v, str) else v for v in values]
         cleaned[name] = values if isinstance(value, list) else values[0]
+    missing = [f.label for f in event_type.fields if f.required and f.name not in cleaned]
+    if missing:
+        raise ValueError(f"A {event_type.type} trigger must name its {', '.join(missing)}")
     return cleaned
 
 

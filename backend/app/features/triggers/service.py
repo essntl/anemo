@@ -332,7 +332,13 @@ def catalogue_out() -> list[EventTypeOut]:
             label=t.label,
             description=t.description,
             fields=[
-                EventFieldOut(name=f.name, label=f.label, kind=f.kind, choices=list(f.choices))
+                EventFieldOut(
+                    name=f.name,
+                    label=f.label,
+                    kind=f.kind,
+                    choices=list(f.choices),
+                    required=f.required,
+                )
                 for f in t.fields
             ],
         )
