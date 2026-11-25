@@ -107,6 +107,26 @@ password again.
   (Ctrl+Alt+Shift+S) on the computer cancels the running command and takes control away
   for an hour; the server sends no action until the client offers control again
   (looking still works, see above).
+- **Files on a computer** (`device_file_get`, `device_file_put`, Anemo Desktop 1.7.0).
+  Only on a *trusted* computer whose client has *Let Anemo read and write files* on (off by
+  default); a watched one is refused, by the server before asking and live before the first
+  command, and by the client. **What the agent can read and write there**: any file the
+  logged-in user can, but only inside the folders the client allows, checked by the client
+  with every link and junction followed first: the home folder, or the folders listed in
+  the client's Settings; never a hidden file or folder below them (`.ssh`, `.aws`, `.gnupg`,
+  `.config`, `.git`, the shell's start files), never the home folder's `AppData` (Windows:
+  browser profiles, credentials, the Startup folder) or `Library` (macOS: keychains, mail,
+  `LaunchAgents`), never the client's own folder (its token), and on Windows no network or
+  device paths. That closes reading keys and planting a program that starts at the next
+  sign-in, but not everything: a document, a download or a script on the desktop the user
+  later opens is reachable, so the permission (*Files on your computers*) asks by default,
+  and replacing an existing file on the computer is a *dangerous* action that is never done
+  unless the agent asked for `overwrite`. Each chunk and the whole file are checked by
+  SHA-256 on both ends; a copy onto the computer is written to a hidden temporary file and
+  only renamed once complete. In the workspace a copied-in file is a revertible run file
+  change, respects the folder access of Settings → Workspace (a folder hidden from agents
+  can't be sent away either), and its content is untrusted for the model. Stop pauses
+  copies too. The client's log keeps paths and sizes, never contents.
 - **Screens are untrusted.** Screenshots, window text and a shared screen can contain
   text written to steer the agent (an email, a web page, a document). They reach the
   model labelled as untrusted, like web pages, and what contains the damage is the

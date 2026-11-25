@@ -256,6 +256,44 @@ with the Code page's phase 2.
     the prompt runs as text (Claude Code sees it literally), no calculator opens.
     `logs\commands-<day>.jsonl` has `code_start` with the job id and the prompt's length only.
 
+## Files between the computer and the workspace (Anemo Desktop 1.7.0)
+
+On the VM (trusted) and on a watched PC. In Anemo, *Files on your computers* at its default
+(*Always ask*). The contract is `docs/device-contracts.md` §8.
+
+71. *Let Anemo read and write files* off (the default): the turn context's line of the computer
+    has no `files on`; asking the agent to fetch a file is denied without a question, no command
+    reaches the client (`logs\commands-<day>.jsonl` has no `file_*` line). Tick it and Save: within
+    30 s the line says `files on`.
+72. **Get**: "Copy `C:\Users\<you>\Documents\<a 20 MB PDF>` from VM to `inbox/`": asked once
+    (*Copy … from VM to the workspace*); the file appears in Files with the same size; its SHA-256
+    (`Get-FileHash`) matches the server's (`sha256sum` in the workspace). The run's file changes
+    list it; *Revert* moves it to the trash.
+73. **Put**: "Put `inbox/report.pdf` on VM as `C:\Users\<you>\Desktop\report.pdf`": asked; the
+    file appears on the desktop only at the end (during a large copy only a hidden
+    `.report.pdf.anemo-xxxxxxxx.part` is there: show hidden files in Explorer), same hash. Again
+    without overwrite: refused, "already exists". With overwrite: asked as **dangerous**, the file
+    is replaced.
+74. **Folders**: try `C:\Users\<you>\.ssh\id_ed25519`, a `.bat` in
+    `C:\Users\<you>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`,
+    `%APPDATA%\Anemo Desktop\settings.json`, `C:\Windows\win.ini`, `\\server\share\x`,
+    `C:\Users\<you>\x.txt:stream`: each refused with a sentence, nothing written. A junction in
+    Documents pointing at `C:\Windows` (`mklink /J`): a file through it is refused. Set *Folders for
+    files* to `D:\Shared`: the home folder is refused, `D:\Shared` works; a relative folder can't be
+    saved.
+75. **Size**: Settings → Devices → *Largest file* 1 MB: a 2 MB file is refused before any chunk
+    (one `file_stat` in the command log). Back to 50.
+76. **Broken copy**: during a 150 MB put (largest file 200 MB) quit Anemo Desktop: no file under the
+    final name; the hidden `.part` file stays (delete it by hand). During one, pull the network:
+    within a minute the `.part` file is gone (the 60 s rule) and the agent's call failed.
+77. **Stop**: press the stop key during a large copy: the call fails ("stopped"), the `.part` file
+    goes; copies are refused until the pause ends. *Allow control* off alone doesn't stop copies.
+78. **Watched**: on the watched PC with the switch on: denied without asking, and the client
+    refuses too (send `file_stat` from a test server).
+79. Unicode names (`Grüße ✓.txt`), a 0-byte file and a file open in Word (read: works; replacing it
+    with overwrite: Windows may refuse, a sentence comes back) behave.
+80. The command log: `file_*` lines have paths, offsets and sizes, never contents.
+
 ## Platforms
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a
