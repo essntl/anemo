@@ -175,6 +175,8 @@ async def test_install_review_approve_enable(authed):
     shown = (await authed.get("/api/plugins/contributions")).json()
     assert shown["disabled_all"] is False
     assert sorted(u["id"] for u in shown["ui"]) == ["page", "panel"]
+    # The host checks a call against the approved permissions before sending it.
+    assert all(u["permissions"] == ["tasks:read", "tasks:write"] for u in shown["ui"])
     assert shown["commands"][0]["action"] == {"type": "openPage", "page": "page"}
     assert shown["templates"][0]["id"] == "follow-up"
     listed = (await authed.get("/api/plugins")).json()
@@ -728,6 +730,32 @@ async def test_frame_bundle_files_and_tampering(authed):
     detail = (await authed.get(f"/api/plugins/{HELLO}")).json()
     assert detail["status"] == "error" and detail["error"]
     assert code_of(await call(authed, HELLO, "tasks.list")) == "unavailable"
+
+
+async def test_frame_bundle_carries_the_modules_a_script_imports(authed):
+    files = package_files(
+        manifest(plugin_id="artem.modules"),
+        **{
+            "ui/panel.html": b'<script type="module" src="main.js"></script>'
+            b'<script src="panel.js"></script>',
+            "ui/main.js": b"import { add } from './util.js'\nconsole.log(add(1, 2))",
+            "ui/util.js": b"export const add = (a, b) => a + b",
+            "lib/deep.mjs": b"export default 1",
+        },
+    )
+    await approve(authed, await install_zip(authed, files), "1.0.0")
+    r = await authed.get("/api/plugins/artem.modules/versions/1.0.0/ui/panel")
+    assert r.status_code == 200, r.text
+    scripts = r.json()["scripts"]
+    # The ones the HTML names first, in its order; then every other script of the version.
+    assert [s["path"] for s in scripts] == [
+        "ui/main.js",
+        "ui/panel.js",
+        "lib/deep.mjs",
+        "ui/util.js",
+    ]
+    assert scripts[3]["text"] == "export const add = (a, b) => a + b"
+    assert all(set(s) == {"path", "text"} for s in scripts)
 
 
 # -- output is data -------------------------------------------------------------------------

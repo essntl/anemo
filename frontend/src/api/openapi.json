@@ -8952,7 +8952,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/app__features__memory__router__ApproveIn"
+                    "$ref": "#/components/schemas/ApproveIn"
                   },
                   {
                     "type": "null"
@@ -21103,7 +21103,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__features__plugins__schemas__ApproveIn"
+                "$ref": "#/components/schemas/PluginApproveIn"
               }
             }
           }
@@ -21614,7 +21614,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__features__plugins__chat_router__PluginChatOut"
+                  "$ref": "#/components/schemas/PluginBuildChatOut"
                 }
               }
             }
@@ -22175,6 +22175,23 @@
           "decided_at"
         ],
         "title": "ApprovalOut"
+      },
+      "ApproveIn": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "title": "ApproveIn"
       },
       "AssetOut": {
         "properties": {
@@ -25517,6 +25534,13 @@
               }
             ],
             "title": "Fence"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions"
           }
         },
         "type": "object",
@@ -25532,7 +25556,8 @@
           "icon",
           "entry",
           "height",
-          "fence"
+          "fence",
+          "permissions"
         ],
         "title": "ContributedUiOut"
       },
@@ -32325,6 +32350,27 @@
         ],
         "title": "PlaylistTracksIn"
       },
+      "PluginApproveIn": {
+        "properties": {
+          "hash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Hash"
+          },
+          "enable": {
+            "type": "boolean",
+            "title": "Enable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "hash"
+        ],
+        "title": "PluginApproveIn"
+      },
       "PluginAuthorOut": {
         "properties": {
           "name": {
@@ -32348,6 +32394,21 @@
           "name"
         ],
         "title": "PluginAuthorOut"
+      },
+      "PluginBuildChatOut": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id"
+        ],
+        "title": "PluginBuildChatOut",
+        "description": "The chat \"Continue building with the assistant\" started (POST /{plugin}/chat)."
       },
       "PluginCallIn": {
         "properties": {
@@ -32429,6 +32490,25 @@
         },
         "type": "object",
         "title": "PluginChatIn"
+      },
+      "PluginChatOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PluginChatOut"
       },
       "PluginContributionsOut": {
         "properties": {
@@ -32654,7 +32734,7 @@
           },
           "chats": {
             "items": {
-              "$ref": "#/components/schemas/app__features__plugins__schemas__PluginChatOut"
+              "$ref": "#/components/schemas/PluginChatOut"
             },
             "type": "array",
             "title": "Chats"
@@ -41194,23 +41274,6 @@
         ],
         "title": "SaveIn"
       },
-      "app__features__memory__router__ApproveIn": {
-        "properties": {
-          "content": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Content"
-          }
-        },
-        "type": "object",
-        "title": "ApproveIn"
-      },
       "app__features__memory__router__ReindexOut": {
         "properties": {
           "queued": {
@@ -41223,60 +41286,6 @@
           "queued"
         ],
         "title": "ReindexOut"
-      },
-      "app__features__plugins__chat_router__PluginChatOut": {
-        "properties": {
-          "conversation_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Conversation Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "conversation_id"
-        ],
-        "title": "PluginChatOut"
-      },
-      "app__features__plugins__schemas__ApproveIn": {
-        "properties": {
-          "hash": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 64,
-            "pattern": "^[0-9a-f]{64}$",
-            "title": "Hash"
-          },
-          "enable": {
-            "type": "boolean",
-            "title": "Enable",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "hash"
-        ],
-        "title": "ApproveIn"
-      },
-      "app__features__plugins__schemas__PluginChatOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
-        "title": "PluginChatOut"
       },
       "app__features__properties__schemas__ReindexOut": {
         "properties": {

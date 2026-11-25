@@ -873,6 +873,7 @@ async def contributions(db: AsyncSession) -> PluginContributionsOut:
                     entry=ui.entry,
                     height=ui.height,
                     fence=ui.fence,
+                    permissions=list(manifest.permissions),
                 )
             )
             if ui.fence:
@@ -944,8 +945,9 @@ def _package_path(entry: str, reference: str) -> str | None:
 async def frame_bundle(
     db: AsyncSession, plugin: Plugin, version: str, ui_id: str
 ) -> PluginFrameBundleOut:
-    """What the host hands a frame (§6.1): the entry's HTML and the scripts and styles it
-    names, checked against their hashes. The approved version of an enabled plugin, or a
+    """What the host hands a frame (§6.1): the entry's HTML, the scripts and styles it
+    names (in order) followed by the version's other .js/.mjs files (for module imports),
+    all checked against their hashes. The approved version of an enabled plugin, or a
     version under review (a preview)."""
     if await gate.kill_switch_on(db):
         raise CallError("unavailable", gate.KILL_SWITCH_ON)
@@ -966,16 +968,32 @@ async def frame_bundle(
         parser = _References()
         parser.feed(html)
 
-        def files_for(references: list[str]) -> list[FrameFileOut]:
+        def files_for_paths(paths: list[str]) -> list[FrameFileOut]:
             out: list[FrameFileOut] = []
-            for reference in references:
-                path = _package_path(ui["entry"], reference)
-                if path is not None and path in row.files:
-                    data = store.read_file(plugin.plugin_id, row.hash, path, row.files)
-                    out.append(FrameFileOut(path=path, text=data.decode("utf-8")))
+            for path in paths:
+                data = store.read_file(plugin.plugin_id, row.hash, path, row.files)
+                out.append(FrameFileOut(path=path, text=data.decode("utf-8")))
             return out
 
+        def files_for(references: list[str]) -> list[FrameFileOut]:
+            paths: list[str] = []
+            for reference in references:
+                path = _package_path(ui["entry"], reference)
+                if path is not None and path in row.files and path not in paths:
+                    paths.append(path)
+            return files_for_paths(paths)
+
         scripts, styles = files_for(parser.scripts), files_for(parser.styles)
+        # Then every other script of the version: module scripts import them ("./util.js"),
+        # and the bootstrap resolves those imports against the bundle. It only runs the
+        # scripts the HTML names, so the extra ones are just there to be imported.
+        named = {script.path for script in scripts}
+        others = sorted(
+            path
+            for path in row.files
+            if path not in named and posixpath.splitext(path.lower())[1] in (".js", ".mjs")
+        )
+        scripts += files_for_paths(others)
     except store.FilesChanged as exc:
         if row.status == "approved":
             await _stop(db, plugin, exc.message)

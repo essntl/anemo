@@ -5428,6 +5428,11 @@ export interface components {
             /** Decided At */
             decided_at: string | null;
         };
+        /** ApproveIn */
+        ApproveIn: {
+            /** Content */
+            content?: string | null;
+        };
         /** AssetOut */
         AssetOut: {
             /** Path */
@@ -6585,6 +6590,8 @@ export interface components {
             height: number | null;
             /** Fence */
             fence: string | null;
+            /** Permissions */
+            permissions: string[];
         };
         /** ContributionOut */
         ContributionOut: {
@@ -9231,12 +9238,33 @@ export interface components {
             /** Track Ids */
             track_ids: string[];
         };
+        /** PluginApproveIn */
+        PluginApproveIn: {
+            /** Hash */
+            hash: string;
+            /**
+             * Enable
+             * @default false
+             */
+            enable: boolean;
+        };
         /** PluginAuthorOut */
         PluginAuthorOut: {
             /** Name */
             name: string;
             /** Url */
             url?: string | null;
+        };
+        /**
+         * PluginBuildChatOut
+         * @description The chat "Continue building with the assistant" started (POST /{plugin}/chat).
+         */
+        PluginBuildChatOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
         };
         /** PluginCallIn */
         PluginCallIn: {
@@ -9266,6 +9294,16 @@ export interface components {
              * @default
              */
             message: string;
+        };
+        /** PluginChatOut */
+        PluginChatOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
         };
         /** PluginContributionsOut */
         PluginContributionsOut: {
@@ -9342,7 +9380,7 @@ export interface components {
             /** Versions */
             versions: components["schemas"]["PluginVersionOut"][];
             /** Chats */
-            chats: components["schemas"]["app__features__plugins__schemas__PluginChatOut"][];
+            chats: components["schemas"]["PluginChatOut"][];
         };
         /** PluginDiffOut */
         PluginDiffOut: {
@@ -12528,43 +12566,10 @@ export interface components {
             /** Base Hash */
             base_hash?: string | null;
         };
-        /** ApproveIn */
-        app__features__memory__router__ApproveIn: {
-            /** Content */
-            content?: string | null;
-        };
         /** ReindexOut */
         app__features__memory__router__ReindexOut: {
             /** Queued */
             queued: boolean;
-        };
-        /** PluginChatOut */
-        app__features__plugins__chat_router__PluginChatOut: {
-            /**
-             * Conversation Id
-             * Format: uuid
-             */
-            conversation_id: string;
-        };
-        /** ApproveIn */
-        app__features__plugins__schemas__ApproveIn: {
-            /** Hash */
-            hash: string;
-            /**
-             * Enable
-             * @default false
-             */
-            enable: boolean;
-        };
-        /** PluginChatOut */
-        app__features__plugins__schemas__PluginChatOut: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Title */
-            title: string;
         };
         /** ReindexOut */
         app__features__properties__schemas__ReindexOut: {
@@ -17468,7 +17473,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["app__features__memory__router__ApproveIn"] | null;
+                "application/json": components["schemas"]["ApproveIn"] | null;
             };
         };
         responses: {
@@ -23984,7 +23989,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__features__plugins__schemas__ApproveIn"];
+                "application/json": components["schemas"]["PluginApproveIn"];
             };
         };
         responses: {
@@ -24242,7 +24247,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__features__plugins__chat_router__PluginChatOut"];
+                    "application/json": components["schemas"]["PluginBuildChatOut"];
                 };
             };
             /** @description Validation Error */
