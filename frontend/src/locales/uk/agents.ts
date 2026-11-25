@@ -230,5 +230,11 @@ const messages: Messages = {
   "Build plugins": "Створення плагінів",
   "Write and change plugins. They stay off until you review and approve them in Settings > Plugins.": "Написання та змінення плагінів. Вони залишаються вимкненими, доки ви не переглянете й не схвалите їх у Налаштування > Плагіни.",
   "Open in Files: {path}": "Відкрити у «Файлах»: {path}",
+  "not found": "не знайдено",
+  "(untitled)": "(без назви)",
+  "(in the trash)": "(у кошику)",
+  "Hide the items": "Сховати елементи",
+  "Show the {n} item | Show all {n} items": "Показати {n} елемент | Показати всі {n} елементи | Показати всі {n} елементів",
+  "Items in this batch": "Елементи цієї групи змін",
 }
 export default messages

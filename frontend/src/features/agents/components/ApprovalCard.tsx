@@ -9,6 +9,8 @@ import { cn } from '@/lib/cn'
 import { msg, rich, t } from '@/lib/i18n'
 import { type ToolCallView, useDecide, useTimeline } from '../api'
 import { pendingApproval } from '../question'
+import { batchItems } from '../batch'
+import { BatchItems } from './BatchItems'
 
 const RISK_TEXT: Record<string, string> = { moderate: msg('moderate risk'), dangerous: msg('dangerous risk') }
 
@@ -22,6 +24,7 @@ export function ApprovalCard({ runId, call, docked }: { runId: string; call: Too
   const [reason, setReason] = useState('')
   const approvalId = call.approval!.id
   const busy = decide.isPending
+  const items = batchItems(call)
   useShortcut('chat.allow', () => decide.mutate({ approvalId, decision: 'approve', scope: 'once' }), Boolean(docked) && !busy)
   useShortcut('chat.deny', () => setDenying(true), Boolean(docked) && !busy && !denying)
   return (
@@ -35,6 +38,7 @@ export function ApprovalCard({ runId, call, docked }: { runId: string; call: Too
             {call.decision_reason} · {rich('capability <code></code>', { code: () => <code className="font-mono">{call.capability}</code> })}
             {call.risk && call.risk !== 'safe' ? ` · ${RISK_TEXT[call.risk] ? t(RISK_TEXT[call.risk]) : t('{risk} risk', { risk: call.risk })}` : ''}
           </div>
+          {items.length > 0 && <BatchItems items={items} />}
         </div>
       </div>
       {denying ? (
