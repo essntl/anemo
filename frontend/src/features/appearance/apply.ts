@@ -9,7 +9,7 @@
  * is worked out here.
  */
 import type { Schemas } from '@/api/client'
-import { AA_TEXT, AA_UI, accentShades, contrast, isHex, mix } from '@/lib/color'
+import { AA_TEXT, AA_UI, accentShades, contrast, isHex, mix, readableOn } from '@/lib/color'
 import { fontStack } from './fonts'
 
 /** The server's settings; fields it fills with a default are always there. */
@@ -106,7 +106,7 @@ export function surfaces(a: Appearance, mode: Resolved): Record<Surface, string>
 
 /** Every variable this module may set, so one left from an earlier choice is removed. */
 const MANAGED = [
-  '--accent', '--accent-hover', '--accent-active', '--accent-contrast',
+  '--accent', '--accent-hover', '--accent-active', '--accent-contrast', '--accent-text',
   '--bg', '--surface', '--surface-2', '--surface-hover', '--card',
   '--font-ui', '--font-code',
   '--glass-blur', '--glass-opacity',
@@ -145,6 +145,10 @@ export function cssVariables(a: Appearance, mode: Resolved): Vars {
   if (a.tint && isHex(a.tint) && a.tint_strength > 0) {
     for (const [name, value] of Object.entries(surfaces(a, mode))) vars[`--${name}`] = value
   }
+  // Links and other text in the accent colour: lightened (dark) or darkened (light) just
+  // enough to read on every surface. The plain accent stays for buttons and fills.
+  const s = surfaces(a, mode)
+  vars['--accent-text'] = readableOn(accent, [s.bg, s.surface, s['surface-2'], s.card], mode === 'dark' ? '#ffffff' : '#000000')
   const ui = fontStack(a.ui_font, 'ui')
   if (ui) vars['--font-ui'] = ui
   const code = fontStack(a.code_font, 'code')

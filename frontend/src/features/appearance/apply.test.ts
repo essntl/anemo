@@ -25,9 +25,20 @@ describe('the copy of the theme colours', () => {
 describe('cssVariables', () => {
   it('sets the accent and its shades, and nothing else by default', () => {
     const vars = cssVariables(DEFAULT_APPEARANCE, 'light')
-    expect(Object.keys(vars).sort()).toEqual(['--accent', '--accent-active', '--accent-contrast', '--accent-hover'])
+    expect(Object.keys(vars).sort()).toEqual(['--accent', '--accent-active', '--accent-contrast', '--accent-hover', '--accent-text'])
     expect(vars['--accent']).toBe('#2a6df4')
     expect(vars['--accent-contrast']).toBe('#ffffff')
+  })
+
+  it('makes text in the accent colour readable on every surface, in both themes', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      for (const accent of ['#2a6df4', '#5f6b7a', '#ffe14d', '#1f9d6b']) {
+        const text = cssVariables({ ...DEFAULT_APPEARANCE, accent }, mode)['--accent-text']
+        for (const bg of [BASE[mode].bg, BASE[mode].surface, BASE[mode]['surface-2'], BASE[mode].card]) expect(contrast(text, bg), `${mode} ${accent} on ${bg}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+    // Already readable: unchanged (a dark blue on white).
+    expect(cssVariables({ ...DEFAULT_APPEARANCE, accent: '#1a3c8c' }, 'light')['--accent-text']).toBe('#1a3c8c')
   })
 
   it('picks dark text on a light accent', () => {

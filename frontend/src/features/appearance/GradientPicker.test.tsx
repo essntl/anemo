@@ -7,7 +7,7 @@ import { type Background, DEFAULT_BACKGROUND } from './apply'
 const toastSpy = vi.hoisted(() => vi.fn())
 vi.mock('@/components/ui/toast', () => ({ toast: toastSpy }))
 import { GradientPicker } from './GradientPicker'
-import { gradientColors, gradientLayer } from './gradients'
+import { distinctColor, gradientColors, gradientLayer } from './gradients'
 
 const ACCENT = '#2a6df4'
 let latest: Background
@@ -118,6 +118,17 @@ describe('gradientLayer', () => {
     for (const i of [1, 2, 3, 4]) {
       expect(style[`--g${i}`], `--g${i}`).toBe(colors[(i - 1) % n])
       expect(style[`--p${i}`], `--p${i}`).toBeTruthy()
+    }
+  })
+})
+
+describe('distinctColor', () => {
+  it('adds a colour you can see, not a near copy of one already there', () => {
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+    const far = (a: string, b: string) => Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i])) > 150
+    for (const existing of [['#ff7e5f', '#feb47b'], ['#2a6df4', '#00c2d4', '#c04fe0']]) {
+      const added = distinctColor(existing, '#2a6df4')
+      for (const c of existing) expect(far(added, c), `${added} vs ${c}`).toBe(true)
     }
   })
 })

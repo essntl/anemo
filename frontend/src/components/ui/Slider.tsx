@@ -171,10 +171,13 @@ export function SliderField({
   format: (value: number) => string
 }) {
   return (
-    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_3.25rem] items-center gap-3 md:grid-cols-[7rem_minmax(0,1fr)_3.5rem]">
+    // Phones: the name and the value on one line, the slider full width under them.
+    // Wider: name, slider and value side by side in fixed columns.
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_3.25rem] md:grid-cols-[7rem_minmax(0,1fr)_3.5rem]">
       <span className="truncate text-[13px] text-muted">{label}</span>
-      <Slider label={label} valueText={(v) => format(Math.round(v))} thumb="always" {...slider} />
-      <span className="text-right text-[12.5px] tabular-nums text-muted">{format(slider.value)}</span>
+      <Slider label={label} valueText={(v) => format(Math.round(v))} thumb="always" {...slider}
+        className={cn('col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1', slider.className)} />
+      <span className="text-right text-[12.5px] tabular-nums text-muted sm:col-start-3">{format(slider.value)}</span>
     </div>
   )
 }

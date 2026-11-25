@@ -75,7 +75,7 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
           </div>
           <p className="mt-0.5 text-[13px] text-muted">
             {automation.schedule_text}
-            {automation.enabled && automation.next_run_at && <> · <span className="whitespace-nowrap">{t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</span></>}
+            {automation.enabled && automation.next_run_at && <> <span className="whitespace-nowrap">· {t('next {when}', { when: formatUpcoming(automation.next_run_at) })}</span></>}
             {!automation.enabled && <> · {t('off')}</>}
             {automation.last_run_at && <> · {t('last ran {when}', { when: formatWhen(automation.last_run_at) })}</>}
           </p>
@@ -91,15 +91,15 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
           { label: t('Delete'), icon: <Trash2 />, danger: true, onSelect: () => void confirmDelete() },
         ]} />
       </div>
-      <div className="mt-(--item-gap) flex flex-wrap items-center gap-2 pl-12">
+      {/* Under the text on wider screens; from the card's edge on a phone, so the buttons fit one line. */}
+      <div className="mt-(--item-gap) flex flex-wrap items-center gap-2 sm:pl-12">
         <Button size="sm" variant="secondary" icon={<Play className="h-3.5 w-3.5" />} disabled={running}
           loading={runNow.isPending} onClick={() => runNow.mutate(automation.id)}>
           {t('Run now')}
         </Button>
         <Button size="sm" variant="ghost" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}
-          icon={<History className="h-3.5 w-3.5" />} aria-label={t('History')}>
-          {/* A phone keeps the buttons on one line: History is its icon there. */}
-          <span className="max-sm:sr-only">{t('History')}</span>
+          icon={<History className="h-3.5 w-3.5" />}>
+          {t('History')}
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showHistory && 'rotate-180')} />
         </Button>
         {running && automation.active_run_id && status !== 'waiting' && (
@@ -114,7 +114,7 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
           </Link>
         )}
       </div>
-      {error && <p className="mt-2 pl-12 text-[12.5px] text-error">{errorMessage(error)}</p>}
+      {error && <p className="mt-2 text-[12.5px] text-error sm:pl-12">{errorMessage(error)}</p>}
       {showHistory && <div className="mt-2 border-t border-border pt-2 md:pl-10"><RunHistory automation={automation} highlight={highlight ?? null} /></div>}
     </div>
   )
@@ -205,7 +205,8 @@ export function AutomationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-4 md:px-8 md:pb-8 md:pt-1">
-      <PageHeader title={t('Automations')} inline={desktop}>{!empty && newButton}</PageHeader>
+      {/* On a phone the button sits in the top bar: a little in from its edge, like the title. */}
+      <PageHeader title={t('Automations')} inline={desktop}>{!empty && (desktop ? newButton : <div className="mr-2">{newButton}</div>)}</PageHeader>
       {/* The tabs come first and stay put; what each tab is about is said under them. */}
       <Segmented kind="tabs" controls="automations-tab" label={t('Kind of automation')} value={tab} onChange={setTab} className="mb-3"
         options={[

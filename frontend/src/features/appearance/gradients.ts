@@ -5,7 +5,7 @@
  * sliding bands (at an angle), and a speed.
  */
 import type { CSSProperties } from 'react'
-import { mix } from '@/lib/color'
+import { mix, parseHex } from '@/lib/color'
 import { msg } from '@/lib/i18n'
 import type { Background, CustomGradient } from './apply'
 
@@ -74,4 +74,18 @@ export function gradientLayer(background: Pick<Background, 'gradient' | 'custom_
 /** A small still picture of a gradient, for a swatch or a preview. */
 export function swatchBackground(colors: string[], angle = 135): string {
   return `linear-gradient(${angle}deg, ${colors.join(', ')})`
+}
+
+/** Colours a new stop can start as: the accent and a spread of hues. */
+const NEW_STOP_CANDIDATES = ['#ffcc00', '#00c2d4', '#c04fe0', '#ff5c7a', '#2bd17e', '#ff8a3d', '#2a6df4']
+
+/** The candidate (the accent first among equals) furthest from all `existing` colours. */
+export function distinctColor(existing: string[], accent: string): string {
+  const rgb = (hex: string) => parseHex(hex) ?? { r: 0, g: 0, b: 0 }
+  const distance = (a: string, b: string) => {
+    const [x, y] = [rgb(a), rgb(b)]
+    return Math.hypot(x.r - y.r, x.g - y.g, x.b - y.b)
+  }
+  const nearest = (c: string) => Math.min(...existing.map((e) => distance(c, e)))
+  return [accent, ...NEW_STOP_CANDIDATES].reduce((best, c) => (nearest(c) > nearest(best) ? c : best))
 }

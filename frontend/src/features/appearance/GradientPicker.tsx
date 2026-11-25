@@ -11,11 +11,10 @@ import { FieldRow } from '@/components/ui/SettingRow'
 import { SliderField } from '@/components/ui/Slider'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/cn'
-import { mix } from '@/lib/color'
 import { t } from '@/lib/i18n'
 import type { Background, CustomGradient } from './apply'
 import { ColorField } from './ColorSwatches'
-import { colorsOf, GRADIENTS, type GradientId, gradientColors, gradientLayer, swatchBackground } from './gradients'
+import { colorsOf, distinctColor, GRADIENTS, type GradientId, gradientColors, gradientLayer, swatchBackground } from './gradients'
 
 export const MIN_STOPS = 2
 export const MAX_STOPS = 4
@@ -118,8 +117,8 @@ export function CustomGradientEditor({ value, onChange, background, accent }: {
 }) {
   const setStop = (i: number, color: string) => onChange({ colors: value.colors.map((c, j) => (j === i ? color : c)) })
   const removeStop = (i: number) => onChange({ colors: value.colors.filter((_, j) => j !== i) })
-  // A new colour starts halfway between the last and the first, so the gradient barely jumps.
-  const addStop = () => onChange({ colors: [...value.colors, mix(value.colors[value.colors.length - 1], value.colors[0], 0.5)] })
+  // A new colour you can see: the candidate furthest from every colour already there.
+  const addStop = () => onChange({ colors: [...value.colors, distinctColor(value.colors, accent)] })
   // The preview shows the gradient being edited, moving, whatever is chosen behind the app.
   const layer = gradientLayer({ ...background, gradient: 'custom', custom_gradient: value }, accent)
 
@@ -129,7 +128,7 @@ export function CustomGradientEditor({ value, onChange, background, accent }: {
       <div className="relative h-20 overflow-hidden rounded-control border border-border" aria-hidden>
         <div className="app-gradient" data-style={layer.dataStyle} style={layer.style} />
       </div>
-      <FieldRow label={t('Colors')} className="items-start [&>span]:pt-1.5">
+      <FieldRow label={t('Colors')} className="sm:items-start sm:[&>span]:pt-1.5">
         <div role="group" aria-label={t('Colors')} className="flex flex-wrap items-start gap-x-4 gap-y-2">
           {value.colors.map((c, i) => (
             <div key={i} className="flex items-start gap-0.5">

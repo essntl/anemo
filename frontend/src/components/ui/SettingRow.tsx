@@ -105,11 +105,13 @@ export function SettingRows({ children, className }: { children: ReactNode; clas
 
 /**
  * A labelled control inside a setting's card: the label in a fixed column on the left,
- * so the controls of one card line up (the same column as SliderField's label).
+ * so the controls of one card line up (the same column as SliderField's label); on a
+ * phone the label goes above the control.
  */
 export function FieldRow({ label, children, className }: { label: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <div className={cn('grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 md:grid-cols-[7rem_minmax(0,1fr)]', className)}>
+    // Phones: the label above the control, so the control gets the whole width.
+    <div className={cn('grid grid-cols-1 gap-1.5 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:items-center sm:gap-3 md:grid-cols-[7rem_minmax(0,1fr)]', className)}>
       <span className="text-[13px] text-muted">{label}</span>
       <div className="min-w-0">{children}</div>
     </div>

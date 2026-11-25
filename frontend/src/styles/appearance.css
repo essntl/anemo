@@ -13,6 +13,14 @@ html[data-background='on'] .chat-panel {
   background-color: transparent;
 }
 
+/* ---- Text in the accent colour ------------------------------------------------------ */
+
+/* Links, the chosen item in a list, accent labels: --accent-text is the accent made
+   readable on the page (apply.ts), so a dark accent on a dark page doesn't vanish. */
+.text-accent {
+  color: var(--accent-text, var(--accent));
+}
+
 /* ---- Frosted glass --------------------------------------------------------------- */
 
 /* The panel keeps most of its colour, so text on it stays readable whatever is behind.
@@ -129,7 +137,10 @@ video.app-background-media {
 }
 /* ...or bands of colour along the angle that slide slowly. */
 .app-gradient[data-style='linear'] {
-  background: linear-gradient(var(--g-angle, 135deg), var(--g-stops));
+  /* A veil of the page colour over the bands, as the spots fade into it: dark mode stays dark. */
+  background:
+    linear-gradient(color-mix(in srgb, var(--bg) 45%, transparent), color-mix(in srgb, var(--bg) 45%, transparent)),
+    linear-gradient(var(--g-angle, 135deg), var(--g-stops));
 }
 @keyframes app-gradient-drift {
   from { transform: translate3d(-8%, -5%, 0) rotate(0deg) scale(1); }
