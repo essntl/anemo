@@ -10,6 +10,9 @@
 # notarization (the release workflow does that). Without it the app is signed ad hoc
 # ("codesign -s -"): it runs on this Mac (right-click > Open the first time elsewhere), and
 # macOS forgets its Screen Recording and Accessibility permissions at every new build.
+#
+# Updates (docs/specs/23-desktop-auto-update.md): ANEMO_UPDATE_REPOSITORY (owner/name) and
+# ANEMO_UPDATE_PUBLIC_KEY, when set, are compiled in (the release workflow sets both).
 set -eu
 
 rid="${1:-osx-arm64}"
@@ -28,7 +31,8 @@ version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$desktop/Directory.Bui
 echo "== publish $rid ($version)"
 rm -rf "$out"
 dotnet publish "$desktop/src/Anemo.Desktop.Mac/Anemo.Desktop.Mac.csproj" -c Release -r "$rid" --self-contained \
-  -o "$out/bin"
+  -o "$out/bin" \
+  -p:AnemoUpdateRepository="${ANEMO_UPDATE_REPOSITORY:-}" -p:AnemoUpdatePublicKey="${ANEMO_UPDATE_PUBLIC_KEY:-}"
 
 echo "== bundle"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
