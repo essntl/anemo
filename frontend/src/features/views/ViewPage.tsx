@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Segmented } from '@/components/ui/Segmented'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/toast'
+import { Board, type BoardColumn } from '@/features/board/Board'
 import { TYPE_ICONS } from '@/features/links/linkTypes'
 import { type PropertyDefinition, useProperties, valueLabel } from '@/features/properties/api'
 import { useProjects } from '@/features/tasks/api'
@@ -143,30 +144,30 @@ export function TableLayout({ view, rows, definitions, onChange }: { view: Saved
   )
 }
 
+/** Grouped by a select property: a column per value. Dragging a card to another column gives it that value. */
 function BoardLayout({ view, rows, definitions, onChange }: { view: SavedView; rows: ViewRow[]; definitions: Map<string, PropertyDefinition>; onChange: (row: ViewRow, key: string, value: unknown) => void }) {
   const selects = [...definitions.values()].filter((d) => d.type === 'select')
   const key = view.query.group_by ?? (selects.find((d) => d.key === 'status') ?? selects[0])?.key
   const definition = key ? definitions.get(key) : undefined
   if (!definition) return <p className="text-[13px] text-muted">{t('A board needs a property with a list of values to group by.')}</p>
-  const groups = groupRows(rows, definition.key, definition.options.map((o) => o.slug))
+  const groupName = (value: string) => (value ? valueLabel(definition, value) : t('No {property}', { property: definition.label }))
+  // The rows have no order of their own: a column only takes a card, it doesn't place it.
+  const columns: BoardColumn<ViewRow>[] = groupRows(rows, definition.key, definition.options.map((o) => o.slug))
+    .map(([value, items]) => ({ id: value, label: groupName(value), items, ordered: false }))
+  const byId = new Map(rows.map((r) => [r.id, r]))
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {groups.map(([value, items]) => (
-        <section key={value || '-'} aria-label={value ? valueLabel(definition, value) : t('No {property}', { property: definition.label })}
-          className="flex w-64 shrink-0 flex-col gap-1.5 rounded-card bg-surface-2 p-2">
-          <h2 className="px-1 text-[12px] font-semibold text-muted">
-            {value ? valueLabel(definition, value) : t('No {property}', { property: definition.label })} <span className="text-subtle">{items.length}</span>
-          </h2>
-          {items.map((row) => (
-            <div key={row.id} className="flex flex-col gap-1 rounded-control border border-border bg-card p-2 shadow-soft">
-              <Link to={row.url} className="text-[13px] font-medium hover:underline">{row.title}</Link>
-              <Select variant="ghost" value={value} aria-label={t('Move {title} to', { title: row.title })} onValueChange={(v) => onChange(row, definition.key, v)}
-                options={[{ value: '', label: t('No {property}', { property: definition.label }) }, ...definition.options.map((o) => ({ value: o.slug, label: o.label }))]} />
-            </div>
-          ))}
-        </section>
-      ))}
-    </div>
+    <Board label={t('Grouped by {property}', { property: definition.label })} columns={columns} itemId={(row) => row.id} itemLabel={(row) => row.title}
+      onMove={({ id, to }) => {
+        const row = byId.get(id)
+        if (row) onChange(row, definition.key, to)
+      }}
+      renderCard={(row, column) => (
+        <div className="flex flex-col gap-1">
+          <Link to={row.url} className="text-[13px] font-medium hover:underline">{row.title}</Link>
+          <Select variant="ghost" value={column.id} aria-label={t('Move {title} to', { title: row.title })} onValueChange={(v) => onChange(row, definition.key, v)}
+            options={[{ value: '', label: t('No {property}', { property: definition.label }) }, ...definition.options.map((o) => ({ value: o.slug, label: o.label }))]} />
+        </div>
+      )} />
   )
 }
 

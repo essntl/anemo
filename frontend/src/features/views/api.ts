@@ -56,6 +56,23 @@ export function useDeleteView() {
   })
 }
 
+/** What the rows query holds: the rows, and whether there were more. */
+type ViewRows = { rows: ViewRow[]; truncated: boolean }
+
+/** The rows with one row's property set (an empty value takes it off). */
+export function withProperty<D extends { rows: ViewRow[] }>(data: D, rowId: string, key: string, value: unknown): D {
+  return {
+    ...data,
+    rows: data.rows.map((row) => {
+      if (row.id !== rowId) return row
+      const properties = { ...row.properties }
+      if (value === '' || value === null || value === undefined) delete properties[key]
+      else properties[key] = value
+      return { ...row, properties }
+    }),
+  }
+}
+
 /**
  * Changes one property of a row's item: a document's front matter (rewritten by the
  * server, with a revision), or a task's or event's values.
@@ -77,6 +94,16 @@ export function useSetRowProperty(viewId: string) {
           }),
         )
       }
+    },
+    // Shown at once (a card dragged to another column stays there); put back if refused.
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: viewRowsKey(viewId) })
+      const before = qc.getQueryData<ViewRows>(viewRowsKey(viewId))
+      if (before) qc.setQueryData<ViewRows>(viewRowsKey(viewId), withProperty(before, v.row.id, v.key, v.value))
+      return { before }
+    },
+    onError: (_err, _v, context) => {
+      if (context?.before) qc.setQueryData(viewRowsKey(viewId), context.before)
     },
     onSuccess: (_done, v) => {
       void qc.invalidateQueries({ queryKey: viewRowsKey(viewId) })

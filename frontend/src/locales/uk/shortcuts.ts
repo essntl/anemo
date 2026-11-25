@@ -33,5 +33,10 @@ const messages: Messages = {
   "Fit to the window": "Вмістити у вікно",
   "Keyboard shortcuts": "Комбінації клавіш",
   "Single keys work when you are not typing in a field.": "Окремі клавіші працюють, коли ви не вводите текст у полі.",
+  "Boards": "Дошки",
+  "Open the focused card": "Відкрити вибрану картку",
+  "Pick up the focused card, or put it down where it is": "Взяти вибрану картку або покласти її, де вона є",
+  "While a card is picked up: move it to another column or place": "Коли картку взято: перемістити її в іншу колонку чи на інше місце",
+  "Put a picked-up card back where it was": "Повернути взяту картку на місце",
 }
 export default messages

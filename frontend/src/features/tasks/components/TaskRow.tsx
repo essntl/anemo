@@ -9,14 +9,12 @@ import { toast } from '@/components/ui/toast'
 import { useFocusOnTask } from '@/features/focus/focusOnTask'
 import { cn } from '@/lib/cn'
 import { plural, t } from '@/lib/i18n'
-import { PRIORITY_LABELS, type Project, type Task, useCreateTask, useDeleteTask } from '../api'
+import { PRIORITY_LABELS, PRIORITY_TONE, type Project, type Task, useCreateTask, useDeleteTask } from '../api'
 import { bucketOf, formatDue } from '../dates'
 import { checklistProgress, isOpen, openBlockers, subtasksOf } from '../relations'
 import { describeRepeat } from '../repeat'
 import { SourceBadge } from '@/features/provenance/Provenance'
 import { useToggleDone } from '../useToggleDone'
-
-const PRIORITY_TONE = ['', 'text-muted', 'text-warning', 'text-error']
 
 /** Every task, to show how a task relates to others (its subtasks, what it waits on). */
 export interface TaskInfo {
