@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "id": "anemo.today-board",
+  "version": "1.0.0",
+  "name": "Today board",
+  "description": "Today on one page: your calendar as a time line and the tasks due today or overdue, by project, ticked off with one click.",
+  "author": { "name": "Anemo" },
+  "license": "MIT",
+  "icon": "icon.png",
+  "readme": "README.md",
+  "permissions": ["tasks:read", "events:read", "tasks:write", "projects:read"],
+  "contributes": {
+    "ui": [
+      {
+        "id": "today",
+        "slot": "page",
+        "title": "Today",
+        "icon": "calendar-check",
+        "entry": "ui/today.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "open-board",
+        "title": "Open Today board",
+        "icon": "calendar-check",
+        "keywords": ["today", "agenda", "schedule", "due"],
+        "action": { "type": "openPage", "page": "today" }
+      }
+    ]
+  }
+}
