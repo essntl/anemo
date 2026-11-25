@@ -15,14 +15,13 @@ from typing import Any
 import httpx
 import pytest
 from mcp.server.subscriptions import ResourceUpdated, ToolsListChanged
-from sqlalchemy import select, update
+from sqlalchemy import update
 
 from app.core.db import get_sessionmaker
 from app.core.redis import get_redis
 from app.features.automations.models import Automation
 from app.features.mcp.models import McpServer
 from app.features.triggers import dispatch, mcp_listener
-from app.features.triggers.models import Trigger
 from app.mcp import client as mcp_client
 from app.mcp import listen
 from app.mcp.client import McpError, Target
@@ -47,8 +46,8 @@ HOSTD_SOURCES = (
 )
 
 
-async def eventually(check: Callable[[], Awaitable[bool] | bool], timeout: float = 10) -> None:
-    deadline = asyncio.get_running_loop().time() + timeout
+async def eventually(check: Callable[[], Awaitable[bool] | bool], within: float = 10) -> None:
+    deadline = asyncio.get_running_loop().time() + within
     while True:
         result = check()
         if isinstance(result, Awaitable):
@@ -112,7 +111,9 @@ async def test_a_session_subscribes_and_passes_on_what_the_server_notifies(fast)
     async with http_server(server=build_notifying) as running:
         heard = Heard()
         wants = listen.Wants(uris=("note://a",))
-        task = asyncio.create_task(listen.watch(remote(running.url), wants, heard.deliver, heard.ready))
+        task = asyncio.create_task(
+            listen.watch(remote(running.url), wants, heard.deliver, heard.ready)
+        )
         try:
             await eventually(lambda: heard.session is not None)
             assert heard.session is not None
@@ -139,7 +140,9 @@ async def test_a_2025_era_server_gets_resources_subscribe_and_log_level(fast, mo
     async with http_server(server=build_legacy(peer)) as running:
         heard = Heard()
         wants = listen.Wants(uris=("note://a", "note://c"), logging=True)
-        task = asyncio.create_task(listen.watch(remote(running.url), wants, heard.deliver, heard.ready))
+        task = asyncio.create_task(
+            listen.watch(remote(running.url), wants, heard.deliver, heard.ready)
+        )
         try:
             await eventually(lambda: heard.session is not None)
             assert peer.subscribed == ["note://a", "note://c"] and peer.log_level == "info"
@@ -162,7 +165,9 @@ async def test_a_dropped_connection_ends_the_session_with_the_reason(fast, monke
         build = build_legacy(LegacyPeer())
     async with http_server(server=build) as running:
         task = asyncio.create_task(
-            listen.watch(remote(running.url), listen.Wants(("note://a",)), heard.deliver, heard.ready)
+            listen.watch(
+                remote(running.url), listen.Wants(("note://a",)), heard.deliver, heard.ready
+            )
         )
         await eventually(lambda: heard.session is not None)
     # The server is gone: the stream or the next ping fails.
@@ -177,7 +182,9 @@ async def test_an_unreachable_server_is_an_mcp_error(fast):
     heard = Heard()
     with pytest.raises(McpError):
         await asyncio.wait_for(
-            listen.watch(remote(f"http://127.0.0.1:{port}/mcp"), listen.Wants(), heard.deliver, heard.ready),
+            listen.watch(
+                remote(f"http://127.0.0.1:{port}/mcp"), listen.Wants(), heard.deliver, heard.ready
+            ),
             timeout=30,
         )
 
@@ -410,7 +417,7 @@ async def test_reconnects_to_a_server_that_came_back(authed, fast):
     watch.session = None
     try:
         async with http_server(server=build_notifying, port=port) as again:
-            await eventually(lambda: watch.session is not None, timeout=20)
+            await eventually(lambda: watch.session is not None, within=20)
             await again.server.bus.publish(ResourceUpdated(uri="note://a"))
 
             async def one_event() -> bool:
@@ -432,8 +439,8 @@ async def test_a_chatty_server_is_paused_and_its_triggers_say_why(authed, fast, 
             await listener.reconcile()
             watch = listener.watches[uuid.UUID(server["id"])]
             await eventually(lambda: watch.session is not None)
-            for i in range(8):
-                # (different URIs: the session's own dedupe would fold identical ones)
+            for _ in range(8):
+                # (two kinds: the SDK's listen stream folds repeats it hasn't handed on yet)
                 await running.server.bus.publish(ResourceUpdated(uri="note://a"))
                 await asyncio.sleep(0.03)
                 await running.server.bus.publish(ToolsListChanged())
@@ -506,12 +513,12 @@ async def test_a_local_server_is_listened_to_through_the_mcp_host(fast, hostd, m
         listen.watch(target, listen.Wants(uris=("note://a",)), heard.deliver, heard.ready)
     )
     try:
-        await eventually(lambda: heard.session is not None, timeout=60)
+        await eventually(lambda: heard.session is not None, within=60)
         assert heard.session is not None and heard.session.subscribed == ["note://a"]
         # A tool call on the same process makes the server notify.
         result = await mcp_client.call_tool(target, "touch", {"uri": "note://a"}, 30)
         assert result.text == "ok"
-        await eventually(lambda: len(heard.notes) == 1, timeout=20)
+        await eventually(lambda: len(heard.notes) == 1, within=20)
         assert (heard.notes[0].method, heard.notes[0].uri) == (UPDATED, "note://a")
         assert len(module._servers) == 1  # the listener and the call share the process
     finally:
@@ -526,6 +533,7 @@ async def test_the_mcp_host_wants_its_token(hostd):
     transport = httpx.ASGITransport(app=module.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://mcp-host") as client:
         r = await client.post(
-            "/listen", json={"server": {"id": "x", "command": sys.executable, "args": [script_path]}}
+            "/listen",
+            json={"server": {"id": "x", "command": sys.executable, "args": [script_path]}},
         )
     assert r.status_code == 401
