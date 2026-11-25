@@ -456,3 +456,27 @@ async def test_the_fake_agent_model_postpones_tasks_in_one_batch(authed):
     now = await tasks_by_title(authed)
     assert [now[t["title"]]["due_date"] for t in made] == ["2030-01-04"] * 3
     assert now["Something else"]["due_date"] is None
+
+
+async def test_an_unexpected_failure_in_one_item_is_reported_and_the_others_go_on(
+    authed, monkeypatch
+):
+    a = await task(authed, "Keep going")
+    b = await task(authed, "Broken")
+    delete = tasks_service.delete_task
+
+    async def flaky(db: Any, item: Any, **kwargs: Any) -> Any:
+        if item.title == "Broken":
+            raise RuntimeError("disk on fire")
+        return await delete(db, item, **kwargs)
+
+    monkeypatch.setattr(tasks_service, "delete_task", flaky)
+    result = await run(
+        UpdateTasks, items=[{"id": b["id"], "trash": True}, {"id": a["id"], "trash": True}]
+    )
+    assert result.content.splitlines() == [
+        "1 of 2 tasks done; 1 failed.",
+        f"1. error: [{b['id']}] failed: RuntimeError",
+        f"2. ok: [{a['id']}] Keep going: moved to the trash",
+    ]
+    assert "disk on fire" not in result.content  # the model sees the kind, not the details

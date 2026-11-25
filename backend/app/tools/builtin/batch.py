@@ -121,15 +121,14 @@ async def apply_all[Item](
     outcomes: list[Outcome] = []
     with activity_group(describe(noun, planned, past=True)):
         for item in items:
+            key = item_id(item)
             try:
                 outcomes.append(await apply(item))
             except AppError as exc:
-                outcomes.append(Outcome(item_id(item), False, f"[{item_id(item)}] {exc.message}"))
+                outcomes.append(Outcome(key, False, f"[{key}] {exc.message}"))
             except Exception as exc:  # noqa: BLE001 - one item's bug must not hide the others' results
                 log.exception("batch item failed", extra={"ctx": {"noun": noun}})
-                outcomes.append(
-                    Outcome(item_id(item), False, f"[{item_id(item)}] failed: {type(exc).__name__}")
-                )
+                outcomes.append(Outcome(key, False, f"[{key}] failed: {type(exc).__name__}"))
     return result(noun, outcomes)
 
 
