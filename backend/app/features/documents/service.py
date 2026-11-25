@@ -25,7 +25,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 from app.core.actor import EXTERNAL, current_actor
 from app.core.errors import AppError, NotFound
 from app.events import bus
-from app.features.documents import meta
+from app.features.documents import meta, sketch, sketch_preview
 from app.features.documents.models import Document, DocumentRevision
 from app.features.links import index as links_index
 from app.jobs import queue
@@ -224,6 +224,7 @@ async def reconcile(db: AsyncSession) -> list[str]:
             continue
         await index.delete_source(db, SOURCE_TYPE, [doc.id])
         await links_index.drop_outgoing(db, "document", doc.id)
+        await asyncio.to_thread(sketch_preview.delete, doc.id)
         await db.delete(doc)
         changed = True
     # Indexed from other content, or never (before properties, a new index format).
@@ -247,7 +248,7 @@ async def _apply(
     """Record that `doc` now has `content`: index fields, a revision, and re-indexing."""
     doc.title = title_of(content, doc.path)
     doc.content_hash = sha(content)
-    doc.word_count = word_count(content)
+    doc.word_count = word_count(sketch.searchable(doc.path, content))
     doc.size, doc.mtime = info.size, info.mtime
     doc.last_editor = author
     # Who did it (app/core/actor.py): a change picked up from the folder was made outside.
@@ -346,7 +347,8 @@ async def index_document(db: AsyncSession, document_id: uuid.UUID) -> bool:
     except AppError:
         return False
     header = await meta.chunk_header(db, doc)  # title, folder and properties
-    chunks = [f"{header}\n\n{c}" for c in chunk_markdown(content)]
+    text = sketch.searchable(doc.path, content)  # a sketch: without its drawing block
+    chunks = [f"{header}\n\n{c}" for c in chunk_markdown(text)]
     await index.index_source(db, SOURCE_TYPE, doc.id, chunks)
     doc.indexed_hash = sha(content)
     await db.commit()
@@ -402,6 +404,7 @@ async def save(
     data = content.encode()
     if len(data) > MAX_DOC_BYTES:
         raise AppError("The document is too large", code="too_large")
+    sketch.check(doc.path, content)  # a sketch keeps a valid drawing
     await asyncio.to_thread(files.write_bytes, doc.path, data, base_hash=base_hash)
     info = await asyncio.to_thread(_info, doc.path)
     await _apply(db, doc, content, info, author=author, run_id=run_id, new_revision=new_revision)
@@ -420,6 +423,9 @@ async def create(
     run_id: uuid.UUID | None = None,
 ) -> Document:
     path = check_path(path)
+    if len(content.encode()) > MAX_DOC_BYTES:
+        raise AppError("The document is too large", code="too_large")
+    sketch.check(path, content)
     await asyncio.to_thread(files.write_bytes, path, content.encode(), must_not_exist=True)
     doc = Document(path=path, title="", content_hash="", created_by_ref=current_actor().ref)
     db.add(doc)
@@ -432,15 +438,25 @@ async def create(
     return doc
 
 
-def unique_path(folder: str, title: str) -> str:
-    """documents/<folder>/<slug>.md, with a number added if that name is taken."""
+def unique_path(folder: str, title: str, suffix: str = ".md") -> str:
+    """documents/<folder>/<slug>.md (or another suffix, such as a sketch's
+    `.sketch.md`), with a number added if that name is taken."""
     folder = folder.strip("/")
     # Checked before anything is created: "../x" or "/x" must not make folders elsewhere.
     base = files.resolve(f"{DOCS_DIR}/{folder}" if folder else DOCS_DIR)
     if not base.is_relative_to(files.root() / DOCS_DIR):
         raise AppError("Not a folder inside documents", code="invalid_path")
     safe_fs.make_dirs(base)
-    return files.rel(files.unique_name(base, f"{slugify(title)}.md"))
+    slug = slugify(title)
+    if suffix == ".md":
+        return files.rel(files.unique_name(base, f"{slug}.md"))
+    # unique_name would number the name before its last suffix ("a.sketch (1).md").
+    n = 1
+    candidate = base / f"{slug}{suffix}"
+    while candidate.exists():
+        candidate = base / f"{slug} ({n}){suffix}"
+        n += 1
+    return files.rel(candidate)
 
 
 async def move(db: AsyncSession, doc: Document, new_path: str) -> Document:
@@ -464,6 +480,8 @@ async def remove(db: AsyncSession, doc: Document, deleted_by: str = "user") -> N
     await links_index.drop_outgoing(db, "document", doc.id)  # links to it stay (broken)
     await db.delete(doc)
     await db.commit()
+    # A sketch's preview is derived: drawn again when it is restored and opened.
+    await asyncio.to_thread(sketch_preview.delete, doc.id)
 
 
 async def follow_move(db: AsyncSession, old: str, new: str) -> None:
