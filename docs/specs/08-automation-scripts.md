@@ -113,6 +113,11 @@ export default async function main(input, anemo) {
 - `input`: `{trigger, input, state, change}`: what started it (`schedule`, `manual`,
   `retry`, `tool`), the JSON an agent passed to `run_script`, the automation's state note,
   and what the change check found. All of it is data.
+- `input.timeZone`: the user's time zone (Settings → General), frozen with the run.
+- `anemo.api(method, params) → JSON`: only in a **plugin's** script: the plugin's methods
+  (`tasks.list`, `documents.create`, …) with the plugin contract's JSON shapes and error
+  codes (`PluginError.code`), checked against the plugin's permissions and journalled like
+  calls (`docs/specs/CONTRACTS-plugins.md` §2.3). Other scripts get `unknown_method`.
 - `anemo.call(tool, args) → {content, data, isError}`: any tool by its registered name
   (built-in, or `mcp__<server>__<tool>`). A refused or failed call throws `ToolError`
   (`.denied` true when the policy or the user said no); the script may catch it.

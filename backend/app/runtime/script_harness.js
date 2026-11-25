@@ -59,6 +59,17 @@ export class ToolError extends Error {
   }
 }
 
+// A refused or failed plugin method (anemo.api): `code` is one of the contract's error
+// codes (docs/specs/CONTRACTS-plugins.md §6.3), so a script can branch on it.
+export class PluginError extends Error {
+  constructor(method, code, message) {
+    super(message);
+    this.name = "PluginError";
+    this.method = method;
+    this.code = code;
+  }
+}
+
 function text(value) {
   if (typeof value === "string") return value;
   try {
@@ -74,8 +85,17 @@ async function call(tool, args = {}) {
   return { content: reply.content, data: reply.data ?? null };
 }
 
+// A plugin's methods (tasks.list, documents.get, ...) with the same JSON answers its
+// panels and pages get. Only a plugin's own scripts have them (the worker refuses others).
+async function api(method, params = {}) {
+  const reply = await request({ type: "method", method: String(method), params });
+  if (reply.error) throw new PluginError(method, reply.error.code, reply.error.message);
+  return reply.result ?? null;
+}
+
 const anemo = {
   call,
+  api,
   async think(prompt, data = null, options = {}) {
     const json = Boolean(options.json);
     const reply = await request({ type: "think", prompt: String(prompt), data, json });
