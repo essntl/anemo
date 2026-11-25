@@ -179,8 +179,11 @@ def _plugin_out(plugin: Plugin, versions: list[PluginVersion]) -> PluginOut:
         icon_url=_icon_url(plugin, shown, manifest) if shown else None,
         enabled=plugin.enabled,
         status=status_of(plugin),  # type: ignore[arg-type]
+        # An *update* waits only when a version runs already; a first version that waits
+        # for review is the status needs_review, not an update (contract §5).
         update_pending=pending is not None
-        and (approved is None or is_higher(pending.version, approved.version)),
+        and approved is not None
+        and is_higher(pending.version, approved.version),
         made_by_assistant=_made_by_assistant(plugin, versions),
         error=plugin.error,
         source=PluginSource.model_validate(plugin.source),

@@ -151,6 +151,8 @@ async def test_install_review_approve_enable(authed):
     assert detail["status"] == "needs_review" and detail["enabled"] is False
     assert detail["source"]["kind"] == "bundled"
     assert detail["pending_version"] == "1.0.0" and detail["approved_version"] is None
+    # A first version waiting for review is not an "update" (contract §5).
+    assert detail["update_pending"] is False
     v1 = version_of(detail, "1.0.0")
     assert v1["status"] == "pending" and v1["created_by"]["kind"] == "user"
     assert {c["kind"] for c in v1["contributions"]} == {"ui", "templates", "commands"}
