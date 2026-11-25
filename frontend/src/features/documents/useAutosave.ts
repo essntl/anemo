@@ -11,7 +11,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ApiError, errorMessage } from '@/api/client'
 import { documentKey, documentsKey, type DocumentContent, saveDocument } from './api'
 
-export type SaveState = 'saved' | 'unsaved' | 'saving' | 'conflict' | 'error'
+/** `offline`: not saved for want of a connection; kept on this device and tried again (sketches). */
+export type SaveState = 'saved' | 'unsaved' | 'saving' | 'conflict' | 'error' | 'offline'
 
 const DELAY_MS = 1200
 

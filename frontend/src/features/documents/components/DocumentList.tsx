@@ -1,19 +1,23 @@
 import { PageHeader } from '@/components/ui/PageHeader'
-import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router'
-import { FileText, Folder, Plus, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { NavLink, useNavigate, useSearchParams } from 'react-router'
+import { FileText, Folder, PenLine, Plus, Search } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { promptDialog } from '@/components/ui/dialogs'
+import { Lingering } from '@/components/ui/Lingering'
+import { NewSketchDialog } from '@/features/sketch/NewSketchDialog'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { plural, rich, t } from '@/lib/i18n'
-import { type DocumentSummary, useCreateDocument, useDocuments } from '../api'
+import { type DocumentSummary, type SketchLayout, useCreateDocument, useDocuments } from '../api'
 
 /**
  * Documents grouped by folder. New documents go into `currentFolder`. With a project
  * chosen (`projectFolder`), only the documents in that project's folder are listed;
  * with `outside`, only those in none of these projects' folders (Uncategorized).
+ *
+ * `?new=document` or `?new=sketch` in the address (the command palette) asks for a new one.
  */
 export function DocumentList({ currentFolder, projectFolder, projectName, outside }: {
   currentFolder: string; projectFolder?: string; projectName?: string; outside?: string[]
@@ -42,14 +46,38 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
     if (!title) return
     create.mutate({ title, folder: currentFolder }, { onSuccess: (doc) => navigate(`/documents/${doc.id}`) })
   }
+  const [newSketch, setNewSketch] = useState(false)
+  const createSketch = (title: string, layout: SketchLayout) =>
+    create.mutate({ title, folder: currentFolder, kind: 'sketch', layout }, {
+      onSuccess: (doc) => {
+        setNewSketch(false)
+        navigate(`/documents/${doc.id}`)
+      },
+    })
+  const [params, setParams] = useSearchParams()
+  const asked = params.get('new')
+  useEffect(() => {
+    if (asked !== 'document' && asked !== 'sketch') return
+    setParams((p) => { p.delete('new'); return p }, { replace: true })
+    if (asked === 'sketch') setNewSketch(true)
+    else void newDocument()
+    // Once for each time it is asked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asked])
 
   return (
     <div className="flex h-full flex-col">
       <PageHeader title={t('Documents')} detail={projectName ?? (outside ? t('Uncategorized') : undefined)}>
-      <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} loading={create.isPending} onClick={() => void newDocument()}>
+      <Button size="icon" variant="ghost" aria-label={t('New sketch')} title={t('New sketch')} onClick={() => setNewSketch(true)}>
+        <PenLine className="h-4 w-4" />
+      </Button>
+      <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} loading={create.isPending && !newSketch} onClick={() => void newDocument()}>
         {t('New')}
       </Button>
       </PageHeader>
+      <Lingering value={newSketch}>
+        {() => <NewSketchDialog busy={create.isPending} onCreate={createSketch} onClose={() => setNewSketch(false)} />}
+      </Lingering>
       <div className="relative px-3 pb-2 pt-3">
         <Search className="pointer-events-none absolute left-5.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Find by title')} aria-label={t('Find by title')}
@@ -83,11 +111,13 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
                 className={({ isActive }) =>
                   cn('flex items-start gap-2 rounded-control px-2 py-(--list-row-y) text-[13.5px] transition-colors',
                     isActive ? 'bg-accent-soft text-accent' : 'hover:bg-surface-hover')}>
-                <FileText className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
+                {doc.kind === 'sketch'
+                  ? <PenLine className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
+                  : <FileText className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{doc.title}</span>
                   <span className="block truncate text-[11.5px] text-muted">
-                    {formatWhen(doc.updated_at)} · {plural(doc.word_count, '{n} words', '{n} words')}
+                    {formatWhen(doc.updated_at)} · {doc.kind === 'sketch' ? t('Drawing sheet') : plural(doc.word_count, '{n} words', '{n} words')}
                     {doc.last_editor === 'agent' && ` · ${t('by an agent')}`}
                     {doc.last_editor === 'extension' && ` · ${t('saved from the browser')}`}
                   </span>

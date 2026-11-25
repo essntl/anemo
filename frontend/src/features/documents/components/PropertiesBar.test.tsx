@@ -17,7 +17,7 @@ vi.mock('../api', () => ({ useSetProperties: () => ({ mutateAsync, isPending: fa
 
 const { PropertiesBar, showsProperties } = await import('./PropertiesBar')
 const doc = (over: object) => ({
-  id: 'doc', path: 'documents/a.md', folder: '', title: 'A', word_count: 1, last_editor: 'user', updated_at: '2026-11-01T00:00:00Z',
+  id: 'doc', path: 'documents/a.md', folder: '', title: 'A', kind: 'markdown' as const, word_count: 1, last_editor: 'user', updated_at: '2026-11-01T00:00:00Z',
   content: '---\ntype: brief\n---\n# A\n', hash: 'h1', properties: { type: 'brief' }, properties_error: null, ...over,
 })
 

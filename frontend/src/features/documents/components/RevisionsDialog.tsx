@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
@@ -17,8 +17,16 @@ const AUTHORS: Record<string, string> = {
   extension: 'Anemo Companion',
 }
 
-/** A document's saved versions, with a preview and "restore". */
-export function RevisionsDialog({ documentId, unsaved, onClose }: { documentId: string; unsaved: boolean; onClose: () => void }) {
+/**
+ * A document's saved versions, with a preview and "restore". `preview` shows a version's
+ * file text (default: its Markdown; a sketch shows its drawing).
+ */
+export function RevisionsDialog({ documentId, unsaved, onClose, preview }: {
+  documentId: string
+  unsaved: boolean
+  onClose: () => void
+  preview?: (content: string) => ReactNode
+}) {
   const revisions = useRevisions(documentId, true)
   const [selected, setSelected] = useState<string | null>(null)
   const revision = useRevision(documentId, selected)
@@ -47,9 +55,11 @@ export function RevisionsDialog({ documentId, unsaved, onClose }: { documentId: 
           {!selected && <p className="text-[13px] text-muted">{t('Choose a version to look at it.')}</p>}
           {revision.data && (
             <>
-              <div className="max-h-[50vh] overflow-y-auto rounded-control border border-border bg-surface px-4 py-3">
-                <Markdown text={splitFrontMatter(revision.data.content).body || t('*(empty)*')} />
-              </div>
+              {preview ? preview(revision.data.content) : (
+                <div className="max-h-[50vh] overflow-y-auto rounded-control border border-border bg-surface px-4 py-3">
+                  <Markdown text={splitFrontMatter(revision.data.content).body || t('*(empty)*')} />
+                </div>
+              )}
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Button variant="primary" size="sm" loading={restore.isPending} disabled={chosen?.current || unsaved}
                   onClick={() => restore.mutate(revision.data.id, { onSuccess: onClose })}>

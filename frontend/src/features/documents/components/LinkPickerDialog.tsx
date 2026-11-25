@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react'
-import { CalendarDays, CheckSquare, FileText, MessageSquare } from 'lucide-react'
+import { CalendarDays, CheckSquare, FileText, MessageSquare, PenLine } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
@@ -95,7 +95,7 @@ export function LinkPickerDialog({ onPick, onPickImage, onClose, pagesOnly, titl
         {loaded && shownDocuments.length + shownTasks.length + events.length + chats.length === 0 && <p className="p-4 text-[13px] text-muted">{t('Nothing matches.')}</p>}
         <Group title={t('Documents')}>
           {shownDocuments.map((d) => (
-            <Choice key={d.id} icon={<FileText />} title={d.title} detail={d.path} onPick={() => pick(documentLink(d.id), d.title)} />
+            <Choice key={d.id} icon={d.kind === 'sketch' ? <PenLine /> : <FileText />} title={d.title} detail={d.path} onPick={() => pick(documentLink(d.id), d.title)} />
           ))}
         </Group>
         <Group title={t('Tasks')}>

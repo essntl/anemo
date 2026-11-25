@@ -6,6 +6,9 @@ export type HubSection = Schemas['HubSection']
 export type DocumentSummary = Schemas['DocumentOut']
 export type DocumentContent = Schemas['DocumentContent']
 export type Revision = Schemas['RevisionOut']
+/** A Markdown document, or a sketch (a drawing sheet kept as a `.sketch.md` file). */
+export type DocumentKind = DocumentSummary['kind']
+export type SketchLayout = Schemas['CreateIn']['layout']
 
 export const documentsKey = ['documents'] as const
 export const documentKey = (id: string) => ['document', id] as const
@@ -29,8 +32,11 @@ export function useDocument(id: string) {
 export function useCreateDocument() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (v: { title: string; folder: string }) =>
-      unwrap(await api.POST('/api/documents', { body: { title: v.title, folder: v.folder, content: null } })),
+    /** `kind: 'sketch'` makes a drawing sheet (`layout`: one endless sheet, or pages). */
+    mutationFn: async (v: { title: string; folder: string; kind?: DocumentKind; layout?: SketchLayout }) =>
+      unwrap(await api.POST('/api/documents', {
+        body: { title: v.title, folder: v.folder, content: null, kind: v.kind ?? 'markdown', layout: v.layout ?? 'infinite' },
+      })),
     onSuccess: (doc) => {
       qc.setQueryData(documentKey(doc.id), doc)
       void qc.invalidateQueries({ queryKey: documentsKey })
