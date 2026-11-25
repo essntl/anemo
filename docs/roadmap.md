@@ -112,7 +112,7 @@ row is filled in by its own pull request.
 | **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
 | **Activity log with undo** (in progress) | [19](specs/19-activity-log.md) | – |
 | **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
-| **Waiting on a code job**: `code_status(wait_s)` waits on the job's live stream until it ends (≤ 5 min); a stopped run ends the wait | [21](specs/21-code-wait.md) | PR_PENDING |
+| **Waiting on a code job**: `code_status(wait_s)` waits on the job's live stream until it ends (≤ 5 min); a stopped run ends the wait | [21](specs/21-code-wait.md) | #100 |
 | **Files between devices and the workspace** (in progress) | [22](specs/22-device-files.md) | – |
 | **Anemo Desktop updates itself** (in progress) | [23](specs/23-desktop-auto-update.md) | – |
 
