@@ -5,7 +5,11 @@
  *   only edits the body below it.
  * - Images are stored with paths relative to the document's folder (so the file
  *   also works in other Markdown tools); the editor needs URLs it can load.
+ * - An embedded sketch is stored as `![Title](/documents/<id>)`; the editor shows its
+ *   image (/api/documents/<id>/sketch/preview).
  */
+import { documentLink, embeddedSketchId, sketchIdOfPreview, sketchPreviewUrl } from '@/lib/appLinks'
+
 
 const FRONT_MATTER = /^﻿?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/
 const IMAGE = /(!\[[^\]]*\]\()([^)\s]+)((?:\s+"[^"]*")?\))/g
@@ -49,6 +53,8 @@ const isExternal = (src: string) => /^([a-z][a-z0-9+.-]*:|\/|#)/i.test(src)
 export function imagesToEditor(body: string, docPath: string): string {
   const dir = dirname(docPath)
   return body.replace(IMAGE, (whole, open: string, src: string, close: string) => {
+    const sketch = embeddedSketchId(src)
+    if (sketch) return `${open}${sketchPreviewUrl(sketch)}${close}`
     if (isExternal(src)) return whole
     let path = src
     try {
@@ -62,12 +68,14 @@ export function imagesToEditor(body: string, docPath: string): string {
 
 /**
  * Editor text -> file text: images of the Documents library (documents/_assets) become
- * paths relative to the document. Images from Files keep their app address, so moving
+ * paths relative to the document, and a sketch's image the sketch's address. Images from Files keep their app address, so moving
  * or renaming them in Files can update the link (the server rewrites those).
  */
 export function imagesToFile(body: string, docPath: string): string {
   const dir = dirname(docPath)
   return body.replace(IMAGE, (whole, open: string, src: string, close: string) => {
+    const sketch = sketchIdOfPreview(src)
+    if (sketch) return `${open}${documentLink(sketch)}${close}`
     if (!src.startsWith(DOWNLOAD)) return whole
     const path = decodeURIComponent(src.slice(DOWNLOAD.length))
     if (!path.startsWith('documents/')) return whole

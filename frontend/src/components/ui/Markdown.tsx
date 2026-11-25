@@ -3,13 +3,13 @@ import ReactMarkdown, { type ExtraProps, type Options } from 'react-markdown'
 import { Link } from 'react-router'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
-import { Check, Copy, Image as ImageIcon } from 'lucide-react'
+import { Check, Copy, Image as ImageIcon, PenLine } from 'lucide-react'
 import { DiagramBlock } from '@/components/diagrams/DiagramBlock'
 import { protectDollars } from '@/components/diagrams/dollars'
 import { isFenceClosed } from '@/components/diagrams/fence'
 import { isDiagramLanguage } from '@/components/diagrams/languages'
 import { useMath } from '@/components/diagrams/useMath'
-import { isAppLink } from '@/lib/appLinks'
+import { documentLink, embeddedSketchId, isAppLink, sketchPreviewUrl } from '@/lib/appLinks'
 import { useFenceRenderer } from '@/lib/fenceRenderers'
 import { stripCitationMarkup } from '@/lib/citations'
 import { t } from '@/lib/i18n'
@@ -83,6 +83,8 @@ function Anchor({ href, children }: ComponentPropsWithoutRef<'a'>) {
 function MarkdownImage({ src, alt, title }: ComponentPropsWithoutRef<'img'>) {
   const [shown, setShown] = useState(false)
   const source = typeof src === 'string' ? src : undefined
+  const sketchId = embeddedSketchId(source)
+  if (sketchId) return <SketchEmbed id={sketchId} alt={alt} title={title} />
   if (shown || loadsWithoutAsking(source)) return <img src={source} alt={alt} title={title} />
   return (
     <button
@@ -94,6 +96,28 @@ function MarkdownImage({ src, alt, title }: ComponentPropsWithoutRef<'img'>) {
       <ImageIcon className="h-3.5 w-3.5" />
       {alt ? t('{alt}: show image from {host}', { alt, host: imageHost(source ?? '') }) : t('show image from {host}', { host: imageHost(source ?? '') })}
     </button>
+  )
+}
+
+/**
+ * An embedded sketch, `![Title](/documents/<id>)`: its image (served by the app), as a
+ * link that opens it. Without an image yet (or a link to something else), its name.
+ */
+function SketchEmbed({ id, alt, title }: { id: string; alt?: string; title?: string }) {
+  const [missing, setMissing] = useState(false)
+  const name = alt || t('Embedded sketch')
+  return (
+    <Link to={documentLink(id)} title={title ?? t('Open {name}', { name })} className="sketch-embed inline-block max-w-full no-underline">
+      {missing ? (
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-muted hover:text-text">
+          <PenLine className="h-3.5 w-3.5" />
+          {name}
+        </span>
+      ) : (
+        <img src={sketchPreviewUrl(id)} alt={alt} onError={() => setMissing(true)}
+          className="rounded-md border border-border" />
+      )}
+    </Link>
   )
 }
 

@@ -69,7 +69,7 @@ function Outline({ outline, active, onJump }: { outline: OutlineItem[]; active: 
 }
 
 /** What the document is, what links to it and its latest versions. */
-function Details({ documentId, path, words, onHistory }: { documentId: string; path: string; words: number; onHistory: () => void }) {
+function Details({ documentId, path, words, onHistory }: { documentId: string; path: string; words?: number; onHistory: () => void }) {
   const links = useLinks('document', documentId).data
   const back = allLinks(links?.backlinks)
   const revisions = useRevisions(documentId, true)
@@ -80,10 +80,12 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
       <section aria-label={t('File')}>
         <div className={LABEL}>{t('File')}</div>
         <p className="break-all px-2 font-mono text-[12px] text-muted">{path}</p>
-        <p className="px-2 pt-1 text-[13px]">
-          {plural(words, '{count} word', '{count} words', { count: words.toLocaleString(dateLocale()) })}
-          <span className="text-muted"> · {t('about {minutes} min to read', { minutes: Math.max(1, Math.round(words / 220)) })}</span>
-        </p>
+        {words !== undefined && (
+          <p className="px-2 pt-1 text-[13px]">
+            {plural(words, '{count} word', '{count} words', { count: words.toLocaleString(dateLocale()) })}
+            <span className="text-muted"> · {t('about {minutes} min to read', { minutes: Math.max(1, Math.round(words / 220)) })}</span>
+          </p>
+        )}
         <ActorLine created={created} className="px-2 pt-1" />
       </section>
 
@@ -122,20 +124,27 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
  * its latest versions; and a chat with the assistant to have the document changed. Tabs,
  * so a long outline is never mixed up with the rest. Shown and hidden with the button in
  * the editor's header; on a narrow screen it slides in over the text (`onClose`).
+ *
+ * A sketch has no outline, word count or chat beside it: `first` takes the outline's
+ * place (its transcription), and without `chat` there is no chat tab.
  */
-export function DocumentInfo({ documentId, path, words, outline, active, onJump, onHistory, notice, chat, onClose }: {
+export function DocumentInfo({ documentId, path, words, outline = [], active = -1, onJump, onHistory, notice, chat, first, showFirst, onClose }: {
   documentId: string
   path: string
-  words: number
-  outline: OutlineItem[]
+  words?: number
+  outline?: OutlineItem[]
   /** The outline item being read under, or -1. */
-  active: number
-  onJump: (index: number) => void
+  active?: number
+  onJump?: (index: number) => void
   onHistory: () => void
   /** Something to decide about the document (an agent edited it), above the tabs. */
   notice?: ReactNode
   /** The chat tab's content. */
-  chat: ReactNode
+  chat?: ReactNode
+  /** The first tab instead of the outline. */
+  first?: { label: string; content: ReactNode }
+  /** A number that, when it changes, brings the first tab to the front (to show what an action put there). */
+  showFirst?: number
   /** Set when the panel lies over the text: a button to put it away. */
   onClose?: () => void
 }) {
@@ -144,11 +153,18 @@ export function DocumentInfo({ documentId, path, words, outline, active, onJump,
     try { localStorage.setItem(TAB, next) } catch { /* no storage: just not remembered */ }
     setTabState(next)
   }
+  // Asked to show the first tab (a new number): during render, as React suggests for this.
+  const [firstAsked, setFirstAsked] = useState(showFirst)
+  if (showFirst !== firstAsked) {
+    setFirstAsked(showFirst)
+    setTabState('outline')
+  }
   // Plugins' panels for documents, one tab each, after the built-in ones.
   const pluginTabs = usePluginDocumentTabs()
-  const tabs: (readonly [Tab, string, boolean])[] = [...TABS.map(([id, label]) => [id, label, true] as const), ...pluginTabs.map((p) => [p.id as Tab, p.label, false] as const)]
-  // A plugin's tab that isn't there (turned off, or still loading) shows the outline.
-  const tab: Tab = isPluginTab(chosen) && !pluginTabs.some((p) => p.id === chosen) ? 'outline' : chosen
+  const builtIn = TABS.filter(([id]) => id !== 'chat' || chat).map(([id, label]) => [id, id === 'outline' && first ? first.label : label, true] as const)
+  const tabs: (readonly [Tab, string, boolean])[] = [...builtIn, ...pluginTabs.map((p) => [p.id as Tab, p.label, false] as const)]
+  // A plugin's tab that isn't there (turned off, or still loading) shows the outline (as does the chat without one).
+  const tab: Tab = (isPluginTab(chosen) && !pluginTabs.some((p) => p.id === chosen)) || (chosen === 'chat' && !chat) ? 'outline' : chosen
   return (
     <div className="flex h-full min-h-0 flex-col">
       {notice}
@@ -160,7 +176,7 @@ export function DocumentInfo({ documentId, path, words, outline, active, onJump,
                 tab === id ? 'bg-surface text-text shadow-soft' : 'text-muted hover:text-text')}>
               {/* A plugin's own title is shown as it is (plugin texts aren't translated). */}
               <span className="truncate">{translated ? t(label) : label}</span>
-              {id === 'outline' && outline.length > 0 && <span className="text-[11px] font-normal tabular-nums text-subtle">{outline.length}</span>}
+              {id === 'outline' && !first && outline.length > 0 && <span className="text-[11px] font-normal tabular-nums text-subtle">{outline.length}</span>}
             </button>
           ))}
         </div>
@@ -171,7 +187,7 @@ export function DocumentInfo({ documentId, path, words, outline, active, onJump,
           </button>
         )}
       </div>
-      {tab === 'outline' && <Outline outline={outline} active={active} onJump={onJump} />}
+      {tab === 'outline' && (first ? first.content : <Outline outline={outline} active={active} onJump={onJump ?? (() => undefined)} />)}
       {tab === 'details' && <Details documentId={documentId} path={path} words={words} onHistory={onHistory} />}
       {tab === 'chat' && chat}
       {isPluginTab(tab) && <PluginDocumentPanel tabId={tab} documentId={documentId} />}

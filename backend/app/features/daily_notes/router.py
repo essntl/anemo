@@ -14,7 +14,7 @@ from app.api.deps import Db
 from app.core.errors import NotFound
 from app.features.daily_notes import service
 from app.features.documents import service as documents
-from app.features.documents.router import DocumentContent, _content
+from app.features.documents.router import DocumentContent, document_content
 from app.features.tasks.models import Project
 
 router = APIRouter(prefix="/daily-notes", tags=["daily-notes"])
@@ -60,7 +60,7 @@ async def get_daily_note(day: str, db: Db, project_id: uuid.UUID | None = None) 
     content = None
     if doc is not None:
         try:
-            content = _content(doc, await documents.read(db, doc))
+            content = await document_content(db, doc, await documents.read(db, doc))
         except NotFound:
             content = None  # the file went away just now
     return DailyNoteOut(
@@ -80,5 +80,5 @@ async def save_daily_note(
         today=today,
         heading=service.heading(when),
         path=doc.path,
-        document=_content(doc, body.content),
+        document=await document_content(db, doc, body.content),
     )

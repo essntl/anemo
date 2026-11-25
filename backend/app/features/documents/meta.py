@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.actor import current_actor
+from app.features.documents import sketch
 from app.features.documents.models import Document, DocumentPath
 from app.features.properties import frontmatter
 from app.features.properties import service as properties
@@ -94,6 +95,7 @@ async def index(db: AsyncSession, doc: Document, content: str) -> None:
     allowed) leaves the document without properties, and `properties_error` says why
     (shown as a warning on the document)."""
     await db.flush()  # what the save changed stays, whatever a savepoint below undoes
+    content = sketch.searchable(doc.path, content)  # a sketch: without its drawing block
     meta = frontmatter.parse(content)
     values, error = await _properties_of(db, doc, meta)
     if error is None and "type" not in values and is_daily(doc.path):

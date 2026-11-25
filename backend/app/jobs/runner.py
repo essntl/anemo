@@ -56,6 +56,13 @@ def default_handlers() -> dict[str, Handler]:
         async with sessionmaker()() as db:
             await documents.index_document(db, uuid.UUID(payload["document_id"]))
 
+    async def sketch_transcribe(payload: dict[str, Any]) -> None:
+        from app.core.db import get_sessionmaker as sessionmaker
+        from app.features.documents import sketch_transcribe as transcription
+
+        async with sessionmaker()() as db:
+            await transcription.run(db, payload)
+
     async def notify_deliver(payload: dict[str, Any]) -> None:
         from app.features.notifications import service as notifications
 
@@ -105,6 +112,7 @@ def default_handlers() -> dict[str, Handler]:
         "mcp.refresh": mcp_refresh,
         "notify.deliver": notify_deliver,
         "document.index": document_index,
+        "sketch.transcribe": sketch_transcribe,
         "run.execute": run_execute,
         "conversation.title": conversation_title,
         "memory.extract": memory_extract,

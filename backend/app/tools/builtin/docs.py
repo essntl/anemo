@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.core.refs import ObjectRef
-from app.features.documents import meta, paths, service
+from app.features.documents import meta, paths, service, sketch
 from app.features.documents import properties as doc_properties
 from app.features.documents import search as doc_search
 from app.features.documents.models import Document
@@ -38,6 +38,7 @@ from app.knowledge import index
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin import linking
+from app.tools.builtin.sketch_read import sketch_result
 from app.tools.builtin.workspace import _backup, path_action
 from app.workspace import files
 
@@ -309,7 +310,8 @@ class ReadDocument(Tool):
     name = "read_document"
     description = (
         "Read one of the user's documents as Markdown, with its properties and what links "
-        "to it above it." + LINKING
+        "to it above it. A sketch (a drawing, `.sketch.md`) comes as an image with its text."
+        + LINKING
     )
     capability = "fs.read"
     Input = ReadDocumentInput
@@ -350,6 +352,8 @@ class ReadDocument(Tool):
         if backlinks and args.start == 0:
             lines.append(backlinks)
         top = "".join(f"{line}\n" for line in lines)
+        if sketch.is_sketch(path):
+            return await sketch_result(found.doc.id, path, f"{header}:\n{top}", content, ctx)
         return ToolResult(
             content=f"{header}:\n{top}{text}{note}", data={"path": path, "chars": len(content)}
         )

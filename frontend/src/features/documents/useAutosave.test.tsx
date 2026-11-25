@@ -12,6 +12,7 @@ const DOC: DocumentContent = {
   path: 'documents/a.md',
   folder: '',
   title: 'A',
+  kind: 'markdown',
   word_count: 1,
   last_editor: 'user',
   updated_at: '2026-10-01T00:00:00Z',

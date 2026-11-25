@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { Loader2, MessageSquare, Timer } from 'lucide-react'
 import { api, errorMessage, unwrap } from '@/api/client'
 import { inScope, useScope } from '@/app/projectStore'
@@ -20,6 +20,7 @@ import { rich, t } from '@/lib/i18n'
 import { conversationKey, conversationsKey, createConversation, messagesKey, useConversations } from '../api'
 import { Composer, type ComposerHandle } from '../components/Composer'
 import { useChatModel } from '../chatModel'
+import type { NewChatState } from '../useAttachments'
 import { ChatOptionsSheet } from '../components/ChatOptionsSheet'
 import { ModelPicker } from '../components/ModelPicker'
 import { ReasoningControl } from '../components/ReasoningControl'
@@ -117,6 +118,8 @@ export function NewChatPage() {
   // (and, if allowed, edit) the file, so Agent mode is preselected.
   const [params] = useSearchParams()
   const aboutDoc = params.get('doc')
+  // Started from elsewhere with attachments already made ("Ask about this sketch").
+  const startedWith = (useLocation().state as NewChatState | null)?.attachments
   const mode: Mode = modeOverride ?? (aboutDoc ? 'agent' : (settings.data?.general.default_chat_mode ?? 'chat'))
   // A chat started while a project is chosen belongs to it, and starts with its defaults.
   const scope = useScope()
@@ -196,6 +199,7 @@ export function NewChatPage() {
             running={false}
             disabled={busy || Boolean(needsSetup)}
             initialText={aboutDoc ? `About my document “${params.get('title') ?? aboutDoc}” (${aboutDoc}): ` : undefined}
+            initialAttachments={startedWith}
             onSend={start}
             // Skills that need tools (e.g. web search for /fact-check) switch to Agent mode.
             onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
