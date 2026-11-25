@@ -153,6 +153,16 @@ def _code_job_change(obj: CodeJob, inserts: dict[str, str]) -> _Pending | None:
     return _code_job(obj, "ended")
 
 
+def _as_created(obj: Any) -> _Pending | None:
+    if isinstance(obj, Task):
+        return _task(obj, "created")
+    if isinstance(obj, CalendarEvent):
+        return _calendar_event(obj, "created")
+    if isinstance(obj, Document):
+        return _document(obj, "created")
+    return None
+
+
 def _made_now(session: Session, obj: Any, again: _Pending) -> bool:
     """`obj` was created in this transaction: its "created" event takes the newest data
     (`again`) instead of a "changed" event coming after it."""
@@ -209,15 +219,9 @@ def _after_flush(session: Session, _ctx: UOWTransaction) -> None:
                 found = _code_job_change(obj, inserts)
             else:
                 continue
-            if found is not None and found.type.endswith((".changed", ".completed")):
-                verb = found.type.split(".")[0]
-                again = {
-                    "task": lambda: _task(obj, "created"),
-                    "calendar_event": lambda: _calendar_event(obj, "created"),
-                    "document": lambda: _document(obj, "created"),
-                }.get(verb)
-                if again is not None and _made_now(session, obj, again()):
-                    continue
+            again = _as_created(obj) if found is not None else None
+            if again is not None and _made_now(session, obj, again):
+                continue
             if found is not None:
                 pending.append(found)
         for obj in session.deleted:
