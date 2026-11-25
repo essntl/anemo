@@ -2,6 +2,7 @@ using Anemo.Desktop.Core.CodeJobs;
 using Anemo.Desktop.Core.Commands;
 using Anemo.Desktop.Core.Connection;
 using Anemo.Desktop.Core.Control;
+using Anemo.Desktop.Core.Files;
 using Anemo.Desktop.Core.Platform;
 using Anemo.Desktop.Core.SharedScreen;
 using Anemo.Desktop.Core.Storage;
@@ -24,7 +25,8 @@ public sealed record DesktopAgentParts(
     CodeJobsOptions? CodeJobsOptions = null,
     ICodeHost? CodeHost = null,
     CodeJobControlOptions? CodeJobControlOptions = null,
-    DesktopPlatform? TargetSystem = null)
+    DesktopPlatform? TargetSystem = null,
+    string? HomeFolder = null)
 {
     /// <summary>The system the client runs on (Windows unless the host says otherwise).</summary>
     public DesktopPlatform Os => TargetSystem ?? DesktopPlatform.Windows;
@@ -34,6 +36,9 @@ public sealed record DesktopAgentParts(
 
     /// <summary>The cache of remote repositories for the git reads (device-contracts.md §7.6), beside <c>settings.json</c>, never in the projects folder.</summary>
     public string GitCacheFolder => Path.Combine(Path.GetDirectoryName(Store.Path) ?? ".", "git-cache");
+
+    /// <summary>The folder of <c>settings.json</c>: the file actions never read or write in it (§8.2).</summary>
+    public string DataFolder => Path.GetDirectoryName(Path.GetFullPath(Store.Path)) ?? ".";
 }
 
 /// <summary>
@@ -63,6 +68,7 @@ public sealed class DesktopAgent
         }
         Control = new ControlState(parts.Time, _settings.AllowControl, _settings.PausedUntil);
         Control.Changed += SaveControlState;
+        Files = new DeviceFiles(() => Settings, parts.Time, parts.Os, parts.HomeFolder, parts.DataFolder);
         Processor = new CommandProcessor(
             parts.Platform,
             Control,
@@ -76,7 +82,8 @@ public sealed class DesktopAgent
                 parts.Time,
                 parts.CodeJobControlOptions,
                 parts.Os,
-                parts.GitCacheFolder));
+                parts.GitCacheFolder),
+            Files);
         CodeJobs = new CodeJobSharing(
             () => Settings,
             new CodeJobStore(parts.CodeJobsStateFile, parts.Time, parts.Log),
@@ -95,7 +102,8 @@ public sealed class DesktopAgent
             parts.ConnectionOptions,
             CodeJobs,
             parts.Os.WireName,
-            () => _shellKind.Value);
+            () => _shellKind.Value,
+            Files.Offered);
         _sharedScreen = new SharedScreenClient(parts.Http);
     }
 
@@ -104,6 +112,9 @@ public sealed class DesktopAgent
     public DeviceConnection Connection { get; }
 
     public CommandProcessor Processor { get; }
+
+    /// <summary>"Let Anemo read and write files" (device-contracts.md §8).</summary>
+    public DeviceFiles Files { get; }
 
     /// <summary>"Share Claude Code jobs with Anemo".</summary>
     public CodeJobSharing CodeJobs { get; }
@@ -158,7 +169,7 @@ public sealed class DesktopAgent
             Connection.Reconnect();
         }
         else if (old.PowerShellEnabled != settings.PowerShellEnabled || old.ShareCodeJobs != settings.ShareCodeJobs
-            || old.StartCodeJobs != settings.StartCodeJobs)
+            || old.StartCodeJobs != settings.StartCodeJobs || old.ShareFiles != settings.ShareFiles)
         {
             Connection.OfferNow();
         }

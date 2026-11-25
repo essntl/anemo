@@ -52,6 +52,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
     private readonly CommandLog? _log;
     private readonly CommandOptions _options;
     private readonly CodeJobs.CodeJobControl? _codeJobs;
+    private readonly Files.DeviceFiles? _files;
     private readonly ControlRefs _refs = new();
     private readonly WindowRefs _windows = new();
     private ScreenCapture? _lastCapture;
@@ -63,7 +64,8 @@ public sealed partial class CommandProcessor : ICommandExecutor
         Func<DesktopSettings> settings,
         CommandLog? log = null,
         CommandOptions? options = null,
-        CodeJobs.CodeJobControl? codeJobs = null)
+        CodeJobs.CodeJobControl? codeJobs = null,
+        Files.DeviceFiles? files = null)
     {
         _platform = platform;
         _control = control;
@@ -71,6 +73,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
         _log = log;
         _options = options ?? new CommandOptions();
         _codeJobs = codeJobs;
+        _files = files;
     }
 
     private IDesktop Desktop => _platform.Desktop;
@@ -129,6 +132,11 @@ public sealed partial class CommandProcessor : ICommandExecutor
         if (CodeJobs.CodeJobControl.Handles(action))
         {
             return await CodeJobAsync(action, args, device, ct);
+        }
+
+        if (Files.DeviceFiles.Handles(action))
+        {
+            return FileAction(action, args, device);
         }
 
         if (!ActingActions.Contains(action))

@@ -33,6 +33,13 @@
         <TextBlock Text="Folder the shell starts in" />
         <TextBox x:Name="WorkFolder" />
 
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Files" />
+        <CheckBox x:Name="FilesSwitch" Content="Let Anemo read and write files (trusted devices only)" />
+        <TextBlock Text="Folders for files (full paths, separated by ;)" />
+        <TextBox x:Name="FileFolders" />
+        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
+                   Text="Anemo's agents copy files between these folders and the workspace. Empty: your home folder. Never hidden folders or ~/Library." />
+
         <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Keys" />
         <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
                    Text="Written as Ctrl+Alt+Shift+S: Ctrl is Control (⌃), Alt is Option (⌥), Win is Command (⌘)." />

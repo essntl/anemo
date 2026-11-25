@@ -54,4 +54,13 @@ public sealed record DesktopSettings
 
     /// <summary>Whose GitHub repositories are listed and cloned; null means the account gh is signed in as.</summary>
     public string? GitHubOwner { get; init; }
+
+    /// <summary>
+    /// "Let Anemo read and write files" (device-contracts.md §8, 1.7.0): Anemo's agents copy
+    /// files between this computer and the workspace, only while the device is trusted. Off by default.
+    /// </summary>
+    public bool ShareFiles { get; init; }
+
+    /// <summary>The folders those files may be in; null or empty means the user's home folder (hidden and system folders never).</summary>
+    public IReadOnlyList<string>? FileFolders { get; init; }
 }

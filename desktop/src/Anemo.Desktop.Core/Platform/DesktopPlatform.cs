@@ -39,6 +39,12 @@ public sealed record DesktopPlatform
     /// <summary><c>press</c> takes <c>Cmd</c> as a modifier and the Mac's own keys rules apply.</summary>
     public bool IsMac { get; init; }
 
+    /// <summary>
+    /// The home folder's system folders, never read or written by the file actions
+    /// (device-contracts.md §8.2): browser profiles, credentials, start-up items live there.
+    /// </summary>
+    public IReadOnlyList<string> ProtectedHomeFolders { get; init; } = ["AppData"];
+
     public static DesktopPlatform Windows { get; } = new()
     {
         WireName = "windows",
@@ -64,5 +70,6 @@ public sealed record DesktopPlatform
         DefaultJobsFolder = home.TrimEnd('/') + "/anemo-bridge/jobs",
         DefaultProjectsFolder = home.TrimEnd('/') + "/dev",
         IsMac = true,
+        ProtectedHomeFolders = ["Library"],
     };
 }

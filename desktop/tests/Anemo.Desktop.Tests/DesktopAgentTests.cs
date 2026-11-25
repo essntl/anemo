@@ -74,6 +74,24 @@ public sealed class DesktopAgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Files_are_offered_on_a_trusted_device_with_the_switch_on()
+    {
+        _server.Trust = "trusted";
+        var agent = Configured();
+        _running = agent.RunAsync(_stop.Token);
+        var client = await _server.NextClientAsync();
+        Assert.False((bool)(await client.NextAsync("device.offer"))["files"]!);
+
+        agent.Save(agent.Settings with { ShareFiles = true }, newToken: null);
+        Assert.True((bool)(await client.NextAsync("device.offer"))["files"]!);
+
+        _server.Trust = "watched";
+        agent.Connection.Reconnect();
+        client = await _server.NextClientAsync();
+        Assert.False((bool)(await client.NextAsync("device.offer"))["files"]!);
+    }
+
+    [Fact]
     public async Task Shell_runs_only_on_a_trusted_device_with_PowerShell_on()
     {
         _server.Trust = "watched";

@@ -39,6 +39,11 @@ public static class CommandSummary
             "code_git_graph" => GitTarget() + (command["fetch"] is JsonValue f && f.TryGetValue<bool>(out var fetch) && fetch ? ", fetch" : ""),
             "code_git_commit" => $"{GitTarget()}, commit {Short(Str("hash"))}",
             "code_git_cache_clear" => "",
+            "file_stat" or "file_read" or "file_write_begin" => Short(Str("path"), 200)
+                + (action == "file_read" ? $", {Num("length")} bytes at {Num("offset")}" : "")
+                + (action == "file_write_begin" ? $", {Num("size")} bytes" + (command["overwrite"] is JsonValue o && o.TryGetValue<bool>(out var ow) && ow ? ", overwrite" : "") : ""),
+            "file_write_chunk" => $"transfer {Short(Str("transfer"), 12)}, {Length("data") / 4 * 3} bytes at {Num("offset")}",
+            "file_write_end" or "file_write_abort" => $"transfer {Short(Str("transfer"), 12)}",
             _ => "unknown action",
         };
     }
