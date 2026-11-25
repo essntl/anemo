@@ -5158,6 +5158,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/{plugin}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Chat
+         * @description A new chat in Agent mode, linked to the plugin, whose first message asks the
+         *     assistant to read the plugin. The answer is already queued.
+         */
+        post: operations["start_chat_api_plugins__plugin__chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -9237,15 +9258,14 @@ export interface components {
             /** Result */
             result: unknown;
         };
-        /** PluginChatOut */
-        PluginChatOut: {
+        /** PluginChatIn */
+        PluginChatIn: {
             /**
-             * Id
-             * Format: uuid
+             * Message
+             * @description What the user wants changed. Left out: the assistant reads the plugin and asks.
+             * @default
              */
-            id: string;
-            /** Title */
-            title: string;
+            message: string;
         };
         /** PluginContributionsOut */
         PluginContributionsOut: {
@@ -9322,7 +9342,7 @@ export interface components {
             /** Versions */
             versions: components["schemas"]["PluginVersionOut"][];
             /** Chats */
-            chats: components["schemas"]["PluginChatOut"][];
+            chats: components["schemas"]["app__features__plugins__schemas__PluginChatOut"][];
         };
         /** PluginDiffOut */
         PluginDiffOut: {
@@ -12518,6 +12538,14 @@ export interface components {
             /** Queued */
             queued: boolean;
         };
+        /** PluginChatOut */
+        app__features__plugins__chat_router__PluginChatOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+        };
         /** ApproveIn */
         app__features__plugins__schemas__ApproveIn: {
             /** Hash */
@@ -12527,6 +12555,16 @@ export interface components {
              * @default false
              */
             enable: boolean;
+        };
+        /** PluginChatOut */
+        app__features__plugins__schemas__PluginChatOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
         };
         /** ReindexOut */
         app__features__properties__schemas__ReindexOut: {
@@ -24168,6 +24206,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginCallOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_chat_api_plugins__plugin__chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PluginChatIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__features__plugins__chat_router__PluginChatOut"];
                 };
             };
             /** @description Validation Error */
