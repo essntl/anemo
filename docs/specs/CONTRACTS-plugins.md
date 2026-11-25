@@ -216,7 +216,7 @@ nothing more.
 | `tasks:write` | create and change tasks (deleting goes to the trash) | medium |
 | `documents:write` | create and change documents | medium |
 | `events:write` | create and change events (deleting goes to the trash) | medium |
-| `code:read` | list the projects on the user's computers and read their git history (`code.projects`, `code.gitGraph`, `code.gitCommit`): a fixed set of read-only git commands run by Anemo Desktop 1.5.0 on a trusted computer that shares its jobs; metadata only, never file contents or diffs | high |
+| `code:read` | list the projects on the user's computers and read their git history (`code.projects`, `code.gitGraph`, `code.gitCommit`): a fixed set of read-only git commands run by Anemo Desktop 1.5.0 (1.6.0: also the owner's GitHub repositories not cloned, from a cache on the computer, and `git fetch`) on a trusted computer that shares its jobs; metadata only, never file contents or diffs | high |
 | `notifications:send` | send you a notification | high |
 | `network:<host>` | HTTP requests to that host, made by the server through the guarded client (`*.example.com` = its subdomains) | high |
 | `tools:<tool name>` | call that agent tool (built-in, or `mcp__<server>__<tool>`) | high, or **critical** (below) |
@@ -397,9 +397,9 @@ anemo.ui.resize(320)                                       // short forms for th
 | `events.get` | `{id}` → `Event` | `events:read` |
 | `events.create` / `events.update` | `{title, start, end, allDay?, …}` / `{id, …changes}` → `Event` | `events:write` |
 | `projects.list` | `{}` → `{projects: [{id, name, color}]}` | `projects:read` or `tasks:read` |
-| `code.projects` | `{device}` → `{projects: [{name, path, remote}]}` | `code:read` |
-| `code.gitGraph` | `{device, project, limit?: 1–1000 = 300, all?: bool = true}` → `GitGraph` (the guide, §6) | `code:read` |
-| `code.gitCommit` | `{device, project, hash: ^[0-9a-f]{7,40}$}` → `GitCommit` (the guide, §6) | `code:read` |
+| `code.projects` | `{device, remote?: bool = true}` → `{projects: [{name, path, remote, repo, cloned}]}` (`cloned: false`: the owner's GitHub repositories not cloned there, unless `remote: false`) | `code:read` |
+| `code.gitGraph` | `{device, project \| repo: "owner/name", limit?: 1–1000 = 300, all?: bool = true, fetch?: bool = false}` → `GitGraph` (the guide, §6; `repo`, `fetch` and pull requests need Anemo Desktop 1.6.0) | `code:read` |
+| `code.gitCommit` | `{device, project \| repo, hash: ^[0-9a-f]{7,40}$}` → `GitCommit` (the guide, §6) | `code:read` |
 | `notifications.send` | `{title, body?}` → `{}` | `notifications:send` |
 | `http.fetch` | `{url, method?, headers?, body?}` → `{status, headers, body}` (text, ≤ 1 MB) | `network:<host of url>` |
 | `tools.call` | `{name, args}` → `{content, data?, isError}` | `tools:<name>` |

@@ -282,6 +282,14 @@ someone else wrote, so it gets nothing by default:
   The server checks the project name, the commit hash and the limit before asking, and the
   answer's shape after; only metadata comes back (no file contents, no diffs, no
   credentials from remote URLs).
+  Anemo's own Git view on the Code page uses the same reads. A GitHub repository that
+  isn't cloned is named only as `owner/name`, and Anemo Desktop takes it only if it is in
+  its owner's `gh repo list` (it clones the URL from that list, never one it is sent) into
+  a size-capped blobless bare cache in its own data folder (outside the projects folder,
+  with the same link check). A fetch (`git fetch --prune`, only when asked: the Refresh
+  button or `fetch: true`) runs with hooks off and the `ext`/`file` transports refused; it
+  uses the computer's own git credentials, which never leave it. Pull requests come from
+  `gh pr list` with fixed arguments, and only github.com links are passed on.
 - **Its output is data.** Results of plugin scripts and plugin MCP tools reach models
   marked as untrusted, and when an agent reads a task, document or event a plugin wrote
   last, the text is labelled with the plugin and marked as untrusted. (Static text you
