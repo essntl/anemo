@@ -142,6 +142,13 @@ class FrameFileOut(BaseModel):
     text: str
 
 
+class FramePictureOut(BaseModel):
+    """A picture of the package, for `<img src>`, CSS `url()` and `anemo.files.url()`."""
+
+    path: str
+    data_url: str  # data:image/...;base64,...
+
+
 class PluginFrameBundleOut(BaseModel):
     entry: str
     html: str
@@ -150,6 +157,8 @@ class PluginFrameBundleOut(BaseModel):
     scripts: list[FrameFileOut]
     styles: list[FrameFileOut]
     hash: str  # the version's package hash
+    # Every picture of the version (a frame can't fetch them itself).
+    pictures: list[FramePictureOut] = Field(default_factory=list)
 
 
 class PluginResourceOut(BaseModel):
@@ -165,6 +174,9 @@ class PluginDataOut(BaseModel):
     resources: list[PluginResourceOut]
     storage_keys: int
     storage_bytes: int
+    # Its pictures (assets.*), deleted with its storage.
+    asset_count: int = 0
+    asset_bytes: int = 0
     # What it wrote (created) that "remove its data" moves to the trash.
     tasks: int
     documents: int

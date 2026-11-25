@@ -5,7 +5,9 @@
  *
  *  - `openPage`: goes to one of the plugin's pages;
  *  - `runScript`: starts one of its scripts (the result comes later, in the run history);
- *  - `newFromTemplate`: creates a document or task from one of its templates and offers to open it.
+ *  - `newFromTemplate`: creates a document or task from one of its templates and offers to open it;
+ *  - `sendToUi`: tells one of its open frames (`anemo.on('command', {event})`), e.g. to
+ *    toggle its overlay; a toast says so when that frame isn't open.
  *
  * The last two are calls like a frame's (`scripts.run`, `templates.apply`), checked by the
  * server, and asking first when the server says so.
@@ -18,6 +20,7 @@ import { t } from '@/lib/i18n'
 import { callPlugin, usePluginContributions } from './api'
 import { callWithConfirm } from './host/channel'
 import { confirmPluginCall } from './host/confirm'
+import { sendToUi } from './host/frames'
 import { NamedIcon, PluginIcon } from './PluginIcon'
 import { pluginPageLink } from './slotData'
 import { commandAction, type ContributionCommand, type ContributionUi, type PluginContributionsOut } from './types'
@@ -53,6 +56,12 @@ export async function runCommand(command: ContributionCommand, iconUrl: string |
   }
   if (action.type === 'openPage') {
     navigate(pluginPageLink(command.plugin, action.page))
+    return
+  }
+  if (action.type === 'sendToUi') {
+    if (!sendToUi(command.plugin, action.ui, action.event)) {
+      toast({ message: t('{name}: “{title}” needs the plugin’s part that isn’t open right now.', { name: command.plugin_name, title: command.title }) })
+    }
     return
   }
   const confirm = (request: Parameters<typeof confirmPluginCall>[1]) =>

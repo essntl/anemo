@@ -132,7 +132,7 @@ export function SidebarRail({ className }: { className?: string }) {
   const { pinned, more } = usePages()
   const button = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
   return (
-    <nav aria-label={t('Menu')} className={cn('h-full w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto bg-surface py-3', className)}>
+    <nav aria-label={t('Menu')} data-plugin-anchor="sidebar" className={cn('h-full w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto bg-surface py-3', className)}>
       <button type="button" aria-label={t('Show the sidebar')} title={t('Show the sidebar ({keys})', { keys: shortcutText('app.sidebar') })} onClick={() => setCollapsed(false)} className={button}>
         <PanelLeftOpen className="h-4 w-4" />
       </button>
@@ -166,7 +166,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   return (
     // Normally nothing here scrolls but the chats; in a very low window the sidebar as a
     // whole does, rather than squeezing the chats away.
-    <aside className={cn('glass h-full shrink-0 flex-col overflow-y-auto bg-surface p-3', onClose ? 'flex' : '', className)}>
+    <aside data-plugin-anchor="sidebar" className={cn('glass h-full shrink-0 flex-col overflow-y-auto bg-surface p-3', onClose ? 'flex' : '', className)}>
       <div className={cn('flex items-center gap-2 px-1.5', onClose ? 'mb-3 gap-1' : 'mb-3')}>
         {/* The logo leads home. */}
         <NavLink to="/home" title={t('Home')} aria-label={t('Anemo, go to Home')}

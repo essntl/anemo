@@ -44,7 +44,7 @@ MAX_FILE_BYTES = 1024 * 1024
 MAX_PATH = 200
 # Binary files travel as base64 text with this prefix; a 1 MB file is ~1.4 M characters.
 BASE64_PREFIX = "base64:"
-BINARY_SUFFIXES = (".png", ".webp", ".woff2")
+BINARY_SUFFIXES = (".png", ".webp", ".gif", ".jpg", ".jpeg", ".woff2")
 MAX_VALUE_CHARS = len(BASE64_PREFIX) + (MAX_FILE_BYTES * 4) // 3 + 4
 # How much file text plugin_read shows (the runtime saves longer results in full and the
 # model can page through them with read_tool_output).
@@ -86,7 +86,7 @@ PLUGIN_ID = "The plugin's id from its manifest, e.g. artem.word-count (see plugi
 FILES = (
     'The files as {"path": "content"}, paths relative to the package root (e.g. '
     '"anemo-plugin.json", "ui/panel.html"). Text files are taken literally. Binary files '
-    '(.png, .webp, .woff2) are base64 with the prefix "base64:", e.g. '
+    '(.png, .webp, .gif, .jpg, .jpeg, .woff2) are base64 with the prefix "base64:", e.g. '
     '{"icon.png": "base64:iVBORw0KGgo..."}. At most 100 files and 1 MB per file per call.'
 )
 REVIEW_NOTE = (

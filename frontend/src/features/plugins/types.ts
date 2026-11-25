@@ -37,7 +37,7 @@ export type ActorOut = Schemas['ActorOut']
 export type Risk = PermissionOut['risk']
 export type PluginStatus = PluginOut['status']
 export type VersionStatus = PluginVersionOut['status']
-export type Slot = 'object.panel' | 'page' | 'settings' | 'chat.block'
+export type Slot = 'object.panel' | 'page' | 'settings' | 'chat.block' | 'overlay'
 export type ObjectType = 'task' | 'document' | 'event'
 
 const OBJECT_TYPES: readonly string[] = ['task', 'document', 'event']
@@ -102,11 +102,13 @@ export type CommandAction =
   | { type: 'openPage'; page: string }
   | { type: 'runScript'; script: string; input?: unknown }
   | { type: 'newFromTemplate'; template: string }
+  | { type: 'sendToUi'; ui: string; event: string }
 
 /** The command's action, or null for one this version of the app doesn't know. */
 export function commandAction(action: ContributionCommand['action']): CommandAction | null {
   if (action.type === 'openPage' && typeof action.page === 'string') return { type: 'openPage', page: action.page }
   if (action.type === 'runScript' && typeof action.script === 'string') return { type: 'runScript', script: action.script, input: action.input }
   if (action.type === 'newFromTemplate' && typeof action.template === 'string') return { type: 'newFromTemplate', template: action.template }
+  if (action.type === 'sendToUi' && typeof action.ui === 'string' && typeof action.event === 'string') return { type: 'sendToUi', ui: action.ui, event: action.event }
   return null
 }

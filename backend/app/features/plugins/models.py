@@ -10,7 +10,16 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -104,6 +113,24 @@ class PluginStorage(Base, IdMixin, TimestampMixin):
     key: Mapped[str] = mapped_column(String(100))
     value: Mapped[Any] = mapped_column(JSONB, nullable=True)
     size: Mapped[int] = mapped_column(Integer)  # bytes of the value as JSON
+
+
+class PluginAsset(Base, IdMixin, TimestampMixin):
+    """A picture a plugin keeps for itself (assets.* methods; 25 MB per plugin), e.g. one
+    the user chose with ui.pickFile. Checked by its content when it is stored; deleted
+    with the plugin, like its storage."""
+
+    __tablename__ = "plugin_assets"
+    __table_args__ = (UniqueConstraint("plugin_id", "key"),)
+
+    plugin_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plugins.id", ondelete="CASCADE"), index=True
+    )
+    key: Mapped[str] = mapped_column(String(100))
+    media_type: Mapped[str] = mapped_column(String(40))  # image/png, image/gif, ...
+    size: Mapped[int] = mapped_column(Integer)  # bytes of the picture
+    # Loaded only when asked for: lists and quotas read the size, not the bytes.
+    data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
 
 
 class PluginChat(Base, IdMixin, TimestampMixin):

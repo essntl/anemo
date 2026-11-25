@@ -8,23 +8,33 @@
  *   1. Is the plugin still allowed to run (enabled or a preview; kill switch off)?
  *   2. Rate limit: at most 120 requests a minute and 8 waiting at once, per frame.
  *   3. Does the method exist, and does the approved manifest (or the preview's) allow it?
- *   4. `ui.*` and `context.get` are answered here; everything else goes to the server
+ *   4. `ui.*`, `context.get` and `layout.get` are answered here; everything else goes to the server
  *      (`POST /api/plugins/{id}/call`), which checks it all again.
  *   5. If the server says the call needs the user's OK (`confirm_required`), Anemo's own
  *      dialog asks; "Allow" sends the call again with the one-time token. The token stays
  *      in this file: it is never put into a message to the frame.
  *
+ * An overlay frame's bootstrap also sends `{pointer: {x, y} | null}` (where the pointer is
+ * while the frame has it): not a request, so it gets no answer and isn't rate limited.
+ *
  * No React and no DOM here (only the port), so the rules can be tested on their own.
  */
 import { ApiError } from '@/api/client'
 import type { PluginCallBody, Risk, Slot } from '../types'
+import type { LayoutInfo, Rect } from './layout'
 import { checkCall, type FrameError, type FrameErrorCode, isLocal, OPEN_NEEDS } from './methods'
+import { MAX_PICK_BYTES, PICKABLE_TYPES, PickError, type PickedFile, type PickOptions } from './pickFile'
 
 /** Requests a frame may send in a minute, and how many may wait for an answer at once. */
 export const RATE_PER_MINUTE = 120
 export const MAX_IN_FLIGHT = 8
 /** The largest message, in characters of JSON (contract: 1 MB). */
 export const MAX_MESSAGE = 1_000_000
+/** assets.set carries a picture of up to 10 MB as a base64 data: URL. */
+export const MAX_ASSET_MESSAGE = 13_980_000
+/** An overlay's hit regions: how many, and how large each may be (CSS pixels). */
+export const MAX_HIT_REGIONS = 8
+export const MAX_HIT_SIZE = 320
 /** What `ui.resize` may ask for, in CSS pixels. */
 export const MIN_HEIGHT = 40
 export const MAX_HEIGHT = 2000
@@ -64,6 +74,16 @@ export interface ChannelOptions {
   resize: (height: number) => void
   toast: (message: string, tone: string) => void
   open: (type: 'task' | 'document' | 'event' | 'page', id: string) => void
+  /** Overlay frames: where the frame takes the pointer (already checked), and whether it shows. */
+  setHitRegions?: (regions: Rect[]) => void
+  setVisible?: (visible: boolean) => void
+  /** Overlay frames: where the pointer is in the frame while it has it (null: it left). */
+  pointer?: (point: { x: number; y: number } | null) => void
+  /** Opens the browser's file picker (pickFile.ts); rejects with a PickError. */
+  pickFile?: (options: PickOptions) => Promise<PickedFile>
+  layout?: () => LayoutInfo
+  /** A write to the plugin's own storage or assets went through: tell its other frames. */
+  wrote?: (area: 'storage' | 'assets', key: string) => void
   now?: () => number
 }
 
@@ -161,6 +181,7 @@ export class PluginChannel {
   }
 
   async receive(data: unknown): Promise<void> {
+    if (this.pointerReport(data)) return
     const request = this.parse(data)
     if (!request || this.closed) return
     const { id, method, params } = request
@@ -174,7 +195,9 @@ export class PluginChannel {
     } catch {
       return this.reply(id, { error: { code: 'invalid_params', message: 'The params must be plain JSON.' } })
     }
-    if (size > MAX_MESSAGE) return this.reply(id, { error: { code: 'invalid_params', message: 'A message may be at most 1 MB.' } })
+    if (size > (method === 'assets.set' ? MAX_ASSET_MESSAGE : MAX_MESSAGE)) {
+      return this.reply(id, { error: { code: 'invalid_params', message: method === 'assets.set' ? 'An asset may be at most 10 MB.' : 'A message may be at most 1 MB.' } })
+    }
     if (typeof params !== 'object' || params === null || Array.isArray(params)) {
       return this.reply(id, { error: { code: 'invalid_params', message: 'The params must be an object.' } })
     }
@@ -183,10 +206,12 @@ export class PluginChannel {
 
     this.inFlight++
     try {
-      const result = isLocal(method) ? this.local(method, params as Record<string, unknown>) : await this.remote(method, params as Record<string, unknown>)
+      const p = params as Record<string, unknown>
+      const result = isLocal(method) ? await this.local(method, p) : await this.remote(method, p)
+      this.wroteOwn(method, p)
       this.reply(id, { result: result ?? null })
     } catch (err) {
-      this.reply(id, { error: err instanceof FrameFailure ? { code: err.code, message: err.message } : frameError(err) })
+      this.reply(id, { error: err instanceof FrameFailure || err instanceof PickError ? { code: err.code, message: err.message } : frameError(err) })
     } finally {
       this.inFlight--
     }
@@ -198,10 +223,51 @@ export class PluginChannel {
     return callWithConfirm(body, o.call, o.confirm)
   }
 
+  /** An overlay's report of the pointer (see the top of this file); true when it was one. */
+  private pointerReport(data: unknown): boolean {
+    if (!data || typeof data !== 'object' || !('pointer' in data) || 'method' in data) return false
+    if (this.closed || this.options.slot !== 'overlay') return true
+    const point = (data as { pointer: unknown }).pointer
+    if (point === null) this.options.pointer?.(null)
+    else if (point && typeof point === 'object') {
+      const { x, y } = point as { x?: unknown; y?: unknown }
+      if (finite(x) && finite(y)) this.options.pointer?.({ x, y })
+    }
+    return true
+  }
+
+  /** After a write to the plugin's own data: its other frames hear about it. */
+  private wroteOwn(method: string, p: Record<string, unknown>): void {
+    const area = WRITES[method]
+    if (area && typeof p.key === 'string') this.options.wrote?.(area, p.key)
+  }
+
   /** The methods the page answers itself. Throws a FrameFailure when the params are wrong. */
-  private local(method: string, p: Record<string, unknown>): unknown {
+  private async local(method: string, p: Record<string, unknown>): Promise<unknown> {
     const o = this.options
     if (method === 'context.get') return o.context()
+    if (method === 'layout.get') {
+      onlyParams(method, p, [])
+      return o.layout?.() ?? null
+    }
+    if (method === 'ui.setHitRegions') {
+      const regions = parseHitRegions(p)
+      if (o.slot !== 'overlay' || !o.setHitRegions) throw invalidParams('Only an overlay has hit regions.')
+      o.setHitRegions(regions)
+      return {}
+    }
+    if (method === 'ui.setVisible') {
+      onlyParams(method, p, ['visible'])
+      if (typeof p.visible !== 'boolean') throw invalidParams('ui.setVisible needs "visible": true or false.')
+      if (o.slot !== 'overlay' || !o.setVisible) throw invalidParams('Only an overlay can hide and show itself.')
+      o.setVisible(p.visible)
+      return {}
+    }
+    if (method === 'ui.pickFile') {
+      const options = parsePickOptions(p)
+      if (!o.pickFile) throw new FrameFailure('unavailable', 'Files can’t be picked here.')
+      return o.pickFile(options)
+    }
     if (method === 'ui.resize') {
       if (typeof p.height !== 'number' || !Number.isFinite(p.height)) throw invalidParams('ui.resize needs a "height" in pixels.')
       // Pages and the settings tab take the room they are given; panels and blocks can grow.
@@ -231,6 +297,65 @@ export class PluginChannel {
 }
 
 export const clampHeight = (height: number): number => Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, height)))
+
+/** The methods that write the plugin's own data, and which kind. */
+const WRITES: Record<string, 'storage' | 'assets'> = {
+  'storage.set': 'storage',
+  'storage.delete': 'storage',
+  'assets.set': 'assets',
+  'assets.delete': 'assets',
+}
+
+/** Unknown parameters are an error, as on the server (a typo shouldn't silently do nothing). */
+function onlyParams(method: string, p: Record<string, unknown>, known: string[]): void {
+  const unknown = Object.keys(p).filter((k) => !known.includes(k))
+  if (unknown.length) throw invalidParams(`${method} has no parameter "${unknown[0]}".`)
+}
+
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+
+/** `ui.setHitRegions`' params, checked: at most 8 rectangles, each at most 320 × 320. */
+export function parseHitRegions(p: Record<string, unknown>): Rect[] {
+  onlyParams('ui.setHitRegions', p, ['regions'])
+  if (!Array.isArray(p.regions)) throw invalidParams('ui.setHitRegions needs "regions": a list of {x, y, width, height}.')
+  if (p.regions.length > MAX_HIT_REGIONS) throw invalidParams(`At most ${MAX_HIT_REGIONS} hit regions.`)
+  return p.regions.map((r: unknown, i) => {
+    if (!r || typeof r !== 'object' || Array.isArray(r)) throw invalidParams(`regions[${i}] must be {x, y, width, height}.`)
+    const region = r as Record<string, unknown>
+    const extra = Object.keys(region).find((k) => !['x', 'y', 'width', 'height'].includes(k))
+    if (extra) throw invalidParams(`regions[${i}] has no field "${extra}".`)
+    const { x, y, width, height } = region
+    if (!finite(x) || !finite(y) || !finite(width) || !finite(height)) throw invalidParams(`regions[${i}] needs numbers x, y, width and height.`)
+    if (width <= 0 || height <= 0 || width > MAX_HIT_SIZE || height > MAX_HIT_SIZE) {
+      throw invalidParams(`regions[${i}] must be larger than 0 and at most ${MAX_HIT_SIZE} × ${MAX_HIT_SIZE} pixels.`)
+    }
+    return { x, y, width, height }
+  })
+}
+
+/** Whether a point is inside one of the regions. */
+export function inRegions(regions: readonly Rect[], x: number, y: number): boolean {
+  return regions.some((r) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)
+}
+
+/** `ui.pickFile`'s params, checked: picture types only, at most 10 MB. */
+export function parsePickOptions(p: Record<string, unknown>): PickOptions {
+  onlyParams('ui.pickFile', p, ['accept', 'maxBytes'])
+  const types: readonly string[] = PICKABLE_TYPES
+  let accept: string[] = [...PICKABLE_TYPES]
+  if (p.accept !== undefined) {
+    if (!Array.isArray(p.accept) || !p.accept.length || !p.accept.every((a) => typeof a === 'string' && types.includes(a))) {
+      throw invalidParams(`"accept" is a list of ${PICKABLE_TYPES.join(', ')} (pictures only).`)
+    }
+    accept = [...new Set(p.accept as string[])]
+  }
+  let maxBytes = MAX_PICK_BYTES
+  if (p.maxBytes !== undefined) {
+    if (!finite(p.maxBytes) || p.maxBytes <= 0) throw invalidParams('"maxBytes" is a number of bytes.')
+    maxBytes = Math.min(MAX_PICK_BYTES, Math.floor(p.maxBytes))
+  }
+  return { accept, maxBytes }
+}
 
 /** A refusal of the page's own (wrong params, a page that doesn't exist), sent to the frame as it is. */
 class FrameFailure extends Error {

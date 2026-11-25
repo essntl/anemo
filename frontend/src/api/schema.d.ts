@@ -7637,6 +7637,16 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * FramePictureOut
+         * @description A picture of the package, for `<img src>`, CSS `url()` and `anemo.files.url()`.
+         */
+        FramePictureOut: {
+            /** Path */
+            path: string;
+            /** Data Url */
+            data_url: string;
+        };
         /** GeneralSettings */
         GeneralSettings: {
             /**
@@ -9328,6 +9338,16 @@ export interface components {
             storage_keys: number;
             /** Storage Bytes */
             storage_bytes: number;
+            /**
+             * Asset Count
+             * @default 0
+             */
+            asset_count: number;
+            /**
+             * Asset Bytes
+             * @default 0
+             */
+            asset_bytes: number;
             /** Tasks */
             tasks: number;
             /** Documents */
@@ -9414,6 +9434,8 @@ export interface components {
             styles: components["schemas"]["FrameFileOut"][];
             /** Hash */
             hash: string;
+            /** Pictures */
+            pictures?: components["schemas"]["FramePictureOut"][];
         };
         /** PluginListOut */
         PluginListOut: {
@@ -24106,6 +24128,8 @@ export interface operations {
                     "text/plain": unknown;
                     "image/png": unknown;
                     "image/webp": unknown;
+                    "image/gif": unknown;
+                    "image/jpeg": unknown;
                 };
             };
             /** @description Validation Error */

@@ -17,8 +17,13 @@
  *      over that port; see channel.ts for the checks on every request.
  *   5. If the frame loads a second document (it navigated itself somewhere), it is removed
  *      at once and the plugin's page in Settings says so.
+ *
+ * Every frame also gets the screen's layout (`layout.changed`) and what the message box and
+ * the assistant are doing (`composer.activity`, `assistant.activity`; states only), and is
+ * listed in frames.ts so the plugin's other frames hear of its writes. An overlay
+ * (OverlayHost in overlays.tsx) is drawn without the box, the skeleton or the error card.
  */
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, type Ref, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { TriangleAlert } from 'lucide-react'
@@ -27,12 +32,17 @@ import { toast } from '@/components/ui/toast'
 import { documentLink, eventLink, taskLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { currentLocale, t } from '@/lib/i18n'
+import { assistantActivity, watchAssistantActivity } from '@/lib/assistantActivity'
 import { settingsKey } from '@/features/settings/api'
 import { callPlugin, fetchFrameBundle } from '../api'
 import type { Slot } from '../types'
-import { clampHeight, PluginChannel } from './channel'
+import { composerActivity, watchComposer } from './activity'
+import { type ChannelOptions, clampHeight, PluginChannel } from './channel'
 import { confirmPluginCall } from './confirm'
+import { announceWrite, type OpenFrame, registerFrame } from './frames'
 import { useFrameIncidents } from './incidents'
+import { measureLayout, watchLayout } from './layout'
+import { pickFile } from './pickFile'
 import { currentTheme, watchTheme } from './theme'
 
 /** The fixed frame document every plugin UI starts from (served by the backend). */
@@ -75,12 +85,18 @@ export interface PluginFrameProps {
   /** The frame's accessible name. */
   title?: string
   className?: string
+  /** An overlay's own host methods (hit regions, visibility, the pointer reports). */
+  overlay?: Pick<ChannelOptions, 'setHitRegions' | 'setVisible' | 'pointer'>
+  /** The iframe element itself (an overlay switches its pointer events directly). */
+  frameRef?: Ref<HTMLIFrameElement>
+  /** Extra style for the iframe (an overlay's visibility). */
+  frameStyle?: CSSProperties
 }
 
 type Status = 'loading' | 'ready' | 'failed' | 'removed'
 
 export function PluginFrame(props: PluginFrameProps) {
-  const { plugin, ui, slot, context, preview = false, fill = false, revision, fallback, title, className } = props
+  const { plugin, ui, slot, context, preview = false, fill = false, revision, fallback, title, className, frameRef, frameStyle } = props
   const qc = useQueryClient()
   const navigate = useNavigate()
   const frame = useRef<HTMLIFrameElement>(null)
@@ -100,6 +116,7 @@ export function PluginFrame(props: PluginFrameProps) {
   useEffect(() => {
     let cancelled = false
     let initSent = false
+    let unregister = () => {}
     const bundle = fetchFrameBundle(qc, plugin.id, plugin.version, ui)
     // A failed fetch is shown once the frame is waiting for it (not as an unhandled rejection).
     bundle.catch(() => {})
@@ -128,7 +145,10 @@ export function PluginFrame(props: PluginFrameProps) {
       }
       if (cancelled) return
       const ports = new MessageChannel()
+      const opened: OpenFrame = { pluginId: plugin.id, ui, emit: (event, data) => channel.current?.emit(event, data) }
+      unregister = registerFrame(opened)
       channel.current = new PluginChannel(ports.port1, {
+        ...latest.current.overlay,
         pluginId: plugin.id,
         ui,
         slot,
@@ -145,6 +165,9 @@ export function PluginFrame(props: PluginFrameProps) {
           const to = type === 'task' ? taskLink(id) : type === 'document' ? documentLink(id) : type === 'event' ? eventLink(id) : `/plugins/${encodeURIComponent(plugin.id)}/${encodeURIComponent(id)}`
           void navigate(to)
         },
+        pickFile,
+        layout: () => measureLayout(),
+        wrote: (area, key) => announceWrite(opened, area, key),
       })
       const init = {
         anemo: 1,
@@ -155,6 +178,7 @@ export function PluginFrame(props: PluginFrameProps) {
         context: latest.current.context,
         theme: currentTheme(),
         locale: currentLocale(),
+        layout: measureLayout(),
         timeZone: userTimeZone(qc.getQueryData(settingsKey)),
         preview,
         files,
@@ -162,16 +186,27 @@ export function PluginFrame(props: PluginFrameProps) {
       // The frame's origin is opaque ("null"), so "*" is the only target that reaches it;
       // it is this exact window object, checked above.
       win.postMessage(init, '*', [ports.port2])
+      // The states as they are now; later changes come as they happen.
+      channel.current.emit('assistant.activity', { state: assistantActivity() })
+      channel.current.emit('composer.activity', { state: composerActivity() })
       setStatus('ready')
     }
 
     window.addEventListener('message', onMessage)
-    const stopTheme = watchTheme((theme) => channel.current?.emit('theme.changed', theme))
+    const emit = (event: string) => (data: unknown) => channel.current?.emit(event, data)
+    const stopTheme = watchTheme(emit('theme.changed'))
+    const stopLayout = watchLayout(emit('layout.changed'))
+    const stopComposer = watchComposer((state) => channel.current?.emit('composer.activity', { state }))
+    const stopAssistant = watchAssistantActivity((state) => channel.current?.emit('assistant.activity', { state }))
     return () => {
       cancelled = true
       window.clearTimeout(timer)
       window.removeEventListener('message', onMessage)
       stopTheme()
+      stopLayout()
+      stopComposer()
+      stopAssistant()
+      unregister()
       channel.current?.close()
       channel.current = null
     }
@@ -203,6 +238,33 @@ export function PluginFrame(props: PluginFrameProps) {
     channel.current = null
     setStatus('removed')
     useFrameIncidents.getState().report(plugin.id, ui)
+  }
+
+  if (slot === 'overlay') {
+    // A transparent layer over the window: no box, no skeleton, no error card (a plugin that
+    // can't start simply isn't drawn). OverlayHost places it and switches its pointer events.
+    if (status !== 'loading' && status !== 'ready') return null
+    return (
+      <iframe
+        // Both refs: this component's (the handshake checks the frame's window) and the host's.
+        ref={(el) => {
+          frame.current = el
+          if (typeof frameRef === 'function') frameRef(el)
+          else if (frameRef) frameRef.current = el
+        }}
+        src={FRAME_URL}
+        sandbox="allow-scripts"
+        allow=""
+        referrerPolicy="no-referrer"
+        title={title ?? plugin.name}
+        onLoad={onLoad}
+        // Never reached with Tab: an overlay can't take the keyboard from Anemo's page.
+        tabIndex={-1}
+        data-plugin-frame={plugin.id}
+        style={{ pointerEvents: 'none', ...frameStyle }}
+        className={cn('fixed inset-0 block h-full w-full border-0 bg-transparent', className)}
+      />
+    )
   }
 
   const box = fill ? { height: '100%' } : { height }

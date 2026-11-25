@@ -173,6 +173,10 @@ const messages: Messages = {
   "It created: {list}": "Он создал: {list}",
   "Stays, as it was yours before: {list}": "Останется, так как было вашим раньше: {list}",
   "{name}: this command needs a newer version of Anemo.": "{name}: для этой команды нужна более новая версия Anemo.",
+  "{name}: “{title}” needs the plugin’s part that isn’t open right now.": "{name}: для «{title}» нужна часть плагина, которая сейчас не открыта.",
+  "Overlay": "Наложение",
+  "An overlay draws over Anemo’s window, so it only runs once this version is approved.": "Наложение рисует поверх окна Anemo, поэтому оно запускается только после одобрения этой версии.",
+  "Its own pictures: {n} picture, {size} | Its own pictures: {n} pictures, {size}": "Собственные изображения: {n} изображение, {size} | Собственные изображения: {n} изображения, {size} | Собственные изображения: {n} изображений, {size}",
 }
 
 export default messages

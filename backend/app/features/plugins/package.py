@@ -17,6 +17,7 @@ import hashlib
 import io
 import logging
 import os
+import posixpath
 import re
 import shutil
 import stat
@@ -44,7 +45,16 @@ MAX_FILE = 1024 * 1024
 MAX_ICON = 256 * 1024
 MAX_PATH = 200
 TEXT_TYPES = (".json", ".md", ".txt", ".html", ".css", ".js", ".mjs", ".ts")
-PICTURE_TYPES = (".png", ".webp")
+PICTURE_TYPES = (".png", ".webp", ".gif", ".jpg", ".jpeg")
+# The picture format Pillow must find in a file, by its suffix.
+PICTURE_FORMATS = {".png": "PNG", ".webp": "WEBP", ".gif": "GIF", ".jpg": "JPEG", ".jpeg": "JPEG"}
+# A picture format's media type (package pictures and plugin assets).
+IMAGE_MEDIA_TYPES = {
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+    "GIF": "image/gif",
+    "JPEG": "image/jpeg",
+}
 FONT_TYPES = (".woff2",)
 ALLOWED_TYPES = TEXT_TYPES + PICTURE_TYPES + FONT_TYPES
 
@@ -176,17 +186,31 @@ def read_zip(data: bytes) -> dict[str, bytes]:
 # -- content -------------------------------------------------------------------------------
 
 
-def _picture_problem(path: str, data: bytes) -> str | None:
+def image_kind(data: bytes) -> str | None:
+    """The picture format of `data` by its content ("PNG", "WEBP", "GIF", "JPEG"), or
+    None when it isn't one of those (markup such as SVG never is)."""
     head = data[:512].lstrip(b"\xef\xbb\xbf").lstrip()
     if head.startswith(b"<"):
-        return "SVG and other markup can't be used as pictures (they can contain scripts)."
+        return None
     try:
         with Image.open(io.BytesIO(data)) as img:
             img.verify()
             kind = img.format
     except (UnidentifiedImageError, OSError, ValueError, SyntaxError, Image.DecompressionBombError):
-        return "This isn't a PNG or WebP picture."
-    expected = "PNG" if path.lower().endswith(".png") else "WEBP"
+        return None
+    if kind == "MPO":  # a camera JPEG with more than one frame is still a JPEG
+        kind = "JPEG"
+    return kind if kind in IMAGE_MEDIA_TYPES else None
+
+
+def _picture_problem(path: str, data: bytes) -> str | None:
+    head = data[:512].lstrip(b"\xef\xbb\xbf").lstrip()
+    if head.startswith(b"<"):
+        return "SVG and other markup can't be used as pictures (they can contain scripts)."
+    kind = image_kind(data)
+    if kind is None:
+        return "This isn't a PNG, WebP, GIF or JPEG picture."
+    expected = PICTURE_FORMATS[posixpath.splitext(path.lower())[1]]
     if kind != expected:
         return f"The file's content is {kind}, not what its name says ({expected})."
     return None

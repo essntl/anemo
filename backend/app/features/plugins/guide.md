@@ -1,7 +1,8 @@
 # Writing an Anemo plugin
 
 A plugin adds things to Anemo: a panel on tasks, documents or events, a page, a renderer
-for a kind of code block in chat answers, command-palette entries, and ready-made objects
+for a kind of code block in chat answers, a click-through layer over the window (an
+overlay), command-palette entries, and ready-made objects
 Anemo already knows (properties, saved views, templates, automations, scripts, MCP
 servers, agent profiles, skills, themes). This guide is the practical side of the plugin
 contract (version 1); it is written for an assistant building a plugin inside Anemo and
@@ -46,6 +47,7 @@ word-count/
   anemo-plugin.json      the manifest (required)
   README.md              shown on the plugin's page (optional, Markdown)
   icon.png               the card icon (optional; PNG or WebP, square, at most 256 KB)
+  sprites/idle.gif       a picture the UI shows (PNG, WebP, GIF or JPEG)
   ui/panel.html          a UI entry: HTML, plus the .js and .css files it references
   ui/panel.js
   ui/panel.css
@@ -57,9 +59,9 @@ word-count/
 | --- | --- |
 | Files | at most 500 files, 5 MB in total, 1 MB per file |
 | Paths | relative, `/`-separated, at most 200 characters; no `..` or `.` segments, no backslashes, no leading `/`, no names starting with `.` |
-| File types | `.json .md .txt .html .css .js .mjs .ts .png .webp .woff2` only. No `.svg`, no executables, no `node_modules` |
+| File types | `.json .md .txt .html .css .js .mjs .ts .png .webp .gif .jpg .jpeg .woff2` only. No `.svg`, no executables, no `node_modules` |
 | Text | UTF-8 |
-| Pictures and fonts | checked by their content (a `.png` must really be a PNG) |
+| Pictures and fonts | checked by their content (a `.png` must really be a PNG, a `.gif` a GIF, a `.jpg` a JPEG); the icon stays PNG or WebP |
 
 A zip may wrap everything in one top-level folder; it is removed on install. A plugin
 installed from a **Git** repository (https, public) must have `anemo-plugin.json` at the
@@ -166,7 +168,9 @@ user can see and change them in their usual place.
       "keywords": ["today"], "action": { "type": "openPage", "page": "today" } },
     { "id": "run-sync", "title": "Sync tasks", "action": { "type": "runScript", "script": "sync" } },
     { "id": "new-meeting", "title": "New meeting notes",
-      "action": { "type": "newFromTemplate", "template": "meeting" } }
+      "action": { "type": "newFromTemplate", "template": "meeting" } },
+    { "id": "toggle-layer", "title": "Clock: show or hide",
+      "action": { "type": "sendToUi", "ui": "layer", "event": "toggle" } }
   ]
 }
 ```
@@ -182,7 +186,7 @@ user can see and change them in their usual place.
 | `profiles` | Name, description, instructions, optional `icon` and `skills` (of this plugin). No permission levels or limits: those stay the user's. |
 | `skills` | `file` is the Markdown instructions; the slug is the `id` (an existing slug refuses the install). |
 | `themes` | `appearance` is a subset of Settings → Appearance: `mode accent tint tintStrength uiFont codeFont glass glassStrength background` (`background`: `none` or `gradient`). Never applied automatically. |
-| `commands` | Command-palette (Ctrl+K) entries. `action`: `openPage` (a `page` ui id), `runScript` (a script id, optional `input`), `newFromTemplate` (a template id). |
+| `commands` | Command-palette (Ctrl+K) entries. `action`: `openPage` (a `page` ui id), `runScript` (a script id, optional `input`), `newFromTemplate` (a template id), `sendToUi` (a `ui` id of this plugin and an `event` name, 1–40 letters, digits, `_ . : -`): the open frame of that UI gets `anemo.on('command', {event})`; if it isn't open, Anemo says so in a toast and nothing else happens. |
 
 Static text in an approved version (skill and profile instructions, automation prompts) is
 given to models as instructions; the user reviews it like code. Anything a plugin
@@ -203,6 +207,7 @@ Each item of `contributes.ui` is one frame. `entry` is an HTML file of the packa
 | `page` | A full page at `/plugins/<plugin id>/<ui id>`, listed under Plugins in the sidebar and in Ctrl+K | `{page: "<ui id>", params: {…query string}}` | any |
 | `settings` | The Settings tab of the plugin's own page in Settings → Plugins | `{}` | at most 1 |
 | `chat.block` | In a chat answer, instead of a fenced code block whose language is `fence` | `{block: {lang, text}}` | any |
+| `overlay` | A transparent layer over Anemo's whole window, for the whole session (it stays across pages) | `{overlay: true}` | at most 1 |
 
 ```jsonc
 "ui": [
@@ -211,7 +216,8 @@ Each item of `contributes.ui` is one frame. `entry` is an HTML file of the packa
   { "id": "today", "slot": "page", "title": "Today board", "icon": "calendar-check",
     "entry": "ui/today.html" },
   { "id": "settings", "slot": "settings", "entry": "ui/settings.html" },
-  { "id": "kanban", "slot": "chat.block", "fence": "today-kanban", "entry": "ui/block.html" }
+  { "id": "kanban", "slot": "chat.block", "fence": "today-kanban", "entry": "ui/block.html" },
+  { "id": "layer", "slot": "overlay", "title": "Clock", "entry": "ui/layer.html" }
 ]
 ```
 
@@ -219,6 +225,56 @@ Each item of `contributes.ui` is one frame. `entry` is an HTML file of the packa
 not one another enabled plugin uses. A `chat.block` frame receives a model's output: treat
 `context.block.text` as **untrusted input** (parse it defensively, never `eval` it, escape it
 before showing it as HTML).
+
+### Overlays
+
+An `overlay` is one frame the size of the window, drawn over Anemo's pages. `title` is
+optional (the review shows it); `height` and `icon` don't apply. Because a layer over the
+whole window could imitate Anemo, Anemo holds it to these rules:
+
+- **Click-through.** Every click, scroll and hover goes to Anemo underneath, except inside
+  the rectangles the overlay names with `ui.setHitRegions` (at most 8, each at most
+  320 × 320 pixels). With no regions it is fully click-through. On touch screens an
+  overlay is always click-through in version 1.
+- **Below Anemo's own things.** Dialogs, confirmations, the password prompt, a plugin
+  call's Allow/Deny, toasts and the command palette are always above it, and the overlay
+  is **hidden** while any dialog, the opened Dynamic Island or a plugin review is on
+  screen. It comes back when they close.
+- **No keyboard focus from Tab**, and it only gets keys after the user clicks inside one
+  of its regions.
+- **The user can hide every overlay** from Ctrl+K ("Hide plugin overlays", remembered on
+  that device), and the review shows an overlay as **medium** risk ("Draws over Anemo's
+  window"). An update that adds an overlay always waits for a review.
+- An overlay can't be tried in a preview: it runs once its version is approved.
+
+The overlay hides and shows itself with `ui.setVisible`. To place something beside the
+message box or the sidebar, read `layout.get` and follow `layout.changed` (section 5).
+
+A small overlay that keeps a clock above the message box (inline, for the idea):
+
+```html
+<!-- ui/layer.html -->
+<div id="clock" class="badge" style="position: fixed; display: none"></div>
+<script>
+  const clock = document.getElementById('clock')
+  let shown = true
+  function place({ anchors }) {
+    const box = anchors.composer             // only there while a chat is on screen
+    clock.style.display = box && shown ? 'block' : 'none'
+    if (!box) return anemo.ui.setHitRegions([])
+    const r = { x: box.x + box.width - 90, y: box.y - 34, width: 90, height: 28 }
+    Object.assign(clock.style, { left: r.x + 'px', top: r.y + 'px' })
+    anemo.ui.setHitRegions(shown ? [r] : [])   // only the clock takes clicks
+  }
+  clock.addEventListener('click', () => anemo.ui.toast(new Date().toLocaleString()))
+  setInterval(() => { clock.textContent = new Date().toLocaleTimeString() }, 1000)
+  anemo.ready.then(({ layout }) => place(layout))
+  anemo.on('layout.changed', place)
+  anemo.on('command', async ({ event }) => {  // the sendToUi command of section 3
+    if (event === 'toggle') { shown = !shown; place(await anemo.layout.get()) }
+  })
+</script>
+```
 
 ## 5. The frame SDK
 
@@ -234,11 +290,12 @@ package (a small library can be copied in as a `.js` file).
 The SDK is the global `window.anemo`:
 
 ```js
-const { plugin, slot, ui, context, theme, locale, timeZone, preview } = await anemo.ready
-// plugin: {id, version}; slot: "object.panel" | "page" | "settings" | "chat.block"
+const { plugin, slot, ui, context, theme, locale, timeZone, preview, layout } = await anemo.ready
+// plugin: {id, version}; slot: "object.panel" | "page" | "settings" | "chat.block" | "overlay"
 // ui: the ui item's id; context: see section 4; theme: section 9
 // locale: "en" | "uk" | "ru"; timeZone: the user's IANA zone (Settings > General), use it
 // for "today" so you ask the server for the same day it means; preview: true while the user previews an unapproved version
+// layout: where things are on screen, as layout.get returns it (below)
 
 const result = await anemo.call('tasks.list', { status: 'todo' })   // any method of section 6
 anemo.on('context.changed', (ctx) => render(ctx))                    // events, below
@@ -258,10 +315,28 @@ await anemo.storage.set('lastTab', 'stats')        // = anemo.call('storage.set'
 const tab = await anemo.storage.get('lastTab')     // = anemo.call('storage.get', {key}): the value, or null
 await anemo.storage.delete('lastTab')              // = anemo.call('storage.delete', {key})
 const { keys } = await anemo.storage.list('last')  // = anemo.call('storage.list', {prefix}); no argument: every key
+
+// Pictures: the package's own, and larger ones the plugin keeps (25 MB in all)
+img.src = anemo.files.url('sprites/idle.gif')     // a package picture as a data: URL (null if there is none)
+const file = await anemo.ui.pickFile({ accept: ['image/gif', 'image/png'] })  // call it from a click handler
+await anemo.assets.set('sprite', file.dataUrl)     // = anemo.call('assets.set', {key, dataUrl})
+const saved = await anemo.assets.get('sprite')     // {dataUrl} or null
+const { assets } = await anemo.assets.list()       // [{key, type, size}]
+await anemo.assets.delete('sprite')
+
+// Where things are, and an overlay's own controls
+const { viewport, anchors, route } = await anemo.layout.get()   // = anemo.call('layout.get', {})
+anemo.ui.setHitRegions([{ x: 20, y: 600, width: 96, height: 96 }])  // overlay only
+anemo.ui.setVisible(false)                                          // overlay only
 ```
 
-`context.get` and the `ui.*` methods are answered by Anemo's page itself (it knows the
-frame's context and shows the toast); every other method is carried out by the server.
+`<img src="…">` in the entry's HTML and `url(…)` in its stylesheets may name pictures of
+the package by a relative path: Anemo puts them in as `data:` URLs (the frame can't fetch
+files). In script, use `anemo.files.url(path)` with a path from the package root.
+
+`context.get`, `layout.get` and the `ui.*` methods are answered by Anemo's page itself (it
+knows the frame's context, the screen, and shows the toast and the file picker); every other
+method is carried out by the server.
 
 `anemo.call` returns a promise of the method's result. A failed call rejects with an
 `Error` (its `name` is `AnemoError`) that has a `code`:
@@ -293,7 +368,26 @@ try {
 | `context.changed` | the new `context` | the panel now shows another object, or the page's params changed |
 | `theme.changed` | the new `theme` | light/dark, accent or density changed (the variables are already updated) |
 | `object.changed` | `{type, id}` | the object the panel shows was changed elsewhere: read it again |
+| `layout.changed` | the new layout (as `layout.get`) | the window was resized, the page changed, the sidebar was folded, the message box appeared, went or grew (at most once per animation frame) |
+| `composer.activity` | `{state}`: `focused`, `blurred`, `typing` or `idle` | the chat message box got or lost the focus, is being typed in, or the typing paused (never the text) |
+| `assistant.activity` | `{state}`: `thinking`, `streaming` or `idle` | the assistant of the chat on screen started working, is writing its answer, or stopped (never the text) |
+| `storage.changed` | `{key}` | another frame of this plugin wrote or deleted that storage key |
+| `assets.changed` | `{key}` | another frame of this plugin wrote or deleted that asset |
+| `command` | `{event}` | the user ran this plugin's `sendToUi` command for this UI (section 3) |
 
+`assistant.activity` and `composer.activity` are sent once right after start, with the
+state then, and again on every change. `storage.changed` and `assets.changed` reach the
+plugin's other frames open in the same browser tab (not the frame that wrote, and not
+writes made by the plugin's scripts).
+
+**Layout.** `layout.get` returns `{viewport: {width, height}, anchors, route}`. `route` is the
+address path of the page shown (`/c/0193…`, `/tasks`). `anchors` has a rectangle
+`{x, y, width, height}` for each known place that is on screen right now, and leaves out the
+ones that aren't: `composer` (the chat message box) and `sidebar` (the menu, folded or not).
+More may be added; ignore names you don't know. All numbers are CSS pixels in the
+coordinates of **Anemo's window** (the top page's viewport), also for a frame that isn't
+full-window: a panel has to subtract its own position, which it doesn't know, so these are
+mostly useful to overlays.
 ## 6. Methods and object shapes
 
 Params and results are JSON. Fields are **camelCase**, ids are strings, times are ISO 8601
@@ -306,6 +400,11 @@ Params and results are JSON. Fields are **camelCase**, ids are strings, times ar
 | `storage.set` | `{key, value}` → `{}` | – |
 | `storage.delete` | `{key}` → `{}` | – |
 | `storage.list` | `{prefix?}` → `{keys: [string]}` (sorted) | – |
+| `assets.get` | `{key}` → `{dataUrl}` or `null` | – |
+| `assets.set` | `{key, dataUrl}` → `{}`; `dataUrl` is `data:image/png\|webp\|gif\|jpeg;base64,…`, checked by its content, at most 10 MB | – |
+| `assets.delete` | `{key}` → `{}` | – |
+| `assets.list` | `{}` → `{assets: [{key, type, size}]}` (sorted by key; `size` in bytes) | – |
+| `layout.get` | `{}` → `{viewport, anchors, route}` (section 5) | – |
 | `tasks.list` | `{status?, projectId?, due?, query?, limit?}` → `{tasks: [Task]}`. `status`: a task status, `open` (the default: todo, in progress, waiting, blocked) or `all`; `due`: a date, due on or before it; `limit` 1–500 (default 100) | `tasks:read` |
 | `tasks.get` | `{id}` → `Task` | `tasks:read` |
 | `tasks.create` | `{title, description?, dueDate?, dueTime?, priority?, projectId?, tags?, checklist?}` → `Task`. `checklist` is a list of texts; a new task is `todo` | `tasks:write` |
@@ -328,11 +427,19 @@ Params and results are JSON. Fields are **camelCase**, ids are strings, times ar
 | `ui.resize` | `{height}` → `{}` (40–2000; panels and blocks only, pages and settings fill their box) | – |
 | `ui.toast` | `{message, tone?}` → `{}` (plain text, at most 200 characters; shown with the plugin's name) | – |
 | `ui.open` | `{type: "task"\|"document"\|"event"\|"page", id}` → `{}` | the matching `:read`, or a page of this plugin |
+| `ui.setHitRegions` | `{regions: [{x, y, width, height}]}` → `{}`; at most 8, each at most 320 × 320 CSS pixels of the window; `[]`: fully click-through. Overlays only | – |
+| `ui.setVisible` | `{visible}` → `{}`: the overlay hides or shows itself. Overlays only | – |
+| `ui.pickFile` | `{accept?, maxBytes?}` → `{name, type, size, dataUrl}`; `accept` is a list of `image/gif image/png image/webp image/jpeg` (default: all four), `maxBytes` at most 10 MB (the default). Opens the browser's file picker in Anemo's page; call it right after a click in the frame (otherwise `permission_denied`). `declined` when the user cancels | – |
 
 Parameter names are camelCase, and an unknown parameter is an `invalid_params` error (so a
 typo doesn't silently do nothing).
 
 Storage: keys at most 100 characters, JSON values, 1 MB per plugin in total.
+
+Assets: the plugin's own pictures (PNG, WebP, GIF, JPEG), e.g. one the user chose with
+`ui.pickFile`. Keys at most 100 characters, at most 10 MB per asset and 25 MB per plugin in
+total; each is checked by its content on the server. Like storage, they need no permission
+and are deleted when the plugin is uninstalled.
 
 ### Task
 
@@ -422,7 +529,9 @@ plugins at all.
 
 Ask for as little as possible: the review shows each permission with its risk, and read
 permissions carry the warning that what a plugin can read, it could send out. UI slots
-need no permission (they are shown as low risk).
+need no permission (they are shown as low risk, an `overlay` as medium: it draws over
+Anemo's window). The plugin's own storage and assets, the layout and the activity events
+need none either.
 
 What scripts may call is limited by the same permissions: a script's `tools` must be
 covered (`tasks:read` covers `list_tasks`, `get_task`, `list_projects`; `tasks:write`
@@ -455,15 +564,22 @@ Policy. In practice:
   and links that navigate don't work (a frame that navigates is removed). Use `ui.toast`,
   `ui.open`, and your own in-frame UI.
 - **Only its own box.** It can't draw over Anemo or read the clipboard; it can ask for a
-  different height with `ui.resize`.
+  different height with `ui.resize`. The exception is the `overlay` slot (section 4): a
+  window-sized layer that lets clicks through outside its hit regions and stays below, and
+  hidden behind, every dialog of Anemo's.
+- **No files of the user's** except a picture the user chooses with `ui.pickFile`.
 - **Images and fonts** must be in the package or made in the page (`data:`/`blob:` URLs).
-  `.svg` files aren't allowed; inline `<svg>` elements in the HTML are fine.
+  Package pictures reach the frame as `data:` URLs (section 5). `.svg` files aren't
+  allowed; inline `<svg>` elements in the HTML are fine.
 - No `eval` of remote code is possible anyway; don't `eval` data either.
 
 ## 9. Theme and base styles
 
-`theme` is `{mode: "light"|"dark", density, vars}`. The `vars` are already set on the
-frame's `:root`, so CSS can use them directly; they change with `theme.changed`.
+`theme` is `{mode: "light"|"dark", density, vars, reducedMotion}`. The `vars` are already
+set on the frame's `:root`, so CSS can use them directly; they change with `theme.changed`.
+`reducedMotion` is `true` when the user asked their system for less motion
+(`prefers-reduced-motion`): keep animations still or short then. It is updated through
+`theme.changed` too.
 
 | Variable | Use |
 | --- | --- |
@@ -587,11 +703,15 @@ Note `textContent` (not `innerHTML`): document text is shown as text, never as H
 | Invalid `version` / not higher | Use `MAJOR.MINOR.PATCH`; after an approval every change needs a higher version than every stored one. |
 | Unknown permission | Use one of section 7; `network:` needs a host (`network:api.example.com`), `tools:` a tool name. |
 | A referenced file doesn't exist | `entry`, `icon`, `readme`, template and script `file`s must be paths inside the package, exactly as written (case matters). |
-| File type not allowed | Only `.json .md .txt .html .css .js .mjs .ts .png .webp .woff2`. Convert an `.svg` icon to PNG or inline it in the HTML. |
+| File type not allowed | Only `.json .md .txt .html .css .js .mjs .ts .png .webp .gif .jpg .jpeg .woff2`. Convert an `.svg` icon to PNG or inline it in the HTML. |
 | Path not allowed | Relative, `/`, no `..`, no leading `/`, no hidden names (`.env`, `.gitignore`). |
 | File too large / too many files | At most 1 MB per file, 5 MB and 500 files in total. Remove bundled libraries you don't need. |
-| A picture doesn't match its type | The bytes of `icon.png` must be a real PNG (send binary files as base64, see section 12). |
-| `slot` unknown / `objects` missing | Slots: `object.panel` (needs `objects`), `page`, `settings` (at most one), `chat.block` (needs `fence`). |
+| A picture doesn't match its type | The bytes of `icon.png` must be a real PNG, of `x.gif` a GIF, of `x.jpg` a JPEG (send binary files as base64, see section 12). The icon itself is PNG or WebP. |
+| `slot` unknown / `objects` missing | Slots: `object.panel` (needs `objects`), `page`, `settings` (at most one), `chat.block` (needs `fence`), `overlay` (at most one). |
+| A command names an unknown UI | `sendToUi`'s `ui` must be the `id` of one of this plugin's `contributes.ui`. |
+| `invalid_params` from `ui.setHitRegions` | At most 8 regions of `{x, y, width, height}` (no other fields), each larger than 0 and at most 320 × 320; only an overlay has them. |
+| `permission_denied` from `ui.pickFile` | Call it straight from a click (or key) handler in the frame, not from a timer or after a slow call. |
+| `invalid_params` from `assets.set` | `dataUrl` must be a base64 `data:` URL of a PNG, WebP, GIF or JPEG whose content matches its type, at most 10 MB; the plugin's assets are at most 25 MB together. |
 | `fence` taken | Another enabled plugin uses it, or it is `mermaid`/`chart`/`math`: pick another name. |
 | A script's tool isn't covered | Add the permission that covers it (section 7) or remove the tool from the script's `tools`. |
 | A view uses an unknown property | Declare the property under `properties`, or use a key that exists. |
@@ -611,7 +731,7 @@ An assistant in Agent mode builds plugins with these tools:
 | `plugin_update_files` | writes or deletes files; the result is a new pending version |
 | `plugin_preview` | a link where the user can try the pending version |
 
-Files are given as `{"path": "text"}`. Binary files (`.png`, `.webp`, `.woff2`) are given
+Files are given as `{"path": "text"}`. Binary files (`.png`, `.webp`, `.gif`, `.jpg`, `.jpeg`, `.woff2`) are given
 as base64 with the prefix `base64:` (`{"icon.png": "base64:iVBORw0KGgo…"}`); text files are
 always taken literally.
 

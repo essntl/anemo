@@ -50,6 +50,13 @@ export const METHODS: Record<string, Need> = {
   'storage.set': { kind: 'none' },
   'storage.delete': { kind: 'none' },
   'storage.list': { kind: 'none' },
+  // The plugin's own pictures (no permission, like storage).
+  'assets.get': { kind: 'none' },
+  'assets.set': { kind: 'none' },
+  'assets.delete': { kind: 'none' },
+  'assets.list': { kind: 'none' },
+  // Where things are on screen (no content).
+  'layout.get': { kind: 'local' },
   'tasks.list': read('tasks', 'read tasks'),
   'tasks.get': read('tasks', 'read tasks'),
   'tasks.create': write('tasks', 'create or change tasks'),
@@ -74,6 +81,9 @@ export const METHODS: Record<string, Need> = {
   'ui.resize': { kind: 'local' },
   'ui.toast': { kind: 'local' },
   'ui.open': { kind: 'local' },
+  'ui.setHitRegions': { kind: 'local' },
+  'ui.setVisible': { kind: 'local' },
+  'ui.pickFile': { kind: 'local' },
 }
 
 export const isLocal = (method: string): boolean => METHODS[method]?.kind === 'local'

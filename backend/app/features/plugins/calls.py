@@ -25,9 +25,12 @@ Methods the page answers itself (`context.get`, `ui.*`) are refused here with
 """
 
 import asyncio
+import base64
+import binascii
 import hashlib
 import json
 import logging
+import re
 import secrets
 import time
 import uuid
@@ -57,9 +60,15 @@ from app.features.documents import paths as document_paths
 from app.features.documents import search as doc_search
 from app.features.documents import service as documents
 from app.features.documents.models import Document
-from app.features.plugins import gate, permissions, shapes, store
+from app.features.plugins import gate, package, permissions, shapes, store
 from app.features.plugins.manifest import Manifest, load
-from app.features.plugins.models import Plugin, PluginResource, PluginStorage, PluginVersion
+from app.features.plugins.models import (
+    Plugin,
+    PluginAsset,
+    PluginResource,
+    PluginStorage,
+    PluginVersion,
+)
 from app.features.settings import service as settings_service
 from app.features.tasks import service as tasks
 from app.features.tasks.models import Project, Task
@@ -77,7 +86,22 @@ CONFIRM_TTL_S = 120
 MAX_STORAGE_BYTES = 1024 * 1024
 MAX_HTTP_BYTES = 1024 * 1024
 MAX_MESSAGE_CHARS = 1024 * 1024  # a message on the port is at most 1 MB (§6.2)
-HOST_ONLY = frozenset({"context.get", "ui.resize", "ui.toast", "ui.open"})
+MAX_ASSET_BYTES = 10 * 1024 * 1024  # one asset (as ui.pickFile gives at most)
+MAX_ASSETS_BYTES = 25 * 1024 * 1024  # all of a plugin's assets
+# assets.set carries a picture as a data: URL (base64), so its call may be larger.
+MAX_ASSET_MESSAGE_CHARS = (MAX_ASSET_BYTES * 4) // 3 + 4 + 1000
+HOST_ONLY = frozenset(
+    {
+        "context.get",
+        "layout.get",
+        "ui.resize",
+        "ui.toast",
+        "ui.open",
+        "ui.setHitRegions",
+        "ui.setVisible",
+        "ui.pickFile",
+    }
+)
 # What a plugin's script can't call through anemo.api: it has anemo.call for tools,
 # anemo.fetch for the web, and a script starting scripts would be a loop.
 NOT_FOR_SCRIPTS = frozenset({"tools.call", "http.fetch", "scripts.run"})
@@ -87,6 +111,8 @@ WRITE_METHODS = frozenset(
     {
         "storage.set",
         "storage.delete",
+        "assets.set",
+        "assets.delete",
         "tasks.create",
         "tasks.update",
         "documents.create",
@@ -443,6 +469,96 @@ async def storage_list(call: Call) -> Any:
     if p.prefix:
         stmt = stmt.where(PluginStorage.key.startswith(p.prefix, autoescape=True))
     return {"keys": sorted(await call.db.scalars(stmt))}
+
+
+# -- assets (no permission: the plugin's own pictures) ----------------------------------------
+
+_DATA_URL = re.compile(r"^data:(image/(?:png|webp|gif|jpeg));base64,([A-Za-z0-9+/]*={0,2})$")
+
+
+class AssetSetParams(KeyParams):
+    data_url: str = Field(min_length=1, max_length=MAX_ASSET_MESSAGE_CHARS)
+
+
+def _picture(data_url: str) -> tuple[str, bytes]:
+    """(media type, bytes) of a data: URL of a PNG, WebP, GIF or JPEG picture, checked
+    by its content. Raises invalid_params."""
+    found = _DATA_URL.match(data_url)
+    if found is None:
+        raise CallError(
+            "invalid_params",
+            "dataUrl must be a data:image/png|webp|gif|jpeg;base64,… URL (pictures only).",
+        )
+    try:
+        data = base64.b64decode(found.group(2), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise CallError("invalid_params", "dataUrl isn't valid base64.") from exc
+    if len(data) > MAX_ASSET_BYTES:
+        raise CallError("invalid_params", "An asset can be at most 10 MB.")
+    kind = package.image_kind(data)
+    if kind is None:
+        raise CallError("invalid_params", "dataUrl isn't a PNG, WebP, GIF or JPEG picture.")
+    media = package.IMAGE_MEDIA_TYPES[kind]
+    if media != found.group(1):
+        raise CallError("invalid_params", f"The picture is {media}, not {found.group(1)}.")
+    return media, data
+
+
+async def _asset_row(call: Call, key: str) -> PluginAsset | None:
+    return await call.db.scalar(
+        select(PluginAsset).where(PluginAsset.plugin_id == call.plugin.id, PluginAsset.key == key)
+    )
+
+
+async def assets_get(call: Call) -> Any:
+    p = _params(KeyParams, call)
+    row = await _asset_row(call, p.key)
+    if row is None:
+        return None
+    data = await call.db.scalar(select(PluginAsset.data).where(PluginAsset.id == row.id))
+    return {"dataUrl": f"data:{row.media_type};base64,{base64.b64encode(data or b'').decode()}"}
+
+
+async def assets_set(call: Call) -> Any:
+    p = _params(AssetSetParams, call)
+    media, data = _picture(p.data_url)
+    row = await _asset_row(call, p.key)
+    used = await call.db.scalar(
+        select(func.coalesce(func.sum(PluginAsset.size), 0)).where(
+            PluginAsset.plugin_id == call.plugin.id
+        )
+    )
+    if int(used or 0) - (row.size if row else 0) + len(data) > MAX_ASSETS_BYTES:
+        raise CallError("invalid_params", "The plugin's assets are full (25 MB).")
+    if row is None:
+        call.db.add(
+            PluginAsset(
+                plugin_id=call.plugin.id, key=p.key, media_type=media, size=len(data), data=data
+            )
+        )
+    else:
+        row.media_type, row.size, row.data = media, len(data), data
+    await call.db.commit()
+    return {}
+
+
+async def assets_delete(call: Call) -> Any:
+    p = _params(KeyParams, call)
+    row = await _asset_row(call, p.key)
+    if row is not None:
+        await call.db.delete(row)
+        await call.db.commit()
+    return {}
+
+
+async def assets_list(call: Call) -> Any:
+    _params(NoParams, call)
+    rows = await call.db.execute(
+        select(PluginAsset.key, PluginAsset.media_type, PluginAsset.size)
+        .where(PluginAsset.plugin_id == call.plugin.id)
+        .order_by(PluginAsset.key)
+    )
+    return {"assets": [{"key": k, "type": t, "size": n} for k, t, n in rows]}
 
 
 # -- tasks ----------------------------------------------------------------------------------
@@ -892,6 +1008,10 @@ METHODS: dict[str, Handler] = {
     "storage.set": storage_set,
     "storage.delete": storage_delete,
     "storage.list": storage_list,
+    "assets.get": assets_get,
+    "assets.set": assets_set,
+    "assets.delete": assets_delete,
+    "assets.list": assets_list,
     "tasks.list": tasks_list,
     "tasks.get": tasks_get,
     "tasks.create": tasks_create,
@@ -915,6 +1035,20 @@ METHODS: dict[str, Handler] = {
 
 
 # -- the entry point ------------------------------------------------------------------------
+
+
+def _check_size(method: str, params: dict[str, Any]) -> None:
+    """A call's parameters are at most 1 MB; assets.set's picture may be up to 10 MB."""
+    asset = method == "assets.set"
+    if len(json.dumps(params, default=str)) > (
+        MAX_ASSET_MESSAGE_CHARS if asset else MAX_MESSAGE_CHARS
+    ):
+        raise CallError(
+            "invalid_params",
+            "An asset can be at most 10 MB."
+            if asset
+            else "A call's parameters can be at most 1 MB.",
+        )
 
 
 async def _version(db: AsyncSession, plugin: Plugin, preview_version: str | None) -> PluginVersion:
@@ -957,8 +1091,7 @@ async def call(
         raise CallError("not_found", f"The plugin has no UI “{ui}”.")
     if await _rate_limited(plugin):
         raise CallError("rate_limited", "Too many calls: at most 120 a minute.")
-    if len(json.dumps(params, default=str)) > MAX_MESSAGE_CHARS:
-        raise CallError("invalid_params", "A call's parameters can be at most 1 MB.")
+    _check_size(method, params)
     if method in HOST_ONLY:
         raise CallError("unknown_method", f"{method} is answered by Anemo's page, not the server.")
     handler = METHODS.get(method)
@@ -992,8 +1125,7 @@ async def call_from_script(
     if await gate.kill_switch_on(db):
         raise CallError("unavailable", gate.KILL_SWITCH_ON)
     version = await _version(db, plugin, None)
-    if len(json.dumps(params, default=str)) > MAX_MESSAGE_CHARS:
-        raise CallError("invalid_params", "A call's parameters can be at most 1 MB.")
+    _check_size(method, params)
     if method in HOST_ONLY or method in NOT_FOR_SCRIPTS:
         raise CallError("unknown_method", f"{method} is not available to scripts.")
     handler = METHODS.get(method)

@@ -167,6 +167,11 @@ export function DataTab({ plugin }: { plugin: PluginDetailOut }) {
           {plural(d.storage_keys, 'Its own storage: {n} key, {size}', 'Its own storage: {n} keys, {size}', { size: formatSize(d.storage_bytes) })}
         </p>
       )}
+      {d.asset_count > 0 && (
+        <p className="text-[13px]">
+          {plural(d.asset_count, 'Its own pictures: {n} picture, {size}', 'Its own pictures: {n} pictures, {size}', { size: formatSize(d.asset_bytes) })}
+        </p>
+      )}
     </div>
   )
 }
@@ -196,6 +201,7 @@ const SLOT_NAMES: Record<ManifestUi['slot'], string> = {
   page: msg('Page'),
   settings: msg('Settings'),
   'chat.block': msg('Chat block'),
+  overlay: msg('Overlay'),
 }
 
 /**
@@ -222,12 +228,19 @@ export function PreviewPanel({ plugin, version, killed, onClose }: { plugin: Plu
             <Badge>{t(SLOT_NAMES[ui.slot])}</Badge>
             <span>{ui.title ?? ui.id}</span>
           </div>
-          <div className={cn(ui.slot === 'page' || ui.slot === 'settings' ? 'h-[min(60vh,560px)]' : undefined, 'rounded-control border border-border bg-surface p-2')}>
-            <PluginFrame key={`${version.version}/${ui.id}`} preview active={!killed}
-              plugin={{ id: plugin.id, name: plugin.name, iconUrl: plugin.icon_url, version: version.version }}
-              ui={ui.id} slot={ui.slot} permissions={manifestOf(version).permissions} pages={pages}
-              context={previewContext(ui)} height={ui.height} fill={ui.slot === 'page' || ui.slot === 'settings'} />
-          </div>
+          {ui.slot === 'overlay' ? (
+            // A layer over the whole window isn't tried before it is approved.
+            <p className="rounded-control border border-border bg-surface p-2 text-[12.5px] text-muted">
+              {t('An overlay draws over Anemo’s window, so it only runs once this version is approved.')}
+            </p>
+          ) : (
+            <div className={cn(ui.slot === 'page' || ui.slot === 'settings' ? 'h-[min(60vh,560px)]' : undefined, 'rounded-control border border-border bg-surface p-2')}>
+              <PluginFrame key={`${version.version}/${ui.id}`} preview active={!killed}
+                plugin={{ id: plugin.id, name: plugin.name, iconUrl: plugin.icon_url, version: version.version }}
+                ui={ui.id} slot={ui.slot} permissions={manifestOf(version).permissions} pages={pages}
+                context={previewContext(ui)} height={ui.height} fill={ui.slot === 'page' || ui.slot === 'settings'} />
+            </div>
+          )}
         </div>
       ))}
     </section>
