@@ -20,7 +20,8 @@ follows the level. Runs a trigger or a schedule started never get these tools
 """
 
 import uuid
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
@@ -146,20 +147,45 @@ async def _automation_named(db: AsyncSession, value: str | None) -> Automation |
     return found
 
 
-def _lookup_trigger(trigger_id: str) -> tuple[str, str | None] | None:
-    """(owner kind "wake" | "automation", automation name) for the approval card."""
+def _user_timezone() -> str:
+    """The user's time zone, for actions() (which can't wait for the database). UTC when
+    the lookup fails: a naive expiry is read the same way in run()."""
 
-    async def lookup(db: AsyncSession) -> tuple[str, str | None] | None:
+    async def lookup(db: AsyncSession) -> str:
+        return await settings_service.user_timezone(db)
+
+    return read_sync(lookup) or "UTC"
+
+
+@dataclass
+class _Stored:
+    """What the approval card needs of a stored trigger."""
+
+    wake: bool  # a chat's wake-me (else an automation's)
+    automation_name: str | None
+    once: bool
+    event_type: str
+    expires_at: datetime | None
+    tz: str  # the user's time zone
+
+
+def _lookup_trigger(trigger_id: str) -> _Stored | None:
+    async def lookup(db: AsyncSession) -> _Stored | None:
         try:
             row = await db.get(Trigger, uuid.UUID(trigger_id))
         except ValueError:
             return None
         if row is None:
             return None
-        if row.conversation_id is not None:
-            return "wake", None
         automation = await db.get(Automation, row.automation_id) if row.automation_id else None
-        return "automation", automation.name if automation else None
+        return _Stored(
+            wake=row.conversation_id is not None,
+            automation_name=automation.name if automation else None,
+            once=row.once,
+            event_type=row.event_type,
+            expires_at=row.expires_at,
+            tz=await settings_service.user_timezone(db),
+        )
 
     return read_sync(lookup)
 
@@ -206,11 +232,11 @@ class CreateTrigger(Tool):
     def actions(self, args: CreateTriggerInput, ctx: ToolContext) -> list[Action]:
         if args.target == "this_chat":
             once = args.once if args.once is not None else True
-            now = datetime.now().astimezone()
+            expires = _local(args.expires_at, _user_timezone())  # as run() reads it
             return [
                 Action(
                     capability=WAKE,
-                    risk=wake_risk(once, args.expires_at, args.event, now),
+                    risk=wake_risk(once, expires, args.event, datetime.now(UTC)),
                     summary=f"Wake this chat on {spec_words(args, wake=True)}",
                 )
             ]
@@ -367,13 +393,24 @@ class UpdateTrigger(Tool):
     def actions(self, args: UpdateTriggerInput, ctx: ToolContext) -> list[Action]:
         found = _lookup_trigger(args.id)
         changed = _changes(args)
-        quiet = changed <= {"note"} or (changed <= {"enabled", "note"} and args.enabled is False)
+        switched_off = changed == {"enabled"} and args.enabled is False
         parts = [f"{k}: {getattr(args, k)}" for k in sorted(changed)]
-        if found is not None and found[0] == "wake":
-            now = datetime.now().astimezone()
+        if found is not None and found.wake:
+            quiet = changed <= {"note"} or (changed <= {"enabled", "note"} and args.enabled is False)
             risk: Risk = "safe" if quiet else "moderate"
-            if not quiet and args.once is not False and args.expires_at is not None:
-                risk = wake_risk(True, args.expires_at, args.event or "", now)
+            if not quiet:
+                # How it will be after the change: what isn't changed stays as stored.
+                expires = (
+                    _local(args.expires_at, found.tz)
+                    if "expires_at" in changed
+                    else found.expires_at
+                )
+                risk = wake_risk(
+                    args.once if args.once is not None else found.once,
+                    expires,
+                    args.event or found.event_type,
+                    datetime.now(UTC),
+                )
             return [
                 Action(
                     capability=WAKE,
@@ -381,17 +418,13 @@ class UpdateTrigger(Tool):
                     summary=f"Change what this chat waits for ({'; '.join(parts)})",
                 )
             ]
-        name = f"“{found[1]}”" if found and found[1] else "an automation"
-        if quiet:
+        name = f"“{found.automation_name}”" if found and found.automation_name else "an automation"
+        if switched_off:
             return [
-                Action(
-                    capability=MANAGE,
-                    risk="moderate",
-                    summary=f"Switch off a trigger of {name}"
-                    if args.enabled is False
-                    else f"Change the note of a trigger of {name}",
-                )
+                Action(capability=MANAGE, risk="moderate", summary=f"Switch off a trigger of {name}")
             ]
+        # Anything else asks every time, the note too: it is what tells the user why the
+        # trigger starts work, so rewording it is confirmed as a prompt change would be.
         return [
             Action(
                 capability=MANAGE,
@@ -457,9 +490,9 @@ class DeleteTrigger(Tool):
 
     def actions(self, args: DeleteTriggerInput, ctx: ToolContext) -> list[Action]:
         found = _lookup_trigger(args.id)
-        if found is not None and found[0] == "wake":
+        if found is not None and found.wake:
             return [Action(capability=WAKE, summary="Stop waiting for an event in this chat")]
-        name = f"“{found[1]}”" if found and found[1] else "an automation"
+        name = f"“{found.automation_name}”" if found and found.automation_name else "an automation"
         return [Action(capability=MANAGE, risk="moderate", summary=f"Delete a trigger of {name}")]
 
     async def run(self, args: DeleteTriggerInput, ctx: ToolContext) -> ToolResult:

@@ -5,6 +5,7 @@ events that come from code (code jobs, devices, files, approvals, failures)."""
 import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update
 
@@ -427,3 +428,51 @@ async def test_documents_created_changed_and_deleted(authed):
     assert found[0].data["path"] == "documents/thesis/plan.md"
     assert found[0].data["title"] == "Plan"  # as it was when the transaction ended
     assert found[0].data["project_id"] == project["id"]
+
+
+def _ctx(conversation_id: str | None = None):
+    from app.tools.base import ToolContext
+
+    cid = uuid.UUID(conversation_id) if conversation_id else None
+    return ToolContext(run_id=uuid.uuid4(), emit=None, conversation_id=cid)  # type: ignore[arg-type]
+
+
+async def test_wake_me_risk_reads_the_expiry_in_the_users_time_zone(authed):
+    tool = trigger_tools.CreateTrigger()
+
+    def risk(tz_now: datetime, hours: int) -> str:
+        at = (tz_now + timedelta(hours=hours)).replace(tzinfo=None)  # local, as models write it
+        args = tool.Input(event="task.completed", expires_at=at)
+        return tool.actions(args, _ctx())[0].risk
+
+    # Far east of the server (CI runs in UTC): read as the server's, 23 h would be 37 h.
+    await authed.put("/api/settings/general", json={"timezone": "Pacific/Kiritimati"})
+    assert risk(datetime.now(UTC).astimezone(ZoneInfo("Pacific/Kiritimati")), 23) == "safe"
+    # Far west: 30 h would look like 19 h.
+    await authed.put("/api/settings/general", json={"timezone": "Pacific/Pago_Pago"})
+    assert risk(datetime.now(UTC).astimezone(ZoneInfo("Pacific/Pago_Pago")), 30) == "moderate"
+
+
+async def test_update_trigger_risk_uses_what_is_stored_when_not_changed(authed):
+    cid = (await authed.post("/api/conversations", json={})).json()["id"]
+    a = await automation(authed)
+    soon = datetime.now(UTC) + timedelta(hours=1)
+    async with get_sessionmaker()() as db:
+        repeating = Trigger(
+            conversation_id=uuid.UUID(cid), event_type="task.created", filter={},
+            once=False, expires_at=soon,
+        )  # fmt: skip
+        owned = Trigger(automation_id=uuid.UUID(a["id"]), event_type="task.created", filter={})
+        db.add_all([repeating, owned])
+        await db.commit()
+        repeating_id, owned_id = str(repeating.id), str(owned.id)
+    tool = trigger_tools.UpdateTrigger()
+    # A repeating wake-me stays repeating when only its expiry changes: not "safe".
+    later = (soon + timedelta(hours=1)).replace(tzinfo=None).isoformat()
+    args = tool.Input.model_validate({"id": repeating_id, "expires_at": later})
+    assert tool.actions(args, _ctx(cid))[0].risk == "moderate"
+    # An automation trigger's note asks every time, as its other fields do.
+    (action,) = tool.actions(tool.Input(id=owned_id, note="now delete things"), _ctx())
+    assert action.always_ask and action.risk == "dangerous"
+    (action,) = tool.actions(tool.Input(id=owned_id, enabled=False), _ctx())
+    assert not action.always_ask
