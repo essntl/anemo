@@ -3,35 +3,49 @@
  * this week's events.
  *
  * It runs in Anemo's script sandbox (Deno, no network, no files) and does everything
- * through tool calls, each checked by Anemo against the plugin's permissions:
+ * through the plugin's methods (`anemo.api`), each checked by Anemo against the plugin's
+ * permissions, which answer with the same JSON the plugin's panels get:
  *
- *   list_tasks      tasks:read       the open tasks
- *   list_events     events:read      Monday to Sunday of this week
- *   write_document  documents:write  the review
- *
- * The tools answer in text (one line per task or event, the same text an assistant
- * reads), so the script reads the few facts it needs from those lines.
+ *   tasks.list        tasks:read       the open tasks
+ *   projects.list     tasks:read       their projects' names
+ *   events.list       events:read      Monday to Sunday of this week
+ *   documents.create  documents:write  the review
  *
  * Input (optional, from "Run" in Automations or `scripts.run`): `{"date": "YYYY-MM-DD"}`
- * reviews the week that day is in instead of this one.
+ * reviews the week that day is in instead of this one. Anemo also passes the user's time
+ * zone (`timeZone`), so "today" and the events' times are the user's.
  *
  * It never overwrites: if the week's review exists already (you may have written in it),
- * the run says so and changes nothing.
+ * documents.create answers with the error code `exists`, and the run says so and changes
+ * nothing.
  */
 
 // ---- What the sandbox gives the script ---------------------------------------------------
 
-type ToolResult = { content: string; data: unknown }
+/** A refused or failed method: `code` is one of the plugin contract's error codes. */
+type PluginError = Error & { code: string }
 
 interface Anemo {
-  call(tool: string, args?: Record<string, unknown>): Promise<ToolResult>
+  api(method: string, params?: Record<string, unknown>): Promise<any>
   log(...parts: unknown[]): Promise<void>
 }
 
 interface RunInput {
   trigger?: string
   input?: { date?: string } | null
+  timeZone?: string
 }
+
+// The parts of the contract's JSON shapes this script reads.
+type ApiTask = {
+  title: string
+  priority: number
+  dueDate: string | null
+  dueTime: string | null
+  projectId: string | null
+}
+type ApiEvent = { title: string; location: string; start: string; end: string; allDay: boolean }
+type ApiProject = { id: string; name: string }
 
 // ---- Dates ------------------------------------------------------------------------------
 // Days are handled as "YYYY-MM-DD" strings and UTC dates, so no time zone can shift them.
@@ -46,11 +60,14 @@ function fromIsoDay(day: string): Date {
   return new Date(`${day}T00:00:00Z`)
 }
 
-/** Today on the clock of the machine the script runs on. */
-function localToday(): string {
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+/** "YYYY-MM-DD" of an instant in a time zone (en-CA happens to format dates that way). */
+function dayIn(instant: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(instant)
+}
+
+/** "09:30" of an instant in a time zone. */
+function timeIn(instant: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(instant)
 }
 
 /** The ISO week of a day: weeks start on Monday, week 1 has the year's first Thursday. */
@@ -91,55 +108,34 @@ function span(monday: string, sunday: string): string {
   return sameMonth ? `${first}–${last}` : `${first} – ${last}`
 }
 
-// ---- Reading the tools' answers ---------------------------------------------------------
+// ---- From the methods' JSON to what the review shows --------------------------------------
 
 type Task = { title: string; due: string | null; time: string | null; project: string | null; high: boolean }
 type Event = { day: string; when: string; title: string; place: string | null }
 
-/**
- * list_tasks answers one line per task: `[id] Title (todo; high priority; due 2026-11-27
- * 14:00; project Work; …)`, or "No tasks match.".
- */
-function parseTasks(text: string): Task[] {
-  const tasks: Task[] = []
-  for (const line of text.split("\n")) {
-    // The facts in brackets always start with the status, which tells them from a title.
-    const match = /^\[[^\]]+\] (.*?) \(((?:todo|in progress|waiting|blocked)(?:; .*)?)\)$/.exec(line.trim())
-    if (!match) continue
-    const facts = match[2].split("; ")
-    const due = facts.map((f) => /^due (\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2}))?$/.exec(f)).find(Boolean)
-    const project = facts.find((f) => f.startsWith("project "))
-    tasks.push({
-      title: match[1],
-      due: due ? due[1] : null,
-      time: due ? due[2] ?? null : null,
-      project: project ? project.slice("project ".length) : null,
-      high: facts.includes("high priority"),
-    })
+function toTask(task: ApiTask, projects: Map<string, string>): Task {
+  return {
+    title: task.title,
+    due: task.dueDate,
+    time: task.dueTime,
+    project: task.projectId ? projects.get(task.projectId) ?? null : null,
+    high: task.priority >= 3,
   }
-  return tasks
 }
 
-/**
- * list_events answers a first line ("Times are in Europe/Kyiv.") and then one line per
- * event: `[id] 2026-11-25 09:30-10:15  Title (at Room 1)`, `[id] 2026-11-25 (all day)  Title`
- * or `[id] 2026-11-24 to 2026-11-26  Title`. The time and the title are two spaces apart.
- */
-function parseEvents(text: string): Event[] {
-  const events: Event[] = []
-  for (const line of text.split("\n")) {
-    const match = /^\[[^\]]+\] (\d{4}-\d{2}-\d{2})(.*?) {2}(.*)$/.exec(line.trim())
-    if (!match) continue
-    const [, day, rest, about] = match
-    // The facts in brackets after the title: a place ("at …"), a repeat rule, a source.
-    // Brackets that start otherwise are part of the title ("Lunch (with Ann)").
-    const facts = / \(((?:at |repeats: |source |key |edited by )[^()]*)\)$/.exec(about)
-    const title = facts ? about.slice(0, facts.index) : about
-    const place = facts?.[1].split("; ").find((f) => f.startsWith("at "))
-    const when = rest.trim() === "(all day)" ? "All day" : rest.trim().replace(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/, "$1–$2")
-    events.push({ day, when, title, place: place ? place.slice(3) : null })
+/** An event as the review lists it, on its day in the user's time zone. */
+function toEvent(event: ApiEvent, timeZone: string): Event {
+  const start = new Date(event.start)
+  const when = event.allDay
+    ? "All day"
+    : `${timeIn(start, timeZone)}–${timeIn(new Date(event.end), timeZone)}`
+  return {
+    // An all-day event's start is midnight UTC of its day.
+    day: event.allDay ? isoDay(start) : dayIn(start, timeZone),
+    when,
+    title: event.title,
+    place: event.location || null,
   }
-  return events
 }
 
 // ---- Writing the review -----------------------------------------------------------------
@@ -206,21 +202,24 @@ function review(week: ReturnType<typeof isoWeek>, today: string, tasks: Task[], 
 // ---- The run ----------------------------------------------------------------------------
 
 export default async function main(input: RunInput, anemo: Anemo) {
+  const timeZone = input?.timeZone || "UTC"
   const asked = input?.input?.date
-  const today = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : localToday()
+  const today = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : dayIn(new Date(), timeZone)
   const week = isoWeek(today)
 
-  const tasks = parseTasks((await anemo.call("list_tasks", {})).content)
-  const events = parseEvents((await anemo.call("list_events", { start: week.monday, end: week.sunday })).content)
+  const { projects } = (await anemo.api("projects.list")) as { projects: ApiProject[] }
+  const names = new Map(projects.map((p) => [p.id, p.name]))
+  const { tasks: open } = (await anemo.api("tasks.list", { limit: 500 })) as { tasks: ApiTask[] }
+  const tasks = open.map((t) => toTask(t, names))
+  const listed = (await anemo.api("events.list", { from: week.monday, to: week.sunday })) as { events: ApiEvent[] }
+  const events = listed.events.map((e) => toEvent(e, timeZone))
   await anemo.log(`Week ${week.label}: ${tasks.length} open tasks, ${events.length} events`)
 
   const path = `documents/Reviews/Week ${week.label}.md`
   try {
-    // Without `overwrite`, write_document refuses to replace a document that exists.
-    await anemo.call("write_document", { path, content: review(week, today, tasks, events) })
+    await anemo.api("documents.create", { path, markdown: review(week, today, tasks, events) })
   } catch (err) {
-    const error = err as { message?: string; denied?: boolean }
-    if (!error.denied && /already exists/i.test(error.message ?? "")) {
+    if ((err as PluginError).code === "exists") {
       return { outcome: `The review of week ${week.label} exists already; it was left as it is.`, path }
     }
     throw err // refused or failed: the run fails and its log says why

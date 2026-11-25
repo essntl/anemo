@@ -23,18 +23,19 @@ permission levels: once the plugin is approved, it writes the review without ask
 
 | Permission | Why |
 | --- | --- |
-| `tasks:read` | the script lists your open tasks (`list_tasks`) |
-| `events:read` | the script lists this week's events (`list_events`) |
-| `documents:write` | the script writes the review (`write_document`); the template creates a document |
+| `tasks:read` | the script lists your open tasks and their projects (`tasks.list`, `projects.list`) |
+| `events:read` | the script lists this week's events (`events.list`) |
+| `documents:write` | the script writes the review (`documents.create`); the template creates a document |
 
-The script runs in Anemo's script sandbox: it has no network and no files, and it can call
-only the three tools above.
+The script runs in Anemo's script sandbox: it has no network and no files, and it reaches
+Anemo only through the plugin's methods above, checked against these permissions.
 
 ## How it is built
 
 An example of a plugin without UI, made only of declarations and a script:
 
 - `scripts/weekly-review.ts`: the script (`export default async function main(input, anemo)`),
-  calling tools with `anemo.call(...)` and returning `{outcome}` for the run log
+  calling the plugin's methods with `anemo.api(...)` (the same JSON a plugin's panels get)
+  and returning `{outcome}` for the run log
 - `templates/weekly-review.md`: the template, a Markdown file with front matter
 - `anemo-plugin.json`: the script, the template and the two commands that start them

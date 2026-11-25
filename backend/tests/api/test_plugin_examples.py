@@ -28,6 +28,7 @@ from app.features.settings import service as settings_service
 from app.features.tasks.models import Task
 from app.runtime import script_sandbox
 from app.runtime.dispatch import execute_run
+from tests.api.test_plugin_script_methods import api
 from tests.api.test_scripts import PROGRAMS, STARTS, FakeRunner, Sdk, outcome_of, run_of
 from tests.conftest import requires_db
 
@@ -56,14 +57,14 @@ async def install_example(authed, plugin_id: str) -> dict[str, Any]:
     assert not [c for c in shown["commands"] if c["plugin"] == plugin_id]
 
     [version] = detail["versions"]
-    assert version["version"] == "1.0.0" and version["status"] == "pending"
+    assert version["status"] == "pending"
     r = await authed.post(
-        f"/api/plugins/{plugin_id}/versions/1.0.0/approve",
+        f"/api/plugins/{plugin_id}/versions/{version['version']}/approve",
         json={"hash": version["hash"], "enable": True},
     )
     assert r.status_code == 200, r.text
     detail = r.json()
-    assert detail["status"] == "enabled" and detail["approved_version"] == "1.0.0"
+    assert detail["status"] == "enabled" and detail["approved_version"] == version["version"]
     return detail
 
 
@@ -137,7 +138,7 @@ async def test_the_example_is_a_valid_package(plugin_id):
     assert report.ok, report.errors
     manifest = report.manifest
     assert manifest is not None
-    assert manifest.id == plugin_id and manifest.version == "1.0.0"
+    assert manifest.id == plugin_id and re.fullmatch(r"\d+\.\d+\.\d+", manifest.version)
     assert manifest.author.name == "Anemo" and manifest.license == "MIT"
     assert manifest.icon == "icon.png" and files["icon.png"].startswith(b"\x89PNG")
     assert manifest.readme == "README.md"
@@ -326,7 +327,8 @@ async def test_weekly_review_contributions_and_its_script(authed):
     assert script["pending"] is None
     assert script["approved"]["hash"] == automation.script_hash
     assert script["approved"]["code"] == script_code()
-    assert script["approved"]["tools"] == ["list_tasks", "list_events", "write_document"]
+    # It reaches Anemo only through the plugin's methods (anemo.api), so it lists no tools.
+    assert script["approved"]["tools"] == []
 
 
 async def test_weekly_review_template(authed):
@@ -343,22 +345,28 @@ async def test_weekly_review_template(authed):
 
 
 async def test_weekly_review_run_with_the_fake_sandbox(authed, fake_sandbox):
-    """The approved code is what reaches the sandbox, and the calls it makes (the tools of
-    its manifest, with the script's arguments) are allowed and write the review. The real
-    TypeScript runs in the Deno test below."""
+    """The approved code is what reaches the sandbox, and the methods it calls (anemo.api)
+    answer with the contract's JSON and write the review. The real TypeScript runs in the
+    Deno test below."""
     await install_example(authed, WEEKLY_REVIEW)
-    await new_task(authed, "Plan the trip")
-    seen: dict[str, str] = {}
+    await new_task(authed, "Plan the trip", due_date="2026-11-19")
+    seen: dict[str, Any] = {}
 
     async def weekly_review(input: dict[str, Any], anemo: Sdk) -> Any:
         assert input["input"] == {"date": "2026-11-18"}
-        seen["tasks"] = (await anemo.call("list_tasks"))["content"]
-        seen["events"] = (await anemo.call("list_events", start="2026-11-16", end="2026-11-22"))[
-            "content"
-        ]
+        seen["time_zone"] = input["timeZone"]
+        seen["tasks"] = (await api(anemo, "tasks.list", limit=500))["result"]["tasks"]
+        seen["events"] = (
+            await api(anemo, "events.list", **{"from": "2026-11-16", "to": "2026-11-22"})
+        )["result"]["events"]
         # Week 47: the tests share one workspace, and the Deno test writes week 48.
         path = "documents/Reviews/Week 2026-W47.md"
-        await anemo.call("write_document", path=path, content="# Week 2026-W47\n\n## Wins\n")
+        made = await api(
+            anemo, "documents.create", path=path, markdown="# Week 2026-W47\n\n## Wins\n"
+        )
+        assert made["error"] is None, made
+        again = await api(anemo, "documents.create", path=path, markdown="#")
+        seen["again"] = again["error"]["code"]
         return {"outcome": "Wrote the review of week 2026-W47.", "path": path}
 
     PROGRAMS[script_code()] = weekly_review
@@ -375,7 +383,10 @@ async def test_weekly_review_run_with_the_fake_sandbox(authed, fake_sandbox):
     run = await run_of(authed, started["runId"])
     assert run["status"] == "completed", run
     assert STARTS == [script_code()]
-    assert "Plan the trip" in seen["tasks"] and "No events" in seen["events"]
+    assert [(t["title"], t["dueDate"]) for t in seen["tasks"]] == [("Plan the trip", "2026-11-19")]
+    assert seen["events"] == [] and seen["again"] == "exists"
+    _, zone = await user_today()
+    assert seen["time_zone"] == str(zone)
     assert await outcome_of(authed, str(automation.id), started["runId"]) == (
         "Wrote the review of week 2026-W47."
     )
@@ -392,8 +403,11 @@ async def test_weekly_review_writes_on_the_plugins_own_permissions(authed, fake_
     assert r.status_code == 200, r.text
 
     async def weekly_review(input: dict[str, Any], anemo: Sdk) -> Any:
-        await anemo.call("list_tasks")
-        await anemo.call("write_document", path="documents/Reviews/Week 2026-W46.md", content="#")
+        await api(anemo, "tasks.list")
+        made = await api(
+            anemo, "documents.create", path="documents/Reviews/Week 2026-W46.md", markdown="#"
+        )
+        assert made["error"] is None, made
         return {"outcome": "Wrote it."}
 
     PROGRAMS[script_code()] = weekly_review
