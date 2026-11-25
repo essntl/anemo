@@ -47,8 +47,8 @@ public static partial class GitOutput
     /// <summary><c>git for-each-ref --format=…</c>: the ref, its object, the commit an annotated tag points at, its upstream, how far ahead and behind, whether it is HEAD.</summary>
     public const string RefFormat = "--format=%(refname)%00%(objectname)%00%(*objectname)%00%(upstream)%00%(upstream:track,nobracket)%00%(HEAD)";
 
-    /// <summary><c>git show -s -z --format=…</c> of one commit: as <see cref="LogFormat"/>, plus the committer date and the body.</summary>
-    public const string CommitFormat = "--format=%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%s%x00%b";
+    /// <summary><c>git show -s -z --format=…</c> of one commit: as <see cref="LogFormat"/>, plus the committer's date and name and the body (1.6.0: the name).</summary>
+    public const string CommitFormat = "--format=%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%cn%x00%s%x00%b";
 
     /// <summary>
     /// The commits of <c>git log -z</c> with <see cref="LogFormat"/>: each record ends with a NUL
@@ -206,18 +206,18 @@ public static partial class GitOutput
 
     /// <summary>
     /// One commit of <c>git show -s -z</c> with <see cref="CommitFormat"/>: the fields of
-    /// <see cref="GitCommit"/>, the committer date and the body; null when it doesn't read.
+    /// <see cref="GitCommit"/>, the committer's date and name and the body; null when it doesn't read.
     /// </summary>
-    public static (GitCommit Commit, string CommitterDate, string Body)? ParseCommit(string output)
+    public static (GitCommit Commit, string CommitterDate, string CommitterName, string Body)? ParseCommit(string output)
     {
         var f = output.Split('\0');
-        if (f.Length < 8 || !IsHash(f[0].Trim('\n', '\r')))
+        if (f.Length < 9 || !IsHash(f[0].Trim('\n', '\r')))
         {
             return null;
         }
 
-        var commit = new GitCommit(f[0].Trim('\n', '\r'), Parents(f[1]), f[2], f[3], f[4], f[6]);
-        return (commit, f[5], f[7].TrimEnd('\n', '\r'));
+        var commit = new GitCommit(f[0].Trim('\n', '\r'), Parents(f[1]), f[2], f[3], f[4], f[7]);
+        return (commit, f[5], f[6], f[8].TrimEnd('\n', '\r'));
     }
 
     /// <summary>

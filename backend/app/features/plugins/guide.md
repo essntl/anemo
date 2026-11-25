@@ -617,6 +617,7 @@ Hashes are full 40 hex digits (64 in a SHA-256 repository).
   "hash": "3f2a…", "parents": ["9b1c…"], "authorName": "Artem", "authorEmail": "artem@example.com",
   "date": "2026-11-25T09:30:00+01:00",
   "committerDate": "2026-11-25T09:31:00+01:00",
+  "committerName": "GitHub",         // "" from Anemo Desktop before 1.6.0
   "subject": "Fix the login",
   "body": "The rest of the message.",
   "files": [{ "path": "src/login.ts",

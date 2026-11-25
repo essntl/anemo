@@ -93,6 +93,7 @@ const messages: Messages = {
   "Commit {hash}": "Коммит {hash}",
   "Merge commit": "Коммит слияния",
   "Committed {when}": "Закоммичено {when}",
+  "committed by {name} {when}": "закоммитил {name} {when}",
   "Show the whole message": "Показать сообщение полностью",
   "Parent | Parents": "Родительский коммит | Родительские коммиты | Родительские коммиты",
   "Show {hash} in the graph": "Показать {hash} на графе",

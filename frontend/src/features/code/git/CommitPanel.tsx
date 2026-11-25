@@ -97,16 +97,19 @@ function Section({ title, children, className }: { title: string; children: Reac
 }
 
 /** Who wrote it and when, on one line (the e-mail and the full date on hover). */
-function Author({ name, email, date, committed }: { name: string; email: string; date: string; committed?: string }) {
+function Author({ name, email, date, committed, committer }: { name: string; email: string; date: string; committed?: string; committer?: string }) {
+  const byOther = !!committer && committer !== name
   return (
     <div className="flex min-w-0 items-center gap-2 text-[12.5px]">
       <Avatar name={name} className="h-6 w-6 text-[10px]" />
       <span className="min-w-0 truncate font-medium" title={email ? `${name} <${email}>` : name}>{name}</span>
       <span className="shrink-0 text-muted">·</span>
       <time dateTime={date} title={formatDateTime(date)} className="shrink-0 text-muted">{formatAgo(date)}</time>
-      {committed && committed !== date && (
+      {committed && (byOther || committed !== date) && (
         <span className="min-w-0 truncate text-[11.5px] text-subtle" title={formatDateTime(committed)}>
-          ({t('Committed {when}', { when: formatAgo(committed) })})
+          ({byOther
+            ? t('committed by {name} {when}', { name: committer, when: formatAgo(committed) })
+            : t('Committed {when}', { when: formatAgo(committed) })})
         </span>
       )}
     </div>
@@ -167,7 +170,7 @@ export function CommitPanel({ choice, hash, commit, remote, known, onJump, onClo
           {/* Untrusted text: shown as text, line breaks kept. */}
           <h2 className="whitespace-pre-wrap break-words text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{subject || t('(no message)')}</h2>
           {(detail ?? commit) && (
-            <Author name={(detail ?? commit)!.authorName} email={(detail ?? commit)!.authorEmail} date={(detail ?? commit)!.date} committed={detail?.committerDate} />
+            <Author name={(detail ?? commit)!.authorName} email={(detail ?? commit)!.authorEmail} date={(detail ?? commit)!.date} committed={detail?.committerDate} committer={detail?.committerName} />
           )}
           {parents.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted">

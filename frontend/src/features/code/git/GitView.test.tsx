@@ -57,7 +57,7 @@ function graph(over: Partial<Graph> = {}): Graph {
 
 const detail = (name: string, over: Partial<Detail> = {}): Detail => ({
   hash: h(name), parents: [h('c2'), h('f1')], authorName: 'Artem Kotov', authorEmail: 'artem@example.com',
-  date: '2026-11-20T10:00:00Z', committerDate: '2026-11-20T10:00:00Z', subject: 'Merge feature', body: 'Line one\n<b>not html</b>',
+  date: '2026-11-20T10:00:00Z', committerDate: '2026-11-20T10:00:00Z', committerName: 'GitHub', subject: 'Merge feature', body: 'Line one\n<b>not html</b>',
   files: [
     { path: 'src/app.ts', status: 'M', additions: 12, deletions: 4 },
     { path: 'logo.png', status: 'A', additions: null, deletions: null },
@@ -308,6 +308,7 @@ describe('the Git view', () => {
     expect(within(panel).getByText('binary')).toBeInTheDocument() // logo.png has no line counts
     // The body is text: its markup is shown, not made.
     expect(within(panel).getByText(/<b>not html<\/b>/)).toBeInTheDocument()
+    expect(within(panel).getByText(/committed by GitHub/)).toBeInTheDocument()
     expect(panel.querySelector('b')).toBeNull()
 
     await userEvent.click(within(panel).getByRole('button', { name: 'f100000' }))
