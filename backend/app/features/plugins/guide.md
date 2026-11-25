@@ -272,7 +272,8 @@ To read the project, ask for `code:read` (section 7) and call `code.gitGraph` an
 `code.gitCommit` (section 6). Anemo's server asks Anemo Desktop on that computer, which runs
 a fixed set of read-only git commands: no shell, no file contents, no diffs. The computer
 must be a trusted one that shares its Claude Code jobs, online, with Anemo Desktop 1.5.0 or
-later; otherwise the call fails with `unavailable` and a message that says why.
+later; otherwise the call fails with `unavailable` and a message that says why. (Anemo has
+its own Git view on the Code page; a panel is for something else you want to show.)
 
 A panel that lists the current branch and the last commits (inline, for the idea):
 
@@ -289,7 +290,7 @@ A panel that lists the current branch and the last commits (inline, for the idea
       const graph = await anemo.call('code.gitGraph', { device: code.device, project: code.project, limit: 50 })
       const head = graph.head
       document.getElementById('head').textContent = head.detached ? 'detached at ' + head.commit.slice(0, 7) : (head.branch ?? '')
-      document.getElementById('dirty').textContent = graph.status.dirty ? 'uncommitted changes' : 'clean'
+      document.getElementById('dirty').textContent = graph.status?.dirty ? 'uncommitted changes' : 'clean'
       const list = document.getElementById('commits')
       list.replaceChildren(...graph.commits.map((c) => {
         const li = document.createElement('li')
@@ -481,9 +482,9 @@ Params and results are JSON. Fields are **camelCase**, ids are strings, times ar
 | `events.create` | `{title, start, end?, allDay?, description?, location?}` → `Event` (`start`, `end`: ISO times) | `events:write` |
 | `events.update` | `{id, title?, start?, end?, allDay?, description?, location?}` → `Event`; only the fields given change | `events:write` |
 | `projects.list` | `{}` → `{projects: [{id, name, color}]}` (archived ones left out) | `projects:read` |
-| `code.projects` | `{device}` → `{projects: [{name, path, remote}]}`: the folders in that computer's projects folder (`remote`: its `origin` URL or `null`) | `code:read` |
-| `code.gitGraph` | `{device, project, limit?, all?}` → `GitGraph` (below). `limit` 1–1000 commits (default 300); `all` (default `true`): the history of every local and remote-tracking branch, `false`: of HEAD only | `code:read` |
-| `code.gitCommit` | `{device, project, hash}` → `GitCommit` (below); `hash` is 7 to 40 lower-case hex digits | `code:read` |
+| `code.projects` | `{device, remote?}` → `{projects: [{name, path, remote, repo, cloned}]}`: the folders in that computer's projects folder (`cloned: true`; `remote`: its `origin` URL or `null`; `repo`: `owner/name` when that is on GitHub) and, unless `remote: false`, its owner's GitHub repositories that aren't cloned there (`cloned: false`, `path: null`; asking GitHub takes a few seconds) | `code:read` |
+| `code.gitGraph` | `{device, project \| repo, limit?, all?, fetch?}` → `GitGraph` (below). `project`: a folder of `code.projects`; or `repo`: the `repo` (`owner/name`) of one with `cloned: false`, read from a cache on the computer (Anemo Desktop 1.6.0). `limit` 1–1000 commits (default 300); `all` (default `true`): the history of every local and remote-tracking branch, `false`: of HEAD only; `fetch` (default `false`): `git fetch --prune` first, so the remote branches are current (slower; 1.6.0) | `code:read` |
+| `code.gitCommit` | `{device, project \| repo, hash}` → `GitCommit` (below); `hash` is 7 to 40 lower-case hex digits | `code:read` |
 | `notifications.send` | `{title, body?}` → `{}` (title at most 120 characters) | `notifications:send` |
 | `http.fetch` | `{url, method?, headers?, body?}` → `{status, headers, body}`; `method` one of `GET HEAD POST PUT PATCH DELETE OPTIONS` (default `GET`), `body` is text; the answer's body comes back as text, at most 1 MB | `network:<host of url>` |
 | `tools.call` | `{name, args?}` → `{content, data, isError}` (`data` may be `null`) | `tools:<name>` |
@@ -572,9 +573,11 @@ and are deleted when the plugin is uninstalled.
 
 ### GitGraph and GitCommit
 
-`code.gitGraph` and `code.gitCommit` read a project on a computer through Anemo Desktop
-(section 4, Code panels). The device is the computer's name, the project its folder name
-(`code.projects`); hashes are full 40 hex digits (64 in a SHA-256 repository).
+`code.gitGraph` and `code.gitCommit` read a repository on a computer through Anemo Desktop
+(section 4, Code panels). The device is the computer's name; the repository either a
+project's folder name (`project`) or, for one of the owner's GitHub repositories that isn't
+cloned there, its `repo` (`owner/name`, from `code.projects`; never a URL). Give exactly one.
+Hashes are full 40 hex digits (64 in a SHA-256 repository).
 
 ```jsonc
 // GitGraph
@@ -587,7 +590,10 @@ and are deleted when the plugin is uninstalled.
                  "remote": false,
                  "upstream": "origin/main",  // or null
                  "ahead": 2, "behind": 0,    // commits ahead of and behind its upstream
-                 "current": true }],         // HEAD is on it
+                 "current": true,            // HEAD is on it
+                 "pullRequest": { "number": 90, "title": "Add the graph", "headRef": "main",
+                                  "url": "https://github.com/artem/anemo/pull/90",
+                                  "draft": false } }],  // the open one from this branch, or null
   "tags": [{ "name": "v1.0", "commit": "9b1c…" }],   // an annotated tag: the commit it points at
   "commits": [{ "hash": "3f2a…",
                 "parents": ["9b1c…", "77de…"],       // two or more for a merge; [] for a first commit
@@ -597,9 +603,14 @@ and are deleted when the plugin is uninstalled.
                 "subject": "Merge branch 'feature'",
                 "refs": ["HEAD", "main", "origin/main", "tag: v1.0"] }],
   "status": { "dirty": true,         // any of the four below
-              "staged": 1, "unstaged": 2, "untracked": 3, "conflicted": 0 },
+              "staged": 1, "unstaged": 2, "untracked": 3, "conflicted": 0 },  // null for a repo
   "remotes": [{ "name": "origin", "url": "https://github.com/artem/anemo.git" }],  // credentials removed
-  "truncated": false                 // there are more commits than limit
+  "truncated": false,                // there are more commits than limit
+  "source": "local",                 // "remote": a repo that isn't cloned, read from the cache
+  "repo": "artem/anemo",             // owner/name on GitHub, or null
+  "fetchedAt": "2026-11-25T09:00:00Z",  // the last fetch, or null (never, or Anemo Desktop 1.5.0)
+  "fetchError": null,                // fetch was asked for and failed: why (the rest is still read)
+  "pullRequests": [ /* the open ones, as in pullRequest above */ ]  // null: gh isn't signed in there
 }
 // GitCommit
 {
@@ -610,7 +621,7 @@ and are deleted when the plugin is uninstalled.
   "body": "The rest of the message.",
   "files": [{ "path": "src/login.ts",
               "status": "M",         // git's letter: A M D R C T
-              "additions": 12, "deletions": 3 }],   // null for a binary file
+              "additions": 12, "deletions": 3 }],   // null for a binary file, and for a repo
   "stats": { "files": 1, "additions": 12, "deletions": 3 },
   "truncated": false                 // more than 1000 files: the list is cut, stats are not
 }
@@ -825,7 +836,7 @@ Note `textContent` (not `innerHTML`): document text is shown as text, never as H
 | File too large / too many files | At most 1 MB per file, 5 MB and 500 files in total. Remove bundled libraries you don't need. |
 | A picture doesn't match its type | The bytes of `icon.png` must be a real PNG, of `x.gif` a GIF, of `x.jpg` a JPEG (send binary files as base64, see section 12). The icon itself is PNG or WebP. |
 | `slot` unknown / `objects` missing | Slots: `object.panel` (needs `objects`), `page`, `settings` (at most one), `chat.block` (needs `fence`), `overlay` (at most one), `code.panel` (needs a `title`). |
-| `unavailable` from `code.gitGraph` | The computer is offline, watched (not trusted), doesn't share its Claude Code jobs, or has an Anemo Desktop older than 1.5.0: the message says which. `not_found`: no computer, project or commit of that name. |
+| `unavailable` from `code.gitGraph` | The computer is offline, watched (not trusted), doesn't share its Claude Code jobs, isn't signed in to GitHub (for a `repo`), or has an Anemo Desktop older than 1.5.0 (1.6.0 for a `repo`): the message says which. `not_found`: no computer, project, repository or commit of that name. |
 | A command names an unknown UI | `sendToUi`'s `ui` must be the `id` of one of this plugin's `contributes.ui`. |
 | `invalid_params` from `ui.setHitRegions` | At most 8 regions of `{x, y, width, height}` (no other fields), each larger than 0 and at most 320 × 320; only an overlay has them. |
 | `permission_denied` from `ui.pickFile` | Call it straight from a click (or key) handler in the frame, not from a timer or after a slow call. |

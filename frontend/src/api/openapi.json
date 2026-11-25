@@ -15740,6 +15740,206 @@
         }
       }
     },
+    "/api/code/devices/{device_id}/git/graph": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Git Graph",
+        "description": "A repository's graph, in the same shape as the plugin method `code.gitGraph`. A\nPOST: a fetch changes what the computer has (its remote branches, its cache).",
+        "operationId": "git_graph_api_code_devices__device_id__git_graph_post",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeGitGraphIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitGraph"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/devices/{device_id}/git/commit": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Git Commit",
+        "description": "One commit's metadata and the files it changed (no diff), as `code.gitCommit`.",
+        "operationId": "git_commit_api_code_devices__device_id__git_commit_post",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeGitCommitIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitCommitDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/devices/{device_id}/git/cache/clear": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Git Cache Clear",
+        "description": "Remove the computer's cached clones of repositories that aren't cloned there.",
+        "operationId": "git_cache_clear_api_code_devices__device_id__git_cache_clear_post",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitCacheCleared"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/research/sessions": {
       "get": {
         "tags": [
@@ -24710,6 +24910,97 @@
         ],
         "title": "CodeFollowUpIn"
       },
+      "CodeGitCommitIn": {
+        "properties": {
+          "project": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,100}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project",
+            "description": "A folder in the computer's projects folder (a local checkout)"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo",
+            "description": "owner/name of one of the owner's GitHub repositories that isn't cloned there (read from a cache on the computer)"
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,40}$",
+            "title": "Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hash"
+        ],
+        "title": "CodeGitCommitIn"
+      },
+      "CodeGitGraphIn": {
+        "properties": {
+          "project": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,100}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project",
+            "description": "A folder in the computer's projects folder (a local checkout)"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo",
+            "description": "owner/name of one of the owner's GitHub repositories that isn't cloned there (read from a cache on the computer)"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 300
+          },
+          "all": {
+            "type": "boolean",
+            "title": "All",
+            "description": "Every branch; false: what HEAD can reach",
+            "default": true
+          },
+          "fetch": {
+            "type": "boolean",
+            "title": "Fetch",
+            "description": "git fetch --prune first (slower)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CodeGitGraphIn"
+      },
       "CodeImageOut": {
         "properties": {
           "id": {
@@ -25168,6 +25459,17 @@
               }
             ],
             "title": "Remote"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo"
           }
         },
         "type": "object",
@@ -25223,6 +25525,17 @@
           "url": {
             "type": "string",
             "title": "Url"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo"
           }
         },
         "type": "object",
@@ -28386,6 +28699,402 @@
         "type": "object",
         "title": "GeneralSettings"
       },
+      "GitBranch": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "commit": {
+            "type": "string",
+            "title": "Commit"
+          },
+          "remote": {
+            "type": "boolean",
+            "title": "Remote"
+          },
+          "upstream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream"
+          },
+          "ahead": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ahead"
+          },
+          "behind": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Behind"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "pullRequest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GitPullRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "commit",
+          "remote",
+          "upstream",
+          "ahead",
+          "behind",
+          "current"
+        ],
+        "title": "GitBranch"
+      },
+      "GitCacheCleared": {
+        "properties": {
+          "removed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Removed"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "removed",
+          "bytes"
+        ],
+        "title": "GitCacheCleared"
+      },
+      "GitCommitDetail": {
+        "properties": {
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          },
+          "parents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Parents"
+          },
+          "authorName": {
+            "type": "string",
+            "title": "Authorname"
+          },
+          "authorEmail": {
+            "type": "string",
+            "title": "Authoremail"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "committerDate": {
+            "type": "string",
+            "title": "Committerdate"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/GitFile"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/GitStats"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "hash",
+          "parents",
+          "authorName",
+          "authorEmail",
+          "date",
+          "subject",
+          "committerDate",
+          "body",
+          "files",
+          "stats"
+        ],
+        "title": "GitCommitDetail"
+      },
+      "GitFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "additions": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additions"
+          },
+          "deletions": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deletions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "status",
+          "additions",
+          "deletions"
+        ],
+        "title": "GitFile"
+      },
+      "GitGraph": {
+        "properties": {
+          "head": {
+            "$ref": "#/components/schemas/GitHead"
+          },
+          "branches": {
+            "items": {
+              "$ref": "#/components/schemas/GitBranch"
+            },
+            "type": "array",
+            "title": "Branches"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/GitTag"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "commits": {
+            "items": {
+              "$ref": "#/components/schemas/GitGraphCommit"
+            },
+            "type": "array",
+            "title": "Commits"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GitStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remotes": {
+            "items": {
+              "$ref": "#/components/schemas/GitRemote"
+            },
+            "type": "array",
+            "title": "Remotes"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "local",
+              "remote"
+            ],
+            "title": "Source",
+            "default": "local"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo"
+          },
+          "fetchedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetchedat"
+          },
+          "fetchError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetcherror"
+          },
+          "pullRequests": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GitPullRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pullrequests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "head",
+          "branches",
+          "tags",
+          "commits",
+          "status",
+          "remotes",
+          "truncated"
+        ],
+        "title": "GitGraph"
+      },
+      "GitGraphCommit": {
+        "properties": {
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          },
+          "parents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Parents"
+          },
+          "authorName": {
+            "type": "string",
+            "title": "Authorname"
+          },
+          "authorEmail": {
+            "type": "string",
+            "title": "Authoremail"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Refs",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "hash",
+          "parents",
+          "authorName",
+          "authorEmail",
+          "date",
+          "subject"
+        ],
+        "title": "GitGraphCommit"
+      },
+      "GitHead": {
+        "properties": {
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "detached": {
+            "type": "boolean",
+            "title": "Detached"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branch",
+          "commit",
+          "detached"
+        ],
+        "title": "GitHead"
+      },
       "GitInstallIn": {
         "properties": {
           "url": {
@@ -28414,6 +29123,139 @@
           "url"
         ],
         "title": "GitInstallIn"
+      },
+      "GitPullRequest": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "headRef": {
+            "type": "string",
+            "title": "Headref"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "draft": {
+            "type": "boolean",
+            "title": "Draft",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "title",
+          "headRef",
+          "url"
+        ],
+        "title": "GitPullRequest"
+      },
+      "GitRemote": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url"
+        ],
+        "title": "GitRemote"
+      },
+      "GitStats": {
+        "properties": {
+          "files": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Files"
+          },
+          "additions": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Additions"
+          },
+          "deletions": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Deletions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files",
+          "additions",
+          "deletions"
+        ],
+        "title": "GitStats"
+      },
+      "GitStatus": {
+        "properties": {
+          "dirty": {
+            "type": "boolean",
+            "title": "Dirty"
+          },
+          "staged": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Staged"
+          },
+          "unstaged": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unstaged"
+          },
+          "untracked": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Untracked"
+          },
+          "conflicted": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Conflicted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dirty",
+          "staged",
+          "unstaged",
+          "untracked",
+          "conflicted"
+        ],
+        "title": "GitStatus"
+      },
+      "GitTag": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "commit": {
+            "type": "string",
+            "title": "Commit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "commit"
+        ],
+        "title": "GitTag"
       },
       "HTTPValidationError": {
         "properties": {

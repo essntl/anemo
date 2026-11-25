@@ -15,7 +15,8 @@ It checks no trust level or permission: the tools do that before they call `send
 Keys (nobody outside features/devices reads them):
   devices:online:<device_id>   a hash: the device's connection (`conn`) and its last offer
                                (`control`, `shell`, `code`, `code_start`, `code_images`,
-                               `code_git`, `platform`, `shell_kind`, `offered_at`); 90 s,
+                               `code_git`, `code_git_remote`, `platform`, `shell_kind`,
+                               `offered_at`); 90 s,
                                renewed by the client's pings and offers. The offer
                                counts for OFFER_TTL_S after offered_at. Changed only by
                                the Lua scripts below, which compare `conn` first, so a
@@ -87,6 +88,9 @@ class Offer:
     code_images: bool = False
     # It answers the read-only git actions (Anemo Desktop 1.5.0; older clients: off).
     code_git: bool = False
+    # They also take a remote repository and `fetch`, and answer pull requests (Anemo
+    # Desktop 1.6.0; older clients: off).
+    code_git_remote: bool = False
     # From `hello` (older clients: Windows) and the offer (older clients: Windows PowerShell).
     platform: Platform = DEFAULT_PLATFORM
     shell_kind: ShellKind = DEFAULT_SHELL_KIND
@@ -127,6 +131,11 @@ class ActionFailed(Exception):
     """The client tried and said why it couldn't (e.g. the control is gone)."""
 
 
+class Unauthenticated(ActionFailed):
+    """git or gh on the device isn't signed in to the remote it had to reach (the
+    `unauthenticated` code, Anemo Desktop 1.6.0)."""
+
+
 class Missing(ActionFailed):
     """What the command named isn't there on the device (a project, a commit; the
     `not_found` code, Anemo Desktop 1.5.0). An ActionFailed, so callers that don't tell
@@ -155,24 +164,27 @@ _CONNECT = """
 local old = redis.call('HGET', KEYS[1], 'conn')
 redis.call('DEL', KEYS[1])
 redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
-  'code_start', '0', 'code_images', '0', 'code_git', '0', 'offered_at', '')
+  'code_start', '0', 'code_images', '0', 'code_git', '0',
+  'code_git_remote', '0', 'offered_at', '')
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return old
 """
 
 # ARGV: conn, ttl, has_offer ('1'/'0'), control, shell, offered_at, code, code_start,
-# code_images, platform, shell_kind, code_git. 0 when another connection has the device.
+# code_images, platform, shell_kind, code_git, code_git_remote. 0 when another connection
+# has the device.
 _RENEW = """
 local cur = redis.call('HGET', KEYS[1], 'conn')
 if cur and cur ~= ARGV[1] then return 0 end
 if not cur then
   redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
-    'code_start', '0', 'code_images', '0', 'code_git', '0', 'offered_at', '')
+    'code_start', '0', 'code_images', '0', 'code_git', '0',
+  'code_git_remote', '0', 'offered_at', '')
 end
 if ARGV[3] == '1' then
   redis.call('HSET', KEYS[1], 'control', ARGV[4], 'shell', ARGV[5], 'offered_at', ARGV[6],
     'code', ARGV[7], 'code_start', ARGV[8], 'code_images', ARGV[9], 'platform', ARGV[10],
-    'shell_kind', ARGV[11], 'code_git', ARGV[12])
+    'shell_kind', ARGV[11], 'code_git', ARGV[12], 'code_git_remote', ARGV[13])
 end
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return 1
@@ -218,6 +230,7 @@ def _fresh_offer(entry: dict[str, str]) -> Offer | None:
         code_start=entry.get("code_start") == "1",
         code_images=entry.get("code_images") == "1",
         code_git=entry.get("code_git") == "1",
+        code_git_remote=entry.get("code_git_remote") == "1",
         # A hash an older server wrote has neither field: Windows PowerShell, as it was.
         platform=platform_of(entry.get("platform")),
         shell_kind=shell_kind_of(entry.get("shell_kind")),
@@ -284,6 +297,7 @@ async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> 
         "",
         "",
         "0",
+        "0",
     ]
     if offer is not None:
         args[2:] = [
@@ -297,6 +311,7 @@ async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> 
             offer.platform,
             offer.shell_kind,
             "1" if offer.code_git else "0",
+            "1" if offer.code_git_remote else "0",
         ]
     try:
         return bool(await _script(_RENEW, device_id, *args))
@@ -445,6 +460,8 @@ def _raise_for(data: dict[str, Any]) -> None:
         raise Unavailable(error)
     if code == "not_found":
         raise Missing(error)
+    if code == "unauthenticated":
+        raise Unauthenticated(error)
     raise ActionFailed(error)
 
 

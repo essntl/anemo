@@ -121,16 +121,49 @@ def project_name(value: str) -> str:
 
 ProjectName = Annotated[str, StringConstraints(pattern=PROJECT), AfterValidator(project_name)]
 
+# One of the owner's GitHub repositories, `owner/name` (docs/device-contracts.md §7.6).
+REPO = r"^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$"
+_GITHUB_URL = re.compile(
+    r"^(?:https://(?:[^@/]+@)?github\.com/|ssh://git@github\.com/|git@github\.com:)"
+    r"([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9._-]{1,100}?)(?:\.git)?/?$",
+    re.IGNORECASE,
+)
+
+
+def repo_name(value: str) -> str:
+    """`owner/name` whose name is a real one: not `.` or `..`, not ending in `.git`."""
+    name = value.split("/", 1)[1]
+    if name in (".", "..") or name.lower().endswith(".git"):
+        raise ValueError("not the name of a GitHub repository")
+    return value
+
+
+RepoName = Annotated[str, StringConstraints(pattern=REPO), AfterValidator(repo_name)]
+
+
+def github_repo(url: str | None) -> str | None:
+    """`owner/name` of a github.com remote URL (https, ssh or scp style), else None."""
+    found = _GITHUB_URL.match(url.strip()) if url else None
+    if found is None:
+        return None
+    repo = f"{found.group(1)}/{found.group(2)}"
+    try:
+        return repo_name(repo)
+    except ValueError:
+        return None
+
 
 class CodeProjectOut(BaseModel):
     name: str
     dir: str
     remote: str | None  # its origin remote's URL
+    repo: str | None = None  # owner/name when origin is on GitHub
 
 
 class CodeRemoteOut(BaseModel):
     name: str
     url: str
+    repo: str | None = None  # owner/name (from the URL): what the git reads take as `repo`
 
 
 class CodeProjectsOut(BaseModel):

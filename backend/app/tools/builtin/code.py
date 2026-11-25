@@ -5,7 +5,8 @@ computers that run Anemo Desktop (docs/specs/code-sessions.md §8, §12.3).
   code_start(device, project, prompt, …)   starts a job (`claude -p` in the project)
   code_status(job_id)     state, todo list, last activities, result
   code_cancel(job_id)     cancels a running job
-  code_git_graph(device, project)   branches, ahead/behind, recent commits, dirty state
+  code_git_graph(device, project | repo)   branches, ahead/behind, pull requests, recent
+                          commits, dirty state; also of a GitHub repository not cloned
 
 Permissions: `code.see` (projects, status, git history; "safe") and `code.run` (start,
 cancel; "moderate"). Jobs are only started on and cancelled on a trusted computer that allows it
@@ -26,7 +27,7 @@ from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.features.code_sessions import control, git, ingest, service
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent
-from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName
+from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName, RepoName
 from app.features.devices import service as devices
 from app.features.devices.models import Device
 from app.policy.models import Action
@@ -153,8 +154,14 @@ class CodeProjects(Tool):
             lines.append(f"- {project.name} ({project.dir}{remote})")
         if not found.projects:
             lines.append("(none)")
-        lines += ["", "On GitHub, not cloned yet (code_start clones them):"]
-        lines += [f"- {r.name} ({r.url})" for r in found.remote[:MAX_LISTED]] or ["(none)"]
+        lines += [
+            "",
+            "On GitHub, not cloned yet (code_start clones them; code_git_graph reads them "
+            "with repo=owner/name):",
+        ]
+        lines += [f"- {r.name} ({r.repo or r.url})" for r in found.remote[:MAX_LISTED]] or [
+            "(none)"
+        ]
         if found.note:
             lines.append(f"Note: {found.note}")
         return ToolResult(content="\n".join(lines))
@@ -438,11 +445,21 @@ MAX_GRAPH_COMMITS = 200
 MAX_LISTED_REFS = 40
 
 
-class GitGraphInput(BaseModel):
+class GitGraphInput(git.GitWhere):
     device: str = Field(min_length=1, max_length=100, description=DEVICE_DESCRIPTION)
-    project: ProjectName = Field(description="The project's folder name (see code_projects)")
+    project: ProjectName | None = Field(
+        None, description="A project's folder name (see code_projects); or give repo"
+    )
+    repo: RepoName | None = Field(
+        None,
+        description="owner/name of a GitHub repository listed by code_projects as not cloned "
+        "yet; read without cloning it into the projects folder",
+    )
     limit: int = Field(
         GRAPH_COMMITS, ge=1, le=MAX_GRAPH_COMMITS, description="How many recent commits to show"
+    )
+    fetch: bool = Field(
+        False, description="git fetch first, so the remote branches are current (slower)"
     )
 
 
@@ -458,7 +475,9 @@ def _tracking(branch: git.GitBranch) -> str:
     return f"{branch.ahead} ahead, {branch.behind} behind {branch.upstream}"
 
 
-def _working_tree(status: git.GitStatus) -> str:
+def _working_tree(status: git.GitStatus | None) -> str:
+    if status is None:
+        return "none (read from a cache on the computer, not cloned there)"
     if not status.dirty:
         return "clean"
     counts = [
@@ -481,13 +500,23 @@ def git_summary(found: git.GitGraph) -> str:
     else:
         at = f"on {head.branch} at {_short(head.commit)}"
     lines = [f"HEAD: {at}", f"Working tree: {_working_tree(found.status)}"]
+    if found.repo:
+        lines.append(f"GitHub: {found.repo}")
+    if found.fetched_at:
+        lines.append(f"Last fetched: {found.fetched_at}")
+    if found.fetch_error:
+        lines.append(f"Fetch: {found.fetch_error}")
     if found.remotes:
         lines.append("Remotes: " + ", ".join(f"{r.name} {r.url}" for r in found.remotes[:5]))
     local = [b for b in found.branches if not b.remote]
     lines.append(f"Local branches ({len(local)}):" if local else "No local branches.")
     for branch in local[:MAX_LISTED_REFS]:
         mark = "*" if branch.current else "-"
-        lines.append(f"{mark} {branch.name} at {_short(branch.commit)}, {_tracking(branch)}")
+        pr = branch.pull_request
+        open_pr = f", pull request #{pr.number} “{_one_line(pr.title, 100)}”" if pr else ""
+        lines.append(
+            f"{mark} {branch.name} at {_short(branch.commit)}, {_tracking(branch)}{open_pr}"
+        )
     remote = [b.name for b in found.branches if b.remote]
     if remote:
         shown = ", ".join(remote[:MAX_LISTED_REFS])
@@ -516,15 +545,16 @@ class CodeGitGraph(Tool):
     )
     capability = SEE
     Input = GitGraphInput
-    timeout_s = git.GIT_TIMEOUT_S + 15
+    timeout_s = git.REMOTE_TIMEOUT_S + 15
 
     def actions(self, args: GitGraphInput, ctx: ToolContext) -> list[Action]:
+        where = f"project:{args.project}" if args.project else f"repo:{args.repo}"
         return [
             Action(
                 capability=SEE,
-                resource=f"{_resource(ctx, args.device)}/project:{args.project}",
+                resource=f"{_resource(ctx, args.device)}/{where}",
                 risk="safe",
-                summary=f"Read the git history of {args.project} on {args.device}"
+                summary=f"Read the git history of {args.label} on {args.device}"
                 + _watched_note(ctx, args.device),
             )
         ]
@@ -537,12 +567,12 @@ class CodeGitGraph(Tool):
             return refused
         try:
             async with get_sessionmaker()() as db:
-                found = await git.graph(db, device.id, args.project, limit=args.limit)
+                found = await git.graph(db, device.id, args, limit=args.limit, fetch=args.fetch)
         except AppError as exc:
             return _error(exc)
-        summary = untrusted(f"git of {args.project} on {device.name}", git_summary(found))
+        summary = untrusted(f"git of {args.label} on {device.name}", git_summary(found))
         return ToolResult(
-            content=f"Git of {args.project} on {device.name} {FROM_COMPUTER}\n{summary}"
+            content=f"Git of {args.label} on {device.name} {FROM_COMPUTER}\n{summary}"
         )
 
 

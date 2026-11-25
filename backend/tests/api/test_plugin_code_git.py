@@ -1,6 +1,6 @@
 """Plugins on the Code page: the `code:read` methods (code.projects, code.gitGraph,
 code.gitCommit) carried out by Anemo Desktop on a trusted computer, and the
-`code_git_graph` agent tool (docs/device-contracts.md §7.5; the plugin guide §6)."""
+`code_git_graph` agent tool (docs/device-contracts.md §7.5, §7.6; the plugin guide §6)."""
 
 import uuid
 from typing import Any
@@ -109,7 +109,12 @@ COMMIT: dict[str, Any] = {
 
 
 async def computer(
-    authed, *, git: bool = True, trust: str = "trusted", share: bool = True
+    authed,
+    *,
+    git: bool = True,
+    remote: bool = True,
+    trust: str = "trusted",
+    share: bool = True,
 ) -> tuple[dict[str, Any], WsClient]:
     device = await add(authed, "PC", trust=trust)
     ws, _ = await welcomed(device["token"])
@@ -122,6 +127,7 @@ async def computer(
     }
     if git:
         offer["code_git"] = True  # Anemo Desktop 1.5.0
+        offer["code_git_remote"] = remote  # 1.6.0
     await ws.send(offer)
     await roundtrip(ws)
     return device, ws
@@ -181,6 +187,7 @@ async def test_the_graph_comes_from_the_computer_in_camel_case(authed, device_si
         "ahead": 1,
         "behind": 0,
         "current": True,
+        "pullRequest": None,
     }
     assert [c["hash"] for c in graph["commits"]] == [HEAD, SIDE, BASE]
     assert graph["commits"][0]["parents"] == [BASE, SIDE]
@@ -196,6 +203,9 @@ async def test_the_graph_comes_from_the_computer_in_camel_case(authed, device_si
     # A token in a remote's URL never reaches the plugin.
     assert graph["remotes"] == [{"name": "origin", "url": "https://github.com/essntl/anemo.git"}]
     assert graph["truncated"] is False
+    # What a 1.5.0 client doesn't send has its default.
+    assert (graph["source"], graph["repo"], graph["fetchedAt"]) == ("local", None, None)
+    assert (graph["fetchError"], graph["pullRequests"]) == (None, None)
     action, fields, _ = device_side.sent[-1]
     assert action == "code_git_graph"
     assert fields == {"project": "anemo", "limit": 300, "all": True}
@@ -241,11 +251,35 @@ async def test_a_commit_and_the_projects(authed, device_side: FakeSend):
     assert r.status_code == 200, r.text
     assert r.json()["result"] == {
         "projects": [
-            {"name": "anemo", "path": "C:\\dev\\anemo", "remote": "https://github.com/e/anemo.git"},
-            {"name": "notes", "path": "C:\\dev\\notes", "remote": None},
+            {
+                "name": "anemo",
+                "path": "C:\\dev\\anemo",
+                "remote": "https://github.com/e/anemo.git",
+                "repo": "e/anemo",
+                "cloned": True,
+            },
+            {
+                "name": "notes",
+                "path": "C:\\dev\\notes",
+                "remote": None,
+                "repo": None,
+                "cloned": True,
+            },
+            # On GitHub, not cloned: what code.gitGraph takes as `repo`.
+            {
+                "name": "not-cloned",
+                "path": None,
+                "remote": "https://github.com/e/not-cloned",
+                "repo": "e/not-cloned",
+                "cloned": False,
+            },
         ]
     }
-    # Only the projects folder: the computer is told not to ask GitHub.
+    assert device_side.sent[-1][:2] == ("code_projects", {})
+
+    # remote: false — only the projects folder; the computer is told not to ask GitHub.
+    r = await call(authed, GRAPH, "code.projects", {"device": "PC", "remote": False})
+    assert [p["cloned"] for p in r.json()["result"]["projects"]] == [True, True]
     assert device_side.sent[-1][:2] == ("code_projects", {"local_only": True})
     await ws.disconnect()
 
@@ -286,6 +320,20 @@ async def test_parameters_are_checked_before_anything_is_sent(authed, device_sid
         ("code.gitCommit", {"device": "PC", "project": "anemo", "hash": "ABCDEF12"}),
         ("code.gitCommit", {"device": "PC", "project": "anemo", "hash": "--output=x"}),
         ("code.gitCommit", {"device": "PC", "project": "anemo", "hash": "a" * 41}),
+        # repo: only owner/name, never a URL or a path; exactly one of project and repo.
+        ("code.gitGraph", {"device": "PC"}),
+        ("code.gitGraph", {"device": "PC", "project": "anemo", "repo": "essntl/anemo"}),
+        ("code.gitGraph", {"device": "PC", "repo": "https://evil.example/x/y.git"}),
+        ("code.gitGraph", {"device": "PC", "repo": "git@github.com:essntl/anemo"}),
+        ("code.gitGraph", {"device": "PC", "repo": "essntl"}),
+        ("code.gitGraph", {"device": "PC", "repo": "essntl/anemo/extra"}),
+        ("code.gitGraph", {"device": "PC", "repo": "essntl/.."}),
+        ("code.gitGraph", {"device": "PC", "repo": "../anemo"}),
+        ("code.gitGraph", {"device": "PC", "repo": "-x/anemo"}),
+        ("code.gitGraph", {"device": "PC", "repo": "essntl/anemo.git"}),
+        ("code.gitGraph", {"device": "PC", "repo": "essntl/--upload-pack=x"}),
+        ("code.gitGraph", {"device": "PC", "project": "anemo", "fetch": "yes please"}),
+        ("code.gitCommit", {"device": "PC", "repo": "essntl/a b", "hash": "abcdef1"}),
     ]
     for method, params in bad:
         r = await call(authed, GRAPH, method, params)
@@ -317,6 +365,127 @@ async def test_a_computer_that_cant_answer_is_unavailable(authed, device_side: F
     r = await call(authed, GRAPH, "code.gitGraph", params)
     assert code_of(r) == "unavailable" and "watched" in r.json()["error"]["message"]
     assert device_side.sent == []
+    await ws.disconnect()
+
+
+async def test_a_repository_not_cloned_is_read_through_the_computer_s_cache(
+    authed, device_side: FakeSend
+):
+    await install_graph(authed)
+    _, ws = await computer(authed)
+    remote_answer = {
+        **ANSWER,
+        "status": None,
+        "source": "remote",
+        "repo": "essntl/anemo",
+        "fetched_at": "2026-11-25T10:00:00Z",
+    }
+    answering(device_side, code_git_graph=remote_answer)
+
+    r = await call(authed, GRAPH, "code.gitGraph", {"device": "PC", "repo": "essntl/anemo"})
+
+    assert r.status_code == 200, r.text
+    graph = r.json()["result"]
+    assert (graph["source"], graph["repo"], graph["status"]) == ("remote", "essntl/anemo", None)
+    assert graph["fetchedAt"] == "2026-11-25T10:00:00Z"
+    action, fields, timeout = device_side.sent[-1]
+    assert (action, fields) == (
+        "code_git_graph",
+        {"repo": "essntl/anemo", "limit": 300, "all": True},
+    )
+    assert timeout >= 240  # it may have to be cloned first
+
+    r = await call(
+        authed, GRAPH, "code.gitCommit", {"device": "PC", "repo": "essntl/anemo", "hash": "ccccccc"}
+    )
+    assert r.status_code == 200, r.text
+    assert device_side.sent[-1][1] == {"repo": "essntl/anemo", "hash": "ccccccc"}
+    await ws.disconnect()
+
+
+async def test_a_1_5_client_reads_local_checkouts_only_and_doesn_t_fetch(
+    authed, device_side: FakeSend
+):
+    await install_graph(authed)
+    _, ws = await computer(authed, remote=False)  # Anemo Desktop 1.5.0
+    answering(device_side)
+
+    r = await call(authed, GRAPH, "code.gitGraph", {"device": "PC", "repo": "essntl/anemo"})
+    assert code_of(r) == "unavailable"
+    assert "to 1.6.0 or later" in r.json()["error"]["message"]
+    assert device_side.sent == []
+
+    # fetch: read anyway, without it, and say why.
+    r = await call(
+        authed, GRAPH, "code.gitGraph", {"device": "PC", "project": "anemo", "fetch": True}
+    )
+    assert r.status_code == 200, r.text
+    assert "1.6.0" in r.json()["result"]["fetchError"]
+    assert "fetch" not in device_side.sent[-1][1]
+    await ws.disconnect()
+
+
+async def test_fetch_reaches_the_computer_and_its_failure_is_shown(authed, device_side: FakeSend):
+    await install_graph(authed)
+    _, ws = await computer(authed)
+    failed_fetch = {**ANSWER, "fetch_error": "git fetch took longer than 60 seconds."}
+    answering(device_side, code_git_graph=failed_fetch)
+
+    r = await call(
+        authed, GRAPH, "code.gitGraph", {"device": "PC", "project": "anemo", "fetch": True}
+    )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["result"]["fetchError"] == "git fetch took longer than 60 seconds."
+    action, fields, timeout = device_side.sent[-1]
+    assert fields == {"project": "anemo", "limit": 300, "all": True, "fetch": True}
+    assert timeout > 60  # the fetch's own minute comes first
+    await ws.disconnect()
+
+
+async def test_pull_requests_are_attached_to_their_branches(authed, device_side: FakeSend):
+    await install_graph(authed)
+    _, ws = await computer(authed)
+    pr = {
+        "number": 90,
+        "title": "Code page: git graph",
+        "head_ref": "main",
+        "url": "https://github.com/essntl/anemo/pull/90",
+        "draft": False,
+    }
+    elsewhere = {**pr, "number": 91, "head_ref": "x", "url": "https://evil.example/pull/91"}
+    answering(device_side, code_git_graph={**ANSWER, "pull_requests": [pr, elsewhere]})
+
+    graph = (
+        await call(authed, GRAPH, "code.gitGraph", {"device": "PC", "project": "anemo"})
+    ).json()["result"]
+
+    shown = {
+        "number": 90,
+        "title": "Code page: git graph",
+        "headRef": "main",
+        "url": "https://github.com/essntl/anemo/pull/90",
+        "draft": False,
+    }
+    # A link that isn't a github.com page is left out, not the whole graph.
+    assert graph["pullRequests"] == [shown]
+    # main and origin/main are both the PR's branch.
+    assert [b["pullRequest"] for b in graph["branches"]] == [shown, shown]
+    await ws.disconnect()
+
+
+async def test_not_signed_in_is_unavailable(authed, device_side: FakeSend):
+    await install_graph(authed)
+    _, ws = await computer(authed)
+    answering(
+        device_side,
+        code_git_graph=relay.Unauthenticated("git on “PC” isn't signed in to GitHub."),
+    )
+
+    r = await call(authed, GRAPH, "code.gitGraph", {"device": "PC", "repo": "essntl/anemo"})
+
+    assert code_of(r) == "unavailable"
+    assert "signed in" in r.json()["error"]["message"]
     await ws.disconnect()
 
 
@@ -404,6 +573,37 @@ async def test_the_agent_tool_summarises_the_graph(authed, device_side: FakeSend
     )
     assert "ghp_secret" not in text
     assert device_side.sent[-1][1]["limit"] == 10
+    await ws.disconnect()
+
+
+async def test_the_agent_tool_reads_a_repository_not_cloned(authed, device_side: FakeSend):
+    _, ws = await computer(authed)
+    pr = {
+        "number": 7,
+        "title": "Add the thing",
+        "head_ref": "main",
+        "url": "https://github.com/essntl/anemo/pull/7",
+    }
+    answer = {**ANSWER, "status": None, "source": "remote", "repo": "essntl/anemo"}
+    answering(device_side, code_git_graph={**answer, "pull_requests": [pr]})
+    tool = code_tools.CodeGitGraph()
+    ctx = ToolContext(run_id=uuid.uuid4(), emit=None)  # type: ignore[arg-type]
+    args = code_tools.GitGraphInput(device="PC", repo="essntl/anemo", fetch=True)
+
+    (action,) = tool.actions(args, ctx)
+    out = await tool.run(args, ctx)
+
+    assert action.resource.endswith("/repo:essntl/anemo")
+    assert not out.is_error, out.content
+    assert "Working tree: none (read from a cache on the computer" in out.content
+    assert "GitHub: essntl/anemo" in out.content
+    assert "pull request #7 “Add the thing”" in out.content
+    assert device_side.sent[-1][1] == {
+        "repo": "essntl/anemo",
+        "limit": 30,
+        "all": True,
+        "fetch": True,
+    }
     await ws.disconnect()
 
 

@@ -26,6 +26,7 @@ from app.features.code_sessions.schemas import (
     CodeProjectOut,
     CodeProjectsOut,
     CodeRemoteOut,
+    github_repo,
 )
 from app.features.devices import relay
 from app.features.devices.models import Device
@@ -78,6 +79,12 @@ class DeviceBusy(Conflict):
 
 class ImagesUnsupported(Conflict):
     code = "images_unsupported"
+
+
+class DeviceUnauthenticated(Conflict):
+    """git or gh on the computer isn't signed in to the remote it had to reach."""
+
+    code = "device_unauthenticated"
 
 
 # -- the computer ----------------------------------------------------------------------------
@@ -136,6 +143,10 @@ async def send_command(
         raise DeviceRefused(str(exc) or f"“{device.name}” refused.") from exc
     except relay.Missing as exc:
         raise NotFound(str(exc) or f"“{device.name}” doesn't have that.") from exc
+    except relay.Unauthenticated as exc:
+        raise DeviceUnauthenticated(
+            str(exc) or f"“{device.name}” isn't signed in to GitHub (gh auth login)."
+        ) from exc
     except relay.ActionFailed as exc:
         raise DeviceFailed(str(exc) or f"“{device.name}” couldn't do that.") from exc
 
@@ -166,11 +177,16 @@ async def projects(
                 name=_text(p["name"], 200),
                 dir=_text(p.get("dir")),
                 remote=_text(p["remote"]) if p.get("remote") else None,
+                repo=github_repo(_text(p.get("remote"))),
             )
             for p in local[:MAX_LISTED]
         ],
         remote=[
-            CodeRemoteOut(name=_text(r["name"], 200), url=_text(r.get("url")))
+            CodeRemoteOut(
+                name=_text(r["name"], 200),
+                url=_text(r.get("url")),
+                repo=github_repo(_text(r.get("url"))),
+            )
             for r in remote[:MAX_LISTED]
         ],
         note=_text(note) if note else None,

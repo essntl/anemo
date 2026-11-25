@@ -259,6 +259,7 @@ class Connection:
                 code_start=bool(message.get("code_start")),
                 code_images=bool(message.get("code_images")),
                 code_git=bool(message.get("code_git")),
+                code_git_remote=bool(message.get("code_git_remote")),
                 platform=self.platform,
                 shell_kind=relay.shell_kind_of(message.get("shell_kind")),
             )
