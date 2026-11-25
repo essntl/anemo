@@ -128,7 +128,9 @@ async def remote_session(target: Target, **options: Any) -> AsyncIterator[Client
             yield client
         return
     async with create_mcp_http_client(headers=target.headers) as http:
-        async with Client(streamable_http_client(target.url, http_client=http), **options) as client:
+        async with Client(
+            streamable_http_client(target.url, http_client=http), **options
+        ) as client:
             yield client
 
 
