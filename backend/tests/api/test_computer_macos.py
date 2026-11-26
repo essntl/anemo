@@ -154,6 +154,10 @@ async def test_a_macs_transcript_has_a_zsh_prompt(fake: FakeDevices):
     assert result.content.startswith("Mac% uname\n[exit code 0, 3 ms]")
     result = await SHELL.run(_shell("PC", "Get-Date"), ctx)
     assert result.content.startswith("PS PC> Get-Date")
+    # A script: only its first line comes back (the model has the rest in its call).
+    result = await SHELL.run(_shell("Mac", "cd ~/src\nmake\nmake test"), ctx)
+    assert result.content.startswith("Mac% cd ~/src … (2 more lines)\n[exit code 0, 3 ms]")
+    assert result.data["shell"]["command"] == "cd ~/src\nmake\nmake test"
 
 
 async def test_a_mac_unknown_to_the_step_is_rated_again(fake: FakeDevices):

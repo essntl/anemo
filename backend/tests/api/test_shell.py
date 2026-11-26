@@ -117,6 +117,22 @@ async def test_nonzero_exit_is_reported_not_an_error(authed, execd):
     assert "exit code 3" in c["result"]
 
 
+async def test_a_long_script_is_not_repeated_in_its_result(authed, execd):
+    """The model wrote the command; its result repeats only the first line."""
+    cid = await setup(authed, **{"shell.exec": "autonomous"})
+    long_line = "echo " + "x" * 300
+    command = "\n".join(["echo first", long_line, "echo third"]) + "\n"
+    script(
+        "script",
+        [call("run_shell", command=command, cwd="project"), Done("tool_use")],
+        [TextDelta("ok"), Done("end")],
+    )
+    c = shell_call(await timeline(authed, await agent_turn(authed, cid, "script")))
+    assert c["result"].startswith("$ echo first … (2 more lines)\n[exit code 0, ")
+    assert "cwd project]" in c["result"] and "x" * 300 in c["result"]  # in the output
+    assert c["result_data"]["shell"]["command"] == command  # the activity view has all
+
+
 async def test_timeout_stops_the_command(authed, execd):
     cid = await setup(authed, **{"shell.exec": "autonomous"})
     script(
