@@ -676,7 +676,8 @@ async def test_neither_audio_nor_transcript_is_kept(authed):
     FakeAdapter.transcript = "Uh, remind me about the zebra sandwich."
     await _speak(authed)
     async with get_sessionmaker()() as db:
-        texts = [m.text_plain for m in await db.scalars(select(ChatMessage))]
+        messages = await db.scalars(select(ChatMessage).order_by(ChatMessage.seq))
+        texts = [m.text_plain for m in messages]
         audit = [str(a.details) for a in await db.scalars(select(AuditLog))]
     # Only the request is kept, as the chat message; what was heard is nowhere.
     assert texts == ["Remind me about the zebra sandwich.", ""]

@@ -146,10 +146,13 @@ async def test_a_message_started_with_a_skill(authed):
     exported = (await authed.get(f"/api/conversations/{cid}/export")).text
     assert "_Skill: /study (Study)_" in exported
 
-    # The instructions are kept with the message as they were when it was sent.
+    # The instructions are kept with the message as they were when it was sent (the first
+    # one: without seq, Postgres may return the conversation's rows in any order).
     async with get_sessionmaker()() as db:
         row = await db.scalar(
-            select(ChatMessage).where(ChatMessage.conversation_id == uuid.UUID(cid))
+            select(ChatMessage).where(
+                ChatMessage.conversation_id == uuid.UUID(cid), ChatMessage.seq == 1
+            )
         )
         assert row is not None and row.skill
         assert "check your understanding" in row.skill["instructions"]

@@ -5,7 +5,8 @@ database run against a throwaway `aiw_test` database on the same Postgres
 server as DATABASE_URL (inside the dev container: `make test-backend`), and
 Redis database 15. They are skipped automatically when no database is configured.
 TEST_DATABASE_URL and TEST_REDIS_URL name both explicitly, so several checkouts can
-test at the same time without sharing a database.
+test at the same time without sharing a database. With pytest-xdist (`pytest -n 4`,
+as `make test-backend` and CI run it) every worker process has its own of both.
 """
 
 import asyncio
@@ -22,11 +23,30 @@ TEST_PASSWORD = "correct horse battery staple"
 _base_db_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
 if _base_db_url and not os.environ.get("TEST_DATABASE_URL"):
     _base_db_url = _base_db_url.rsplit("/", 1)[0] + "/aiw_test"
-# TEST_REDIS_URL picks the Redis database itself (several checkouts testing at once,
-# each with its own); otherwise database 15 on the REDIS_URL server.
-_redis_url = os.environ.get("TEST_REDIS_URL") or (
-    os.environ.get("REDIS_URL", "redis://localhost:6379/0").rsplit("/", 1)[0] + "/15"
-)
+
+# `pytest -n 4` (pytest-xdist) runs the tests in 4 processes, "gw0" to "gw3". Each one gets
+# its own database (aiw_test_gw0, …) and its own Redis database, so no data is shared and
+# the per-test cleanup (db_clean) of one worker can't wipe another's.
+_worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+_worker_n = int(_worker.removeprefix("gw")) if _worker else 0
+if _base_db_url and _worker:
+    _base_db_url = f"{_base_db_url}_{_worker}"
+
+
+def _redis_for_worker() -> str:
+    """TEST_REDIS_URL names the Redis database (several checkouts testing at once, each with
+    its own); worker N uses that database + N, so leave room above it. Without it: database
+    15 on the REDIS_URL server, and worker N uses 15 - N (database 0 is the dev app's)."""
+    explicit = os.environ.get("TEST_REDIS_URL")
+    url = explicit or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    server, db = url.rsplit("/", 1)
+    number = int(db) + _worker_n if explicit else 15 - _worker_n
+    if number < 1 and not explicit:
+        raise pytest.UsageError("at most 15 test workers share the default Redis (16 databases)")
+    return f"{server}/{number}"
+
+
+_redis_url = _redis_for_worker()
 
 os.environ.update(
     {
@@ -84,9 +104,15 @@ async def migrated_db() -> AsyncIterator[None]:
 
 @pytest.fixture
 async def db_clean(migrated_db: None) -> AsyncIterator[None]:
-    """Empty every table and the test Redis DB before each test."""
-    from sqlalchemy import text
+    """Empty every table and the test Redis DB before each test.
 
+    DELETE, not TRUNCATE: TRUNCATE gives every table and index new files, and Postgres
+    keeps the old ones until the next checkpoint, which must then fsync them all. With
+    several test workers that was ~1,400 files a second and a checkpoint of 7 minutes,
+    and everything that waits for a checkpoint (DROP DATABASE in the migration tests)
+    stalled with it. The tables hold a few rows, so DELETE is quick; children go first,
+    and no table has a sequence that TRUNCATE's RESTART IDENTITY would have reset.
+    """
     from app.core.db import get_engine
     from app.core.redis import get_redis
     from app.db.models import Base
@@ -94,10 +120,9 @@ async def db_clean(migrated_db: None) -> AsyncIterator[None]:
 
     listener.install()  # as the API and the worker do (event triggers)
 
-    tables = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     async with get_engine().begin() as conn:
-        if tables:
-            await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
     await get_redis().flushdb()
     yield
 
