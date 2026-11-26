@@ -15,6 +15,7 @@ from app.core.actor import current_actor
 from app.core.errors import AppError, Conflict, NotFound
 from app.core.ids import uuid7
 from app.events import bus
+from app.features.activity import service as activity
 from app.features.calendar.models import CalendarEvent
 from app.features.focus.models import FocusSession
 from app.features.links import index as links_index
@@ -226,6 +227,7 @@ async def create_task(
         await targets.check_linkable(db, links)
         await links_index.add_explicit(db, "task", task.id, links)
     await links_index.refresh_inline(db, "task", task.id, task.description)
+    await activity.created(db, "task", task.id, task.title)
     await db.commit()
     await db.refresh(task)
     await notify()
@@ -254,6 +256,7 @@ async def update_task(
     added to `dropped`.
     """
     changes = dict(changes)
+    logged = await task_snapshot(db, task, "blocked_by" in changes)  # for the activity log
     choice = changes.pop("subtasks", None)
     blocked_by = changes.pop("blocked_by", None)
     values = changes.pop("properties", None)
@@ -325,11 +328,30 @@ async def update_task(
         await _set_blockers(db, task, blocked_by)
     if "description" in changes:
         await links_index.refresh_inline(db, "task", task.id, task.description)
+    await _log_change(db, task, logged)
     await db.commit()
     await db.refresh(task)
     await _tell_ready(db, ready)
     await notify()
     return task
+
+
+async def task_snapshot(db: AsyncSession, task: Task, blockers: bool = False) -> dict[str, Any]:
+    """The task's fields as the activity log keeps them (with what it waits on, when
+    that may change)."""
+    found = activity.snapshot(task, activity.TASK_FIELDS)
+    if blockers:
+        waits_on = (await blocked_by_map(db, [task.id])).get(task.id, [])
+        found["blocked_by"] = [str(b) for b in waits_on]
+    return found
+
+
+async def _log_change(db: AsyncSession, task: Task, before: dict[str, Any]) -> None:
+    """An activity entry for what changed since `before` (task_snapshot). No commit."""
+    after = await task_snapshot(db, task, "blocked_by" in before)
+    activity.without_moved_rule(before, after)
+    action = "completed" if activity.task_completed(before, after) else "changed"
+    await activity.changed(db, "task", task.id, task.title, before, after, action=action)
 
 
 def _checklist(items: Any) -> list[dict[str, object]]:
@@ -379,9 +401,11 @@ async def _set_status(db: AsyncSession, task: Task, status: str) -> None:
 async def _finish(db: AsyncSession, task: Task) -> list[Task]:
     """Finish a task (a subtask, along with its parent). Returns tasks now ready."""
     old_status = task.status
+    logged = await task_snapshot(db, task)
     sources.record_changed(task)
     await _set_status(db, task, "done")
     await _repeat(db, task)
+    await _log_change(db, task, logged)
     return await _status_changed(db, task, old_status)
 
 
@@ -542,6 +566,7 @@ async def delete_task(db: AsyncSession, task: Task, *, deleted_by: str = "user")
     )
     await db.delete(task)
     await db.flush()
+    await activity.deleted(db, "task", task.id, task.title, item.id)
     for other in waiting:
         if other.status == "blocked" and await _open_blocker_count(db, other.id) == 0:
             await _set_status(db, other, "todo")
@@ -657,6 +682,7 @@ async def restore_task(db: AsyncSession, item: TrashedItem) -> Task:
                 .where(model.id.in_(wanted), model.task_id.is_(None))
                 .values(task_id=task.id)
             )
+    await activity.restored(db, "task", task.id, task.title)
     await db.delete(item)
     await db.commit()
     await db.refresh(task)
@@ -714,11 +740,13 @@ async def reorder(
         task = found
         if task.status != status:
             old_status = task.status
+            logged = await task_snapshot(db, task)
             sources.record_changed(task)
             task.status = status
             task.completed_at = now if status == "done" else None
             if status == "done":
                 await _repeat(db, task)
+            await _log_change(db, task, logged)
             ready += await _status_changed(db, task, old_status)
         task.sort_order = position
     if choice == "finish":

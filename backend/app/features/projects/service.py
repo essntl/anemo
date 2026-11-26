@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, NotFound
 from app.events import bus
+from app.features.activity import service as activity
 from app.features.calendar.models import CalendarEvent
 from app.features.conversations.models import Conversation
 from app.features.documents.models import Document
@@ -96,6 +97,7 @@ async def create(db: AsyncSession, data: ProjectIn) -> Project:
     db.add(project)
     await db.flush()
     await ensure_folders(project)
+    await activity.created(db, "project", project.id, project.name)
     return project
 
 
@@ -129,12 +131,15 @@ async def get_or_create_by_name(db: AsyncSession, name: str) -> Project:
 async def update(db: AsyncSession, project: Project, data: ProjectIn) -> Project:
     name = data.name.strip()
     await _unique_name(db, name, own_id=project.id)
+    logged = activity.snapshot(project, activity.PROJECT_FIELDS)  # for the activity log
     project.name, project.color, project.archived = name, data.color, data.archived
     project.instructions = data.instructions.strip()
     project.default_model_id = data.default_model_id
     project.default_profile_id = data.default_profile_id
     await db.flush()
     await ensure_folders(project)
+    after = activity.snapshot(project, activity.PROJECT_FIELDS)
+    await activity.changed(db, "project", project.id, project.name, logged, after)
     return project
 
 

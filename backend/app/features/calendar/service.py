@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.actor import current_actor
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
+from app.features.activity import service as activity
 from app.features.calendar import recurrence
 from app.features.calendar.models import CalendarEvent, EventException
 from app.features.calendar.schemas import EventIn, EventOut, OccurrenceIn, OccurrenceOut
@@ -113,6 +114,7 @@ async def create_event(
     if refs:
         await links_index.add_explicit(db, "event", event.id, refs)
     await links_index.refresh_inline(db, "event", event.id, event.description)
+    await activity.created(db, "event", event.id, event.title)
     await db.commit()
     await db.refresh(event)
     await notify()
@@ -153,6 +155,7 @@ async def update_event(
     removes one; left out, they stay), validated as on create. Moving it to another
     project drops the values not allowed there; their keys are added to `dropped`.
     `links_add` / `links_remove`: references of items to link it to, or no longer."""
+    logged = activity.snapshot(event, activity.EVENT_FIELDS)  # for the activity log
     before = (event.start_at, event.rrule, event.all_day, event.tz)
     fields = _fields(event)
     old_project = event.project_id
@@ -185,6 +188,7 @@ async def update_event(
         # Changes to single occurrences no longer line up with the new schedule.
         await db.execute(delete(EventException).where(EventException.event_id == event.id))
     await links_index.refresh_inline(db, "event", event.id, event.description)
+    await _log_change(db, event, logged)
     await db.commit()
     await db.refresh(event)
     await notify()
@@ -207,6 +211,8 @@ async def delete_event(
         db, "event", event.id, event.title, payload, deleted_by, external_key=event.external_key
     )
     await db.delete(event)
+    await db.flush()
+    await activity.deleted(db, "event", event.id, event.title, item.id)
     await db.commit()
     await notify()
     return item
@@ -233,6 +239,7 @@ async def restore_event(db: AsyncSession, item: TrashedItem) -> CalendarEvent:
     await links_index.refresh_inline(db, "event", event.id, event.description)
     for row in item.payload.get("exceptions") or []:
         db.add(EventException(**trash.row_values(EventException, row)))
+    await activity.restored(db, "event", event.id, event.title)
     await db.delete(item)
     await db.commit()
     await db.refresh(event)
@@ -258,10 +265,24 @@ async def _restore_occurrence(db: AsyncSession, item: TrashedItem) -> CalendarEv
         event.updated_by_ref = current_actor().ref  # putting it back is a change
         if not row.override:
             await db.delete(row)
+    await activity.record(
+        db,
+        action="restored",
+        object_type="event",
+        object_id=str(event.id),
+        summary=f"Restored {item.title}",
+        # Undone by cancelling the occurrence again (from the calendar): no undo here.
+    )
     await db.delete(item)
     await db.commit()
     await notify()
     return event
+
+
+async def _log_change(db: AsyncSession, event: CalendarEvent, before: dict[str, Any]) -> None:
+    """An activity entry for what changed since `before` (a snapshot). No commit."""
+    after = activity.snapshot(event, activity.EVENT_FIELDS)
+    await activity.changed(db, "event", event.id, event.title, before, after)
 
 
 async def detach_source(db: AsyncSession, event: CalendarEvent) -> CalendarEvent:
@@ -510,15 +531,24 @@ async def set_occurrence(
         row = EventException(event_id=event.id, original_start=original_start, override={})
         db.add(row)
     before = (bool(row.is_cancelled), dict(row.override or {}))
+    when = original_start.astimezone(recurrence.zone(event.tz))
     if body.cancelled and not row.is_cancelled:
-        when = original_start.astimezone(recurrence.zone(event.tz))
-        trash.put(
+        item = trash.put(
             db,
             "event",
             event.id,
             f"{event.title} ({when:%Y-%m-%d %H:%M} only)",
             {"occurrence": original_start.isoformat()},
             changed_by,
+        )
+        await db.flush()
+        await activity.record(
+            db,
+            action="deleted",
+            object_type="event",
+            object_id=str(event.id),
+            summary=f"Cancelled “{event.title}” on {when:%Y-%m-%d %H:%M}"[:300],
+            undo={"kind": "trash_restore", "trash_id": str(item.id)},
         )
     row.is_cancelled = body.cancelled
     override = dict(row.override)
@@ -532,6 +562,15 @@ async def set_occurrence(
     row.override = override
     if (bool(row.is_cancelled), override) != before:
         sources.record_changed(event)
+        if override != before[1]:
+            await activity.record(
+                db,
+                action="changed",
+                object_type="event",
+                object_id=str(event.id),
+                # Not undoable from the log: the occurrence's own changes are in the calendar.
+                summary=f"Changed “{event.title}” on {when:%Y-%m-%d %H:%M} only"[:300],
+            )
     await db.commit()
     await notify()
 
@@ -541,8 +580,10 @@ async def set_properties(
 ) -> CalendarEvent:
     """Set (or, with None, remove) some property values of an event, leaving the others
     and everything else as it is (a table or board view edits one cell). Commits."""
+    logged = activity.snapshot(event, activity.EVENT_FIELDS)
     if await item_properties.set_properties(db, event, "event", values, merge=True):
         sources.record_changed(event)
+        await _log_change(db, event, logged)
     await db.commit()
     await db.refresh(event)
     await notify()

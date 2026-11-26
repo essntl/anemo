@@ -136,6 +136,7 @@ PageId = Literal[
     "automations",
     "agents",
     "memory",
+    "activity",
 ]
 # Home is where the app opens and the Inbox is where approvals wait: these stay.
 PAGES_ALWAYS_ON: frozenset[str] = frozenset({"home", "notifications"})
@@ -161,6 +162,7 @@ class NavigationSettings(BaseModel):
             "automations",
             "agents",
             "memory",
+            "activity",
         ],
         max_length=20,
     )

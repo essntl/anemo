@@ -121,7 +121,7 @@ test('the pages bar grows into a card in the middle, and folds back', async ({ p
 
   await bar.click()
   const card = page.getByRole('dialog', { name: 'Pages' })
-  await expect(card.getByRole('link')).toHaveCount(13)
+  await expect(card.getByRole('link')).toHaveCount(14)
   // Once grown, it sits in the middle of the screen, not in the menu.
   const view = page.viewportSize()!
   await expect.poll(async () => {

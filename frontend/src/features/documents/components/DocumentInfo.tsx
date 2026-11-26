@@ -6,6 +6,7 @@ import { TYPE_ICONS } from '@/features/links/linkTypes'
 import { PluginDocumentPanel } from '@/features/plugins/slots'
 import { usePluginDocumentTabs } from '@/features/plugins/slotData'
 import { ActorLine } from '@/features/provenance/Provenance'
+import { HistoryLink } from '@/features/activity/HistoryLink'
 import { actorLabel } from '@/features/provenance/labels'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
@@ -87,6 +88,7 @@ function Details({ documentId, path, words, onHistory }: { documentId: string; p
           </p>
         )}
         <ActorLine created={created} className="px-2 pt-1" />
+        <HistoryLink type="document" id={documentId} className="block px-2 pt-1" />
       </section>
 
       <section aria-label={t('Linked from')}>

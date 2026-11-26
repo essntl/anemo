@@ -68,6 +68,7 @@ export const router = createBrowserRouter([
           { path: 'agents', ...page(() => import('@/features/profiles/pages/ProfilesPage'), 'ProfilesPage') },
           { path: 'memory', ...page(() => import('@/features/memory/MemoryPage'), 'MemoryPage') },
           { path: 'notifications', ...page(() => import('@/features/notifications/NotificationsPage'), 'NotificationsPage') },
+          { path: 'activity', ...page(() => import('@/features/activity/ActivityPage'), 'ActivityPage') },
           // A plugin's own page (its `page` UI), listed under Plugins in the sidebar and Ctrl+K.
           { path: 'plugins/:pluginId/:uiId', ...page(() => import('@/features/plugins/PluginPage'), 'PluginPage') },
           {

@@ -118,6 +118,7 @@ async def test_navigation_says_where_each_page_goes(authed):
             "automations",
             "agents",
             "memory",
+            "activity",
         ],
         "off": [],
     }

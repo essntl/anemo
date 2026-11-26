@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import Db, client_ip
 from app.core.errors import AppError
+from app.features.activity import service as activity
 from app.features.audit import service as audit
 from app.features.links import service as links
 from app.features.settings import service as settings
@@ -199,6 +200,8 @@ async def move(body: MoveIn, db: Db) -> EntryOut:
         files.move, body.source, body.destination, body.keep_both
     )
     await links.on_moved(db, files.rel(source), files.rel(target), author="user")
+    await activity.file_moved(db, files.rel(source), files.rel(target))
+    await db.commit()
     return _out(files.entry(target))
 
 
@@ -215,6 +218,7 @@ async def delete(body: PathIn, request: Request, db: Db) -> TrashItemOut:
     audit.record(
         db, "files.trash", target_type="file", target_id=body.path[:64], ip=client_ip(request)
     )
+    await activity.file_deleted(db, body.path, item_id)
     await db.commit()
     item = next(i for i in files.list_trash() if i.id == item_id)
     return TrashItemOut(**item.__dict__)
@@ -226,8 +230,10 @@ async def list_trash() -> list[TrashItemOut]:
 
 
 @router.post("/trash/{item_id}/restore", response_model=EntryOut)
-async def restore(item_id: str) -> EntryOut:
+async def restore(item_id: str, db: Db) -> EntryOut:
     restored = await asyncio.to_thread(files.restore, item_id)
+    await activity.file_restored(db, restored)
+    await db.commit()
     return _out(files.entry(files.resolve(restored)))
 
 

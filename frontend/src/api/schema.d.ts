@@ -664,6 +664,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Activity
+         * @description What was changed, newest first. `actor_kind`: who (`trigger`: runs an event
+         *     started); `since` / `until`: a time range (until is exclusive).
+         */
+        get: operations["list_activity_api_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity/{entry_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Entry
+         * @description Undo one change. 409 `activity_conflict` (with `details.differs`) when the item
+         *     was changed since; `force=true` undoes it anyway.
+         */
+        post: operations["undo_entry_api_activity__entry_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity/groups/{group_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Group
+         * @description Undo a batch, newest change first, each on its own: the results say which were
+         *     undone and why the others weren't.
+         */
+        post: operations["undo_group_api_activity_groups__group_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/provider-types": {
         parameters: {
             query?: never;
@@ -5431,6 +5494,75 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityOut */
+        ActivityOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** @description Who did it (None: an actor that can't be read) */
+            actor: components["schemas"]["ActorOut"] | null;
+            /**
+             * Action
+             * @description created | changed | completed | deleted | restored | reverted | moved | undone
+             */
+            action: string;
+            /** Object Type */
+            object_type: string;
+            /**
+             * Object Id
+             * @description A UUID, or a workspace path for a file
+             */
+            object_id: string | null;
+            /**
+             * Object Label
+             * @description The object's name now (None when it is gone: the summary names it)
+             */
+            object_label: string | null;
+            /**
+             * Object Url
+             * @description Where the object is in the app
+             */
+            object_url: string | null;
+            /** Summary */
+            summary: string;
+            /**
+             * Fields
+             * @description What a change changed, e.g. title, properties.client
+             */
+            fields: string[];
+            /** Group Id */
+            group_id: string | null;
+            /** Group Label */
+            group_label: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Undone At */
+            undone_at: string | null;
+            /** Undone By */
+            undone_by: string | null;
+            /**
+             * Undo Blocked
+             * @description Why it can't be undone (undone | is_undo | not_undoable | too_large), None when it can be tried
+             */
+            undo_blocked: string | null;
+        };
+        /** ActivityPage */
+        ActivityPage: {
+            /** Items */
+            items: components["schemas"]["ActivityOut"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` for the next page
+             */
+            next_cursor: string | null;
+        };
         /**
          * ActorOut
          * @description Who made or changed something, ready to show: "the assistant in <chat title>".
@@ -8246,6 +8378,14 @@ export interface components {
             /** Commit */
             commit: string;
         };
+        /** GroupUndoOut */
+        GroupUndoOut: {
+            /**
+             * Results
+             * @description One per entry tried, newest first
+             */
+            results: components["schemas"]["UndoItemOut"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -9153,7 +9293,7 @@ export interface components {
              *       "files"
              *     ]
              */
-            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
             /**
              * More
              * @default [
@@ -9164,12 +9304,13 @@ export interface components {
              *       "code",
              *       "automations",
              *       "agents",
-             *       "memory"
+             *       "memory",
+             *       "activity"
              *     ]
              */
-            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
             /** Off */
-            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
         };
         /** NewDeviceOut */
         NewDeviceOut: {
@@ -12954,6 +13095,31 @@ export interface components {
             /** Revision Id */
             revision_id?: string | null;
         };
+        /** UndoItemOut */
+        UndoItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+            /**
+             * Code
+             * @description The error code when it wasn't undone
+             */
+            code: string | null;
+            /** Details */
+            details?: unknown;
+        };
+        /** UndoOut */
+        UndoOut: {
+            /** Message */
+            message: string;
+            entry: components["schemas"]["ActivityOut"];
+        };
         /** UpdateMentionsIn */
         UpdateMentionsIn: {
             /** Old Path */
@@ -14789,6 +14955,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_activity_api_activity_get: {
+        parameters: {
+            query?: {
+                actor_kind?: ("user" | "assistant" | "automation" | "script" | "plugin" | "trigger" | "external") | null;
+                actor_ref?: string | null;
+                object_type?: ("task" | "event" | "document" | "file" | "project") | null;
+                object_id?: string | null;
+                since?: string | null;
+                until?: string | null;
+                group_id?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_entry_api_activity__entry_id__undo_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_group_api_activity_groups__group_id__undo_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupUndoOut"];
                 };
             };
             /** @description Validation Error */
