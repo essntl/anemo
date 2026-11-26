@@ -42,6 +42,8 @@ async def start_turn(
         db,
         trigger.conversation_id,
         event_block(trigger, event, info),
-        f"(event) {info['summary']}",
+        # Fixed text, never the summary: it quotes titles, paths and URIs from outside,
+        # and the request reaches the model outside untrusted() (compaction).
+        f"(event) {event.type}",
         {"event": info},
     )

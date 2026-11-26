@@ -138,8 +138,12 @@ password again.
   ECDSA signature by the key compiled into the client, bound to the tag; that stops someone who
   can edit Releases but not run the release workflow with its secret. Neither stops someone who
   controls the repository (they can have the workflow build and sign their code): review of what
-  reaches `main` is the boundary. On a Mac with a Developer ID build, the new app must also be
-  signed by the same Apple team; an ad hoc build's signature only proves the bundle is intact. On
+  reaches `main` is the boundary. The signing secret belongs in the `desktop-release`
+  environment, restricted to `desktop-v*` tags, so that a workflow run on a branch can't read it.
+  On a Mac with a Developer ID build, the new app must also be signed by the same Apple team,
+  checked as a code requirement anchored to Apple (`codesign -R`), not from what the signature
+  claims; if the app can't read its own signature, it doesn't update. An ad hoc build's signature
+  only proves the bundle is intact. On
   Windows the exe has no Authenticode signature. Before swapping, the new version is started once
   with `--self-test`; it is never restarted into while the agent is working; the previous
   version is kept beside it and put back if the new one doesn't start. Downloads carry no Mark of

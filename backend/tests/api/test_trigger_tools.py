@@ -104,6 +104,9 @@ async def test_a_code_job_ending_wakes_the_chat_that_asked_once(authed):
     await dispatch.dispatch()
     runs = await chat_runs(cid)
     assert len(runs) == 2 and runs[1].options["event"]["type"] == "code_job.ended"
+    # The run's request is fixed text: the job's title (outside text) would otherwise
+    # reach the model as "the user's current request" when the chat is compacted.
+    assert runs[1].request == "(event) code_job.ended"
 
     listing = await messages(authed, cid)
     card = listing[-2]

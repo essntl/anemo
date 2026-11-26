@@ -4,7 +4,9 @@ dispatch with its rails, automation runs started by events, the HTTP API."""
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 
 from app.core.actor import Actor, acting_as
 from app.core.db import get_sessionmaker
@@ -128,6 +130,31 @@ async def test_an_event_is_kept_only_if_its_change_commits(authed):
     await events.emit_now("device.online", {"device_id": "d", "name": "PC", "kind": "computer"})
     (stored,) = await stored_events()
     assert stored.data == {"device_id": "d", "name": "PC", "kind": "computer"}
+
+
+async def test_a_broken_change_fails_with_its_own_error_not_a_hidden_one(authed):
+    # emit() must not flush the caller's rows inside its own error handling: the
+    # caller's IntegrityError was logged as "event not emitted" and the caller then got
+    # PendingRollbackError instead.
+    async with get_sessionmaker()() as db:
+        existing = Job(type="test.x", payload={})
+        db.add(existing)
+        await db.commit()
+        taken = existing.id
+    device = {"device_id": "d", "name": "PC", "kind": "computer"}
+    async with get_sessionmaker()() as db:  # nobody listens: only the lookup runs
+        db.add(Job(id=taken, type="test.x", payload={}))
+        await events.emit(db, "device.online", device)
+        with pytest.raises(IntegrityError):
+            await db.commit()
+    a = await automation(authed)
+    await add_trigger(authed, a["id"], event_type="device.online")
+    async with get_sessionmaker()() as db:  # listened to: queuing the dispatch job flushes
+        db.add(Job(id=taken, type="test.x", payload={}))
+        with pytest.raises(IntegrityError):
+            await events.emit(db, "device.online", device)
+            await db.commit()
+    assert await stored_events() == []
 
 
 # -- dispatch: an event starts an automation run with its rails -----------------------------------

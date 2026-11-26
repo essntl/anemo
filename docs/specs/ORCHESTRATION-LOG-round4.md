@@ -118,18 +118,9 @@ Code map findings that shaped the contracts:
 
 ## Open for Artem
 
-Review findings not fixed yet (the fix round was cut off):
-- T: webhook replay mark set before the rate check (a 429'd retry is refused as a
-  replay); no limit on unsigned webhook floods; a wake-me run's request text carries the
-  event summary outside `untrusted()` (compaction shows it as the user's request);
-  `emit()` can autoflush inside its try/except.
-- M: the hostd listener replays up to 200 old notifications after a reconnect.
+Review findings still open (the rest were fixed in #105, #106 and #107):
 - R: semantic results are filtered by scope after the top-N; keyword hits can be labelled
   "by meaning".
-- U: the macOS Team ID check reads what the signature claims (verify with
-  `-R 'anchor apple generic and certificate leaf[subject.OU] = …'`); it fails open
-  when the running app's signature can't be read; one unexpected exception stops
-  updates until restart; the signing secret should live in a tag-restricted environment.
 - Hardware: desktop MANUAL-TESTS 71–88 and the Mac checklist N–O; webhooks through the
   tunnel; a real MCP host with a notifying stdio server.
 - To decide: the embedding of ordinary chats once an embedding model is set (on by

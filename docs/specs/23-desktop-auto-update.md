@@ -1,6 +1,8 @@
 # 23. Anemo Desktop updates itself
 
-Status: built (round 4, workstream U), Anemo Desktop **1.8.0** on Windows and macOS. Contract:
+Status: built (round 4, workstream U), Anemo Desktop **1.8.0** on Windows and macOS; review fixes
+in **1.8.1** (the Apple-anchored Team ID check, no updates without the app's own signature,
+unexpected errors, rollback, restart wait, version checks). Contract:
 `docs/specs/CONTRACTS-round4.md` §8. No server change: Anemo's server is not involved at all.
 Owner files: `desktop/src/Anemo.Desktop.Core/Updates/`, `desktop/src/Anemo.Desktop/Platform/WindowsUpdates.cs`,
 `desktop/src/Anemo.Desktop.Mac/Platform/MacUpdates.cs`, `.github/workflows/release.yml`.
@@ -58,6 +60,12 @@ place for delta updates or installs under Program Files; neither is needed now.
 5. **Platform checks** (`IUpdatePlatform.PrepareAsync`), then *ready*.
 6. **Install** at quit, or after *Restart to update* when `DesktopAgent.BusyReason()` is null.
 
+Any failure ends only this attempt. The expected ones say why (a refusal waits for the next
+6-hour check; network and file errors retry after an hour); anything else (an antivirus that
+blocks the self-test's `Process.Start`, a process that can't be ended, a bug) is logged with its
+type and also retries after an hour, with "The update failed unexpectedly" in Settings. The loop
+itself catches whatever a look throws, so nothing stops updates until a restart.
+
 Every URL is built from the compiled-in repository, the tag and the file name; nothing from the
 API's answer is used as an address. HttpClient follows GitHub's redirect to its storage host and
 never from HTTPS to HTTP; the client checks the final address is HTTPS anyway.
@@ -70,7 +78,9 @@ after another with the model thinking in between; restarting in such a gap would
 just the same); a file copy is open (spec 22); a Claude Code job started from Anemo is still being
 set up (its clone runs inside the client); a Claude Code job the client shares is running (sharing
 would stop until the restart; the job itself is detached and would survive, but the brief asks not
-to interrupt it). While waiting, Settings says what it waits for ("… once nothing is running (a
+to interrupt it). Only running jobs count: one that ended and whose last events the server hasn't
+acknowledged yet doesn't (offline, that ack never comes, and the restart would wait forever; the
+restarted client sends the rest). While waiting, Settings says what it waits for ("… once nothing is running (a
 Claude Code job is running)"); it looks again every 5 s. **Quit** installs at once: quitting is
 the user's own choice, and the swap doesn't stop anything that quitting doesn't.
 
@@ -86,7 +96,9 @@ Done by the quitting process **after** its window, tray and single-instance lock
 2. rename the running version to `Previous` (Windows allows renaming a running exe, not deleting
    it; macOS allows moving a running bundle);
 3. rename the staged version to the running one's path. If that fails, step 2 is undone; if even
-   that fails, the log says where the old version is (`BROKEN: … rename it back`).
+   that fails, the log says where the old version is (`BROKEN: … rename it back`), and after
+   *Restart to update* the old version is started from there (`Anemo Desktop.old.exe` /
+   `.Anemo Desktop.old.app`), so the computer isn't left without the client.
 
 The three paths are on one volume, so each step is a rename, not a copy. Nothing needs admin
 rights: the client only updates where its user can write (else Settings says so and how to move it).
@@ -96,7 +108,8 @@ the old one's instance (mutex / lock file), and once its tray is up writes `upda
 its version. The old process watches for 45 s: the file with the right version means done; the
 new copy exiting, or staying silent (then it is ended), means **rollback**: the new version is
 deleted (retried while Windows still locks the exe), `Previous` is renamed back, the old version
-is started again, and the version goes into `updates/failed`. A stale `started` file is deleted
+is started again, and the version goes into `updates/failed`. If `Previous` can't be renamed back,
+the old version is started from where it is kept, as above. A stale `started` file is deleted
 before the start, so it can't count.
 
 At quit nothing is started, so nothing is watched. What protects that path is the check before the
@@ -113,7 +126,8 @@ the old one), which gives no process to watch. The file works the same on both s
 In the exe's own folder: `Anemo Desktop.download` (being downloaded) → `Anemo Desktop.new.exe`
 (checked) → swapped in; the old exe is kept as `Anemo Desktop.old.exe`. The name follows the
 running exe's, whatever it was renamed to. Checks: the version resource (`ProductName` *Anemo
-Desktop*, `ProductVersion` the release's version, as `release.yml` checks it) and the
+Desktop*, `ProductVersion` the release's version exactly, or followed by the `+<commit>` .NET appends; not a
+prefix, so `1.8.10` isn't taken for `1.8.1`; as `release.yml` checks it) and the
 `--self-test` run. Only the published single-file exe updates: a `dotnet build` output is a
 launcher beside `Anemo Desktop.dll`, and replacing only the launcher would break it. A Windows
 sign-out or shutdown (`SystemEvents.SessionEnded`) swaps a ready update in like a quit.
@@ -129,11 +143,21 @@ The zip goes to `~/Library/Application Support/Anemo Desktop/updates/`, is unpac
 swapped in; the old one is kept as `.Anemo Desktop.old.app`. Checks:
 
 - `codesign --verify --deep --strict` on the new bundle: every file is as it was signed;
+- when the running app has a **Developer ID** signature (a Team ID), `codesign --verify --deep
+  --strict -R='anchor apple generic and certificate leaf[subject.OU] = "<TEAM>"'` (arguments as a
+  list, no shell): the new bundle's certificate chain must end at Apple's root and its leaf must
+  belong to the **same team**. That is the strong check: someone who controls the GitHub release
+  but not the Apple Developer certificate can't make a build this client accepts. The requirement
+  is needed because `codesign -dv` only reports the Team ID a signature *claims* (a self-made
+  certificate can claim any), and `--verify` without `-R` only checks a bundle against its own
+  requirement. A Team ID that isn't ten capitals and digits isn't read, as it goes into the
+  requirement's text;
 - `codesign -dv` of both apps (`MacSignature.cs`): the same bundle identifier (`app.anemo.desktop`)
-  always; and when the running app has a **Developer ID** signature (a Team ID), the new one must
-  have the **same Team ID**. That is the strong check: someone who controls the GitHub release but
-  not the Apple Developer certificate can't make a build this client accepts;
+  always, and the same Team ID (again, after the requirement);
 - the `--self-test` run of the new binary.
+
+If the running app's own signature can't be read, there is nothing to compare a download with:
+updates are **unavailable** (Settings says why) rather than accepting any signed bundle.
 
 An **ad hoc** build (no Developer ID secrets in the repository, today's case) proves only that the
 bundle is intact, not who made it: `codesign --verify` passes for anything anyone signed ad hoc.
@@ -166,16 +190,25 @@ development build, or before the key is set up) checks the SHA-256 only. ECDSA P
 Ed25519/minisign because it is built into .NET 8 on Windows and macOS and into the runner's
 openssl: no package, no extra tool.
 
-Cost: one secret and one variable (desktop/README.md, *Signing updates*: four commands). The key
-lives only in the release job, which runs only for a tag on main, after the build jobs; it checks
-the signature with the public key before publishing, and a set public key without the secret fails
-the release (instead of publishing one every client would refuse).
+Cost: an environment, one secret in it and one variable (desktop/README.md, *Signing updates*).
+The secret belongs in the **`desktop-release` environment, restricted to `desktop-v*` tags**, not
+in the repository's secrets: a repository secret can be read by any workflow run on any branch
+(anyone who can push a branch can add a workflow that prints it), whereas an environment secret
+only reaches a job that names the environment and runs on a ref the environment allows. Only
+release.yml's `sign-desktop` job names it; it runs for a `desktop-v*` tag, after the build jobs
+(which fail for a tag that isn't on main), has no write access, checks the signature with the
+public key, and hands the `.sig` files to the release job, which publishes. A set public key
+without the secret fails the release (instead of publishing one every client would refuse). The
+tag restriction is only as strong as who may create `desktop-v*` tags: anyone with write access can
+push one on any commit (a tag ruleset can limit that), and a tag's run uses the workflow file of
+the tagged commit.
 
 **What the key protects against, honestly:** someone who can edit or replace the Release's files
 without being able to run the release workflow with its secrets: a leaked token with release
 rights, a GitHub account session that edits a release by hand, tampering at GitHub's storage. It
-does **not** protect against someone who controls the repository (write access to `main` or to
-workflows): they can have the workflow sign whatever they push, or read the secret. The macOS
+does **not** protect against someone who controls the repository (write access to `main`, to
+workflows, or the right to create `desktop-v*` tags): they can have the workflow sign whatever they
+push, or read the secret. The macOS
 Team ID check has the same limit, as the Developer ID certificate is a repository secret too
 (`MACOS_CERTIFICATE_P12`). Against a repository owner, review of what reaches `main` is the real
 boundary. Keeping the private key off GitHub
@@ -217,12 +250,16 @@ staged state isn't kept across runs: it is downloaded again).
   after an exit or silence, a still-locked exe, a stale started-file), the updater (timing, ETag,
   ready, checksum mismatch, refusals, signature required, switched off, discard, failed version,
   retry after an hour, a newer release replacing a ready one, waiting while busy and restarting
-  once), the codesign parsing and the Team ID rule; `DesktopAgentTests` (the minute after a
+  once, an unexpected exception failing one attempt and not the loop), the codesign parsing, the
+  Team ID rule and its code requirement, an unknown running signature, product versions; `DesktopAgentTests` (the minute after a
   command; no update host, no update), `SettingsDraftTests` / `SettingsStoreTests` (the switch, an
   old settings file updates).
 - `desktop/tests/Anemo.Desktop.Mac.Tests/MacUpdateTests.cs` (CI's macOS job): two tiny ad hoc
   signed bundles through `ditto`, `codesign --verify`, the identifier rule, a tampered bundle, the
-  self-test and the swap of bundles.
+  Apple-anchored requirement refusing an ad hoc bundle when the running app has a Team ID (the
+  running signature is given by the test: CI has no Developer ID), no updates without the app's own
+  signature, the self-test and the swap of bundles. A bundle signed with a self-made certificate
+  that claims the team isn't built in CI; the requirement is what refuses it.
 - By hand: `desktop/MANUAL-TESTS.md` *Updates* and `docs/specs/09-desktop-macos-mac-testing.md`
   *O*. The `--self-test` of a published win-x64 exe and renaming a running exe were checked on
   this Windows VM.

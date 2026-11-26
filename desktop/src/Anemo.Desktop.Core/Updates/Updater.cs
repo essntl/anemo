@@ -191,7 +191,16 @@ public sealed class Updater
         {
             while (true)
             {
-                await TickAsync(ct);
+                try
+                {
+                    await TickAsync(ct);
+                }
+                catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
+                {
+                    // Whatever went wrong, the loop goes on: updates must not stop until a restart.
+                    _log.Info($"update: unexpected error in the update loop: {e.GetType().Name}");
+                }
+
                 await Task.Delay(_options.Tick, _time, ct);
             }
         }
@@ -389,6 +398,14 @@ public sealed class Updater
         {
             _log.Info($"update: file error: {e.GetType().Name}");
             Fail("The update couldn't be saved on this computer.", _options.RetryAfterFailure);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // Anything else (an antivirus refusing to start the self-test, a process that can't be
+            // ended, a bug): this attempt fails and the next one comes as after a network error,
+            // rather than the state staying "Downloading" until a restart.
+            _log.Info($"update: unexpected error: {e.GetType().Name}");
+            Fail("The update failed unexpectedly; it is tried again later.", _options.RetryAfterFailure);
         }
     }
 
