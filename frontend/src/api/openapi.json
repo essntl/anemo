@@ -16682,6 +16682,76 @@
         }
       }
     },
+    "/api/code/jobs/{job_id}/auto-continue": {
+      "put": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Auto Continue",
+        "description": "Auto continue for a job that stopped at the usage limit: on, its session is resumed\nshortly after the limit resets (as soon as its computer is back); off, that is\ncancelled. 409 `not_limited` for a job that isn't the last of its thread or didn't stop\nat the limit.",
+        "operationId": "auto_continue_api_code_jobs__job_id__auto_continue_put",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeAutoContinueIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeJobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/code/jobs/{job_id}/cancel": {
       "post": {
         "tags": [
@@ -26374,6 +26444,19 @@
         "title": "ClaudeRunnerStatus",
         "description": "The claude-runner as the worker last saw it (the app cannot reach it)."
       },
+      "CodeAutoContinueIn": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "CodeAutoContinueIn"
+      },
       "CodeDeviceOut": {
         "properties": {
           "id": {
@@ -27061,6 +27144,91 @@
                 "type": "null"
               }
             ]
+          },
+          "input_open": {
+            "type": "boolean",
+            "title": "Input Open",
+            "default": false
+          },
+          "limit_hit": {
+            "type": "boolean",
+            "title": "Limit Hit",
+            "default": false
+          },
+          "limit_resets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Resets At"
+          },
+          "resume_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume State"
+          },
+          "resume_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume At"
+          },
+          "resume_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Note"
+          },
+          "resume_attempt": {
+            "type": "integer",
+            "title": "Resume Attempt",
+            "default": 0
+          },
+          "resumed_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed Job Id"
+          },
+          "resumed_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed From"
           }
         },
         "type": "object",
@@ -27379,6 +27547,11 @@
             "minimum": 1.0,
             "title": "Keep Days",
             "default": 30
+          },
+          "auto_continue": {
+            "type": "boolean",
+            "title": "Auto Continue",
+            "default": false
           }
         },
         "type": "object",

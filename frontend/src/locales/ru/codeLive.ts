@@ -28,6 +28,18 @@ const messages: Messages = {
   "Queue a message for this job…": "Поставить сообщение в очередь этого запуска…",
   "Send now: stop Claude Code’s current step and send this at once": "Отправить сейчас: остановить текущий шаг Claude Code и сразу отправить это",
   "Queue: Claude Code takes it in after its current step": "В очередь: Claude Code прочитает его после текущего шага",
+  "Continues by itself {when}, in the same session.": "Продолжится сам {when}, в том же сеансе.",
+  "Continues by itself, in the same session.": "Продолжится сам, в том же сеансе.",
+  "{device} is offline: it continues as soon as it is back.": "{device} не в сети: продолжится, как только он вернётся.",
+  "Continuing…": "Продолжение…",
+  "Continued in the next job of this thread.": "Продолжено в следующем запуске этой цепочки.",
+  "Limit reached": "Лимит исчерпан",
+  "The usage limit resets {when}.": "Лимит использования сбросится {when}.",
+  "When the usage limit resets isn’t known; it is tried again in an hour.": "Неизвестно, когда сбросится лимит; будет ещё одна попытка через час.",
+  "Auto continue": "Автопродолжение",
+  "On, the job resumes its session with “Continue where you left off.” a few minutes after the limit resets, reusing its context.": "Если включено, запуск продолжит свой сеанс словами «Continue where you left off.» через несколько минут после сброса лимита, с тем же контекстом.",
+  "Auto continue Claude Code jobs": "Автопродолжение запусков Claude Code",
+  "A job that stops at your Claude subscription’s usage limit resumes its session by itself a few minutes after the limit resets, at most three times in a row. Each job’s “Limit reached” panel can turn it on or off.": "Запуск, остановившийся на лимите использования вашей подписки Claude, сам продолжит свой сеанс через несколько минут после сброса лимита, не более трёх раз подряд. На панели «Лимит исчерпан» каждого запуска это можно включить или выключить.",
 }
 
 export default messages

@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict, Forbidden, NotFound
-from app.features.code_sessions import images, ingest, service
+from app.features.code_sessions import images, ingest, resume, service
 from app.features.code_sessions.models import STATES, TERMINAL, CodeJob, State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -295,6 +295,8 @@ async def follow_up(
     last = await last_of_thread(db, await service.get(db, job_id))
     if last.state not in TERMINAL:
         raise JobRunning("The thread's last job is still running.")
+    if resume.cancel(last, "You continued the thread yourself."):
+        await db.commit()  # an auto continue (§16) that waited is no longer wanted
     if not last.session_id:
         raise NoSession("The thread's last job has no Claude Code session to resume.")
     return await start_job(
@@ -318,6 +320,9 @@ async def follow_up(
 async def cancel_job(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut:
     """Cancel a running job. One that has ended is returned as it is."""
     job = await service.get(db, job_id)
+    if resume.cancel(job, "The job was cancelled."):
+        await db.commit()  # a cancel also stops a continue that waits (§16)
+        await ingest.publish_job(job.id)
     if job.state not in TERMINAL:
         device, _ = await checked_computer(db, job.device_id, need="cancel")
         await db.close()

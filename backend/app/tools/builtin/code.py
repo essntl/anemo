@@ -313,6 +313,18 @@ def activities(events: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
+def limit_line(job: CodeJobOut) -> str:
+    """Where a job that stopped at the usage limit stands (code-sessions.md §16)."""
+    line = "It stopped at the Claude subscription's usage limit"
+    if job.limit_resets_at:
+        line += f", which resets at {job.limit_resets_at.isoformat(timespec='minutes')}"
+    if job.resume_state == "scheduled" and job.resume_at:
+        return f"{line}. It continues by itself at {job.resume_at.isoformat(timespec='minutes')}."
+    if job.resume_state == "started" and job.resumed_job_id:
+        return f"{line}. It was continued by job {job.resumed_job_id}."
+    return f"{line}. Auto continue is off: follow it up when the limit has reset."
+
+
 def _status_text(job: CodeJobOut, recent: list[str]) -> str:
     head = [
         f"Claude Code job {job.id} (the computer's job id {job.job_key}) on {job.device.name}: "
@@ -331,6 +343,10 @@ def _status_text(job: CodeJobOut, recent: list[str]) -> str:
         head.append(", ".join(numbers))
     if not job.device.online:
         head.append(f"{job.device.name} is offline: this is what it last sent.")
+    if job.limit_hit and job.state in TERMINAL:
+        head.append(limit_line(job))
+    if job.resumed_from:
+        head.append(f"It continues job {job.resumed_from}, which stopped at the usage limit.")
     head.append(f"The user sees it on the Code page: /code/{job.id}")
 
     body = [

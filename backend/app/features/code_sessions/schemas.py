@@ -82,6 +82,18 @@ class CodeJobOut(BaseModel):
     images: list[CodeImageOut] = []
     # The token counts of its last result (None: no result yet, or none given).
     tokens: CodeTokensOut | None = None
+    # It takes messages while it runs now (§15).
+    input_open: bool = False
+    # Auto continue (§16): it stopped at the usage limit, which resets at limit_resets_at;
+    # resume_state: None | scheduled | starting | started | cancelled | stopped | failed.
+    limit_hit: bool = False
+    limit_resets_at: datetime | None = None
+    resume_state: str | None = None
+    resume_at: datetime | None = None
+    resume_note: str | None = None
+    resume_attempt: int = 0  # automatic continues in a row that led to this job
+    resumed_job_id: uuid.UUID | None = None  # the job its continue started
+    resumed_from: uuid.UUID | None = None  # the job whose continue started this one
 
 
 class CodeUsageWindowOut(BaseModel):
@@ -241,6 +253,10 @@ class CodeJobIn(BaseModel):
         max_length=MAX_IMAGES,
         description="Uploaded images (POST /api/attachments) to send with the prompt",
     )
+
+
+class CodeAutoContinueIn(BaseModel):
+    enabled: bool
 
 
 class CodeMessageIn(BaseModel):

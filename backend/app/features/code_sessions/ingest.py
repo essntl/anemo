@@ -23,9 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.core.ids import uuid7
 from app.events import bus
-from app.features.code_sessions import inbox, parse, service, trim, usage
+from app.features.code_sessions import inbox, limits, parse, resume, service, trim, usage
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent, State
 from app.features.notifications import service as notifications
+from app.features.settings import service as settings_service
 
 log = logging.getLogger(__name__)
 
@@ -392,6 +393,7 @@ def _apply(job: CodeJob, item: _Prepared) -> bool:
         job.is_error = result.is_error
         if result.tokens is not None:
             job.tokens = result.tokens.as_json()
+        job.limit_hit = result.limit_hit
         _result_state(job, result)
     return session_known
 
@@ -476,6 +478,12 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
         return changes
     if newest_limit is not None:
         changes.usage_changed = await usage.record(db, job, newest_limit)
+        if newest_limit.rejected_until is not None:
+            job.limit_resets_at = newest_limit.rejected_until
+    if job.limit_hit and job.limit_resets_at is None:
+        # No rejected rate_limit_event: the time in the result's text ("resets 6pm (…)").
+        zone = limits.zone(await settings_service.user_timezone(db))
+        job.limit_resets_at = limits.reset_from_text(job.result_text, datetime.now(UTC), zone)
     if replays:
         changes.messages_changed = await inbox.delivered(db, job, replays) > 0
     job.last_event_at = datetime.now(UTC)
@@ -509,6 +517,14 @@ def duration_text(ms: int) -> str:
 
 def notification_text(job: CodeJob) -> tuple[str, str, str]:
     """(title, body, level) of the notification for a job that ended."""
+    if job.limit_hit and job.state != "cancelled":
+        title, level = f"Claude Code job stopped at the usage limit: {job.title}", "warning"
+        parts = [job.project]
+        if job.resume_state == "scheduled" and job.resume_at is not None:
+            parts.append(f"continues by itself at {job.resume_at:%H:%M} UTC")
+        elif job.limit_resets_at is not None:
+            parts.append(f"the limit resets at {job.limit_resets_at:%H:%M} UTC")
+        return title, " · ".join(parts), level
     if job.state == "done":
         title, level = f"Claude Code job finished: {job.title}", "success"
     else:
@@ -619,6 +635,7 @@ async def _handle_job(device_id: uuid.UUID, frame: JobFrame) -> dict[str, Any]:
     async with get_sessionmaker()() as db:
         job, changes = await _job(db, device_id, frame.job)
         await inbox.kick_if_due(db, job, old_state=changes.old_state, opened=changes.input_opened)
+        await resume.on_change(db, job, old_state=changes.old_state)
         await _finish(db, job)
         if changes.old_state is None:
             log.info(
@@ -636,10 +653,20 @@ async def _handle_events(device_id: uuid.UUID, frame: EventsFrame) -> dict[str, 
             return None  # the client always sends code.job first
         changes = await _events(db, job, frame)
         await inbox.kick_if_due(db, job, old_state=changes.old_state)
+        await resume.on_change(db, job, old_state=changes.old_state)
         await _finish(db, job)
         if changes.stored or changes.old_state != job.state or changes.usage_changed:
             await _publish(db, job, changes)
         return ack(job.job_key, job.last_seq)
+
+
+async def publish_job(job_id: uuid.UUID) -> None:
+    """The job changed outside ingestion (its auto continue, §16): its stream and the
+    lists hear of it."""
+    async with get_sessionmaker()() as db:
+        job = await db.get(CodeJob, job_id)
+        if job is not None:
+            await _publish(db, job, _Changes(old_state=job.state, thread_changed=True))
 
 
 async def device_offline(device_id: uuid.UUID) -> None:
@@ -728,6 +755,7 @@ async def answered_state(job_id: uuid.UUID, state: State) -> CodeJob | None:
         if job.state != "running":
             job.input_open = False
         await inbox.kick_if_due(db, job, old_state=changes.old_state)
+        await resume.on_change(db, job, old_state=changes.old_state)
         await _finish(db, job)
         if job.state != changes.old_state:
             await _publish(db, job, changes)

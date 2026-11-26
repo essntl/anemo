@@ -20,6 +20,8 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
+from app.features.code_sessions import limits
+
 Kind = Literal["system", "assistant", "user", "result", "raw", "other"]
 KINDS: tuple[str, ...] = ("system", "assistant", "user", "result", "raw", "other")
 
@@ -78,6 +80,7 @@ class Result:
     text: str | None
     session_id: str | None
     tokens: Tokens | None = None
+    limit_hit: bool = False  # it stopped at the subscription's usage limit (limits.py)
 
     @property
     def failed(self) -> bool:
@@ -106,6 +109,15 @@ class RateLimit:
     @property
     def rejected(self) -> bool:
         return self.status == "rejected" or any(w.status == "rejected" for w in self.windows)
+
+    @property
+    def rejected_until(self) -> datetime | None:
+        """When the limit that was hit resets: the latest reset of a rejected window (the
+        deciding one's when only it is known)."""
+        times = [w.resets_at for w in self.windows if w.status == "rejected" and w.resets_at]
+        if times:
+            return max(times)
+        return self.resets_at if self.status == "rejected" else None
 
 
 @dataclass
@@ -285,6 +297,7 @@ def _result(event: dict[str, Any]) -> Result:
         text=_text(event.get("result"), MAX_RESULT_TEXT),
         session_id=_text(event.get("session_id"), MAX_ID),
         tokens=_tokens(event.get("usage")),
+        limit_hit=limits.is_limit_result(event),
     )
 
 

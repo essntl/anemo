@@ -313,6 +313,16 @@ export function useSendMessageNow() {
   })
 }
 
+/** Auto continue for a job that stopped at the usage limit (§16): on schedules its continue, off cancels it. */
+export function useAutoContinue() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ jobId, enabled }: { jobId: string; enabled: boolean }) =>
+      unwrap(await api.PUT('/api/code/jobs/{job_id}/auto-continue', { params: { path: { job_id: jobId } }, body: { enabled } })),
+    onSuccess: (job) => putJob(qc, job),
+  })
+}
+
 /** Cancels a running job (one that has ended comes back as it is). */
 export function useCancelJob() {
   const qc = useQueryClient()

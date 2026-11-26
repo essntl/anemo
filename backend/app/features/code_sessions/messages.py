@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError, Conflict, NotFound
 from app.core.ids import uuid7
 from app.events import bus
-from app.features.code_sessions import control, images, inbox, service
+from app.features.code_sessions import autocontinue, control, images, inbox, service
 from app.features.code_sessions.inbox import message_out
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeMessage
 from app.features.code_sessions.schemas import CodeMessageOut
@@ -83,6 +83,8 @@ async def create(
     follow-up (at once when its last job has ended)."""
     last = await control.last_of_thread(db, await service.get(db, job_id))
     ready = await images.ready(db, image_ids or [])
+    # A message instead of the auto continue that waits (§16): the user decides.
+    await autocontinue.cancel_for_thread(db, last.thread_id, "You sent a message meanwhile.")
     message = CodeMessage(
         id=uuid7(),
         thread_id=last.thread_id,
@@ -200,7 +202,7 @@ def hold_reason(job: CodeJob, *, force: bool = False) -> str | None:
     """Why the thread's waiting messages can't follow `job` up by themselves (it ended);
     None when they can. `force`: the user asked (Send now), so an unfinished job is no
     reason."""
-    if job.state in ("failed", "exited_without_result") and not force:
+    if job.state in ("failed", "exited_without_result") and not force and not job.limit_hit:
         return "The job didn’t finish, so this message wasn’t sent."
     if not job.session_id:
         return "The job left no session to continue, so this message wasn’t sent."

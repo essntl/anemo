@@ -845,3 +845,55 @@ Desktop and jobs on a Mac take no messages: theirs go as the next follow-up, as 
   `command_lifecycle`, `control_request` and `control_response` are left out.
 - What an older page queued in the browser (`anemo.codeQueue` `byThread`) is sent to the
   server once (`CodeQueueRunner`); one the server refuses goes back into its thread's box.
+
+## 16. Auto continue after the usage limit
+
+A job that stops at the Claude subscription's usage limit (a real one ends with an
+assistant event `error: "rate_limit"` and a `result` with `is_error: true`,
+`api_error_status: 429`, `terminal_reason: "api_error"`, `result: "You've hit your 5-hour
+limit · resets 6pm (Europe/Berlin)"`) gets a **Limit reached** panel with the reset time
+and an **Auto continue** switch. On, the server resumes the job's session (`--resume
+<session_id>`, a follow-up in the same thread with the prompt "Continue where you left
+off.") shortly after the limit resets, so its context and prompt cache are reused.
+
+- **Detection** (`limits.py`, pure): `is_limit_result` (a `result` with `is_error` and
+  `api_error_status` 429, or a text like "hit your … limit" / "usage limit"). The reset
+  time comes from the job's newest `rate_limit_event` with a `rejected` window (its
+  `resetsAt`, seconds since 1970: no time zone to guess); else from the result's text
+  (`reset_from_text`: "6pm", "5:20pm", "18:00", "Nov 28, 3pm", "tomorrow at 9am", the zone
+  in brackets, else the user's time zone; the next such time after now). `code_jobs.limit_hit`
+  (the newest result's) and `limit_resets_at` (migration 0086).
+- **Scheduling** (`resume.py` rules, `autocontinue.py` switch and tasks): `resume_state`
+  `scheduled` → `starting` → `started` (`resumed_job_id`; the new job has `resumed_from`
+  and `resume_attempt` + 1), or `cancelled` / `stopped` / `failed` with `resume_note`.
+  `resume_at` = reset + 2 minutes; unknown reset: in an hour. A job that ends at the limit
+  is scheduled by itself when the setting `code.auto_continue` is on (Settings → Devices,
+  *Auto continue Claude Code jobs*; off by default), and always when it was itself an
+  automatic continue. A continue that hit the limit again without doing anything (≤ 1
+  turn, reset passed or unknown) is tried once more 30 minutes later. At most **3** in a
+  row (`stopped` then): a job the user starts counts from 0 again.
+- **Running it**: the scheduler (`code.continue`, every 30 s) takes due continues whose
+  computer is online and can start jobs and enqueues the `code.continue` job; one whose
+  computer is away waits, and goes as soon as it is back (as long as the switch is on).
+  The job claims it (`scheduled` → `starting`), starts the follow-up, and on a busy or
+  away computer puts it back for the next round; another error makes it `failed`. A claim
+  older than 10 minutes is given back.
+- **Cancelled cleanly** (`resume_note` says why) when the switch is turned off, the job is
+  cancelled (`POST …/cancel`, also the `code_cancel` tool), the user follows the thread up
+  by hand or sends a message (§15: a message for a job that stopped at the limit isn't
+  held, it goes as the follow-up at once), or a newer job joined the thread meanwhile.
+- **API**: `PUT /api/code/jobs/{id}/auto-continue {enabled}` → `CodeJobOut` (409
+  `not_limited` unless it is the thread's last job and stopped at the limit).
+  `CodeJobOut` gains `limit_hit, limit_resets_at, resume_state, resume_at, resume_note,
+  resume_attempt, resumed_job_id, resumed_from` (and `input_open`, §15).
+- **Events**: every change of the schedule publishes the job (`code.job` on its stream
+  and the global notice), so the job view shows it at once. The triggers' `code_job.*`
+  data gains `limit_hit`, `resume_at` and `resumed_from`: the limited job's
+  `code_job.ended` (state `failed`) says it will continue by itself, and the continue's
+  `code_job.started` names the job it continues. The notification of such a job says
+  "stopped at the usage limit" (level warning) with when it continues. `code_status`
+  tells the agent where the job stands.
+- **Page** (`LimitPanel.tsx`): under the result of a job that stopped at the limit: the
+  reset time, the switch (on the thread's last job), and what is planned: "Continues by
+  itself <when>, in the same session" (with "<computer> is offline: it continues as soon
+  as it is back"), "Continued in the next job of this thread", or the note.

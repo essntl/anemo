@@ -35,6 +35,7 @@ import { type CodeJob, jobDurationMs, pullRequest, toThreads } from './threads'
 import { PromptImages } from './ImageAttachments'
 import { useFollowEnd } from './useFollowEnd'
 import { JobUsage } from './UsageMeter'
+import { LimitPanel } from './LimitPanel'
 import { type ResultInfo, buildTimeline, num, resultOf, todoProgress, toTodos } from './timeline'
 
 function Fact({ icon, children, className }: { icon: ReactNode; children: ReactNode; className?: string }) {
@@ -157,7 +158,7 @@ function AgentHead({ agent, onMain }: { agent: AgentInfo; onMain: () => void }) 
  * sub-agents. A part whose job didn't start the sub-agent shown draws nothing (it still
  * keeps its events live).
  */
-function JobPart({ job, index, agent, agents, onMain }: { job: CodeJob; index: number; agent: string; agents: AgentInfo[]; onMain: () => void }) {
+function JobPart({ job, index, last, agent, agents, onMain }: { job: CodeJob; index: number; last: boolean; agent: string; agents: AgentInfo[]; onMain: () => void }) {
   const running = job.state === 'running'
   const events = useCodeEvents(job.id, { live: running, lastSeq: job.last_seq })
   const own = agent === MAIN ? undefined : agents.find((a) => a.id === agent)
@@ -219,6 +220,7 @@ function JobPart({ job, index, agent, agents, onMain }: { job: CodeJob; index: n
             </p>
           )}
           <ResultCard job={job} result={resultOf(items)} />
+          <LimitPanel job={job} last={last} />
         </div>
       </div>
     </JobContext.Provider>
@@ -432,7 +434,7 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
                       <Todos job={latest} />
                       <div className="flex flex-col">
                         {thread.map((job, i) => (
-                          <JobPart key={job.id} job={job} index={i} agent={selected} agents={perJob.get(job.id) ?? NO_AGENTS} onMain={showMain} />
+                          <JobPart key={job.id} job={job} index={i} last={i === thread.length - 1} agent={selected} agents={perJob.get(job.id) ?? NO_AGENTS} onMain={showMain} />
                         ))}
                       </div>
                     </>

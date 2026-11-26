@@ -4036,6 +4036,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/jobs/{job_id}/auto-continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Auto Continue
+         * @description Auto continue for a job that stopped at the usage limit: on, its session is resumed
+         *     shortly after the limit resets (as soon as its computer is back); off, that is
+         *     cancelled. 409 `not_limited` for a job that isn't the last of its thread or didn't stop
+         *     at the limit.
+         */
+        put: operations["auto_continue_api_code_jobs__job_id__auto_continue_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/jobs/{job_id}/cancel": {
         parameters: {
             query?: never;
@@ -6740,6 +6763,11 @@ export interface components {
             /** Start Command */
             start_command: string;
         };
+        /** CodeAutoContinueIn */
+        CodeAutoContinueIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** CodeDeviceOut */
         CodeDeviceOut: {
             /**
@@ -7003,6 +7031,33 @@ export interface components {
              */
             images: components["schemas"]["CodeImageOut"][];
             tokens?: components["schemas"]["CodeTokensOut"] | null;
+            /**
+             * Input Open
+             * @default false
+             */
+            input_open: boolean;
+            /**
+             * Limit Hit
+             * @default false
+             */
+            limit_hit: boolean;
+            /** Limit Resets At */
+            limit_resets_at?: string | null;
+            /** Resume State */
+            resume_state?: string | null;
+            /** Resume At */
+            resume_at?: string | null;
+            /** Resume Note */
+            resume_note?: string | null;
+            /**
+             * Resume Attempt
+             * @default 0
+             */
+            resume_attempt: number;
+            /** Resumed Job Id */
+            resumed_job_id?: string | null;
+            /** Resumed From */
+            resumed_from?: string | null;
         };
         /** CodeMessageIn */
         CodeMessageIn: {
@@ -7111,6 +7166,11 @@ export interface components {
              * @default 30
              */
             keep_days: number;
+            /**
+             * Auto Continue
+             * @default false
+             */
+            auto_continue: boolean;
         };
         /** CodeTodoOut */
         CodeTodoOut: {
@@ -22899,6 +22959,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_continue_api_code_jobs__job_id__auto_continue_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeAutoContinueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
                 };
             };
             /** @description Validation Error */

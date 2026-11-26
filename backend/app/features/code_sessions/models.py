@@ -45,6 +45,7 @@ class CodeJob(Base, IdMixin, TimestampMixin):
         Index("ix_code_jobs_project", "project"),
         Index("ix_code_jobs_conversation_id", "conversation_id"),
         Index("ix_code_jobs_run_id", "run_id"),
+        Index("ix_code_jobs_resume_state", "resume_state"),
     )
 
     device_id: Mapped[uuid.UUID] = mapped_column(
@@ -118,6 +119,23 @@ class CodeJob(Base, IdMixin, TimestampMixin):
     input_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # It takes them now (the client's code.job `input`): running, its stdin still open.
     input_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Auto continue (§16). limit_hit: its last result says the usage limit stopped it;
+    # limit_resets_at: when that limit resets (its rejected rate_limit_event, else the
+    # result's text).
+    limit_hit: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    limit_resets_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # None | scheduled | starting | started | cancelled | stopped | failed (resume_note: why)
+    resume_state: Mapped[str | None] = mapped_column(String(20))
+    resume_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resume_note: Mapped[str | None] = mapped_column(String(300))
+    # How many automatic continues in a row led to this job (0: the user started it).
+    resume_attempt: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    resumed_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("code_jobs.id", ondelete="SET NULL")
+    )
+    resumed_from: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("code_jobs.id", ondelete="SET NULL")
+    )
 
 
 class CodeUsage(Base, IdMixin, TimestampMixin):

@@ -30,9 +30,10 @@ from app.api.deps import Db
 from app.api.sse import comment, frame, sse_response
 from app.core.db import get_sessionmaker
 from app.events import bus
-from app.features.code_sessions import control, git, messages, service, usage
+from app.features.code_sessions import autocontinue, control, git, messages, service, usage
 from app.features.code_sessions.models import State
 from app.features.code_sessions.schemas import (
+    CodeAutoContinueIn,
     CodeDeviceOut,
     CodeEventsOut,
     CodeFollowUpIn,
@@ -226,6 +227,15 @@ async def send_message_now(message_id: uuid.UUID, db: Db) -> CodeMessageOut:
     """Send a waiting (or held) message now: interrupting the job's current step, or as a
     follow-up at once when the job has ended."""
     return await messages.send_now(db, message_id)
+
+
+@router.put("/jobs/{job_id}/auto-continue", response_model=CodeJobOut)
+async def auto_continue(job_id: uuid.UUID, body: CodeAutoContinueIn, db: Db) -> CodeJobOut:
+    """Auto continue for a job that stopped at the usage limit: on, its session is resumed
+    shortly after the limit resets (as soon as its computer is back); off, that is
+    cancelled. 409 `not_limited` for a job that isn't the last of its thread or didn't stop
+    at the limit."""
+    return await autocontinue.set_auto(db, job_id, body.enabled)
 
 
 @router.post("/jobs/{job_id}/cancel", response_model=CodeJobOut)

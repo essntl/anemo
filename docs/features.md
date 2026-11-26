@@ -1158,3 +1158,30 @@ shows is untrusted content for the model, like a web page. Installing the client
 [docs/specs/06-desktop-client.md](specs/06-desktop-client.md) and, for macOS,
 [docs/specs/09-desktop-macos.md](specs/09-desktop-macos.md); the protocol the apps use:
 [docs/device-contracts.md](device-contracts.md).
+
+## Claude Code jobs (the Code page)
+
+A trusted computer with *Share Claude Code jobs with Anemo* on in Anemo Desktop shows the
+Claude Code jobs that run on it on the **Code** page, live: every tool call, the todo list,
+sub-agents, the result, turns, duration, tokens and API-equivalent cost, the branch and
+pull request ([spec](specs/code-sessions.md)). With *Let Anemo start Claude Code jobs* on,
+you start jobs there (in a local project or one cloned from GitHub), follow them up in the
+same session, cancel them, and the agent does the same with the `code_*` tools.
+
+- **Usage**: the top of the list and each thread's header show how much of your Claude
+  subscription's **5-hour and weekly limits** the computer's jobs have used, and when each
+  resets, as of the latest job (it stays when no job runs). The usage events themselves
+  are no longer steps in the job's timeline.
+- **Messages while a job runs**: write in the box while the job works and Claude Code
+  takes the message in **at its next step** (after the command it is running), in the same
+  session; **Send now** stops the current step and sends it at once. Waiting messages can
+  be sent now, edited or removed until Claude Code takes them in; the timeline shows where
+  each was delivered. A job that can't take messages (started by `cc.ps1`, an older
+  Anemo Desktop or a Mac) gets them as its next follow-up when it ends, sent by the
+  server, also with no browser open. Needs Anemo Desktop 1.9.0 on Windows.
+- **Auto continue after the usage limit**: a job that stopped at the limit shows *Limit
+  reached* with the reset time and an **Auto continue** switch: on, the job resumes its
+  session with "Continue where you left off." a few minutes after the reset (when the
+  computer is back, if it was away), at most three times in a row. A message or a
+  follow-up of your own, a cancel or turning it off cancels it. The default is in
+  Settings → Devices (*Auto continue Claude Code jobs*).

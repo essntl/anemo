@@ -368,6 +368,9 @@ class CodeSettings(BaseModel):
 
     # Jobs started longer ago than this are deleted, with their events.
     keep_days: int = Field(30, ge=1, le=365)
+    # A job that stops at the Claude subscription's usage limit continues by itself once
+    # the limit resets (docs/specs/code-sessions.md §16); each job's panel can change it.
+    auto_continue: bool = False
 
 
 class PluginSettings(BaseModel):

@@ -17,6 +17,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.features.automations import removal as automation_removal
     from app.features.automations import service as automations
     from app.features.calendar import reminders
+    from app.features.code_sessions import autocontinue as code_continue
     from app.features.code_sessions import messages as code_messages
     from app.features.code_sessions import service as code_sessions
     from app.features.conversations import recall as chat_recall
@@ -43,6 +44,8 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
         ("code.prune", code_sessions.prune_if_due),  # at most every 10 minutes
         # Messages for Claude Code jobs that can go now (a computer came back, a job ended).
         ("code.messages", code_messages.due),
+        # Jobs stopped at the usage limit whose auto continue is due (§16).
+        ("code.continue", code_continue.due),
         ("updates.check", updates.check_if_due),  # about once a day
         ("activity.prune", activity.prune_if_due),  # entries past 90 days, once an hour
         # Once per worker start: documents changed while Anemo wasn't running.

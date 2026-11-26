@@ -109,6 +109,15 @@ def job_out(
         conversation_title=conversation_title if job.conversation_id else None,
         images=[CodeImageOut.model_validate(ref) for ref in images.refs(job.images)],
         tokens=_tokens(job.tokens),
+        input_open=job.input_open,
+        limit_hit=job.limit_hit,
+        limit_resets_at=job.limit_resets_at,
+        resume_state=job.resume_state,
+        resume_at=job.resume_at,
+        resume_note=job.resume_note,
+        resume_attempt=job.resume_attempt,
+        resumed_job_id=job.resumed_job_id,
+        resumed_from=job.resumed_from,
     )
 
 

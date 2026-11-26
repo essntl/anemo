@@ -663,7 +663,7 @@ async def test_old_jobs_are_pruned(authed, monkeypatch):
         assert await db.scalar(select(func.count()).select_from(CodeJobEvent)) == 0
     # Settings > code: keep_days.
     settings = (await authed.get("/api/settings")).json()["code"]
-    assert settings == {"keep_days": 30}
+    assert settings == {"keep_days": 30, "auto_continue": False}
     assert (await authed.put("/api/settings/code", json={"keep_days": 2})).status_code == 200
     assert await service.prune(now) == 1
     for bad in (0, 366):

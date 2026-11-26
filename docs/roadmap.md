@@ -72,6 +72,13 @@ view on the Code page, starting a job in a project (cloned from GitHub if needed
 follow-ups, cancelling, queued messages, and the agent tools `code_projects`,
 `code_start`, `code_status`, `code_cancel`. Works on a phone (#75).
 
+Since then (2026-11-26, `feat/code-page-usage-queue-continue`, Anemo Desktop 1.9.0): a
+**usage indicator** from Claude Code's `rate_limit_event` (5-hour and weekly windows, kept
+per computer, no longer in the timeline; §14), **messages delivered to a running job at its
+next step** with *Send now* (stream-json stdin fed from the job folder's inbox, kept on the
+server; §15) and **auto continue after the usage limit** in the same session (§16). Still to
+check by hand: `desktop/MANUAL-TESTS.md` 89–96; Macs take no messages yet (they follow up).
+
 ---
 
 ### Round 3 (2026-11-24)

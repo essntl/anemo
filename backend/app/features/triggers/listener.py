@@ -131,6 +131,11 @@ def _code_job(obj: CodeJob, verb: str) -> _Pending:
         "title": obj.title,
         "state": obj.state,
         "conversation_id": _id(obj.conversation_id),
+        # Auto continue (code-sessions.md §16): it stopped at the usage limit, it continues
+        # by itself at resume_at, or it is the continue of resumed_from.
+        "limit_hit": bool(obj.limit_hit),
+        "resume_at": obj.resume_at.isoformat() if obj.resume_at else None,
+        "resumed_from": _id(obj.resumed_from),
     }
     return _Pending(f"code_job.{verb}", str(obj.id), data)
 
