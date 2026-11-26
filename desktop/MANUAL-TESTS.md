@@ -347,6 +347,38 @@ and start it.
     one installs. GitHub offline (unplug the network): "GitHub couldn't be reached", retried after an
     hour, nothing else changes.
 
+## Messages while a Claude Code job runs (Anemo Desktop 1.9.0)
+
+Checked by hand on the build VM with Claude Code 2.1.330 (the pipeline, queue, send now and
+the end after the last answer); these need a real computer and account:
+
+89. **Queue**: start a job from the Code page whose first step takes a while ("run
+    `sleep 60`, then …"). While it runs, write a message and press Queue message: the card
+    says "Queued: Claude Code takes it in after its current step"; when the command ends,
+    the message shows in the timeline as yours with "Delivered …", and the job works on it
+    in the same session (the session id in the header doesn't change). `C:\anemo-bridge\jobs\<id>\inbox\`
+    has the message as a `.sent` file.
+90. **Send now**: in a running job, write a message and press Send now: the running command
+    stops ("[Request interrupted by user for tool use]"), the message is delivered and the
+    job goes on with it. The job stays *running* the whole time.
+91. **Edit and remove**: queue a message during a long command and press Edit before the
+    command ends: the text is back in the box and the job never gets it. Remove does the
+    same without putting it back. After it was delivered, Edit says "Claude Code took this
+    message in already."
+92. **The end**: after its last answer the job ends by itself within about 5 seconds
+    (*done*), `inbox\closed` exists, and no `powershell.exe` of the job is left (Task
+    Manager → Details, command line with `feed.ps1`).
+93. **A restart in between**: while a job runs, quit Anemo Desktop and start it again (or let
+    an update restart it): the job keeps running, a message queued after the restart is still
+    delivered at its next step, and the page catches up.
+94. **Cancel**: Cancel on the page ends `cmd.exe`, `powershell.exe` and `claude.exe` of the
+    job; the job shows *cancelled*, not *done*, even though it had answered before.
+95. **Images with a message**: queue a message with a screenshot: it lands in
+    `<job>\messages\<id>\images\`, and Claude Code opens it with Read.
+96. **Older jobs**: a job started by `cc.ps1` (or by Anemo Desktop 1.8): a message written
+    while it runs waits ("sent as a follow-up when it ends") and becomes the next follow-up
+    when the job ends, also with the browser closed.
+
 ## Platforms
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a

@@ -16052,6 +16052,56 @@
         }
       }
     },
+    "/api/code/usage": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Code Usage",
+        "description": "The latest known usage of the Claude subscription of each computer (from its jobs'\n`rate_limit_event`s), with when it was seen; kept while no job runs.",
+        "operationId": "code_usage_api_code_usage_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeUsageListOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/code/jobs/{job_id}": {
       "get": {
         "tags": [
@@ -16427,6 +16477,259 @@
         },
         "responses": {
           "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeJobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/jobs/{job_id}/messages": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Send Message",
+        "description": "A message for the thread: handed to its running job, which takes it in at its next\nstep (`now`: after interrupting the current one), or sent as the next follow-up when\nthe job can't take it or has ended.",
+        "operationId": "send_message_api_code_jobs__job_id__messages_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeMessageIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeMessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/messages/{message_id}": {
+      "delete": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Remove Message",
+        "description": "Remove a message that wasn't delivered yet (withdrawn from the job when it holds it);\n409 `message_delivered` when Claude Code took it in already.",
+        "operationId": "remove_message_api_code_messages__message_id__delete",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/messages/{message_id}/now": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Send Message Now",
+        "description": "Send a waiting (or held) message now: interrupting the job's current step, or as a\nfollow-up at once when the job has ended.",
+        "operationId": "send_message_now_api_code_messages__message_id__now_post",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeMessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/jobs/{job_id}/auto-continue": {
+      "put": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Auto Continue",
+        "description": "Auto continue for a job that stopped at the usage limit: on, its session is resumed\nshortly after the limit resets (as soon as its computer is back); off, that is\ncancelled. 409 `not_limited` for a job that isn't the last of its thread or didn't stop\nat the limit.",
+        "operationId": "auto_continue_api_code_jobs__job_id__auto_continue_put",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeAutoContinueIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -26141,6 +26444,19 @@
         "title": "ClaudeRunnerStatus",
         "description": "The claude-runner as the worker last saw it (the app cannot reach it)."
       },
+      "CodeAutoContinueIn": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "CodeAutoContinueIn"
+      },
       "CodeDeviceOut": {
         "properties": {
           "id": {
@@ -26438,6 +26754,14 @@
             },
             "type": "array",
             "title": "Thread"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/CodeMessageOut"
+            },
+            "type": "array",
+            "title": "Messages",
+            "default": []
           }
         },
         "type": "object",
@@ -26810,6 +27134,101 @@
             "type": "array",
             "title": "Images",
             "default": []
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeTokensOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "input_open": {
+            "type": "boolean",
+            "title": "Input Open",
+            "default": false
+          },
+          "limit_hit": {
+            "type": "boolean",
+            "title": "Limit Hit",
+            "default": false
+          },
+          "limit_resets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Resets At"
+          },
+          "resume_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume State"
+          },
+          "resume_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume At"
+          },
+          "resume_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Note"
+          },
+          "resume_attempt": {
+            "type": "integer",
+            "title": "Resume Attempt",
+            "default": 0
+          },
+          "resumed_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed Job Id"
+          },
+          "resumed_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed From"
           }
         },
         "type": "object",
@@ -26845,6 +27264,174 @@
           "truncated"
         ],
         "title": "CodeJobOut"
+      },
+      "CodeMessageIn": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "image_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Image Ids",
+            "description": "Uploaded images (POST /api/attachments) to send with the message"
+          },
+          "now": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Now",
+            "description": "Interrupt the job's current step and send it at once (default: queue)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "CodeMessageIn"
+      },
+      "CodeMessageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "thread_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Thread Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/CodeImageOut"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "queue",
+              "now"
+            ],
+            "title": "Mode"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "sending",
+              "sent",
+              "delivered",
+              "followed_up",
+              "held"
+            ],
+            "title": "State"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "delivered_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered Seq"
+          },
+          "follow_up_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "thread_id",
+          "job_id",
+          "prompt",
+          "mode",
+          "state",
+          "note",
+          "created_at",
+          "sent_at",
+          "delivered_at",
+          "delivered_seq",
+          "follow_up_job_id"
+        ],
+        "title": "CodeMessageOut",
+        "description": "A message written for a thread while its job ran (\u00a715)."
       },
       "CodeProjectOut": {
         "properties": {
@@ -26960,6 +27547,11 @@
             "minimum": 1.0,
             "title": "Keep Days",
             "default": 30
+          },
+          "auto_continue": {
+            "type": "boolean",
+            "title": "Auto Continue",
+            "default": false
           }
         },
         "type": "object",
@@ -26994,6 +27586,182 @@
           "status"
         ],
         "title": "CodeTodoOut"
+      },
+      "CodeTokensOut": {
+        "properties": {
+          "input": {
+            "type": "integer",
+            "title": "Input",
+            "default": 0
+          },
+          "output": {
+            "type": "integer",
+            "title": "Output",
+            "default": 0
+          },
+          "cache_read": {
+            "type": "integer",
+            "title": "Cache Read",
+            "default": 0
+          },
+          "cache_creation": {
+            "type": "integer",
+            "title": "Cache Creation",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "CodeTokensOut"
+      },
+      "CodeUsageListOut": {
+        "properties": {
+          "usage": {
+            "items": {
+              "$ref": "#/components/schemas/CodeUsageOut"
+            },
+            "type": "array",
+            "title": "Usage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usage"
+        ],
+        "title": "CodeUsageListOut"
+      },
+      "CodeUsageOut": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "limit_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Type"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/CodeUsageWindowOut"
+            },
+            "type": "array",
+            "title": "Windows"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Observed At"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "device_name",
+          "status",
+          "limit_type",
+          "resets_at",
+          "windows",
+          "observed_at",
+          "job_id"
+        ],
+        "title": "CodeUsageOut",
+        "description": "The usage of the Claude subscription a computer's jobs run on, as its newest\n`rate_limit_event` said (\u00a714)."
+      },
+      "CodeUsageWindowOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "utilization": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "utilization",
+          "resets_at",
+          "status"
+        ],
+        "title": "CodeUsageWindowOut"
       },
       "ContentOut": {
         "properties": {

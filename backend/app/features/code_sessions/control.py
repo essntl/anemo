@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict, Forbidden, NotFound
-from app.features.code_sessions import images, ingest, service
+from app.features.code_sessions import images, ingest, resume, service
 from app.features.code_sessions.models import STATES, TERMINAL, CodeJob, State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -242,6 +242,9 @@ async def start_job(
         fields["follow_job_id"] = follow_job_id
     if ready:
         fields["images"] = [image.command() for image in ready]
+    if offer.code_input:
+        # It takes messages while it runs (§15): Anemo Desktop 1.9.0 on Windows.
+        fields["input"] = True
     await db.close()  # nothing is held while the computer answers
     state = await send_command(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
@@ -271,7 +274,7 @@ async def start_job(
     return shaped
 
 
-async def _last_of_thread(db: AsyncSession, job: CodeJob) -> CodeJob:
+async def last_of_thread(db: AsyncSession, job: CodeJob) -> CodeJob:
     jobs = await service.thread(db, job)
     return jobs[-1] if jobs else job
 
@@ -289,9 +292,11 @@ async def follow_up(
 ) -> CodeJobOut:
     """Resume the session of the thread's last job, in its project on its computer: the
     new job joins the thread."""
-    last = await _last_of_thread(db, await service.get(db, job_id))
+    last = await last_of_thread(db, await service.get(db, job_id))
     if last.state not in TERMINAL:
         raise JobRunning("The thread's last job is still running.")
+    if resume.cancel(last, "You continued the thread yourself."):
+        await db.commit()  # an auto continue (§16) that waited is no longer wanted
     if not last.session_id:
         raise NoSession("The thread's last job has no Claude Code session to resume.")
     return await start_job(
@@ -315,6 +320,9 @@ async def follow_up(
 async def cancel_job(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut:
     """Cancel a running job. One that has ended is returned as it is."""
     job = await service.get(db, job_id)
+    if resume.cancel(job, "The job was cancelled."):
+        await db.commit()  # a cancel also stops a continue that waits (§16)
+        await ingest.publish_job(job.id)
     if job.state not in TERMINAL:
         device, _ = await checked_computer(db, job.device_id, need="cancel")
         await db.close()

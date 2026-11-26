@@ -220,7 +220,10 @@ public sealed class CodeJobsSession
         var cancelled = JobFolder.IsCancelled(job.Folder);
         var alive = JobState.IsAlive(job.Folder, job.Meta, _probe, _time.GetUtcNow());
         ScanForResult(job); // after the liveness check: a job that just ended is read to its end once more
+        // A job that takes messages (§15) writes a result per answer and goes on while its
+        // process lives: only its last result, once it has ended, says how it ended.
         var state = cancelled ? JobStates.Cancelled
+            : job.Meta.Input && alive ? JobStates.Running
             : job.ResultFailed is { } failed ? (failed ? JobStates.Failed : JobStates.Done)
             : alive ? JobStates.Running
             : JobStates.ExitedWithoutResult;
@@ -288,7 +291,8 @@ public sealed class CodeJobsSession
         var atEnd = job.Announced && !JsonlTail.HasLineAfter(job.OutPath, job.Position);
         var snapshot = Snapshot(job, atEnd);
         var changed = job.LastSent is not { } last
-            || last.State != snapshot.State || last.Branch != snapshot.Branch || last.Pid != snapshot.Pid;
+            || last.State != snapshot.State || last.Branch != snapshot.Branch || last.Pid != snapshot.Pid
+            || last.Input != snapshot.Input;
         var final = JobStates.IsTerminal(snapshot.State) && snapshot.State == job.State && atEnd;
         if (!job.Announced || changed || (final && !job.FinalSent))
         {
@@ -353,7 +357,8 @@ public sealed class CodeJobsSession
             state,
             terminal ? job.Ended : null,
             job.Branch,
-            terminal ? job.StderrTail : null);
+            terminal ? job.StderrTail : null,
+            !terminal && job.Meta.Input && JobFeeder.IsOpen(job.Folder));
     }
 
     /// <summary>The next events after the acked position: ≤ 200 items and ≤ 256 KB of UTF-8 in all.</summary>

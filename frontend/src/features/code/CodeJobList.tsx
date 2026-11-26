@@ -18,6 +18,7 @@ import { msg, plural, t } from '@/lib/i18n'
 import { withoutAgent } from './agents'
 import { type CodeFilters, useCodeJobs } from './api'
 import { NewJobDialog } from './NewJobDialog'
+import { CodeUsageBar } from './UsageMeter'
 import { StateBadge } from './parts'
 import { useCodeQueue } from './queueStore'
 import { type CodeJobState, type CodeThread, JOB_STATES, groupByProject, jobDurationMs, pullRequest, toThreads } from './threads'
@@ -153,6 +154,7 @@ export function CodeJobList({ jobId }: { jobId?: string }) {
           <Select variant="pill" className="w-full max-w-none @md:w-auto @md:max-w-[11rem]" aria-label={t('State')} value={filters.state ?? ''} onValueChange={(v) => setFilter('state', v)}
             options={[{ value: '', label: t('All states') }, ...JOB_STATES.map((s) => ({ value: s, label: t(STATE_FILTER[s]) }))]} />
         </div>
+        <CodeUsageBar />
         {/* Mounted only while open (and while it animates out): its queries run only then. */}
         <Lingering value={starting}>{() => <NewJobDialog open={starting} onOpenChange={setStarting} />}</Lingering>
       </div>

@@ -23,9 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.core.ids import uuid7
 from app.events import bus
-from app.features.code_sessions import parse, service, trim
+from app.features.code_sessions import inbox, limits, parse, resume, service, trim, usage
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent, State
 from app.features.notifications import service as notifications
+from app.features.settings import service as settings_service
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +66,8 @@ class JobIn(BaseModel):
     ended: datetime | None = None
     branch: str | None = Field(None, max_length=255)
     stderr_tail: str | None = Field(None, max_length=4000)
+    # It takes messages now (§15, Anemo Desktop 1.9.0; older clients don't send it).
+    input: bool = False
 
     @field_validator(
         "device_job_dir",
@@ -130,6 +133,9 @@ class _Changes:
     old_state: str | None  # None: the row is new
     thread_changed: bool = False
     stored: list[CodeJobEvent] = field(default_factory=list)
+    usage_changed: bool = False  # the computer's usage (code_usage) was updated
+    input_opened: bool = False  # the job takes messages now, and didn't before
+    messages_changed: bool = False  # messages for it were delivered
 
 
 async def _locked(db: AsyncSession, device_id: uuid.UUID, job_key: str) -> CodeJob | None:
@@ -166,6 +172,8 @@ def _client_state(job: CodeJob, state: State, ended: datetime | None) -> None:
 
 
 def _result_state(job: CodeJob, result: parse.Result) -> None:
+    if job.input_mode:
+        return  # it answers once per message and goes on: its client says when it ended (§15)
     if job.state in ("running", "exited_without_result"):
         _end(job, "failed" if result.failed else "done")
 
@@ -275,12 +283,17 @@ async def _job(db: AsyncSession, device_id: uuid.UUID, data: JobIn) -> tuple[Cod
         job.branch = data.branch
     if data.stderr_tail is not None:
         job.stderr_tail = data.stderr_tail
+    if data.input:
+        job.input_mode = True
+    was_open = job.input_open
     if changes.old_state is None:
         # A new row takes the client's state as it is. A job first seen finished is a
         # back-filled one: seen_running stays off, so it doesn't notify (D10).
         _end(job, data.state, data.ended)
     else:
         _client_state(job, data.state, data.ended)
+    job.input_open = data.input and job.state == "running"
+    changes.input_opened = job.input_open and not was_open
     changes.thread_changed = await _join_parent(db, job)
     return job, changes
 
@@ -378,6 +391,9 @@ def _apply(job: CodeJob, item: _Prepared) -> bool:
         job.result_text = result.text
         job.result_subtype = result.subtype
         job.is_error = result.is_error
+        if result.tokens is not None:
+            job.tokens = result.tokens.as_json()
+        job.limit_hit = result.limit_hit
         _result_state(job, result)
     return session_known
 
@@ -444,6 +460,8 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
         )
     )
     session_known = False
+    newest_limit: parse.RateLimit | None = None
+    replays: list[tuple[str, int]] = []
     for p in prepared:
         if p.seq not in inserted:
             continue
@@ -452,8 +470,22 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
         if p.trimmed or p.dropped:
             job.truncated = True
         session_known = _apply(job, p) or session_known
+        if p.pulled.rate_limit is not None:
+            newest_limit = p.pulled.rate_limit  # prepared is in seq order
+        if p.pulled.replay_uuid is not None:
+            replays.append((p.pulled.replay_uuid, p.seq))
     if not inserted:
         return changes
+    if newest_limit is not None:
+        changes.usage_changed = await usage.record(db, job, newest_limit)
+        if newest_limit.rejected_until is not None:
+            job.limit_resets_at = newest_limit.rejected_until
+    if job.limit_hit and job.limit_resets_at is None:
+        # No rejected rate_limit_event: the time in the result's text ("resets 6pm (…)").
+        zone = limits.zone(await settings_service.user_timezone(db))
+        job.limit_resets_at = limits.reset_from_text(job.result_text, datetime.now(UTC), zone)
+    if replays:
+        changes.messages_changed = await inbox.delivered(db, job, replays) > 0
     job.last_event_at = datetime.now(UTC)
     if min(inserted) <= job.last_seq + 1:
         job.last_seq = await _contiguous(db, job)
@@ -485,6 +517,14 @@ def duration_text(ms: int) -> str:
 
 def notification_text(job: CodeJob) -> tuple[str, str, str]:
     """(title, body, level) of the notification for a job that ended."""
+    if job.limit_hit and job.state != "cancelled":
+        title, level = f"Claude Code job stopped at the usage limit: {job.title}", "warning"
+        parts = [job.project]
+        if job.resume_state == "scheduled" and job.resume_at is not None:
+            parts.append(f"continues by itself at {job.resume_at:%H:%M} UTC")
+        elif job.limit_resets_at is not None:
+            parts.append(f"the limit resets at {job.limit_resets_at:%H:%M} UTC")
+        return title, " · ".join(parts), level
     if job.state == "done":
         title, level = f"Claude Code job finished: {job.title}", "success"
     else:
@@ -546,8 +586,12 @@ async def _publish(db: AsyncSession, job: CodeJob, changes: _Changes) -> None:
         maxlen=service.STREAM_MAXLEN,
         ttl_s=service.STREAM_TTL_S,
     )
+    if changes.usage_changed:
+        await bus.publish_global("code.usage", {"device_id": str(job.device_id)})
     now = time.monotonic()
-    state_changed = changes.old_state != job.state or changes.thread_changed
+    state_changed = (
+        changes.old_state != job.state or changes.thread_changed or changes.messages_changed
+    )
     if state_changed or now - _last_global.get(job.id, 0.0) >= GLOBAL_EVERY_S:
         _last_global[job.id] = now
         if len(_last_global) > 1000:  # forget the jobs that went quiet
@@ -590,6 +634,8 @@ async def handle(device_id: uuid.UUID, message: dict[str, Any]) -> dict[str, Any
 async def _handle_job(device_id: uuid.UUID, frame: JobFrame) -> dict[str, Any]:
     async with get_sessionmaker()() as db:
         job, changes = await _job(db, device_id, frame.job)
+        await inbox.kick_if_due(db, job, old_state=changes.old_state, opened=changes.input_opened)
+        await resume.on_change(db, job, old_state=changes.old_state)
         await _finish(db, job)
         if changes.old_state is None:
             log.info(
@@ -606,10 +652,21 @@ async def _handle_events(device_id: uuid.UUID, frame: EventsFrame) -> dict[str, 
         if job is None:
             return None  # the client always sends code.job first
         changes = await _events(db, job, frame)
+        await inbox.kick_if_due(db, job, old_state=changes.old_state)
+        await resume.on_change(db, job, old_state=changes.old_state)
         await _finish(db, job)
-        if changes.stored or changes.old_state != job.state:
+        if changes.stored or changes.old_state != job.state or changes.usage_changed:
             await _publish(db, job, changes)
         return ack(job.job_key, job.last_seq)
+
+
+async def publish_job(job_id: uuid.UUID) -> None:
+    """The job changed outside ingestion (its auto continue, §16): its stream and the
+    lists hear of it."""
+    async with get_sessionmaker()() as db:
+        job = await db.get(CodeJob, job_id)
+        if job is not None:
+            await _publish(db, job, _Changes(old_state=job.state, thread_changed=True))
 
 
 async def device_offline(device_id: uuid.UUID) -> None:
@@ -695,6 +752,10 @@ async def answered_state(job_id: uuid.UUID, state: State) -> CodeJob | None:
             return None
         changes = _Changes(old_state=job.state)
         _client_state(job, state, None)
+        if job.state != "running":
+            job.input_open = False
+        await inbox.kick_if_due(db, job, old_state=changes.old_state)
+        await resume.on_change(db, job, old_state=changes.old_state)
         await _finish(db, job)
         if job.state != changes.old_state:
             await _publish(db, job, changes)

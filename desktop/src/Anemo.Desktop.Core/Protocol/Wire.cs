@@ -56,8 +56,10 @@ public static class Wire
     /// always with <c>code_git</c>.
     /// <paramref name="shellKind"/>: powershell, pwsh, zsh or bash (§2, 1.4.0).
     /// <paramref name="files"/>: the file actions of §8 are there (1.7.0): the switch is on and the device is trusted.
+    /// <paramref name="codeInput"/>: the jobs Anemo starts take messages while they run
+    /// (<c>code_input</c>, <c>code_input_withdraw</c>, 1.9.0); only where starting is offered.
     /// </summary>
-    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell", bool files = false) => Json(new JsonObject
+    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell", bool files = false, bool codeInput = false) => Json(new JsonObject
     {
         ["type"] = "device.offer",
         ["control"] = control,
@@ -69,6 +71,7 @@ public static class Wire
         ["code_git_remote"] = code,
         ["shell_kind"] = shellKind,
         ["files"] = files,
+        ["code_input"] = codeStart && codeInput,
     });
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });

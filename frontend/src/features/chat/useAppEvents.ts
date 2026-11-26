@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router'
 import { toast } from '@/components/ui/toast'
 import { approvalsKey } from '@/features/agents/api'
 import { automationsKey } from '@/features/automations/api'
-import { codeKey } from '@/features/code/api'
+import { codeKey, codeUsageKey } from '@/features/code/api'
 import { type CodeJobNotice, noticeCodeJob } from '@/features/code/codeJobNotices'
 import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
@@ -100,6 +100,8 @@ export function useAppEvents() {
       void qc.invalidateQueries({ queryKey: codeKey })
       noticeCodeJob(JSON.parse(e.data) as CodeJobNotice)
     }) as EventListener)
+    // A computer's Claude subscription usage changed (a job wrote a rate_limit_event).
+    source.addEventListener('code.usage', () => void qc.invalidateQueries({ queryKey: codeUsageKey }))
     // A new notification (a reminder, an automation's result, ...): show it as a
     // desktop notification when the tab is in the background, else as a notice here.
     source.addEventListener('notification', ((e: MessageEvent<string>) => {

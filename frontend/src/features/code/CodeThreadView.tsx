@@ -21,7 +21,7 @@ import { toast } from '@/components/ui/toast'
 import { useIslandVisible } from '@/features/island/islandStore'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
-import { formatCost, formatDuration, formatWhen } from '@/lib/format'
+import { formatCost, formatCount, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { AGENT_PARAM, type AgentInfo, MAIN, agentTree, agentsOf, eventsOfAgent } from './agents'
 import { type AgentNav, AgentNavContext, type ThreadAgent } from './agentNav'
@@ -34,6 +34,8 @@ import { StateBadge, TodoChecklist } from './parts'
 import { type CodeJob, jobDurationMs, pullRequest, toThreads } from './threads'
 import { PromptImages } from './ImageAttachments'
 import { useFollowEnd } from './useFollowEnd'
+import { JobUsage } from './UsageMeter'
+import { LimitPanel } from './LimitPanel'
 import { type ResultInfo, buildTimeline, num, resultOf, todoProgress, toTodos } from './timeline'
 
 function Fact({ icon, children, className }: { icon: ReactNode; children: ReactNode; className?: string }) {
@@ -72,10 +74,14 @@ function ResultCard({ job, result }: { job: CodeJob; result?: ResultInfo }) {
   const ms = jobDurationMs(job) ?? result?.durationMs ?? null
   const cost = num(job.cost_usd) ?? result?.costUsd
   const subtype = job.result_subtype ?? result?.subtype
+  const tokens = job.tokens
   const failed = state === 'failed' || state === 'exited_without_result'
   const head = {
     done: { icon: <CheckCircle2 className="h-4 w-4 text-tool-ok" />, label: t('Finished') },
-    failed: { icon: <XCircle className="h-4 w-4 text-error" />, label: subtype && subtype !== 'success' ? t('Failed: {reason}', { reason: subtype }) : t('Failed') },
+    failed: {
+      icon: <XCircle className="h-4 w-4 text-error" />,
+      label: job.limit_hit ? t('Stopped at the usage limit') : subtype && subtype !== 'success' ? t('Failed: {reason}', { reason: subtype }) : t('Failed'),
+    },
     cancelled: { icon: <Ban className="h-4 w-4 text-muted" />, label: t('Cancelled') },
     exited_without_result: { icon: <TriangleAlert className="h-4 w-4 text-warning" />, label: t('Exited without a result') },
   }[state]
@@ -89,10 +95,20 @@ function ResultCard({ job, result }: { job: CodeJob; result?: ResultInfo }) {
       {state === 'exited_without_result' && !job.stderr_tail && (
         <p className="mt-2 text-[12.5px] text-muted">{t('The process ended without writing a result.')}</p>
       )}
-      {(turns !== undefined || ms !== null || cost !== undefined) && (
-        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3">
+      {(turns !== undefined || ms !== null || cost !== undefined || tokens) && (
+        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">
           {turns !== undefined && <Stat label={t('Turns')}>{turns}</Stat>}
           {ms !== null && <Stat label={t('Duration')}>{formatDuration(ms / 1000)}</Stat>}
+          {tokens && (
+            <Stat label={t('Tokens')}>
+              <span title={t('{input} input ({cached} read from the cache, {written} written to it) · {output} output', {
+                input: formatCount(tokens.input + tokens.cache_read + tokens.cache_creation),
+                cached: formatCount(tokens.cache_read), written: formatCount(tokens.cache_creation), output: formatCount(tokens.output),
+              })}>
+                {t('{input} in · {output} out', { input: formatCount(tokens.input + tokens.cache_read + tokens.cache_creation), output: formatCount(tokens.output) })}
+              </span>
+            </Stat>
+          )}
           {cost !== undefined && <Stat label={t('API-equivalent cost')}>{formatCost(cost)}</Stat>}
         </div>
       )}
@@ -145,7 +161,7 @@ function AgentHead({ agent, onMain }: { agent: AgentInfo; onMain: () => void }) 
  * sub-agents. A part whose job didn't start the sub-agent shown draws nothing (it still
  * keeps its events live).
  */
-function JobPart({ job, index, agent, agents, onMain }: { job: CodeJob; index: number; agent: string; agents: AgentInfo[]; onMain: () => void }) {
+function JobPart({ job, index, last, agent, agents, onMain }: { job: CodeJob; index: number; last: boolean; agent: string; agents: AgentInfo[]; onMain: () => void }) {
   const running = job.state === 'running'
   const events = useCodeEvents(job.id, { live: running, lastSeq: job.last_seq })
   const own = agent === MAIN ? undefined : agents.find((a) => a.id === agent)
@@ -207,6 +223,7 @@ function JobPart({ job, index, agent, agents, onMain }: { job: CodeJob; index: n
             </p>
           )}
           <ResultCard job={job} result={resultOf(items)} />
+          <LimitPanel job={job} last={last} />
         </div>
       </div>
     </JobContext.Provider>
@@ -299,6 +316,7 @@ function Header({ thread }: { thread: CodeJob[] }) {
           </Stat>
         )}
       </div>
+      <JobUsage deviceId={device.id} />
     </header>
   )
 }
@@ -419,7 +437,7 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
                       <Todos job={latest} />
                       <div className="flex flex-col">
                         {thread.map((job, i) => (
-                          <JobPart key={job.id} job={job} index={i} agent={selected} agents={perJob.get(job.id) ?? NO_AGENTS} onMain={showMain} />
+                          <JobPart key={job.id} job={job} index={i} last={i === thread.length - 1} agent={selected} agents={perJob.get(job.id) ?? NO_AGENTS} onMain={showMain} />
                         ))}
                       </div>
                     </>

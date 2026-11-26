@@ -63,6 +63,16 @@ def default_handlers() -> dict[str, Handler]:
         async with sessionmaker()() as db:
             await transcription.run(db, payload)
 
+    async def code_messages(payload: dict[str, Any]) -> None:
+        from app.features.code_sessions import messages as code_messages_service
+
+        await code_messages_service.run_job(uuid.UUID(payload["thread_id"]))
+
+    async def code_continue(payload: dict[str, Any]) -> None:
+        from app.features.code_sessions import autocontinue
+
+        await autocontinue.run(uuid.UUID(payload["job_id"]))
+
     async def notify_deliver(payload: dict[str, Any]) -> None:
         from app.features.notifications import service as notifications
 
@@ -122,6 +132,8 @@ def default_handlers() -> dict[str, Handler]:
         "research.writeup": research_writeup,
         "mcp.refresh": mcp_refresh,
         "notify.deliver": notify_deliver,
+        "code.messages": code_messages,
+        "code.continue": code_continue,
         "document.index": document_index,
         "chats.index": chats_index,
         "sketch.transcribe": sketch_transcribe,

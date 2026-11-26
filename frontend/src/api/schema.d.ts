@@ -3829,6 +3829,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Usage
+         * @description The latest known usage of the Claude subscription of each computer (from its jobs'
+         *     `rate_limit_event`s), with when it was seen; kept while no job runs.
+         */
+        get: operations["code_usage_api_code_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -3945,6 +3966,93 @@ export interface paths {
          * @description Resume the session of the thread's last job (it must have ended): the new job.
          */
         post: operations["follow_up_api_code_jobs__job_id__follow_up_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message
+         * @description A message for the thread: handed to its running job, which takes it in at its next
+         *     step (`now`: after interrupting the current one), or sent as the next follow-up when
+         *     the job can't take it or has ended.
+         */
+        post: operations["send_message_api_code_jobs__job_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Message
+         * @description Remove a message that wasn't delivered yet (withdrawn from the job when it holds it);
+         *     409 `message_delivered` when Claude Code took it in already.
+         */
+        delete: operations["remove_message_api_code_messages__message_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/messages/{message_id}/now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message Now
+         * @description Send a waiting (or held) message now: interrupting the job's current step, or as a
+         *     follow-up at once when the job has ended.
+         */
+        post: operations["send_message_now_api_code_messages__message_id__now_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/auto-continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Auto Continue
+         * @description Auto continue for a job that stopped at the usage limit: on, its session is resumed
+         *     shortly after the limit resets (as soon as its computer is back); off, that is
+         *     cancelled. 409 `not_limited` for a job that isn't the last of its thread or didn't stop
+         *     at the limit.
+         */
+        put: operations["auto_continue_api_code_jobs__job_id__auto_continue_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6655,6 +6763,11 @@ export interface components {
             /** Start Command */
             start_command: string;
         };
+        /** CodeAutoContinueIn */
+        CodeAutoContinueIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** CodeDeviceOut */
         CodeDeviceOut: {
             /**
@@ -6790,6 +6903,11 @@ export interface components {
             job: components["schemas"]["CodeJobOut"];
             /** Thread */
             thread: components["schemas"]["CodeJobOut"][];
+            /**
+             * Messages
+             * @default []
+             */
+            messages: components["schemas"]["CodeMessageOut"][];
         };
         /** CodeJobIn */
         CodeJobIn: {
@@ -6912,6 +7030,102 @@ export interface components {
              * @default []
              */
             images: components["schemas"]["CodeImageOut"][];
+            tokens?: components["schemas"]["CodeTokensOut"] | null;
+            /**
+             * Input Open
+             * @default false
+             */
+            input_open: boolean;
+            /**
+             * Limit Hit
+             * @default false
+             */
+            limit_hit: boolean;
+            /** Limit Resets At */
+            limit_resets_at?: string | null;
+            /** Resume State */
+            resume_state?: string | null;
+            /** Resume At */
+            resume_at?: string | null;
+            /** Resume Note */
+            resume_note?: string | null;
+            /**
+             * Resume Attempt
+             * @default 0
+             */
+            resume_attempt: number;
+            /** Resumed Job Id */
+            resumed_job_id?: string | null;
+            /** Resumed From */
+            resumed_from?: string | null;
+        };
+        /** CodeMessageIn */
+        CodeMessageIn: {
+            /** Prompt */
+            prompt: string;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the message
+             */
+            image_ids?: string[];
+            /**
+             * Now
+             * @description Interrupt the job's current step and send it at once (default: queue)
+             */
+            now?: boolean | null;
+        };
+        /**
+         * CodeMessageOut
+         * @description A message written for a thread while its job ran (§15).
+         */
+        CodeMessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Thread Id
+             * Format: uuid
+             */
+            thread_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Images
+             * @default []
+             */
+            images: components["schemas"]["CodeImageOut"][];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "queue" | "now";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "queued" | "sending" | "sent" | "delivered" | "followed_up" | "held";
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Sent At */
+            sent_at: string | null;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** Delivered Seq */
+            delivered_seq: number | null;
+            /** Follow Up Job Id */
+            follow_up_job_id: string | null;
         };
         /** CodeProjectOut */
         CodeProjectOut: {
@@ -6952,6 +7166,11 @@ export interface components {
              * @default 30
              */
             keep_days: number;
+            /**
+             * Auto Continue
+             * @default false
+             */
+            auto_continue: boolean;
         };
         /** CodeTodoOut */
         CodeTodoOut: {
@@ -6961,6 +7180,74 @@ export interface components {
             status: string;
             /** Activeform */
             activeForm?: string | null;
+        };
+        /** CodeTokensOut */
+        CodeTokensOut: {
+            /**
+             * Input
+             * @default 0
+             */
+            input: number;
+            /**
+             * Output
+             * @default 0
+             */
+            output: number;
+            /**
+             * Cache Read
+             * @default 0
+             */
+            cache_read: number;
+            /**
+             * Cache Creation
+             * @default 0
+             */
+            cache_creation: number;
+        };
+        /** CodeUsageListOut */
+        CodeUsageListOut: {
+            /** Usage */
+            usage: components["schemas"]["CodeUsageOut"][];
+        };
+        /**
+         * CodeUsageOut
+         * @description The usage of the Claude subscription a computer's jobs run on, as its newest
+         *     `rate_limit_event` said (§14).
+         */
+        CodeUsageOut: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Status */
+            status: string | null;
+            /** Limit Type */
+            limit_type: string | null;
+            /** Resets At */
+            resets_at: string | null;
+            /** Windows */
+            windows: components["schemas"]["CodeUsageWindowOut"][];
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Job Id */
+            job_id: string | null;
+        };
+        /** CodeUsageWindowOut */
+        CodeUsageWindowOut: {
+            /** Name */
+            name: string;
+            /** Utilization */
+            utilization: number | null;
+            /** Resets At */
+            resets_at: string | null;
+            /** Status */
+            status: string | null;
         };
         /** ContentOut */
         ContentOut: {
@@ -22350,6 +22637,37 @@ export interface operations {
             };
         };
     };
+    code_usage_api_code_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeUsageListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_job_api_code_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -22535,6 +22853,144 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_code_jobs__job_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_message_api_code_messages__message_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_now_api_code_messages__message_id__now_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_continue_api_code_jobs__job_id__auto_continue_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeAutoContinueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

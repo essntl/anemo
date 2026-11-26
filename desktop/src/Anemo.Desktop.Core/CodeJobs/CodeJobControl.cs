@@ -150,7 +150,8 @@ public sealed partial class CodeJobControl
     }
 
     public static bool Handles(string action) =>
-        action is "code_projects" or "code_start" or "code_cancel" or "code_git_graph" or "code_git_commit" or "code_git_cache_clear";
+        action is "code_projects" or "code_start" or "code_cancel" or "code_input" or "code_input_withdraw"
+            or "code_git_graph" or "code_git_commit" or "code_git_cache_clear";
 
     private string ProjectsFolder => Setting(_settings().CodeProjectsFolder) ?? _platform.DefaultProjectsFolder;
 
@@ -202,6 +203,12 @@ public sealed partial class CodeJobControl
             case "code_cancel":
                 RequireStart(device);
                 return await CancelAsync(args);
+            case "code_input":
+                RequireStart(device);
+                return Input(args);
+            case "code_input_withdraw":
+                RequireStart(device);
+                return await WithdrawAsync(args, ct);
             case "code_git_graph":
                 RequireShare(device);
                 return await GitGraphAsync(args, ct);
@@ -231,7 +238,7 @@ public sealed partial class CodeJobControl
         }
 
         // Listing the projects and reading their git history need sharing only.
-        return action is "code_start" or "code_cancel" && !settings.StartCodeJobs ? StartOffMessage : null;
+        return action is "code_start" or "code_cancel" or "code_input" or "code_input_withdraw" && !settings.StartCodeJobs ? StartOffMessage : null;
     }
 
     private void RequireShare(DeviceInfo device)
@@ -532,6 +539,10 @@ public sealed partial class CodeJobControl
         var model = Optional(args, "model", ModelPattern(), "“model” must be a model name of at most 100 letters, digits, dots, dashes, underscores and brackets.");
         int? maxTurns = args.Has("max_turns") ? args.Int("max_turns", 1, 500) : null;
         var images = CodeJobImages.Parse(args);
+        // Messages while it runs (§15, 1.9.0): only where the platform can feed them, and only
+        // with Windows PowerShell there; else the job runs as before (the server falls back
+        // to a follow-up after it).
+        var feeder = args.Bool("input", false) && _platform.JobsTakeInput ? _host.WindowsPowerShell() : null;
 
         // The full path, so a claude.cmd in the project folder (a cloned repository's) never runs.
         var claude = _host.FindOnPath("claude") ?? throw CommandException.Failed(NoClaudeMessage);
@@ -548,7 +559,12 @@ public sealed partial class CodeJobControl
 
         // 2. Resolve the project at once when it is a folder already (a follow-up never clones
         // or makes one); a clone or git init is planned for after the answer (§12.5).
-        var job = new PlannedJob(claude, prompt, resume, model, maxTurns);
+        if (feeder is not null && !CommandLineSafe(feeder))
+        {
+            feeder = null;
+        }
+
+        var job = new PlannedJob(claude, prompt, resume, model, maxTurns, feeder);
         string dir;
         Func<CancellationToken, Task>? prepare = null;
         if (follow is not null)
@@ -581,6 +597,12 @@ public sealed partial class CodeJobControl
         }
 
         File.WriteAllText(Path.Combine(folder, JobFolder.Prompt), fullPrompt, new UTF8Encoding(false));
+        if (feeder is not null)
+        {
+            // The script and the first message, the prompt (prompt.txt stays the prompt as text).
+            File.WriteAllText(Path.Combine(folder, JobFeeder.ScriptName), JobFeeder.Script, new UTF8Encoding(true));
+            JobFeeder.Put(folder, JobFeeder.PromptFile, [JobFeeder.UserLine(fullPrompt, null)]);
+        }
 
         if (prepare is null)
         {
@@ -723,7 +745,7 @@ public sealed partial class CodeJobControl
         int pid;
         try
         {
-            pid = _host.StartJob(new JobLaunch(job.Claude, folder, dir, job.Resume, job.Model, job.MaxTurns));
+            pid = _host.StartJob(new JobLaunch(job.Claude, folder, dir, job.Resume, job.Model, job.MaxTurns, job.Feeder));
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -733,7 +755,18 @@ public sealed partial class CodeJobControl
         WriteMeta(folder, Meta(id, pid, dir, started, job));
     }
 
-    private static JsonObject Meta(string id, int? pid, string dir, DateTimeOffset started, PlannedJob job) => new()
+    private static JsonObject Meta(string id, int? pid, string dir, DateTimeOffset started, PlannedJob job)
+    {
+        var meta = BaseMeta(id, pid, dir, started, job);
+        if (job.Feeder is not null)
+        {
+            meta["input"] = JobFeeder.MetaInput; // §15: it takes messages while it runs
+        }
+
+        return meta;
+    }
+
+    private static JsonObject BaseMeta(string id, int? pid, string dir, DateTimeOffset started, PlannedJob job) => new()
     {
         ["id"] = id,
         ["pid"] = pid,
@@ -757,7 +790,7 @@ public sealed partial class CodeJobControl
     }
 
     /// <summary>What the start of a job needs, all validated.</summary>
-    private sealed record PlannedJob(string Claude, string Prompt, string? Resume, string? Model, int? MaxTurns);
+    private sealed record PlannedJob(string Claude, string Prompt, string? Resume, string? Model, int? MaxTurns, string? Feeder);
 
     /// <summary>A start whose clone or git init runs after the answer.</summary>
     private sealed class Starting(CancellationTokenSource cts)
@@ -960,13 +993,191 @@ public sealed partial class CodeJobControl
         }
 
         // It may have finished between the look above and the kill: its result wins (§12.5).
-        if (JobState.ResultState(folder) is { } finished)
+        // Not for a job that takes messages: it writes a result per answer while it runs (§15).
+        if (!meta.Input && JobState.ResultState(folder) is { } finished)
         {
             TryDeleteFile(marker);
             return new JsonObject { ["job_id"] = id, ["state"] = finished };
         }
 
         return new JsonObject { ["job_id"] = id, ["state"] = JobStates.Cancelled };
+    }
+
+    // -- code_input, code_input_withdraw (§15) ------------------------------------------
+
+    /// <summary>How long a withdrawal waits for Claude Code's answer.</summary>
+    private static readonly TimeSpan WithdrawWait = TimeSpan.FromSeconds(8);
+
+    private static readonly TimeSpan WithdrawLook = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>The folder of a running job that takes messages; <c>failed</c> with a sentence otherwise.</summary>
+    private (string Id, string Folder) OpenJob(Args args)
+    {
+        var id = args.String("job_id", 100);
+        var folder = Path.Combine(JobsFolder, id);
+        if (!JobFolder.IsJobId(id) || !Directory.Exists(folder) || JobFolder.ReadMeta(folder, id) is not { } meta)
+        {
+            throw CommandException.Failed($"There is no job {JobFolder.Cut(id, 40)}.");
+        }
+
+        if (!meta.Input)
+        {
+            throw CommandException.Failed("This job doesn't take messages while it runs.");
+        }
+
+        if (JobFolder.IsCancelled(folder) || !JobFeeder.IsOpen(folder) || !JobState.IsAlive(folder, meta, _probe, _time.GetUtcNow()))
+        {
+            throw CommandException.Failed(NoInputMessage);
+        }
+
+        return (id, folder);
+    }
+
+    public const string NoInputMessage = "The job no longer takes messages.";
+
+    private static string MessageId(Args args)
+    {
+        var message = args.String("message_id", 36);
+        if (!Guid.TryParseExact(message, "D", out _))
+        {
+            throw CommandException.Failed("“message_id” must be a UUID.");
+        }
+
+        return message.ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// <c>code_input</c>: a message for a running job, taken in by Claude Code at its next step;
+    /// with <c>now</c>, after an interrupt of the current one. Images go into
+    /// <c>messages\&lt;message id&gt;\images\</c> and are listed after the text, as with a prompt.
+    /// </summary>
+    private JsonObject Input(Args args)
+    {
+        var (id, folder) = OpenJob(args);
+        var message = MessageId(args);
+        var prompt = args.String("prompt", 100_000);
+        var now = args.Bool("now", false);
+        var images = CodeJobImages.Parse(args);
+        string text;
+        try
+        {
+            text = images.Count == 0 ? prompt : CodeJobImages.Write(Path.Combine(folder, "messages", message), images, prompt);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw CommandException.Failed("The images couldn't be written into the job's folder.");
+        }
+
+        var lines = new List<string>();
+        if (now)
+        {
+            lines.Add(JobFeeder.ControlLine("interrupt-" + message, "interrupt"));
+        }
+
+        lines.Add(JobFeeder.UserLine(text, message));
+        try
+        {
+            JobFeeder.Put(folder, InboxName(message), lines);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw CommandException.Failed("The message couldn't be written into the job's folder.");
+        }
+
+        return new JsonObject { ["job_id"] = id, ["message_id"] = message, ["state"] = "sent" };
+    }
+
+    /// <summary>A name that sorts after the files written before it (the time in ticks), then the message.</summary>
+    private string InboxName(string message, string kind = "m") =>
+        _time.GetUtcNow().UtcTicks.ToString("D20", CultureInfo.InvariantCulture) + "-" + kind + "-" + message + ".jsonl";
+
+    /// <summary>
+    /// <c>code_input_withdraw</c>: takes a message back. One the script hasn't forwarded yet is
+    /// removed from the inbox; one Claude Code holds is withdrawn with
+    /// <c>cancel_async_message</c>, whose answer it waits for. <c>withdrawn: false</c> when
+    /// Claude Code took it in already (or the job ended meanwhile).
+    /// </summary>
+    private async Task<JsonObject> WithdrawAsync(Args args, CancellationToken ct)
+    {
+        var id = args.String("job_id", 100);
+        var message = MessageId(args);
+        var folder = Path.Combine(JobsFolder, id);
+        if (!JobFolder.IsJobId(id) || !Directory.Exists(folder))
+        {
+            throw CommandException.Failed($"There is no job {JobFolder.Cut(id, 40)}.");
+        }
+
+        var inbox = JobFeeder.InboxOf(folder);
+        var waiting = Directory.Exists(inbox) ? Directory.GetFiles(inbox, $"*-m-{message}.jsonl") : [];
+        foreach (var file in waiting)
+        {
+            try
+            {
+                // Renamed, as the script claims a file: only one of the two can.
+                File.Move(file, Path.ChangeExtension(file, ".withdrawn"));
+                return Withdrawn(id, message, true);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // The script took it just now: ask Claude Code below.
+            }
+        }
+
+        if (!JobFeeder.IsOpen(folder) || JobFolder.IsCancelled(folder))
+        {
+            return Withdrawn(id, message, false);
+        }
+
+        var request = "withdraw-" + message;
+        var outPath = Path.Combine(folder, JobFolder.Out);
+        var position = JsonlTail.Each(outPath, LinePosition.Start, _ => { });
+        JobFeeder.Put(folder, InboxName(message, "w"), [JobFeeder.ControlLine(request, "cancel_async_message", message)]);
+        for (var look = 0; ; look++)
+        {
+            bool? answer = null;
+            position = JsonlTail.Each(outPath, position, line =>
+            {
+                if (line.Text.Contains(request, StringComparison.Ordinal) && WithdrawAnswer(line.Text, request) is { } found)
+                {
+                    answer = found;
+                }
+            });
+            if (answer is { } done)
+            {
+                return Withdrawn(id, message, done);
+            }
+
+            if (!JobFeeder.IsOpen(folder) || look * WithdrawLook >= WithdrawWait)
+            {
+                return Withdrawn(id, message, false);
+            }
+
+            await Task.Delay(WithdrawLook, ct);
+        }
+    }
+
+    private static JsonObject Withdrawn(string id, string message, bool withdrawn) =>
+        new() { ["job_id"] = id, ["message_id"] = message, ["withdrawn"] = withdrawn };
+
+    /// <summary><c>response.response.cancelled</c> of the control response to <paramref name="request"/>, or null.</summary>
+    internal static bool? WithdrawAnswer(string line, string request)
+    {
+        try
+        {
+            if (JsonNode.Parse(line) is not JsonObject ev || Wire.Str(ev, "type") != "control_response"
+                || ev["response"] is not JsonObject response || Wire.Str(response, "request_id") != request)
+            {
+                return null;
+            }
+
+            // An error answer (a Claude Code without the request) withdraws nothing.
+            return response["response"] is JsonObject inner && inner["cancelled"] is JsonValue value
+                && value.GetValueKind() == System.Text.Json.JsonValueKind.True;
+        }
+        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     // -- helpers -------------------------------------------------------------------------

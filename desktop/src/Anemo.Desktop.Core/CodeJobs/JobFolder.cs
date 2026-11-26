@@ -13,7 +13,8 @@ public sealed record JobMeta(
     string? ResumeSession,
     DateTimeOffset Started,
     string? PromptPreview,
-    string? Model);
+    string? Model,
+    bool Input = false); // meta.json "input": "stream-json": the job takes messages while it runs (§15, 1.9.0)
 
 /// <summary>
 /// Reads one job folder of <c>cc.ps1</c>'s format (code-sessions.md D2):
@@ -81,7 +82,8 @@ public static partial class JobFolder
             NullIfBlank(Str(meta, "resume")),
             started.Value,
             Str(meta, "prompt_preview"),
-            NullIfBlank(Str(meta, "model")));
+            NullIfBlank(Str(meta, "model")),
+            Str(meta, "input") == JobFeeder.MetaInput);
     }
 
     /// <summary><c>prompt.txt</c>, or the meta's preview when it is missing.</summary>

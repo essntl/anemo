@@ -4,12 +4,12 @@ travel on the job's live stream (`code.job` {job}, `code.events` {job_id, events
 import re
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
 from app.features.code_sessions.images import MAX_IMAGES
-from app.features.code_sessions.models import EventKind, State
+from app.features.code_sessions.models import EventKind, MessageState, State
 
 
 class CodeDeviceOut(BaseModel):
@@ -34,6 +34,13 @@ class CodeTodoOut(BaseModel):
 class CodeImageOut(BaseModel):
     id: uuid.UUID  # the attachment: GET /api/attachments/{id}/content
     name: str  # the file name in the job's folder on the computer (images\\<name>)
+
+
+class CodeTokensOut(BaseModel):
+    input: int = 0
+    output: int = 0
+    cache_read: int = 0
+    cache_creation: int = 0
 
 
 class CodeJobOut(BaseModel):
@@ -73,6 +80,46 @@ class CodeJobOut(BaseModel):
     conversation_title: str | None = None
     # The images sent with its prompt (only for a job Anemo started with images).
     images: list[CodeImageOut] = []
+    # The token counts of its last result (None: no result yet, or none given).
+    tokens: CodeTokensOut | None = None
+    # It takes messages while it runs now (§15).
+    input_open: bool = False
+    # Auto continue (§16): it stopped at the usage limit, which resets at limit_resets_at;
+    # resume_state: None | scheduled | starting | started | cancelled | stopped | failed.
+    limit_hit: bool = False
+    limit_resets_at: datetime | None = None
+    resume_state: str | None = None
+    resume_at: datetime | None = None
+    resume_note: str | None = None
+    resume_attempt: int = 0  # automatic continues in a row that led to this job
+    resumed_job_id: uuid.UUID | None = None  # the job its continue started
+    resumed_from: uuid.UUID | None = None  # the job whose continue started this one
+
+
+class CodeUsageWindowOut(BaseModel):
+    # five_hour | seven_day | seven_day_opus | … (as Claude Code names them)
+    name: str
+    utilization: float | None  # 0.49 = 49 % used; past 1 once the limit was hit
+    resets_at: datetime | None
+    status: str | None  # allowed | allowed_warning | rejected
+
+
+class CodeUsageOut(BaseModel):
+    """The usage of the Claude subscription a computer's jobs run on, as its newest
+    `rate_limit_event` said (§14)."""
+
+    device_id: uuid.UUID
+    device_name: str
+    status: str | None  # of the window that decides (limit_type)
+    limit_type: str | None
+    resets_at: datetime | None  # when that window resets
+    windows: list[CodeUsageWindowOut]
+    observed_at: datetime  # when it was true ("as of")
+    job_id: uuid.UUID | None  # the job whose event it came from
+
+
+class CodeUsageListOut(BaseModel):
+    usage: list[CodeUsageOut]  # one per computer, the newest first
 
 
 class CodeJobListOut(BaseModel):
@@ -81,9 +128,31 @@ class CodeJobListOut(BaseModel):
     has_more: bool
 
 
+class CodeMessageOut(BaseModel):
+    """A message written for a thread while its job ran (§15)."""
+
+    id: uuid.UUID
+    thread_id: uuid.UUID
+    job_id: uuid.UUID  # the job it was written for (the thread's running job then)
+    prompt: str
+    images: list[CodeImageOut] = []
+    mode: Literal["queue", "now"]  # queue: at the job's next step; now: interrupting it
+    # queued | sending | sent (in the job's hands) | delivered (taken in) |
+    # followed_up (sent as a follow-up: follow_up_job_id) | held (note says why)
+    state: MessageState
+    note: str | None  # why it waits or is held
+    created_at: datetime
+    sent_at: datetime | None
+    delivered_at: datetime | None
+    delivered_seq: int | None  # the seq of its echo in the job's events
+    follow_up_job_id: uuid.UUID | None
+
+
 class CodeJobDetailOut(BaseModel):
     job: CodeJobOut
     thread: list[CodeJobOut]  # every job of its thread in start order, the job included
+    # The thread's messages (the newest 50), oldest first.
+    messages: list[CodeMessageOut] = []
 
 
 class CodeEventOut(BaseModel):
@@ -183,6 +252,22 @@ class CodeJobIn(BaseModel):
         default_factory=list,
         max_length=MAX_IMAGES,
         description="Uploaded images (POST /api/attachments) to send with the prompt",
+    )
+
+
+class CodeAutoContinueIn(BaseModel):
+    enabled: bool
+
+
+class CodeMessageIn(BaseModel):
+    prompt: str = Field(min_length=1, max_length=100_000)
+    image_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        max_length=MAX_IMAGES,
+        description="Uploaded images (POST /api/attachments) to send with the message",
+    )
+    now: bool | None = Field(
+        None, description="Interrupt the job's current step and send it at once (default: queue)"
     )
 
 

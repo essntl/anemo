@@ -14,6 +14,8 @@ export function codeJob(more: Partial<CodeJob> = {}): CodeJob {
     thread_id: id, model: null, branch: null, pr_url: null, todos: [], num_turns: null, duration_ms: null, cost_usd: null,
     result_text: null, result_subtype: null, is_error: false, stderr_tail: null, last_seq: 0, event_count: 0, truncated: false,
     conversation_id: null, run_id: null, conversation_title: null, images: [],
+    tokens: null, input_open: false, limit_hit: false, limit_resets_at: null, resume_state: null, resume_at: null, resume_note: null,
+    resume_attempt: 0, resumed_job_id: null, resumed_from: null,
     ...more,
   }
 }

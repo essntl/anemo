@@ -263,6 +263,7 @@ class Connection:
                 code_git=bool(message.get("code_git")),
                 code_git_remote=bool(message.get("code_git_remote")),
                 files=bool(message.get("files")),  # Anemo Desktop 1.7.0 (§8)
+                code_input=bool(message.get("code_input")),  # Anemo Desktop 1.9.0
                 platform=self.platform,
                 shell_kind=relay.shell_kind_of(message.get("shell_kind")),
             )

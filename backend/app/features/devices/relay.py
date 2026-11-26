@@ -15,7 +15,7 @@ It checks no trust level or permission: the tools do that before they call `send
 Keys (nobody outside features/devices reads them):
   devices:online:<device_id>   a hash: the device's connection (`conn`) and its last offer
                                (`control`, `shell`, `code`, `code_start`, `code_images`,
-                               `code_git`, `code_git_remote`, `files`, `platform`,
+                               `code_git`, `code_git_remote`, `files`, `code_input`, `platform`,
                                `shell_kind`, `offered_at`); 90 s,
                                renewed by the client's pings and offers. The offer
                                counts for OFFER_TTL_S after offered_at. Changed only by
@@ -94,6 +94,9 @@ class Offer:
     # It moves files to and from the workspace (device-contracts.md §8, Anemo Desktop
     # 1.7.0): "Let Anemo read and write files" is on in the client (older clients: off).
     files: bool = False
+    # The jobs it starts take messages while they run (code-sessions.md §15, Anemo Desktop
+    # 1.9.0): `code_start` takes `input`, and `code_input`, `code_input_withdraw` are there.
+    code_input: bool = False
     # From `hello` (older clients: Windows) and the offer (older clients: Windows PowerShell).
     platform: Platform = DEFAULT_PLATFORM
     shell_kind: ShellKind = DEFAULT_SHELL_KIND
@@ -174,13 +177,13 @@ local old = redis.call('HGET', KEYS[1], 'conn')
 redis.call('DEL', KEYS[1])
 redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
   'code_start', '0', 'code_images', '0', 'code_git', '0',
-  'code_git_remote', '0', 'files', '0', 'offered_at', '')
+  'code_git_remote', '0', 'files', '0', 'code_input', '0', 'offered_at', '')
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return old
 """
 
 # ARGV: conn, ttl, has_offer ('1'/'0'), control, shell, offered_at, code, code_start,
-# code_images, platform, shell_kind, code_git, code_git_remote, files. 0 when another
+# code_images, platform, shell_kind, code_git, code_git_remote, files, code_input. 0 when another
 # connection has the device.
 _RENEW = """
 local cur = redis.call('HGET', KEYS[1], 'conn')
@@ -188,13 +191,13 @@ if cur and cur ~= ARGV[1] then return 0 end
 if not cur then
   redis.call('HSET', KEYS[1], 'conn', ARGV[1], 'control', '0', 'shell', '0', 'code', '0',
     'code_start', '0', 'code_images', '0', 'code_git', '0',
-  'code_git_remote', '0', 'files', '0', 'offered_at', '')
+  'code_git_remote', '0', 'files', '0', 'code_input', '0', 'offered_at', '')
 end
 if ARGV[3] == '1' then
   redis.call('HSET', KEYS[1], 'control', ARGV[4], 'shell', ARGV[5], 'offered_at', ARGV[6],
     'code', ARGV[7], 'code_start', ARGV[8], 'code_images', ARGV[9], 'platform', ARGV[10],
     'shell_kind', ARGV[11], 'code_git', ARGV[12], 'code_git_remote', ARGV[13],
-    'files', ARGV[14])
+    'files', ARGV[14], 'code_input', ARGV[15])
 end
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 return 1
@@ -242,6 +245,7 @@ def _fresh_offer(entry: dict[str, str]) -> Offer | None:
         code_git=entry.get("code_git") == "1",
         code_git_remote=entry.get("code_git_remote") == "1",
         files=entry.get("files") == "1",
+        code_input=entry.get("code_input") == "1",
         # A hash an older server wrote has neither field: Windows PowerShell, as it was.
         platform=platform_of(entry.get("platform")),
         shell_kind=shell_kind_of(entry.get("shell_kind")),
@@ -310,6 +314,7 @@ async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> 
         "0",
         "0",
         "0",
+        "0",
     ]
     if offer is not None:
         args[2:] = [
@@ -325,6 +330,7 @@ async def renew(device_id: uuid.UUID, conn: str, offer: Offer | None = None) -> 
             "1" if offer.code_git else "0",
             "1" if offer.code_git_remote else "0",
             "1" if offer.files else "0",
+            "1" if offer.code_input else "0",
         ]
     try:
         return bool(await _script(_RENEW, device_id, *args))

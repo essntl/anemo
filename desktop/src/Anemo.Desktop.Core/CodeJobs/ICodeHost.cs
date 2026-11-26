@@ -37,8 +37,16 @@ public sealed record JobLaunch(
     string WorkingDirectory,
     string? Resume,
     string? Model,
-    int? MaxTurns)
+    int? MaxTurns,
+    string? Feeder = null)
 {
+    /// <summary>
+    /// The job takes messages while it runs (§15): its stdin comes from
+    /// <see cref="JobFeeder"/>'s script, run by <see cref="Feeder"/> (Windows PowerShell), instead
+    /// of <c>prompt.txt</c>.
+    /// </summary>
+    public bool Input => Feeder is not null;
+
     /// <summary><c>claude</c>'s arguments, each as it is (no quoting).</summary>
     public IReadOnlyList<string> Arguments
     {
@@ -76,7 +84,9 @@ public static class WindowsJobCommand
 {
     public static DetachedStart For(JobLaunch launch) => new(
         "cmd.exe",
-        CodeJobControl.CommandLine(launch.Claude, launch.JobFolder, launch.Resume, launch.Model, launch.MaxTurns),
+        launch.Feeder is { } feeder
+            ? JobFeeder.CommandLine(feeder, launch.Claude, launch.JobFolder, launch.Resume, launch.Model, launch.MaxTurns)
+            : CodeJobControl.CommandLine(launch.Claude, launch.JobFolder, launch.Resume, launch.Model, launch.MaxTurns),
         launch.WorkingDirectory,
         CodeJobControl.StartEnvironment);
 }
@@ -102,6 +112,16 @@ public interface ICodeHost
 
     /// <summary>Ends the process and every process it started; false when Windows wouldn't.</summary>
     bool KillTree(int pid);
+
+    /// <summary>
+    /// Windows PowerShell from the system folder (never one found on PATH or in a project
+    /// folder), which feeds the messages of a job that takes them (§15); null when it isn't there.
+    /// </summary>
+    string? WindowsPowerShell()
+    {
+        var path = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+        return File.Exists(path) ? path : null;
+    }
 }
 
 /// <summary>No programs at all (where no host is given): every lookup finds nothing.</summary>

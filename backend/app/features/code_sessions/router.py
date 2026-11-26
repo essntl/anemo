@@ -30,9 +30,10 @@ from app.api.deps import Db
 from app.api.sse import comment, frame, sse_response
 from app.core.db import get_sessionmaker
 from app.events import bus
-from app.features.code_sessions import control, git, service
+from app.features.code_sessions import autocontinue, control, git, messages, service, usage
 from app.features.code_sessions.models import State
 from app.features.code_sessions.schemas import (
+    CodeAutoContinueIn,
     CodeDeviceOut,
     CodeEventsOut,
     CodeFollowUpIn,
@@ -40,7 +41,10 @@ from app.features.code_sessions.schemas import (
     CodeJobIn,
     CodeJobListOut,
     CodeJobOut,
+    CodeMessageIn,
+    CodeMessageOut,
     CodeProjectsOut,
+    CodeUsageListOut,
 )
 
 router = APIRouter(prefix="/code", tags=["code"])
@@ -71,6 +75,13 @@ async def list_jobs(
         before=before,
         before_id=before_id,
     )
+
+
+@router.get("/usage", response_model=CodeUsageListOut)
+async def code_usage(db: Db) -> CodeUsageListOut:
+    """The latest known usage of the Claude subscription of each computer (from its jobs'
+    `rate_limit_event`s), with when it was seen; kept while no job runs."""
+    return await usage.list_usage(db)
 
 
 @router.get("/jobs/{job_id}", response_model=CodeJobDetailOut)
@@ -192,6 +203,39 @@ async def follow_up(job_id: uuid.UUID, body: CodeFollowUpIn, db: Db) -> CodeJobO
         max_turns=body.max_turns,
         image_ids=body.image_ids,
     )
+
+
+@router.post("/jobs/{job_id}/messages", response_model=CodeMessageOut, status_code=201)
+async def send_message(job_id: uuid.UUID, body: CodeMessageIn, db: Db) -> CodeMessageOut:
+    """A message for the thread: handed to its running job, which takes it in at its next
+    step (`now`: after interrupting the current one), or sent as the next follow-up when
+    the job can't take it or has ended."""
+    return await messages.create(
+        db, job_id, prompt=body.prompt, image_ids=body.image_ids, now=bool(body.now)
+    )
+
+
+@router.delete("/messages/{message_id}", status_code=204)
+async def remove_message(message_id: uuid.UUID, db: Db) -> None:
+    """Remove a message that wasn't delivered yet (withdrawn from the job when it holds it);
+    409 `message_delivered` when Claude Code took it in already."""
+    await messages.remove(db, message_id)
+
+
+@router.post("/messages/{message_id}/now", response_model=CodeMessageOut)
+async def send_message_now(message_id: uuid.UUID, db: Db) -> CodeMessageOut:
+    """Send a waiting (or held) message now: interrupting the job's current step, or as a
+    follow-up at once when the job has ended."""
+    return await messages.send_now(db, message_id)
+
+
+@router.put("/jobs/{job_id}/auto-continue", response_model=CodeJobOut)
+async def auto_continue(job_id: uuid.UUID, body: CodeAutoContinueIn, db: Db) -> CodeJobOut:
+    """Auto continue for a job that stopped at the usage limit: on, its session is resumed
+    shortly after the limit resets (as soon as its computer is back); off, that is
+    cancelled. 409 `not_limited` for a job that isn't the last of its thread or didn't stop
+    at the limit."""
+    return await autocontinue.set_auto(db, job_id, body.enabled)
 
 
 @router.post("/jobs/{job_id}/cancel", response_model=CodeJobOut)

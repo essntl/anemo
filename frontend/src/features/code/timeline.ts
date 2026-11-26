@@ -14,6 +14,11 @@
  *   parent_tool_use_id = X     → nested under the Task/Agent call X
  *   raw                        → plain text; stored-as-stub events → one "not stored" run
  *   result                     → the result
+ *   rate_limit_event           → nothing: the subscription's usage is the page's usage
+ *                                indicator (usage.ts), not a step of the job
+ *   user with isReplay         → a message the user sent while the job ran, where Claude
+ *                                Code took it in (§15); the first one is the prompt itself
+ *   command_lifecycle, control_request, control_response → nothing (bookkeeping of §15)
  */
 import type { Schemas } from '@/api/client'
 
@@ -140,6 +145,8 @@ export type TimelineItem =
   | (Base & { kind: 'thinking'; text: string })
   /** A user message's own text: a sub-agent's prompt, "[Request interrupted by user]". */
   | (Base & { kind: 'user'; text: string })
+  /** A message sent while the job ran, taken in here (`at`: when its echo arrived). */
+  | (Base & { kind: 'message'; text: string; at: string })
   | (Base & { kind: 'tool'; call: ToolCall })
   | (Base & { kind: 'raw'; text: string })
   /** An event too large to keep, of which only its type is left (§6 step 4). */
@@ -172,11 +179,18 @@ function blocksOf(event: Json): Json[] {
   return arr(content).map(obj).filter((b): b is Json => b !== undefined)
 }
 
+/**
+ * Event types that are bookkeeping, not something the job did: kept in the stored log,
+ * left out of the timeline.
+ */
+export const HIDDEN_EVENT_TYPES: ReadonlySet<string> = new Set(['rate_limit_event', 'command_lifecycle', 'control_request', 'control_response'])
+
 /** The timeline of one job's events (in any order; sorted by seq here). */
 export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
   const top: TimelineItem[] = []
   const calls = new Map<string, ToolCall>()
   let dropped: Dropped | null = null
+  let replays = 0
 
   for (const ev of [...events].sort((a, b) => a.seq - b.seq)) {
     const seq = ev.seq
@@ -192,10 +206,12 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
       }
       continue
     }
-    dropped = null
-
     const e = obj(ev.event) ?? {}
     const type = str(e.type) ?? ''
+    // Before the run of stubs ends: hidden events between stubs don't split it.
+    if (HIDDEN_EVENT_TYPES.has(type)) continue
+    dropped = null
+
     const parent = str(e.parent_tool_use_id)
     // A sub-agent's events go inside its Task call (at the top when that call isn't known).
     const into = (parent && calls.get(parent)?.children) || top
@@ -228,6 +244,13 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
         break
       }
       case 'user': {
+        if (e.isReplay === true) {
+          // Claude Code's echo of what it read on stdin: the prompt first, then each message.
+          replays += 1
+          const text = blocksOf(e).map((b) => str(b.text) ?? '').join('\n')
+          if (replays > 1 && text.trim()) into.push({ kind: 'message', key: key(), seq, trimmed, text, at: ev.created_at })
+          break
+        }
         const blocks = blocksOf(e)
         const results = blocks.filter((b) => b.type === 'tool_result')
         for (const b of blocks) {
