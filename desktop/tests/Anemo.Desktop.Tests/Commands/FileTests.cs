@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Anemo.Desktop.Core.Commands;
 using Anemo.Desktop.Core.Files;
+using Anemo.Desktop.Core.Platform;
 using Anemo.Desktop.Core.Protocol;
 using Anemo.Desktop.Core.Storage;
 
@@ -119,6 +120,68 @@ public sealed class FileTests : IDisposable
         _f.Settings = _f.Settings with { FileFolders = [shared] };
         await Ok("file_stat", new JsonObject { ["path"] = Path.Combine(shared, "b.txt") });
         await Fails("file_stat", new JsonObject { ["path"] = InHome("Documents", "a.txt") }, ResultCodes.Refused);
+    }
+
+    [Fact]
+    public async Task Never_powershell_profile_folders_whose_scripts_run_at_every_start()
+    {
+        foreach (var folder in new[] { "PowerShell", "WindowsPowerShell" })
+        {
+            Directory.CreateDirectory(InHome("Documents", folder));
+            var profile = InHome("Documents", folder, "Microsoft.PowerShell_profile.ps1");
+            File.WriteAllText(profile, "# mine");
+
+            await Fails("file_stat", new JsonObject { ["path"] = profile }, ResultCodes.Refused);
+            await Fails("file_write_begin", new JsonObject { ["path"] = InHome("Documents", folder, "profile.ps1"), ["size"] = 1, ["sha256"] = Sha([1]) }, ResultCodes.Refused);
+            await Fails("file_write_begin", new JsonObject { ["path"] = InHome("Documents", folder, "Modules", "m", "m.psm1"), ["size"] = 1, ["sha256"] = Sha([1]) }, ResultCodes.Refused);
+            Assert.False(File.Exists(InHome("Documents", folder, "profile.ps1")));
+        }
+
+        // A file next to them in Documents is fine.
+        await Begin(InHome("Documents", "PowerShell notes.txt"), [1]);
+    }
+
+    [Fact]
+    public void PowerShell_folders_below_a_moved_documents_folder_and_the_startup_folders_are_protected_too()
+    {
+        var oneDrive = Path.Combine(_f.Home, "OneDrive", "Documents");
+        var startup = Path.Combine(_f.Home, "Start");
+        var rules = new FileRules(null, _f.Home, DesktopPlatform.Windows, null,
+            [Path.Combine(oneDrive, "WindowsPowerShell"), startup]);
+
+        Assert.Throws<CommandException>(() => rules.CheckWrite(Path.Combine(oneDrive, "WindowsPowerShell", "profile.ps1")));
+        Assert.Throws<CommandException>(() => rules.CheckWrite(Path.Combine(startup, "run.bat")));
+        Assert.Equal(Path.Combine(oneDrive, "report.docx"), rules.CheckWrite(Path.Combine(oneDrive, "report.docx")));
+    }
+
+    [Theory]
+    [InlineData("Chrome.lnk")]
+    [InlineData("Bank.URL")]
+    [InlineData("explorer.scf")]
+    [InlineData("Music.library-ms")]
+    [InlineData("x.searchConnector-ms")]
+    [InlineData("x.settingcontent-ms")]
+    [InlineData("desktop.ini")]
+    public async Task Shortcuts_and_folder_settings_files_are_never_written_but_can_be_read(string name)
+    {
+        Directory.CreateDirectory(InHome("Desktop"));
+        var path = InHome("Desktop", name);
+        var refused = await Fails("file_write_begin", new JsonObject { ["path"] = path, ["size"] = 1, ["sha256"] = Sha([1]) }, ResultCodes.Refused);
+        Assert.Contains("shortcuts", refused.Error);
+        Assert.Empty(PartFiles());
+
+        File.WriteAllText(path, "x");
+        Assert.Equal("file", (string?)(await Ok("file_stat", new JsonObject { ["path"] = path }))["kind"]);
+    }
+
+    [Fact]
+    public void A_mac_writes_any_file_type_finder_runs_nothing_for_showing_a_folder()
+    {
+        var rules = new FileRules(null, _f.Home, DesktopPlatform.MacOS(_f.Home), null);
+        var path = InHome("Desktop", "a.lnk");
+        Assert.Equal(path, rules.CheckWrite(path));
+        Assert.Throws<CommandException>(() => rules.Check(InHome("Library", "LaunchAgents", "x.plist")));
+        Assert.Throws<CommandException>(() => rules.Check(InHome(".zshrc")));
     }
 
     [Fact]

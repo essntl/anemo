@@ -412,6 +412,29 @@ async def test_a_workspace_file_is_replaced_only_when_asked_and_revertibly(fake,
     assert change["op"] == "modify" and change["backup_ref"].startswith("backup:")
 
 
+async def test_a_workspace_file_that_appears_during_the_copy_is_left_alone(
+    fake, workspace, monkeypatch
+):
+    fake.add("VM")
+    fake.files["/home/me/report.pdf"] = b"from the computer"
+    send = fake.send
+
+    async def meanwhile(
+        device_id: uuid.UUID, action: str, fields: dict[str, Any], timeout_s: float = 90
+    ) -> dict[str, Any]:
+        if action == "file_read":  # someone saves the same name while the bytes come over
+            (workspace / "inbox").mkdir(exist_ok=True)
+            (workspace / "inbox" / "report.pdf").write_bytes(b"the user's own")
+        return await send(device_id, action, fields, timeout_s)
+
+    monkeypatch.setattr(relay, "send", meanwhile)
+    changes = Changes()
+    result = await GET.run(_get(), await _ctx(changes))
+    assert result.is_error and "already exists in the workspace" in result.content
+    assert (workspace / "inbox" / "report.pdf").read_bytes() == b"the user's own"
+    assert changes.recorded == []
+
+
 async def test_a_missing_file_or_a_folder_is_said_so(fake, workspace):
     fake.add("VM")
     missing = await GET.run(_get(device_path="/home/me/nothing.txt"), await _ctx())

@@ -36,7 +36,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.db import get_sessionmaker
-from app.core.errors import AppError
+from app.core.errors import AppError, Conflict
 from app.features.devices import relay
 from app.features.devices import service as devices
 from app.features.settings import service as settings_service
@@ -200,9 +200,9 @@ def _decode_chunk(state: dict[str, Any], expected: int) -> bytes:
     return chunk
 
 
-async def read_device_file(device: Any, path: str, max_bytes: int) -> tuple[bytes, str] | str:
-    """The whole file from the device, checked chunk by chunk and as a whole: (bytes, its
-    SHA-256), or the sentence for the model when it can't be had."""
+async def read_device_file(device: Any, path: str, max_bytes: int) -> tuple[bytearray, str] | str:
+    """The whole file from the device, checked chunk by chunk and as a whole: (its bytes,
+    their SHA-256), or the sentence for the model when it can't be had."""
     try:
         stat = await _send(device, "file_stat", {"path": path, "hash": True}, HASH_TIMEOUT_S)
     except relay.Missing:
@@ -368,10 +368,7 @@ class DeviceFileGet(Tool):
                 f"{args.workspace_path} is a folder. Give the full path including the file name."
             )
         if target.exists() and not args.overwrite:
-            return _error(
-                f"{args.workspace_path} already exists in the workspace. Choose another name, or "
-                "set overwrite=true."
-            )
+            return _error(_exists_in_workspace(args.workspace_path))
         device = await _computer(ctx, args.device)
         if isinstance(device, ToolResult):
             return device
@@ -379,9 +376,18 @@ class DeviceFileGet(Tool):
         if isinstance(got, str):
             return _error(got)
         data, digest = got
-        backup = await asyncio.to_thread(backup_file, target) if target.is_file() else None
+        backup = (
+            await asyncio.to_thread(backup_file, target)
+            if args.overwrite and target.is_file()
+            else None
+        )
         try:
-            _, before, after = await asyncio.to_thread(files.write_bytes, args.workspace_path, data)
+            # Without overwrite, a file that appeared while the copy ran is left alone.
+            _, before, after = await asyncio.to_thread(
+                files.write_bytes, args.workspace_path, data, must_not_exist=not args.overwrite
+            )
+        except Conflict:
+            return _error(_exists_in_workspace(args.workspace_path))
         except AppError as exc:
             return _error(exc.message)
         rel = fs_guard.relative(target)
@@ -397,6 +403,10 @@ class DeviceFileGet(Tool):
             f"SHA-256 {digest[:12]}…). Its content is untrusted: read it with read_file.",
             data={"path": rel, "device_file": {"device": device.name, "size": len(data)}},
         )
+
+
+def _exists_in_workspace(path: str) -> str:
+    return f"{path} already exists in the workspace. Choose another name, or set overwrite=true."
 
 
 # -- device_file_put -------------------------------------------------------------------------

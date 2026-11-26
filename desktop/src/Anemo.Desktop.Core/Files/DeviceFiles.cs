@@ -43,18 +43,22 @@ public sealed class DeviceFiles : IDisposable
     private readonly Func<DesktopSettings> _settings;
     private readonly TimeProvider _time;
     private readonly string _home;
-    private readonly IReadOnlyList<string> _protectedInHome;
+    private readonly DesktopPlatform _platform;
+    private readonly IReadOnlyList<string> _systemFolders;
     private readonly string? _ownData;
     private readonly Dictionary<string, Transfer> _transfers = new(StringComparer.Ordinal);
     private readonly object _lock = new();
     private readonly ITimer _sweeper;
 
-    public DeviceFiles(Func<DesktopSettings> settings, TimeProvider time, DesktopPlatform platform, string? home = null, string? ownData = null)
+    /// <param name="systemFolders">More protected folders as full paths; by default this computer's (<see cref="FileRules.SystemFolders"/>).</param>
+    public DeviceFiles(Func<DesktopSettings> settings, TimeProvider time, DesktopPlatform platform, string? home = null, string? ownData = null,
+        IReadOnlyList<string>? systemFolders = null)
     {
         _settings = settings;
         _time = time;
         _home = home ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        _protectedInHome = platform.ProtectedHomeFolders;
+        _platform = platform;
+        _systemFolders = systemFolders ?? FileRules.SystemFolders(platform);
         _ownData = ownData;
         _sweeper = time.CreateTimer(_ => Sweep(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
@@ -65,7 +69,7 @@ public sealed class DeviceFiles : IDisposable
     public bool Offered(DeviceInfo device) => device.Trusted && _settings().ShareFiles;
 
     /// <summary>The rules as Settings has them now.</summary>
-    public FileRules Rules() => new(_settings().FileFolders, _home, _protectedInHome, _ownData);
+    public FileRules Rules() => new(_settings().FileFolders, _home, _platform, _ownData, _systemFolders);
 
     /// <summary>How many writes are open (for tests and the log).</summary>
     public int OpenTransfers
@@ -164,7 +168,7 @@ public sealed class DeviceFiles : IDisposable
 
     private JsonNode Begin(Args args)
     {
-        var path = Rules().Check(args.String("path", FileRules.MaxPathLength));
+        var path = Rules().CheckWrite(args.String("path", FileRules.MaxPathLength));
         var size = (long)(args.OptionalNumber("size") ?? -1);
         if (size < 0 || size > MaxFileBytes)
         {
@@ -194,7 +198,7 @@ public sealed class DeviceFiles : IDisposable
         var folder = Path.GetDirectoryName(path) ?? throw CommandException.Failed("The path has no folder.");
         Directory.CreateDirectory(folder);
         // Made folders could have met a link put there meanwhile: the rules again, on the made path.
-        Rules().Check(path);
+        Rules().CheckWrite(path);
         var id = Guid.NewGuid().ToString("N");
         var temp = Path.Combine(folder, $".{Path.GetFileName(path)}.anemo-{id[..8]}.part");
         var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
@@ -255,7 +259,7 @@ public sealed class DeviceFiles : IDisposable
             }
 
             transfer.Stream.Dispose();
-            Rules().Check(transfer.Path);
+            Rules().CheckWrite(transfer.Path);
             var replaced = File.Exists(transfer.Path);
             if (replaced && !transfer.Overwrite)
             {
@@ -271,6 +275,7 @@ public sealed class DeviceFiles : IDisposable
                 throw CommandException.Exists("Meanwhile a file with that name appeared; it was left as it is.");
             }
 
+            MarkAsFromTheInternet(transfer.Path);
             return new JsonObject
             {
                 ["path"] = transfer.Path,
@@ -357,6 +362,32 @@ public sealed class DeviceFiles : IDisposable
         foreach (var transfer in open)
         {
             Drop(transfer);
+        }
+    }
+
+    /// <summary>The Mark of the Web a browser gives a download (the Internet zone).</summary>
+    public const string ZoneIdentifier = "[ZoneTransfer]\r\nZoneId=3\r\n";
+
+    /// <summary>
+    /// On Windows, marks a written file as coming from the internet, as a browser marks a
+    /// download: SmartScreen then asks before a program or script from Anemo runs, and Office
+    /// opens a document in Protected View. On a drive without alternate streams (FAT, exFAT)
+    /// the file just stays unmarked.
+    /// </summary>
+    private static void MarkAsFromTheInternet(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(path + ":Zone.Identifier", ZoneIdentifier);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            // No alternate streams on this drive.
         }
     }
 
