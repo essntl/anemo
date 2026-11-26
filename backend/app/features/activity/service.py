@@ -536,8 +536,14 @@ async def file_restored(db: AsyncSession, path: str) -> None:
     )
 
 
-async def file_moved(db: AsyncSession, old_path: str, new_path: str) -> None:
-    """Undone by moving it back."""
+async def file_moved(
+    db: AsyncSession, old_path: str, new_path: str, fingerprint: dict[str, Any] | None = None
+) -> None:
+    """Undone by moving it back. `fingerprint`: the moved file's (`files.fingerprint`),
+    so the undo can tell it is still the same file at the new path."""
+    undo: dict[str, Any] = {"kind": "fields"}
+    if fingerprint is not None:
+        undo["fingerprint"] = fingerprint
     await record(
         db,
         action="moved",
@@ -546,7 +552,7 @@ async def file_moved(db: AsyncSession, old_path: str, new_path: str) -> None:
         summary=f"Moved {old_path} to {new_path}"[:SUMMARY_LENGTH],
         before={"path": old_path},
         after={"path": new_path},
-        undo={"kind": "fields"},
+        undo=undo,
     )
 
 

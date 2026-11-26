@@ -463,6 +463,40 @@ async def test_the_users_file_moves_and_deletions_are_undone(authed, workspace):
     assert again.json()["error"]["code"] == "activity_undone"
 
 
+async def test_undoing_a_move_checks_it_is_still_the_same_file(authed, workspace):
+    (workspace / "notes" / "a.txt").write_text("a")
+    r = await authed.post("/api/files/move", json={"source": "notes/a.txt", "destination": "b.txt"})
+    assert r.status_code == 200, r.text
+    [moved] = await entries(authed, object_type="file")
+    # Another file now has the name the moved one was given.
+    (workspace / "b.txt").unlink()
+    (workspace / "b.txt").write_text("someone else's file")
+    r = await undo(authed, moved["id"])
+    assert r.status_code == 409, r.text
+    assert r.json()["error"]["code"] == "activity_conflict"
+    assert r.json()["error"]["details"]["differs"][0]["field"] == "file"
+    assert not (workspace / "notes" / "a.txt").exists()
+    assert (await undo(authed, moved["id"], force=True)).status_code == 200
+    assert (workspace / "notes" / "a.txt").read_text() == "someone else's file"
+
+
+async def test_a_move_logged_without_a_fingerprint_is_moved_back_unchecked(authed, workspace):
+    (workspace / "notes" / "a.txt").write_text("a")
+    r = await authed.post("/api/files/move", json={"source": "notes/a.txt", "destination": "b.txt"})
+    assert r.status_code == 200, r.text
+    [moved] = await entries(authed, object_type="file")
+    async with get_sessionmaker()() as db:  # as entries recorded before fingerprints were
+        await db.execute(
+            update(Activity)
+            .where(Activity.id == uuid.UUID(moved["id"]))
+            .values(undo={"kind": "fields"})
+        )
+        await db.commit()
+    (workspace / "b.txt").write_text("changed since")
+    assert (await undo(authed, moved["id"])).status_code == 200
+    assert (workspace / "notes" / "a.txt").read_text() == "changed since"
+
+
 # -- projects ------------------------------------------------------------------------------
 
 

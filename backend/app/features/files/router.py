@@ -199,8 +199,9 @@ async def move(body: MoveIn, db: Db) -> EntryOut:
     source, target = await asyncio.to_thread(
         files.move, body.source, body.destination, body.keep_both
     )
+    fingerprint = await asyncio.to_thread(files.fingerprint, files.rel(target))
     await links.on_moved(db, files.rel(source), files.rel(target), author="user")
-    await activity.file_moved(db, files.rel(source), files.rel(target))
+    await activity.file_moved(db, files.rel(source), files.rel(target), fingerprint)
     await db.commit()
     return _out(files.entry(target))
 
