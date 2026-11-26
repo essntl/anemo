@@ -191,4 +191,10 @@ describe('toRows', () => {
     const rows = toRows([entry({ group_id: 'a' }), entry({ group_id: 'a' }), entry({ group_id: 'b' }), entry()])
     expect(rows.map((r) => r.kind)).toEqual(['group', 'entry', 'entry'])
   })
+
+  it('keeps a batch in one row when other changes fall between its entries', () => {
+    const [a1, other, a2, b, a3] = [entry({ group_id: 'a' }), entry(), entry({ group_id: 'a' }), entry({ group_id: 'b' }), entry({ group_id: 'a' })]
+    const rows = toRows([a1, other, a2, b, a3])
+    expect(rows.map((r) => (r.kind === 'group' ? r.entries.map((e) => e.id) : r.entry.id))).toEqual([[a1.id, a2.id, a3.id], other.id, b.id])
+  })
 })
