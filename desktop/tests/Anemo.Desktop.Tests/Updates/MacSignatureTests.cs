@@ -74,4 +74,11 @@ public sealed class MacSignatureTests
         Assert.Contains("another bundle identifier", MacSignature.Refusal(running, MacSignature.Parse(AdHoc.Replace("Identifier=app.anemo.desktop", "Identifier=com.example.other"))));
         Assert.Contains("isn't signed", MacSignature.Refusal(running, null));
     }
+
+    [Fact]
+    public void When_the_running_apps_signature_is_unknown_nothing_is_accepted()
+    {
+        Assert.Contains("own signature couldn't be read", MacSignature.Refusal(null, MacSignature.Parse(DeveloperId)));
+        Assert.Contains("own signature couldn't be read", MacSignature.Refusal(null, MacSignature.Parse(AdHoc)));
+    }
 }

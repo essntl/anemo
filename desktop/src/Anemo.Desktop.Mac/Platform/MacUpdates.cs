@@ -39,17 +39,25 @@ internal sealed class MacUpdatePlatform : IUpdatePlatform
         Staged = Path.Combine(_staging, Path.GetFileName(_bundle));
         Previous = Path.Combine(_parent, $".{name}.old.app");
         DownloadPath = Path.Combine(updatesFolder, AssetName);
-        Unavailable = _bundle.Length == 0
+        var unavailable = _bundle.Length == 0
             ? "This copy isn't an installed Anemo Desktop.app (a development build), so it doesn't update itself."
             : architecture != Architecture.Arm64
                 ? "Only an Apple Silicon build is published, so this Mac doesn't update itself."
                 : !CanWrite(_parent)
                     ? $"Anemo Desktop can't write to {_parent}, so it can't replace itself there. Move it to /Applications as an administrator, or to ~/Applications."
                     : null;
-        if (Unavailable is null)
+        if (unavailable is null)
         {
+            // Without its own signature there is nothing to compare a download with: refuse
+            // rather than accept any signed bundle.
             _running = runningSignature(_bundle);
+            if (_running is null)
+            {
+                unavailable = "Anemo Desktop couldn't read its own signature (codesign), so it doesn't update itself. Download a new copy from GitHub.";
+            }
         }
+
+        Unavailable = unavailable;
     }
 
     public string? Unavailable { get; }

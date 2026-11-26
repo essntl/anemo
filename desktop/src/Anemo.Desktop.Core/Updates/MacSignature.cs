@@ -67,20 +67,26 @@ public sealed record MacSignature(string? Identifier, bool AdHoc, string? TeamId
     /// signed with the same identifier, and when the running app has a Developer ID (a Team ID),
     /// with the same Team ID. An ad hoc running app accepts any signed app that passed
     /// <c>codesign --verify</c>: an ad hoc signature proves the bundle is intact, not who made it.
+    /// A running app whose own signature couldn't be read accepts nothing.
     /// </summary>
     public static string? Refusal(MacSignature? running, MacSignature? candidate)
     {
+        if (running is null)
+        {
+            return "This app's own signature couldn't be read, so no update is installed.";
+        }
+
         if (candidate is null)
         {
             return "The downloaded app isn't signed, so it isn't installed.";
         }
 
-        if (running?.Identifier is { } id && candidate.Identifier != id)
+        if (running.Identifier is { } id && candidate.Identifier != id)
         {
             return "The downloaded app isn't Anemo Desktop (another bundle identifier), so it isn't installed.";
         }
 
-        if (running?.TeamId is { } team && candidate.TeamId != team)
+        if (running.TeamId is { } team && candidate.TeamId != team)
         {
             return "The downloaded app is signed by another developer than this one, so it isn't installed.";
         }

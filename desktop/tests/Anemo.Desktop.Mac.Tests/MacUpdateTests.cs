@@ -97,6 +97,19 @@ public sealed class MacUpdateTests : IDisposable
         Assert.Equal("Anemo Desktop 1.8.0", SelfTest(running)); // untouched
     }
 
+    [MacFact]
+    public void When_its_own_signature_cannot_be_read_the_app_does_not_update_itself()
+    {
+        var running = MakeApp(Path.Combine(_root, "Applications"), "1.8.0", "app.anemo.desktop");
+        var platform = new MacUpdatePlatform(
+            Path.Combine(running, "Contents", "MacOS", "Anemo Desktop"),
+            Path.Combine(_root, "updates"),
+            Architecture.Arm64,
+            _ => null);
+
+        Assert.Contains("couldn't read its own signature", platform.Unavailable);
+    }
+
     private MacUpdatePlatform Platform(string bundle) =>
         new(Path.Combine(bundle, "Contents", "MacOS", "Anemo Desktop"), Path.Combine(_root, "updates"), Architecture.Arm64);
 
