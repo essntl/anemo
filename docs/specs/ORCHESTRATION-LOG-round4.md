@@ -28,15 +28,15 @@ worktree, branch and pull request per workstream; nothing merged into or pushed 
 
 | Id | Workstream | Branch | PR | Status |
 | --- | --- | --- | --- | --- |
-| – | Contracts, log, roadmap table | `docs/round4-contracts` | | wave 0 |
-| T | Event triggers | `feat/event-triggers` | | not started |
-| R | Chat recall | `feat/chat-recall` | | not started |
-| A | Activity log with undo | `feat/activity-log` | | not started |
-| B | Bulk task and event changes | `feat/bulk-changes` | | not started |
-| W | Waiting on a code job | `feat/code-wait` | | not started |
-| F | Files between devices and the workspace | `feat/device-files` | | not started |
-| M | MCP triggers | `feat/mcp-triggers` | | not started |
-| U | Desktop auto-update | `feat/desktop-auto-update` | | not started |
+| – | Contracts, log, roadmap table | `docs/round4-contracts` | #95 | merged via #104 |
+| T | Event triggers | `feat/event-triggers` | #99 | merged via #104 |
+| R | Chat recall | `feat/chat-recall` | #97 | merged via #104 |
+| A | Activity log with undo | `feat/activity-log` | #96 | merged via #104 |
+| B | Bulk task and event changes | `feat/bulk-changes` | #98 | merged via #104 |
+| W | Waiting on a code job | `feat/code-wait` | #100 | merged via #104 |
+| F | Files between devices and the workspace | `feat/device-files` | #101 | merged via #104 |
+| M | MCP triggers | `feat/mcp-triggers` | #102 | merged via #104 |
+| U | Desktop auto-update | `feat/desktop-auto-update` | #103 | merged via #104 |
 
 ## Wave 0 (orchestrator)
 
@@ -78,12 +78,64 @@ Code map findings that shaped the contracts:
 
 ## What happened
 
-(Filled in as the round goes.)
+- **Background launch again.** The first four builders started in the background (the
+  Agent tool's default); they were stopped within seconds and relaunched with
+  `run_in_background: false`. Pass it explicitly every time.
+- **Usage limit mid-wave.** T, A and B were cut off by the 5-hour limit while finishing
+  docs. A and B had already pushed draft PRs with green CI; T had everything committed
+  but unpushed. A fresh agent finished T from its commits and progress file (resuming
+  with SendMessage would have run in the background, which a headless run kills).
+- **Wave 2** (W, F, M, plus the T finisher) and **wave 3** (U, stacked on F) ran four at
+  a time. Then three fresh reviewers covered T+M, A+B, R+W+F, and one covered U.
+- **Review fixes.** The fix agents for T+M, A+B and R+F were interrupted when the
+  session ended. What landed: T's fixes 1–5 and the note-asks change (scripts can't use
+  trigger tools, savepoint per trigger, serialised dispatch with the automation locked,
+  wake-me risk in the user's time zone), all of B's fixes, and F's two security fixes
+  (PowerShell profile folders refused, `must_not_exist` on device_file_get; committed by
+  the orchestrator after its tests passed). Not done: see *Open for Artem*.
+- **Merge.** At Artem's request ("merge everything to main"), everything went in as one
+  PR, #104 (`integrate/round4`). Conflicts in `fake.py`, `presets.py`, `registry.py`,
+  `security.md` and `roadmap.md` were kept on both sides. Migrations were re-chained to
+  0081 → 0082 → 0083 (the repo's revision ids are bare numbers, not the file names
+  §10 used).
 
 ## Contract changes and accepted deviations
 
-(None yet.)
+- Revision ids are `"0081"` and so on, not `0081_event_triggers` (CONTRACTS §10).
+- T: a trigger is its own row; webhooks belong only to automations; automations with
+  only triggers use the `manual` schedule; events no trigger listens for aren't stored.
+  T also edited `memory/extraction.py`, `providers/base.py` (the event block),
+  `conversations/service.py` (`send_event_turn`), and added more than one hunk to
+  `files.py` and `runs/service.py`.
+- R: one change in `runtime/agent.py` (`unattended=` for `registry.allowed`), so that an
+  automation without a tool list doesn't get the recall tools.
+- A: file activity is recorded in `files/router.py`, `runs/agent_router.py` and a
+  `before_flush` listener for `FileChange`, not in `workspace/files.py` / `revert.py`.
+  Uploads, new folders and text saves in Files aren't logged.
+- F: the macOS client is C# (shared Core), not Swift; the device file tools are offered
+  with the computer tools rather than only when a files-capable computer is online.
+- M: the edits to T's catalogue/matching files; URIs match exactly, not by prefix.
 
 ## Open for Artem
 
-(Filled in at the end.)
+Review findings not fixed yet (the fix round was cut off):
+- T: webhook replay mark set before the rate check (a 429'd retry is refused as a
+  replay); no limit on unsigned webhook floods; a wake-me run's request text carries the
+  event summary outside `untrusted()` (compaction shows it as the user's request);
+  `emit()` can autoflush inside its try/except.
+- M: the hostd listener replays up to 200 old notifications after a reconnect.
+- A: "Undo all" counts entries that can't be undone as failures; undo of an agent's
+  file change from Activity writes no audit row; undoing a file move doesn't check that it is
+  still the same file; batch rows split when entries interleave.
+- R: chat indexing runs inline in the 30 s scheduler; a chat whose embedding failed is
+  never embedded again; semantic results are filtered by scope after the top-N; keyword hits
+  can be labelled "by meaning".
+- U: the macOS Team ID check reads what the signature claims (verify with
+  `-R 'anchor apple generic and certificate leaf[subject.OU] = …'`); it fails open
+  when the running app's signature can't be read; one unexpected exception stops
+  updates until restart; the signing secret should live in a tag-restricted environment.
+- Hardware: desktop MANUAL-TESTS 71–88 and the Mac checklist N–O; webhooks through the
+  tunnel; a real MCP host with a notifying stdio server.
+- To decide: the embedding of ordinary chats once an embedding model is set (on by
+  default); the global trigger ceiling's default; the device folder rule; setting
+  `DESKTOP_UPDATE_SIGNING_KEY` / `DESKTOP_UPDATE_PUBLIC_KEY`.
