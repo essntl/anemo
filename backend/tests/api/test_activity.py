@@ -416,6 +416,11 @@ async def test_an_agents_file_write_is_undone_by_reverting_it(authed, workspace)
     assert r.status_code == 409 and r.json()["error"]["code"] == "activity_conflict"
     assert (await undo(authed, new["id"], force=True)).status_code == 200
     assert not (workspace / "notes" / "new.md").exists()
+    # The same security event as reverting it from the run page.
+    audit = (await authed.get("/api/audit")).json()
+    [reverted_audit] = [e for e in audit if e["action"] == "files.revert"]
+    assert reverted_audit["details"]["via"] == "activity"
+    assert reverted_audit["details"]["force"] is True
 
     # Reverted from the run instead: the entry can't be undone any more.
     timeline = (await authed.get(f"/api/runs/{run_id}/timeline")).json()

@@ -37,6 +37,7 @@ from app.core.activity import activity_group
 from app.core.errors import AppError, Conflict, NotFound
 from app.features.activity import service as activity
 from app.features.activity.models import Activity
+from app.features.audit import service as audit
 from app.features.calendar import recurrence
 from app.features.calendar import service as calendar
 from app.features.calendar.models import CalendarEvent
@@ -362,8 +363,11 @@ async def get(db: AsyncSession, entry_id: uuid.UUID) -> Activity:
     return entry
 
 
-async def undo(db: AsyncSession, entry: Activity, *, force: bool = False) -> str:
-    """Undo one entry (see the module docstring). Commits. Returns what was done."""
+async def undo(
+    db: AsyncSession, entry: Activity, *, force: bool = False, ip: str | None = None
+) -> str:
+    """Undo one entry (see the module docstring). Commits. Returns what was done.
+    `ip`: the client's address, for the audit entry of reverting an agent's file change."""
     blocked = activity.undo_blocked(entry)
     if blocked is not None:
         raise Conflict(REASONS[blocked], code=f"activity_{blocked}")
@@ -377,6 +381,16 @@ async def undo(db: AsyncSession, entry: Activity, *, force: bool = False) -> str
             # and the undo are saved together (or not at all).
             activity.mark_undone(db, entry, f"Undid: {entry.summary}"[: activity.SUMMARY_LENGTH])
             message = await handler(db, entry, force)
+            if kind == "file_revert":
+                # The same security event as reverting it from the run page.
+                audit.record(
+                    db,
+                    "files.revert",
+                    target_type="file_change",
+                    target_id=(entry.undo or {}).get("change_id"),
+                    ip=ip,
+                    details={"message": message, "force": force, "via": "activity"},
+                )
             await db.commit()
     except Exception:
         await db.rollback()
@@ -388,7 +402,9 @@ async def undo(db: AsyncSession, entry: Activity, *, force: bool = False) -> str
     return message
 
 
-async def undo_group(db: AsyncSession, group_id: uuid.UUID, *, force: bool = False) -> GroupResult:
+async def undo_group(
+    db: AsyncSession, group_id: uuid.UUID, *, force: bool = False, ip: str | None = None
+) -> GroupResult:
     """Undo every entry of a batch that can be, newest first, each on its own (one that
     fails doesn't stop the others). Entries that were undone already, or are undos
     themselves, are left out; entries that can't be undone at all (nothing kept to undo
@@ -418,7 +434,7 @@ async def undo_group(db: AsyncSession, group_id: uuid.UUID, *, force: bool = Fal
                 continue
             entry = await get(db, entry_id)  # loaded again: a failed undo rolls back
             try:
-                message = await undo(db, entry, force=force)
+                message = await undo(db, entry, force=force, ip=ip)
             except AppError as exc:
                 result.results.append(
                     ItemResult(entry_id, False, exc.message, code=exc.code, details=exc.details)
