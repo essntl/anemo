@@ -23,7 +23,9 @@ short buffer, and the worker long-polls it. A call subscribes to the resources i
 (resources/subscribe on 2025-era servers, a subscriptions/listen stream on 2026-07-28
 ones: the same logic as the worker's app/mcp/listen.py, which this container can't
 import) and waits up to `wait_s` for notifications newer than `after`. `epoch` changes
-when the server's process was started again (then `after` starts from 0).
+when the server's process was started again. A call whose `epoch` isn't the current one
+(a new listener, or a new process) is answered at once with the current sequence and no
+notifications: a listener starts from now, never with the backlog.
 
 The token is random per start and written to HOSTD_TOKEN_FILE, a volume only this
 container and the worker mount.
@@ -348,7 +350,13 @@ async def listen(body: ListenIn, request: Request) -> dict[str, Any]:
         error = entry.watch_info["error"]
         entry.watching = None  # subscribe again on the next call
         raise HTTPException(status_code=502, detail=f"could not listen: {error}")
-    after = body.after if body.epoch == entry.epoch else 0
+    if body.epoch != entry.epoch:
+        # A new listener (or the process was started again): it starts from now. The
+        # backlog is from before it listened, and handing it over on every reconnect
+        # would fire triggers again for old notifications.
+        entry.last_used = time.monotonic()
+        return _listened(entry, [], 0)
+    after = body.after
     deadline = time.monotonic() + body.wait_s
     while entry.seq <= after and entry.task is not None and not entry.task.done():
         left = deadline - time.monotonic()
@@ -365,11 +373,15 @@ async def listen(body: ListenIn, request: Request) -> dict[str, Any]:
     entry.last_used = time.monotonic()
     found = [n for n in entry.kept if n["seq"] > after]
     oldest = entry.kept[0]["seq"] if entry.kept else entry.seq + 1
+    return _listened(entry, found, max(0, oldest - after - 1))
+
+
+def _listened(entry: Running, found: list[dict[str, Any]], missed: int) -> dict[str, Any]:
     return {
         "epoch": entry.epoch,
         "next": entry.seq,
         "notifications": found,
-        "missed": max(0, oldest - after - 1),
+        "missed": missed,
         "era": entry.watch_info.get("era"),
         "subscribed": entry.watch_info.get("subscribed", []),
         "note": entry.watch_info.get("note"),

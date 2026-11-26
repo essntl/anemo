@@ -180,6 +180,9 @@ async def _watch_remote(target: Target, wants: Wants, deliver: Deliver, ready: R
 
 
 async def _watch_host(target: Target, wants: Wants, deliver: Deliver, ready: Ready) -> None:
+    # No epoch yet: hostd answers the first call at once with where its sequence is now
+    # and no notifications, so a new watch (a reconnect, another worker taking the lock
+    # over) starts from now instead of getting the host's backlog again.
     epoch: str | None = None
     after = 0
     while True:

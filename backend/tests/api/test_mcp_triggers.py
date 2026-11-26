@@ -528,6 +528,44 @@ async def test_a_local_server_is_listened_to_through_the_mcp_host(fast, hostd, m
             await module._halt(server_id)
 
 
+async def test_a_new_watch_through_the_mcp_host_starts_from_now(fast, hostd, monkeypatch):
+    # A reconnect (or another worker taking the lock over) starts a new watch with no
+    # epoch: it must not get the host's backlog again, from before it listened.
+    module, script_path = hostd
+    monkeypatch.setattr(listen, "HOST_WAIT_S", 1.0)
+    target = Target(
+        server_id=str(uuid.uuid4()), transport="stdio", command=sys.executable, args=[script_path]
+    )
+    wants = listen.Wants(uris=("note://a",))
+
+    async def watching(heard: Heard) -> asyncio.Task:
+        task = asyncio.create_task(listen.watch(target, wants, heard.deliver, heard.ready))
+        await eventually(lambda: heard.session is not None, within=60)
+        return task
+
+    first = Heard()
+    task = await watching(first)
+    try:
+        assert (await mcp_client.call_tool(target, "touch", {"uri": "note://a"}, 30)).text == "ok"
+        await eventually(lambda: len(first.notes) == 1, within=20)
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+        second = Heard()
+        task = await watching(second)
+        await asyncio.sleep(1.5)  # a long poll or two: nothing old comes in
+        assert second.notes == []
+        assert (await mcp_client.call_tool(target, "touch", {"uri": "note://a"}, 30)).text == "ok"
+        await eventually(lambda: len(second.notes) == 1, within=20)
+        await asyncio.sleep(0.5)
+        assert len(second.notes) == 1
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        for server_id in list(module._servers):
+            await module._halt(server_id)
+
+
 async def test_the_mcp_host_wants_its_token(hostd):
     module, script_path = hostd
     transport = httpx.ASGITransport(app=module.app)
