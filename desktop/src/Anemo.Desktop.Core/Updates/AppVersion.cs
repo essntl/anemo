@@ -34,6 +34,14 @@ public readonly partial record struct AppVersion(int Major, int Minor, int Patch
 
     public string Tag => TagPrefix + this;
 
+    /// <summary>
+    /// Whether an exe's <c>ProductVersion</c> is this version: exactly, or with the build metadata
+    /// .NET appends (<c>1.8.1+3f2a…</c>). Not a prefix: <c>1.8.10</c> isn't <c>1.8.1</c>.
+    /// </summary>
+    public bool IsProductVersion(string? productVersion) =>
+        productVersion is not null
+        && (productVersion == ToString() || productVersion.StartsWith(ToString() + "+", StringComparison.Ordinal));
+
     public int CompareTo(AppVersion other) =>
         Major != other.Major ? Major.CompareTo(other.Major)
         : Minor != other.Minor ? Minor.CompareTo(other.Minor)

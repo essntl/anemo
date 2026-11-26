@@ -44,6 +44,17 @@ public sealed class UpdatePartsTests
     }
 
     [Theory]
+    [InlineData("1.8.1", true)]
+    [InlineData("1.8.1+3f2a9c1", true)] // the commit .NET appends
+    [InlineData("1.8.10", false)]
+    [InlineData("1.8.1.0", false)]
+    [InlineData("1.8.1-beta", false)]
+    [InlineData("1.8", false)]
+    [InlineData(null, false)]
+    public void An_exes_product_version_must_be_the_version_not_start_with_it(string? productVersion, bool same) =>
+        Assert.Equal(same, new AppVersion(1, 8, 1).IsProductVersion(productVersion));
+
+    [Theory]
     [InlineData("desktop-v1.9.0", "1.9.0")]
     [InlineData("voice-v1.9.0", null)]
     [InlineData("v1.9.0", null)]
