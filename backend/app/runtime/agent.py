@@ -82,6 +82,7 @@ from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin import computer
 from app.tools.builtin.ask import AskUserInput, clean_options
 from app.tools.builtin.plan import PlanInput
+from app.tools.say_once import say_once
 from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
 
@@ -417,7 +418,8 @@ class AgentRun:
         # Hidden tools: old names that are still executed, but never offered.
         offered = sorted((t for t in self.tools.values() if not t.hidden), key=lambda t: t.name)
         names = frozenset(t.name for t in offered)
-        specs = [] if self.tools_off else [t.spec(names) for t in offered]
+        # A long field description several tools share is said once (tools/say_once.py).
+        specs = [] if self.tools_off else say_once([t.spec(names) for t in offered])
 
         def build(model: ResolvedModel) -> ChatRequest:
             history = rendered[bool(model.capabilities.get("vision"))]
