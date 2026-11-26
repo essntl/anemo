@@ -26,6 +26,7 @@ public sealed class UpdatePartsTests
     [InlineData("v1.8.0")]
     [InlineData("01.8.0")]
     [InlineData(" 1.8.0")]
+    [InlineData("1.8.0\n")]
     [InlineData("1.8.x")]
     [InlineData("99999999999.0.0")]
     [InlineData("")]
@@ -41,6 +42,17 @@ public sealed class UpdatePartsTests
         Assert.False(AppVersion.Parse("1.8.0") > AppVersion.Parse("1.8.0"));
         Assert.Equal("desktop-v1.8.0", Current.Tag);
     }
+
+    [Theory]
+    [InlineData("1.8.1", true)]
+    [InlineData("1.8.1+3f2a9c1", true)] // the commit .NET appends
+    [InlineData("1.8.10", false)]
+    [InlineData("1.8.1.0", false)]
+    [InlineData("1.8.1-beta", false)]
+    [InlineData("1.8", false)]
+    [InlineData(null, false)]
+    public void An_exes_product_version_must_be_the_version_not_start_with_it(string? productVersion, bool same) =>
+        Assert.Equal(same, new AppVersion(1, 8, 1).IsProductVersion(productVersion));
 
     [Theory]
     [InlineData("desktop-v1.9.0", "1.9.0")]

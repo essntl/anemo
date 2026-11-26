@@ -79,7 +79,7 @@ internal sealed class WindowsUpdatePlatform : IUpdatePlatform
         {
             // The version resource the release workflow checked, then the exe itself saying it.
             var info = FileVersionInfo.GetVersionInfo(Staged);
-            if (info.ProductName != "Anemo Desktop" || info.ProductVersion?.StartsWith(version.ToString(), StringComparison.Ordinal) != true)
+            if (info.ProductName != "Anemo Desktop" || !version.IsProductVersion(info.ProductVersion))
             {
                 throw new UpdateRefusedException($"The downloaded file isn't Anemo Desktop {version}, so it isn't installed.");
             }

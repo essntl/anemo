@@ -76,6 +76,40 @@ public sealed class MacUpdateTests : IDisposable
         Assert.Contains("isn't intact", e.Message);
     }
 
+    [MacFact]
+    public async Task With_a_developer_id_a_bundle_not_issued_by_apple_to_that_team_is_refused()
+    {
+        // The running app as a Developer ID build would read; the download is only ad hoc signed,
+        // as a forged bundle claiming the team without Apple's certificate would be.
+        var running = MakeApp(Path.Combine(_root, "Applications"), "1.8.0", "app.anemo.desktop");
+        var platform = new MacUpdatePlatform(
+            Path.Combine(running, "Contents", "MacOS", "Anemo Desktop"),
+            Path.Combine(_root, "updates"),
+            Architecture.Arm64,
+            _ => new MacSignature("app.anemo.desktop", false, "ABCDE12345"));
+        Assert.Null(platform.Unavailable);
+        Assert.Null(platform.Note);
+
+        var zip = Zip(MakeApp(Path.Combine(_root, "build"), "1.9.0", "app.anemo.desktop"));
+        var e = await Assert.ThrowsAsync<UpdateRefusedException>(() => platform.PrepareAsync(zip, new AppVersion(1, 9, 0), default));
+
+        Assert.Contains("Apple Developer ID (ABCDE12345)", e.Message);
+        Assert.Equal("Anemo Desktop 1.8.0", SelfTest(running)); // untouched
+    }
+
+    [MacFact]
+    public void When_its_own_signature_cannot_be_read_the_app_does_not_update_itself()
+    {
+        var running = MakeApp(Path.Combine(_root, "Applications"), "1.8.0", "app.anemo.desktop");
+        var platform = new MacUpdatePlatform(
+            Path.Combine(running, "Contents", "MacOS", "Anemo Desktop"),
+            Path.Combine(_root, "updates"),
+            Architecture.Arm64,
+            _ => null);
+
+        Assert.Contains("couldn't read its own signature", platform.Unavailable);
+    }
+
     private MacUpdatePlatform Platform(string bundle) =>
         new(Path.Combine(bundle, "Contents", "MacOS", "Anemo Desktop"), Path.Combine(_root, "updates"), Architecture.Arm64);
 

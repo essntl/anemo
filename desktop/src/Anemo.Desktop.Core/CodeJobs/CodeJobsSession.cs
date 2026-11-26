@@ -45,7 +45,7 @@ public sealed class CodeJobsSession
     private readonly DateTimeOffset _startedAt;
     private DateTimeOffset? _lastScan;
     private bool _anyAck;
-    private int _followingCount;
+    private int _runningCount;
 
     public CodeJobsSession(
         string folder,
@@ -69,8 +69,11 @@ public sealed class CodeJobsSession
     /// <summary>The jobs this session follows (not settled), by id: for tests and the tray.</summary>
     public IReadOnlyCollection<string> Following => _jobs.Keys.ToList();
 
-    /// <summary>How many jobs it follows (running, or ended and not yet acked); safe to read from any thread.</summary>
-    public int FollowingCount => Volatile.Read(ref _followingCount);
+    /// <summary>
+    /// How many of the jobs it follows are still running (not those that ended and wait for the
+    /// server's ack: offline, that could be forever); safe to read from any thread.
+    /// </summary>
+    public int RunningCount => Volatile.Read(ref _runningCount);
 
     /// <summary>A <c>code.ack</c> from the server; any thread.</summary>
     public void OnAck(string jobId, long seq)
@@ -179,7 +182,6 @@ public sealed class CodeJobsSession
 
             var job = new Job(id, folder, meta, JobFolder.ReadPrompt(folder, meta), record);
             _jobs[id] = job;
-            Volatile.Write(ref _followingCount, _jobs.Count);
             if (record is null)
             {
                 _log.Info($"code job discovered: {id}");
@@ -190,6 +192,8 @@ public sealed class CodeJobsSession
         {
             Refresh(job);
         }
+
+        Volatile.Write(ref _runningCount, _jobs.Values.Count(j => j.State == JobStates.Running));
     }
 
     private IEnumerable<string> ListFolders()
@@ -401,8 +405,7 @@ public sealed class CodeJobsSession
         _store.Put(job.Id, job.Record);
         if (settled)
         {
-            _jobs.Remove(job.Id);
-            Volatile.Write(ref _followingCount, _jobs.Count);
+            _jobs.Remove(job.Id); // ended, so it wasn't counted as running
             _ignored.Add(job.Id);
         }
         else if (sent.Final)

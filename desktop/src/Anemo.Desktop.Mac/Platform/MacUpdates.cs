@@ -25,6 +25,12 @@ internal sealed class MacUpdatePlatform : IUpdatePlatform
     /// <param name="executable">The running binary (<see cref="Environment.ProcessPath"/>), inside <c>X.app/Contents/MacOS</c>.</param>
     /// <param name="updatesFolder">Anemo Desktop's <c>updates</c> folder in Application Support.</param>
     public MacUpdatePlatform(string? executable, string updatesFolder, Architecture architecture)
+        : this(executable, updatesFolder, architecture, bundle => Signature(bundle).GetAwaiter().GetResult())
+    {
+    }
+
+    /// <param name="runningSignature">Reads the running bundle's signature (tests give one that a real build would have).</param>
+    internal MacUpdatePlatform(string? executable, string updatesFolder, Architecture architecture, Func<string, MacSignature?> runningSignature)
     {
         _bundle = BundleOf(executable) ?? "";
         _parent = Path.GetDirectoryName(_bundle) ?? "";
@@ -33,17 +39,25 @@ internal sealed class MacUpdatePlatform : IUpdatePlatform
         Staged = Path.Combine(_staging, Path.GetFileName(_bundle));
         Previous = Path.Combine(_parent, $".{name}.old.app");
         DownloadPath = Path.Combine(updatesFolder, AssetName);
-        Unavailable = _bundle.Length == 0
+        var unavailable = _bundle.Length == 0
             ? "This copy isn't an installed Anemo Desktop.app (a development build), so it doesn't update itself."
             : architecture != Architecture.Arm64
                 ? "Only an Apple Silicon build is published, so this Mac doesn't update itself."
                 : !CanWrite(_parent)
                     ? $"Anemo Desktop can't write to {_parent}, so it can't replace itself there. Move it to /Applications as an administrator, or to ~/Applications."
                     : null;
-        if (Unavailable is null)
+        if (unavailable is null)
         {
-            _running = Signature(_bundle).GetAwaiter().GetResult();
+            // Without its own signature there is nothing to compare a download with: refuse
+            // rather than accept any signed bundle.
+            _running = runningSignature(_bundle);
+            if (_running is null)
+            {
+                unavailable = "Anemo Desktop couldn't read its own signature (codesign), so it doesn't update itself. Download a new copy from GitHub.";
+            }
         }
+
+        Unavailable = unavailable;
     }
 
     public string? Unavailable { get; }
@@ -91,6 +105,14 @@ internal sealed class MacUpdatePlatform : IUpdatePlatform
             if ((await Run(Codesign, ["--verify", "--deep", "--strict", Staged], ct)).Code != 0)
             {
                 throw new UpdateRefusedException($"The signature of the downloaded {version} isn't intact, so it isn't installed.");
+            }
+
+            // What -dv reports below is only what the signature claims; with a Developer ID, codesign
+            // checks the certificate chain too: issued by Apple, to this app's team.
+            if (_running is not null && MacSignature.Requirement(_running) is { } requirement
+                && (await Run(Codesign, ["--verify", "--deep", "--strict", $"-R={requirement}", Staged], ct)).Code != 0)
+            {
+                throw new UpdateRefusedException($"The downloaded {version} isn't signed with this app's Apple Developer ID ({_running.TeamId}), so it isn't installed.");
             }
 
             if (MacSignature.Refusal(_running, await Signature(Staged, ct)) is { } refusal)

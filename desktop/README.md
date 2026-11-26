@@ -82,9 +82,9 @@ minute after start and every 6 hours it asks GitHub (unauthenticated, with the l
 newest stable `desktop-v…` Release newer than itself, downloads this computer's file, checks it
 (the signature over the checksum file when the build has the release key, the SHA-256 from
 `SHA256SUMS-desktop*.txt`, then the exe's version and a `--self-test` run on Windows, `codesign`
-and the Team ID on the Mac) and installs it **when you quit**, or now from the tray item **Update
+and the Team ID on the Mac, checked against Apple's certificate chain) and installs it **when you quit**, or now from the tray item **Update
 to X ready: Restart to update**, which waits until no command, file copy or Claude Code job is
-running. *Update automatically* (Settings → This computer, on by default) switches it off; **Check
+running (a job that ended counts as done, even before Anemo has all of its output). *Update automatically* (Settings → This computer, on by default) switches it off; **Check
 now** looks at once. The old version is kept beside the new one (`Anemo Desktop.old.exe`,
 `.Anemo Desktop.old.app`) until the next update; a restarted version that doesn't come up is
 replaced by the old one again. Only the published exe updates (not a `dotnet build` output), and
@@ -178,14 +178,27 @@ offline, losing it means users install the next version by hand once):
 
 ```
 openssl ecparam -name prime256v1 -genkey -noout -out anemo-update-key.pem
-gh secret set DESKTOP_UPDATE_SIGNING_KEY < anemo-update-key.pem
+# The environment the signing job runs in, usable only by runs on a desktop-v* tag:
+gh api -X PUT 'repos/{owner}/{repo}/environments/desktop-release' \
+  -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true'
+gh api -X POST 'repos/{owner}/{repo}/environments/desktop-release/deployment-branch-policies' -f name='desktop-v*' -f type=tag
+gh secret set DESKTOP_UPDATE_SIGNING_KEY --env desktop-release < anemo-update-key.pem
 gh variable set DESKTOP_UPDATE_PUBLIC_KEY --body "$(openssl ec -in anemo-update-key.pem -pubout -outform DER | base64 | tr -d '\n')"
 ```
 
-From the next Release on, the release job signs `SHA256SUMS-desktop.txt` and
-`SHA256SUMS-desktop-macos.txt` (`.sig` beside each) and the clients it builds carry the public key
-and accept only signed updates. A Release with the variable set but no secret fails instead of
-publishing one the clients would refuse.
+(The same by hand: **Settings → Environments → New environment** `desktop-release`, *Deployment
+branches and tags* → *Selected branches and tags* → add a **tag** rule `desktop-v*`, then add the
+secret to that environment.) Put the key **in the environment, not as a repository secret**: a
+repository secret can be read by any workflow run on any branch of the repository, while an
+environment secret reaches only jobs that run on a `desktop-v*` tag and name the environment
+(release.yml's `sign-desktop` job). If it was set as a repository secret before, remove that one
+(`gh secret delete DESKTOP_UPDATE_SIGNING_KEY`). To limit who can create such tags, add a tag
+ruleset for `desktop-v*` (**Settings → Rules**).
+
+From the next Release on, the `sign-desktop` job signs `SHA256SUMS-desktop.txt` and
+`SHA256SUMS-desktop-macos.txt` (`.sig` beside each), the release job publishes them, and the
+clients it builds carry the public key and accept only signed updates. A Release with the variable
+set but no secret fails instead of publishing one the clients would refuse.
 
 ## Install on a computer
 

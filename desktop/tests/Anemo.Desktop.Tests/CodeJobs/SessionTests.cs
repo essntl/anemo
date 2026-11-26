@@ -137,6 +137,21 @@ public sealed class SessionTests : IDisposable
     }
 
     [Fact]
+    public async Task Only_running_jobs_count_as_running_not_ended_ones_waiting_for_an_ack()
+    {
+        var job = Running(Now.AddMinutes(-1));
+        await _h.StepAsync();
+        Assert.Equal(1, _h.Session.RunningCount);
+
+        job.Finish();
+        _processes.Running.Clear();
+        await _h.StepAsync(); // no ack comes (offline): the job stays followed, but it ended
+
+        Assert.Contains(job.Id, _h.Session.Following);
+        Assert.Equal(0, _h.Session.RunningCount);
+    }
+
+    [Fact]
     public async Task A_settled_job_is_not_announced_again_after_a_reconnect_or_restart()
     {
         var job = Running(Now.AddMinutes(-1));

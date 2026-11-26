@@ -84,6 +84,9 @@ public sealed class FakeUpdatePlatform(string folder) : IUpdatePlatform
     /// <summary>Set to refuse the download in PrepareAsync (as a wrong version resource would).</summary>
     public string? Refuse { get; set; }
 
+    /// <summary>Set to make PrepareAsync throw this (as a Process.Start blocked by an antivirus would).</summary>
+    public Exception? Throws { get; set; }
+
     public int CleanUps { get; private set; }
 
     public string Current => Path.Combine(folder, "Anemo Desktop.exe");
@@ -94,6 +97,11 @@ public sealed class FakeUpdatePlatform(string folder) : IUpdatePlatform
 
     public Task<StagedUpdate> PrepareAsync(string downloaded, AppVersion version, CancellationToken ct)
     {
+        if (Throws is { } e)
+        {
+            throw e;
+        }
+
         if (Refuse is { } why)
         {
             throw new UpdateRefusedException(why);
