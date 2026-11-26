@@ -217,6 +217,10 @@ async def test_a_chat_from_before_snapshots_keeps_its_system_prompt(authed):
                 )
                 m.turn_memories = None
         await db.commit()
+    # Its first answer again: the snapshot isn't taken from it (its context has them).
+    r = await authed.post(f"/api/conversations/{cid}/regenerate")
+    await execute_run(uuid.UUID(r.json()["run_id"]))
+    assert "Rotterdam" not in (FakeAdapter.requests[-1].system or "")
     await chat_turn(authed, cid, "next question")
     request = FakeAdapter.requests[-1]
     assert "Rotterdam" not in (request.system or "")

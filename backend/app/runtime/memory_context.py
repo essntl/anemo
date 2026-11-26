@@ -83,13 +83,15 @@ async def _take_snapshot(
         .where(
             ChatMessage.conversation_id == conversation.id,
             ChatMessage.role == "user",
-            ChatMessage.seq < message.seq,
+            # This message too: answered again (regenerate) in a chat from before.
+            ChatMessage.seq <= message.seq,
             ChatMessage.turn_context.is_not(None),
         )
         .limit(1)
     )
     if earlier is not None:
-        # A chat from before snapshots: its turns carry the memories already.
+        # A chat from before snapshots: its turns carry the memories already. (In a
+        # chat from now, a message's turn context is saved with the snapshot.)
         return dict(EMPTY)
     section, used = await memory.always_section(db, settings)
     return {"memories": used, "section": section}
