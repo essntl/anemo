@@ -151,7 +151,8 @@ public sealed class FileTests : IDisposable
 
         Assert.Throws<CommandException>(() => rules.CheckWrite(Path.Combine(oneDrive, "WindowsPowerShell", "profile.ps1")));
         Assert.Throws<CommandException>(() => rules.CheckWrite(Path.Combine(startup, "run.bat")));
-        Assert.Equal(Path.Combine(oneDrive, "report.docx"), rules.CheckWrite(Path.Combine(oneDrive, "report.docx")));
+        // EndsWith: the rules answer the resolved path (on macOS the temp folder is under /private).
+        Assert.EndsWith(Path.Combine("OneDrive", "Documents", "report.docx"), rules.CheckWrite(Path.Combine(oneDrive, "report.docx")));
     }
 
     [Theory]
@@ -179,7 +180,7 @@ public sealed class FileTests : IDisposable
     {
         var rules = new FileRules(null, _f.Home, DesktopPlatform.MacOS(_f.Home), null);
         var path = InHome("Desktop", "a.lnk");
-        Assert.Equal(path, rules.CheckWrite(path));
+        Assert.EndsWith(Path.Combine("Desktop", "a.lnk"), rules.CheckWrite(path));
         Assert.Throws<CommandException>(() => rules.Check(InHome("Library", "LaunchAgents", "x.plist")));
         Assert.Throws<CommandException>(() => rules.Check(InHome(".zshrc")));
     }

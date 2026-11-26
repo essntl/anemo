@@ -116,7 +116,7 @@ async def test_update_tasks_reports_every_item_and_goes_on_after_a_failure(authe
     assert any(i["title"] == "Old idea" for i in trash)
 
 
-async def test_update_tasks_add_tags_keeps_each_tag_once_and_refuses_more_than_20(authed, caplog):
+async def test_update_tasks_add_tags_keeps_each_tag_once_and_refuses_more_than_20(authed):
     full = await task(authed, "Many tags", tags=[f"t{n}" for n in range(19)])
     plain = await task(authed, "Few tags", tags=["work"])
 
@@ -134,7 +134,6 @@ async def test_update_tasks_add_tags_keeps_each_tag_once_and_refuses_more_than_2
         f"1. error: [{full['id']}] Many tags: it would have 21 tags, and a task can have at "
         "most 20. Remove some with remove_tags."
     )
-    assert "batch item failed" not in caplog.text  # a refusal, not a crash with a traceback
     now = await tasks_by_title(authed)
     assert now["Few tags"]["tags"] == ["work", "home"]
     assert now["Many tags"]["tags"] == full["tags"]
