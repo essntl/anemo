@@ -13,9 +13,9 @@ from app.tools.schema import compact
 from app.tools.spec_size import spec_sizes
 
 # Total characters of every offered built-in tool spec (compact JSON). A bit above the
-# size when it was set (91,209 chars, ~27.6k tokens); raise it on purpose when a new tool
+# size when it was set (90,205 chars, ~27.3k tokens); raise it on purpose when a new tool
 # needs the room, not by accident. `python -m app.cli tool-spec-sizes` shows what is big.
-TOTAL_BUDGET = 93_500
+TOTAL_BUDGET = 92_500
 
 
 class _Item(BaseModel):

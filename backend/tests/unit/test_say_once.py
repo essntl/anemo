@@ -1,7 +1,7 @@
 """Long field descriptions that several tools share are said once per request."""
 
 from app.providers.base import ToolSpec
-from app.tools.registry import all_tools
+from app.tools.registry import all_tools, get
 from app.tools.say_once import MIN_CHARS, say_once
 
 LONG = "Properties, e.g. {client: x}: the keys and values list_properties shows, nothing else."
@@ -77,3 +77,23 @@ def test_the_same_toolset_gives_the_same_bytes_and_one_tool_alone_is_unchanged()
     text = str([s.input_schema for s in once])
     for pointer in text.split("As in ")[1:]:
         assert pointer.split(".")[0].split(" ")[0] in names
+
+
+def test_document_tools_say_their_shared_sentences_once():
+    from app.tools.builtin import docs
+
+    names = {"list_documents", "read_document", "search_documents", "set_document_properties"}
+    specs = {n: get(n).spec(names) for n in names}
+    assert docs.FOLDERS_AND_PROPERTIES in specs["list_documents"].description
+    assert docs.LINKING in specs["list_documents"].description
+    for name in ("search_documents", "set_document_properties"):
+        text = specs[name].description
+        assert docs.FOLDERS_AND_PROPERTIES not in text and docs.LINKING not in text
+        assert "Folders vs properties: as in list_documents." in text
+    assert "How to link a document: as in list_documents." in specs["read_document"].description
+    # Without list_documents, search_documents says them; alone, every tool does.
+    rest = names - {"list_documents"}
+    assert docs.LINKING in get("read_document").spec(rest).description
+    assert docs.FOLDERS_AND_PROPERTIES in get("search_documents").spec(rest).description
+    assert docs.LINKING not in get("search_documents").spec(rest).description
+    assert docs.LINKING in get("search_documents").spec().description

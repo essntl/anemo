@@ -611,8 +611,7 @@ class ActInput(BaseModel):
     action: ActKind = Field(
         description="click / double_click / right_click (ref, or x and y); type (text, "
         "optionally into ref); press (keys); scroll (direction, amount, optionally ref); "
-        "focus_window (window_ref); open (target: a program's name from the Start menu or a "
-        "Mac's Applications, or an http(s) URL); clipboard_set (text)"
+        "focus_window (window_ref); open (target); clipboard_set (text)"
     )
     ref: str | None = Field(
         None, max_length=40, description="A control's ref from the last look, e.g. c12"
@@ -640,7 +639,7 @@ class ActInput(BaseModel):
         min_length=1,
         max_length=2000,
         description="open: a program's name (the Start menu's on Windows, the Applications "
-        "folder's on a Mac) or a URL",
+        "folder's on a Mac) or an http(s) URL",
     )
 
     @field_validator("keys")
@@ -745,12 +744,11 @@ def _act_summary(args: ActInput, ctx: ToolContext) -> str:
 class ComputerAct(Tool):
     name = "computer_act"
     description = (
-        "Do one thing on a computer that runs Anemo Desktop: click, double_click or "
-        "right_click a control (its ref from computer_look) or a point (x, y in screenshot "
-        "pixels), type text, press keys, scroll, focus_window, open a program or URL, or "
-        "clipboard_set. Answers with the window afterwards, as computer_look. Never type "
-        "passwords: ask the user to type them. On a watched computer the user is asked "
-        "about every action."
+        "Do one action on a computer that runs Anemo Desktop (see `action`): a click on a "
+        "control (its ref from computer_look) or a point (x, y in screenshot pixels), "
+        "typing, keys, scrolling, a window, a program or URL, the clipboard. Answers with "
+        "the window afterwards, as computer_look. Never type passwords: ask the user to. "
+        "On a watched computer the user is asked about every action."
     )
     capability = ACT
     Input = ActInput

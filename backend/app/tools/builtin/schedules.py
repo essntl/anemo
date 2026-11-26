@@ -415,17 +415,14 @@ class CreateScheduleInput(SettingsIn):
 class CreateSchedule(Tool):
     name = "create_schedule"
     description = (
-        "Schedule a prompt to run by itself: once (`at`) or repeating (`rrule`), in the "
-        "user's time zone. Each run is a chat of its own (the user opens it from the "
-        "Automations page) with the tools you list, and anything that needs approval "
-        "waits for them. By default the user is notified only when the run calls "
-        "send_notification (so include it in the tools) or keeps failing; notify=always "
-        "sends every answer. Use it when the user asks for something regular or later "
-        "(“every weekday at 7, give me my day”, “check this page tomorrow”). The user is "
-        "always asked to confirm the prompt, the times and the settings. It cannot run "
-        "more often than every 5 minutes; for a reminder without the assistant, a task "
-        "with a reminder is enough. With `triggers` it (also) runs when an event happens "
-        "(a task is created, a Claude Code job ends, a webhook is called…)."
+        "Schedule a prompt to run by itself, once (`at`) or repeating (`rrule`, the user's "
+        "time zone), for something regular or later (“every weekday at 7, give me my "
+        "day”). Each run is a chat of its own (on the Automations page) with the tools you "
+        "list; what needs approval waits for the user. The user hears of a run only when it "
+        "calls send_notification (so list it) or keeps failing; notify=always sends every "
+        "answer. The user confirms the prompt, times and settings. At most every 5 minutes; "
+        "a plain reminder is a task with a reminder. With `triggers` it (also) runs on "
+        "events (a task created, a Claude Code job ended, a webhook…)."
     )
     capability = MANAGE
     Input = CreateScheduleInput
