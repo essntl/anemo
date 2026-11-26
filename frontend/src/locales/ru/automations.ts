@@ -276,5 +276,12 @@ const messages: Messages = {
   "Device": "Устройство",
   "Content type": "Тип содержимого",
   "Only on events (or when started)": "Только по событиям (или вручную)",
+  "MCP server notification": "Уведомление MCP-сервера",
+  "A connected MCP server sent a notification (a resource changed, its tools changed…).": "Подключённый MCP-сервер отправил уведомление (изменился ресурс, изменились его инструменты…).",
+  "MCP server": "MCP-сервер",
+  "Notification": "Уведомление",
+  "Resource URI": "URI ресурса",
+  "Choose a server": "Выберите сервер",
+  "A server that was removed": "Удалённый сервер",
 }
 export default messages

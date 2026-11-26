@@ -12,7 +12,7 @@ export const EVENT_WORDS = [
   msg('Document created'), msg('Document changed'), msg('Document deleted'),
   msg('Claude Code job started'), msg('Claude Code job ended'),
   msg('Device online'), msg('Device offline'), msg('File added'),
-  msg('Automation failed'), msg('Approval waiting'), msg('Webhook'),
+  msg('Automation failed'), msg('Approval waiting'), msg('Webhook'), msg('MCP server notification'),
   // what they are
   msg('A task was created.'),
   msg('A task was changed (fields: the names of what changed).'),
@@ -32,10 +32,12 @@ export const EVENT_WORDS = [
   msg('An automation’s run failed for good (after its retries).'),
   msg('A run is waiting for your approval.'),
   msg('Another service called this trigger’s webhook URL (signed with its secret).'),
+  msg('A connected MCP server sent a notification (a resource changed, its tools changed…).'),
   // the fields a filter can name
   msg('Task'), msg('Title'), msg('Status'), msg('Project'), msg('Tag'), msg('Priority'),
   msg('Parent task'), msg('Changed field'), msg('Event'), msg('Document'), msg('Path'),
   msg('Job'), msg('Thread'), msg('Computer'), msg('Computer name'), msg('Project folder'),
   msg('Chat that started it'), msg('How it ended'), msg('Device'), msg('Name'), msg('Kind'),
   msg('Type'), msg('Automation'), msg('Run'), msg('Chat'), msg('Tool'), msg('Content type'),
+  msg('MCP server'), msg('Notification'), msg('Resource URI'),
 ] as const

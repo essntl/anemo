@@ -699,6 +699,18 @@ you have looked at it, and runs already in progress do not get the changed tool.
 Only add servers you trust: a server sees what agents send to its tools, and its
 answers can try to steer the agent.
 
+**MCP triggers.** An automation (or a chat that asked to be woken) can run when a
+connected server sends a notification: a resource changed (`notifications/resources/updated`,
+for the resource URI you name), its list of tools, prompts or resources changed, or (older
+servers) a log message. Add one on the Automations page with **Add a trigger** → *MCP server
+notification*: pick the server, the kind of notification and the resource URI (exact). While
+such a trigger is on, the worker keeps one connection open to that server (local ones through
+the MCP host), subscribes to the resources the triggers name, and reconnects when it drops.
+Bursts are coalesced (repeats within 5 seconds are one event, and a new trigger waits 30
+seconds for more by default), and a server that sends more than 120 notifications a minute is
+not listened to for 15 minutes; its triggers say why. What a server sends reaches the run as
+data, like its tool results.
+
 ## Plugins
 
 Plugins extend Anemo: a panel on tasks, documents or events, a page of its own in the

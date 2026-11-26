@@ -19,6 +19,9 @@ export interface TriggerForm {
 }
 
 export const WEBHOOK = 'webhook.received'
+export const MCP_NOTIFICATION = 'mcp.notification'
+/** MCP servers can be chatty: a new trigger on one coalesces bursts by default. */
+export const MCP_DEFAULT_DEBOUNCE_S = 30
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -83,4 +86,15 @@ export function createBody(automationId: string, form: TriggerForm, type: EventT
 /** "tags: urgent · project_id: …" for a trigger's line on the card. */
 export function describeFilter(filter: Record<string, unknown>): string {
   return Object.entries(filter).map(([k, v]) => `${k}: ${filterText(v)}`).join(' · ')
+}
+
+/** Whether a field the event type requires (an MCP trigger's server) is still empty. */
+export function missingRequired(form: TriggerForm, type: EventType | undefined): boolean {
+  return (type?.fields ?? []).some((f) => f.required && !(form.filter[f.name] ?? '').trim())
+}
+
+/** What changes when another event type is picked: an MCP trigger gets a burst window
+ * (unless one was set already). */
+export function typeDefaults(eventType: string, form: TriggerForm): Partial<TriggerForm> {
+  return eventType === MCP_NOTIFICATION && form.debounceS === 0 ? { debounceS: MCP_DEFAULT_DEBOUNCE_S } : {}
 }

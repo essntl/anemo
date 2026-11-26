@@ -3,7 +3,7 @@ import { createBody, describeFilter, filterOf, formFrom, toLocalInput } from './
 
 const type = {
   type: 'task.created', label: 'Task created', description: '',
-  fields: [{ name: 'tags', label: 'Tag', kind: 'tags', choices: [] }, { name: 'title', label: 'Title', kind: 'text', choices: [] }],
+  fields: [{ name: 'tags', label: 'Tag', kind: 'tags', choices: [], required: false }, { name: 'title', label: 'Title', kind: 'text', choices: [], required: false }],
 }
 
 describe('the trigger form', () => {

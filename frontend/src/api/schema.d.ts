@@ -7673,6 +7673,11 @@ export interface components {
              * @default []
              */
             choices: string[];
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
         };
         /**
          * EventIn

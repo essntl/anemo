@@ -6,7 +6,8 @@ programs; they run in the separate mcp-host container, and this module asks its
 daemon (mcp-host/hostd) to list or call their tools.
 
 Every call opens a fresh connection: slower than keeping one open, but there is
-nothing to keep alive, reconnect or clean up when runs are paused or resumed.
+nothing to keep alive, reconnect or clean up when runs are paused or resumed. (The one
+long-lived connection, for triggers on a server's notifications, is listen.py's.)
 
 Only the worker uses this module. Everything an MCP server returns (tool names,
 descriptions, results) is untrusted text.
@@ -117,21 +118,25 @@ def result_from_dump(dump: dict[str, Any]) -> CallResult:
 
 
 @asynccontextmanager
-async def _remote(target: Target) -> AsyncIterator[Client]:
+async def remote_session(target: Target, **options: Any) -> AsyncIterator[Client]:
+    """A connection to a remote server. `options` go to the SDK's Client (listen.py passes
+    a message handler, to hear the server's notifications)."""
     assert target.url is not None
     if target.transport == "sse":
         transport = sse_client(target.url, headers=target.headers, timeout=CONNECT_TIMEOUT_S)
-        async with Client(transport) as client:
+        async with Client(transport, **options) as client:
             yield client
         return
     async with create_mcp_http_client(headers=target.headers) as http:
-        async with Client(streamable_http_client(target.url, http_client=http)) as client:
+        async with Client(
+            streamable_http_client(target.url, http_client=http), **options
+        ) as client:
             yield client
 
 
 async def _remote_tools(target: Target) -> list[RemoteTool]:
     found: list[RemoteTool] = []
-    async with asyncio.timeout(LIST_TIMEOUT_S), _remote(target) as client:
+    async with asyncio.timeout(LIST_TIMEOUT_S), remote_session(target) as client:
         cursor: str | None = None
         for _page in range(20):
             page = await client.list_tools(cursor=cursor, cache_mode="bypass")
@@ -145,7 +150,7 @@ async def _remote_tools(target: Target) -> list[RemoteTool]:
 async def _remote_call(
     target: Target, name: str, arguments: dict[str, Any], timeout_s: float
 ) -> CallResult:
-    async with asyncio.timeout(timeout_s + CONNECT_TIMEOUT_S), _remote(target) as client:
+    async with asyncio.timeout(timeout_s + CONNECT_TIMEOUT_S), remote_session(target) as client:
         result = await client.call_tool(name, arguments, read_timeout_seconds=timeout_s)
         return result_from_dump(result.model_dump(mode="json", by_alias=False))
 
@@ -171,7 +176,7 @@ def _host() -> HostConnection:
     return settings.mcp_host_url, token, None
 
 
-async def _host_post(path: str, body: dict[str, Any], timeout_s: float) -> dict[str, Any]:
+async def host_post(path: str, body: dict[str, Any], timeout_s: float) -> dict[str, Any]:
     url, token, transport = _host()
     timeout = httpx.Timeout(connect=5, read=timeout_s, write=10, pool=5)
     try:
@@ -197,7 +202,7 @@ async def _host_post(path: str, body: dict[str, Any], timeout_s: float) -> dict[
     return data
 
 
-def _spec(target: Target) -> dict[str, Any]:
+def host_spec(target: Target) -> dict[str, Any]:
     return {
         "id": target.server_id,
         "command": target.command,
@@ -212,7 +217,7 @@ def _spec(target: Target) -> dict[str, Any]:
 async def list_tools(target: Target) -> list[RemoteTool]:
     """Raises McpError when the server cannot be reached or does not answer properly."""
     if target.transport == "stdio":
-        data = await _host_post("/tools", {"server": _spec(target)}, START_TIMEOUT_S)
+        data = await host_post("/tools", {"server": host_spec(target)}, START_TIMEOUT_S)
         return [tool_from_dump(t) for t in data.get("tools", [])][:MAX_TOOLS]
     try:
         return (await _remote_tools(target))[:MAX_TOOLS]
@@ -229,12 +234,12 @@ async def call_tool(
     with is_error set."""
     if target.transport == "stdio":
         body = {
-            "server": _spec(target),
+            "server": host_spec(target),
             "name": name,
             "arguments": arguments,
             "timeout_s": timeout_s,
         }
-        return result_from_dump(await _host_post("/call", body, timeout_s + START_TIMEOUT_S))
+        return result_from_dump(await host_post("/call", body, timeout_s + START_TIMEOUT_S))
     try:
         return await _remote_call(target, name, arguments, timeout_s)
     except asyncio.CancelledError:

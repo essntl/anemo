@@ -13,9 +13,10 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/toast'
+import { useMcpServers } from '@/features/mcp/api'
 import { t } from '@/lib/i18n'
 import { type EventType, type Trigger, useEventCatalogue, useRotateSecret, useSaveTrigger } from '../api'
-import { createBody, expiresOf, filterOf, formFrom, type TriggerForm, WEBHOOK } from '../triggerForm'
+import { createBody, expiresOf, filterOf, formFrom, missingRequired, type TriggerForm, typeDefaults, WEBHOOK } from '../triggerForm'
 
 /** The URL and a secret, shown once, with buttons to copy them. */
 export function WebhookSecret({ url, secret }: { url: string; secret: string | null }) {
@@ -48,6 +49,14 @@ export function WebhookSecret({ url, secret }: { url: string; secret: string | n
   )
 }
 
+/** An MCP server, picked by name (the filter keeps its id). */
+function McpServerField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const servers = useMcpServers().data ?? []
+  const options = servers.map((s) => ({ value: s.id, label: s.enabled ? s.name : `${s.name} (${t('off')})` }))
+  if (value && !servers.some((s) => s.id === value)) options.push({ value, label: t('A server that was removed') })
+  return <Select value={value} placeholder={t('Choose a server')} onValueChange={onChange} options={options} />
+}
+
 function FilterFields({ type, form, onChange }: { type: EventType; form: TriggerForm; onChange: (f: TriggerForm) => void }) {
   if (type.fields.length === 0) return null
   const set = (name: string, value: string) => onChange({ ...form, filter: { ...form.filter, [name]: value } })
@@ -57,8 +66,10 @@ function FilterFields({ type, form, onChange }: { type: EventType; form: Trigger
       <p className="-mt-1 text-[12px] text-muted">{t('Leave a field empty for any value. Commas separate values that may each match.')}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         {type.fields.map((f) => (
-          <Field key={f.name} label={t(f.label)}>
-            {f.kind === 'enum' ? (
+          <Field key={f.name} label={f.required ? `${t(f.label)} *` : t(f.label)}>
+            {f.kind === 'mcp_server' ? (
+              <McpServerField value={form.filter[f.name] ?? ''} onChange={(v) => set(f.name, v)} />
+            ) : f.kind === 'enum' ? (
               <Select value={form.filter[f.name] ?? ''} onValueChange={(v) => set(f.name, v)}
                 options={[{ value: '', label: t('Any') }, ...(f.choices ?? []).map((c) => ({ value: c, label: c }))]} />
             ) : (
@@ -85,7 +96,7 @@ export function TriggerDialog({ automationId, trigger, onClose }: { automationId
   const type = types.find((ty) => ty.type === form.eventType)
   // A webhook stays a webhook (its URL is set up elsewhere), and nothing else becomes one.
   const choices = trigger ? types.filter((ty) => (ty.type === WEBHOOK) === (trigger.event_type === WEBHOOK)) : types
-  const valid = Boolean(type) && form.maxPerHour >= 1 && form.maxPerHour <= 120 && form.debounceS >= 0 && form.debounceS <= 3600
+  const valid = Boolean(type) && !missingRequired(form, type) && form.maxPerHour >= 1 && form.maxPerHour <= 120 && form.debounceS >= 0 && form.debounceS <= 3600
   const error = save.error ?? rotate.error
 
   const submit = () => {
@@ -138,7 +149,7 @@ export function TriggerDialog({ automationId, trigger, onClose }: { automationId
       <div className="flex flex-col gap-4">
         <Field label={t('Event')} hint={type ? t(type.description) : undefined}>
           <Select value={form.eventType} disabled={trigger?.event_type === WEBHOOK}
-            onValueChange={(v) => setForm({ ...form, eventType: v, filter: {} })}
+            onValueChange={(v) => setForm({ ...form, ...typeDefaults(v, form), eventType: v, filter: {} })}
             options={choices.map((ty) => ({ value: ty.type, label: t(ty.label) }))} />
         </Field>
         {type && <FilterFields type={type} form={form} onChange={setForm} />}

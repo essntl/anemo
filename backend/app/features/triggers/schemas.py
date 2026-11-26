@@ -80,8 +80,9 @@ class SecretOut(BaseModel):
 class EventFieldOut(BaseModel):
     name: str
     label: str
-    kind: str  # id | text | tags | enum | bool
+    kind: str  # id | text | tags | enum | bool | mcp_server
     choices: list[str] = []
+    required: bool = False  # a trigger of this type must name it
 
 
 class EventTypeOut(BaseModel):

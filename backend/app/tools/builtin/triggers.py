@@ -58,7 +58,8 @@ def _event_list() -> str:
     """The catalogue, for the tools' descriptions: each type and its filter fields."""
     lines = []
     for t in catalogue.EVENT_TYPES:
-        fields = ", ".join(f.name for f in t.fields) or "none"
+        fields = ", ".join(f.name + (" (required)" if f.required else "") for f in t.fields)
+        fields = fields or "none"
         lines.append(f"{t.type} ({t.description} Filter fields: {fields})")
     return "; ".join(lines)
 
@@ -127,8 +128,9 @@ def spec_words(spec: TriggerSpec, *, wake: bool) -> str:
 
 def wake_risk(spec_once: bool, expires_at: datetime | None, event: str, now: datetime) -> Risk:
     """A one-shot wake-me on an internal event that waits at most 24 hours is safe;
-    repeating, longer or on a webhook is moderate."""
-    if event == triggers.WEBHOOK or not spec_once:
+    repeating, longer or on an event from outside (a webhook, an MCP server) is moderate."""
+    known = catalogue.get(event)
+    if event == triggers.WEBHOOK or (known is not None and known.outside) or not spec_once:
         return "moderate"
     if expires_at is not None:
         at = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=now.tzinfo)
