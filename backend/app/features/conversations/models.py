@@ -70,6 +70,11 @@ class Conversation(Base, IdMixin, TimestampMixin):
     # embedding model of the last time this chat's messages were indexed by meaning.
     recall_indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     recall_index_model: Mapped[str | None] = mapped_column(String(64))
+    # The always-included memories (pinned, instructions) as they were when the chat's
+    # first turn started: {"memories": [{id, content}], "section": text}. They go into
+    # the system prompt of every run of the chat, so it stays the same bytes (a prompt
+    # cache prefix). None: not taken yet (runtime/memory_context.py).
+    memory_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class ChatMessage(Base, IdMixin):
@@ -100,6 +105,9 @@ class ChatMessage(Base, IdMixin):
     # time, memories). Not shown in the UI; replayed byte for byte in later requests
     # so the conversation prefix stays cacheable (runtime/turn_context.py).
     turn_context: Mapped[str | None] = mapped_column(Text)
+    # The memories that turn context gave ([{id, content}]): later turns of the chat
+    # leave them out (each memory reaches the model once per conversation).
+    turn_memories: Mapped[list[dict[str, str]] | None] = mapped_column(JSONB)
     # User messages started with a skill (/study ...): the skill as it was then
     # (Skill.invocation()). Its instructions go into the turn context.
     skill: Mapped[dict[str, Any] | None] = mapped_column(JSONB)

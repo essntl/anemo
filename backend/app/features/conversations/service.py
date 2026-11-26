@@ -741,6 +741,7 @@ async def edit_last(
     user.content = [*kept, {"type": "text", "text": text}]
     user.text_plain = text
     user.turn_context = None  # rendered again (current time, memories) for the new text
+    user.turn_memories = None
     assistant.content, assistant.text_plain = [], ""
     assistant.status, assistant.error = "streaming", None
     # The earlier answers were to the text as it was before, and so were their files.
@@ -781,6 +782,8 @@ async def branch(db: AsyncSession, conversation_id: uuid.UUID, upto_seq: int) ->
         project_id=source.project_id,
         tags=list(source.tags),
         branched_from_id=source.id,
+        # Its system prompt has the same memories as the chat it comes from.
+        memory_snapshot=source.memory_snapshot,
     )
     db.add(copy)
     await db.flush()
@@ -795,6 +798,7 @@ async def branch(db: AsyncSession, conversation_id: uuid.UUID, upto_seq: int) ->
             model_id=m.model_id,
             model_label=m.model_label,
             turn_context=m.turn_context,  # same bytes: the copy starts with the same prefix
+            turn_memories=m.turn_memories,
             skill=m.skill,
             created_at=m.created_at,
         )
