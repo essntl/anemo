@@ -320,6 +320,31 @@ token from the general token list closes the connection within a minute.
   data folder, the two sandboxes, browser, MCP host, Claude runner and SearXNG.
 - `curl http://<server>:8080/api/health` answers `{"status":"ok"}`.
 
+## Where the tokens go
+
+`docker compose exec app python -m app.cli usage-report` prints the model tokens of the
+last 7 days by kind of work (chat, agent, title, memory, …) and by model, with the input
+split into uncached, read from the prompt cache and written to it, plus the biggest single
+requests. `--since 2026-11-01 --until 2026-11-15` for another period, `--top 30` for more
+of the biggest requests, `--json` for a machine-readable copy.
+
+## Slow queries
+
+Postgres starts with `pg_stat_statements` loaded (the `command:` of the `postgres`
+service), so it counts the time every kind of query takes. Turn the view on once, then
+read the queries that took the most time in total:
+
+```bash
+docker compose exec postgres psql -U aiw -d aiw -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements"
+docker compose exec postgres psql -U aiw -d aiw -c "
+  SELECT calls, round(total_exec_time) AS total_ms, round(mean_exec_time, 1) AS mean_ms,
+         rows, left(query, 120) AS query
+  FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20"
+```
+
+`SELECT pg_stat_statements_reset()` starts the counts again. An install from before this
+setting needs `docker compose up -d postgres` once to restart Postgres with it.
+
 ## Updating
 
 From a checkout:

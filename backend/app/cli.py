@@ -7,6 +7,8 @@ claude-code-check run a short agent conversation on the Claude subscription prov
                   and print the prompt-cache use of every model request (uses some
                   subscription quota; `claude-code-check --help` for options)
 tool-spec-sizes   print the size of every built-in tool spec as the model receives it
+usage-report      tokens per kind of work and per model (uncached, cached, written,
+                  output) and the biggest requests (`usage-report --help` for options)
 """
 
 import asyncio
@@ -56,6 +58,10 @@ def main(argv: list[str]) -> int:
 
         print(report())
         return 0
+    if cmd == "usage-report":
+        from app.features.usage.report import main as usage_report
+
+        return usage_report(argv[2:])
     if cmd == "export-openapi":
         import json
 
