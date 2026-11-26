@@ -43,7 +43,7 @@ jobs:
         run: >
           docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm -e ENV=test
           -v "$PWD/frontend/src/api/openapi.json:/openapi.json:ro" -e OPENAPI_SNAPSHOT=/openapi.json app
-          sh -c "ruff check . && ruff format --check . && mypy app && lint-imports && pytest -q -p no:logging -n auto && alembic check"
+          sh -c "nproc && ruff check . && ruff format --check . && mypy app && lint-imports && pytest -q -p no:logging -n 4 && alembic check"
 
   frontend:
     name: Frontend (types, lint, tests, build)
