@@ -12,6 +12,7 @@ from app.tools.builtin.agent import LoadSkill, ReadToolOutput
 from app.tools.builtin.ask import AskUser
 from app.tools.builtin.automation import AUTOMATION_TOOLS, STATE_ALIASES
 from app.tools.builtin.browser import BROWSER_TOOLS, BrowserCurrentTab
+from app.tools.builtin.chats import CHAT_TOOL_NAMES, CHAT_TOOLS
 from app.tools.builtin.code import CODE_TOOL_NAMES, CODE_TOOLS
 from app.tools.builtin.computer import COMPUTER_TOOLS
 from app.tools.builtin.docs import DOCUMENT_TOOLS
@@ -83,6 +84,7 @@ BUILTIN_TOOLS: list[Tool] = [
     *SCRIPT_TOOLS,
     VoiceStop(),
     *PLUGIN_TOOLS,
+    *CHAT_TOOLS,
 ]
 _BY_NAME = {t.name: t for t in BUILTIN_TOOLS}
 # Tools that only work in a run that answers in a chat.
@@ -106,10 +108,18 @@ FEATURE_TOOLS: dict[str, frozenset[str]] = {
 ALWAYS_OFFERED = frozenset({"read_tool_output"})
 
 
-def allowed(tools: list[Tool], allowlist: Iterable[str] | None) -> list[Tool]:
-    """The tools an automation's runs see: those on its list (None: no list, all)."""
+# Given to an automation's runs only when its list names them, not with "no list, all":
+# earlier chats are the user's private conversations (docs/specs/18-chat-recall.md).
+NAMED_ONLY = CHAT_TOOL_NAMES
+
+
+def allowed(
+    tools: list[Tool], allowlist: Iterable[str] | None, *, unattended: bool = False
+) -> list[Tool]:
+    """The tools an automation's runs see: those on its list (None: no list, all but
+    NAMED_ONLY). `unattended`: the run is an automation's (or its sub-agent)."""
     if allowlist is None:
-        return tools
+        return [t for t in tools if not (unattended and t.name in NAMED_ONLY)]
     names = {*allowlist, *ALWAYS_OFFERED}
     if "update_automation_state" in names:
         names |= STATE_ALIASES  # its old names, which existing prompts may still use

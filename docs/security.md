@@ -330,6 +330,7 @@ The kinds of action and their defaults:
 | Edit documents | Always ask |
 | Manage tasks, manage calendar, send notifications | Ask for dangerous actions |
 | Update memory | Fully autonomous |
+| Earlier chats (search and read them; automations only when their tool list names them) | Fully autonomous |
 | MCP tools | Always ask (each tool can be set on its own) |
 | Start sub-agents | Never |
 | Generate images | Fully autonomous (automations ask first, see below) |

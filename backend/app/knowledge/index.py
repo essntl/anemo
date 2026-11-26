@@ -56,14 +56,37 @@ def _hash(text: str) -> str:
 
 
 async def index_source(
-    db: AsyncSession, source_type: str, source_id: uuid.UUID, chunks: list[str]
+    db: AsyncSession,
+    source_type: str,
+    source_id: uuid.UUID,
+    chunks: list[str],
+    *,
+    positions: list[int] | None = None,
 ) -> None:
-    """Replace the indexed chunks of one source (a memory, a document, ...)."""
+    """Replace the indexed chunks of one source (a memory, a document, ...).
+
+    `positions`: the chunk_index of each chunk (default 0, 1, 2, ...), e.g. the seq of
+    the chat message it comes from. A chunk whose text is unchanged keeps its vector
+    (when it was made by the current model): only new or changed text is embedded."""
     model = await embedding_model(db)
-    vectors: list[list[float]] | None = None
-    if model is not None and chunks:
+    model_key = str(model.model_id) if model else None
+    kept: dict[str, list[float]] = {}
+    if model_key is not None and chunks:
+        rows = await db.execute(
+            select(KnowledgeChunk.content_hash, KnowledgeChunk.embedding).where(
+                KnowledgeChunk.source_type == source_type,
+                KnowledgeChunk.source_id == source_id,
+                KnowledgeChunk.model_key == model_key,
+            )
+        )
+        kept = {h: list(v) for h, v in rows.all() if v is not None}
+    hashes = [_hash(text) for text in chunks]
+    vectors: dict[str, list[float]] = dict(kept)
+    new = [i for i, h in enumerate(hashes) if h not in kept]
+    if model is not None and new:
         try:
-            vectors = await embed(db, model, chunks)
+            made = await embed(db, model, [chunks[i] for i in new])
+            vectors.update({hashes[i]: v for i, v in zip(new, made, strict=True)})
         except ProviderError as exc:
             log.warning(
                 "embedding failed; indexing keywords only", extra={"ctx": {"error": str(exc)}}
@@ -74,15 +97,16 @@ async def index_source(
         )
     )
     for i, text in enumerate(chunks):
+        vector = vectors.get(hashes[i])
         db.add(
             KnowledgeChunk(
                 source_type=source_type,
                 source_id=source_id,
-                chunk_index=i,
+                chunk_index=positions[i] if positions is not None else i,
                 content=text,
-                content_hash=_hash(text),
-                embedding=vectors[i] if vectors else None,
-                model_key=str(model.model_id) if model and vectors else None,
+                content_hash=hashes[i],
+                embedding=vector,
+                model_key=model_key if vector is not None else None,
             )
         )
     await db.flush()
@@ -103,6 +127,7 @@ class Hit:
     content: str
     score: float  # fused rank score, higher is better
     similarity: float | None  # cosine similarity, when found by meaning
+    chunk_index: int = 0  # which chunk of the source matched best
 
 
 def keyword_query(text: str, *, all_words: bool = False) -> str | None:
@@ -159,7 +184,12 @@ async def search(
             else_=None,
         )
         rows = await db.execute(
-            select(KnowledgeChunk.source_id, KnowledgeChunk.content, distance.label("d"))
+            select(
+                KnowledgeChunk.source_id,
+                KnowledgeChunk.content,
+                KnowledgeChunk.chunk_index,
+                distance.label("d"),
+            )
             .where(
                 KnowledgeChunk.source_type == source_type,
                 KnowledgeChunk.model_key == key,
@@ -168,29 +198,29 @@ async def search(
             .order_by("d")
             .limit(limit * 2)
         )
-        for rank, (source_id, content, d) in enumerate(rows.all()):
+        for rank, (source_id, content, chunk_index, d) in enumerate(rows.all()):
             if source_id in info:
                 continue
             ranks[source_id] = 1 / (RRF_K + rank)
-            info[source_id] = Hit(source_id, content, 0.0, similarity=1 - float(d))
+            info[source_id] = Hit(source_id, content, 0.0, 1 - float(d), chunk_index)
 
     tsq_text = keyword_query(query, all_words=all_words)
     if tsq_text:
         tsq = func.to_tsquery("english", tsq_text)
         rank_expr = func.ts_rank_cd(KnowledgeChunk.tsv, tsq)
         rows = await db.execute(
-            select(KnowledgeChunk.source_id, KnowledgeChunk.content)
+            select(KnowledgeChunk.source_id, KnowledgeChunk.content, KnowledgeChunk.chunk_index)
             .where(KnowledgeChunk.source_type == source_type, KnowledgeChunk.tsv.op("@@")(tsq))
             .order_by(rank_expr.desc())
             .limit(limit * 2)
         )
         seen: set[uuid.UUID] = set()
-        for rank, (source_id, content) in enumerate(rows.all()):
+        for rank, (source_id, content, chunk_index) in enumerate(rows.all()):
             if source_id in seen:
                 continue
             seen.add(source_id)
             ranks[source_id] = ranks.get(source_id, 0.0) + 1 / (RRF_K + rank)
-            info.setdefault(source_id, Hit(source_id, content, 0.0, similarity=None))
+            info.setdefault(source_id, Hit(source_id, content, 0.0, None, chunk_index))
 
     hits = []
     for source_id, score in sorted(ranks.items(), key=lambda kv: kv[1], reverse=True)[:limit]:

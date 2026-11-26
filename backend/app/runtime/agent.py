@@ -1292,7 +1292,9 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
                 if verdict.decision != "deny":
                     tools.append(tool)
         unattended_by = run.policy.get("automation")  # the automation's settings, if any
-        tools = registry.allowed(tools, (unattended_by or {}).get("tools"))
+        tools = registry.allowed(
+            tools, (unattended_by or {}).get("tools"), unattended=unattended_by is not None
+        )
         automation_id = run.automation_id
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         effort = await effort_for(db, run)
