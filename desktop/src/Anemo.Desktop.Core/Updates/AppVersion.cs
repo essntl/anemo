@@ -49,7 +49,8 @@ public readonly partial record struct AppVersion(int Major, int Minor, int Patch
 
     public override string ToString() => $"{Major}.{Minor}.{Patch}";
 
-    // At most 9 digits each (fits an int); no leading zeros, as semver says.
-    [GeneratedRegex(@"^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$", RegexOptions.CultureInvariant)]
+    // At most 9 digits each (fits an int); no leading zeros, as semver says. \z, not $: $ also
+    // matches before a final newline.
+    [GeneratedRegex(@"^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\z", RegexOptions.CultureInvariant)]
     private static partial Regex Strict();
 }

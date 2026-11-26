@@ -26,6 +26,7 @@ public sealed class UpdatePartsTests
     [InlineData("v1.8.0")]
     [InlineData("01.8.0")]
     [InlineData(" 1.8.0")]
+    [InlineData("1.8.0\n")]
     [InlineData("1.8.x")]
     [InlineData("99999999999.0.0")]
     [InlineData("")]
