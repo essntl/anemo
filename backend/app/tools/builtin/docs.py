@@ -303,7 +303,7 @@ class ListDocuments(Tool):
 class ReadDocumentInput(BaseModel):
     path: str = Field(description=DOCUMENT_REF + " (see list_documents)")
     start: int = Field(0, ge=0, description="Character offset, to continue a long document")
-    max_chars: int = Field(15_000, ge=500, le=15_000)
+    max_chars: int = Field(10_000, ge=500, le=15_000)
 
 
 class ReadDocument(Tool):

@@ -14,6 +14,7 @@ from app.runtime.dispatch import execute_run
 from app.tools import registry
 from app.tools.base import ToolContext, ToolResult
 from app.tools.builtin.agent import ReadToolOutput
+from app.tools.builtin.workspace import ReadFile
 from tests.api.test_agent import (
     agent_turn,
     call,
@@ -268,6 +269,21 @@ async def test_cost_limit_and_totals(authed):
 
 
 # -- long outputs and compaction -----------------------------------------------------
+
+
+async def test_read_file_gives_10k_characters_and_pages_on(authed, workspace):  # noqa: F811
+    (workspace / "notes" / "long.txt").write_text("a" * 10_000 + "b" * 5_000)
+    tool = ReadFile()
+    ctx = ToolContext(run_id=uuid.uuid4(), emit=lambda *_: None)  # type: ignore[arg-type,return-value]
+    first = await tool.run(tool.Input(path="notes/long.txt"), ctx)
+    assert first.content.startswith("notes/long.txt:\n" + "a" * 10_000 + "\n\n[Characters 0-10,000")
+    assert "of 15,000. Call read_file again with start=10000 for more.]" in first.content
+    rest = await tool.run(tool.Input(path="notes/long.txt", start=10_000), ctx)
+    assert rest.content == "notes/long.txt:\n" + "b" * 5_000 + (
+        "\n\n[Characters 10,000-15,000 of 15,000.]"
+    )
+    short = await tool.run(tool.Input(path="notes/todo.md"), ctx)
+    assert "[Characters" not in short.content
 
 
 async def test_long_tool_output_is_shortened_and_saved(authed, workspace):  # noqa: F811

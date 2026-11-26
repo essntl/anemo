@@ -199,8 +199,8 @@ MAX_WINDOWS = 200
 MAX_LABEL = 300  # a title, an app, a control's role or name
 MAX_VALUE = 1_000  # a control's value, a note
 MAX_REF = 40
-SHELL_HEAD = 20_000
-SHELL_TAIL = 10_000
+SHELL_HEAD = 8_000
+SHELL_TAIL = 4_000
 
 
 def _cut(value: Any, limit: int) -> str | None:

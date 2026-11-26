@@ -500,7 +500,7 @@ class BrowserScreenshot(Tool):
 
 class CurrentTabInput(BaseModel):
     start: int = Field(0, ge=0, description="Character offset, to continue a long page")
-    max_chars: int = Field(15_000, ge=500, le=15_000)
+    max_chars: int = Field(8_000, ge=500, le=15_000)
 
 
 NOTHING_SHARED = (

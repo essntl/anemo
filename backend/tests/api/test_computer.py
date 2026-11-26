@@ -891,7 +891,7 @@ async def test_what_the_client_sends_is_capped(fake):
 
     fake.answer = {"exit_code": 0, "stdout": "a" * 50_000, "stderr": "", "duration_ms": 1}
     result = await SHELL.run(computer.ShellInput(device="VM", command="Get-Date"), ctx)
-    assert result.data and len(result.data["shell"]["stdout"]) < 30_100
+    assert result.data and len(result.data["shell"]["stdout"]) < 12_100
     assert "characters left out" in result.data["shell"]["stdout"]
 
 
