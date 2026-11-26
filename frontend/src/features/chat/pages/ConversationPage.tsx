@@ -29,11 +29,14 @@ import { useIslandVisible } from '@/features/island/islandStore'
 import {
   type ChatMessage,
   type Conversation,
+  contextKey,
   conversationKey,
   conversationsKey,
   messagesKey,
   useBranch,
   useCancelRun,
+  useChatContext,
+  useCompact,
   useConversation,
   useEditLast,
   useMessages,
@@ -47,6 +50,8 @@ import { TemporaryLabel } from '../temporary'
 import { LiveTiming } from '../components/AnswerTiming'
 import { EventCard } from '../components/EventCard'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
+import { CompactionDivider } from '../components/CompactionDivider'
+import { contextWarning, parseCompact } from '../compaction'
 import { Composer } from '../components/Composer'
 import { useChatModel } from '../chatModel'
 import { ChatOptionsSheet } from '../components/ChatOptionsSheet'
@@ -101,6 +106,8 @@ function Conversation() {
   const messages = useMessages(conversationId)
   const settings = useSettings()
   const send = useSendTurn()
+  const compact = useCompact()
+  const chatContext = useChatContext(conversationId)
   const cancel = useCancelRun()
   const regenerate = useRegenerate()
   const selectVersion = useSelectVersion()
@@ -150,10 +157,17 @@ function Conversation() {
     void qc.invalidateQueries({ queryKey: messagesKey(conversationId) })
     void qc.invalidateQueries({ queryKey: conversationKey(conversationId) })
     void qc.invalidateQueries({ queryKey: conversationsKey })
+    void qc.invalidateQueries({ queryKey: contextKey(conversationId) })
   }
   const appendShellOutput = useShellOutput((s) => s.append)
   const onEvent = (event: RunEvent) => {
     noticeMemoryEvent(event, () => void qc.invalidateQueries({ queryKey: ['memories'] }))
+    if (event.type === 'chat.compacted') {
+      // The turn summarized the chat before answering: show where.
+      void qc.invalidateQueries({ queryKey: messagesKey(conversationId) })
+      void qc.invalidateQueries({ queryKey: contextKey(conversationId) })
+      return
+    }
     if (event.type === 'tool.progress') {
       appendShellOutput(String(event.data.tool_call_id), String(event.data.text ?? ''))
       return
@@ -189,10 +203,13 @@ function Conversation() {
   const enter = (id: string) => (seen?.ids.has(id) ? undefined : 'msg-in')
   const lastAssistant = [...list].reverse().find((m) => m.role === 'assistant')
   const lastUser = [...list].reverse().find((m) => m.role === 'user')
+  // Nothing (a compaction) came after the last answer.
+  const answerIsLast = Boolean(lastAssistant) && list[list.length - 1]?.id === lastAssistant?.id
   // The last message can be edited when it is the one the last answer replied to.
-  const canEditLast = !activeRunId && lastUser && !lastUser.event && lastAssistant && lastAssistant.seq === lastUser.seq + 1
+  const canEditLast = !activeRunId && answerIsLast && lastUser && !lastUser.event && lastAssistant && lastAssistant.seq === lastUser.seq + 1
   const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
-  const actionError = send.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
+  const warning = contextWarning(chatContext.data)
+  const actionError = send.error ?? compact.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
   // What the assistant is doing (only the state), for anything that shows it, e.g. plugins.
@@ -288,6 +305,9 @@ function Conversation() {
             </Link>
           )}
           {list.map((m) => {
+            if (m.role === 'compaction') {
+              return <div key={m.id} className={enter(m.id)}><CompactionDivider message={m} /></div>
+            }
             if (m.role === 'user' && m.event) {
               return <div key={m.id} className={enter(m.id)}><EventCard event={m.event} /></div>
             }
@@ -323,7 +343,7 @@ function Conversation() {
                   />
                 ) : (() => {
                   const versions = m.versions ?? []
-                  const isLast = m.id === lastAssistant?.id
+                  const isLast = m.id === lastAssistant?.id && answerIsLast
                   const index = Math.min(viewing[m.id] ?? m.version, Math.max(versions.length - 1, 0))
                   // Another answer than the one the chat goes on from (only looked at).
                   const other = versions.length > 1 && index !== m.version ? versions[index] : null
@@ -369,6 +389,7 @@ function Conversation() {
 
       <div className="mx-auto w-full max-w-3xl px-3 pb-2 md:px-6 md:pb-6">
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
+        {warning && !activeRunId && <p className="mb-2 text-center text-[12px] text-muted">{warning}</p>}
         {/* What the agent waits for stays in sight here, whatever the chat is scrolled to. */}
         <ApprovalDock runId={activeRunId} />
         <Composer
@@ -385,7 +406,10 @@ function Conversation() {
               ? answer.mutateAsync({ approvalId: question.approval!.id, decision: 'approve', answer: text })
               : paused && activeRunId
                 ? resume.mutateAsync({ runId: activeRunId, message: text })
-                : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
+                : parseCompact(text) && !attachmentIds.length
+                  // /compact [focus]: summarizes the chat, sends no message.
+                  ? compact.mutateAsync({ conversationId, focus: parseCompact(text)?.focus ?? null })
+                  : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
           }
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           controls={{

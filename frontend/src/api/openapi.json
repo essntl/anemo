@@ -789,6 +789,65 @@
         }
       }
     },
+    "/api/settings/chat": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Chat Settings",
+        "operationId": "put_chat_settings_api_settings_chat_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/appearance": {
       "put": {
         "tags": [
@@ -3993,6 +4052,136 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TurnOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/compact": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Compact",
+        "description": "`/compact`: summarize the chat so far; the model reads on from the summary.",
+        "operationId": "compact_api_conversations__conversation_id__compact_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompactIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompactOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/context": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Context",
+        "description": "How big the chat's history is for the model, and when it is compacted.",
+        "operationId": "context_api_conversations__conversation_id__context_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOut"
                 }
               }
             }
@@ -23607,6 +23796,9 @@
           "general": {
             "$ref": "#/components/schemas/GeneralSettings"
           },
+          "chat": {
+            "$ref": "#/components/schemas/ChatSettings"
+          },
           "appearance": {
             "$ref": "#/components/schemas/AppearanceSettings"
           },
@@ -23674,6 +23866,7 @@
         "type": "object",
         "required": [
           "general",
+          "chat",
           "appearance",
           "profile",
           "models",
@@ -26329,6 +26522,25 @@
         ],
         "title": "ChatBulkOut"
       },
+      "ChatSettings": {
+        "properties": {
+          "auto_compact": {
+            "type": "boolean",
+            "title": "Auto Compact",
+            "default": true
+          },
+          "compact_at_tokens": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 20000.0,
+            "title": "Compact At Tokens",
+            "default": 250000
+          }
+        },
+        "type": "object",
+        "title": "ChatSettings",
+        "description": "Long chats (docs/specs/24-chat-compaction.md): at the start of a turn, a chat whose\ncontext reaches `compact_at_tokens` is summarized first (API providers; the Claude\nsubscription gets the number as Claude Code's own auto-compact window)."
+      },
       "Check": {
         "properties": {
           "name": {
@@ -27763,6 +27975,99 @@
         ],
         "title": "CodeUsageWindowOut"
       },
+      "CompactIn": {
+        "properties": {
+          "focus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus",
+            "description": "What to keep in detail"
+          }
+        },
+        "type": "object",
+        "title": "CompactIn"
+      },
+      "CompactOut": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "message"
+        ],
+        "title": "CompactOut"
+      },
+      "CompactionSummary": {
+        "properties": {
+          "kept_from_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kept From Seq"
+          },
+          "tokens_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Before"
+          },
+          "tokens_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens After"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus"
+          },
+          "auto": {
+            "type": "boolean",
+            "title": "Auto",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CompactionSummary",
+        "description": "A compaction row (role \"compaction\"): where the model reads on, and how big the\ncontext was before and after (estimates). Numbers are None while it is written."
+      },
       "ContentOut": {
         "properties": {
           "path": {
@@ -27790,6 +28095,35 @@
           "size"
         ],
         "title": "ContentOut"
+      },
+      "ContextOut": {
+        "properties": {
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          },
+          "compact_at": {
+            "type": "integer",
+            "title": "Compact At"
+          },
+          "auto_compact": {
+            "type": "boolean",
+            "title": "Auto Compact"
+          },
+          "compacts_itself": {
+            "type": "boolean",
+            "title": "Compacts Itself"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tokens",
+          "compact_at",
+          "auto_compact",
+          "compacts_itself"
+        ],
+        "title": "ContextOut",
+        "description": "How big the chat's history is for the model, and when it is compacted."
       },
       "ContributedCommandOut": {
         "properties": {
@@ -33314,6 +33648,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RunTiming"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "compaction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompactionSummary"
               },
               {
                 "type": "null"
