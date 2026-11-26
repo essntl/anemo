@@ -133,7 +133,9 @@ function GroupRow({ row }: { row: Extract<Row, { kind: 'group' }> }) {
   const run = async (force = false) => {
     try {
       const { results } = await undoGroup.mutateAsync({ groupId: row.id, force })
-      const failed = results.filter((r) => !r.ok)
+      // Skipped entries (nothing kept to undo them with) weren't tried: not failures.
+      const failed = results.filter((r) => !r.ok && !r.skipped)
+      const skipped = results.filter((r) => r.skipped).length
       const conflicts = failed.filter((r) => r.code === 'activity_conflict')
       if (!force && conflicts.length > 0) {
         const sure = await confirmDialog({
@@ -146,7 +148,9 @@ function GroupRow({ row }: { row: Extract<Row, { kind: 'group' }> }) {
         if (sure) await run(true)
         return
       }
-      toast({ message: failed.length ? plural(failed.length, '{n} change could not be undone', '{n} changes could not be undone') : t('Undone') })
+      const parts = [failed.length ? plural(failed.length, '{n} change could not be undone', '{n} changes could not be undone') : t('Undone')]
+      if (skipped) parts.push(plural(skipped, '{n} change can’t be undone and was skipped', '{n} changes can’t be undone and were skipped'))
+      toast({ message: parts.join('. ') })
     } catch (err) {
       toast({ message: errorMessage(err) })
     }

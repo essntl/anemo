@@ -37,6 +37,7 @@ from app.core.activity import activity_group
 from app.core.errors import AppError, Conflict, NotFound
 from app.features.activity import service as activity
 from app.features.activity.models import Activity
+from app.features.audit import service as audit
 from app.features.calendar import recurrence
 from app.features.calendar import service as calendar
 from app.features.calendar.models import CalendarEvent
@@ -81,6 +82,7 @@ class ItemResult:
     message: str
     code: str | None = None
     details: Any = None
+    skipped: bool = False  # not tried: the entry can't be undone (no inverse, too large)
 
 
 @dataclass
@@ -231,8 +233,19 @@ async def _document_path(db: AsyncSession, entry: Activity, force: bool) -> str:
 
 async def _file_path(db: AsyncSession, entry: Activity, force: bool) -> str:
     old, new = str((entry.before or {}).get("path")), str((entry.after or {}).get("path"))
-    if not await asyncio.to_thread(lambda: files.resolve(new).exists()):
+    current = await asyncio.to_thread(files.fingerprint, new)
+    if current is None:
         raise _unavailable(f"{new} is no longer there (moved or deleted since)")
+    # Entries from before fingerprints were kept have none: moved back unchecked.
+    expected = (entry.undo or {}).get("fingerprint")
+    if expected is not None and current != expected and not force:
+        raise ActivityConflict(
+            f"{new} was changed or replaced since it was moved. Undo anyway to move what "
+            "is there now.",
+            [{"field": "file", "expected": expected, "current": current}],
+        )
+    # Everything is checked; now the disk. The links follow it afterwards (they need the
+    # file at its place) and are committed with the entry's mark.
     await asyncio.to_thread(files.move, new, old)
     await links.on_moved(db, new, old, author="user")
     return f"Moved {new} back to {old}"
@@ -361,8 +374,11 @@ async def get(db: AsyncSession, entry_id: uuid.UUID) -> Activity:
     return entry
 
 
-async def undo(db: AsyncSession, entry: Activity, *, force: bool = False) -> str:
-    """Undo one entry (see the module docstring). Commits. Returns what was done."""
+async def undo(
+    db: AsyncSession, entry: Activity, *, force: bool = False, ip: str | None = None
+) -> str:
+    """Undo one entry (see the module docstring). Commits. Returns what was done.
+    `ip`: the client's address, for the audit entry of reverting an agent's file change."""
     blocked = activity.undo_blocked(entry)
     if blocked is not None:
         raise Conflict(REASONS[blocked], code=f"activity_{blocked}")
@@ -373,9 +389,23 @@ async def undo(db: AsyncSession, entry: Activity, *, force: bool = False) -> str
     try:
         with activity.suppressed():
             # The services commit as they finish, so the entry is marked first: the mark
-            # and the undo are saved together (or not at all).
+            # is saved with the service's change. A change on disk (moving a file back,
+            # reverting an agent's change, restoring from the trash) can't be part of the
+            # transaction: each handler makes its checks first and changes the disk last,
+            # just before the commit. Should saving fail after that, the disk stays
+            # changed and the entry stays not undone (trying again reports it gone).
             activity.mark_undone(db, entry, f"Undid: {entry.summary}"[: activity.SUMMARY_LENGTH])
             message = await handler(db, entry, force)
+            if kind == "file_revert":
+                # The same security event as reverting it from the run page.
+                audit.record(
+                    db,
+                    "files.revert",
+                    target_type="file_change",
+                    target_id=(entry.undo or {}).get("change_id"),
+                    ip=ip,
+                    details={"message": message, "force": force, "via": "activity"},
+                )
             await db.commit()
     except Exception:
         await db.rollback()
@@ -387,10 +417,13 @@ async def undo(db: AsyncSession, entry: Activity, *, force: bool = False) -> str
     return message
 
 
-async def undo_group(db: AsyncSession, group_id: uuid.UUID, *, force: bool = False) -> GroupResult:
+async def undo_group(
+    db: AsyncSession, group_id: uuid.UUID, *, force: bool = False, ip: str | None = None
+) -> GroupResult:
     """Undo every entry of a batch that can be, newest first, each on its own (one that
     fails doesn't stop the others). Entries that were undone already, or are undos
-    themselves, are left out."""
+    themselves, are left out; entries that can't be undone at all (nothing kept to undo
+    them with, a value too long to keep) are reported as skipped, not tried."""
     entries = list(
         await db.scalars(
             select(Activity)
@@ -401,13 +434,22 @@ async def undo_group(db: AsyncSession, group_id: uuid.UUID, *, force: bool = Fal
     if not entries:
         raise NotFound("Activity group not found")
     label = entries[0].group_label or "a batch"
-    ids = [e.id for e in entries if activity.undo_blocked(e) not in ("undone", "is_undo")]
+    blocked = {e.id: activity.undo_blocked(e) for e in entries}
+    ids = [e.id for e in entries if blocked[e.id] not in ("undone", "is_undo")]
     result = GroupResult()
     with activity_group(f"Undid: {label}"):
         for entry_id in ids:
+            reason = blocked[entry_id]
+            if reason is not None:
+                result.results.append(
+                    ItemResult(
+                        entry_id, False, REASONS[reason], code=f"activity_{reason}", skipped=True
+                    )
+                )
+                continue
             entry = await get(db, entry_id)  # loaded again: a failed undo rolls back
             try:
-                message = await undo(db, entry, force=force)
+                message = await undo(db, entry, force=force, ip=ip)
             except AppError as exc:
                 result.results.append(
                     ItemResult(entry_id, False, exc.message, code=exc.code, details=exc.details)

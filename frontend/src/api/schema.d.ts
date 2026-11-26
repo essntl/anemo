@@ -8413,7 +8413,7 @@ export interface components {
         GroupUndoOut: {
             /**
              * Results
-             * @description One per entry tried, newest first
+             * @description One per entry tried or skipped, newest first (undone ones are left out)
              */
             results: components["schemas"]["UndoItemOut"][];
         };
@@ -13152,6 +13152,11 @@ export interface components {
             code: string | null;
             /** Details */
             details?: unknown;
+            /**
+             * Skipped
+             * @description Not tried: the entry can't be undone (`code` says why); not a failure
+             */
+            skipped: boolean;
         };
         /** UndoOut */
         UndoOut: {

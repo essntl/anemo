@@ -62,12 +62,16 @@ async def index_source(
     chunks: list[str],
     *,
     positions: list[int] | None = None,
-) -> None:
+) -> bool:
     """Replace the indexed chunks of one source (a memory, a document, ...).
 
     `positions`: the chunk_index of each chunk (default 0, 1, 2, ...), e.g. the seq of
     the chat message it comes from. A chunk whose text is unchanged keeps its vector
-    (when it was made by the current model): only new or changed text is embedded."""
+    (when it was made by the current model): only new or changed text is embedded.
+
+    If embedding fails, the chunks are stored without vectors (found by their words).
+    Returns False then, True when every chunk has its vector (or there is no embedding
+    model), so a caller can try again later."""
     model = await embedding_model(db)
     model_key = str(model.model_id) if model else None
     kept: dict[str, list[float]] = {}
@@ -83,11 +87,13 @@ async def index_source(
     hashes = [_hash(text) for text in chunks]
     vectors: dict[str, list[float]] = dict(kept)
     new = [i for i, h in enumerate(hashes) if h not in kept]
+    embedded = True
     if model is not None and new:
         try:
             made = await embed(db, model, [chunks[i] for i in new])
             vectors.update({hashes[i]: v for i, v in zip(new, made, strict=True)})
         except ProviderError as exc:
+            embedded = False
             log.warning(
                 "embedding failed; indexing keywords only", extra={"ctx": {"error": str(exc)}}
             )
@@ -110,6 +116,7 @@ async def index_source(
             )
         )
     await db.flush()
+    return embedded
 
 
 async def delete_source(db: AsyncSession, source_type: str, source_ids: list[uuid.UUID]) -> None:

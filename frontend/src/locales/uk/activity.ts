@@ -30,6 +30,7 @@ const messages: Messages = {
   "Nothing in it can be undone": "Тут нічого не можна скасувати",
   "({n} change) | ({n} changes)": "({n} зміна) | ({n} зміни) | ({n} змін)",
   "{n} change could not be undone | {n} changes could not be undone": "{n} зміну не вдалося скасувати | {n} зміни не вдалося скасувати | {n} змін не вдалося скасувати",
+  "{n} change can’t be undone and was skipped | {n} changes can’t be undone and were skipped": "{n} зміну не можна скасувати, її пропущено | {n} зміни не можна скасувати, їх пропущено | {n} змін не можна скасувати, їх пропущено",
   "{n} item was changed since. Undo it anyway? | {n} items were changed since. Undo them anyway?": "{n} елемент відтоді змінено. Усе одно скасувати? | {n} елементи відтоді змінено. Усе одно скасувати? | {n} елементів відтоді змінено. Усе одно скасувати?",
   "What was changed in it, by whom, with Undo": "Що в ньому змінено і ким, зі скасуванням",
   "A batch of changes": "Кілька змін разом",

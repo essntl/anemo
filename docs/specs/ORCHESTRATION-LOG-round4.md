@@ -118,13 +118,9 @@ Code map findings that shaped the contracts:
 
 ## Open for Artem
 
-Review findings not fixed yet (the fix round was cut off):
-- A: "Undo all" counts entries that can't be undone as failures; undo of an agent's
-  file change from Activity writes no audit row; undoing a file move doesn't check that it is
-  still the same file; batch rows split when entries interleave.
-- R: chat indexing runs inline in the 30 s scheduler; a chat whose embedding failed is
-  never embedded again; semantic results are filtered by scope after the top-N; keyword hits
-  can be labelled "by meaning".
+Review findings still open (the rest were fixed in #105, #106 and #107):
+- R: semantic results are filtered by scope after the top-N; keyword hits can be labelled
+  "by meaning".
 - Hardware: desktop MANUAL-TESTS 71–88 and the Mac checklist N–O; webhooks through the
   tunnel; a real MCP host with a notifying stdio server.
 - To decide: the embedding of ordinary chats once an embedding model is set (on by

@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from app.core.errors import AppError, Conflict, NotFound
 from app.workspace import fs_guard, safe_fs
@@ -92,6 +93,20 @@ def entry(path: Path) -> Entry:
         modified=datetime.fromtimestamp(st.st_mtime, UTC),
         mime=None if is_dir else (mimetypes.guess_type(path.name)[0] or "application/octet-stream"),
     )
+
+
+def fingerprint(relative: str) -> dict[str, Any] | None:
+    """What tells this file apart from another one put at its path later, cheaply (no
+    reading): its size and modification time, which a move keeps. A folder only says it
+    is one. None when nothing is there."""
+    path = resolve(relative)
+    try:
+        st = path.stat()
+    except FileNotFoundError:
+        return None
+    if path.is_dir():
+        return {"is_dir": True}
+    return {"is_dir": False, "size": st.st_size, "mtime_ns": st.st_mtime_ns}
 
 
 def list_dir(relative: str) -> list[Entry]:

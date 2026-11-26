@@ -123,13 +123,16 @@ Details:
   cost; their words are still found).
 - **Only with an embedding model**: without one nothing is written (the messages' own
   `tsv` already finds the words, so keyword-only chunks would just duplicate them).
-- **When**: the scheduler's `chats.index` task (every 30 s) picks up to 10 chats that
+- **When**: the scheduler's `chats.index` task (every 30 s) claims up to 10 chats that
   have been quiet for 2 minutes and have messages newer than their last indexing (or
-  were indexed with another embedding model). Two new columns on `conversations`
-  (migration `0083`): `recall_indexed_at` (the chat's `last_message_at` when it was
-  indexed) and `recall_index_model`. A chat is claimed by setting these first, with
-  `SKIP LOCKED`, so no row stays locked while the embedding model is called, and two
-  workers never take the same chat.
+  were indexed with another embedding model), and queues one `chats.index` background
+  job per chat (`jobs/runner.py`; a dedupe key per claim) in the same transaction. The
+  scheduler never calls the embedding model itself, so a slow provider doesn't hold up
+  reminders and automations. Two new columns on `conversations` (migration `0083`):
+  `recall_indexed_at` (the chat's `last_message_at` when it was indexed) and
+  `recall_index_model`. A chat is claimed by setting these, with `SKIP LOCKED`, so no row
+  stays locked while the embedding model is called, and two workers never take the same
+  chat. A chat deleted before its job runs is left alone.
 - **Only new text is embedded**: `knowledge/index.py` `index_source` now keeps the
   vector of a chunk whose text (hash) is unchanged and was made by the current model.
   A chat that gets one more message costs one embedding, not the whole chat again. This
@@ -138,8 +141,13 @@ Details:
   through all chats, newest first, 10 per half minute (about 1,200 an hour).
 - **Deleting** a chat removes its chunks (`delete_conversations`). The downgrade of
   `0083` removes all chat chunks.
-- If embedding fails, the chunks are stored without vectors (as for documents): the
-  chat is found by words until its next message is indexed.
+- If embedding fails (`index_source` reports whether every chunk got its vector), the job
+  saves nothing and fails, so the queue retries it (3 attempts, with backoff); after the
+  last one a give-up hook drops the chat's claim and the scheduler takes it again. A
+  backfill during a provider outage therefore catches up once the provider is back
+  (meanwhile the chat is found by its words, and the same few chats are retried each
+  pass). Documents and memories are indexed as before: on failure their chunks are
+  stored without vectors.
 
 **Privacy**: with an embedding model set, the text of your chats goes to the embedding
 provider, as your documents and memories already do. Chat text already goes to the chat
@@ -167,13 +175,15 @@ them.
 | `features/conversations/recall.py` | `visible()`, scope helpers, `search()`, `page()`, `index_chat()`, `index_due()`, `forget()` |
 | `tools/builtin/chats.py` | `SearchChats`, `ReadChat`, `render_message()` |
 | `knowledge/index.py` | `index_source(positions=…)`, vector reuse, `Hit.chunk_index` |
-| `policy/presets.py`, `tools/registry.py`, `jobs/scheduler.py` | the category, the tools and `NAMED_ONLY`, the `chats.index` task |
+| `policy/presets.py`, `tools/registry.py`, `jobs/scheduler.py`, `jobs/runner.py` | the category, the tools and `NAMED_ONLY`, the `chats.index` task (claims) and job (embeds; its give-up hook drops the claim) |
 | `frontend/src/locales/{uk,ru}/chatRecall.ts` | the category's label and description |
 
 Tests: `tests/api/test_chat_recall.py` (an agent turn with the scripted model; scope;
 title and archived; exclusions incl. retention; paging; text-only rendering; the
 untrusted block; the permission; indexing, meaning-only hits with the fake embedding,
-re-embedding only new text, deletion), `tests/unit/test_chat_recall_tools.py`
+re-embedding only new text, deletion, the scheduler only claiming and a job per chat
+embedding, a failed embedding retried and recovered, documents still indexed by their
+words when embedding fails), `tests/unit/test_chat_recall_tools.py`
 (category, actions, offering incl. automations, inputs, message rendering),
 `frontend/src/features/agents/PermissionsPage.test.tsx`.
 

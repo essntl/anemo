@@ -6,10 +6,10 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
-from app.api.deps import Db
+from app.api.deps import Db, client_ip
 from app.features.activity import service, undo
 from app.features.activity.models import Activity
 from app.features.provenance import service as provenance
@@ -63,10 +63,15 @@ class UndoItemOut(BaseModel):
     message: str
     code: str | None = Field(description="The error code when it wasn't undone")
     details: Any = None
+    skipped: bool = Field(
+        description="Not tried: the entry can't be undone (`code` says why); not a failure"
+    )
 
 
 class GroupUndoOut(BaseModel):
-    results: list[UndoItemOut] = Field(description="One per entry tried, newest first")
+    results: list[UndoItemOut] = Field(
+        description="One per entry tried or skipped, newest first (undone ones are left out)"
+    )
 
 
 async def _out(db: Db, entries: list[Activity]) -> list[ActivityOut]:
@@ -127,23 +132,32 @@ async def list_activity(
 
 
 @router.post("/{entry_id}/undo", response_model=UndoOut)
-async def undo_entry(entry_id: uuid.UUID, db: Db, force: bool = False) -> UndoOut:
+async def undo_entry(entry_id: uuid.UUID, request: Request, db: Db, force: bool = False) -> UndoOut:
     """Undo one change. 409 `activity_conflict` (with `details.differs`) when the item
     was changed since; `force=true` undoes it anyway."""
     entry = await undo.get(db, entry_id)
-    message = await undo.undo(db, entry, force=force)
+    message = await undo.undo(db, entry, force=force, ip=client_ip(request))
     entry = await undo.get(db, entry_id)
     return UndoOut(message=message, entry=(await _out(db, [entry]))[0])
 
 
 @router.post("/groups/{group_id}/undo", response_model=GroupUndoOut)
-async def undo_group(group_id: uuid.UUID, db: Db, force: bool = False) -> GroupUndoOut:
+async def undo_group(
+    group_id: uuid.UUID, request: Request, db: Db, force: bool = False
+) -> GroupUndoOut:
     """Undo a batch, newest change first, each on its own: the results say which were
     undone and why the others weren't."""
-    result = await undo.undo_group(db, group_id, force=force)
+    result = await undo.undo_group(db, group_id, force=force, ip=client_ip(request))
     return GroupUndoOut(
         results=[
-            UndoItemOut(id=r.id, ok=r.ok, message=r.message, code=r.code, details=r.details)
+            UndoItemOut(
+                id=r.id,
+                ok=r.ok,
+                message=r.message,
+                code=r.code,
+                details=r.details,
+                skipped=r.skipped,
+            )
             for r in result.results
         ]
     )

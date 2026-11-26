@@ -18,6 +18,8 @@ from app.features.automations.models import Automation
 from app.features.calendar import service as calendar
 from app.features.calendar.schemas import EventIn
 from app.features.plugins.models import Plugin
+from app.features.projects import service as projects
+from app.features.projects.schemas import ProjectIn
 from app.features.runs.models import Run
 from app.features.tasks import service as tasks
 from app.providers.adapters.fake import FakeAdapter
@@ -253,6 +255,28 @@ async def test_a_batch_shares_a_group_and_is_undone_newest_first(authed):
     assert missing.status_code == 404
 
 
+async def test_undo_all_skips_what_cant_be_undone_instead_of_failing_it(authed):
+    task = await new_task(authed, title="One")
+    async with get_sessionmaker()() as db:
+        with activity_group("Set up the thesis") as group:
+            await projects.create(db, ProjectIn(name="Thesis"))  # no undo for a new project
+            await db.commit()
+            row = await tasks.get_task(db, uuid.UUID(task["id"]))
+            await tasks.update_task(db, row, {"title": "Two"})
+    changed, created = await entries(authed, group_id=str(group.id))
+    assert created["undo_blocked"] == "not_undoable"
+
+    r = await authed.post(f"/api/activity/groups/{group.id}/undo")
+    assert r.status_code == 200, r.text
+    results = r.json()["results"]
+    assert [(x["id"], x["ok"], x["skipped"]) for x in results] == [
+        (changed["id"], True, False),
+        (created["id"], False, True),
+    ]
+    assert results[1]["code"] == "activity_not_undoable"
+    assert (await get_task(authed, task["id"]))["title"] == "One"
+
+
 # -- events --------------------------------------------------------------------------------
 
 
@@ -392,6 +416,11 @@ async def test_an_agents_file_write_is_undone_by_reverting_it(authed, workspace)
     assert r.status_code == 409 and r.json()["error"]["code"] == "activity_conflict"
     assert (await undo(authed, new["id"], force=True)).status_code == 200
     assert not (workspace / "notes" / "new.md").exists()
+    # The same security event as reverting it from the run page.
+    audit = (await authed.get("/api/audit")).json()
+    [reverted_audit] = [e for e in audit if e["action"] == "files.revert"]
+    assert reverted_audit["details"]["via"] == "activity"
+    assert reverted_audit["details"]["force"] is True
 
     # Reverted from the run instead: the entry can't be undone any more.
     timeline = (await authed.get(f"/api/runs/{run_id}/timeline")).json()
@@ -432,6 +461,40 @@ async def test_the_users_file_moves_and_deletions_are_undone(authed, workspace):
     assert (workspace / "notes" / "a.txt").read_text() == "a"
     again = await undo(authed, deleted["id"])
     assert again.json()["error"]["code"] == "activity_undone"
+
+
+async def test_undoing_a_move_checks_it_is_still_the_same_file(authed, workspace):
+    (workspace / "notes" / "a.txt").write_text("a")
+    r = await authed.post("/api/files/move", json={"source": "notes/a.txt", "destination": "b.txt"})
+    assert r.status_code == 200, r.text
+    [moved] = await entries(authed, object_type="file")
+    # Another file now has the name the moved one was given.
+    (workspace / "b.txt").unlink()
+    (workspace / "b.txt").write_text("someone else's file")
+    r = await undo(authed, moved["id"])
+    assert r.status_code == 409, r.text
+    assert r.json()["error"]["code"] == "activity_conflict"
+    assert r.json()["error"]["details"]["differs"][0]["field"] == "file"
+    assert not (workspace / "notes" / "a.txt").exists()
+    assert (await undo(authed, moved["id"], force=True)).status_code == 200
+    assert (workspace / "notes" / "a.txt").read_text() == "someone else's file"
+
+
+async def test_a_move_logged_without_a_fingerprint_is_moved_back_unchecked(authed, workspace):
+    (workspace / "notes" / "a.txt").write_text("a")
+    r = await authed.post("/api/files/move", json={"source": "notes/a.txt", "destination": "b.txt"})
+    assert r.status_code == 200, r.text
+    [moved] = await entries(authed, object_type="file")
+    async with get_sessionmaker()() as db:  # as entries recorded before fingerprints were
+        await db.execute(
+            update(Activity)
+            .where(Activity.id == uuid.UUID(moved["id"]))
+            .values(undo={"kind": "fields"})
+        )
+        await db.commit()
+    (workspace / "b.txt").write_text("changed since")
+    assert (await undo(authed, moved["id"])).status_code == 200
+    assert (workspace / "notes" / "a.txt").read_text() == "changed since"
 
 
 # -- projects ------------------------------------------------------------------------------

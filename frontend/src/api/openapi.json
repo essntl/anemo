@@ -30854,7 +30854,7 @@
             },
             "type": "array",
             "title": "Results",
-            "description": "One per entry tried, newest first"
+            "description": "One per entry tried or skipped, newest first (undone ones are left out)"
           }
         },
         "type": "object",
@@ -43301,6 +43301,11 @@
           },
           "details": {
             "title": "Details"
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped",
+            "description": "Not tried: the entry can't be undone (`code` says why); not a failure"
           }
         },
         "type": "object",
@@ -43308,7 +43313,8 @@
           "id",
           "ok",
           "message",
-          "code"
+          "code",
+          "skipped"
         ],
         "title": "UndoItemOut"
       },

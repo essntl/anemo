@@ -103,6 +103,11 @@ def default_handlers() -> dict[str, Handler]:
 
         await research_writeup.run(uuid.UUID(payload["session_id"]), str(payload["format"]))
 
+    async def chats_index(payload: dict[str, Any]) -> None:
+        from app.features.conversations import recall
+
+        await recall.index_job(uuid.UUID(payload["conversation_id"]))
+
     async def triggers_dispatch(payload: dict[str, Any]) -> None:
         from app.features.triggers import dispatch
 
@@ -118,6 +123,7 @@ def default_handlers() -> dict[str, Handler]:
         "mcp.refresh": mcp_refresh,
         "notify.deliver": notify_deliver,
         "document.index": document_index,
+        "chats.index": chats_index,
         "sketch.transcribe": sketch_transcribe,
         "run.execute": run_execute,
         "conversation.title": conversation_title,
@@ -133,7 +139,13 @@ def default_give_ups() -> dict[str, GiveUp]:
         # Otherwise the run would stay "running" forever (refactor/BUGS.md core-B1).
         await give_up_run(uuid.UUID(payload["run_id"]))
 
-    return {"run.execute": run_execute}
+    async def chats_index(payload: dict[str, Any]) -> None:
+        from app.features.conversations import recall
+
+        # Otherwise the chat would stay claimed, never embedded (until its next message).
+        await recall.give_up_index(uuid.UUID(payload["conversation_id"]))
+
+    return {"run.execute": run_execute, "chats.index": chats_index}
 
 
 class JobRunner:
