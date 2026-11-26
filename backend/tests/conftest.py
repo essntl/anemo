@@ -11,6 +11,7 @@ as `make test-backend` and CI run it) every worker process has its own of both.
 
 import asyncio
 import os
+import shutil
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -77,6 +78,30 @@ HAS_DB = bool(_base_db_url)
 # they passed only when an earlier test on the same xdist worker had created that worker's
 # database. With no database configured, `migrated_db` skips the test.
 requires_db = pytest.mark.usefixtures("db_clean")
+
+# The folders every test in this process shares, as set above.
+_PROCESS_FOLDERS = (Path(os.environ["WORKSPACE_PATH"]), Path(os.environ["DATA_PATH"]))
+
+
+def _empty(folder: Path) -> None:
+    """Delete what is in a folder but keep the folder (which may not exist yet)."""
+    if not folder.is_dir():
+        return
+    for entry in folder.iterdir():
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+
+
+@pytest.fixture(autouse=True)
+def _empty_workspace_and_data() -> None:
+    """Every test starts with an empty workspace and data folder, as db_clean gives it an
+    empty database: a file left by an earlier test on the same worker (documents/thesis/
+    plan.md) made the next one get "plan (1).md". Autouse and in this conftest, so it runs
+    before the fixtures of a test module that put files into the workspace."""
+    for folder in _PROCESS_FOLDERS:
+        _empty(folder)
 
 
 # The key of a Postgres advisory lock, the same in every worker (any constant would do).
