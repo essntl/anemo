@@ -79,31 +79,38 @@ HAS_DB = bool(_base_db_url)
 requires_db = pytest.mark.usefixtures("db_clean")
 
 
-async def _recreate_database(url: str) -> None:
-    import asyncpg
-
-    dsn = url.replace("postgresql+asyncpg://", "postgresql://")
-    admin_dsn, name = dsn.rsplit("/", 1)
-    conn = await asyncpg.connect(admin_dsn + "/postgres")
-    try:
-        await conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
-        await conn.execute(f'CREATE DATABASE "{name}"')
-    finally:
-        await conn.close()
+# The key of a Postgres advisory lock, the same in every worker (any constant would do).
+_MIGRATION_LOCK = 7_301_001
 
 
 @pytest.fixture(scope="session")
 async def migrated_db() -> AsyncIterator[None]:
+    """Each worker's database, dropped, created and migrated once per test session.
+
+    One worker at a time: the whole migration is one transaction that locks every table and
+    index it creates, and with many workers migrating at once (all start together) those
+    locks overflowed Postgres's shared lock table ("out of shared memory", 15 workers). A
+    migration takes about a second, so waiting for the others costs little.
+    """
     if not HAS_DB:
         pytest.skip("no database configured")
+    import asyncpg
     from alembic import command
     from alembic.config import Config
 
-    await _recreate_database(os.environ["DATABASE_URL"])
     cfg = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     cfg.set_main_option("script_location", str(Path(__file__).parents[1] / "migrations"))
-    # Alembic's env.py runs its own event loop, so run it in a thread.
-    await asyncio.to_thread(command.upgrade, cfg, "head")
+    dsn = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+    admin_dsn, name = dsn.rsplit("/", 1)
+    conn = await asyncpg.connect(admin_dsn + "/postgres")
+    try:
+        await conn.execute("SELECT pg_advisory_lock($1)", _MIGRATION_LOCK)
+        await conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        await conn.execute(f'CREATE DATABASE "{name}"')
+        # Alembic's env.py runs its own event loop, so run it in a thread.
+        await asyncio.to_thread(command.upgrade, cfg, "head")
+    finally:
+        await conn.close()  # which also releases the lock
     yield
 
 
