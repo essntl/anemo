@@ -43,6 +43,7 @@ from app.features.devices import relay, shared_screen
 from app.features.devices import service as devices
 from app.policy.models import Action, Risk
 from app.policy.shell_risk import classify, max_risk
+from app.tools import clixml
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.browser import KEY_MODIFIERS, clean_key
 from app.tools.builtin.shell import command_echo
@@ -1036,8 +1037,9 @@ class ComputerShell(Tool):
         if isinstance(result, ToolResult):
             return result
         exit_code = result.get("exit_code")
-        stdout = head_tail(str(result.get("stdout") or ""))
-        stderr = head_tail(str(result.get("stderr") or ""))
+        # PowerShell writes its error stream as CLIXML when it goes to a pipe: plain text again.
+        stdout = head_tail(clixml.decode(str(result.get("stdout") or "")))
+        stderr = head_tail(clixml.decode(str(result.get("stderr") or "")))
         prompt = f"PS {name}>" if is_powershell(shell_kind) else f"{name}%"
         parts = [
             f"{prompt} {command_echo(args.command)}",
