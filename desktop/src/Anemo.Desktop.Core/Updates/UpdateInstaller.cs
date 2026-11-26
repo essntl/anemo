@@ -122,6 +122,10 @@ public sealed class UpdateInstaller
             {
                 _launcher.Start(update.Paths.Current, null); // the old one again, so the computer isn't left without the client
             }
+            else
+            {
+                StartPrevious(update);
+            }
 
             return swapped;
         }
@@ -164,7 +168,29 @@ public sealed class UpdateInstaller
             return InstallOutcome.RolledBack;
         }
 
+        StartPrevious(update);
         return InstallOutcome.Broken;
+    }
+
+    /// <summary>
+    /// The old version from where it was kept, when it couldn't be put back in its place: the
+    /// computer isn't left without the client, and the log says how to rename it back.
+    /// </summary>
+    private void StartPrevious(StagedUpdate update)
+    {
+        if (!_files.Exists(update.Paths.Previous))
+        {
+            return;
+        }
+
+        try
+        {
+            _launcher.Start(update.Paths.Previous, null);
+        }
+        catch (Exception e)
+        {
+            _log.Info($"update {update.Version}: the old version didn't start from {update.Paths.Previous}: {e.GetType().Name}");
+        }
     }
 
     /// <summary>The version whose install failed last, if any: the updater doesn't download it again by itself.</summary>

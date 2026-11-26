@@ -159,6 +159,29 @@ public sealed class UpdateSwapTests
     }
 
     [Fact]
+    public async Task When_going_back_fails_the_old_version_is_started_from_where_it_was_kept()
+    {
+        _launcher.OnStart = (_, argument) => argument is null ? new FakeProcess() : new FakeProcess { HasExited = true };
+        _files.FailingMoves.Add($"{Previous}→{Current}");
+
+        Assert.Equal(InstallOutcome.Broken, await Installer.InstallAndRestartAsync(Update));
+
+        Assert.Equal([(Current, UpdateInstaller.UpdatedArgument), (Previous, null)], _launcher.Started);
+        Assert.Equal("1.8.0", _files.Items[Previous]);
+    }
+
+    [Fact]
+    public async Task A_restart_whose_swap_breaks_starts_the_old_version_from_where_it_was_kept()
+    {
+        _files.FailingMoves.Add($"{Staged}→{Current}");
+        _files.FailingMoves.Add($"{Previous}→{Current}");
+
+        Assert.Equal(InstallOutcome.Broken, await Installer.InstallAndRestartAsync(Update));
+
+        Assert.Equal([(Previous, null)], _launcher.Started);
+    }
+
+    [Fact]
     public void Reporting_started_clears_an_earlier_failure()
     {
         var installer = Installer;
