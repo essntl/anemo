@@ -35,7 +35,7 @@ do I put it back?" in one place.
   | A task or event deleted, an occurrence cancelled | restores it from the trash |
   | A task, event or document created, or restored from the trash | deletes it, to the trash (so the undo itself can be undone from there) |
   | A document's text changed | restores the text before, from the document's revision |
-  | A document or file moved | moves it back |
+  | A document or file moved | moves it back (a file only if it is still the one that was moved) |
   | A document or file deleted | restores the file from the workspace trash |
   | An agent's file change | reverts it (`workspace/revert.py`) |
 
@@ -48,8 +48,12 @@ do I put it back?" in one place.
 - **Batches**: a tool that changes many items in one call (workstream B's bulk changes)
   runs inside `activity_group(label)` (`app/core/activity.py`); its entries share
   `group_id` and the page shows them as one row ("Moved 12 tasks to Friday (12 changes)")
-  that opens. *Undo all* undoes the batch newest first, each entry on its own, and reports
-  per-item results; the undo entries form a group of their own ("Undid: …").
+  that opens, wherever its entries are in the loaded list (other changes can fall between
+  them, and a batch can go on in the next page). *Undo all* undoes the batch newest first,
+  each entry on its own, and reports per-item results: entries that can't be undone at all
+  (`not_undoable`, such as a project the batch created, or `too_large`) are *skipped*, not
+  tried and not counted as failures; the toast names them apart. The undo entries form a
+  group of their own ("Undid: …").
 - **The page** `/activity` (Settings → Pages: under *More*; in the command palette):
   entries newest first with who ("You", "The assistant in ‹chat›", "Automation ‹name›",
   "Script ‹name›", "Plugin ‹name›", with links), what (verb, kind of item, the item's name
@@ -94,8 +98,24 @@ do I put it back?" in one place.
   `update_task`, `restore_event`, `documents.save` and so on, so every rule of those
   services applies; `activity.suppressed()` keeps them from writing entries of their own,
   and the undo writes exactly one `undone` entry. The entry is marked undone *before* the
-  service runs, so the mark and the change are committed together (the services commit as
-  they finish) or rolled back together.
+  service runs, so the mark is committed with the service's change (the services commit as
+  they finish). A change on disk (moving a file back, reverting an agent's change,
+  restoring from the trash) can't be part of that transaction: the handler makes every
+  check first and changes the disk last, just before the commit (moving a file back, the
+  links to it follow afterwards, since they need the file at its place). Should saving
+  fail after the disk change, the disk stays changed and the entry stays not undone
+  (trying again reports the file gone).
+- **A moved file is recognised by its fingerprint.** A move by the user stores the file's
+  size and modification time (a move keeps both; a folder only notes that it is one) in
+  the entry's `undo.fingerprint` (`workspace/files.py` `fingerprint()`). Undoing it compares
+  them with what is at the new path now, so another file put there since isn't moved in
+  its place: `409 activity_conflict` (`differs` field `file`) unless forced. Cheap (no
+  reading of the file); a hash would also notice an edit that keeps the size within the
+  same timestamp, which isn't worth reading large files for. Entries recorded before this
+  (no fingerprint) are moved back unchecked, as before.
+- **The same audit entry from both places.** Undoing an agent's file change from Activity
+  records `files.revert` in the audit log, as reverting it from the run page does (with
+  `via: activity` and the client's address).
 - **Conflict check by values.** For field changes the current values of the changed fields
   are compared with the entry's after-values (also catching changes that bypass the log,
   such as an outside edit of a document's file). Deleting a created item instead checks
@@ -130,7 +150,9 @@ on (`object_type`, `object_id`, `created_at`) and (`actor_ref`, `created_at`).
   `activity_unavailable` (the item or what undoing needs is gone), `activity_undone`,
   `activity_is_undo`, `activity_not_undoable`, `activity_too_large`.
 - `POST /api/activity/groups/{group_id}/undo?force=` → `{results: [{id, ok, message, code,
-  details}]}`, newest first; 404 for an unknown group.
+  details, skipped}]}`, newest first (entries undone already and undo entries are left out;
+  `skipped`: not tried because it can't be undone, `code` says why); 404 for an unknown
+  group.
 
 ## 5. Code
 
@@ -162,13 +184,16 @@ and no message contents; titles an agent wrote are shown as text, never as marku
   occurrence, documents, files by an agent and by the user, projects), one per actor kind
   (user, chat with run id, automation, script, plugin, trigger-started), undo of each kind
   with conflicts and force, already undone and undo entries, group undo with a conflict
-  then forced (inside `activity_group()`, as B's tools do), filters, cursor paging, prune,
-  the fake agent's rename.
+  then forced (inside `activity_group()`, as B's tools do), a batch with an entry that
+  can't be undone (skipped, not failed), the audit entry of undoing an agent's file change,
+  a moved file replaced since (conflict, then forced) and an entry without a fingerprint,
+  filters, cursor paging, prune, the fake agent's rename.
 - `backend/tests/unit/test_activity_values.py`: diff, properties, capping and hashes, UTC
   instants, summaries, why an entry can't be undone, the fields shown.
 - `frontend/src/features/activity/ActivityPage.test.tsx`: the list, actors and links,
   Undo with the "changed since" question and force, a batch row that opens and *Undo all*,
-  the history of one item from the address, the actor filter, `toRows`.
+  the history of one item from the address, the actor filter, the toast of a batch with
+  skipped entries, `toRows` (incl. a batch with other entries between its own).
 - `e2e/tests/activity.spec.ts`: the demo agent renames a task, the change shows on
   /activity as the assistant's, Undo puts the title back, the item's history.
 

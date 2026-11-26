@@ -124,12 +124,8 @@ Review findings not fixed yet (the fix round was cut off):
   event summary outside `untrusted()` (compaction shows it as the user's request);
   `emit()` can autoflush inside its try/except.
 - M: the hostd listener replays up to 200 old notifications after a reconnect.
-- A: "Undo all" counts entries that can't be undone as failures; undo of an agent's
-  file change from Activity writes no audit row; undoing a file move doesn't check that it is
-  still the same file; batch rows split when entries interleave.
-- R: chat indexing runs inline in the 30 s scheduler; a chat whose embedding failed is
-  never embedded again; semantic results are filtered by scope after the top-N; keyword hits
-  can be labelled "by meaning".
+- R: semantic results are filtered by scope after the top-N; keyword hits can be labelled
+  "by meaning".
 - U: the macOS Team ID check reads what the signature claims (verify with
   `-R 'anchor apple generic and certificate leaf[subject.OU] = …'`); it fails open
   when the running app's signature can't be read; one unexpected exception stops
