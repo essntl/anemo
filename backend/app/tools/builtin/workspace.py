@@ -58,7 +58,7 @@ def path_action(
     return action
 
 
-def _backup(path: Path) -> str:
+def backup_file(path: Path) -> str:
     """Copy a file's current content aside so an agent change can be reverted."""
     backups = Path(get_settings().data_path) / "run-backups"
     backups.mkdir(parents=True, exist_ok=True)
@@ -287,7 +287,7 @@ class WriteFile(Tool):
     idempotent = False
 
     def actions(self, args: WriteInput, ctx: ToolContext) -> list[Action]:
-        exists = _exists(args.path)
+        exists = path_exists(args.path)
         verb = "Overwrite" if exists else "Create"
         return [
             path_action(
@@ -308,7 +308,7 @@ class WriteFile(Tool):
                 "overwrite=true to replace it.",
                 is_error=True,
             )
-        backup = await asyncio.to_thread(_backup, path) if path.is_file() else None
+        backup = await asyncio.to_thread(backup_file, path) if path.is_file() else None
         try:
             _, before, after = await asyncio.to_thread(
                 files.write_bytes, args.path, args.content.encode()
@@ -369,7 +369,7 @@ class EditFile(Tool):
             )
         new = text.replace(args.old_text, args.new_text)
         path = fs_guard.resolve(args.path)
-        backup = await asyncio.to_thread(_backup, path)
+        backup = await asyncio.to_thread(backup_file, path)
         try:
             _, before, after = await asyncio.to_thread(
                 files.write_bytes, args.path, new.encode(), base_hash=sha
@@ -497,7 +497,7 @@ class DeletePath(Tool):
         return ToolResult(content=f"Moved {rel} to the trash.", data={"path": rel})
 
 
-def _exists(path: str) -> bool:
+def path_exists(path: str) -> bool:
     try:
         return fs_guard.resolve(path).exists()
     except fs_guard.OutsideWorkspace:

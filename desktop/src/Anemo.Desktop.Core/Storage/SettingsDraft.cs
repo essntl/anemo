@@ -12,6 +12,7 @@ public enum SettingsField
     StopKey,
     ShareKey,
     GitHubOwner,
+    FileFolders,
 }
 
 /// <summary>Why the settings can't be saved, and which field to fix.</summary>
@@ -53,6 +54,11 @@ public sealed record SettingsDraft
 
     public string GitHubOwner { get; init; } = "";
 
+    public bool ShareFiles { get; init; }
+
+    /// <summary>The allowed folders, separated by <c>;</c> (or one per line); empty: the home folder.</summary>
+    public string FileFolders { get; init; } = "";
+
     public static SettingsDraft From(DesktopSettings settings) => new()
     {
         Address = settings.Address ?? "",
@@ -66,6 +72,8 @@ public sealed record SettingsDraft
         StartCodeJobs = settings.StartCodeJobs,
         CodeProjectsFolder = settings.CodeProjectsFolder ?? "",
         GitHubOwner = settings.GitHubOwner ?? "",
+        ShareFiles = settings.ShareFiles,
+        FileFolders = string.Join("; ", settings.FileFolders ?? []),
     };
 
     /// <summary>
@@ -106,6 +114,12 @@ public sealed record SettingsDraft
             return Fail(SettingsField.GitHubOwner, "The GitHub owner is a GitHub user or organisation name: letters, digits and dashes.");
         }
 
+        var folders = FileFolders.Split([';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (folders.Any(f => !Path.IsPathFullyQualified(f)))
+        {
+            return Fail(SettingsField.FileFolders, "Each folder for files must be a full path; several are separated by ;.");
+        }
+
         var settings = current with
         {
             Address = address.ToString(),
@@ -119,6 +133,8 @@ public sealed record SettingsDraft
             StartCodeJobs = StartCodeJobs,
             CodeProjectsFolder = OrNull(CodeProjectsFolder),
             GitHubOwner = owner.Length == 0 ? null : owner,
+            ShareFiles = ShareFiles,
+            FileFolders = folders.Length == 0 ? null : folders,
         };
         return new SettingsCheck(settings, token.Length > 0 ? token : null, null);
     }

@@ -39,6 +39,30 @@ public sealed record DesktopPlatform
     /// <summary><c>press</c> takes <c>Cmd</c> as a modifier and the Mac's own keys rules apply.</summary>
     public bool IsMac { get; init; }
 
+    /// <summary>
+    /// Folders in the home folder (relative, <c>/</c> between names) never read or written by the
+    /// file actions (device-contracts.md §8.2): the system folder (browser profiles, credentials,
+    /// the Startup folder) and, on Windows, PowerShell's profile folders, whose
+    /// <c>profile.ps1</c> runs at every PowerShell start.
+    /// </summary>
+    public IReadOnlyList<string> ProtectedHomeFolders { get; init; } =
+        ["AppData", "Documents/PowerShell", "Documents/WindowsPowerShell"];
+
+    /// <summary>
+    /// The same folders below the system's own Documents folder when it isn't
+    /// <c>home/Documents</c> (moved to OneDrive or another drive).
+    /// </summary>
+    public IReadOnlyList<string> ProtectedDocumentsFolders { get; init; } = ["PowerShell", "WindowsPowerShell"];
+
+    /// <summary>
+    /// File types the file actions never write (any folder): ones the system's file browser acts
+    /// on just by showing the folder (a shortcut's icon or a <c>.url</c>/<c>.scf</c> can make
+    /// Explorer fetch from a network share, sending the user's sign-in hash) or that disguise
+    /// a program as something else. Lower case, with the dot; <c>desktop.ini</c> by name.
+    /// </summary>
+    public IReadOnlyList<string> UnwrittenFileTypes { get; init; } =
+        [".lnk", ".url", ".scf", ".library-ms", ".searchconnector-ms", ".settingcontent-ms", "desktop.ini"];
+
     public static DesktopPlatform Windows { get; } = new()
     {
         WireName = "windows",
@@ -64,5 +88,10 @@ public sealed record DesktopPlatform
         DefaultJobsFolder = home.TrimEnd('/') + "/anemo-bridge/jobs",
         DefaultProjectsFolder = home.TrimEnd('/') + "/dev",
         IsMac = true,
+        // The shell's start files (.zshrc, .profile) are hidden, so already refused; LaunchAgents
+        // are in Library. Finder runs nothing for showing a folder.
+        ProtectedHomeFolders = ["Library"],
+        ProtectedDocumentsFolders = [],
+        UnwrittenFileTypes = [],
     };
 }

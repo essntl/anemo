@@ -11,9 +11,10 @@ The protocol is docs/device-contracts.md §2 (and §6 for versions). In short:
   client → {"type": "ping"}  ← {"type": "pong"}
   server → {"type": "event", "id", "event", "data"}   phones only: events of runs this
            phone started (features/devices/phone_events.py)
-  client → {"type": "device.offer", "control", "shell", "code", "code_start", "shell_kind"?}
+  client → {"type": "device.offer", "control", "shell", "code", "code_start", "shell_kind"?,
+           "files"?}
            computers, every 30 s (shell_kind: "powershell" | "pwsh" | "zsh" | "bash";
-           missing means powershell)
+           missing means powershell; files: the file actions of §8, missing means false)
   server → {"type": "device.command", "id", "action", …}   from features/devices/relay.py
   client → {"type": "device.result", "id", "ok", "state" | "error", "code"}
   client → {"type": "device.stopped"}
@@ -261,6 +262,7 @@ class Connection:
                 code_images=bool(message.get("code_images")),
                 code_git=bool(message.get("code_git")),
                 code_git_remote=bool(message.get("code_git_remote")),
+                files=bool(message.get("files")),  # Anemo Desktop 1.7.0 (§8)
                 platform=self.platform,
                 shell_kind=relay.shell_kind_of(message.get("shell_kind")),
             )

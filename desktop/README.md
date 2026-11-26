@@ -63,6 +63,19 @@ lists the repository's open pull requests (`gh pr list`, kept 2 minutes). A clon
 git refuses for want of a sign-in answers `unauthenticated`: run `gh auth login` and
 `gh auth setup-git`. Contract: `docs/device-contracts.md` §7.6.
 
+**Files between this computer and Anemo's workspace (1.7.0).** With *Let Anemo read and write
+files* ticked in Settings (*This computer*; off by default) and the device **trusted** in Anemo,
+Anemo's agents can copy a file from here into the workspace (`device_file_get`) or a workspace
+file onto this computer (`device_file_put`). Only inside the *Folders for files* (full paths,
+separated by `;`; empty: your user folder), with links and junctions followed first, and never a
+hidden file or folder below them, `AppData` (`~/Library` on the Mac) or Anemo Desktop's own
+folder. A file is sent and received in chunks of up to 4 MB, each with its SHA-256, and the whole
+file's SHA-256 is checked before a copy gets its name: until then it is a hidden
+`.<name>.anemo-<id>.part` file in the same folder, removed if the copy fails, is aborted or waits
+a minute without a chunk. An existing file is replaced only when Anemo asks for it
+(`overwrite`), at most 200 MB per file, and the stop key stops copies too. Contract:
+`docs/device-contracts.md` §8; design: `docs/specs/22-device-files.md`.
+
 ## Layout
 
 ```
@@ -260,6 +273,11 @@ its jobs show on the Code page too. Tests: `node --test bridge/cc.test.mjs`.
   full path (never a `.cmd`/`.bat`) with `core.fsmonitor`, signature checks, optional locks
   and lazy fetches off, 10 s per command, and answer metadata only; credentials in remote
   URLs are removed.
+- Files (1.7.0) only while *Let Anemo read and write files* is ticked, the device is trusted and
+  control isn't paused; only inside the allowed folders once links are followed, never hidden
+  files or folders, `AppData`/`Library` or the client's own folder, no network or device paths;
+  written to a temporary file and renamed only once complete and its SHA-256 is right; an
+  existing file replaced only with `overwrite`.
 - Remote git reads (1.6.0) clone only the owner's repositories, from the URL gh lists, into the
   git cache (checked to stay inside it once links are followed), with hooks, `ext::` and
   `file://` transports, submodules and automatic maintenance off and `GIT_TERMINAL_PROMPT=0`.

@@ -55,6 +55,7 @@ internal sealed partial class SettingsWindow : Window
         };
         AddressBox.TextChanged += (_, _) => ClearError(SettingsField.Address);
         OwnerBox.TextChanged += (_, _) => ClearError(SettingsField.GitHubOwner);
+        FileFoldersBox.TextChanged += (_, _) => ClearError(SettingsField.FileFolders);
         StopKey.Changed += () => ClearError(SettingsField.StopKey);
         ShareKey.Changed += () => ClearError(SettingsField.ShareKey);
         ShareJobsSwitch.Click += (_, _) => ShowCodeJobs();
@@ -128,6 +129,9 @@ internal sealed partial class SettingsWindow : Window
         ProjectsBox.Tag = CodeJobLimits.DefaultProjectsFolder;
         OwnerBox.Text = draft.GitHubOwner;
         OwnerBox.Tag = "The account gh is signed in as";
+        FilesSwitch.IsChecked = draft.ShareFiles;
+        FileFoldersBox.Text = draft.FileFolders;
+        FileFoldersBox.Tag = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         ShowCodeJobs();
     }
 
@@ -145,6 +149,8 @@ internal sealed partial class SettingsWindow : Window
         StartCodeJobs = StartJobsSwitch.IsChecked == true,
         CodeProjectsFolder = ProjectsBox.Text,
         GitHubOwner = OwnerBox.Text,
+        ShareFiles = FilesSwitch.IsChecked == true,
+        FileFolders = FileFoldersBox.Text,
     };
 
     private void TrySave()
@@ -271,6 +277,14 @@ internal sealed partial class SettingsWindow : Window
                 OwnerHelp.Visibility = Visibility.Collapsed;
                 OwnerBox.Focus();
                 break;
+            case SettingsField.FileFolders:
+                ShowPage(NavComputer);
+                MarkBox(FileFoldersBox, true);
+                FileFoldersErrorText.Text = problem.Message;
+                FileFoldersError.Visibility = Visibility.Visible;
+                FileFoldersHelp.Visibility = Visibility.Collapsed;
+                FileFoldersBox.Focus();
+                break;
         }
     }
 
@@ -297,6 +311,11 @@ internal sealed partial class SettingsWindow : Window
                 MarkBox(OwnerBox, false);
                 OwnerError.Visibility = Visibility.Collapsed;
                 OwnerHelp.Visibility = Visibility.Visible;
+                break;
+            case SettingsField.FileFolders:
+                MarkBox(FileFoldersBox, false);
+                FileFoldersError.Visibility = Visibility.Collapsed;
+                FileFoldersHelp.Visibility = Visibility.Visible;
                 break;
         }
 

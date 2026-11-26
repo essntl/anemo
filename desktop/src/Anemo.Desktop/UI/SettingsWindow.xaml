@@ -489,6 +489,28 @@
                                 </ContentControl>
                                 <ContentControl Style="{StaticResource CardBox}">
                                     <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="Files" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="folder" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="FilesSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Let Anemo read and write files" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Let Anemo read and write files" />
+                                                <TextBlock Style="{StaticResource Help}" Text="Anemo’s agents copy files between these folders and the workspace. Only when the device is trusted in Anemo; never hidden or system folders." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock Style="{StaticResource Label}" Text="Folders for files" Margin="0,16,0,6" />
+                                        <TextBox x:Name="FileFoldersBox" Style="{StaticResource FieldBox}" ui:Field.Icon="folder" />
+                                        <StackPanel x:Name="FileFoldersError" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                                            <ui:LineIcon Kind="alert" Size="14" Stroke="{DynamicResource Error}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                            <TextBlock x:Name="FileFoldersErrorText" Style="{StaticResource ErrorText}" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="FileFoldersHelp" Style="{StaticResource Help}" Margin="0,6,0,0" Text="Full paths, separated by ;. Empty: your user folder (without AppData)." />
+                                    </StackPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
                                         <TextBlock Style="{StaticResource CardTitle}" Text="Keys" />
                                         <DockPanel>
                                             <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">

@@ -55,8 +55,9 @@ public static class Wire
     /// also take <c>repo</c> and <c>fetch</c>, and <c>code_git_cache_clear</c> is there (§7.6, 1.6.0);
     /// always with <c>code_git</c>.
     /// <paramref name="shellKind"/>: powershell, pwsh, zsh or bash (§2, 1.4.0).
+    /// <paramref name="files"/>: the file actions of §8 are there (1.7.0): the switch is on and the device is trusted.
     /// </summary>
-    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell") => Json(new JsonObject
+    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell", bool files = false) => Json(new JsonObject
     {
         ["type"] = "device.offer",
         ["control"] = control,
@@ -67,6 +68,7 @@ public static class Wire
         ["code_git"] = code,
         ["code_git_remote"] = code,
         ["shell_kind"] = shellKind,
+        ["files"] = files,
     });
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });

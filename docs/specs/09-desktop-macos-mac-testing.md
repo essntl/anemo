@@ -180,3 +180,23 @@ login`), git.
 54. In Anemo, delete the device. Expected: the client shows "Anemo refused the token" within a
     minute. Quit, delete the app, the Keychain entry and
     `~/Library/Application Support/Anemo Desktop`.
+
+## N. Files between the Mac and the workspace (Anemo Desktop 1.7.0)
+
+The Mac `trusted`; Settings → *Let Anemo read and write files* ticked. Contract:
+`docs/device-contracts.md` §8.
+
+55. The turn context's line says `files on`. "Copy `~/Documents/<a 20 MB file>` from Mac to
+    `inbox/`". Expected: asked once; the file is in the workspace, `shasum -a 256` on the Mac matches
+    `sha256sum` on the server; the run's file changes can revert it.
+56. "Put `inbox/<file>` on Mac as `~/Desktop/<file>`". Expected: the file shows on the desktop only
+    when complete (Finder hides the `.<name>.anemo-<id>.part` file meanwhile; `ls -a ~/Desktop`
+    shows it during a large copy). Again without overwrite: "already exists". With overwrite: asked
+    as dangerous, replaced.
+57. Refused, each with a sentence: `~/.ssh/id_ed25519`, `~/.zshrc`, `~/Library/LaunchAgents/x.plist`,
+    `~/Library/Application Support/Anemo Desktop/settings.json`, `/etc/hosts`, a file through a
+    symlink in `~/Documents` to `/etc` (`ln -s /etc ~/Documents/etc`). *Folders for files* set to
+    `/Volumes/Shared`: the home folder is refused, that folder works.
+58. Names with Unicode (as Finder writes them, e.g. `Grüße.txt`) and spaces: get and put work.
+59. Stop key during a large copy: the call fails, the `.part` file goes. Untick the switch: within
+    30 s `files on` is gone and a copy is refused.

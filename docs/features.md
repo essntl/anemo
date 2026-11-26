@@ -1114,6 +1114,20 @@ the window in front once, like *Share this tab* in the browser extension. The ag
 it with `computer_shared_screen`; it is forgotten after 12 hours or when you stop
 sharing, and the API never returns its content.
 
+**Files between a computer and the workspace** (Anemo Desktop 1.7.0). With *Let Anemo read
+and write files* switched on in the client (off by default) on a **trusted** computer, the
+agent copies a file from it into the workspace (`device_file_get`) or a workspace file onto it
+(`device_file_put`); the computer's line in the turn context then says *files on*. Only the
+folders the client allows: your home folder, or the folders you list in its Settings, never
+hidden folders (`.ssh`, `.config`, …), `AppData` or `~/Library`, or the client's own folder.
+The permission is *Files on your computers* (asks by default); replacing a file that is
+already on the computer only happens when the agent asks for it, and counts as dangerous.
+A file copied into the workspace is in the run's file changes and can be reverted, and
+never replaces a workspace file unless asked. Each chunk and the whole file are checked by
+SHA-256 on both ends, and a copy onto the computer only gets its name once it is complete.
+The largest file is set in **Settings → Devices** (50 MB by default, up to 200 MB). Stop
+stops copies too. Design: [docs/specs/22-device-files.md](specs/22-device-files.md).
+
 Automations get the computer tools only when the automation lists them. What a screen
 shows is untrusted content for the model, like a web page. Installing the client:
 [deployment.md](deployment.md#anemo-desktop-and-anemo-voice). Design:

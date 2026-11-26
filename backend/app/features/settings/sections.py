@@ -183,6 +183,10 @@ class FilesSettings(BaseModel):
 
     # documents/ holds the Documents library; Files hides it unless this is on.
     show_documents_folder: bool = False
+    # The largest file the agent copies between a computer and the workspace
+    # (device_file_get / device_file_put, docs/specs/22-device-files.md). The whole file
+    # is held in the worker's memory while it is checked, hence the ceiling.
+    device_file_max_mb: int = Field(50, ge=1, le=200)
 
 
 HEX_COLOUR = r"^#[0-9a-fA-F]{6}$"

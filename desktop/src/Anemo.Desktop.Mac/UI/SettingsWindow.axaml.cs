@@ -44,6 +44,9 @@ public sealed partial class SettingsWindow : Window
         Box("ProjectsFolder").Text = draft.CodeProjectsFolder;
         Box("ProjectsFolder").Watermark = Core.Platform.DesktopPlatform.MacOS(AppPaths.HomeFolder).DefaultProjectsFolder;
         Box("GitHubOwner").Text = draft.GitHubOwner;
+        Find<CheckBox>("FilesSwitch").IsChecked = draft.ShareFiles;
+        Box("FileFolders").Text = draft.FileFolders;
+        Box("FileFolders").Watermark = AppPaths.HomeFolder;
         Find<TextBlock>("Version").Text = $"Anemo Desktop {version} for macOS";
 
         Find<Button>("Cancel").Click += (_, _) => Close();
@@ -72,6 +75,8 @@ public sealed partial class SettingsWindow : Window
             StartCodeJobs = Find<CheckBox>("StartJobs").IsChecked == true,
             CodeProjectsFolder = Box("ProjectsFolder").Text ?? "",
             GitHubOwner = Box("GitHubOwner").Text ?? "",
+            ShareFiles = Find<CheckBox>("FilesSwitch").IsChecked == true,
+            FileFolders = Box("FileFolders").Text ?? "",
         };
         var check = draft.Check(_current);
         if (!check.Ok)
@@ -96,6 +101,7 @@ public sealed partial class SettingsWindow : Window
         SettingsField.Token => "Token",
         SettingsField.StopKey => "StopKey",
         SettingsField.ShareKey => "ShareKey",
+        SettingsField.FileFolders => "FileFolders",
         _ => "GitHubOwner",
     };
 
