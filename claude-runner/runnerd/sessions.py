@@ -72,6 +72,7 @@ class ProcessConfig:
     effort: str | None
     tools_hash: str
     persist: bool
+    compact_window: int | None = None  # Claude Code's autoCompactWindow
 
 
 class RunnerError(Exception):
@@ -227,8 +228,10 @@ class Session:
                     reason = "tools changed"
                 elif self.config.model != config.model:
                     reason = "model changed"
-                else:
+                elif self.config.effort != config.effort:
                     reason = "effort changed"
+                else:
+                    reason = "compact window changed"
             else:
                 return {"type": "session", "claude_session_id": self.claude_session_id,
                         "start": "warm", "model": config.model}
@@ -250,6 +253,7 @@ class Session:
             fork=fork is not None,
             resume_at=(fork or {}).get("resume_session_at"),
             drops_turn=(fork or {}).get("drops_turn"),
+            compact_window=config.compact_window,
         )
         if new_id and config.persist:
             kwargs["session_id"] = new_id
