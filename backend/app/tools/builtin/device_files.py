@@ -200,7 +200,7 @@ def _decode_chunk(state: dict[str, Any], expected: int) -> bytes:
     return chunk
 
 
-async def read_device_file(device: Any, path: str, max_bytes: int) -> tuple[bytearray, str] | str:
+async def read_device_file(device: Any, path: str, max_bytes: int) -> tuple[bytes, str] | str:
     """The whole file from the device, checked chunk by chunk and as a whole: (its bytes,
     their SHA-256), or the sentence for the model when it can't be had."""
     try:

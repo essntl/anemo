@@ -398,7 +398,9 @@ class UpdateTrigger(Tool):
         switched_off = changed == {"enabled"} and args.enabled is False
         parts = [f"{k}: {getattr(args, k)}" for k in sorted(changed)]
         if found is not None and found.wake:
-            quiet = changed <= {"note"} or (changed <= {"enabled", "note"} and args.enabled is False)
+            quiet = changed <= {"note"} or (
+                changed <= {"enabled", "note"} and args.enabled is False
+            )
             risk: Risk = "safe" if quiet else "moderate"
             if not quiet:
                 # How it will be after the change: what isn't changed stays as stored.
@@ -423,7 +425,9 @@ class UpdateTrigger(Tool):
         name = f"“{found.automation_name}”" if found and found.automation_name else "an automation"
         if switched_off:
             return [
-                Action(capability=MANAGE, risk="moderate", summary=f"Switch off a trigger of {name}")
+                Action(
+                    capability=MANAGE, risk="moderate", summary=f"Switch off a trigger of {name}"
+                )
             ]
         # Anything else asks every time, the note too: it is what tells the user why the
         # trigger starts work, so rewording it is confirmed as a prompt change would be.

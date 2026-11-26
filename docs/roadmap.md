@@ -103,18 +103,18 @@ then built in parallel; how it went is in
 
 Built in parallel from [specs/CONTRACTS-round4.md](specs/CONTRACTS-round4.md); how it
 went is in [specs/ORCHESTRATION-LOG-round4.md](specs/ORCHESTRATION-LOG-round4.md). Each
-row is filled in by its own pull request.
+All merged into `main` on 2026-11-26. Contracts: #95.
 
 | What | Spec | Pull request |
 | --- | --- | --- |
 | **Event triggers**: automations and chats woken by events (tasks, calendar, documents, Claude Code jobs, devices, files, failures, approvals) and signed webhooks; wake me | [16](specs/16-event-triggers.md) | #99 |
-| **MCP triggers** (in progress) | [17](specs/17-mcp-triggers.md) | – |
-| **Chat recall** (in progress) | [18](specs/18-chat-recall.md) | – |
-| **Activity log with undo** (done) | [19](specs/19-activity-log.md) | #96 |
-| **Bulk task and event changes** (in progress) | [20](specs/20-bulk-changes.md) | – |
+| **MCP triggers**: notifications from MCP servers (resource updated, lists changed) fire triggers, remote and local servers | [17](specs/17-mcp-triggers.md) | #102 |
+| **Chat recall**: `search_chats` / `read_chat` under *Read earlier chats*, full text and by meaning | [18](specs/18-chat-recall.md) | #97 |
+| **Activity log with undo**: one list of who changed what (you, assistants, automations, scripts, plugins), undo per entry or per batch | [19](specs/19-activity-log.md) | #96 |
+| **Bulk task and event changes**: `update_tasks` / `update_events`, up to 100 items, one approval, one undoable group | [20](specs/20-bulk-changes.md) | #98 |
 | **Waiting on a code job**: `code_status(wait_s)` waits on the job's live stream until it ends (≤ 5 min); a stopped run ends the wait | [21](specs/21-code-wait.md) | #100 |
-| **Files between devices and the workspace** (in progress) | [22](specs/22-device-files.md) | – |
-| **Anemo Desktop updates itself** (in progress) | [23](specs/23-desktop-auto-update.md) | – |
+| **Files between devices and the workspace**: `device_file_get` / `device_file_put` on trusted computers, chunked with hashes (Anemo Desktop 1.7.0) | [22](specs/22-device-files.md) | #101 |
+| **Anemo Desktop updates itself** from GitHub Releases, checksum (and optional signature) checked, installed on quit or *Restart to update* (1.8.0) | [23](specs/23-desktop-auto-update.md) | #103 |
 
 ---
 
@@ -148,13 +148,6 @@ project id); projects have their own instructions instead. Needs a nullable
 `project_id` on memories, retrieval that prefers the current project's, and a filter on
 the Memory page.
 
-### Chat recall
-
-**Status: partly built.** Chats are found by the search page and Ctrl+K (full text in
-messages and titles). Agents have no tool to search or read earlier chats; memories
-extracted from chats are the only bridge. Next step: a read-only `search_chats` /
-`read_chat` tool pair under a new permission.
-
 ### Ctrl+K
 
 **Status: done.** The command palette searches chats, documents, memories, tasks,
@@ -169,7 +162,6 @@ documents, tasks or projects.
 
 ### Devices, from the specs' "Later"
 
-- Files between Anemo's workspace and a device (`device_file_get` / `device_file_put`).
 - A Linux client on the same protocol (Windows and macOS exist).
 - Watching a window over time (with your say-so) for longer tasks on the VM.
 - Run the Windows client's manual tests on real hardware; `Windows.Graphics.Capture` has

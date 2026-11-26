@@ -34,7 +34,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from functools import partial
-from typing import Any, TypeVar
+from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,8 +56,6 @@ BATCH = 200  # events per pass
 # is simpler than locking each pass's triggers up front in id order, and costs nothing
 # that matters: a pass is short, and the passes are a few seconds apart at most.
 LOCK_KEY = 0x74726967
-
-T = TypeVar("T")
 
 
 def _now() -> datetime:
@@ -201,7 +199,7 @@ def _wait(
     trigger.pending_count = count
 
 
-async def _guarded(
+async def _guarded[T](
     db: AsyncSession,
     trigger: Trigger,
     event_id: Any,
@@ -335,9 +333,7 @@ async def _fire_waiting(now: datetime) -> int:
     return fired
 
 
-async def _fire_waiting_one(
-    db: AsyncSession, trigger: Trigger, now: datetime, ceiling: int
-) -> str:
+async def _fire_waiting_one(db: AsyncSession, trigger: Trigger, now: datetime, ceiling: int) -> str:
     """Fire one waiting firing, or forget it when its event is gone or the trigger or its
     owner is off. Returns fired | waiting | dropped | forgotten."""
     event = (

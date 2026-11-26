@@ -202,7 +202,6 @@ CATEGORIES: list[Category] = [
         "temporary chats). Automations only when their tool list names these tools.",
         "autonomous",
     ),
-    ),
     # Files between the workspace and the computers that run Anemo Desktop
     # (docs/specs/22-device-files.md). Only trusted computers that allow it in Anemo
     # Desktop; replacing a file on a computer is dangerous (tools/builtin/device_files.py).

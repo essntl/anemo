@@ -1,7 +1,7 @@
 """activity: one list of what was changed, by whom, and how to undo it
 
 Revision ID: 0082
-Revises: 0080
+Revises: 0081
 Create Date: 2026-11-25 20:00:00.000000
 
 docs/specs/19-activity-log.md and CONTRACTS-round4.md §3. One row per change to a task,
@@ -17,7 +17,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0082"
-down_revision: str | None = "0080"
+down_revision: str | None = "0081"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

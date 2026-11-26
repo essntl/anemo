@@ -1,7 +1,7 @@
 """chat recall: when a chat's messages were last put into the knowledge index
 
 Revision ID: 0083
-Revises: 0080
+Revises: 0082
 Create Date: 2026-11-25 20:00:00.000000
 
 With an embedding model set, the messages of ordinary chats are embedded (source_type
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0083"
-down_revision: str | None = "0080"
+down_revision: str | None = "0082"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
