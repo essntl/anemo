@@ -17,7 +17,7 @@ import { useModels } from '@/features/providers/api'
 import { msg, rich, t } from '@/lib/i18n'
 import { type Automation, type NotifyWhen, type OnAsk, useSaveAutomation, useSchedulePreview } from '../api'
 import { checksValid, runSettingsBody, runSettingsFrom } from '../runSettings'
-import { defaultForm, fromSchedule, minMinutes, toSchedule } from '../scheduleForm'
+import { AGENT_FREQUENCY_OPTIONS, defaultForm, fromSchedule, minMinutes, toSchedule } from '../scheduleForm'
 import type { AutomationTemplate } from '../templates'
 import { RunSettings } from './RunSettings'
 import { ScheduleFields } from './ScheduleFields'
@@ -71,7 +71,8 @@ export function AutomationDialog({ automation, template, onClose }: { automation
   const preview = useSchedulePreview(toSchedule(schedule, tz, fewest), hasCheck)
   const usableModels = (models.data ?? []).filter((m) => m.enabled && m.provider_enabled && m.capabilities.tools)
   const channels = destinations.data ?? []
-  const valid = name.trim() !== '' && prompt.trim() !== '' && preview.valid && checksValid(runSettings.checks)
+  const scheduleOk = schedule.frequency === 'manual' || preview.valid  // manual: only its event triggers
+  const valid = name.trim() !== '' && prompt.trim() !== '' && scheduleOk && checksValid(runSettings.checks)
 
   const submit = () =>
     save.mutate(
@@ -119,7 +120,7 @@ export function AutomationDialog({ automation, template, onClose }: { automation
             placeholder={t("Search for today's news about open-source AI and give me the five most important stories, each with a link.")}
             onChange={(e) => setPrompt(e.target.value)} />
         </Field>
-        <ScheduleFields form={schedule} onChange={setSchedule} tz={tz} preview={preview} fewest={fewest} />
+        <ScheduleFields form={schedule} onChange={setSchedule} tz={tz} preview={preview} fewest={fewest} options={AGENT_FREQUENCY_OPTIONS} />
       </div>
 
       <Section title={t('Agent')}

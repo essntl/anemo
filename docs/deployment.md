@@ -227,6 +227,30 @@ recording), look for that limit.
 Anemo has one user and one password. Do not expose it to the internet without
 HTTPS; an extra access list or VPN in front is a good idea.
 
+### Webhooks from other services
+
+An automation's webhook trigger (Automations → a card → Add a trigger → Webhook) is
+called at `https://<public address>/api/hooks/<trigger id>`. If Anemo is otherwise only
+reachable in your network or VPN, expose **only that path**. With a Cloudflare Tunnel:
+give the tunnel a public hostname (e.g. `hooks.example.com`) whose service is
+`http://app:8080` (or `http://<docker-host>:8080`), and in the tunnel's ingress rules put
+the path rule first and a catch-all that refuses everything else:
+
+```yaml
+ingress:
+  - hostname: hooks.example.com
+    path: ^/api/hooks/
+    service: http://app:8080
+  - hostname: hooks.example.com
+    service: http_status:404
+  - service: http_status:404
+```
+
+(In the Cloudflare dashboard: the public hostname with *Path* `^/api/hooks/`.) Set
+`PUBLIC_URL` to the address the other service should call, so the URL the Automations
+page shows is the right one. The requests are signed (see `docs/security.md`,
+*Webhooks*); the tunnel rule keeps the rest of the app off the internet.
+
 ## Anemo Desktop and Anemo Voice
 
 Both apps are *devices*: each logs in with its own token and keeps one WebSocket to

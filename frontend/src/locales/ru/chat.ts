@@ -209,5 +209,7 @@ const messages: Messages = {
   "Could not save the reasoning level.": "Не удалось сохранить уровень рассуждений.",
   "Open {name} in Files": "Открыть {name} в «Файлах»",
   "Open in Files: {path}": "Открыть в «Файлах»: {path}",
+  "An event woke this chat": "Событие разбудило этот чат",
+  "{n} event in a short time | {n} events in a short time": "{n} событие за короткое время | {n} события за короткое время | {n} событий за короткое время",
 }
 export default messages

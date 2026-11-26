@@ -9,8 +9,9 @@ the window's controls through UI Automation, clicks, typing, keys, opening progr
 on a trusted device with PowerShell switched on, PowerShell. What it does and why:
 `docs/specs/06-desktop-client.md`; the wire protocol: `docs/device-contracts.md`.
 
-It only connects out (one WebSocket to `wss://<anemo>/api/devices/ws`, and
-`PUT /api/devices/shared-screen` when you share the screen). It opens no port.
+It only connects out (one WebSocket to `wss://<anemo>/api/devices/ws`,
+`PUT /api/devices/shared-screen` when you share the screen, and GitHub for its updates, 1.8.0). It
+opens no port.
 
 **Claude Code jobs (1.1.0).** With *Share Claude Code jobs with Anemo* ticked in Settings
 (off by default) and the device **trusted** in Anemo, the client watches the jobs folder of
@@ -63,6 +64,33 @@ lists the repository's open pull requests (`gh pr list`, kept 2 minutes). A clon
 git refuses for want of a sign-in answers `unauthenticated`: run `gh auth login` and
 `gh auth setup-git`. Contract: `docs/device-contracts.md` §7.6.
 
+**Files between this computer and Anemo's workspace (1.7.0).** With *Let Anemo read and write
+files* ticked in Settings (*This computer*; off by default) and the device **trusted** in Anemo,
+Anemo's agents can copy a file from here into the workspace (`device_file_get`) or a workspace
+file onto this computer (`device_file_put`). Only inside the *Folders for files* (full paths,
+separated by `;`; empty: your user folder), with links and junctions followed first, and never a
+hidden file or folder below them, `AppData` (`~/Library` on the Mac) or Anemo Desktop's own
+folder. A file is sent and received in chunks of up to 4 MB, each with its SHA-256, and the whole
+file's SHA-256 is checked before a copy gets its name: until then it is a hidden
+`.<name>.anemo-<id>.part` file in the same folder, removed if the copy fails, is aborted or waits
+a minute without a chunk. An existing file is replaced only when Anemo asks for it
+(`overwrite`), at most 200 MB per file, and the stop key stops copies too. Contract:
+`docs/device-contracts.md` §8; design: `docs/specs/22-device-files.md`.
+
+**Updates (1.8.0).** Anemo Desktop updates itself from this repository's GitHub Releases: a
+minute after start and every 6 hours it asks GitHub (unauthenticated, with the last ETag) for the
+newest stable `desktop-v…` Release newer than itself, downloads this computer's file, checks it
+(the signature over the checksum file when the build has the release key, the SHA-256 from
+`SHA256SUMS-desktop*.txt`, then the exe's version and a `--self-test` run on Windows, `codesign`
+and the Team ID on the Mac) and installs it **when you quit**, or now from the tray item **Update
+to X ready: Restart to update**, which waits until no command, file copy or Claude Code job is
+running. *Update automatically* (Settings → This computer, on by default) switches it off; **Check
+now** looks at once. The old version is kept beside the new one (`Anemo Desktop.old.exe`,
+`.Anemo Desktop.old.app`) until the next update; a restarted version that doesn't come up is
+replaced by the old one again. Only the published exe updates (not a `dotnet build` output), and
+only in a folder its user can write. On the Mac an **ad hoc** build loses Screen Recording and
+Accessibility at every update (allow them again). Design: `docs/specs/23-desktop-auto-update.md`.
+
 ## Layout
 
 ```
@@ -77,6 +105,7 @@ desktop/
     Protocol/                 the JSON messages
     SharedScreen/             "Share this screen with Anemo"
     Storage/                  settings.json, the command log, the connection log
+    Updates/                  updates from GitHub Releases: picking, checksums, signature, the swap
     DesktopAgent.cs           all of it wired together, without a window
   src/Anemo.Desktop/          net8.0-windows WinForms app: the platform implementations, the tray,
                               the indicator, the Settings window
@@ -132,10 +161,31 @@ The `Release` workflow (`.github/workflows/release.yml`) builds both exes on a W
    `SHA256SUMS-desktop.txt` and the checksums in its notes. A re-run of a failed run adds the
    files to the same Release.
 
+Clients 1.8.0 and later find the new Release by themselves within 6 hours (see *Updates*): a
+Release must therefore have the exes, the zip and both checksum files under exactly these names.
+
 Pushing a `desktop-v<version>` tag by hand still works the same way; a wrong tag is deleted
 with `git push origin :desktop-v<version>` (and the Release, if one was made, on GitHub). If a
 release was missed, **Actions → Auto release → Run workflow**. A dry run at any time:
 **Actions → Release → Run workflow**, app *desktop*.
+
+## Signing updates
+
+Until this is set up, clients check an update's SHA-256 only, which catches a damaged download but
+not someone who can replace a Release's files (docs/specs/23-desktop-auto-update.md, *Signing*).
+Once, on a computer you trust (Git Bash or a Mac terminal; keep `anemo-update-key.pem` safe and
+offline, losing it means users install the next version by hand once):
+
+```
+openssl ecparam -name prime256v1 -genkey -noout -out anemo-update-key.pem
+gh secret set DESKTOP_UPDATE_SIGNING_KEY < anemo-update-key.pem
+gh variable set DESKTOP_UPDATE_PUBLIC_KEY --body "$(openssl ec -in anemo-update-key.pem -pubout -outform DER | base64 | tr -d '\n')"
+```
+
+From the next Release on, the release job signs `SHA256SUMS-desktop.txt` and
+`SHA256SUMS-desktop-macos.txt` (`.sig` beside each) and the clients it builds carry the public key
+and accept only signed updates. A Release with the variable set but no secret fails instead of
+publishing one the clients would refuse.
 
 ## Install on a computer
 
@@ -163,6 +213,7 @@ Windows 10 1903 or later is needed (Windows.Graphics.Capture).
 | Startup | `shell:startup\Anemo Desktop.lnk` |
 | PowerShell's folder | `%USERPROFILE%\AnemoWork` unless set in Settings |
 | Git cache (1.6.0) | `%APPDATA%\Anemo Desktop\git-cache\<owner>\<name>.git`: blobless bare clones of the owner's GitHub repositories for the remote git reads (no file contents); each repository's `anemo-fetched` and `anemo-read` files keep its last fetch and read; at most 1 GB each, 3 GB in all. `git-no-hooks` beside it is an empty folder git uses as `core.hooksPath` for every clone and fetch |
+| Updates (1.8.0) | beside the exe: `<name>.download` while downloading, `<name>.new.exe` once checked, `<name>.old.exe` the version before the last update (to go back: quit, rename it back); `%APPDATA%\Anemo Desktop\updates\started` and `failed` (a version that didn't start, not fetched again by itself) |
 | Claude Code jobs | `%APPDATA%\Anemo Desktop\code-jobs.json`: per job only how far Anemo acked it (`acked_seq`, `acked_offset`), the last state sent and whether it is settled; jobs older than 14 days are forgotten; a damaged file starts empty (Anemo's acks repair it) |
 
 ## macOS
@@ -225,7 +276,9 @@ notes say so.
 
 **Files on the Mac:** settings and logs in `~/Library/Application Support/Anemo Desktop/`
 (the same files as on Windows; `settings.json` holds only `keychain:v1` for the token), the
-shell's folder `~/AnemoWork`.
+shell's folder `~/AnemoWork`. Updates: the zip in `…/Anemo Desktop/updates/`, the checked app in
+`.Anemo Desktop.update/` beside the app, the version before in `.Anemo Desktop.old.app` (hidden in
+Finder; to go back: quit, `mv` it back).
 
 **The bridge for agents.** `bridge/cc.mjs` (Node 18+, no packages) is the cross-platform
 replacement of `C:\anemo-bridge\cc.ps1`: `node bridge/cc.mjs start --project <name> --prompt
@@ -260,6 +313,14 @@ its jobs show on the Code page too. Tests: `node --test bridge/cc.test.mjs`.
   full path (never a `.cmd`/`.bat`) with `core.fsmonitor`, signature checks, optional locks
   and lazy fetches off, 10 s per command, and answer metadata only; credentials in remote
   URLs are removed.
+- Files (1.7.0) only while *Let Anemo read and write files* is ticked, the device is trusted and
+  control isn't paused; only inside the allowed folders once links are followed, never hidden
+  files or folders, `AppData`/`Library` or the client's own folder, no network or device paths;
+  written to a temporary file and renamed only once complete and its SHA-256 is right; an
+  existing file replaced only with `overwrite`.
+- Updates (1.8.0) come only from the compiled-in repository's GitHub Releases over HTTPS, are
+  installed only after the checksum (and, with the release key, the signature) and the platform's
+  checks pass, and never restart the client while a command, a copy or a Claude Code job runs.
 - Remote git reads (1.6.0) clone only the owner's repositories, from the URL gh lists, into the
   git cache (checked to stay inside it once links are followed), with hooks, `ext::` and
   `file://` transports, submodules and automatic maintenance off and `GIT_TERMINAL_PROMPT=0`.

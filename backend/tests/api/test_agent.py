@@ -147,6 +147,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_task",
             "update_task",
             "delete_task",
+            "update_tasks",
             "list_task_files",
             "attach_file_to_task",
             "list_projects",
@@ -157,6 +158,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_event",
             "update_event",
             "delete_event",
+            "update_events",
             "get_focus_stats",
             "list_focus_sessions",
             "start_focus",
@@ -165,6 +167,8 @@ async def test_agent_uses_tools_and_plan(authed):
             "get_music_queue",
             "music_control",
             "send_notification",
+            "search_chats",  # earlier chats (chat recall)
+            "read_chat",
             "remember",
             "update_memory",
             "forget_memory",
@@ -173,6 +177,11 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_schedule",
             "update_schedule",
             "delete_schedule",
+            # Event triggers: wake this chat, or start an automation, on an event.
+            "create_trigger",
+            "list_triggers",
+            "update_trigger",
+            "delete_trigger",
             # Automation scripts (spec 08): reading them, and writing or starting them
             # (those ask by default).
             "list_scripts",

@@ -41,7 +41,7 @@ describe('moving pages', () => {
   it('shifts a page within its list, and stops at the ends', () => {
     expect(shiftPage(DEFAULT_NAVIGATION, 'tasks', -1).pinned.slice(0, 3)).toEqual(['home', 'tasks', 'notifications'])
     expect(shiftPage(DEFAULT_NAVIGATION, 'home', -1)).toBe(DEFAULT_NAVIGATION)
-    expect(shiftPage(DEFAULT_NAVIGATION, 'memory', 1)).toBe(DEFAULT_NAVIGATION)
+    expect(shiftPage(DEFAULT_NAVIGATION, 'activity', 1)).toBe(DEFAULT_NAVIGATION)
   })
 })
 

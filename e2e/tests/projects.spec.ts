@@ -94,7 +94,7 @@ test('the pages are pinned above the chats, which are the only thing that scroll
   await login(page)
   const sidebar = page.locator('aside').first()
   const pages = sidebar.getByRole('navigation', { name: 'Pages' })
-  // Six pages are always there; the other eight open from More.
+  // Six pages are always there; the other nine open from More.
   await expect(pages.getByRole('link')).toHaveCount(6)
   await expect(pages.getByRole('link', { name: 'Files', exact: true })).toBeVisible()
   // The chat list takes the free height and scrolls by itself; the column around it does not.
@@ -103,7 +103,7 @@ test('the pages are pinned above the chats, which are the only thing that scroll
   expect(await sidebar.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true)
   await pages.getByRole('button', { name: 'More pages' }).click()
   const more = page.getByRole('navigation', { name: 'More pages' })
-  await expect(more.getByRole('link')).toHaveCount(8)
+  await expect(more.getByRole('link')).toHaveCount(9)
   // Short names in the card; the full one is the tooltip.
   await expect(more.getByRole('link', { name: 'Agents' })).toHaveAttribute('title', 'Profiles & Skills')
   // A page from More joins the list while you are on it.

@@ -12,7 +12,7 @@ import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
@@ -28,7 +28,7 @@ from app.features.tasks.models import Project, Task
 from app.features.trash.models import TrashedItem
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin import linking
+from app.tools.builtin import batch, linking
 from app.tools.builtin import sources as src
 
 
@@ -72,10 +72,6 @@ def _id(value: str) -> uuid.UUID | None:
         return uuid.UUID(value.strip())
     except ValueError:
         return None
-
-
-def _problems(exc: ValidationError) -> str:
-    return "; ".join(e["msg"].removeprefix("Value error, ") for e in exc.errors()[:3])
 
 
 # list_events without a range of days lists at most this many events.
@@ -314,7 +310,7 @@ class CreateEvent(Tool):
                     create_values=args.create_value,
                 )
             except ValidationError as exc:
-                return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
+                return ToolResult(content=f"Invalid event: {batch.problems(exc)}", is_error=True)
             except ExternalKeyTaken as exc:
                 existing = (
                     _describe(service.base_occurrence(exc.item, exc.item.start_at), tz)
@@ -361,7 +357,8 @@ class UpdateEvent(Tool):
     name = "update_event"
     description = (
         "Change an event. For a repeating event this changes the whole series. A synced "
-        "event's source and external_key can't be changed."
+        "event's source and external_key can't be changed. Several events at once: "
+        "update_events."
     )
     capability = "calendar.write"
     Input = UpdateEventInput
@@ -380,68 +377,74 @@ class UpdateEvent(Tool):
             event = await db.get(CalendarEvent, event_id) if event_id else None
             if event is None:
                 return ToolResult(content=f"No event with id {args.id}.", is_error=True)
-            tz = event.tz
-            current = service.event_out(event)
-            all_day = current.all_day if args.all_day is None else args.all_day
-            start = args.start or (
-                datetime.combine(current.start_date, time.min)
-                if current.start_date
-                else current.start_at
-            )
-            # Keep the length when only the start moves.
-            end = args.end
-            if end is None and current.end_date is not None and current.start_date is not None:
-                end = datetime.combine(
-                    start.date() + (current.end_date - current.start_date), time.min
-                )
-            elif end is None:
-                end = _instant(start, tz).astimezone(UTC) + (event.end_at - event.start_at)
-            merged = CreateEventInput(
-                title=args.title or event.title,
-                start=start,
-                end=end,
-                all_day=all_day,
-                description=event.description if args.description is None else args.description,
-                location=event.location if args.location is None else args.location,
-                rrule=event.rrule if args.rrule is None else (args.rrule or None),
-                remind_minutes=event.remind_minutes
-                if args.remind_minutes is None
-                else args.remind_minutes,
-            )
-            try:
-                body = _event_in(merged, tz).model_copy(
-                    update={
-                        "color": event.color,
-                        "task_id": event.task_id,
-                        "project_id": event.project_id,
-                        "properties": args.properties,
-                    }
-                )
-                source = src.source_in(None, None, args.source_url)
-                if isinstance(source, str):
-                    return ToolResult(content=f"Invalid event: {source}", is_error=True)
-                if hidden := await linking.hidden_document(db, ctx, args.links_add):
-                    return ToolResult(content=hidden, is_error=True)
-                dropped: list[str] = []
-                event = await service.update_event(
-                    db,
-                    event,
-                    body,
-                    source_url=source.source_url,
-                    links_add=args.links_add,
-                    links_remove=args.links_remove,
-                    create_values=args.create_value,
-                    dropped=dropped,
-                )
-            except ValidationError as exc:
-                return ToolResult(content=f"Invalid event: {_problems(exc)}", is_error=True)
-            except AppError as exc:
-                return ToolResult(content=exc.message, is_error=True)
-            line = _describe(service.base_occurrence(event, event.start_at), tz)
-            line += linking.dropped_note(dropped)
+            outcome = await change_event(db, event, args, ctx)
+        if isinstance(outcome, ToolResult):
+            return outcome
+        event, line = outcome
         return ToolResult(
             content=f"Updated: {line}", data={"event": {"id": str(event.id), "title": event.title}}
         )
+
+
+async def change_event(
+    db: Any, event: CalendarEvent, args: UpdateEventInput, ctx: ToolContext
+) -> tuple[CalendarEvent, str] | ToolResult:
+    """Apply update_event's arguments to one event: the changed event and its line for
+    the model, or the error result."""
+    tz = event.tz
+    current = service.event_out(event)
+    all_day = current.all_day if args.all_day is None else args.all_day
+    start = args.start or (
+        datetime.combine(current.start_date, time.min) if current.start_date else current.start_at
+    )
+    # Keep the length when only the start moves.
+    end = args.end
+    if end is None and current.end_date is not None and current.start_date is not None:
+        end = datetime.combine(start.date() + (current.end_date - current.start_date), time.min)
+    elif end is None:
+        end = _instant(start, tz).astimezone(UTC) + (event.end_at - event.start_at)
+    merged = CreateEventInput(
+        title=args.title or event.title,
+        start=start,
+        end=end,
+        all_day=all_day,
+        description=event.description if args.description is None else args.description,
+        location=event.location if args.location is None else args.location,
+        rrule=event.rrule if args.rrule is None else (args.rrule or None),
+        remind_minutes=event.remind_minutes if args.remind_minutes is None else args.remind_minutes,
+    )
+    try:
+        body = _event_in(merged, tz).model_copy(
+            update={
+                "color": event.color,
+                "task_id": event.task_id,
+                "project_id": event.project_id,
+                "properties": args.properties,
+            }
+        )
+        source = src.source_in(None, None, args.source_url)
+        if isinstance(source, str):
+            return ToolResult(content=f"Invalid event: {source}", is_error=True)
+        if hidden := await linking.hidden_document(db, ctx, args.links_add):
+            return ToolResult(content=hidden, is_error=True)
+        dropped: list[str] = []
+        event = await service.update_event(
+            db,
+            event,
+            body,
+            source_url=source.source_url,
+            links_add=args.links_add,
+            links_remove=args.links_remove,
+            create_values=args.create_value,
+            dropped=dropped,
+        )
+    except ValidationError as exc:
+        return ToolResult(content=f"Invalid event: {batch.problems(exc)}", is_error=True)
+    except AppError as exc:
+        return ToolResult(content=exc.message, is_error=True)
+    line = _describe(service.base_occurrence(event, event.start_at), tz)
+    line += linking.dropped_note(dropped)
+    return event, line
 
 
 class DeleteEventInput(BaseModel):
@@ -503,4 +506,153 @@ class DeleteEvent(Tool):
         )
 
 
-EVENT_TOOLS: list[Tool] = [ListEvents(), GetEvent(), CreateEvent(), UpdateEvent(), DeleteEvent()]
+class EventChangeInput(BaseModel):
+    id: str = Field(description="The event's id (from list_events)")
+    title: str | None = Field(None, min_length=1, max_length=300)
+    start: datetime | None = Field(None, description="New start; the length stays if no end")
+    end: datetime | None = None
+    all_day: bool | None = None
+    location: str | None = Field(None, max_length=300)
+    remind_minutes: int | None = Field(None, ge=0, le=40_320)
+    properties: dict[str, Any] | None = Field(
+        None, max_length=30, description=linking.PROPERTIES_CHANGE
+    )
+    trash: bool = Field(
+        False, description="Move it (a repeating one: the whole series) to the trash"
+    )
+    occurrence: datetime | None = Field(
+        None,
+        description="With trash: cancel only the occurrence of a repeating event starting "
+        "at this time (from list_events)",
+    )
+
+    @model_validator(mode="after")
+    def _one_kind_of_change(self) -> "EventChangeInput":
+        given = self.model_fields_set - {"id", "trash", "occurrence"}
+        if self.occurrence is not None and not self.trash:
+            raise ValueError("occurrence is only for cancelling one (with trash)")
+        if self.trash and given:
+            raise ValueError("an item that goes to the trash changes nothing else")
+        if not self.trash and not given:
+            raise ValueError("the item changes nothing")
+        return self
+
+
+def _event_change(item: EventChangeInput) -> str:
+    """What changes on one event, in words (for the approval and the activity log)."""
+    if item.trash and item.occurrence is not None:
+        return f"cancel the occurrence of {batch.moment(item.occurrence)}"
+    if item.trash:
+        return "move to the trash"
+    parts: list[str] = []
+    if item.title is not None:
+        parts.append(f"title → “{batch.short(item.title)}”")
+    if item.all_day is not None:
+        parts.append("all day" if item.all_day else "not all day")
+    if item.start is not None:
+        parts.append(f"starts → {batch.moment(item.start)}")
+    if item.end is not None:
+        parts.append(f"ends → {batch.moment(item.end)}")
+    if item.location is not None:
+        parts.append(f"at → {batch.short(item.location, 40)}" if item.location else "no location")
+    if item.remind_minutes is not None:
+        parts.append(f"reminder {item.remind_minutes} min before")
+    if item.properties:
+        parts.append(batch.properties_text(item.properties))
+    return "; ".join(parts)
+
+
+class UpdateEventsInput(BaseModel):
+    items: list[EventChangeInput] = Field(
+        min_length=1,
+        max_length=batch.MAX_ITEMS,
+        description="One entry per event, each with only what changes on it",
+    )
+    create_value: bool = Field(False, description=linking.CREATE_VALUE)
+
+    @model_validator(mode="after")
+    def _each_event_once(self) -> "UpdateEventsInput":
+        # The same event written two ways ("{…}", no dashes, capitals) is still one event.
+        keys = [(_id(i.id) or i.id.strip().lower(), i.occurrence) for i in self.items]
+        if len(set(keys)) != len(keys):
+            raise ValueError("each event (or occurrence) may appear only once")
+        return self
+
+
+class UpdateEvents(Tool):
+    name = "update_events"
+    description = (
+        f"Change many calendar events in one call (up to {batch.MAX_ITEMS}): time, title, "
+        "location, reminder, properties, or move them to the trash (or cancel single "
+        "occurrences). A repeating event changes as a whole series. The user approves the "
+        "whole batch once; each event is reported on its own. Times without an offset are "
+        "the user's local time."
+    )
+    capability = "calendar.write"
+    Input = UpdateEventsInput
+    idempotent = False  # a batch cut short must not be applied again blindly
+    timeout_s = batch.TIMEOUT_S
+
+    def _planned(self, args: UpdateEventsInput) -> list[batch.Planned]:
+        return [
+            batch.Planned(
+                text=_event_change(item),
+                ref=ref_url("event", event_id) if (event_id := _id(item.id)) else None,
+                # As for one event: a change or a cancelled occurrence is moderate,
+                # deleting a whole event (or series) dangerous.
+                risk="dangerous" if item.trash and item.occurrence is None else "moderate",
+                trash=item.trash,
+            )
+            for item in args.items
+        ]
+
+    def actions(self, args: UpdateEventsInput, ctx: ToolContext) -> list[Action]:
+        found = batch.actions(self.capability, "event", self._planned(args))
+        found[0] = linking.create_value_note(found[0], args.create_value)
+        return found
+
+    async def run(self, args: UpdateEventsInput, ctx: ToolContext) -> ToolResult:
+        async def apply(item: EventChangeInput) -> batch.Outcome:
+            event_id = _id(item.id)
+            async with get_sessionmaker()() as db:
+                event = await db.get(CalendarEvent, event_id) if event_id else None
+                if event is None:
+                    return batch.Outcome(item.id, False, f"No event with id {item.id}.")
+                title = event.title
+                if item.trash and item.occurrence is not None:
+                    start = _instant(item.occurrence, event.tz)
+                    await service.set_occurrence(
+                        db, event, start, OccurrenceIn(cancelled=True), changed_by="agent"
+                    )
+                    text = f"[{event_id}] {title}: cancelled on {start:%Y-%m-%d %H:%M}"
+                    return batch.Outcome(str(event_id), True, text, title)
+                if item.trash:
+                    await service.delete_event(db, event, deleted_by="agent")
+                    text = f"[{event_id}] {title}: moved to the trash"
+                    return batch.Outcome(str(event_id), True, text, title)
+                fields = item.model_dump(exclude_unset=True, exclude={"trash", "occurrence"})
+                if args.create_value:
+                    fields["create_value"] = True
+                try:
+                    changes = UpdateEventInput.model_validate(fields)
+                    outcome = await change_event(db, event, changes, ctx)
+                except ValidationError as exc:
+                    return batch.Outcome(item.id, False, f"[{item.id}] {batch.problems(exc)}")
+            if isinstance(outcome, ToolResult):
+                return batch.Outcome(item.id, False, f"[{item.id}] {outcome.content}")
+            event, line = outcome
+            return batch.Outcome(str(event.id), True, line, event.title)
+
+        return await batch.apply_all(
+            "event", args.items, self._planned(args), apply, lambda item: item.id
+        )
+
+
+EVENT_TOOLS: list[Tool] = [
+    ListEvents(),
+    GetEvent(),
+    CreateEvent(),
+    UpdateEvent(),
+    DeleteEvent(),
+    UpdateEvents(),
+]

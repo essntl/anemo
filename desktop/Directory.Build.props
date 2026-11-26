@@ -4,9 +4,21 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>1.6.1</Version>
+    <Version>1.8.0</Version>
     <DebugType>embedded</DebugType>
     <Company>Anemo</Company>
     <Product>Anemo Desktop</Product>
   </PropertyGroup>
+
+  <!-- Updates (docs/specs/23-desktop-auto-update.md): whose GitHub Releases the client updates
+       from, and the public key the release's checksum file must be signed with. release.yml
+       passes both (-p:AnemoUpdateRepository=… -p:AnemoUpdatePublicKey=…); a build without a key
+       checks the SHA-256 only. Read by UpdateOptions.FromBuild. -->
+  <PropertyGroup>
+    <AnemoUpdateRepository Condition="'$(AnemoUpdateRepository)' == ''">essntl/anemo</AnemoUpdateRepository>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="AnemoUpdateRepository" Value="$(AnemoUpdateRepository)" />
+    <AssemblyMetadata Include="AnemoUpdatePublicKey" Value="$(AnemoUpdatePublicKey)" Condition="'$(AnemoUpdatePublicKey)' != ''" />
+  </ItemGroup>
 </Project>

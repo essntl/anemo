@@ -13,25 +13,35 @@ TICK_S = 30.0
 
 
 def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
+    from app.features.activity import service as activity
     from app.features.automations import removal as automation_removal
     from app.features.automations import service as automations
     from app.features.calendar import reminders
     from app.features.code_sessions import service as code_sessions
+    from app.features.conversations import recall as chat_recall
     from app.features.conversations import service as conversations
     from app.features.documents import properties as documents
     from app.features.notifications import service as notifications
     from app.features.runs import service as runs
+    from app.features.triggers import dispatch as triggers
+    from app.features.triggers import service as trigger_service
     from app.features.updates import service as updates
 
     return [
         ("reminders", reminders.fire_due),
         ("automations", automations.fire_due),
+        # Events whose dispatch job was lost, and firings whose debounce window closed or
+        # whose run ended.
+        ("triggers", triggers.dispatch),
+        ("triggers.prune", trigger_service.prune_if_due),  # at most every 10 minutes
         ("automations.prune", automation_removal.prune_run_chats),  # run chats past keeping
         ("notifications.prune", notifications.prune),
         ("approvals.expire", runs.expire_stale_approvals),
         ("chats.temporary", conversations.delete_expired_temporary),
+        ("chats.index", chat_recall.index_due),  # chats quiet for a while, by meaning
         ("code.prune", code_sessions.prune_if_due),  # at most every 10 minutes
         ("updates.check", updates.check_if_due),  # about once a day
+        ("activity.prune", activity.prune_if_due),  # entries past 90 days, once an hour
         # Once per worker start: documents changed while Anemo wasn't running.
         ("documents.reconcile", documents.reconcile_on_start),
     ]

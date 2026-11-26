@@ -24,6 +24,7 @@ adapter), and searching inside workspace files that are not documents.
 - [Music](#music)
 - [Dynamic Island](#dynamic-island)
 - [Stats](#stats)
+- [Activity](#activity)
 - [Notifications](#notifications)
 - [Automations](#automations)
 - [MCP servers](#mcp-servers)
@@ -443,6 +444,17 @@ subtasks and what a task waits on. Changes follow the
 *Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
 action, so the default level asks you first.
 
+**Many at once.** An agent can change up to 100 tasks or events in one step ("move
+everything tagged *errands* to Friday", "finish these twelve", "cancel my standups next
+week"): their status, due date, project, tags or priority, an event's time, title or
+location, or moving them to the trash. When the change needs your approval you are asked
+once for the whole batch: the card says what it does ("Change 30 tasks: due → Fri
+2026-11-27") and **Show all 30 items** lists each one by title with what changes on it.
+Each item is changed on its own, with the same rules as a single change, and the agent is
+told which ones worked and which didn't (a task that's gone, an event that would end
+before it starts); one failing doesn't stop the others. The batch shows up in the
+activity log as one entry. See [spec 20](specs/20-bulk-changes.md).
+
 ## Appearance and profile
 
 **Settings → Appearance** changes the look of the whole app at once, and the change is
@@ -549,6 +561,23 @@ the timer and music*, asks first). With no Anemo tab open anywhere they say so. 
 ready-made **Daily summary** automation (Automations → *Start from a template*)
 sums up your focus and tasks each evening; it does nothing until you save it.
 
+## Activity
+
+**Activity** lists what was changed, by whom, newest first: tasks, calendar events,
+documents, workspace files and projects, changed by you, the assistant in a chat, an
+automation, a script, a plugin or a run an event started. Each entry names the item (with
+a link while it exists), what changed (the fields) and when; a batch, such as one tool call
+that moved twelve tasks, is one row that opens. Filter by who, by kind of item and by time;
+**History** in a task, an event or a document's details opens the page for that item only.
+
+**Undo** puts a change back where it can: a task's, event's or project's fields return to
+what they were, a deleted task or event comes back from the trash, something created goes
+to the trash, a document gets its earlier text back from its revisions, a moved document or
+file goes back, an agent's file change is reverted. If the item was changed since, Anemo
+says what differs and asks before overwriting it. *Undo all* does a whole batch. Undo is
+yours only: agents have no tool for it. Entries are kept for 90 days. Details:
+[spec 19](specs/19-activity-log.md).
+
 ## Notifications
 
 Reminders, the results of automations and messages from agents are listed under
@@ -601,6 +630,31 @@ between its runs, so "tell me when this page changes" works. Failed runs can be
 retried. If the app was off when a run was due, that run is skipped rather than
 caught up later, and a run still going when the next one is due is not stacked.
 
+### Triggers
+
+An automation can also run **when something happens**, besides or instead of its
+schedule ("Only on events"): a task is created, changed, completed or deleted; a
+calendar event or a document is created, changed or deleted; a Claude Code job starts or
+ends; a computer or phone comes online or goes offline; a new file arrives in the
+workspace; an automation fails; a run waits for your approval; or another service calls
+the automation's **webhook** (a secret URL whose requests are signed). On the
+automation's card, **Add a trigger** picks the event and, optionally, which ones (a
+project, a tag, one job…), how long a burst is gathered into one run, how many runs an
+hour at most, once only, and until when. The run gets the event as data, never as
+instructions, and the run log says which event started each run. Every rail of a
+scheduled run applies: its tools, notifications, model, limits, state note, approvals,
+and never two runs at once (events that come while it runs start one more run after
+it). An automation's own changes never start it again, chains of triggers stop after
+three steps, and **Pause all** stops triggers too.
+
+In a chat, the assistant can be asked to **wake you when something happens** ("tell me
+when this Claude Code job is done"): when it does, the chat goes on by itself, with a
+card that shows the event (not as your message). Such a wait ends after one firing and
+after 24 hours unless the assistant asked for longer (at most 30 days); the Automations
+page lists the chats that wait, and **Stop waiting** cancels one. The assistant can
+propose an automation with its triggers in one step, which you confirm as you confirm a
+schedule.
+
 ### Scripts
 
 The **Scripts** tab holds automations that run code instead of asking a model: cheap,
@@ -644,6 +698,18 @@ you have looked at it, and runs already in progress do not get the changed tool.
 
 Only add servers you trust: a server sees what agents send to its tools, and its
 answers can try to steer the agent.
+
+**MCP triggers.** An automation (or a chat that asked to be woken) can run when a
+connected server sends a notification: a resource changed (`notifications/resources/updated`,
+for the resource URI you name), its list of tools, prompts or resources changed, or (older
+servers) a log message. Add one on the Automations page with **Add a trigger** → *MCP server
+notification*: pick the server, the kind of notification and the resource URI (exact). While
+such a trigger is on, the worker keeps one connection open to that server (local ones through
+the MCP host), subscribes to the resources the triggers name, and reconnects when it drops.
+Bursts are coalesced (repeats within 5 seconds are one event, and a new trigger waits 30
+seconds for more by default), and a server that sends more than 120 notifications a minute is
+not listened to for 15 minutes; its triggers say why. What a server sends reaches the run as
+data, like its tool results.
 
 ## Plugins
 
@@ -703,6 +769,17 @@ resume the timer*, *Play or pause music*, *Next track*, *Paste a music link…*,
 type has to match. On that page documents and memories are also found by meaning
 when an embedding model is set (Settings → Providers & Models); the quick box
 matches words only, so typing never calls a model.
+
+**Chat recall.** In Agent mode the assistant can search your earlier chats and read
+them ("what did we decide about the website last week?"): it finds them by their
+words and titles, and by meaning when an embedding model is set, then reads the one it
+needs from the matching message on. In a project chat it looks at that project's chats
+unless the request needs more; it never sees the chat it is in or temporary chats, and
+archived chats are found too. What it reads is treated as data, not instructions.
+Settings → Agent Permissions → *Read earlier chats* (default: allowed); automations only
+get it when their tool list names `search_chats` or `read_chat`. With an embedding
+model, the text of your chats is sent to it for this, as documents and memories are
+(docs/specs/18-chat-recall.md).
 
 ## Keyboard shortcuts
 
@@ -1005,6 +1082,12 @@ the agent sees which ones are, with their trust level, in its turn context.
 | `computer_shell` | One command in the computer's shell (PowerShell on Windows, zsh or bash on a Mac) on a trusted computer with the shell switched on in the client, with a timeout (60 s by default, at most 10 minutes) |
 | `computer_shared_screen` | What you shared last with *Share this screen with Anemo* |
 
+On a trusted computer that shares its Claude Code jobs, the agent starts and follows jobs
+with the `code_*` tools instead (`code_start`, `code_status`, `code_cancel`; the jobs are on
+the Code page). `code_status` with `wait_s` (up to 5 minutes) waits until the job ends and
+then answers, so the agent doesn't keep asking; stopping the run ends the wait at once
+([spec 21](specs/21-code-wait.md)).
+
 PowerShell commands are rated like shell commands: one that deletes, formats, changes
 users, services, the firewall or the registry, or downloads and runs something, is
 dangerous; one that uses the network counts as reaching people. A Mac's zsh commands are
@@ -1042,6 +1125,32 @@ signed by a developer lose both permissions at every update (allow them again).
 the window in front once, like *Share this tab* in the browser extension. The agent reads
 it with `computer_shared_screen`; it is forgotten after 12 hours or when you stop
 sharing, and the API never returns its content.
+
+**Files between a computer and the workspace** (Anemo Desktop 1.7.0). With *Let Anemo read
+and write files* switched on in the client (off by default) on a **trusted** computer, the
+agent copies a file from it into the workspace (`device_file_get`) or a workspace file onto it
+(`device_file_put`); the computer's line in the turn context then says *files on*. Only the
+folders the client allows: your home folder, or the folders you list in its Settings, never
+hidden folders (`.ssh`, `.config`, …), `AppData` or `~/Library`, or the client's own folder.
+The permission is *Files on your computers* (asks by default); replacing a file that is
+already on the computer only happens when the agent asks for it, and counts as dangerous.
+A file copied into the workspace is in the run's file changes and can be reverted, and
+never replaces a workspace file unless asked. Each chunk and the whole file are checked by
+SHA-256 on both ends, and a copy onto the computer only gets its name once it is complete.
+The largest file is set in **Settings → Devices** (50 MB by default, up to 200 MB). Stop
+stops copies too. Design: [docs/specs/22-device-files.md](specs/22-device-files.md).
+
+**Anemo Desktop updates itself** (1.8.0, Windows and macOS). A minute after it starts and every
+6 hours, the client looks for a newer `desktop-v…` Release on GitHub (no Anemo server involved),
+downloads it, checks it (the SHA-256 from the release's checksum file, the release signature once
+the repository has a signing key, the exe's version and a test start on Windows, the code
+signature on the Mac) and installs it when you quit. The tray or menu bar then shows **Update to
+X ready: Restart to update**, which restarts as soon as the agent is done (no command in the last
+minute, no file copy, no Claude Code job running). In the client's Settings, *Update
+automatically* (on by default) turns it off and **Check now** looks at once. If the new version
+doesn't come up, the old one is put back and started again. An ad hoc signed Mac build has to be
+given Screen Recording and Accessibility again after each update. Design:
+[docs/specs/23-desktop-auto-update.md](specs/23-desktop-auto-update.md).
 
 Automations get the computer tools only when the automation lists them. What a screen
 shows is untrusted content for the model, like a web page. Installing the client:

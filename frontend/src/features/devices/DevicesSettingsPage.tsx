@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/toast'
 import { formatWhen } from '@/lib/format'
 import { msg, t } from '@/lib/i18n'
+import { DeviceFilesCard } from './DeviceFilesCard'
 import { type Device, type DeviceKind, type DeviceTrust, useAddDevice, useDeleteDevice, useDevices, useRenameDevice, useSetTrust } from './api'
 
 const KINDS = [
@@ -194,6 +195,7 @@ export function DevicesSettingsPage() {
         </Card>
       )}
       {devices.isError && <p className="text-[13px] text-error">{errorMessage(devices.error)}</p>}
+      <DeviceFilesCard />
     </div>
   )
 }

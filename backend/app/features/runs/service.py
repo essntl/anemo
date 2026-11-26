@@ -9,7 +9,7 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
-from app.core.actor import USER, Actor
+from app.core.actor import USER, Actor, acting_as
 from app.core.db import get_sessionmaker
 from app.core.errors import NotFound
 from app.events import bus
@@ -22,6 +22,7 @@ from app.features.runs.models import (
     ToolCall,
 )
 from app.features.runs.schemas import Outcome, RunTiming
+from app.features.triggers import events as trigger_events
 from app.jobs import queue
 
 # Event types stored durably in run_events (everything else is live-only).
@@ -84,10 +85,36 @@ async def emit(
         db.add(RunEvent(run_id=run.id, seq=next_seq, type=event_type, data=data))
 
 
+async def _emit_waiting_approvals(db: AsyncSession, run: Run) -> None:
+    """approval.waiting for each approval the run now waits for (features/triggers),
+    as caused by the run itself (its own chat or automation is never woken by it)."""
+    rows = await db.execute(
+        select(Approval, ToolCall.tool_name)
+        .join(ToolCall, ToolCall.id == Approval.tool_call_id)
+        .where(Approval.run_id == run.id, Approval.status == "pending")
+    )
+    with acting_as(actor_for(run)):
+        for approval, tool in rows.all():
+            await trigger_events.emit(
+                db,
+                "approval.waiting",
+                {
+                    "approval_id": str(approval.id),
+                    "run_id": str(run.id),
+                    "conversation_id": str(run.conversation_id) if run.conversation_id else None,
+                    "tool": tool,
+                    "summary": approval.summary,
+                },
+                subject=str(approval.id),
+            )
+
+
 async def set_status(
     db: AsyncSession, run: Run, status: str, *, error: dict[str, Any] | None = None
 ) -> None:
     now = datetime.now(UTC)
+    if status == "waiting_approval" and run.status != "waiting_approval":
+        await _emit_waiting_approvals(db, run)
     run.status = status
     if status == "running" and run.started_at is None:
         run.started_at = now

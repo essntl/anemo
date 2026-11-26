@@ -5,6 +5,7 @@ using Anemo.Desktop.Core.Connection;
 using Anemo.Desktop.Core.Control;
 using Anemo.Desktop.Core.Platform;
 using Anemo.Desktop.Core.Storage;
+using Anemo.Desktop.Core.Updates;
 using Anemo.Desktop.Mac.Platform;
 using Avalonia;
 using Avalonia.Controls;
@@ -36,13 +37,17 @@ internal sealed class MenuBarApp : IDisposable
     private readonly NativeMenuItem _share = new("Share this screen with Anemo");
     private readonly NativeMenuItem _pause = new("Pause control for 1 hour");
     private readonly NativeMenuItem _allow = new("Allow control") { ToggleType = NativeMenuItemToggleType.CheckBox };
+    private readonly NativeMenuItem _update = new("Restart to update") { IsVisible = false };
+    private readonly NativeMenuItemSeparator _updateLine = new() { IsVisible = false };
     private readonly string _version;
     private bool _busy;
     private DateTimeOffset _lastNag = DateTimeOffset.MinValue;
     private SettingsWindow? _settingsWindow;
     private PermissionsWindow? _permissionsWindow;
+    private Install? _restart;
 
-    public MenuBarApp(Application app, Action quit)
+    /// <param name="updated">Started by an update (<c>--updated</c>): tell the old copy, which waits, that this one is up.</param>
+    public MenuBarApp(Application app, Action quit, bool updated)
     {
         _quitApp = quit;
         var time = TimeProvider.System;
@@ -59,7 +64,10 @@ internal sealed class MenuBarApp : IDisposable
             AppPaths.DefaultWorkFolder,
             Processes: new MacProcessProbe(),
             CodeHost: new MacCodeHost(),
-            TargetSystem: DesktopPlatform.MacOS(AppPaths.HomeFolder)));
+            TargetSystem: DesktopPlatform.MacOS(AppPaths.HomeFolder),
+            Updates: new MacUpdatePlatform(
+                Environment.ProcessPath, AppPaths.UpdatesFolder, System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture),
+            UpdateOptions: UpdateOptions.FromBuild(typeof(MenuBarApp).Assembly)));
 
         _indicator = new IndicatorWindow(() => _agent.Control.Stop(), () => _agent.Settings.StopHotkey);
         _hideIndicator.Tick += (_, _) =>
@@ -77,6 +85,8 @@ internal sealed class MenuBarApp : IDisposable
         _agent.Connection.NoticeReceived += text => Dispatcher.UIThread.Post(() => Notice.Show(text));
         _agent.Control.Changed += () => Dispatcher.UIThread.Post(Refresh);
         Permissions.Missing += () => Dispatcher.UIThread.Post(NagAboutPermissions);
+        _agent.Updates.Changed += () => Dispatcher.UIThread.Post(Refresh);
+        _agent.Updates.RestartRequested += update => Dispatcher.UIThread.Post(() => QuitToInstall(update));
 
         RegisterHotKeys();
         ApplyLoginItem();
@@ -98,10 +108,25 @@ internal sealed class MenuBarApp : IDisposable
         {
             Dispatcher.UIThread.Post(ShowPermissions);
         }
+
+        if (updated)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                _agent.Updates.ReportStarted();
+                Notice.Show(Permissions.AllGranted
+                    ? $"Anemo Desktop was updated to {_version}."
+                    : $"Anemo Desktop was updated to {_version}. macOS asks again for its permissions: remove Anemo Desktop from both lists in System Settings, then allow it again.");
+            });
+        }
     }
+
+    /// <summary>What Program does after the app has closed: swap the update in, and start it for a restart.</summary>
+    public sealed record Install(UpdateInstaller Installer, StagedUpdate Update, bool Restart);
 
     public void Dispose()
     {
+        Program.PendingInstall = TakeInstall();
         _quit.Cancel();
         _refresh.Stop();
         _hideIndicator.Stop();
@@ -125,10 +150,13 @@ internal sealed class MenuBarApp : IDisposable
             }
         };
         _allow.Click += (_, _) => _agent.Control.SetAllow(!_agent.Control.AllowControl);
+        _update.Click += (_, _) => RestartToUpdate();
 
         var menu = new NativeMenu();
         menu.Add(_status);
         menu.Add(new NativeMenuItemSeparator());
+        menu.Add(_update);
+        menu.Add(_updateLine);
         menu.Add(_share);
         menu.Add(_pause);
         menu.Add(_allow);
@@ -219,7 +247,41 @@ internal sealed class MenuBarApp : IDisposable
         _pause.Header = _agent.Control.PausedUntil is { } until
             ? $"Resume control (paused until {until.ToLocalTime():HH:mm})"
             : "Pause control for 1 hour";
+        var updateItem = UpdateText.MenuItem(_agent.Updates.State);
+        _update.IsVisible = _updateLine.IsVisible = updateItem is not null;
+        _update.Header = updateItem ?? "";
         _settingsWindow?.ShowStatus(summary);
+        _settingsWindow?.ShowUpdate(_agent.Updates.State, _agent.Settings.AutoUpdate);
+    }
+
+    /// <summary>The install after the app closed: the restart that was asked for, else a ready update (installed at quit).</summary>
+    private Install? TakeInstall()
+    {
+        if (_restart is { } restart)
+        {
+            _restart = null;
+            return restart;
+        }
+
+        return _agent.Updates.TakeReady() is { } ready ? new Install(_agent.Installer, ready, Restart: false) : null;
+    }
+
+    private void RestartToUpdate()
+    {
+        if (_agent.Updates.Note is { } note && _agent.Updates.Ready is not null)
+        {
+            Notice.Show(note); // ad hoc builds: the permissions have to be allowed again
+        }
+
+        _agent.Updates.RestartToUpdate();
+    }
+
+    /// <summary>"Restart to update" found nothing running: quit; Program swaps and restarts.</summary>
+    private void QuitToInstall(StagedUpdate update)
+    {
+        _restart = new Install(_agent.Installer, update, Restart: true);
+        _settingsWindow?.Close();
+        _quitApp();
     }
 
     private async Task ShareAsync()
@@ -236,7 +298,14 @@ internal sealed class MenuBarApp : IDisposable
             return;
         }
 
-        var window = new SettingsWindow(_agent.Settings, _agent.HasToken, _version, SaveSettings);
+        var window = new SettingsWindow(
+            _agent.Settings,
+            _agent.HasToken,
+            _version,
+            SaveSettings,
+            () => _ = _agent.Updates.CheckNowAsync(_quit.Token),
+            RestartToUpdate,
+            _agent.Updates.Note);
         _settingsWindow = window;
         window.Closed += (_, _) => _settingsWindow = null;
         Refresh();

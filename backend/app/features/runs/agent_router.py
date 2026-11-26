@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import Db, client_ip
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
+from app.features.activity import service as activity
 from app.features.audit import service as audit
 from app.features.runs import service
 from app.features.runs.models import Approval, FileChange, Run, ToolCall
@@ -278,6 +279,7 @@ async def revert_change(
         ip=client_ip(request),
         details={"message": message, "force": force},
     )
+    await activity.file_reverted(db, change, message)
     await db.commit()
     return RevertOut(
         message=message, change=FileChangeOut.model_validate(change, from_attributes=True)

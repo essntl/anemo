@@ -29,7 +29,7 @@ from sqlalchemy import update as sql_update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.actor import acting_as
+from app.core.actor import Actor, acting_as, current_actor
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
@@ -49,6 +49,7 @@ from app.features.automations.schemas import (
     ChangeCheck,
     PendingApproval,
     RunChange,
+    RunEvent,
 )
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.documents import service as documents
@@ -62,6 +63,7 @@ from app.features.runs.models import ACTIVE_STATUSES, Approval, Run, ToolCall
 from app.features.settings import service as settings_service
 from app.features.settings.sections import AutomationSettings
 from app.features.tasks.models import Project
+from app.features.triggers import events as trigger_events
 from app.jobs import queue
 from app.jobs.models import Job
 from app.workspace import files
@@ -298,6 +300,20 @@ def run_log_entry(run: Run, tool_calls: int = 0) -> AutomationRunOut:
         conversation_id=run.conversation_id,
         error=(run.error or {}).get("message"),
         timing=runs.run_timing(run, tool_calls),
+        event=_event_of(run),
+    )
+
+
+def _event_of(run: Run) -> RunEvent | None:
+    """The event that started the run, for its line in the run log."""
+    event = run.options.get("event")
+    if not isinstance(event, dict) or not event.get("type"):
+        return None
+    return RunEvent(
+        type=str(event["type"]),
+        summary=str(event.get("summary") or event["type"]),
+        at=datetime.fromisoformat(event["at"]) if event.get("at") else run.created_at,
+        coalesced=int(event.get("coalesced") or 1),
     )
 
 
@@ -512,12 +528,15 @@ async def start_run(
     now: datetime | None = None,
     change: dict[str, Any] | None = None,
     script_input: Any = None,
+    event: dict[str, Any] | None = None,
 ) -> Run:
     """A new conversation holding the prompt, and a queued agent run to answer it.
     `change`: what the change check found (its old and new results), for the run's
-    context. A script gets a script run of its approved version instead (only that one
-    ever runs), with `script_input` (what an agent passed to run_script). Adds to the
-    caller's transaction."""
+    context. `event`: the event that started it (trigger "event", features/triggers:
+    {id, type, subject, at, coalesced, depth, trigger_id, summary}). A script gets a
+    script run of its approved version instead (only that one ever runs), with
+    `script_input` (what an agent passed to run_script). Adds to the caller's
+    transaction."""
     if automation.kind == "script" and automation.script_hash is None:
         raise Conflict("Approve the script's code first", code="script_not_approved")
     if reason := await gate.blocked_reason(db, "automation", automation.id):
@@ -571,6 +590,7 @@ async def start_run(
                 "retry": retry,
                 **({"change": change} if change is not None else {}),
             },
+            **({"event": event} if event is not None else {}),
             # The version it runs (a run that waits for an approval goes on with it).
             **(
                 {"script": {"hash": automation.script_hash, "input": script_input}}
@@ -668,8 +688,12 @@ async def retry_run(
         if await busy_run(db, automation.id) is not None:
             return
         failed = await db.get(Run, failed_run_id) if failed_run_id else None
-        change = ((failed.options if failed else {}).get("automation") or {}).get("change")
-        await start_run(db, automation, trigger="retry", retry=retry, change=change)
+        options = failed.options if failed else {}
+        change = (options.get("automation") or {}).get("change")
+        # A run an event started is retried with that event.
+        await start_run(
+            db, automation, trigger="retry", retry=retry, change=change, event=options.get("event")
+        )
         await db.commit()
     await notify_changed()
 
@@ -919,7 +943,7 @@ async def on_run_finished(db: AsyncSession, run: Run, status: str, error: str | 
             )
             await db.commit()
         else:
-            await count_failure(db, automation, error or "The run failed.", link)
+            await count_failure(db, automation, error or "The run failed.", link, run_id=run_id)
     await notify_changed()
 
 
@@ -929,6 +953,7 @@ async def count_failure(
     error: str,
     link: str | None,
     detail: str | None = None,
+    run_id: uuid.UUID | None = None,
 ) -> None:
     """A run (or change check) failed for good: count it, and tell the user. With
     agent_decides once, when it has failed FAILURES_BEFORE_ALERT times in a row; else, as
@@ -945,6 +970,20 @@ async def count_failure(
     automation.last_error_at = _now()
     name, notify, streak = automation.name, automation.notify, automation.failure_streak
     destinations = _destinations(automation)
+    # Caused by the automation's own run: its own triggers never fire on it (loop rule).
+    actor = Actor.automation(automation.id, run_id) if run_id else current_actor()
+    with acting_as(actor):
+        await trigger_events.emit(
+            db,
+            "automation.run_failed",
+            {
+                "automation_id": str(automation.id),
+                "run_id": str(run_id) if run_id else None,
+                "name": name,
+                "failure_streak": streak,
+            },
+            subject=str(automation.id),
+        )
     await db.commit()
     if notify == "agent_decides":
         if streak != FAILURES_BEFORE_ALERT:

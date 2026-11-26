@@ -33,6 +33,13 @@
         <TextBlock Text="Folder the shell starts in" />
         <TextBox x:Name="WorkFolder" />
 
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Files" />
+        <CheckBox x:Name="FilesSwitch" Content="Let Anemo read and write files (trusted devices only)" />
+        <TextBlock Text="Folders for files (full paths, separated by ;)" />
+        <TextBox x:Name="FileFolders" />
+        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
+                   Text="Anemo's agents copy files between these folders and the workspace. Empty: your home folder. Never hidden folders or ~/Library." />
+
         <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Keys" />
         <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
                    Text="Written as Ctrl+Alt+Shift+S: Ctrl is Control (⌃), Alt is Option (⌥), Win is Command (⌘)." />
@@ -43,6 +50,17 @@
 
         <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Start" />
         <CheckBox x:Name="OpenAtLogin" Content="Open at login" />
+
+        <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Updates" />
+        <CheckBox x:Name="AutoUpdate" Content="Update automatically" />
+        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
+                   Text="New versions come from Anemo's releases on GitHub and are checked before they are kept. One is installed when you quit, never while the agent is working." />
+        <TextBlock x:Name="UpdateStatus" TextWrapping="Wrap" FontSize="12" />
+        <TextBlock x:Name="UpdateNote" TextWrapping="Wrap" FontSize="12" Foreground="#b7791f" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="CheckNow" Content="Check now" />
+          <Button x:Name="RestartToUpdate" Content="Restart to update" Classes="accent" IsVisible="False" />
+        </StackPanel>
 
         <TextBlock FontWeight="SemiBold" Margin="0,12,0,0" Text="Claude Code jobs" />
         <CheckBox x:Name="ShareJobs" Content="Share Claude Code jobs with Anemo (trusted devices only)" />

@@ -187,6 +187,13 @@ jobs:
         run: |
           plutil -lint "publish/osx-arm64/Anemo Desktop.app/Contents/Info.plist"
           file "publish/osx-arm64/Anemo Desktop.app/Contents/MacOS/Anemo Desktop" | tee /dev/stderr | grep -q arm64
+      # What the updater runs before it swaps a new version in (docs/specs/23-desktop-auto-update.md).
+      - name: The app answers --self-test with its version
+        run: |
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)
+          said=$("publish/osx-arm64/Anemo Desktop.app/Contents/MacOS/Anemo Desktop" --self-test)
+          echo "$said"
+          [ "$said" = "Anemo Desktop $version" ]
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-macos

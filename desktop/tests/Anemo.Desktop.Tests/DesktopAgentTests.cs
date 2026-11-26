@@ -74,6 +74,24 @@ public sealed class DesktopAgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Files_are_offered_on_a_trusted_device_with_the_switch_on()
+    {
+        _server.Trust = "trusted";
+        var agent = Configured();
+        _running = agent.RunAsync(_stop.Token);
+        var client = await _server.NextClientAsync();
+        Assert.False((bool)(await client.NextAsync("device.offer"))["files"]!);
+
+        agent.Save(agent.Settings with { ShareFiles = true }, newToken: null);
+        Assert.True((bool)(await client.NextAsync("device.offer"))["files"]!);
+
+        _server.Trust = "watched";
+        agent.Connection.Reconnect();
+        client = await _server.NextClientAsync();
+        Assert.False((bool)(await client.NextAsync("device.offer"))["files"]!);
+    }
+
+    [Fact]
     public async Task Shell_runs_only_on_a_trusted_device_with_PowerShell_on()
     {
         _server.Trust = "watched";
@@ -202,6 +220,35 @@ public sealed class DesktopAgentTests : IAsyncLifetime
         Assert.Contains("Settings", result.Message);
     }
 
+    [Fact]
+    public async Task A_restart_for_an_update_waits_for_a_command_and_the_minute_after_it()
+    {
+        var time = new ManualTime { Now = DateTimeOffset.UtcNow };
+        var settings = _store.WithToken(new DesktopSettings { Address = _server.BaseUri.ToString() }, FakeAnemoServer.Token);
+        _store.Save(settings);
+        var agent = new DesktopAgent(Parts(time));
+        Assert.Null(agent.BusyReason());
+
+        _running = agent.RunAsync(_stop.Token);
+        var client = await _server.NextClientAsync();
+        await client.CommandAsync("l1", "look", new JsonObject { ["what"] = "window" });
+        await client.NextAsync("device.result");
+
+        Assert.Equal("the agent used this computer a moment ago", agent.BusyReason());
+        time.Now += DesktopAgent.QuietBeforeRestart;
+        Assert.Null(agent.BusyReason());
+    }
+
+    [Fact]
+    public void A_client_without_an_update_host_does_not_update()
+    {
+        var agent = Create();
+
+        Assert.Equal(Core.Updates.UpdatePhase.Unavailable, agent.Updates.State.Phase);
+        Assert.Null(agent.Updates.Ready);
+        Assert.True(agent.Settings.AutoUpdate); // on by default
+    }
+
     private DesktopAgent Create() => new(Parts());
 
     private DesktopAgent Configured(string token = FakeAnemoServer.Token, bool powerShell = false)
@@ -211,12 +258,12 @@ public sealed class DesktopAgentTests : IAsyncLifetime
         return Create();
     }
 
-    private DesktopAgentParts Parts() => new(
+    private DesktopAgentParts Parts(TimeProvider? time = null) => new(
         _store,
         _platform.Services,
         new CommandLog(Path.Combine(_folder, "log"), TimeProvider.System),
         new ListLog(),
-        TimeProvider.System,
+        time ?? TimeProvider.System,
         _http,
         "1.0.0",
         @"C:\Users\me\AnemoWork",

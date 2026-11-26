@@ -12,12 +12,19 @@ import json
 import mimetypes
 import os
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from app.core.errors import AppError, Conflict, NotFound
 from app.workspace import fs_guard, safe_fs
+
+# Called with (workspace-relative path, size, mime type) after a new file was written:
+# the event triggers' `file.created` (features/triggers/files_hook.py registers it). It
+# may run in a worker thread, and must not raise.
+CreatedHook = Callable[[str, int, str], None]
+created_hooks: list[CreatedHook] = []
 
 TRASH_DIR = ".trash"
 MAX_TEXT_BYTES = 2 * 1024 * 1024
@@ -150,6 +157,11 @@ def write_bytes(
             details={"current_hash": previous},
         )
     _atomic_write(path, data)
+    if previous is None:
+        relative_path = rel(path)
+        mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        for hook in created_hooks:
+            hook(relative_path, len(data), mime)
     return path, previous, hashlib.sha256(data).hexdigest()
 
 

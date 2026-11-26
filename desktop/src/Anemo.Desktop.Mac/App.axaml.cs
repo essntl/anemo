@@ -16,7 +16,7 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            _menuBar = new MenuBarApp(this, () => desktop.Shutdown());
+            _menuBar = new MenuBarApp(this, () => desktop.Shutdown(), Program.Updated);
             desktop.Exit += (_, _) => _menuBar.Dispose();
         }
 

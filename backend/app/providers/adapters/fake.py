@@ -8,7 +8,8 @@ Enabled only when ENABLE_FAKE_PROVIDER=true (or ENV=test). Behaviour by model:
   slow       like echo but slower (for testing cancel / reconnect)
   agent      a tiny tool-using agent: plans, lists the workspace, then summarizes
              (asked to "ask me" something: asks the user a question, then repeats
-             the answer)
+             the answer; asked to "rename task <id> to <title>": renames that task
+             with update_task, for the activity log's e2e test)
   no-tools   refuses any request that carries tools (like a server without tool
              calling), otherwise echoes
   scripted   replays FakeAdapter.scripts[<first user text>] (tests only). A script is a
@@ -43,6 +44,7 @@ from app.providers.base import (
 )
 
 TURN_CONTEXT_OPEN = "<turn_context>"  # see runtime/turn_context.py
+_RENAME_TASK = re.compile(r"rename task ([0-9a-f-]{36}) to (.+)", re.IGNORECASE)
 _STOPWORDS = {"the", "a", "an", "is", "are", "to", "of", "and", "i", "my", "in", "do", "what"}
 
 
@@ -181,8 +183,24 @@ class FakeAdapter:
             if b.type == "tool_result"
         ]
         asks = "ask me" in _last_user_text(req).lower()
+        rename = _RENAME_TASK.search(_last_user_text(req))
+        # "postpone my tasks: <words>": the tasks matching the words move to a Friday in
+        # one update_tasks call (the e2e test of a batch approval).
+        postpone = re.match(r"postpone my tasks: (.+)", _last_user_text(req).strip(), re.I)
         if not req.tools:
             yield TextDelta("(The agent model needs Agent mode to use tools.)")
+        elif postpone and not answers:
+            yield ToolCall("bulk1", "list_tasks", {"query": postpone.group(1)})
+            yield Done("tool_use")
+            return
+        elif postpone and len(answers) == 1:
+            ids = re.findall(r"^\[([0-9a-f-]{36})\]", answers[0], re.M)
+            items = [{"id": task_id, "due_date": "2030-01-04"} for task_id in ids]
+            yield ToolCall("bulk2", "update_tasks", {"items": items})
+            yield Done("tool_use")
+            return
+        elif postpone:
+            yield TextDelta(f"Postponed. {answers[-1].splitlines()[0]}")
         elif asks and not answers and any(t.name == "ask_user" for t in req.tools):
             # "... ask me ...": the agent asks which way the user wants it first.
             yield ToolCall(
@@ -194,6 +212,12 @@ class FakeAdapter:
             return
         elif asks:
             yield TextDelta(f"Thanks. {answers[-1]}")
+        elif rename and not answers:
+            yield ToolCall("rename1", "update_task", {"id": rename[1], "title": rename[2].strip()})
+            yield Done("tool_use")
+            return
+        elif rename:
+            yield TextDelta(f"Renamed it. {answers[-1]}")
         elif turn == 0:
             yield TextDelta("Let me look at your workspace.")
             yield ToolCall(

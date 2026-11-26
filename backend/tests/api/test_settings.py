@@ -63,7 +63,7 @@ async def test_focus_home_and_files_sections(authed):
     assert body["focus"]["quiet_while_focusing"] is False
     assert body["music"]["play_while_focusing"] is False
     assert body["home"] == {"layout": [], "mobile_layout": []}
-    assert body["files"] == {"show_documents_folder": False}
+    assert body["files"] == {"show_documents_folder": False, "device_file_max_mb": 50}
 
     layout = [
         {"id": "focus", "w": 2, "h": 1, "hidden": False, "pinned": False, "options": {}},
@@ -118,6 +118,7 @@ async def test_navigation_says_where_each_page_goes(authed):
             "automations",
             "agents",
             "memory",
+            "activity",
         ],
         "off": [],
     }

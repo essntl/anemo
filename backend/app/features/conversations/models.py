@@ -66,6 +66,10 @@ class Conversation(Base, IdMixin, TimestampMixin):
     last_message_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Chat recall (features/conversations/recall.py): the last_message_at and the
+    # embedding model of the last time this chat's messages were indexed by meaning.
+    recall_indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recall_index_model: Mapped[str | None] = mapped_column(String(64))
 
 
 class ChatMessage(Base, IdMixin):

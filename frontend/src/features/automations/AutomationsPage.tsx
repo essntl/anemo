@@ -35,6 +35,7 @@ import { AutomationDialog } from './components/AutomationDialog'
 import { RunHistory } from './components/RunHistory'
 import { ScriptDialog } from './components/ScriptDialog'
 import { ScriptsTab } from './components/ScriptsTab'
+import { AutomationTriggers, WaitingChats } from './components/Triggers'
 import { type AutomationTemplate, TEMPLATES } from './templates'
 import { Lingering } from '@/components/ui/Lingering'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -115,6 +116,7 @@ function AutomationCard({ automation, onEdit, highlight }: { automation: Automat
         )}
       </div>
       {error && <p className="mt-2 text-[12.5px] text-error sm:pl-12">{errorMessage(error)}</p>}
+      <AutomationTriggers automationId={automation.id} />
       {showHistory && <div className="mt-2 border-t border-border pt-2 md:pl-10"><RunHistory automation={automation} highlight={highlight ?? null} /></div>}
     </div>
   )
@@ -270,6 +272,7 @@ export function AutomationsPage() {
                 highlight={a.id === linked ? params.get('run') : undefined} />
             ))}
           </div>
+          <WaitingChats />
         </div>
       )}
 

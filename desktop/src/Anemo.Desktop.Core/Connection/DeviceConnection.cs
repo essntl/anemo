@@ -60,6 +60,7 @@ public sealed class DeviceConnection
     private readonly ICodeJobsHost? _codeJobs;
     private readonly string _platform; // hello.platform
     private readonly Func<string> _shellKind; // offer.shell_kind
+    private readonly Func<DeviceInfo, bool> _filesOffered; // offer.files (§8)
     private readonly object _lock = new();
     private TaskCompletionSource _kick = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _kicked;
@@ -81,9 +82,11 @@ public sealed class DeviceConnection
         DeviceConnectionOptions? options = null,
         ICodeJobsHost? codeJobs = null,
         string platform = "windows",
-        Func<string>? shellKind = null)
+        Func<string>? shellKind = null,
+        Func<DeviceInfo, bool>? filesOffered = null)
     {
         _platform = platform;
+        _filesOffered = filesOffered ?? (_ => false);
         _shellKind = shellKind ?? (() => "powershell");
         _settings = settings;
         _control = control;
@@ -374,7 +377,8 @@ public sealed class DeviceConnection
             {
                 var code = Device is { } device && _owner._codeJobs?.Offered(device) == true;
                 var codeStart = Device is { } d && _owner._codeJobs?.OfferedStart(d) == true;
-                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart, _owner._shellKind()));
+                var files = Device is { } f && _owner._filesOffered(f);
+                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart, _owner._shellKind(), files));
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
             {

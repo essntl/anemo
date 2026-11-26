@@ -107,6 +107,44 @@ password again.
   (Ctrl+Alt+Shift+S) on the computer cancels the running command and takes control away
   for an hour; the server sends no action until the client offers control again
   (looking still works, see above).
+- **Files on a computer** (`device_file_get`, `device_file_put`, Anemo Desktop 1.7.0).
+  Only on a *trusted* computer whose client has *Let Anemo read and write files* on (off by
+  default); a watched one is refused, by the server before asking and live before the first
+  command, and by the client. **What the agent can read and write there**: any file the
+  logged-in user can, but only inside the folders the client allows, checked by the client
+  with every link and junction followed first: the home folder, or the folders listed in
+  the client's Settings; never a hidden file or folder below them (`.ssh`, `.aws`, `.gnupg`,
+  `.config`, `.git`, the shell's start files), never the home folder's `AppData` (Windows:
+  browser profiles, credentials, the Startup folder) or `Library` (macOS: keychains, mail,
+  `LaunchAgents`), never the client's own folder (its token), and on Windows no network or
+  device paths. That closes reading keys and planting a program that starts at the next
+  sign-in, but not everything: a document, a download or a script on the desktop the user
+  later opens is reachable, so the permission (*Files on your computers*) asks by default,
+  and replacing an existing file on the computer is a *dangerous* action that is never done
+  unless the agent asked for `overwrite`. Each chunk and the whole file are checked by
+  SHA-256 on both ends; a copy onto the computer is written to a hidden temporary file and
+  only renamed once complete. In the workspace a copied-in file is a revertible run file
+  change, respects the folder access of Settings → Workspace (a folder hidden from agents
+  can't be sent away either), and its content is untrusted for the model. Stop pauses
+  copies too. The client's log keeps paths and sizes, never contents.
+- **Updates of Anemo Desktop** (1.8.0). The client asks GitHub's API for this repository's
+  Releases every 6 hours, unauthenticated: GitHub sees the computer's address and
+  `Anemo-Desktop/<version>`, nothing else (no token, device or Anemo address); Anemo's server
+  isn't involved. **What it trusts:** a stable `desktop-v…` Release of the repository compiled
+  into it, fetched over HTTPS from addresses it builds itself, whose file matches the SHA-256 in
+  the Release's checksum file. That checksum comes from the same Release, so on its own it guards
+  against a damaged download, not against someone who can change the Release. With the release
+  key set up (`desktop/README.md`, *Signing updates*), the checksum file must also carry a valid
+  ECDSA signature by the key compiled into the client, bound to the tag; that stops someone who
+  can edit Releases but not run the release workflow with its secret. Neither stops someone who
+  controls the repository (they can have the workflow build and sign their code): review of what
+  reaches `main` is the boundary. On a Mac with a Developer ID build, the new app must also be
+  signed by the same Apple team; an ad hoc build's signature only proves the bundle is intact. On
+  Windows the exe has no Authenticode signature. Before swapping, the new version is started once
+  with `--self-test`; it is never restarted into while the agent is working; the previous
+  version is kept beside it and put back if the new one doesn't start. Downloads carry no Mark of
+  the Web / quarantine, so SmartScreen and Gatekeeper don't ask again: the checks above are what
+  decides. Design: [specs/23-desktop-auto-update.md](specs/23-desktop-auto-update.md).
 - **Screens are untrusted.** Screenshots, window text and a shared screen can contain
   text written to steer the agent (an email, a web page, a document). They reach the
   model labelled as untrusted, like web pages, and what contains the damage is the
@@ -330,12 +368,16 @@ The kinds of action and their defaults:
 | Edit documents | Always ask |
 | Manage tasks, manage calendar, send notifications | Ask for dangerous actions |
 | Update memory | Fully autonomous |
+| Earlier chats (search and read them; automations only when their tool list names them) | Fully autonomous |
 | MCP tools | Always ask (each tool can be set on its own) |
 | Start sub-agents | Never |
 | Generate images | Fully autonomous (automations ask first, see below) |
 | See your computers | Ask for dangerous actions (looking is safe, so it goes ahead) |
 | Use your computers | Always ask (a watched computer asks every time whatever the level) |
 | Commands on your computers | Always ask (never offered on a watched computer) |
+| Schedules | Always ask (a new schedule, or a changed prompt, time or trigger list, asks every time) |
+| Event triggers | Always ask (adding one to an automation, or changing what or when one fires, asks every time; switching one off follows the level) |
+| Wake this chat on events | Ask for dangerous actions (a one-shot wait of at most 24 hours on an internal event is safe; repeating or longer is not) |
 
 Whether an action is "dangerous" is decided by code, not by the model: for
 example `rm -r`, `git push --force`, piping a download into a shell, or any
@@ -360,8 +402,9 @@ When a run waits for you, you can approve once, approve for the rest of that run
 (for that kind of action in that place), or deny, with a reason the agent sees.
 An approval for the run never overrides "Never" or the ceiling, and some actions are
 asked about every time regardless: clicks, hovering, typing and key presses in your own
-Chrome, and creating a schedule or changing what one does or when (the request shows the
-prompt and the times). Unanswered
+Chrome, creating a schedule or changing what one does or when (the request shows the
+prompt and the times), and adding an event trigger to an automation or changing what or
+when it fires. Unanswered
 requests expire after 24 hours and count as denied. Unattended automations follow
 their own setting for this: wait and notify you, skip the action, or stop.
 
@@ -385,7 +428,8 @@ sub-agent depth. When one is reached the run stops and says which.
 | Scripts | A script's code runs in Deno as a child process of the worker with no permissions except its own folder (`/data/scripts/<id>`): no network, no environment variables, no subprocesses, no other files, no remote or npm imports; 256 MB of memory, the automation's time and tool-call limits, 1 MB per message, 64 KB of log and of result. It reaches Anemo only through JSON messages the worker answers: each call is checked against the version's tool list (and web addresses against its hosts) and then goes through the permission engine and approvals exactly like an agent's, as the automation's run. Code an agent writes or changes is saved switched off and never runs until you approve that exact version (by its hash, with your password); `update_schedule` cannot switch a script on. `think` gives its data to a model inside an untrusted block, with no tools unless the script lists some. Secrets are filled in by the worker only in request headers to a declared host and replaced by their placeholder in what comes back. Deno has no kernel-level isolation: approved code runs inside the worker container. |
 | Schedules | An agent can set up a prompt that runs by itself (an automation) only with your confirmation, every time, whatever the "Schedules" level says. Scheduled runs wait for you when an action needs approval, cannot create or change schedules themselves, are stopped after the time limit for scheduled runs (30 minutes unless changed), run at most every 5 minutes, and all stop starting while "Pause all" is on (Automations page). |
 | Deleting | Files, tasks and calendar events an agent deletes go to a trash only you can restore from or empty. Forgetting a memory and deleting a schedule are permanent; both say so. |
-| MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
+| MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. A trigger on a server's notifications (*MCP triggers*) must name that server, so a server can only fire the triggers that name it; what it sends is untrusted data like its tool results (caused by "external", cut to 12 KB of params, given to a model only inside an untrusted-data block, never in a system prompt or a tool description), and a server sending more than 120 notifications a minute is not listened to for 15 minutes. A wake-me on one asks (moderate). A loop through a server (a run calls its tool, the server notifies, the trigger fires again) can't be told apart from outside changes: the hourly limits and the server ceiling cap it. |
+| Undo (Activity) | Undoing a change from the activity log is for you only: an endpoint behind login, no agent tool, so an agent can't undo your changes or another run's. It goes through the same services and checks as any edit and refuses to overwrite a later change unless you confirm. It can't bring back what is gone for good: a task or event purged from the trash, a file the workspace trash no longer has, an agent's file change whose run was deleted, a document text whose revision was pruned, a value too long to keep. The log keeps ids, changed field values (capped) and paths, never file or message contents, for 90 days. |
 | Claude Code | Runs in its own container without workspace, database or app secrets, and with no tools of its own: every tool call it makes is a normal Anemo tool call, checked here. |
 | Your computers (Anemo Desktop) | No isolation from the computer itself: the client acts as the logged-in Windows user, so the trust level and the permissions are the boundary (see [Devices](#devices-anemo-desktop-anemo-voice)). A watched computer asks before every action and never gets the PowerShell tool. Not for automations unless the automation lists the tool. |
 
@@ -400,6 +444,30 @@ can reach the runner (internal network plus a token). The Claude Code login stay
 `claude-config` volume, mounted in that container only: Anemo never reads, stores, logs
 or forwards it, and the CLI's environment is built from an allowlist (no Anthropic API
 key, token or base URL, none of Anemo's secrets).
+
+## Webhooks
+
+An automation can have a webhook trigger: another service calls
+`POST /api/hooks/<trigger id>` and the automation runs with the request's body as data.
+That path needs no login, so the request is checked instead:
+
+- `X-Anemo-Timestamp` (the time in Unix seconds) must be within 5 minutes of the
+  server's clock, and `X-Anemo-Signature` must be `sha256=` and the HMAC-SHA256 of
+  `<timestamp>.<raw body>` with the trigger's secret. The secret is shown once when the
+  trigger is made (or rotated, which needs your password), stored encrypted, and never
+  given to a model: a webhook an assistant sets up gets its secret from you, on the
+  Automations page.
+- A request seen before (the same signature in the last 10 minutes) is refused, so a
+  captured request can't be replayed.
+- The body may be at most 64 KB; a trigger accepts at most 30 requests a minute.
+- An unknown or switched-off trigger, a bad or missing signature, an old timestamp and a
+  replay all get the same `404`, so the endpoint doesn't tell anyone which triggers exist.
+- The body is untrusted data for the run, never instructions: it is marked as such in
+  the run's context and never put in a system prompt. Tools that reach other people
+  still ask in that run.
+
+Expose only `/api/hooks/*` to the internet for this, never the whole app (see
+`docs/deployment.md`, *Webhooks from other services*).
 
 ## Secrets
 

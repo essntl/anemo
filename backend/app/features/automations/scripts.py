@@ -63,6 +63,10 @@ NOT_FOR_SCRIPTS = frozenset(
         "create_schedule",
         "update_schedule",
         "delete_schedule",
+        # A script's run can't set what starts runs either (CONTRACTS-round4 §2.2).
+        "create_trigger",
+        "update_trigger",
+        "delete_trigger",
     }
 )
 SECRET_KIND = "script"  # noqa: S105 - the kind of the secrets rows, not a secret

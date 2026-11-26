@@ -3,6 +3,7 @@
  * automations and scripts. */
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { Zap } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Badge } from '@/components/ui/Badge'
 import { AnswerDuration, LiveTiming } from '@/features/chat/components/AnswerTiming'
@@ -42,6 +43,13 @@ function RunLogEntry({ run, highlighted }: { run: AutomationRun; highlighted: bo
         <RunStatusBadge status={run.status} />
         <RunDuration run={run} />
         {run.nothing_to_do && <Badge tone="neutral">{t('Nothing to do')}</Badge>}
+        {run.event && (
+          <span className="inline-flex min-w-0 items-center gap-1 text-[12px] text-muted" title={t('Started by an event')}>
+            <Zap className="h-3 w-3 shrink-0" aria-label={t('Started by an event')} />
+            <span className="truncate">{run.event.summary}</span>
+            {(run.event.coalesced ?? 1) > 1 && <span>{plural(run.event.coalesced ?? 1, '({n} event)', '({n} events)')}</span>}
+          </span>
+        )}
         <span className={cn('min-w-0 flex-1 truncate text-[12.5px]', run.error ? 'text-error' : 'text-subtle')} title={summary ?? undefined}>
           {summary}
         </span>

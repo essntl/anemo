@@ -20,6 +20,7 @@ import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/feat
 import { PropertyChips } from '@/features/properties/PropertyChips'
 import { type Synced } from '@/features/provenance/labels'
 import { ActorLine, SourceBadge, SourceDetails } from '@/features/provenance/Provenance'
+import { HistoryLink } from '@/features/activity/HistoryLink'
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -262,6 +263,7 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
               onDetach={() => detach.mutate(task.id, { onSuccess: (detached) => setSynced(detached) })} />
           )}
           {task && <ActorLine created={task.created_by_actor} updated={task.updated_by_actor} />}
+          {task && <HistoryLink type="task" id={task.id} className="self-start" />}
           {task && status !== 'done' && status !== 'cancelled' && (
             <Button variant="secondary" icon={<Timer className="h-4 w-4" />} onClick={() => focusOnTask(task)}>
               {t('Focus on this')}

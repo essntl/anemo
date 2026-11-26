@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Anemo.Desktop.Core.Commands;
 using Anemo.Desktop.Core.Control;
+using Anemo.Desktop.Core.Files;
 using Anemo.Desktop.Core.Platform;
 using Anemo.Desktop.Core.Protocol;
 using Anemo.Desktop.Core.Storage;
@@ -20,12 +21,16 @@ public sealed class ProcessorFixture : IDisposable
     {
         Control = new ControlState(Time, allow: true, pausedUntil: null);
         Log = new CommandLog(_folder, Time);
+        Home = Path.Combine(_folder, "home");
+        DataFolder = Path.Combine(Home, "AppData", "Roaming", "Anemo Desktop");
+        Files = new DeviceFiles(() => Settings, Time, platform ?? DesktopPlatform.Windows, Home, DataFolder);
         Processor = new CommandProcessor(
             Platform.Services,
             Control,
             () => Settings,
             Log,
-            new CommandOptions { SettleDelay = TimeSpan.Zero, OpenDelay = TimeSpan.Zero, DefaultWorkFolder = @"C:\Users\me\AnemoWork", Platform = platform ?? DesktopPlatform.Windows });
+            new CommandOptions { SettleDelay = TimeSpan.Zero, OpenDelay = TimeSpan.Zero, DefaultWorkFolder = @"C:\Users\me\AnemoWork", Platform = platform ?? DesktopPlatform.Windows },
+            files: Files);
         Save = new FakeElement { Desktop = Platform.Desktop };
         Name = new FakeElement { CanInvoke = false, Desktop = Platform.Desktop, Point = new ScreenPoint(640, 220) };
         Pass = new FakeElement { Password = true, Desktop = Platform.Desktop };
@@ -43,6 +48,14 @@ public sealed class ProcessorFixture : IDisposable
     }
 
     public FakePlatform Platform { get; } = new();
+
+    /// <summary>The user's home folder for the file actions: a temporary folder of this fixture.</summary>
+    public string Home { get; }
+
+    /// <summary>Anemo Desktop's own data folder, which the file actions never touch.</summary>
+    public string DataFolder { get; }
+
+    public DeviceFiles Files { get; }
 
     public ManualTime Time { get; } = new();
 
@@ -93,6 +106,7 @@ public sealed class ProcessorFixture : IDisposable
 
     public void Dispose()
     {
+        Files.Dispose();
         if (Directory.Exists(_folder))
         {
             Directory.Delete(_folder, recursive: true);

@@ -239,6 +239,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hooks/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Hook */
+        post: operations["receive_hook_api_hooks__trigger_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -641,6 +658,69 @@ export interface paths {
         get: operations["list_audit_api_audit_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Activity
+         * @description What was changed, newest first. `actor_kind`: who (`trigger`: runs an event
+         *     started); `since` / `until`: a time range (until is exclusive).
+         */
+        get: operations["list_activity_api_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity/{entry_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Entry
+         * @description Undo one change. 409 `activity_conflict` (with `details.differs`) when the item
+         *     was changed since; `force=true` undoes it anyway.
+         */
+        post: operations["undo_entry_api_activity__entry_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity/groups/{group_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Group
+         * @description Undo a batch, newest change first, each on its own: the results say which were
+         *     undone and why the others weren't.
+         */
+        post: operations["undo_group_api_activity_groups__group_id__undo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1699,6 +1779,27 @@ export interface paths {
         get: operations["broken_links_api_links_broken_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/links/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link Targets
+         * @description What these references point to now (title, state), in the order given: the approval
+         *     of a batch change names its tasks or events this way.
+         */
+        post: operations["link_targets_api_links_targets_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4289,6 +4390,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/triggers/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalogue
+         * @description The event types a trigger can wait for, with the fields a filter may name.
+         */
+        get: operations["catalogue_api_triggers_catalogue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Triggers */
+        get: operations["list_triggers_api_triggers_get"];
+        put?: never;
+        /**
+         * Create Trigger
+         * @description A trigger for an automation. A webhook's secret is in the answer, this once.
+         */
+        post: operations["create_trigger_api_triggers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Trigger */
+        delete: operations["delete_trigger_api_triggers__trigger_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Trigger */
+        patch: operations["update_trigger_api_triggers__trigger_id__patch"];
+        trace?: never;
+    };
+    "/api/triggers/{trigger_id}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Secret
+         * @description A new signing secret for a webhook trigger, shown this once; the old one stops
+         *     working at once. Needs the password entered recently.
+         */
+        post: operations["rotate_secret_api_triggers__trigger_id__secret_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mcp/servers": {
         parameters: {
             query?: never;
@@ -5334,6 +5515,75 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityOut */
+        ActivityOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** @description Who did it (None: an actor that can't be read) */
+            actor: components["schemas"]["ActorOut"] | null;
+            /**
+             * Action
+             * @description created | changed | completed | deleted | restored | reverted | moved | undone
+             */
+            action: string;
+            /** Object Type */
+            object_type: string;
+            /**
+             * Object Id
+             * @description A UUID, or a workspace path for a file
+             */
+            object_id: string | null;
+            /**
+             * Object Label
+             * @description The object's name now (None when it is gone: the summary names it)
+             */
+            object_label: string | null;
+            /**
+             * Object Url
+             * @description Where the object is in the app
+             */
+            object_url: string | null;
+            /** Summary */
+            summary: string;
+            /**
+             * Fields
+             * @description What a change changed, e.g. title, properties.client
+             */
+            fields: string[];
+            /** Group Id */
+            group_id: string | null;
+            /** Group Label */
+            group_label: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Undone At */
+            undone_at: string | null;
+            /** Undone By */
+            undone_by: string | null;
+            /**
+             * Undo Blocked
+             * @description Why it can't be undone (undone | is_undo | not_undoable | too_large), None when it can be tried
+             */
+            undo_blocked: string | null;
+        };
+        /** ActivityPage */
+        ActivityPage: {
+            /** Items */
+            items: components["schemas"]["ActivityOut"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` for the next page
+             */
+            next_cursor: string | null;
+        };
         /**
          * ActorOut
          * @description Who made or changed something, ready to show: "the assistant in <chat title>".
@@ -5902,6 +6152,7 @@ export interface components {
             /** Error */
             error: string | null;
             timing: components["schemas"]["RunTiming"];
+            event?: components["schemas"]["RunEvent"] | null;
         };
         /**
          * AutomationSettings
@@ -5918,6 +6169,11 @@ export interface components {
              * @default 30
              */
             max_run_minutes: number;
+            /**
+             * Max Trigger Firings Per Hour
+             * @default 60
+             */
+            max_trigger_firings_per_hour: number;
         };
         /**
          * AutomationToolOut
@@ -7404,6 +7660,25 @@ export interface components {
             /** Mime */
             mime: string | null;
         };
+        /** EventFieldOut */
+        EventFieldOut: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Choices
+             * @default []
+             */
+            choices: string[];
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
         /**
          * EventIn
          * @description A timed event has start_at/end_at; an all-day event has start_date/end_date
@@ -7538,6 +7813,40 @@ export interface components {
              */
             dropped_properties?: string[];
         };
+        /**
+         * EventSummary
+         * @description The event a "wake me" trigger brought into the chat (features/triggers): the
+         *     message is the system's, not the user's, and is shown as an event card.
+         */
+        EventSummary: {
+            /** Event Type */
+            event_type: string;
+            /** Summary */
+            summary: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Coalesced
+             * @default 1
+             */
+            coalesced: number;
+            /** Trigger Id */
+            trigger_id?: string | null;
+        };
+        /** EventTypeOut */
+        EventTypeOut: {
+            /** Type */
+            type: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["EventFieldOut"][];
+        };
         /** ExplainIn */
         ExplainIn: {
             /** Text */
@@ -7601,6 +7910,11 @@ export interface components {
              * @default false
              */
             show_documents_folder: boolean;
+            /**
+             * Device File Max Mb
+             * @default 50
+             */
+            device_file_max_mb: number;
         };
         /**
          * FilterChip
@@ -8095,6 +8409,14 @@ export interface components {
             /** Commit */
             commit: string;
         };
+        /** GroupUndoOut */
+        GroupUndoOut: {
+            /**
+             * Results
+             * @description One per entry tried, newest first
+             */
+            results: components["schemas"]["UndoItemOut"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -8109,6 +8431,17 @@ export interface components {
             layout?: components["schemas"]["WidgetLayout"][];
             /** Mobile Layout */
             mobile_layout?: components["schemas"]["WidgetLayout"][];
+        };
+        /**
+         * HookAccepted
+         * @description Nothing about the trigger or its automation: only that the request was taken.
+         */
+        HookAccepted: {
+            /**
+             * Accepted
+             * @default true
+             */
+            accepted: boolean;
         };
         /** HubSection */
         HubSection: {
@@ -8764,6 +9097,7 @@ export interface components {
              */
             references: components["schemas"]["ReferenceSummary"][];
             page?: components["schemas"]["PageSummary"] | null;
+            event?: components["schemas"]["EventSummary"] | null;
             skill?: components["schemas"]["SkillSummary"] | null;
             /** Mode */
             mode?: string | null;
@@ -8990,7 +9324,7 @@ export interface components {
              *       "files"
              *     ]
              */
-            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
             /**
              * More
              * @default [
@@ -9001,12 +9335,13 @@ export interface components {
              *       "code",
              *       "automations",
              *       "agents",
-             *       "memory"
+             *       "memory",
+             *       "activity"
              *     ]
              */
-            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
             /** Off */
-            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
         };
         /** NewDeviceOut */
         NewDeviceOut: {
@@ -10810,6 +11145,26 @@ export interface components {
              */
             memories_used: components["schemas"]["MemoryUsed"][];
         };
+        /**
+         * RunEvent
+         * @description The event that started a run (an event trigger, features/triggers).
+         */
+        RunEvent: {
+            /** Type */
+            type: string;
+            /** Summary */
+            summary: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Coalesced
+             * @default 1
+             */
+            coalesced: number;
+        };
         /** RunListItem */
         RunListItem: {
             /**
@@ -11296,6 +11651,13 @@ export interface components {
             title: string;
             /** Url */
             url: string;
+        };
+        /** SecretOut */
+        SecretOut: {
+            /** Secret */
+            secret: string;
+            /** Webhook Url */
+            webhook_url: string;
         };
         /** SessionOut */
         SessionOut: {
@@ -12059,6 +12421,14 @@ export interface components {
             /** Titles */
             titles: string[];
         };
+        /** TargetsIn */
+        TargetsIn: {
+            /**
+             * Refs
+             * @description References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>
+             */
+            refs: string[];
+        };
         /** TaskFileOut */
         TaskFileOut: {
             /** Path */
@@ -12577,6 +12947,141 @@ export interface components {
              */
             deleted_at: string;
         };
+        /** TriggerCreated */
+        TriggerCreated: {
+            trigger: components["schemas"]["TriggerOut"];
+            /** Secret */
+            secret?: string | null;
+        };
+        /**
+         * TriggerIn
+         * @description A trigger for an automation (the Automations page). Wake-me triggers are only made
+         *     by an agent in its chat (the create_trigger tool).
+         */
+        TriggerIn: {
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            /** Event Type */
+            event_type: string;
+            /** Filter */
+            filter?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Once
+             * @default false
+             */
+            once: boolean;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Debounce S
+             * @default 0
+             */
+            debounce_s: number;
+            /**
+             * Max Per Hour
+             * @default 12
+             */
+            max_per_hour: number;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** TriggerOut */
+        TriggerOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Automation Id */
+            automation_id: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "automation" | "wake";
+            /** Event Type */
+            event_type: string;
+            /** Event Label */
+            event_label: string;
+            /** Filter */
+            filter: {
+                [key: string]: unknown;
+            };
+            /** Once */
+            once: boolean;
+            /** Expires At */
+            expires_at: string | null;
+            /** Debounce S */
+            debounce_s: number;
+            /** Max Per Hour */
+            max_per_hour: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Note */
+            note: string;
+            /** Created By */
+            created_by: string;
+            /** Fire Count */
+            fire_count: number;
+            /** Last Fired At */
+            last_fired_at: string | null;
+            /** Dropped Count */
+            dropped_count: number;
+            /** Last Drop Reason */
+            last_drop_reason: string | null;
+            /** Waiting */
+            waiting: boolean;
+            /** Webhook Url */
+            webhook_url?: string | null;
+            /**
+             * Has Secret
+             * @default false
+             */
+            has_secret: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** TriggerPatch */
+        TriggerPatch: {
+            /** Event Type */
+            event_type?: string | null;
+            /** Filter */
+            filter?: {
+                [key: string]: unknown;
+            } | null;
+            /** Once */
+            once?: boolean | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Debounce S */
+            debounce_s?: number | null;
+            /** Max Per Hour */
+            max_per_hour?: number | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Note */
+            note?: string | null;
+        };
         /** TurnIn */
         TurnIn: {
             /**
@@ -12628,6 +13133,31 @@ export interface components {
             document_id: string;
             /** Revision Id */
             revision_id?: string | null;
+        };
+        /** UndoItemOut */
+        UndoItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+            /**
+             * Code
+             * @description The error code when it wasn't undone
+             */
+            code: string | null;
+            /** Details */
+            details?: unknown;
+        };
+        /** UndoOut */
+        UndoOut: {
+            /** Message */
+            message: string;
+            entry: components["schemas"]["ActivityOut"];
         };
         /** UpdateMentionsIn */
         UpdateMentionsIn: {
@@ -13612,6 +14142,37 @@ export interface operations {
             };
         };
     };
+    receive_hook_api_hooks__trigger_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HookAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_settings_all_api_settings_get: {
         parameters: {
             query?: never;
@@ -14433,6 +14994,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_activity_api_activity_get: {
+        parameters: {
+            query?: {
+                actor_kind?: ("user" | "assistant" | "automation" | "script" | "plugin" | "trigger" | "external") | null;
+                actor_ref?: string | null;
+                object_type?: ("task" | "event" | "document" | "file" | "project") | null;
+                object_id?: string | null;
+                since?: string | null;
+                until?: string | null;
+                group_id?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_entry_api_activity__entry_id__undo_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_group_api_activity_groups__group_id__undo_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupUndoOut"];
                 };
             };
             /** @description Validation Error */
@@ -16713,6 +17385,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrokenLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_targets_api_links_targets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkItem"][];
                 };
             };
             /** @description Validation Error */
@@ -22899,6 +23606,208 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalogue_api_triggers_catalogue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventTypeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_triggers_api_triggers_get: {
+        parameters: {
+            query?: {
+                automation_id?: string | null;
+                conversation_id?: string | null;
+                kind?: ("automation" | "wake") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trigger_api_triggers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_trigger_api_triggers__trigger_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_trigger_api_triggers__trigger_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_secret_api_triggers__trigger_id__secret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretOut"];
                 };
             };
             /** @description Validation Error */

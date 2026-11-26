@@ -3,8 +3,8 @@
 Where Anemo stands, what is being built now, and what comes next. Each item links to
 its spec or to the section of [features.md](features.md) that says how it works.
 
-Last audited against the code and the git history on **2026-11-24**, and updated at
-the end of round 3 (pull requests up to #82).
+Last audited against the code and the git history on **2026-11-24**, updated at
+the end of round 3 (pull requests up to #82), and at the start of round 4 (2026-11-25).
 
 - [Done](#done): built and merged into `main`.
 - [In progress](#in-progress): open pull requests.
@@ -51,7 +51,7 @@ find in chat. `extension/`, [companion-contracts.md](companion-contracts.md),
 | Spec | Status |
 | --- | --- |
 | [01 Organisation, links and sources](specs/01-organisation-links-sources.md), phases 1–3 | **Done.** Who created and last changed a document, task or event (`app/core/actor.py`, `features/provenance/`); source fields and `external_key` for synced items; document properties, views and stable paths; links and backlinks between documents, tasks and events. Known small gaps: [FINAL-REPORT.md](specs/FINAL-REPORT.md) §5. |
-| [02 Automations that reason](specs/02-automations.md) | **Done.** Quiet runs (`agent_decides`), the state note, model, tool allowlist and limits per automation, contact tools always ask, no overlapping runs, approvals that don't block later runs, the change check, the failure streak. The real artemk automation is set up by hand (FINAL-REPORT.md §4). Webhooks (§2.8) were left for later on purpose. |
+| [02 Automations that reason](specs/02-automations.md) | **Done.** Quiet runs (`agent_decides`), the state note, model, tool allowlist and limits per automation, contact tools always ask, no overlapping runs, approvals that don't block later runs, the change check, the failure streak. The real artemk automation is set up by hand (FINAL-REPORT.md §4). Webhooks (§2.8) came in round 4 with event triggers ([16](specs/16-event-triggers.md)). |
 | [03 Response timer](specs/03-response-timer.md) | **Done.** Durations on messages, runs and tool calls. |
 | [04 Dictation](specs/04-dictation.md) | **Done** (#59, #60). Speak and get tidy text where you were typing; WAV upload so whisper.cpp servers take it. |
 
@@ -99,6 +99,23 @@ then built in parallel; how it went is in
 | --- | --- | --- |
 | **Plugins.** Packages with a manifest (stable id, semver, a hash per version) installed from a zip, a Git URL, the bundled examples or an assistant's chat; reviewed and approved per version with the password; UI in sealed iframes in four slots (panels on tasks/documents/events, pages, a plugin's settings, chat blocks), declarative contributions (properties, views, templates, automations, scripts, MCP servers, profiles, skills, themes, commands), every call checked as a tool call with the plugin as the actor; a kill switch. Settings → Plugins with cards that grow into the plugin's page; agent tools to build plugins in a chat. Examples: *Word count*, *Today board*, *Weekly review*. | [12](specs/12-plugins.md) | #87 |
 
+### Round 4 (2026-11-25)
+
+Built in parallel from [specs/CONTRACTS-round4.md](specs/CONTRACTS-round4.md); how it
+went is in [specs/ORCHESTRATION-LOG-round4.md](specs/ORCHESTRATION-LOG-round4.md). Each
+All merged into `main` on 2026-11-26. Contracts: #95.
+
+| What | Spec | Pull request |
+| --- | --- | --- |
+| **Event triggers**: automations and chats woken by events (tasks, calendar, documents, Claude Code jobs, devices, files, failures, approvals) and signed webhooks; wake me | [16](specs/16-event-triggers.md) | #99 |
+| **MCP triggers**: notifications from MCP servers (resource updated, lists changed) fire triggers, remote and local servers | [17](specs/17-mcp-triggers.md) | #102 |
+| **Chat recall**: `search_chats` / `read_chat` under *Read earlier chats*, full text and by meaning | [18](specs/18-chat-recall.md) | #97 |
+| **Activity log with undo**: one list of who changed what (you, assistants, automations, scripts, plugins), undo per entry or per batch | [19](specs/19-activity-log.md) | #96 |
+| **Bulk task and event changes**: `update_tasks` / `update_events`, up to 100 items, one approval, one undoable group | [20](specs/20-bulk-changes.md) | #98 |
+| **Waiting on a code job**: `code_status(wait_s)` waits on the job's live stream until it ends (≤ 5 min); a stopped run ends the wait | [21](specs/21-code-wait.md) | #100 |
+| **Files between devices and the workspace**: `device_file_get` / `device_file_put` on trusted computers, chunked with hashes (Anemo Desktop 1.7.0) | [22](specs/22-device-files.md) | #101 |
+| **Anemo Desktop updates itself** from GitHub Releases, checksum (and optional signature) checked, installed on quit or *Restart to update* (1.8.0) | [23](specs/23-desktop-auto-update.md) | #103 |
+
 ---
 
 ## In progress
@@ -117,30 +134,6 @@ Windows client's manual tests (`desktop/MANUAL-TESTS.md`).
 
 Proposals that are still open, with what of each exists today. Order is a suggestion.
 
-### Activity log with undo
-
-**Status: not built as such; the pieces exist.** There is no single list of "what was
-done, by whom, and undo it". What exists:
-
-- `audit_log` (`features/audit/`): security-relevant actions only (logins, settings,
-  tokens, devices, MCP servers, approvals by voice), actor `user | agent | system`.
-- Provenance on documents, tasks and events: who created them and who changed them last
-  (`created_by` / `updated_by` as actor references `user`, `chat:<id>`,
-  `automation:<id>/<run>`), shown as "the assistant in ‹chat›".
-- Per run: the timeline of tool calls; for automation runs, the list of changes the
-  server recorded (`runs.changes`, at most 200, `{tool, summary, ref}`).
-- **Undo** exists for files an agent changed (each change is kept and can be reverted
-  while the file is still as the agent left it: `workspace/revert.py`), for deletions
-  (the trash), and for a memory just saved (a notice with *Undo*). Task, event and
-  document edits can't be undone from one place (documents have revisions).
-
-What it would take: one `activity` table written where `record_change` and the
-provenance helpers already run, a page that lists it with filters (by actor, by
-object), and undo per entry where an inverse exists (file revert, trash restore, a
-task/event field change from a stored before-value). Scripts (#82)
-record their actions with provenance through the same
-paths, so they show up there once it exists.
-
 ### Inbox for loose items
 
 **Status: partly built.** The **Inbox** page exists (notifications, and *Needs you*:
@@ -154,13 +147,6 @@ later.
 project id); projects have their own instructions instead. Needs a nullable
 `project_id` on memories, retrieval that prefers the current project's, and a filter on
 the Memory page.
-
-### Chat recall
-
-**Status: partly built.** Chats are found by the search page and Ctrl+K (full text in
-messages and titles). Agents have no tool to search or read earlier chats; memories
-extracted from chats are the only bridge. Next step: a read-only `search_chats` /
-`read_chat` tool pair under a new permission.
 
 ### Ctrl+K
 
@@ -176,7 +162,6 @@ documents, tasks or projects.
 
 ### Devices, from the specs' "Later"
 
-- Files between Anemo's workspace and a device (`device_file_get` / `device_file_put`).
 - A Linux client on the same protocol (Windows and macOS exist).
 - Watching a window over time (with your say-so) for longer tasks on the VM.
 - Run the Windows client's manual tests on real hardware; `Windows.Graphics.Capture` has
@@ -198,11 +183,8 @@ From spec 12 §8 and what building the examples showed:
 - More slots: editor blocks in documents, Home widgets, the run timeline; plugin
   keyboard shortcuts; translations of plugin texts.
 - An e2e spec for install → approve → panel (needs the Docker stack).
-
-### Automations
-
-- Webhooks (`POST /api/hooks/{id}` with an HMAC signature, behind a Cloudflare Tunnel
-  rule), spec 02 §2.8. Scripts (#82) are designed not to rule it out.
+- Triggers on a plugin's declared automations (`AutomationItem`): a `triggers` list in
+  the manifest, synced to the same `triggers` rows on install and update (spec 16 §10).
 
 ---
 

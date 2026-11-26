@@ -28,6 +28,10 @@ const messages: Messages = {
   "never connected": "ще не під’єднувався",
   "Trust of “{name}”": "Довіра до «{name}»",
   "The token could not be copied. Select it and copy it yourself.": "Не вдалося скопіювати токен. Виділіть його й скопіюйте самостійно.",
+  "Files on your computers": "Файли на ваших комп’ютерах",
+  "On a trusted computer with “Let Anemo read and write files” switched on in Anemo Desktop, the agent can copy files between it and the workspace. Anemo Desktop decides which folders: your home folder unless you list others, never hidden or system folders.": "На довіреному комп’ютері, де в Anemo Desktop увімкнено «Let Anemo read and write files», агент може копіювати файли між ним і робочим простором. Які теки, вирішує Anemo Desktop: ваша домашня тека, якщо ви не вкажете інші, і ніколи приховані чи системні теки.",
+  "Largest file (MB)": "Найбільший файл (МБ)",
+  "From {min} to {max} MB.": "Від {min} до {max} МБ.",
 }
 
 export default messages

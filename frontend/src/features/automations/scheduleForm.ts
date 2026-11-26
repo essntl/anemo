@@ -9,7 +9,7 @@ import { msg } from '@/lib/i18n'
 
 export type Schedule = Schemas['Schedule']
 
-/** `manual`: only when started (Run now, or an agent's run_script). Scripts only. */
+/** `manual`: only when started (Run now, run_script) or by its event triggers. */
 export type Frequency = 'minutes' | 'hours' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'once' | 'cron' | 'rrule' | 'manual'
 
 export interface ScheduleForm {
@@ -40,7 +40,13 @@ export const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
   { value: 'rrule', label: msg('Custom (repeat rule)') },
 ]
 
-/** A script can also run only when it is started; agent automations never offer that. */
+/** An agent automation can also run only on its event triggers (or when started). */
+export const AGENT_FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
+  ...FREQUENCY_OPTIONS,
+  { value: 'manual', label: msg('Only on events (or when started)') },
+]
+
+/** A script can also run only when it is started. */
 export const SCRIPT_FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
   { value: 'manual', label: msg('Only when started') },
   ...FREQUENCY_OPTIONS,

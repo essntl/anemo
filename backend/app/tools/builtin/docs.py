@@ -39,7 +39,7 @@ from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin import linking
 from app.tools.builtin.sketch_read import sketch_result
-from app.tools.builtin.workspace import _backup, path_action
+from app.tools.builtin.workspace import backup_file, path_action
 from app.workspace import files
 
 MAX_WRITE_CHARS = 1_000_000
@@ -538,7 +538,7 @@ class WriteDocument(Tool):
                     values = await properties.validate(db, "document", project_id, args.properties)
                     content = frontmatter.update(content, values)
                 before = doc.content_hash
-                backup = await asyncio.to_thread(_backup, files.resolve(path))
+                backup = await asyncio.to_thread(backup_file, files.resolve(path))
                 doc = await service.save(
                     db, doc, content, base_hash=None, author="agent", run_id=ctx.run_id
                 )
@@ -610,7 +610,7 @@ class EditDocument(Tool):
                 updated = content.replace(args.old_text, args.new_text)
                 notes = await _check_front_matter(db, path, content, updated)
                 before = doc.content_hash
-                backup = await asyncio.to_thread(_backup, files.resolve(path))
+                backup = await asyncio.to_thread(backup_file, files.resolve(path))
                 doc = await service.save(
                     db, doc, updated, base_hash=before, author="agent", run_id=ctx.run_id
                 )
@@ -716,7 +716,7 @@ class SetDocumentProperties(Tool):
                     if doc is None:
                         continue
                     before = doc.content_hash
-                    backup = await asyncio.to_thread(_backup, files.resolve(doc.path))
+                    backup = await asyncio.to_thread(backup_file, files.resolve(doc.path))
                     doc = await doc_properties.set_properties(
                         db,
                         doc,

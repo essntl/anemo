@@ -9,7 +9,9 @@ using Anemo.Desktop.Core.Connection;
 using Anemo.Desktop.Core.Control;
 using Anemo.Desktop.Core.Platform;
 using Anemo.Desktop.Core.Storage;
+using Anemo.Desktop.Core.Updates;
 using Anemo.Desktop.Platform;
+using Microsoft.Win32;
 
 namespace Anemo.Desktop.UI;
 
@@ -35,12 +37,16 @@ internal sealed class TrayApp : ApplicationContext
     private readonly ToolStripMenuItem _share = new("Share this screen with Anemo");
     private readonly ToolStripMenuItem _pause = new("Pause control for 1 hour");
     private readonly ToolStripMenuItem _allow = new("Allow control") { CheckOnClick = true };
+    private readonly ToolStripMenuItem _update = new("Restart to update") { Visible = false };
+    private readonly ToolStripSeparator _updateLine = new() { Visible = false };
     private readonly TrayMenu _menu = new();
     private readonly string _version;
     private bool _busy;
     private SettingsWindow? _settingsWindow;
+    private Install? _restart;
 
-    public TrayApp()
+    /// <param name="updated">Started by an update (<c>--updated</c>): tell the old copy, which waits, that this one is up.</param>
+    public TrayApp(bool updated)
     {
         _ui.CreateControl();
         var time = TimeProvider.System;
@@ -57,7 +63,13 @@ internal sealed class TrayApp : ApplicationContext
             version,
             AppPaths.DefaultWorkFolder,
             Processes: new WindowsProcessProbe(),
-            CodeHost: new WindowsCodeHost()));
+            CodeHost: new WindowsCodeHost(),
+            Updates: new WindowsUpdatePlatform(
+                Environment.ProcessPath,
+                // A build from dotnet build is a launcher beside "Anemo Desktop.dll"; the published exe has no dll.
+                singleFile: Environment.ProcessPath is { } exe && !System.IO.File.Exists(System.IO.Path.ChangeExtension(exe, ".dll")),
+                System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture),
+            UpdateOptions: UpdateOptions.FromBuild(typeof(TrayApp).Assembly)));
 
         _indicator = new Indicator(() => _agent.Control.Stop(), () => _agent.Settings.StopHotkey);
         _hideIndicator.Interval = (int)IndicatorLinger.TotalMilliseconds;
@@ -76,6 +88,9 @@ internal sealed class TrayApp : ApplicationContext
         _agent.Connection.CommandRunning += action => OnUi(() => OnCommand(action));
         _agent.Connection.NoticeReceived += text => OnUi(() => Balloon(text, ToolTipIcon.Info));
         _agent.Control.Changed += () => OnUi(Refresh);
+        _agent.Updates.Changed += () => OnUi(Refresh);
+        _agent.Updates.RestartRequested += update => OnUi(() => QuitToInstall(update));
+        SystemEvents.SessionEnded += OnSessionEnded;
 
         RegisterHotkeys();
         ApplyStartup();
@@ -93,6 +108,30 @@ internal sealed class TrayApp : ApplicationContext
             // After Application.Run has started, not inside this constructor.
             _ui.BeginInvoke(ShowSettings);
         }
+
+        if (updated)
+        {
+            _ui.BeginInvoke(() =>
+            {
+                _agent.Updates.ReportStarted();
+                Balloon($"Anemo Desktop was updated to {_version}.", ToolTipIcon.Info);
+            });
+        }
+    }
+
+    /// <summary>What Program does after the tray is gone: swap the update in, and start it for a restart.</summary>
+    public sealed record Install(UpdateInstaller Installer, StagedUpdate Update, bool Restart);
+
+    /// <summary>The install for after the message loop: the restart that was asked for, else a ready update (installed at quit).</summary>
+    public Install? TakeInstall()
+    {
+        if (_restart is { } restart)
+        {
+            _restart = null;
+            return restart;
+        }
+
+        return _agent.Updates.TakeReady() is { } ready ? new Install(_agent.Installer, ready, Restart: false) : null;
     }
 
     protected override void Dispose(bool disposing)
@@ -100,6 +139,7 @@ internal sealed class TrayApp : ApplicationContext
         if (disposing)
         {
             _quit.Cancel();
+            SystemEvents.SessionEnded -= OnSessionEnded;
             _tray.Visible = false;
             _tray.Dispose();
             _hotkeys.Dispose();
@@ -130,6 +170,9 @@ internal sealed class TrayApp : ApplicationContext
             }
         };
         _allow.Click += (_, _) => _agent.Control.SetAllow(_allow.Checked);
+        _update.Click += (_, _) => _agent.Updates.RestartToUpdate();
+        _menu.Add(_update, "download");
+        _menu.Strip.Items.Add(_updateLine);
         _menu.Add(_share, "share");
         _menu.Add(_pause, "pause");
         _menu.Add(_allow, "pointer");
@@ -205,7 +248,16 @@ internal sealed class TrayApp : ApplicationContext
     {
         var status = _agent.Connection.Status;
         _tray.Icon = _icons.For(TrayStatus.Icon(status, _busy, _agent.Control));
-        _tray.Text = TrayStatus.Tooltip(status, _busy, _agent.Control);
+        var tooltip = TrayStatus.Tooltip(status, _busy, _agent.Control);
+        if (UpdateText.Tooltip(_agent.Updates.State) is { } update && tooltip.Length + update.Length < TrayStatus.MaxTooltip)
+        {
+            tooltip += "\n" + update;
+        }
+
+        _tray.Text = tooltip;
+        var updateItem = UpdateText.MenuItem(_agent.Updates.State);
+        _update.Visible = _updateLine.Visible = updateItem is not null;
+        _update.Text = updateItem ?? "";
         ShowStatusInSettings();
         _menu.Status = TrayStatus.Summary(status, _busy, _agent.Control, _agent.Connection.Device);
         _allow.Checked = _agent.Control.AllowControl;
@@ -231,7 +283,15 @@ internal sealed class TrayApp : ApplicationContext
         }
 
         var window = new SettingsWindow(new SettingsWindow.Context(
-            _agent.Settings, _agent.HasToken, AppPaths.DefaultWorkFolder, _version, SaveSettings, OpenAnemo, _icons.AppImage));
+            _agent.Settings,
+            _agent.HasToken,
+            AppPaths.DefaultWorkFolder,
+            _version,
+            SaveSettings,
+            OpenAnemo,
+            _icons.AppImage,
+            () => _ = _agent.Updates.CheckNowAsync(_quit.Token),
+            () => _agent.Updates.RestartToUpdate()));
         _settingsWindow = window;
         ShowStatusInSettings();
         try
@@ -253,6 +313,31 @@ internal sealed class TrayApp : ApplicationContext
     {
         var status = _agent.Connection.Status;
         _settingsWindow?.ShowStatus(TrayStatus.Summary(status, _busy, _agent.Control, _agent.Connection.Device), status.Phase);
+        _settingsWindow?.ShowUpdate(_agent.Updates.State, _agent.Settings.AutoUpdate);
+    }
+
+    /// <summary>"Restart to update" found nothing running: close the windows and leave the loop; Program swaps and restarts.</summary>
+    private void QuitToInstall(StagedUpdate update)
+    {
+        _restart = new Install(_agent.Installer, update, Restart: true);
+        if (_settingsWindow is { } window)
+        {
+            window.Close(); // ends its ShowDialog; the loop is left after that
+            _ui.BeginInvoke(ExitThread);
+        }
+        else
+        {
+            ExitThread();
+        }
+    }
+
+    /// <summary>Windows is signing out or shutting down: a ready update is swapped in now (three renames), not restarted.</summary>
+    private void OnSessionEnded(object? sender, SessionEndedEventArgs e)
+    {
+        if (TakeInstall() is { } install)
+        {
+            install.Installer.InstallOnQuit(install.Update);
+        }
     }
 
     /// <summary>Saves from the Settings window; a sentence when it failed (the window stays open).</summary>

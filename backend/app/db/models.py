@@ -4,6 +4,7 @@ When adding a feature with tables, import its models module here.
 """
 
 from app.db.base import Base
+from app.features.activity import models as activity_models
 from app.features.appearance import models as appearance_models
 from app.features.attachments import models as attachments_models
 from app.features.audit import models as audit_models
@@ -32,6 +33,7 @@ from app.features.shares import models as shares_models
 from app.features.skills import models as skills_models
 from app.features.tasks import models as tasks_models
 from app.features.trash import models as trash_models
+from app.features.triggers import models as triggers_models
 from app.features.usage import models as usage_models
 from app.features.views import models as views_models
 from app.jobs import models as jobs_models
@@ -39,6 +41,7 @@ from app.knowledge import models as knowledge_models
 
 __all__ = [
     "Base",
+    "activity_models",
     "appearance_models",
     "attachments_models",
     "audit_models",
@@ -69,6 +72,7 @@ __all__ = [
     "skills_models",
     "tasks_models",
     "trash_models",
+    "triggers_models",
     "usage_models",
     "views_models",
 ]

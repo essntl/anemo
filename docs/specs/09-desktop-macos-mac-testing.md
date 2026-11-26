@@ -180,3 +180,49 @@ login`), git.
 54. In Anemo, delete the device. Expected: the client shows "Anemo refused the token" within a
     minute. Quit, delete the app, the Keychain entry and
     `~/Library/Application Support/Anemo Desktop`.
+
+## N. Files between the Mac and the workspace (Anemo Desktop 1.7.0)
+
+The Mac `trusted`; Settings → *Let Anemo read and write files* ticked. Contract:
+`docs/device-contracts.md` §8.
+
+55. The turn context's line says `files on`. "Copy `~/Documents/<a 20 MB file>` from Mac to
+    `inbox/`". Expected: asked once; the file is in the workspace, `shasum -a 256` on the Mac matches
+    `sha256sum` on the server; the run's file changes can revert it.
+56. "Put `inbox/<file>` on Mac as `~/Desktop/<file>`". Expected: the file shows on the desktop only
+    when complete (Finder hides the `.<name>.anemo-<id>.part` file meanwhile; `ls -a ~/Desktop`
+    shows it during a large copy). Again without overwrite: "already exists". With overwrite: asked
+    as dangerous, replaced.
+57. Refused, each with a sentence: `~/.ssh/id_ed25519`, `~/.zshrc`, `~/Library/LaunchAgents/x.plist`,
+    `~/Library/Application Support/Anemo Desktop/settings.json`, `/etc/hosts`, a file through a
+    symlink in `~/Documents` to `/etc` (`ln -s /etc ~/Documents/etc`). *Folders for files* set to
+    `/Volumes/Shared`: the home folder is refused, that folder works.
+58. Names with Unicode (as Finder writes them, e.g. `Grüße.txt`) and spaces: get and put work.
+59. Stop key during a large copy: the call fails, the `.part` file goes. Untick the switch: within
+    30 s `files on` is gone and a copy is refused.
+
+## O. Updates (Anemo Desktop 1.8.0)
+
+With a test repository as in `desktop/MANUAL-TESTS.md` *Updates*: build two apps with
+`ANEMO_UPDATE_REPOSITORY=<you>/anemo-update-test sh mac/build-app.sh` after setting `<Version>` to
+1.8.0 and then 1.8.1 (keep the first app, release the second's zip with
+`shasum -a 256 Anemo-Desktop-macos-arm64.zip > SHA256SUMS-desktop-macos.txt`). Install the 1.8.0 app in
+`/Applications` with both permissions allowed.
+
+60. Within about a minute the menu shows *Update to 1.8.1 ready: Restart to update*; Settings →
+    Updates says so and, for this ad hoc build, warns that the permissions will have to be allowed
+    again. `ls -a /Applications` shows `.Anemo Desktop.update`.
+61. *Restart to update* (nothing running): the app quits and comes back as 1.8.1 (menu → Settings
+    shows the version) with a notice; for an ad hoc build the Permissions window shows both "not
+    allowed" (remove and allow again, as in L). `/Applications/.Anemo Desktop.old.app` is 1.8.0.
+62. Quit with an update ready: the next start is the new version. A long agent task or a shared
+    Claude Code job holds *Restart to update* back until it is done (Settings says why).
+63. A zip with a wrong checksum line, a zip of another app (another bundle identifier) and a zip
+    whose app was changed after signing (`echo >> "…/Contents/MacOS/Anemo Desktop"` before zipping)
+    are each refused with a sentence; `/Applications` is unchanged.
+64. *Update automatically* off: no request for 10 minutes after a restart; *Check now* works.
+65. The app in a folder you can't write (e.g. `/Applications` as a standard user): Settings says it
+    can't replace itself there. A build whose app exits at once: after *Restart to update* the old
+    app is back within a minute and running.
+66. (Only with a Developer ID build.) A Developer ID 1.8.0 refuses an ad hoc 1.8.1 ("signed by
+    another developer") and accepts a Developer ID 1.8.1 of the same team; the permissions stay.

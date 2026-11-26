@@ -86,7 +86,8 @@ sends them after the next `welcome`.
 ```
 client → {"type": "device.offer", "control": bool, "shell": bool, "code": bool,
           "code_start": bool, "code_images": bool, "code_git": bool,
-          "code_git_remote": bool, "shell_kind": "powershell" | "pwsh" | "zsh" | "bash"}
+          "code_git_remote": bool, "shell_kind": "powershell" | "pwsh" | "zsh" | "bash",
+          "files": bool}
           on connect and every 30 s; control: "Allow control" is on;
           shell: the shell is switched on in the client (PowerShell on Windows, zsh on
           macOS); code: "Share Claude Code jobs with Anemo" is on (§7); code_start: "Let
@@ -95,15 +96,18 @@ client → {"type": "device.offer", "control": bool, "shell": bool, "code": bool
           (§7.5, 1.5.0); code_git_remote: they also take `repo`, `fetch`, answer pull
           requests, and `code_git_cache_clear` is there (§7.6, 1.6.0). A missing code,
           code_start, code_images, code_git or code_git_remote means false. shell_kind (1.4.0): the shell `shell` runs in; missing, or any other
-          value, means "powershell".
+          value, means "powershell". files (1.7.0): "Let Anemo read and write files" is
+          on and the device is trusted: the file actions of §8 are there; missing means
+          false.
 server → {"type": "device.command", "id": "<uuid>", "action": "<action>", …fields}
 client → {"type": "device.result", "id": "<uuid>", "ok": true, "state": {…}}
 client → {"type": "device.result", "id": "<uuid>", "ok": false, "error": "<one sentence>",
           "code": "stopped" | "refused" | "unavailable" | "failed" | "not_found"
-                  | "unauthenticated"}
+                  | "unauthenticated" | "exists"}
           not_found (1.5.0): what the command named isn't there (a project, a commit);
           unauthenticated (1.6.0): git or gh on the computer isn't signed in to the
-          remote (§7.6). An older server takes either as failed.
+          remote (§7.6); exists (1.7.0): a file is already where a write would put one
+          (§8). An older server takes any of them as failed.
 client → {"type": "device.stopped"}   the user pressed the stop hotkey or chose Pause
 ```
 
@@ -256,6 +260,8 @@ messages from the server of up to 16 MB (4 MB before). 1.4.0 adds `hello.platfor
 (§7.5, the `code_git` offer field), `local_only` for `code_projects` and the `not_found`
 result code. 1.6.0 adds remote repositories and fetching to the git actions (§7.6, the
 `code_git_remote` offer field, `code_git_cache_clear`, the `unauthenticated` result code).
+1.7.0 adds files between the computer and the workspace (§8, the `files` offer field, the
+`exists` result code).
 The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
 `{"type": "notice", "text": "…"}` once per connection when a client is older than the
 oldest version it supports; it keeps working where it can. A client that gets an action it
@@ -480,3 +486,78 @@ says `"code_git_remote": true` in its offer (with `code_git`); the server sends 
   on GitHub, a timeout. The server attaches them to the branches by `head_ref`.
 - In a bare cache, `branches` are the remote's branches (`remote: false`, no upstream),
   `head.branch` its default branch; nothing returns file contents or diffs here either.
+
+## 8. Files between the computer and the workspace (Anemo Desktop 1.7.0)
+
+For the agent tools `device_file_get` (a file on the computer into the workspace) and
+`device_file_put` (a workspace file onto the computer); design and reasons in
+`docs/specs/22-device-files.md`. A client that has these says `"files": true` in its offer:
+Anemo Desktop does so while *Let Anemo read and write files* is on (off by default) **and**
+`welcome` said the device is `trusted`. The server sends the actions below only to a trusted
+computer whose fresh offer says `files: true`.
+
+### 8.1 Actions
+
+`device.command` actions, answered with `device.result` like §3. All of them are `refused`
+when the device isn't trusted, the switch is off, or the user paused control (the stop key;
+`file_write_abort` excepted). *Allow control* is not needed.
+
+| action | fields | `state` |
+|---|---|---|
+| `file_stat` | `path`, `hash` (bool, default false) | `{"kind": "file" \| "folder", "size": <bytes> \| null, "modified": "<ISO 8601>", "sha256": "<hex>"?}`; `sha256` of the whole file only with `hash` and for a file of at most 200 MB; `not_found` when there is nothing at `path` |
+| `file_read` | `path`, `offset` (≥ 0), `length` (1 … 4 194 304) | `{"data": "<base64>", "sha256": "<hex of these bytes>", "size": <the file's size now>}`; fewer bytes than `length` only at the end of the file |
+| `file_write_begin` | `path`, `size` (0 … 209 715 200), `sha256` (hex, the whole file), `overwrite` (bool, default false) | `{"transfer": "<id>", "chunk_bytes": 4194304}`; `exists` when a file is at `path` and `overwrite` is false; `failed` when a folder is; missing folders on the way are made |
+| `file_write_chunk` | `transfer`, `offset`, `data` (base64, ≤ 4 MB of bytes), `sha256` (hex of these bytes) | `{"received": <bytes so far>}` |
+| `file_write_end` | `transfer` | `{"path": "<the final path, links followed>", "size", "sha256", "replaced": bool}` |
+| `file_write_abort` | `transfer` | `{}` (also for a transfer that is already gone) |
+
+- **Paths** are the computer's own absolute paths (`C:\Users\me\x.pdf`, `/Users/me/x.pdf`),
+  at most 1000 characters, no control characters: opaque strings on the server, as in §7. A
+  relative path, or one with `.` or `..` parts, is `failed`.
+- **Chunks.** The server reads and writes 1 MB chunks (about 1.4 MB as base64: inside the
+  12 MB the server takes as a result and the 16 MB a 1.3.0+ client takes as a command); the
+  client takes up to 4 MB. Chunks of a write come in order: `offset` must be the number of
+  bytes received so far.
+- **Hashes, both ends.** Every chunk carries the SHA-256 of its bytes; the receiver checks
+  it. A read: the server compares each chunk's hash (asking for a chunk once more when it
+  doesn't match, then giving up) and, at the end, the hash of the whole file with
+  `file_stat`'s (a file that changed meanwhile is not saved). A write: the client checks
+  each chunk and, at `file_write_end`, reads the temporary file back and compares its
+  SHA-256 with the begin's; the server compares the end's `sha256` with its own.
+- **No partial file under the final name.** A write goes to a hidden temporary file in the
+  target's folder (`.<name>.anemo-<8 hex>.part`, the same drive, so the rename is atomic) and
+  is renamed to `path` only at a successful `file_write_end`. A wrong chunk (hash, order, too
+  many bytes), a wrong whole hash, too few bytes, `file_write_abort`, or **60 s without a
+  chunk** drop the transfer and delete its temporary file; any later chunk for it is
+  `failed` ("That copy isn't open any more"). At most 4 writes are open at once
+  (`unavailable` beyond that).
+- **Overwrite.** Without `overwrite` an existing file is never replaced: `exists` at the
+  begin, and again at the end when a file appeared meanwhile (it is left as it is). With
+  `overwrite` the rename replaces it.
+- **Limits.** The client copies at most 200 MB either way; the server's own limit is a
+  setting (Settings → Devices, 1–200 MB, default 50) checked before the first chunk.
+- **Timeouts** (server): 30 s per chunk command, 90 s for `file_stat` with `hash` and for
+  `file_write_end` (they hash the whole file); the server sends `file_write_abort` after any
+  failure once a write began, and the client's 60 s rule cleans up when even that is lost.
+- **Log.** The client's command log keeps the action, the path, offsets and sizes, never
+  the data.
+
+### 8.2 Which folders (the client's rule)
+
+A path is used only when, with every symbolic link and junction on the way followed (again
+and again until nothing changes), it is
+
+1. inside one of the **allowed folders**: the folders listed in Anemo Desktop's Settings
+   (*Folders for files*, full paths separated by `;`), or, when none are listed, the user's
+   home folder (`%USERPROFILE%`, `~`); and
+2. below that folder, has **no hidden part** (a name starting with `.`: `.ssh`, `.aws`,
+   `.gnupg`, `.config`, `.git`, `.zshrc`, …); and
+3. not in the home folder's **system folder**, whatever Settings lists: `AppData` on
+   Windows (browser profiles, credentials, the Startup folder), `Library` on macOS
+   (keychains, mail, `LaunchAgents`); and not in **Anemo Desktop's own data folder** (its
+   settings, the protected token, the logs); and
+4. on Windows, not a network or device path (`\server\…`, `\?\…`) and without a `:`
+   past the drive letter (no alternate data streams).
+
+Anything else is `refused` with a sentence saying why. The server doesn't know the rule;
+it is the client's to keep, as the trust checks are.

@@ -22,6 +22,7 @@ import { plural, t } from '@/lib/i18n'
 import { addDays, dayOf, REMINDER_OPTIONS, today } from '@/features/tasks/dates'
 import { type Synced } from '@/features/provenance/labels'
 import { ActorLine, SourceDetails } from '@/features/provenance/Provenance'
+import { HistoryLink } from '@/features/activity/HistoryLink'
 import { useCreateMeetingNotes } from '@/features/links/api'
 import { LinksPanel } from '@/features/links/LinksPanel'
 import { PluginPanels } from '@/features/plugins/slots'
@@ -284,6 +285,7 @@ function EventForm({ mode, source, defaults, occurrence, onClose }: {
         {source?.created_by_actor
           ? <ActorLine created={source.created_by_actor} updated={source.updated_by_actor} />
           : source?.created_by === 'agent' && <p className="text-[12px] text-muted">{t('Added by an agent.')}</p>}
+        {mode === 'event' && eventId && <HistoryLink type="event" id={eventId} className="self-start" />}
         {error && <p className="text-[12.5px] text-error">{errorMessage(error)}</p>}
       </div>
       <Lingering value={newTask && eventId ? eventId : null}>

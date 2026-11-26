@@ -27,6 +27,7 @@ import { withWaiting } from '../timing'
 import { useStickToBottom } from '../useStickToBottom'
 import { Composer } from './Composer'
 import { LiveTiming } from './AnswerTiming'
+import { EventCard } from './EventCard'
 import { AssistantMessage, UserBubble } from './MessageBubble'
 
 interface SideChatProps {
@@ -223,6 +224,7 @@ function Thread({ conversationId, onRestart, onGone, prepare = same, display = s
       {messages.data && list.length === 0 ? empty((text) => void onSend(text).catch(() => undefined)) : (
         <div className="flex flex-col gap-4 p-3">
           {list.map((m) => {
+            if (m.role === 'user' && m.event) return <EventCard key={m.id} event={m.event} />
             if (m.role === 'user') {
               return <UserBubble key={m.id} text={display(m.text)} attachments={m.attachments} references={m.references} skill={m.skill} />
             }

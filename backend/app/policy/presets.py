@@ -173,6 +173,45 @@ CATEGORIES: list[Category] = [
         # anything in it runs, not before it is written.
         "autonomous",
     ),
+    # Event triggers (docs/specs/16-event-triggers.md). Adding a trigger to an automation
+    # (or a webhook), and changing what or when one fires, always asks in code, whatever
+    # this level says (tools/builtin/triggers.py, schedules.py); turning one off or
+    # deleting it follows the level.
+    Category(
+        "triggers.manage",
+        "Event triggers",
+        "Make automations run when something happens (a task is created, a Claude Code "
+        "job ends, a webhook is called). Adding one or changing it always asks.",
+        "ask",
+    ),
+    # Wake me: a one-shot trigger on an internal event that waits at most 24 hours is
+    # safe; repeating or longer is moderate.
+    Category(
+        "triggers.wake",
+        "Wake this chat on events",
+        "Let the assistant continue a chat when something it waits for happens (“tell me "
+        "when the job ends”).",
+        "ask_dangerous",
+    ),
+    # search_chats and read_chat (tools/builtin/chats.py): reading only, so "safe".
+    # Automations get them only when their tool list names them (tools/registry.py).
+    Category(
+        "chats.read",
+        "Read earlier chats",
+        "Search your earlier chats and read them (never the chat the agent is in, nor "
+        "temporary chats). Automations only when their tool list names these tools.",
+        "autonomous",
+    ),
+    # Files between the workspace and the computers that run Anemo Desktop
+    # (docs/specs/22-device-files.md). Only trusted computers that allow it in Anemo
+    # Desktop; replacing a file on a computer is dangerous (tools/builtin/device_files.py).
+    Category(
+        "device.files",
+        "Files on your computers",
+        "Copy files between the workspace and trusted computers that allow it in Anemo "
+        "Desktop. Replacing a file on a computer counts as dangerous.",
+        "ask",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 

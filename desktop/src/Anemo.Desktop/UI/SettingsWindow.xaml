@@ -489,6 +489,28 @@
                                 </ContentControl>
                                 <ContentControl Style="{StaticResource CardBox}">
                                     <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="Files" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="folder" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="FilesSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Let Anemo read and write files" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Let Anemo read and write files" />
+                                                <TextBlock Style="{StaticResource Help}" Text="Anemo’s agents copy files between these folders and the workspace. Only when the device is trusted in Anemo; never hidden or system folders." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock Style="{StaticResource Label}" Text="Folders for files" Margin="0,16,0,6" />
+                                        <TextBox x:Name="FileFoldersBox" Style="{StaticResource FieldBox}" ui:Field.Icon="folder" />
+                                        <StackPanel x:Name="FileFoldersError" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                                            <ui:LineIcon Kind="alert" Size="14" Stroke="{DynamicResource Error}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                            <TextBlock x:Name="FileFoldersErrorText" Style="{StaticResource ErrorText}" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="FileFoldersHelp" Style="{StaticResource Help}" Margin="0,6,0,0" Text="Full paths, separated by ;. Empty: your user folder (without AppData)." />
+                                    </StackPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
                                         <TextBlock Style="{StaticResource CardTitle}" Text="Keys" />
                                         <DockPanel>
                                             <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
@@ -529,6 +551,26 @@
                                             <TextBlock Style="{StaticResource Help}" Text="Anemo Desktop starts in the notification area when you sign in." />
                                         </StackPanel>
                                     </DockPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="Updates" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="download" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="UpdateSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Update automatically" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Update automatically" />
+                                                <TextBlock Style="{StaticResource Help}" Text="New versions come from Anemo’s releases on GitHub and are checked before they are kept. One is installed when you quit, never while the agent is working." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock x:Name="UpdateStatus" Style="{StaticResource Help}" Margin="44,12,0,0" />
+                                        <StackPanel Orientation="Horizontal" Margin="44,10,0,0">
+                                            <Button x:Name="CheckNowButton" Style="{StaticResource Button}" Content="Check now" />
+                                            <Button x:Name="RestartToUpdateButton" Style="{StaticResource Primary}" Content="Restart to update" Margin="8,0,0,0" Visibility="Collapsed" />
+                                        </StackPanel>
+                                    </StackPanel>
                                 </ContentControl>
                             </StackPanel>
 

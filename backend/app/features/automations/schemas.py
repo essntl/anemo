@@ -194,12 +194,21 @@ class RunChange(BaseModel):
     ref: str | None = None  # the item's reference (/tasks?task=..., /calendar?event=...)
 
 
+class RunEvent(BaseModel):
+    """The event that started a run (an event trigger, features/triggers)."""
+
+    type: str  # e.g. task.created
+    summary: str  # "Task created: Buy milk"
+    at: datetime
+    coalesced: int = 1  # how many events this one firing stands for
+
+
 class AutomationRunOut(BaseModel):
     """One run in an automation's run log."""
 
     run_id: uuid.UUID
     status: str
-    trigger: str | None = None  # schedule | manual | retry
+    trigger: str | None = None  # schedule | manual | retry | event
     created_at: datetime
     ended_at: datetime | None
     outcome_line: str | None
@@ -209,6 +218,7 @@ class AutomationRunOut(BaseModel):
     error: str | None
     # How long it took, as the chat shows it: finished_at - started_at - waiting_ms.
     timing: RunTiming
+    event: RunEvent | None = None  # trigger "event": which event started it
 
 
 # -- scripts (docs/specs/08-automation-scripts.md) ----------------------------------------
