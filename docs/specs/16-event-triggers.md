@@ -38,9 +38,14 @@ async def emit(db, type, data, *, subject=None) -> None        # in the caller's
 async def emit_now(type, data, *, subject=None, actor=None, depth=None) -> None  # own session
 ```
 
-- `emit` adds a `TriggerEvent` row and one `triggers.dispatch` job per transaction; it
-  never raises (a bad payload is logged and dropped). `actor_ref` comes from
-  `current_actor()`, `depth` from `caused_at_depth()` (§4.4).
+- `emit` adds a `TriggerEvent` row and one `triggers.dispatch` job per transaction; a
+  bad payload never makes it raise (it is logged and dropped). A database error is
+  raised, not logged: it leaves the caller's transaction unusable anyway and is most
+  likely the caller's own (queuing the job flushes the caller's pending rows), and
+  hiding it would only turn it into a `PendingRollbackError` at the caller's commit.
+  The "is anyone listening" lookup runs under `no_autoflush`, so it never flushes the
+  caller's rows. `actor_ref` comes from `current_actor()`, `depth` from
+  `caused_at_depth()` (§4.4).
 - **An event nobody waits for is not stored**: `emit` (and the listener) first check that
   an enabled trigger of that type exists. Without triggers, nothing changes for anyone
   (no rows, no jobs), and document autosaves don't fill the outbox.
@@ -148,7 +153,11 @@ system added it ("This message is not from the user…"), the trigger's note and
 payload each in an untrusted-data block. Providers never see the block (it is resolved
 like a page or an attachment), so no provider changed. `MessageOut.event` tells the app
 to show an event card. The chat's answers to it are left out of memory extraction (as
-answers to an attached page are), and compaction names it as an event.
+answers to an attached page are), and compaction names it as an event. The run's
+`request` is the fixed text `(event) <type>`, never the event's summary: the summary
+quotes titles, paths and URIs from outside or from a model, and the request reaches the
+model outside an untrusted-data block (compaction shows it as "The user's current
+request"). The summary is only shown to the user (the event card, the run log).
 
 ### 4.3 Why a trigger is its own row
 
@@ -211,7 +220,21 @@ sha256=<hex>` is the HMAC-SHA256 with the trigger's secret of **`<timestamp>.<ra
 soon as the stream passes it). Everything a caller without the secret can try (unknown
 or malformed id, off, wrong or missing signature, old timestamp, a replay, a changed
 body) gets the same 404. A caller with the secret is rate-limited to 30 accepted
-requests a minute per trigger (429).
+requests a minute per trigger (429). The replay check comes before the rate check (a
+replay doesn't use up the sender's rate), and a request refused with 429 is unmarked
+again, so the sender's retry of the same signed request is taken, not refused as a
+replay.
+
+Failed attempts are limited too: every 404 above counts, in Valkey for a minute, per
+client address (20) and per trigger id, known or not (60). Past either limit every
+request to it gets the same 404 at once, before the database lookup and the secret's
+decryption that each failed attempt would otherwise cost; nothing in the answer tells
+the limit apart from any other failure, or an unknown id from a known one. The cost:
+someone who knows a webhook's URL can keep it refusing its real sender for as long as
+they keep failing at it (the sender's retries get in once they stop). The address is
+`request.client`, which uvicorn takes from `X-Forwarded-For` only for
+`TRUSTED_PROXIES`; behind an untrusted proxy all callers share one address, so they
+share its limit. Without Valkey there is no limit.
 
 Deviation from the contract's wording: the contract says "an HMAC of the raw body" and
 "a timestamp header within 5 minutes". Signing the body alone would let anyone who saw
@@ -300,19 +323,21 @@ webhook_url, has_secret, created_at`. Every change is in the audit log.
   automation run with its rails (tool list, context, run log), off and paused, its own
   runs and depth, depth passed on by a run, debounce, no overlap with one follow-up,
   per-trigger and global limits, once and expiry and prune, a retry carrying its event,
-  CRUD and validation.
+  a caller's database error not hidden by `emit`, CRUD and validation.
 - `tests/api/test_trigger_tools.py`: a code job reaching `done` wakes the chat that asked
   (once; the event card; untrusted; no trigger tools in that run), a chat never woken by
   its own runs and waiting while busy, the wake-me risk levels, no webhook for a chat,
   `create_schedule` with triggers confirmed in one step and `update_schedule` replacing
-  them, automation triggers always asking and switching off following the level,
+  them, the run's request being fixed text, automation triggers always asking and switching off following the level,
   trigger-started runs without the write tools, devices online/offline, `file.created`,
   `approval.waiting` and `automation.run_failed`, calendar events, documents, a single
   dispatch for concurrent dispatchers.
 - `tests/api/test_webhooks.py`: a signed request starts the run with its body as data;
   the same 404 for everything else (bad or missing signature, old timestamp, unknown or
-  malformed id, a changed body, a replay, off); 413 and 429; rotating needs the password
-  and retires the old secret; no secret in listings.
+  malformed id, a changed body, a replay, off); 413 and 429; a request refused with 429
+  taken when sent again; failed attempts limited per address and per trigger id with
+  the same 404 and no lookup; rotating needs the password and retires the old secret;
+  no secret in listings.
 - Frontend: `AutomationsPage.test.tsx` (triggers on the card, remove asks, chats waiting,
   the run's event), `TriggerDialog.test.tsx`, `triggerForm.test.ts`, `EventCard.test.tsx`.
 - e2e: `e2e/tests/triggers.spec.ts` (add a trigger in the UI, a task fires it, the run

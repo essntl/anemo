@@ -119,11 +119,6 @@ Code map findings that shaped the contracts:
 ## Open for Artem
 
 Review findings not fixed yet (the fix round was cut off):
-- T: webhook replay mark set before the rate check (a 429'd retry is refused as a
-  replay); no limit on unsigned webhook floods; a wake-me run's request text carries the
-  event summary outside `untrusted()` (compaction shows it as the user's request);
-  `emit()` can autoflush inside its try/except.
-- M: the hostd listener replays up to 200 old notifications after a reconnect.
 - A: "Undo all" counts entries that can't be undone as failures; undo of an agent's
   file change from Activity writes no audit row; undoing a file move doesn't check that it is
   still the same file; batch rows split when entries interleave.
