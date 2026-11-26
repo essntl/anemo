@@ -612,10 +612,10 @@ public sealed partial class CodeJobControl
         return new JsonObject { ["job_id"] = id, ["dir"] = dir, ["project"] = Path.GetFileName(dir) };
     }
 
-    /// <summary>Waits for every start still cloning or making its folder (for tests and shutdown).</summary>
     /// <summary>Jobs started from Anemo whose clone or <c>git init</c> still runs in this process (a restart would break them).</summary>
     public int StartingCount => _starting.Count;
 
+    /// <summary>Waits for every start still cloning or making its folder (for tests and shutdown).</summary>
     public Task IdleAsync() => Task.WhenAll(_starting.Values.Select(s => s.Task ?? Task.CompletedTask));
 
     /// <summary><c>&lt;projects&gt;\&lt;project&gt;</c>, else a folder whose origin is that repository; null when neither.</summary>
