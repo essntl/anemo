@@ -63,10 +63,15 @@ class UndoItemOut(BaseModel):
     message: str
     code: str | None = Field(description="The error code when it wasn't undone")
     details: Any = None
+    skipped: bool = Field(
+        description="Not tried: the entry can't be undone (`code` says why); not a failure"
+    )
 
 
 class GroupUndoOut(BaseModel):
-    results: list[UndoItemOut] = Field(description="One per entry tried, newest first")
+    results: list[UndoItemOut] = Field(
+        description="One per entry tried or skipped, newest first (undone ones are left out)"
+    )
 
 
 async def _out(db: Db, entries: list[Activity]) -> list[ActivityOut]:
@@ -143,7 +148,14 @@ async def undo_group(group_id: uuid.UUID, db: Db, force: bool = False) -> GroupU
     result = await undo.undo_group(db, group_id, force=force)
     return GroupUndoOut(
         results=[
-            UndoItemOut(id=r.id, ok=r.ok, message=r.message, code=r.code, details=r.details)
+            UndoItemOut(
+                id=r.id,
+                ok=r.ok,
+                message=r.message,
+                code=r.code,
+                details=r.details,
+                skipped=r.skipped,
+            )
             for r in result.results
         ]
     )

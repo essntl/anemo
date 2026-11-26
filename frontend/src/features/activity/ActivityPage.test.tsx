@@ -10,6 +10,7 @@ const calls = vi.hoisted(() => ({
   posts: [] as { path: string; params: { path: Record<string, string>; query: { force: boolean } } }[],
   items: [] as unknown[],
   conflict: false,
+  groupResults: [{ id: 'a', ok: true, message: 'ok', skipped: false }] as unknown[],
 }))
 
 vi.mock('@/api/client', () => {
@@ -34,7 +35,7 @@ vi.mock('@/api/client', () => {
         if (calls.conflict && !init.params.query.force) {
           return { error: new ApiError(409, 'activity_conflict', 'It was changed since', { differs: [{ field: 'title' }] }) }
         }
-        if (path.includes('groups')) return { data: { results: [{ id: 'a', ok: true, message: 'ok' }] } }
+        if (path.includes('groups')) return { data: { results: calls.groupResults } }
         return { data: { message: 'Put back the title of “Buy milk”', entry: calls.items[0] } }
       },
     },
@@ -49,6 +50,7 @@ vi.mock('@/api/client', () => {
 const { ActivityPage } = await import('./ActivityPage')
 const { toRows } = await import('./rows')
 const { DialogHost } = await import('@/components/ui/DialogHost')
+const { useToasts } = await import('@/components/ui/toast')
 
 const actors = {
   user: { ref: 'user', kind: 'user', label: 'You', url: null, automation_kind: null },
@@ -95,6 +97,8 @@ beforeEach(() => {
   calls.posts.length = 0
   calls.items = []
   calls.conflict = false
+  calls.groupResults = [{ id: 'a', ok: true, message: 'ok', skipped: false }]
+  useToasts.setState({ toasts: [] })
   Element.prototype.hasPointerCapture = () => false
   Element.prototype.releasePointerCapture = () => {}
   Element.prototype.scrollIntoView = () => {}
@@ -150,6 +154,18 @@ describe('the Activity page', () => {
     await waitFor(() => expect(calls.posts).toHaveLength(1))
     expect(calls.posts[0].path).toBe('/api/activity/groups/{group_id}/undo')
     expect(calls.posts[0].params.path).toEqual({ group_id: 'g1' })
+  })
+
+  it('tells skipped entries of a batch apart from failed ones', async () => {
+    calls.items = [entry({ group_id: 'g1', group_label: 'Set up' }), entry({ group_id: 'g1', group_label: 'Set up', undo_blocked: 'not_undoable' })]
+    calls.groupResults = [
+      { id: 'a', ok: true, message: 'ok', skipped: false },
+      { id: 'b', ok: false, message: 'This change can’t be undone', code: 'activity_not_undoable', skipped: true },
+    ]
+    show()
+    const group = await screen.findByTestId('activity-group')
+    await userEvent.click(within(group).getByRole('button', { name: /Undo all/ }))
+    await waitFor(() => expect(useToasts.getState().toasts.map((x) => x.message)).toEqual(['Undone. 1 change can’t be undone and was skipped']))
   })
 
   it('shows the history of one item from its address, and can show everything again', async () => {

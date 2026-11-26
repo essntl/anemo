@@ -30,6 +30,7 @@ const messages: Messages = {
   "Nothing in it can be undone": "Здесь ничего нельзя отменить",
   "({n} change) | ({n} changes)": "({n} изменение) | ({n} изменения) | ({n} изменений)",
   "{n} change could not be undone | {n} changes could not be undone": "{n} изменение не удалось отменить | {n} изменения не удалось отменить | {n} изменений не удалось отменить",
+  "{n} change can’t be undone and was skipped | {n} changes can’t be undone and were skipped": "{n} изменение нельзя отменить, оно пропущено | {n} изменения нельзя отменить, они пропущены | {n} изменений нельзя отменить, они пропущены",
   "{n} item was changed since. Undo it anyway? | {n} items were changed since. Undo them anyway?": "{n} элемент с тех пор изменён. Всё равно отменить? | {n} элемента с тех пор изменены. Всё равно отменить? | {n} элементов с тех пор изменены. Всё равно отменить?",
   "What was changed in it, by whom, with Undo": "Что в нём изменено и кем, с отменой",
   "A batch of changes": "Несколько изменений сразу",

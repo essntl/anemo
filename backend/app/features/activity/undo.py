@@ -81,6 +81,7 @@ class ItemResult:
     message: str
     code: str | None = None
     details: Any = None
+    skipped: bool = False  # not tried: the entry can't be undone (no inverse, too large)
 
 
 @dataclass
@@ -390,7 +391,8 @@ async def undo(db: AsyncSession, entry: Activity, *, force: bool = False) -> str
 async def undo_group(db: AsyncSession, group_id: uuid.UUID, *, force: bool = False) -> GroupResult:
     """Undo every entry of a batch that can be, newest first, each on its own (one that
     fails doesn't stop the others). Entries that were undone already, or are undos
-    themselves, are left out."""
+    themselves, are left out; entries that can't be undone at all (nothing kept to undo
+    them with, a value too long to keep) are reported as skipped, not tried."""
     entries = list(
         await db.scalars(
             select(Activity)
@@ -401,10 +403,19 @@ async def undo_group(db: AsyncSession, group_id: uuid.UUID, *, force: bool = Fal
     if not entries:
         raise NotFound("Activity group not found")
     label = entries[0].group_label or "a batch"
-    ids = [e.id for e in entries if activity.undo_blocked(e) not in ("undone", "is_undo")]
+    blocked = {e.id: activity.undo_blocked(e) for e in entries}
+    ids = [e.id for e in entries if blocked[e.id] not in ("undone", "is_undo")]
     result = GroupResult()
     with activity_group(f"Undid: {label}"):
         for entry_id in ids:
+            reason = blocked[entry_id]
+            if reason is not None:
+                result.results.append(
+                    ItemResult(
+                        entry_id, False, REASONS[reason], code=f"activity_{reason}", skipped=True
+                    )
+                )
+                continue
             entry = await get(db, entry_id)  # loaded again: a failed undo rolls back
             try:
                 message = await undo(db, entry, force=force)
