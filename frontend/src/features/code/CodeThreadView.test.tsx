@@ -160,6 +160,14 @@ describe('a finished thread', () => {
     expect(first).toHaveTextContent('8.4M in · 23k out')
   })
 
+  it('says a job stopped at the usage limit, with its Limit reached panel', async () => {
+    thread[1] = { ...thread[1], limit_hit: true, limit_resets_at: new Date(Date.now() + 3600_000).toISOString() }
+    show('j2')
+    const second = await within((await screen.findAllByTestId('code-job'))[1]).findByRole('region', { name: 'Result' })
+    expect(second).toHaveTextContent('Stopped at the usage limit')
+    expect(screen.getByTestId('limit-panel')).toHaveTextContent('Limit reached')
+  })
+
   it('keeps the way back, the state and the title in one row', async () => {
     media.desktop = false // a phone
     show('j2')

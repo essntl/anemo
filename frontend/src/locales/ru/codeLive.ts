@@ -40,6 +40,7 @@ const messages: Messages = {
   "On, the job resumes its session with “Continue where you left off.” a few minutes after the limit resets, reusing its context.": "Если включено, запуск продолжит свой сеанс словами «Continue where you left off.» через несколько минут после сброса лимита, с тем же контекстом.",
   "Auto continue Claude Code jobs": "Автопродолжение запусков Claude Code",
   "A job that stops at your Claude subscription’s usage limit resumes its session by itself a few minutes after the limit resets, at most three times in a row. Each job’s “Limit reached” panel can turn it on or off.": "Запуск, остановившийся на лимите использования вашей подписки Claude, сам продолжит свой сеанс через несколько минут после сброса лимита, не более трёх раз подряд. На панели «Лимит исчерпан» каждого запуска это можно включить или выключить.",
+  "Stopped at the usage limit": "Остановлено на лимите использования",
 }
 
 export default messages

@@ -78,7 +78,10 @@ function ResultCard({ job, result }: { job: CodeJob; result?: ResultInfo }) {
   const failed = state === 'failed' || state === 'exited_without_result'
   const head = {
     done: { icon: <CheckCircle2 className="h-4 w-4 text-tool-ok" />, label: t('Finished') },
-    failed: { icon: <XCircle className="h-4 w-4 text-error" />, label: subtype && subtype !== 'success' ? t('Failed: {reason}', { reason: subtype }) : t('Failed') },
+    failed: {
+      icon: <XCircle className="h-4 w-4 text-error" />,
+      label: job.limit_hit ? t('Stopped at the usage limit') : subtype && subtype !== 'success' ? t('Failed: {reason}', { reason: subtype }) : t('Failed'),
+    },
     cancelled: { icon: <Ban className="h-4 w-4 text-muted" />, label: t('Cancelled') },
     exited_without_result: { icon: <TriangleAlert className="h-4 w-4 text-warning" />, label: t('Exited without a result') },
   }[state]
