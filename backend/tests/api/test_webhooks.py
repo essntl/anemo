@@ -5,9 +5,11 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy import update
 
 from app.core.db import get_sessionmaker
+from app.core.errors import NotFound
 from app.features.auth.models import AuthSession
 from app.features.triggers import dispatch, webhooks
 from app.providers.adapters.fake import FakeAdapter
@@ -146,6 +148,59 @@ async def test_a_request_refused_with_429_can_be_sent_again(authed, monkeypatch)
     assert len(await stored_events("webhook.received")) == 2
     # Taken once, it is a replay again.
     assert (await post(authed, trigger["id"], body, headers)).status_code == 404
+
+
+async def test_failed_attempts_are_limited_with_the_same_404(authed, monkeypatch):
+    _, secret, trigger = await webhook(authed)
+    tid = trigger["id"]
+    body = b'{"x": 1}'
+    reveals = 0
+    real_reveal = webhooks.secrets.reveal
+
+    async def counting_reveal(*args, **kwargs):
+        nonlocal reveals
+        reveals += 1
+        return await real_reveal(*args, **kwargs)
+
+    monkeypatch.setattr(webhooks.secrets, "reveal", counting_reveal)
+    monkeypatch.setattr(webhooks, "FAILS_PER_IP", 3)
+    answers = set()
+    for target, headers in [
+        (tid, signed("whsec_wrong", body)),
+        (str(uuid.uuid4()), signed(secret, body)),  # unknown ids count as well
+        (tid, {"content-type": "application/json"}),
+    ]:
+        r = await post(authed, target, body, headers)
+        answers.add((r.status_code, r.text))
+    assert reveals == 1  # (only the request with a timestamp got that far)
+    # Over the limit: even a good request from this address gets the same 404, and
+    # nothing is looked up or decrypted for it.
+    for target in (tid, str(uuid.uuid4())):
+        r = await post(authed, target, body, signed(secret, body))
+        answers.add((r.status_code, r.text))
+    assert len(answers) == 1 and next(iter(answers))[0] == 404
+    assert reveals == 1
+    assert await stored_events() == []
+
+    # Per trigger id, whatever the address.
+    await login(authed)
+    _, other_secret, other = await webhook(authed)
+    monkeypatch.setattr(webhooks, "FAILS_PER_IP", 100)
+    monkeypatch.setattr(webhooks, "FAILS_PER_TRIGGER", 2)
+    async with get_sessionmaker()() as db:
+        for n in range(2):
+            with pytest.raises(NotFound):
+                await webhooks.receive(
+                    db, uuid.UUID(tid), body, signed("whsec_wrong", body), ip=f"10.0.0.{n}"
+                )
+        good = b'{"x": 2}'
+        with pytest.raises(NotFound):
+            await webhooks.receive(db, uuid.UUID(tid), good, signed(secret, good), ip="10.0.1.1")
+        # Another trigger id from the same address is not affected.
+        await webhooks.receive(
+            db, uuid.UUID(other["id"]), good, signed(other_secret, good), ip="10.0.1.1"
+        )
+    assert len(await stored_events("webhook.received")) == 1
 
 
 async def test_rotating_the_secret_needs_the_password_and_retires_the_old_one(authed):
