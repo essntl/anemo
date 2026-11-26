@@ -14,8 +14,9 @@ Anything else that a caller without the secret could try gets the same 404, so t
 endpoint says nothing about which triggers exist. A caller with the secret can be
 rate-limited (429). Failed attempts are limited too, per client address and per trigger
 id (known or not): past the limit every request gets that same 404 at once, before the
-database lookup and the secret's decryption that each attempt would otherwise cost. The body becomes a `webhook.received` event: data, never
-instructions, for the run it starts (render.py).
+database lookup and the secret's decryption that each attempt would otherwise cost.
+The body becomes a `webhook.received` event: data, never instructions, for the run it
+starts (render.py).
 """
 
 import hashlib
